@@ -84,8 +84,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int riverCount = 0;
             long payloadBytes = 0L;
 
-            StylizedRiverFoamDevelopmentCacheCoordinator
-                .BuildPreflightInProgress = true;
             try
             {
                 EditorBuildSettingsScene[] buildScenes =
@@ -147,8 +145,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     SceneManager.SetActiveScene(activeSceneBeforeValidation);
                 }
 
-                StylizedRiverFoamDevelopmentCacheCoordinator
-                    .BuildPreflightInProgress = false;
             }
 
             if (sceneCount == 0)
@@ -314,9 +310,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 }
 
                 builder.Append(
-                    "Press Play in the Editor to let automatic development " +
-                    "orchestration rebuild and persist current caches, then " +
-                    "run the preflight again.");
+                    "Use Prepare / Rebuild Foam Topology Cache in Edit Mode " +
+                    "for each failed river, then run the preflight again.");
                 return builder.ToString();
             }
         }

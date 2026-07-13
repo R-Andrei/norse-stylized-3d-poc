@@ -1,3 +1,69 @@
+### 2026-07-13 — Active V3J.4F2 Translation-Driven Companion Architecture
+
+Painted Accent companion clusters remain atomic groups of two or three existing independent descriptors, but vertical structure is no longer authored through extreme member rotation. The primary member retains its deterministic ordinary angle. A structured pair may use at most 10 degrees beyond authored `Angle Jitter Degrees`; a structured triplet may use at most 15 degrees beyond it; one 42-degree absolute safety cap prevents unusual authored settings from reintroducing near-vertical glyphs.
+
+`Triplet Verticality` is now principally a placement control. It increases structured-layout prevalence, signed centre stepping along permanent visual vertical, required vertical span, and centre non-linearity. It does not require a steep member or a minimum member-angle spread. Flat continuation remains a legal minority.
+
+The source planner supplies a bounded-orientation stepped layout intent. Final contact is solved only after actual wiggled family profiles and visible widths exist. The projected solver may join a moving endpoint to an anchor endpoint, shoulder, or interior sample, but it must preserve the sign and a substantial fraction of any meaningful requested centre step. Candidates that flatten or reverse the requested arrangement are rejected before atomic cluster commit.
+
+The production invariants remain fixed descriptor population, no connector geometry, no graph/network cache, maximum three members, fixed primary centre, cluster anti-chain envelopes, independent final surface validation, projected silhouette and external-conflict validation, complete-cluster fallback, exact `Horizontal Companion Strength = 0` compatibility, ordinary R8 coverage, and the closed G3 performance architecture.
+
+Compact placement diagnostics expose accepted companion angle min/mean/max separately from the overall accepted-angle range. Projected diagnostics retain requested/accepted/fallback cluster totals and contact/silhouette fallback counts.
+
+**Methods tried:** E7/E8 extreme rotation is rejected. V3J.4F projected contact geometry and atomic fallback are retained. F2 translation-driven stepping is the active pending-validation architecture.
+
+### 2026-07-13 — Historical V3J.4F Atomic Projected-Cluster Architecture
+
+**Status:** Superseded by V3J.4F2 above. Its projected-space contact and atomic-fallback architecture remains active; its inherited extreme-orientation grammar does not.
+
+Companion composition is now finalized in the same projected representation that feeds the R8 coverage baker. Surface placement still selects and seeds a bounded fixed-population cluster, but source-space contact geometry is provisional only. Each composed stroke carries internal cluster identity, member role, intended size, and an independent fallback stroke.
+
+The projected stage builds the real wiggled/family-shaped prototype for each actual selected member before solving contact. The primary remains fixed. Secondary and tertiary prototypes are translated using samples from their real projected polylines and production half-widths. Moving-member contacts use endpoint-adjacent samples with visible width, and the tapered tail beyond the chosen contact is removed, avoiding the sub-pixel needles produced by mathematical endpoints. Anchor contacts may be at an endpoint, shoulder, or interior sample.
+
+A cluster is an atomic projected transaction:
+
+```text
+actual selected source members
+→ actual longitudinal profiles
+→ actual fixed-north projected prototypes
+→ projected contact placement
+→ complete silhouette and external-mark checks
+→ final ground/domain sampling for every member
+→ commit all members
+```
+
+If any step fails, all available members return to their stored independent variants. After all initial cluster decisions, a deterministic reconciliation pass rechecks committed clusters against the final independent/fallback population and atomically restores any newly conflicting cluster. Partial pairs/triplets, orphan steep branches, and triplet-fragment pair fallthrough are forbidden. Cluster identity is preserved into final projected glyphs so diagnostics count only complete clusters that actually reach coverage.
+
+The active diagnostics contract includes requested/accepted/fallback clusters, complete final pairs/triplets, fallback reason categories, and a separate projected-cluster composition timing. These are compact aggregate diagnostics; no per-cluster Console logging is introduced.
+
+The production invariants remain fixed descriptor population, no connector geometry, no graph/network cache, maximum three members, independent `Horizontal Companion Strength = 0` compatibility, ordinary final ground/river/modifier/slope/grade validation, ordinary R8 coverage, and the closed G3 performance architecture.
+
+**Methods tried:** E7's render-angle correction remains useful grammar input; E8's source-space straight-segment junction gate is rejected as a production validator because it ignored path wiggle, family projection, width taper, later projected rejection, and unrelated final glyphs.
+
+### 2026-07-13 — Historical V3J.4E8 Source-Space Junction Architecture
+
+V3J.4E8 keeps the bounded fixed-population companion architecture but adds an explicit final-junction quality gate. Structured contacts now place the target member by its true endpoint against an endpoint, shoulder, or interior point on the anchor. Target endpoint fractions remain within the final 1.5% of the member span, eliminating the visible free stubs that appeared when E7 allowed shoulder-depth target contacts.
+
+Every structured junction is validated against the same final straight-segment geometry used by target placement. The gate rejects intersections away from the intended contact, excessive contact separation, acute interior junctions, free endpoints that remain inside another member's body corridor, multiple triplet junctions collapsing onto nearly the same anchor point, and unintended non-adjacent member intersections. Failed triplets continue to downgrade to pairs; rejected structured pairs simply remain unavailable to that composition attempt.
+
+`Triplet Verticality` remains the single vertical-composition control, but it now gives pairs a deliberately weaker subset of the structured grammar. At maximum Verticality, up to 64% of pair requests may use stepped-continuation, shoulder-contact, or offset-echo layouts; flat pair continuation remains legal and common enough to preserve visual variety. Structured pairs may exceed ordinary `Angle Jitter Degrees` up to a 64-degree safety bound, while triplets retain the E7 84-degree limit.
+
+Structured contact separation is solved along the target member's outward axis rather than fixed visual horizontal. Interior contacts do not receive routine deep penetration; endpoint-to-endpoint contacts retain only small taper compensation. The three-member hard cap, fixed descriptor population, primary-centre preservation, cluster anti-chain envelopes, independent physical validation, G3 performance architecture, and exact `Horizontal Companion Strength = 0` compatibility remain unchanged.
+
+**V3J.4E7 is superseded by this architecture.** Its render-faithful angle fix and stronger junction grammar remain foundational, but it lacked final contact-quality rejection and left pair composition comparatively flat.
+
+### 2026-07-13 — Historical V3J.4E7 Render-Faithful Triplet Junction Architecture
+
+Structured triplet geometry now uses the same final angles for contact solving, geometric acceptance, descriptor orientation, and rendering. Ordinary `Angle Jitter Degrees` remains authoritative for independent marks and pair grammar, but the explicit `Triplet Verticality` control may exceed that bound for structured triplets up to an 84-degree safety limit. This removes the E6 mismatch in which steep targets were validated and then flattened during final orientation.
+
+Three-mark clusters use bounded contact topology rather than endpoint-only chains. Depending on deterministic layout, an endpoint may contact another member's shoulder or middle, and crown motifs may place two steep members against opposite interior portions of the primary. These are still three independent descriptors with no connector, shared topology record, recursive extension, or additional population.
+
+At high Verticality, the control also increases eligible triplet prevalence, makes the flat exception rare, strengthens final member inclination, and raises mandatory endpoint-span, centre non-linearity, and two-step thresholds. Acceptance is evaluated from the final six segment endpoints and the same final axes later used by surface-stroke generation. A structured proposal that cannot prove the required geometry downgrades to a pair.
+
+Maximum Tightness permits small deterministic penetration at triplet contacts to compensate for tapered endpoints and produce visible contact. Cluster envelopes continue to reserve the complete final motif and prevent cluster-to-cluster concatenation. `Horizontal Companion Strength = 0` remains the exact pre-composition compatibility state.
+
+**V3J.4E6 is superseded by this architecture.** Its explicit control and geometric-gate direction were correct, but its target solver and final renderer used different angle bounds and its contacts remained endpoint-only.
+
 ---
 document_id: PS3D-GROUND-01
 title: "Ground Visual Design and Architecture"
@@ -11,10 +77,559 @@ implementation_documents:
 ---
 
 
+### 2026-07-13 — Historical V3J.4E6 Guaranteed Triplet Verticality Architecture
+
+Three-mark companion clusters are no longer accepted merely because they were assigned a stepped or arched template. `Triplet Verticality` is an explicit style input controlling both the triplet-only orientation range and the minimum visible departure from a line. It belongs to the surface-stroke signature whenever Horizontal Companion Strength is active.
+
+At maximum verticality, structured triplets may use a steep 30–62-degree member while retaining a hard 68-degree limit. After endpoint-connected centres are solved, the generator measures (1) the middle centre's perpendicular distance from the line joining the outer centres and (2) total span along fixed visual vertical. Both thresholds scale with Stroke Width. A structured triplet that fails either threshold is discarded as a triplet and may still compose as a pair.
+
+The 8% flat-continuation template remains a deliberate exception. Therefore horizontal triplets are legal but uncommon, while every retained non-flat triplet is geometrically proven to have a visible two-dimensional component. Tightness continues to govern endpoint contact; verticality does not add strokes, connectors, shared topology, recursive extension, or runtime objects.
+
+The active Horizontal Companion controls are:
+
+```text
+Horizontal Companion Strength
+Companion Tightness
+Triplet Verticality
+```
+
+`Horizontal Companion Strength = 0` still exits before mutation. Pair grammar, fixed descriptor population, anti-chain isolation, three-member hard cap, independent physical validation, projection, coverage, and the closed G3 performance architecture remain invariants.
+
+### 2026-07-13 — Historical V3J.4E5 Vertically Structured Triplet Architecture
+
+**Status:** Superseded by the active V3J.4E6 architecture above. Retained as the angle-progression grammar that did not guarantee visible non-linearity.
+
+The production doctrine remains bounded implied connectivity between independent Painted Accent descriptors. Pairs retain the accepted E4 grammar. Triplets remain capped at exactly three existing descriptors, but their default composition is now a vertically structured run rather than a flat horizontal assembly.
+
+```text
+fixed primary
+→ endpoint-adjacent secondary
+→ endpoint-adjacent tertiary
+→ one stepped, crowned, or broken-terrace trend
+→ one reserved cluster envelope and composition cell
+→ independent physical validation
+→ unchanged projected glyph and R8 coverage paths
+```
+
+Structured triplets use the authored `Angle Jitter Degrees` range as their absolute orientation bound. Their vertical component is created primarily by tangent progression across the three members, allowing adjacent endpoints to stay touching or nearly touching. Small endpoint-local offsets prevent mechanical perfect joins but remain only a fraction of Stroke Width.
+
+The deterministic internal distribution is:
+
+```text
+Stepped Run:       44%
+Crown Run:         28%
+Broken Terrace:    20%
+Flat Continuation:  8%
+```
+
+Flat triplets remain legal as an exception, not the dominant motif. Strength and Tightness retain their E4 meaning: Strength controls the bounded participant budget and pair/triplet frequency; Tightness controls endpoint separation. No new authoring control is added.
+
+Anti-chain isolation, the three-member hard cap, fixed population, primary-centre preservation, and independent ground/slope/river/modifier/grade validation remain architectural invariants. At `Horizontal Companion Strength = 0`, the pass exits before mutation and preserves V3J.4D3 exactly.
+
+
+### 2026-07-13 — Active V3J.4E4 Bounded Companion-Cluster Architecture
+
+**Status:** Superseded by the active V3J.4E5 architecture above. Retained as the stronger bounded-cluster architecture whose triplet layout remained too horizontally synchronized.
+
+The production doctrine remains implied connectivity between independent Painted Accent descriptors, but the bounded local artistic unit is now a **cluster of two or three marks**. Three is a hard cap, not the start of graph topology.
+
+```text
+post-thinning descriptors
+→ choose one fixed primary
+→ resolve one or two oriented endpoint-adjacent targets
+→ relocate existing secondary/tertiary descriptors
+→ reserve one expanded cluster envelope and composition cell
+→ validate each descriptor independently
+→ project and bake through the unchanged R8 coverage path
+```
+
+The primary centre is never translated. Secondary and tertiary members are selected from the existing same-region population within a bounded relocation radius. No proposal or stroke is created. Maximum Strength raises the participant budget to 68% so the authoring control has a clearly strong diagnostic endpoint; the remainder stays independently placed.
+
+Cluster layout follows fixed visual horizontal only as a broad trend. Each member has independent bounded tangent drift and deliberate vertical stagger. Endpoint placement uses the actual oriented member axes and compensates for the authored longitudinal End Taper. At maximum Tightness, adjacent source centreline spans may overlap slightly so the tapered rendered marks touch or retain only an approximately one-to-two-pixel break; tangent drift still prevents the complete member centres from snapping onto one ruler-straight row. Pair and triplet templates remain deterministic internal grammar, not new authoring controls.
+
+Anti-chain isolation remains architectural. Each complete two/three-mark motif reserves one expanded envelope and one deterministic composition cell. A later motif whose envelope intersects it is rejected. Recursive extension, a fourth member, connectors, junctions, shared vertices, graph records, and network caches remain forbidden.
+
+At `Horizontal Companion Strength = 0`, the pass exits before mutation and preserves V3J.4D3 exactly. With companions active, only the existing surface-stroke signature and downstream projected glyph, coverage, and material stages invalidate.
+
+### 2026-07-13 — Historical V3J.4E3 Isolated Companion Architecture
+
+**Status:** Superseded by the active V3J.4E4 architecture above. Retained as the exactly-two-mark isolation experiment.
+
+The production doctrine remains implied connectivity between independent marks, but one local motif must contain exactly two marks. V3J.4E3 therefore treats anti-chain isolation as an architectural invariant rather than a probability preference.
+
+The active pipeline is:
+
+```text
+regional surviving descriptors
+→ choose an unchanged primary
+→ solve one deterministic companion target
+→ select one nearby available secondary
+→ reject when the pair corridor intersects another pair or any third mark
+→ independently validate both descriptors
+→ ordinary projected glyph and R8 coverage paths
+```
+
+The primary descriptor is never translated by companion composition. The secondary remains an existing descriptor from the fixed stroke population; it is repositioned only when its original centre lies within the bounded target-selection radius. No new stroke is created.
+
+Each accepted pair reserves both a deterministic composition cell and an expanded visual-horizontal corridor. This prevents two pairs from joining end-to-end and prevents an unpaired third mark from extending the motif. These are conservative composition checks only; both members still pass the exact ground, slope, river, modifier, and grade validation independently afterward.
+
+Companions are intentionally readable again: 72–95% of primary length and 90–100% strength, with maximum authored participation capped at 44% before spatial and anti-chain rejection. Strength controls frequency; Tightness controls target gap and vertical relationship. Neither control creates graph topology or changes total descriptor count.
+
+The invariant remains:
+
+```text
+one implied companion motif = exactly two independent marks
+```
+
+At `Horizontal Companion Strength = 0`, the composition pass exits before any candidate mutation and preserves the accepted V3J.4D3 baseline exactly.
+
+### 2026-07-13 — Historical V3J.4E2 Horizontal Companion Grammar
+
+**Status:** Superseded by the active V3J.4E3 architecture above. Retained as the record of the dominant/subordinate and same-facing experiment.
+
+The production doctrine remains implied connectivity between independent marks. V3J.4E proved that horizontal companionship is the correct direction, but its equal-length, symmetrically angled, highly saturated pairs created a repeated bird/moustache symbol at maximum strength. V3J.4E2 replaces that grammar without adding controls or representation layers.
+
+Each composed pair now has a clear hierarchy:
+
+```text
+primary mark
+  ordinary authored length and strength
+
+subordinate companion
+  55–85% of primary length
+  82–94% of ordinary strength
+  same authored Stroke Width system
+```
+
+Directional families align their existing mirrored profile variant to the primary member. Pair orientation no longer straddles a shared angle with equal positive and negative offsets; the companion receives a restrained deviation on the same side. This removes the strongest source of wing-like symmetry without modifying any projected-family formula.
+
+The pair grammar contains three deterministic internal arrangements:
+
+```text
+Continuation     58%  end-to-end broken contour with a positive gap
+Staggered Echo   30%  shorter companion offset vertically and toward one end
+Offset Shoulder  12%  uncommon tucked companion implying a broken larger silhouette
+```
+
+These are not new authoring modes and do not appear as Inspector controls. They are bounded variation inside the existing Horizontal Companion Strength and Companion Tightness contract.
+
+Population participation is now nonlinear and capped at 38% of post-thinning survivors at Strength `1`. Strength `0.35` is intended to be occasional, `0.65` clearly present, and `1.0` a strong diagnostic state that still leaves most of the field independently placed. Tightness controls separation inside each arrangement, but Continuation never receives a negative gap.
+
+All architecture invariants remain:
+
+```text
+no added proposals or strokes
+no connectors or shared nodes
+no graph/network cache
+no runtime objects
+same independent physical validation
+same projected families and R8 coverage
+strength zero preserves the accepted independent-placement baseline
+```
+
+
+### 2026-07-13 — Active GeneratedGround Inspector Contract after V3J.4E1
+
+**Status:** Implemented for Unity validation. This is an editor-authoring contract only.
+
+The primary `GeneratedGround` Inspector must expose every active Painted Accent control used by the selected style variant. Horizontal companion controls are part of that primary contract; exposing them only in the underlying style-profile asset editor is insufficient.
+
+The Inspector is organized as nested foldouts rather than one continuous control and diagnostic stream. Painted Accent authoring is divided into coherent groups for basics, distribution, regional composition, companions, family mix, geometry, projected profile, and ink. Debug overlays and read-only diagnostic blocks are separate collapsed groups. Other GeneratedGround systems and advanced material families are likewise collapsible.
+
+Foldout state is transient editor UI state. Opening or closing a foldout must not modify serialized recipes, invalidate generation signatures, mark assets dirty, or schedule regeneration. Only edits to the actual serialized controls may invoke the existing GeneratedGround refresh path.
+
+The `Horizontal Companions` foldout is open by default during V3J.4E validation. Its controls remain:
+
+```text
+Horizontal Companion Strength
+Companion Tightness
+```
+
+Tightness is visually disabled while strength is zero, matching the generation-signature contract that inactive tightness has no effect.
+
+
+### 2026-07-13 — Active V3J.4E Horizontal Companion Architecture
+
+**Status:** Historical V3J.4E proof. Superseded by the active V3J.4E2 grammar above; V3J.4D3 remains the strength-zero visual baseline.
+
+The active production representation remains mesh-free and population-bounded:
+
+```text
+independent regional surface-stroke candidates
+→ optional bounded two-mark horizontal composition
+→ independent physical validation
+→ four projected glyph families
+→ shared R8 coverage
+→ Ink Color albedo composition
+```
+
+Horizontal companions are a composition rule, not a new representation. They consume existing post-thinning candidates and never add proposal budget, connector segments, shared nodes, graph records, child objects, meshes, materials, or runtime update work. At maximum strength, approximately half of surviving candidates may participate; the remaining population stays independently placed.
+
+Pairing is deterministic and local to an existing composition region. A candidate is paired with the nearest available regional survivor, and the pair is repositioned end-to-end along the GeneratedGround-local projection of fixed world horizontal. Small vertical separation and restrained orientation difference prevent mechanical duplication while retaining the intended larger implied contour. Both members remain ordinary `GroundPaintedAccentSurfaceStroke` candidates and pass sampling, slope, river, modifier, and grade rejection independently.
+
+`Horizontal Companion Strength = 0` is a strict compatibility contract: it preserves the accepted V3J.4D3 placement and family behavior. `Companion Tightness` changes only pair spacing and has no signature effect while strength is zero. With companions active, both controls belong to the surface-stroke signature and therefore invalidate only descriptors and their downstream projection/coverage/material stages.
+
+Family-aware pairing biases the second member toward Shoulder + Shallow, Asymmetric + Shoulder, Shallow + Shallow, and Complete + Shoulder arrangements while respecting authored zero weights. The system does not force a hidden family into an isolated-family preview. Complete + Complete is de-emphasized, not categorically forbidden, because a single-family authored configuration must remain valid.
+
+The accepted doctrine remains implied connectivity:
+
+```text
+separate marks placed in relation
+→ eye reads a larger contour
+```
+
+and explicitly rejects:
+
+```text
+connector geometry
+shared topology
+procedural graph/network storage
+branch or tendril generation
+population growth outside Stroke Density
+```
+
+
+### 2026-07-13 — Active Ground Performance Architecture after G3
+
+**Status:** G1, G2, and G3 are Unity-validated and closed; V3J.4D3 remains the accepted strength-zero visual baseline.
+
+The active Painted Accent production architecture remains:
+
+```text
+accepted surface-stroke descriptors
+→ four projected glyph families
+→ exact ground/domain validation
+→ generated R8 coverage
+→ flat Ink Color albedo composition under ordinary ground lighting
+```
+
+G2 established stable stage signatures and made unchanged regeneration effectively free. G3 does not alter those dependencies. It optimizes only the legitimate projected-footprint work measured after a shape-only change.
+
+Projected validation now uses a narrow immutable ground-sampling contract containing only height and visible render normal. Centre, left, and right samples share the snapshot/grid context and each resolve the checkerboard triangle once. The complete `GroundSurfaceSample` contract remains authoritative for consumers that require material and semantic masks; it is no longer constructed merely to validate Painted Accent slope and grade.
+
+One reusable build-local scratch set owns candidate projected points, widths, footprint boundaries, sampled centres, and broad-phase indices. Rejected glyphs do not allocate permanent point arrays. Accepted glyphs still receive independent owned arrays, so cached production data never aliases mutable scratch storage.
+
+River and modifier broad phases are conservative filters only. Ground-owned river bounds are built from active spline samples and expanded by maximum snapshot influence; unsafe or unavailable bounds remain unbounded. Modifier bounds include complete authored shapes and blend distance. Exact snapshot evaluation remains the final authority, and the existing first-failure rejection order is preserved. No river implementation file is changed.
+
+The topology audit retains all exact segment-intersection decisions but rejects segment pairs with disjoint AABBs before cross-product testing.
+
+Coverage remains a single GeneratedGround-owned R8 texture. G3 retains a compatible readable texture plus exact-size CPU byte buffer across coverage rebuilds, using raw bulk upload and one controlled `Apply`. The deliberate maximum additional retained CPU memory is approximately 8 MB at 2048²; visual resolution and coverage bytes are unchanged.
+
+The timing contract now reports:
+
+```text
+profile build
+family validation
+point construction
+topology + turn
+surface/domain validation
+  footprint preparation
+  ground sampling
+  broad slope
+  river exclusion
+  modifier exclusion
+  transverse grade
+  longitudinal grade
+diagnostics
+coverage raster
+coverage upload
+```
+
+G3 passed exact timing and invalidation validation. V3J.4E is now the active visual experiment described above.
+
+
+### 2026-07-13 — Active Ground Performance Architecture after G1
+
+**Status:** Historical G1 architecture checkpoint. Superseded by the active G3 section above; V3J.4D3 remains the accepted visual baseline.
+
+Painted Accents no longer own or sample a legacy fold-field representation. The sole active representation is:
+
+```text
+independent accepted surface-stroke descriptors
+→ four projected glyph families
+→ generated R8 coverage
+→ flat Ink Color albedo composition under ordinary ground lighting
+```
+
+`GroundPaintedAccentSurfaceStrokeGenerator` is the current descriptor/placement generator. The old `GroundPaintedAccentFoldFieldGenerator` name, RGBA texture, relief body, signed-side field, final-prototype debug view, and brute-force diagnostic rasterizer are retired. Historical sections may mention those items only to document rejected development stages; they are not valid implementation guidance.
+
+The production `Ground Painted Accent Lines` shader debug mode now displays only the same R8 coverage used by the accepted render. The obsolete Painted Accent scale, contrast, mask-influence, direction, seed, and unused coverage-texel-size shader properties are removed; GeneratedGround now writes only the active Painted Accent strength plus coverage/Ink Color properties. Minor material response that previously sampled the legacy selected-line channel is driven by production coverage instead. There is no second Painted Accent texture representation and no legacy shader fallback.
+
+Exact nearest-stroke-distance statistics are not part of generation semantics and are removed. Performance evidence is supplied through GeneratedGround Profiler markers and a compact cached inspector timing summary rather than expensive diagnostic geometry sweeps or console spam.
+
+G1 intentionally preserves every approved visual parameter and output-quality choice. It does not reduce the 2048² coverage ceiling, density capability, family weights, length/width contracts, regional distribution, path wiggle, physical exclusions, or deterministic seeds.
+
+The remaining strictly GeneratedGround performance roadmap is:
+
+```text
+G2
+  stable stage signatures
+  no unconditional downstream invalidation
+  material-only changes remain material-only
+  Painted Accent-only changes do not rebuild ground mesh/collider
+  unchanged geometry does not recook MeshCollider
+
+G3
+  reuse compatible R8 Texture2D instances
+  reuse the CPU byte buffer
+  retain bulk upload
+  optimize the measured legitimate raster hotspot only if still required
+```
+
+No river implementation file is part of this roadmap. GeneratedGround may continue to report the time spent in its own corridor-notification call, but this track does not alter river lifecycle ownership or river generation semantics. V3J.4E implied horizontal companions remain paused until G2 and G3 pass timing and visual-equivalence validation.
+
+### 2026-07-13 — Active Painted Accent Baseline, Pause Boundary, and Performance Ownership
+
+**Status:** Historical pause boundary. G1 is now active above; V3J.4D3 remains the accepted visual baseline.
+
+The active Painted Accent doctrine is now:
+
+```text
+independent strokes, not explicit networks
+regional concentration and bounded signed orientation variation
+four deterministic glyph families
+strict final-profile sanity
+mesh-free projected coverage baked into ground albedo
+```
+
+The current shapes are accepted as good enough to compose. Future visual work should not reopen explicit contour graphs, tendril clusters, shared-node networks, or π/terrace topology. The next permitted network-adjacent mechanism is implied connectivity through nearby independent marks.
+
+The performance boundary is architectural, not artistic. Editor restoration currently has a structurally duplicated full-ground path: GeneratedGround enables and regenerates, then river enablement can notify the parent and request another complete ground regeneration. Because a pass may include collider recooking, Painted Accent placement/projection, and a `2048 × 2048` R8 coverage bake, companion work is paused until unnecessary duplicate execution is removed.
+
+Performance work is owned outside this Painted Accent thread. It may not be implemented here, and this thread may not modify `StylizedRiver.cs` or other river files. Any separate performance patch must preserve this document's visual doctrine and must not reduce coverage resolution, density capability, family behavior, or accepted style defaults as a substitute for lifecycle correctness.
+
+Required performance semantics:
+
+```text
+one explicit owner for each lifecycle processing pass
+coalesced edit-mode requests rather than synchronous duplicate regeneration
+stage signatures remain authoritative
+material/debug changes do not rebuild geometry or coverage
+shape changes rebuild projection/coverage but not ground geometry
+placement changes rebuild placement/projection/coverage but not unchanged geometry
+geometry or structural river/modifier changes rebuild all true dependants exactly once
+unchanged geometry does not recook the collider
+```
+
+After that work is validated visually and by profiling, V3J.4E may introduce bounded horizontal companion compositions. Pair members must remain independent descriptors/glyphs/coverage strokes, consume the existing population budget, validate independently, and create implied rather than literal connectivity.
+
+### 2026-07-13 — Patch V3J.4D3: Final-Profile Sanity and Signed Orientation Balance
+
+**Status:** Unity-validated as good enough; active baseline pending lifecycle-performance work.
+
+Painted Accent family identity is now subject to a common final-profile sanity invariant:
+
+```text
+no accepted non-flat mark may contain a significant interior valley
+with separated higher profile sections on both sides
+```
+
+This is the explicit prohibition against the observed “cat-ear” silhouette. The rule is evaluated from the final dense combined-height samples, not from source parameters. A valley counts only when both sides exceed it by at least the greater of `0.001 m` or `8%` of the profile peak; minor organic detail remains legal. Complete Mound is no longer exempt from this cross-family sanity rule.
+
+Final projected smoothness is family-sensitive. Complete and Asymmetric mounds may turn slightly more strongly than one-sided quiet marks, but the former shared `42°` ceiling is retired. Active limits are `32°`, `30°`, `27°`, and `25°` for Complete, Asymmetric, Single Shoulder, and Shallow Crest respectively. Single Shoulder and ordinary Shallow Crest must also devote at least 18% of their span to the primary 5%-to-95% height transition. Construction ranges are adjusted to give Shoulder a stable high run and Shallow Crest a 34–44% smooth shoulder transition envelope.
+
+Orientation composition must preserve both local relationship and authored signed randomness. `Angle Jitter Degrees` is again an absolute final bound around the perpendicular base direction. Regional mean bias is limited to at most 25% of that authored range and never more than `10°`; each accepted mark receives a larger deterministic per-mark deviation. Within a composition region, sign choice is acceptance-aware: the next candidate uses the currently under-represented positive or negative sign, and only successful physical placements update the balance. Therefore a failed mark cannot leave the rest of the region permanently biased to one side.
+
+This balance is not a new control and does not force a global checkerboard. Single-mark regions remain random, magnitudes remain varied, and neighboring marks still share the weaker regional mean. The existing accepted angle min/mean/max diagnostic is the evidence: populated fields should normally straddle zero and keep the mean near zero while respecting the authored absolute jitter limit.
+
+Coverage, density, regional density contrast, zone scale, family weights, Stroke Path Wiggle, strict length bounds, width, and every physical-domain exclusion remain unchanged. V3J.4E companions may only compose marks that pass these final-profile and orientation contracts.
+
+### 2026-07-13 — Patch V3J.4D2: Smooth Source Paths and Visible Shallow Shoulders
+
+**Status:** Unity-validated as a useful smoothness/readability pass; residual extrema and orientation defects are corrected by V3J.4D3.
+
+Painted Accent shape quality is governed by two independent curves:
+
+```text
+source ground path
+  controls lateral bend and regional flow
+
+projected family profile
+  controls displacement toward fixed world +Z
+```
+
+Both must be smooth and artistically legible. A dense projected profile cannot repair an angular source path. The active source-path doctrine therefore stores the analytic deterministic centreline at approximately `0.03 m` spacing with `13–33` points, replacing the former five-point minimum that created visible quarter-span elbows across multiple families.
+
+`Stroke Path Wiggle` is the sole authoring control for source-path lateral curvature. It is not an alias for Profile Irregularity or feature Contrast and cannot change family identity, length, width, height, density, or region membership. The baseline remains monotonic along its authored stroke axis, so added wiggle may bend but cannot loop or create graph-like topology.
+
+Final projected XZ geometry is now audited directly. Maximum per-sample turn is reported, and turns above `42°` are rejected as severe residual kinks. The existing profile-space turn metric remains useful for scalar-profile analysis but is not accepted as evidence that final projected geometry is smooth.
+
+Shallow Crest is now defined by visible projected displacement, not normalized ratios alone:
+
+```text
+ordinary variant
+  broad upper run
+  one small but visible endpoint shoulder
+  at least 0.0035 m endpoint displacement
+
+rare quiet variant
+  intentionally near-straight
+  approximately 4% of Shallow Crest selections
+```
+
+This preserves occasional calm dashes while preventing the family from being dominated by visually straight lines. Single Shoulder uses quintic-smooth plateau/descent transitions. The four-family architecture, authored family weights, independent-mark representation, R8 coverage, and all physical-domain exclusions remain active.
+
+The next architectural candidate remains V3J.4E implied horizontal companions. It may only compose the corrected independent strokes; it must not hide unresolved kinks or invisible family shoulders.
+
+
+
+### 2026-07-12 — Patch V3J.4D1: Distinct Final-Curve Family Identities
+
+**Status:** Unity-validated as a useful separation pass; source-baseline angularity and Shallow-Crest visibility are corrected by V3J.4D2.
+
+The four-family architecture remains accepted, but family identity is now defined by measurable final-curve structure rather than by loose seeded intent. This prevents the vocabulary from collapsing back into one continuous arch-to-line spectrum.
+
+Active identity doctrine:
+
+```text
+Complete Mound
+  preserved A6/A7 baseline; two meaningful sides
+
+Asymmetric Mound
+  unmistakably off-centre crest; >= 2:1 leg-span ratio; >= 1.5:1 slope ratio
+
+Single Shoulder
+  high plateau/run followed by exactly one sustained descent
+
+Shallow Crest
+  normally one small shoulder leading into a broad shallow run
+  rare near-straight quiet subvariant only
+```
+
+The final densely sampled profile is the authority. Parameter values alone cannot prove family membership. A generated candidate that fails its perceptual family contract is rejected rather than relabelled or converted into Complete Mound. Authored Stroke Length Min / Max and Stroke Width remain absolute and family-independent. Regional density, direction, family weights, R8 coverage, and all physical exclusions remain unchanged.
+
+Unity also exposed a valuable composition behavior: two independent marks placed roughly end-to-end along visual horizontal can imply a larger contour formation without literal connectivity. This is now the preferred network-adjacent direction. It preserves independent strokes and lets the eye complete the relationship, avoiding the rejected tendril-tree and π-terrace failures.
+
+### Planned V3J.4E — Implied Horizontal Companions
+
+**Status:** Historical design checkpoint. Implemented by the active V3J.4E architecture section above after G3 validation.
+
+The future companion system may pair a bounded portion of the existing mark population along the axis perpendicular to fixed world `+Z`. Pair members remain fully independent geometry and coverage. Small end-to-end gaps, rare slight overlaps, restrained vertical offsets, and compatible family combinations may create emergent larger shapes. The system must never create explicit connectors, shared nodes, graph topology, or a separate network representation.
+
+### 2026-07-12 — Patch V3J.4D: Four-Family Glyph Vocabulary and Spacing Cleanup
+
+**Status:** Unity-validated as a useful vocabulary proof; family overlap corrected by V3J.4D1.
+
+V3J.4D expands the sole accepted mesh-free Painted Accent shape path from one repeated complete mound into four deterministic single-stroke families. The production architecture remains independent marks baked into the existing R8 coverage texture; no graph, shared topology, fragmentation, runtime object, mesh, or per-frame generation is introduced.
+
+Active glyph vocabulary:
+
+```text
+Complete Mound     → accepted A6/A7 rounded two-sided mound
+Asymmetric Mound   → off-centre crest with materially unequal legs
+Single Shoulder    → one high run and one meaningful descending side
+Shallow Crest      → low predominantly lateral contour with restrained ends
+```
+
+Family choice is made once from the proposal seed and four artist-authored relative weights. The weights are normalized internally, do not depend on regional mode or composition role, and do not alter length or width. If all four weights are zero, Complete Mound is the explicit safe fallback. Each family is selected before final physical validation and rejected in place when its own shape or footprint is invalid; there is no silent conversion to another family.
+
+Authoring contract:
+
+```text
+Stroke Length Min <= every family descriptor length <= Stroke Length Max
+Stroke Width remains authoritative and family-independent
+Profile Height remains the primary projected-height response
+Crest Crown Height remains an additive crest-cap response
+regional density/direction composition remains independent from family mix
+```
+
+The `Local Spacing Strength` control and its pairwise spacing-suppression stage are removed completely. Unity validation showed no visible artistic response at the active sparse/dense field scales, and retaining a dead control would obstruct deliberately dense baked populations. There is no hidden fixed spacing replacement. Population is now governed by Stroke Density, broad distribution, regional thinning, and the existing all-or-nothing physical-domain validation.
+
+The editor-only Family Preview filter can isolate Complete Mound, Asymmetric Mound, Single Shoulder, or Shallow Crest in Scene diagnostics without changing generated coverage. Composition role remains encoded by marker size while family is encoded by marker colour. Production rendering always contains the complete accepted family mixture.
+
+
+### 2026-07-12 — Patch V3J.4C2: Author-Controlled Population and Regional Concentration
+
+**Status:** Unity-validated for width, high population, Regional Zone Scale, and Regional Density Contrast. The ineffective Local Spacing Strength experiment is removed by V3J.4D.
+
+Painted Accent population and regional concentration are separate authoring dimensions. `Stroke Density` controls the requested proposal population and supports up to `2000` proposals per standard `40 × 40 m` patch. `Regional Density Contrast` redistributes a fixed average survival rate among quiet, supporting, and accent regions, so denser local zones do not require a higher total density. `Regional Zone Scale` controls the size of those coherent zones.
+
+The active distribution doctrine is:
+
+```text
+Stroke Density            → requested population
+Distribution Patch Scale  → broad continuous density-field scale
+Distribution Patchiness   → continuous field preference strength
+Distribution Sparse Floor → broad-field cold-region floor
+Regional Zone Scale       → coherent regional density/direction size
+Regional Density Contrast → fixed-average redistribution into accent zones
+```
+
+These layers must not silently redefine one another. Increasing regional contrast may redistribute marks but does not change Stroke Length Min / Max or authored width. Increasing Stroke Density creates more proposals but does not force uniform distribution. No secondary pairwise spacing stage remains after regional selection.
+
+Coverage remains a generated R8 field. The minimum raster support and feather are reduced to `0.08` and `0.10` texels, with relative feather reduced to `0.12 ×` core half-width. Authored Stroke Width now supports `0.002–0.20 m` and remains the primary physical line-width control. No connected network, fragmentation, new glyph family, runtime object, or per-frame generation is introduced.
+
+
+### 2026-07-12 — Patch V3J.4C1: Stroke Length Min / Max Are Hard Bounds
+
+**Status:** Unity-validated active contract.
+
+`Stroke Length Min` and `Stroke Length Max` are authoritative physical limits in metres. Regional composition may decide where inside that interval a support, standard, or dominant mark belongs, but it may never multiply a selected length beyond either bound.
+
+The active role contract is:
+
+```text
+support  → lower portion of authored interval
+standard → middle portion of authored interval
+dominant → upper portion of authored interval
+```
+
+Regional scale variation is a bounded normalized offset inside that same interval. A narrow artist-authored interval deliberately produces a narrow role hierarchy. This preserves direct author control and prevents composition logic from silently redefining length semantics.
+
+
+### 2026-07-12 — Patch V3J.4C: Independent Marks with Regional Composition
+
+**Status:** Unity-validated for regional distribution; length-bound defect corrected by V3J.4C1.
+
+V3J.4B proved that accepted A6/A7 projected glyphs can be rendered as mesh-free ground-integrated ink, but Unity evidence exposed two problems: the provisional raster feather made a nominally thin line visibly too broad, and the population still read as many equally important copies of one small arch. V3J.4C addresses both without reopening network topology or changing the accepted profile generator.
+
+Active architecture:
+
+```text
+weighted independent proposals
+→ stable jittered macro-regions
+→ region mode: quiet / supporting / accent
+→ deterministic thinning and role assignment
+→ local regional direction and scale hierarchy
+→ existing all-or-nothing physical validation
+→ unchanged A6/A7 continuous projected glyph
+→ narrow corrected R8 coverage
+→ family/variant Ink Color in ordinary ground lighting
+```
+
+The artistic unit remains an independent terrain mark. Regional composition relates nearby marks through shared density, direction, and scale; it never joins them into a graph. Quiet regions may contain no accepted marks. Supporting regions contain restrained standard/support marks. Accent regions may contain at most one longer dominant mark plus smaller independent companions. No rejected candidate is backfilled.
+
+The regional direction doctrine is:
+
+```text
+authored global facing
++ stable regional offset
++ small per-mark jitter
+```
+
+This replaces near-identical global orientation without becoming random scratch noise. Length varies by role only within the authored Stroke Length Min / Max interval, while width scales mildly. Dominant marks occupy the upper part of that interval rather than overriding it. The original role-aware spacing proof was later removed by V3J.4D after Unity showed that its exposed strength control had no useful visible effect. Dense local packing is now allowed to follow the authored population and regional controls directly.
+
+The V3J.4B provisional raster expansion is narrowed from `1.15` to `0.35` texels of minimum feather and from `0.45` to `0.30` texels of minimum half-width. The coverage diagnostic contract now reports authored core, effective raster core, feather per side, and estimated visible full width separately.
+
+Authoritative boundaries:
+
+```text
+accepted A6/A7 profile and projection: unchanged
+connected network or shared topology: prohibited
+fragmentation and geometry clipping: absent
+new glyph families: deferred
+new artist controls: absent during proof
+runtime objects or per-frame generation: absent
+```
+
+The temporary composition overlay is editor-only and independently controllable. It shows proposal region modes, thinning survival, one direction bar per occupied region, and role/family markers for accepted marks. Production rendering remains solely the generated R8 coverage sampled by the existing ground shader.
+
+Decision gate: if regional density, direction, hierarchy, and spacing succeed but the field still reads as one repeated arch family, the next justified step is a restrained V3J.4D glyph-family expansion. Breakup and fragmentation remain later rendering concerns and must not be used to disguise a failed composition.
+
 
 ### 2026-07-12 — Patch V3J.4B: Accepted Projected Coverage and Ground-Albedo Ink Proof
 
-**Status:** Implemented; awaiting Unity visual validation.
+**Status:** Unity-validated as a functional representation proof; superseded by V3J.4C for width fidelity and regional composition.
 
 V3J.4B preserves the accepted A6/A7 projected glyph geometry and changes only its production representation. Accepted glyph polylines and tapered half-widths are rasterized at generation/dirty time into a `GeneratedGround`-owned single-channel `R8` coverage texture. The texture is sampled in fixed GeneratedGround-local XZ space by means of a per-renderer world-to-ground matrix, so the same property block remains valid for the ground mesh and dependent river-corridor renderers.
 
@@ -851,6 +1466,48 @@ The active source of truth is now a generated 3D surface stroke. Each stroke is 
 The old height-field preview has been removed from the active workflow and replaced by a 3D line/ribbon preview. The preview builds actual temporary mesh ribbons from the generated stroke points so the next validation answers the important question first: do the generated 3D surface lines themselves look promising enough to become the effect?
 
 # Ground Visual Design and Architecture
+
+
+### 2026-07-13 — GeneratedGround Stage Ownership and Invalidation
+
+**Status:** G2 Unity-validated. Its stage ownership remains active under the G3 optimization above.
+
+The active GeneratedGround pipeline is no longer treated as one indivisible regeneration operation. Its owned outputs are:
+
+```text
+ground geometry / base surface
+mesh assignment
+collider assignment
+Painted Accent surface descriptors
+Painted Accent projected glyphs
+Painted Accent R8 coverage
+material property state
+river-corridor notification issued after changed ground geometry
+```
+
+Each output is governed by a stable input signature plus a missing-output check. A downstream stage depends on the upstream output revision rather than forcing every earlier stage to run again.
+
+Active dependency doctrine:
+
+```text
+geometry change
+  → mesh → collider → descriptors → projection → coverage → material
+
+placement/domain change
+  → descriptors → projection → coverage → material
+
+shape-profile change
+  → projection → coverage → material
+
+ink/debug/material change
+  → material only
+```
+
+GeneratedGround remains the only modified runtime owner in this performance pass. River source state is inspected from the ground side solely to distinguish an identical enable-time notification from a real structural change; no river lifecycle or generation implementation is altered. Corridor notification is issued only after changed ground geometry, never after Painted Accent-only updates.
+
+The regeneration diagnostic must state which stages actually executed. Projected-glyph generation also reports coarse substage timings so the final G3 patch is driven by measured profile, topology, domain-validation, or diagnostic cost rather than by speculation.
+
+Visual doctrine is unchanged: four independent glyph families, strict authored length/width contracts, final-profile sanity, regional composition, production R8 coverage, and no explicit graph/network representation.
 
 ## Purpose
 

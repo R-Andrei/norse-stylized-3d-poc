@@ -11,8 +11,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private static TriangleSoup BuildPlaneCutMass(
             MassRecipe recipe,
-            MassSurfaceFeatureSettings? surfaceFeatures)
+            MassSurfaceFeatureSettings? surfaceFeatures,
+            EdgeWearEvaluationMode edgeWearEvaluationMode,
+            int boundedEdgeOrdinal,
+            out PlaneCutBevelPreviewStatus previewStatus,
+            out BoundedEdgePreviewStatus boundedPreviewStatus)
         {
+            previewStatus = default;
+            boundedPreviewStatus = default;
             System.Random shapeRandom =
                 CreateRandom(recipe.ShapeSeed, 0x27101987);
 
@@ -98,10 +104,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ApplyCut(faces, normal, depth);
             }
 
-            ApplyGeneratedEdgeWearBevels(
-                faces,
-                recipe,
-                surfaceFeatures);
+            TriangleSoup planeCutPreviewSoup = null;
+            if (edgeWearEvaluationMode != EdgeWearEvaluationMode.None)
+            {
+                planeCutPreviewSoup = ApplyGeneratedEdgeWearBevels(
+                    faces,
+                    recipe,
+                    surfaceFeatures,
+                    edgeWearEvaluationMode,
+                    boundedEdgeOrdinal,
+                    out previewStatus,
+                    out boundedPreviewStatus);
+            }
+            if ((edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.PlaneCutPreview ||
+                 edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.BoundedSingleEdgePreview) &&
+                planeCutPreviewSoup != null)
+            {
+                return planeCutPreviewSoup;
+            }
 
             return TriangulatePolyhedron(
                 faces,

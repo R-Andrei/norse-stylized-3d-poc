@@ -106,14 +106,28 @@ Atlas generation is justified only when a retained material feature needs it. Ge
 
 - Prefer deterministic dirty-time construction over per-frame work.
 - Generated rocks are static after generation unless explicitly regenerated.
-- Expensive validation may remain editor/diagnostic-only.
+- Lifecycle restoration first attempts to re-adopt a certified production mesh whose stored production state and generation-contract version match the current recipe.
+- A missing, stale, preview, or uncertified mesh may rebuild once; later lifecycle callbacks must reuse the accepted result instead of repeating the rebuild.
+- Ordinary `OnEnable` and `OnValidate` synchronize generated state rather than unconditionally regenerating.
+- Material-only changes update renderer state without rebuilding geometry, recooking the collider, recalculating the world-triangle fingerprint, or notifying geometry consumers.
+- River-interaction authoring changes notify consumers without rebuilding production geometry.
+- Feature-atlas diagnostics are tracked separately from production geometry and may refresh atlas data without recooking an unchanged collider.
+- Lifecycle restoration may rebuild a transient production mesh, but ordinary generation must not run diagnostic-grade edge-wear reconstruction or audits.
+- Expensive validation is explicit editor/diagnostic-only and never runs from `OnEnable`, ordinary `OnValidate`, script reload, or Play Mode transitions.
+- Collider recooking occurs only when geometry was rebuilt or the collider lost its certified mesh binding.
+- Exact world-triangle fingerprints are invalidated by geometry changes and calculated lazily on the first consumer request.
+- Any future normal-generation semantic change must increment the production-generation contract version before old generated state may be reused.
 - Production geometry must respect the accepted tier budgets.
 - Do not add per-frame full-mesh rebuilds.
 - Cache reusable deterministic data when it materially reduces regeneration cost.
 
 ## Editor and diagnostics contract
 
-- Normal Console output is one compact audit per physical mass.
+- Ordinary production generation emits no edge-wear audit.
+- Automatic lifecycle synchronization emits no per-object Console summary; performance evidence uses Profiler markers.
+- The authoritative markers are `GeneratedMass.Synchronize`, `GeneratedMass.GenerateProduction`, `GeneratedMass.BindCollider`, `GeneratedMass.ComputeFingerprint`, and `GeneratedMass.NotifyConsumers`.
+- Explicit plane-cut preview emits one dedicated compact plane-cut result per intentionally evaluated mass.
+- The legacy replacement/strip/patch compact audit is explicit, single-object, opt-in evidence.
 - Detailed evidence is opt-in, deduplicated, and capped to representative failures.
 - Diagnostics must never alter production eligibility unless explicitly promoted.
 - Editor-only previews must be clearly labeled and must not become serialized artistic controls accidentally.

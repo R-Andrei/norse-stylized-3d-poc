@@ -27,6 +27,19 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            if (initializationPhase ==
+                InitializationPhase.CachePreparationRequired)
+            {
+                if (fieldWidth > 0 || currentState != null ||
+                    computeShader != null)
+                {
+                    ReleaseResources();
+                    initializationPhase =
+                        InitializationPhase.CachePreparationRequired;
+                }
+                return false;
+            }
+
             if (initializationPhase == InitializationPhase.Ready)
             {
                 BeginTopologyStartupValidation();
@@ -46,6 +59,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
             else if (InitializationInputsChanged())
             {
+                RecordTopologyStartupRestartReasons();
+                topologyStartupRestartCount++;
                 BeginTopologyStartupValidation();
                 // A domain or quality change invalidates every later phase.
                 // Restart from release rather than allowing partially built
@@ -60,7 +75,10 @@ namespace ProgrammaticStylized3D.Rivers
             RecordTopologyStartupStep(
                 measuredPhase,
                 stopwatch.Elapsed.TotalMilliseconds);
-            if (initializationPhase == InitializationPhase.Ready)
+            if (initializationPhase == InitializationPhase.Ready ||
+                initializationPhase == InitializationPhase.Failed ||
+                initializationPhase ==
+                    InitializationPhase.CachePreparationRequired)
             {
                 CompleteTopologyStartupValidation();
             }
@@ -112,6 +130,32 @@ namespace ProgrammaticStylized3D.Rivers
                 transportMetricsBuffer != null &&
                 domainVersion == river.Domain.Version &&
                 allocatedQuality == river.Quality;
+        }
+
+        private void RecordTopologyStartupRestartReasons()
+        {
+            if (river == null)
+            {
+                topologyStartupDirtyReasons |=
+                    TopologyStartupDirtyReason.RiverUnavailable;
+                return;
+            }
+
+            if (!river.Domain.IsValid)
+            {
+                topologyStartupDirtyReasons |=
+                    TopologyStartupDirtyReason.DomainInvalid;
+            }
+            if (domainVersion != river.Domain.Version)
+            {
+                topologyStartupDirtyReasons |=
+                    TopologyStartupDirtyReason.DomainChanged;
+            }
+            if (allocatedQuality != river.Quality)
+            {
+                topologyStartupDirtyReasons |=
+                    TopologyStartupDirtyReason.QualityChanged;
+            }
         }
 
         private bool InitializationInputsChanged()
@@ -380,28 +424,16 @@ namespace ProgrammaticStylized3D.Rivers
                             initializationPhase =
                                 InitializationPhase.InstallCachedTopology;
                         }
-                        else if (IsAutomaticDevelopmentCacheEnabled)
-                        {
-                            BeginAutomaticDevelopmentStartupGeneration();
-                            initializationPhase =
-                                InitializationPhase.BuildObstacleExclusion;
-                        }
                         else
                         {
                             initializationPhase =
-                                InitializationPhase
-                                    .AwaitExplicitTopologyGeneration;
+                                InitializationPhase.CachePreparationRequired;
                         }
                     }
                     break;
 
-                case InitializationPhase.AwaitExplicitTopologyGeneration:
-                    if (explicitTopologyGenerationRequested)
-                    {
-                        explicitTopologyGenerationRequested = false;
-                        initializationPhase =
-                            InitializationPhase.BuildObstacleExclusion;
-                    }
+                case InitializationPhase.CachePreparationRequired:
+                    BindDisabled();
                     break;
 
                 case InitializationPhase.InstallCachedTopology:
@@ -420,21 +452,27 @@ namespace ProgrammaticStylized3D.Rivers
                             initializationPhase =
                                 InitializationPhase.ClearMaterial;
                         }
-                        else if (IsAutomaticDevelopmentCacheEnabled)
-                        {
-                            BeginAutomaticDevelopmentStartupGeneration();
-                            initializationPhase =
-                                InitializationPhase.BuildObstacleExclusion;
-                        }
                         else
                         {
-                            initializationPhase = InitializationPhase
-                                .AwaitExplicitTopologyGeneration;
+                            initializationPhase =
+                                InitializationPhase.CachePreparationRequired;
                         }
                     }
                     break;
 
                 case InitializationPhase.BuildObstacleExclusion:
+                    if (!editorTopologyPreparationInProgress)
+                    {
+                        topologyCacheStartupOutcome =
+                            TopologyCacheStartupOutcome.PreparationRequired;
+                        topologyCacheStartupState = "Preparation Required";
+                        topologyCacheStartupSummary =
+                            "Play Mode topology generation is disabled. Use " +
+                            "Prepare / Rebuild Foam Topology Cache in Edit Mode.";
+                        initializationPhase =
+                            InitializationPhase.CachePreparationRequired;
+                        break;
+                    }
                     topologyStartupValidationObstacleBuildCount++;
                     RebuildObstacleExclusionCache();
                     initializationObstacleObservedVersion = int.MinValue;
@@ -443,6 +481,18 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.BuildMajorTopology:
+                    if (!editorTopologyPreparationInProgress)
+                    {
+                        topologyCacheStartupOutcome =
+                            TopologyCacheStartupOutcome.PreparationRequired;
+                        topologyCacheStartupState = "Preparation Required";
+                        topologyCacheStartupSummary =
+                            "Play Mode topology generation is disabled. Use " +
+                            "Prepare / Rebuild Foam Topology Cache in Edit Mode.";
+                        initializationPhase =
+                            InitializationPhase.CachePreparationRequired;
+                        break;
+                    }
                     topologyStartupValidationMajorBuildCount++;
                     BuildMajorTopology();
                     initializationPhase =
@@ -450,6 +500,18 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.BuildConnectorTopology:
+                    if (!editorTopologyPreparationInProgress)
+                    {
+                        topologyCacheStartupOutcome =
+                            TopologyCacheStartupOutcome.PreparationRequired;
+                        topologyCacheStartupState = "Preparation Required";
+                        topologyCacheStartupSummary =
+                            "Play Mode topology generation is disabled. Use " +
+                            "Prepare / Rebuild Foam Topology Cache in Edit Mode.";
+                        initializationPhase =
+                            InitializationPhase.CachePreparationRequired;
+                        break;
+                    }
                     topologyStartupValidationConnectorBuildCount++;
                     BuildConnectorTopology();
                     initializationPhase =
@@ -457,6 +519,18 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.BuildPocketTopology:
+                    if (!editorTopologyPreparationInProgress)
+                    {
+                        topologyCacheStartupOutcome =
+                            TopologyCacheStartupOutcome.PreparationRequired;
+                        topologyCacheStartupState = "Preparation Required";
+                        topologyCacheStartupSummary =
+                            "Play Mode topology generation is disabled. Use " +
+                            "Prepare / Rebuild Foam Topology Cache in Edit Mode.";
+                        initializationPhase =
+                            InitializationPhase.CachePreparationRequired;
+                        break;
+                    }
                     topologyStartupValidationPocketBuildCount++;
                     BuildPocketTopology();
                     initializationPhase = InitializationPhase.ClearMaterial;
@@ -596,7 +670,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            if (!pendingAutomaticDevelopmentRebuildAfterStartup &&
+            if (!activeTopologyRequiresExplicitPreparation &&
                 majorTopologyInputSignature !=
                     ResolveMajorTopologyInputSignature())
             {
@@ -606,7 +680,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            if (!pendingAutomaticDevelopmentRebuildAfterStartup &&
+            if (!activeTopologyRequiresExplicitPreparation &&
                 connectorTopologyInputSignature !=
                     ResolveConnectorTopologyInputSignature())
             {
@@ -616,7 +690,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            if (!pendingAutomaticDevelopmentRebuildAfterStartup &&
+            if (!activeTopologyRequiresExplicitPreparation &&
                 pocketTopologyInputSignature !=
                     ResolvePocketTopologyInputSignature())
             {
@@ -651,11 +725,9 @@ namespace ProgrammaticStylized3D.Rivers
             initializationPhase = InitializationPhase.Ready;
             if (DevelopmentTopologyGenerationInProgress)
             {
-                CompleteDevelopmentTopologyGeneration(
-                    "automatic staged startup generation");
+                CompleteDevelopmentTopologyGeneration();
             }
 
-            BeginAutomaticDevelopmentRebuildAfterStartup();
         }
 
         private static int ResolveStructuralResolution(
@@ -1054,16 +1126,12 @@ namespace ProgrammaticStylized3D.Rivers
             topologyCacheLoadedForActiveResources = false;
             obstacleExclusionUsesCachedScalar = false;
             activeTopologyObstacleStale = false;
+            activeTopologyRequiresExplicitPreparation = false;
             pendingStartupCachePackage = null;
             pendingStartupCacheStaleObstacles = false;
             pendingStartupCacheStaleSettings = false;
-            pendingAutomaticDevelopmentRebuildAfterStartup = false;
-            explicitTopologyGenerationRequested = false;
-            explicitTopologyGenerationInProgress = false;
-            automaticTopologyGenerationInProgress = false;
-            automaticDevelopmentObservedSignature = int.MinValue;
-            automaticDevelopmentRebuildReason =
-                AutomaticDevelopmentRebuildReason.None;
+            explicitTopologyGenerationInProgress =
+                editorTopologyPreparationInProgress;
             automaticTopologyCacheWritePending = false;
             topologyGeneratedUploadPixels = Array.Empty<Color>();
             majorTopology = null;
@@ -1254,6 +1322,15 @@ namespace ProgrammaticStylized3D.Rivers
             if (texture == null)
             {
                 return;
+            }
+
+            // Explicit Editor cache preparation can finish while one of its
+            // temporary targets is still bound as RenderTexture.active. Unity
+            // warns when that target is released. Unbind only the exact target
+            // being destroyed; unrelated active render targets remain intact.
+            if (RenderTexture.active == texture)
+            {
+                RenderTexture.active = null;
             }
 
             texture.Release();

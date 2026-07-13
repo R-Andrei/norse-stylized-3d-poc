@@ -256,6 +256,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 0
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 5944
+    SurfaceSeed: 7566
+    Size: 2
+    FormComplexity: 4
+    SurfaceFacetDensity: 0
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 0
+    Lean: 2
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 1
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 5944
+      SurfaceSeed: 7566
+      Size: 2
+      FormComplexity: 4
+      SurfaceFacetDensity: 0
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 0
+      Lean: 2
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 1
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &14916370
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -507,6 +571,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 3
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 3
+    ShapeSeed: 5595
+    SurfaceSeed: 7566
+    Size: 0
+    FormComplexity: 3
+    SurfaceFacetDensity: 4
+    EdgeCharacter: 3
+    ShapeDiversity: 2
+    Grounding: 0
+    Lean: 0
+    FineScale: 0.85
+    WidthBias: 0.7
+    HeightBias: 0.7
+    DepthBias: 0.903
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 3
+      ShapeSeed: 5595
+      SurfaceSeed: 7566
+      Size: 0
+      FormComplexity: 3
+      SurfaceFacetDensity: 4
+      EdgeCharacter: 3
+      ShapeDiversity: 2
+      Grounding: 0
+      Lean: 0
+      FineScale: 0.85
+      WidthBias: 0.7
+      HeightBias: 0.7
+      DepthBias: 0.903
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &28373281
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -947,6 +1075,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 2
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 2
+    ShapeSeed: 4685
+    SurfaceSeed: 7566
+    Size: 4
+    FormComplexity: 0
+    SurfaceFacetDensity: 4
+    EdgeCharacter: 0
+    ShapeDiversity: 1
+    Grounding: 0
+    Lean: 0
+    FineScale: 1
+    WidthBias: 1.015
+    HeightBias: 1
+    DepthBias: 0.761
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 2
+      ShapeSeed: 4685
+      SurfaceSeed: 7566
+      Size: 4
+      FormComplexity: 0
+      SurfaceFacetDensity: 4
+      EdgeCharacter: 0
+      ShapeDiversity: 1
+      Grounding: 0
+      Lean: 0
+      FineScale: 1
+      WidthBias: 1.015
+      HeightBias: 1
+      DepthBias: 0.761
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &68241431
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1163,6 +1355,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 4
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 4
+    ShapeSeed: 6513
+    SurfaceSeed: 7566
+    Size: 4
+    FormComplexity: 4
+    SurfaceFacetDensity: 2
+    EdgeCharacter: 2
+    ShapeDiversity: 2
+    Grounding: 1
+    Lean: 1
+    FineScale: 1.019
+    WidthBias: 0.896
+    HeightBias: 0.848
+    DepthBias: 0.971
+    SurfaceVariation: 0.735
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 4
+      ShapeSeed: 6513
+      SurfaceSeed: 7566
+      Size: 4
+      FormComplexity: 4
+      SurfaceFacetDensity: 2
+      EdgeCharacter: 2
+      ShapeDiversity: 2
+      Grounding: 1
+      Lean: 1
+      FineScale: 1.019
+      WidthBias: 0.896
+      HeightBias: 0.848
+      DepthBias: 0.971
+      SurfaceVariation: 0.735
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &79655150
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1379,6 +1635,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 0
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 4475
+    SurfaceSeed: 7566
+    Size: 3
+    FormComplexity: 4
+    SurfaceFacetDensity: 0
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 0
+    Lean: 2
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 1
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 4475
+      SurfaceSeed: 7566
+      Size: 3
+      FormComplexity: 4
+      SurfaceFacetDensity: 0
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 0
+      Lean: 2
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 1
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &106799631
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1769,6 +2089,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 3
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 3
+    ShapeSeed: 6504
+    SurfaceSeed: 7566
+    Size: 4
+    FormComplexity: 3
+    SurfaceFacetDensity: 4
+    EdgeCharacter: 1
+    ShapeDiversity: 1
+    Grounding: 2
+    Lean: 1
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 0.845
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 3
+      ShapeSeed: 6504
+      SurfaceSeed: 7566
+      Size: 4
+      FormComplexity: 3
+      SurfaceFacetDensity: 4
+      EdgeCharacter: 1
+      ShapeDiversity: 1
+      Grounding: 2
+      Lean: 1
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 0.845
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &256542329
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -2619,6 +3003,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 3
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 3
+    ShapeSeed: 6294
+    SurfaceSeed: 7566
+    Size: 3
+    FormComplexity: 3
+    SurfaceFacetDensity: 4
+    EdgeCharacter: 1
+    ShapeDiversity: 1
+    Grounding: 2
+    Lean: 1
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 0.845
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 3
+      ShapeSeed: 6294
+      SurfaceSeed: 7566
+      Size: 3
+      FormComplexity: 3
+      SurfaceFacetDensity: 4
+      EdgeCharacter: 1
+      ShapeDiversity: 1
+      Grounding: 2
+      Lean: 1
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 0.845
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &441717167
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -2844,9 +3292,9 @@ MonoBehaviour:
   showPaintedAccentDistributionOverlay: 1
   showPaintedAccentWeightedProposals: 1
   showPaintedAccentLastAcceptedPositions: 1
+  showPaintedAccentCompositionDebug: 0
   showPaintedAccentProjectedGlyphDebug: 0
-  showPaintedAccentRegionalNetworkCandidateDebug: 0
-  comparePaintedAccentProjectedGlyphAndRegionalNetwork: 0
+  paintedAccentGlyphFamilyPreview: 0
   paintedAccentPlacementOverlayWeight: 0
   modifiers:
   - {fileID: 1356653796}
@@ -3092,7 +3540,7 @@ Transform:
   m_GameObject: {fileID: 610640548}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.7716303, y: 0.14999998, z: 0.07268}
+  m_LocalPosition: {x: -1.53, y: 0.14999998, z: -5.65}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -3927,6 +4375,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 0
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 5727
+    SurfaceSeed: 3930
+    Size: 2
+    FormComplexity: 2
+    SurfaceFacetDensity: 2
+    EdgeCharacter: 2
+    ShapeDiversity: 1
+    Grounding: 1
+    Lean: 1
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 1
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 5727
+      SurfaceSeed: 3930
+      Size: 2
+      FormComplexity: 2
+      SurfaceFacetDensity: 2
+      EdgeCharacter: 2
+      ShapeDiversity: 1
+      Grounding: 1
+      Lean: 1
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 1
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &799756165
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -4158,6 +4670,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 4
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 4
+    ShapeSeed: 2098
+    SurfaceSeed: 7566
+    Size: 3
+    FormComplexity: 4
+    SurfaceFacetDensity: 3
+    EdgeCharacter: 3
+    ShapeDiversity: 2
+    Grounding: 2
+    Lean: 1
+    FineScale: 0.962
+    WidthBias: 0.975
+    HeightBias: 1.092
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 4
+      ShapeSeed: 2098
+      SurfaceSeed: 7566
+      Size: 3
+      FormComplexity: 4
+      SurfaceFacetDensity: 3
+      EdgeCharacter: 3
+      ShapeDiversity: 2
+      Grounding: 2
+      Lean: 1
+      FineScale: 0.962
+      WidthBias: 0.975
+      HeightBias: 1.092
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &805796057
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -4829,6 +5405,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 0
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 2029
+    SurfaceSeed: 7566
+    Size: 2
+    FormComplexity: 3
+    SurfaceFacetDensity: 3
+    EdgeCharacter: 4
+    ShapeDiversity: 0
+    Grounding: 2
+    Lean: 2
+    FineScale: 1.052
+    WidthBias: 1.021
+    HeightBias: 1.084
+    DepthBias: 0.95
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 2029
+      SurfaceSeed: 7566
+      Size: 2
+      FormComplexity: 3
+      SurfaceFacetDensity: 3
+      EdgeCharacter: 4
+      ShapeDiversity: 0
+      Grounding: 2
+      Lean: 2
+      FineScale: 1.052
+      WidthBias: 1.021
+      HeightBias: 1.084
+      DepthBias: 0.95
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1042099020
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -4935,7 +5575,7 @@ Transform:
   m_GameObject: {fileID: 1046290411}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 19.842, y: 0.14999998, z: -11.196}
+  m_LocalPosition: {x: 19.81, y: 0.14999998, z: -11.61}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -5285,6 +5925,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 3
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 3
+    ShapeSeed: 6643
+    SurfaceSeed: 7566
+    Size: 1
+    FormComplexity: 4
+    SurfaceFacetDensity: 3
+    EdgeCharacter: 3
+    ShapeDiversity: 2
+    Grounding: 2
+    Lean: 0
+    FineScale: 1
+    WidthBias: 1.3
+    HeightBias: 0.7
+    DepthBias: 0.7
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 3
+      ShapeSeed: 6643
+      SurfaceSeed: 7566
+      Size: 1
+      FormComplexity: 4
+      SurfaceFacetDensity: 3
+      EdgeCharacter: 3
+      ShapeDiversity: 2
+      Grounding: 2
+      Lean: 0
+      FineScale: 1
+      WidthBias: 1.3
+      HeightBias: 0.7
+      DepthBias: 0.7
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1112228205
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -5725,6 +6429,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 3
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 3
+    ShapeSeed: 6992
+    SurfaceSeed: 7566
+    Size: 1
+    FormComplexity: 4
+    SurfaceFacetDensity: 3
+    EdgeCharacter: 3
+    ShapeDiversity: 2
+    Grounding: 2
+    Lean: 0
+    FineScale: 1
+    WidthBias: 1.3
+    HeightBias: 0.7
+    DepthBias: 0.7
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 3
+      ShapeSeed: 6992
+      SurfaceSeed: 7566
+      Size: 1
+      FormComplexity: 4
+      SurfaceFacetDensity: 3
+      EdgeCharacter: 3
+      ShapeDiversity: 2
+      Grounding: 2
+      Lean: 0
+      FineScale: 1
+      WidthBias: 1.3
+      HeightBias: 0.7
+      DepthBias: 0.7
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1205211015
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -5941,6 +6709,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 1
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 1
+    ShapeSeed: 1468
+    SurfaceSeed: 7566
+    Size: 0
+    FormComplexity: 3
+    SurfaceFacetDensity: 3
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 0
+    Lean: 1
+    FineScale: 0.85
+    WidthBias: 0.7
+    HeightBias: 0.7
+    DepthBias: 0.7
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 1
+      ShapeSeed: 1468
+      SurfaceSeed: 7566
+      Size: 0
+      FormComplexity: 3
+      SurfaceFacetDensity: 3
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 0
+      Lean: 1
+      FineScale: 0.85
+      WidthBias: 0.7
+      HeightBias: 0.7
+      DepthBias: 0.7
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1229904452
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -6200,6 +7032,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 1
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 1
+    ShapeSeed: 3356
+    SurfaceSeed: 7566
+    Size: 0
+    FormComplexity: 3
+    SurfaceFacetDensity: 1
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 2
+    Lean: 1
+    FineScale: 0.888
+    WidthBias: 1
+    HeightBias: 1
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 1
+      ShapeSeed: 3356
+      SurfaceSeed: 7566
+      Size: 0
+      FormComplexity: 3
+      SurfaceFacetDensity: 1
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 2
+      Lean: 1
+      FineScale: 0.888
+      WidthBias: 1
+      HeightBias: 1
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1240706388
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -6689,6 +7585,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 0
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 6643
+    SurfaceSeed: 7566
+    Size: 0
+    FormComplexity: 4
+    SurfaceFacetDensity: 0
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 0
+    Lean: 2
+    FineScale: 0.85
+    WidthBias: 1
+    HeightBias: 1
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 6643
+      SurfaceSeed: 7566
+      Size: 0
+      FormComplexity: 4
+      SurfaceFacetDensity: 0
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 0
+      Lean: 2
+      FineScale: 0.85
+      WidthBias: 1
+      HeightBias: 1
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1302693752
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7030,6 +7990,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 4
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 4
+    ShapeSeed: 2308
+    SurfaceSeed: 7566
+    Size: 2
+    FormComplexity: 2
+    SurfaceFacetDensity: 3
+    EdgeCharacter: 1
+    ShapeDiversity: 2
+    Grounding: 1
+    Lean: 1
+    FineScale: 0.987
+    WidthBias: 1
+    HeightBias: 1.082
+    DepthBias: 1.073
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 4
+      ShapeSeed: 2308
+      SurfaceSeed: 7566
+      Size: 2
+      FormComplexity: 2
+      SurfaceFacetDensity: 3
+      EdgeCharacter: 1
+      ShapeDiversity: 2
+      Grounding: 1
+      Lean: 1
+      FineScale: 0.987
+      WidthBias: 1
+      HeightBias: 1.082
+      DepthBias: 1.073
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1369079058
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7343,6 +8367,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 0
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 5727
+    SurfaceSeed: 3930
+    Size: 2
+    FormComplexity: 2
+    SurfaceFacetDensity: 2
+    EdgeCharacter: 2
+    ShapeDiversity: 1
+    Grounding: 1
+    Lean: 1
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 1
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 5727
+      SurfaceSeed: 3930
+      Size: 2
+      FormComplexity: 2
+      SurfaceFacetDensity: 2
+      EdgeCharacter: 2
+      ShapeDiversity: 1
+      Grounding: 1
+      Lean: 1
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 1
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1374330460
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7722,6 +8810,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 0
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 5315
+    SurfaceSeed: 7566
+    Size: 0
+    FormComplexity: 3
+    SurfaceFacetDensity: 3
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 0
+    Lean: 0
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 0.811
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 5315
+      SurfaceSeed: 7566
+      Size: 0
+      FormComplexity: 3
+      SurfaceFacetDensity: 3
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 0
+      Lean: 0
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 0.811
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1511177835
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -8347,7 +9499,7 @@ MonoBehaviour:
   featureRecipe: 0
   stoneSurfaceProfile: 1
   baseColor: {r: 0.39061943, g: 0.39342293, b: 0.3962264, a: 1}
-  surfaceMaskDebug: 4
+  surfaceMaskDebug: 0
   surfaceMaskBaseLift: 0.0517
   creviceReach: 1.024
   creviceSmoothness: 0.995
@@ -8369,10 +9521,10 @@ MonoBehaviour:
   overallRockTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   overallRockTintStrength: 0
   lightingTintInfluence: 0.8
-  edgeWearAmount: 0.741
-  edgeWearWidth: 0.956
-  edgeWearCoverage: 2
-  edgeWearSoftness: 0.463
+  edgeWearAmount: 0.238
+  edgeWearWidth: 0.868
+  edgeWearCoverage: 0.954
+  edgeWearSoftness: 0.258
   edgeWearResponseStrength: 1
   edgeWearBrightnessLift: 1
   edgeWearTint: {r: 0.7, g: 0.69, b: 0.62, a: 1}
@@ -8415,6 +9567,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 0
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 5727
+    SurfaceSeed: 3778
+    Size: 2
+    FormComplexity: 2
+    SurfaceFacetDensity: 2
+    EdgeCharacter: 2
+    ShapeDiversity: 1
+    Grounding: 1
+    Lean: 1
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 1
+    DepthBias: 1
+    SurfaceVariation: 0.225
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 5727
+      SurfaceSeed: 3778
+      Size: 2
+      FormComplexity: 2
+      SurfaceFacetDensity: 2
+      EdgeCharacter: 2
+      ShapeDiversity: 1
+      Grounding: 1
+      Lean: 1
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 1
+      DepthBias: 1
+      SurfaceVariation: 0.225
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 0.238
+    EdgeWearWidth: 0.868
+    EdgeWearCoverage: 0.954
+    EdgeWearSoftness: 0.258
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1595308778
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -8762,6 +9978,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 4
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 4
+    ShapeSeed: 5875
+    SurfaceSeed: 7566
+    Size: 5
+    FormComplexity: 4
+    SurfaceFacetDensity: 2
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 2
+    Lean: 2
+    FineScale: 1.008
+    WidthBias: 0.939
+    HeightBias: 0.761
+    DepthBias: 1.3
+    SurfaceVariation: 0.237
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 4
+      ShapeSeed: 5875
+      SurfaceSeed: 7566
+      Size: 5
+      FormComplexity: 4
+      SurfaceFacetDensity: 2
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 2
+      Lean: 2
+      FineScale: 1.008
+      WidthBias: 0.939
+      HeightBias: 0.761
+      DepthBias: 1.3
+      SurfaceVariation: 0.237
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1624202336
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -9437,13 +10717,32 @@ MonoBehaviour:
   foamVisualOccupancyReleaseTime: 0.8
   foamMaterialLifecycleTuningVersion: 1
   foamVelocityTuningVersion: 1
-  foamColour: {r: 0.85884655, g: 0.9243452, b: 0.9529412, a: 0.9137255}
-  foamInteriorOpacityFloor: 0
-  foamEdgeContrast: 0
+  foamColour: {r: 0.80544674, g: 0.9031609, b: 0.9433962, a: 0.7882353}
+  foamInteriorOpacityFloor: 0.352
+  foamEdgeContrast: -0.356
   foamChipStrength: 0
   foamFrayStrength: 0
   foamBreakupScale: 0
-  foamDebugView: 0
+  foamChipActivation: 0.6
+  foamChipCandidateSpacing: 0.15
+  foamChipDistributionIrregularity: 1
+  foamChipRadius: 0.22
+  foamChipRadiusRatio: 0.18
+  foamChipSizeIrregularity: 0.91
+  foamChipShapeIrregularity: 0.85
+  foamChipSelectionDepth: 0.6
+  foamChipFieldSpeed: 0.11
+  foamChipEvolutionRate: 0.18
+  foamChipEvolutionAmount: 0.11
+  foamFraySelectionDepth: 0.68
+  foamFrayWavelength: 0.06
+  foamFrayDepth: 0
+  foamChipFraySelectionTuningVersion: 5
+  foamStrandStrength: 0.86
+  foamStrandScale: 0.56
+  foamStrandDensity: 0.5
+  foamStrandReach: 0.46
+  foamDebugView: 18
   foamSpawnDistanceNormalized: 0.634
   foamSpawnAcrossNormalized: -0.27
   foamSpawnScale: 0.538
@@ -10266,6 +11565,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 3
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 3
+    ShapeSeed: 5524
+    SurfaceSeed: 7566
+    Size: 4
+    FormComplexity: 0
+    SurfaceFacetDensity: 0
+    EdgeCharacter: 0
+    ShapeDiversity: 0
+    Grounding: 0
+    Lean: 1
+    FineScale: 0.85
+    WidthBias: 1.019
+    HeightBias: 0.7
+    DepthBias: 1.094
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 3
+      ShapeSeed: 5524
+      SurfaceSeed: 7566
+      Size: 4
+      FormComplexity: 0
+      SurfaceFacetDensity: 0
+      EdgeCharacter: 0
+      ShapeDiversity: 0
+      Grounding: 0
+      Lean: 1
+      FineScale: 0.85
+      WidthBias: 1.019
+      HeightBias: 0.7
+      DepthBias: 1.094
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1865931327
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -10482,6 +11845,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 1
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 1
+    ShapeSeed: 839
+    SurfaceSeed: 7566
+    Size: 0
+    FormComplexity: 3
+    SurfaceFacetDensity: 3
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 0
+    Lean: 1
+    FineScale: 0.85
+    WidthBias: 0.7
+    HeightBias: 0.7
+    DepthBias: 0.7
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 1
+      ShapeSeed: 839
+      SurfaceSeed: 7566
+      Size: 0
+      FormComplexity: 3
+      SurfaceFacetDensity: 3
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 0
+      Lean: 1
+      FineScale: 0.85
+      WidthBias: 0.7
+      HeightBias: 0.7
+      DepthBias: 0.7
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1871029509
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -11102,6 +12529,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 1
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 1
+    ShapeSeed: 5734
+    SurfaceSeed: 3930
+    Size: 3
+    FormComplexity: 3
+    SurfaceFacetDensity: 1
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 2
+    Lean: 1
+    FineScale: 0.888
+    WidthBias: 1
+    HeightBias: 1
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 1
+      ShapeSeed: 5734
+      SurfaceSeed: 3930
+      Size: 3
+      FormComplexity: 3
+      SurfaceFacetDensity: 1
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 2
+      Lean: 1
+      FineScale: 0.888
+      WidthBias: 1
+      HeightBias: 1
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &1930435765
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -11350,6 +12841,70 @@ MonoBehaviour:
   recipeInitialized: 1
   lastAppliedArchetype: 0
   lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 5734
+    SurfaceSeed: 7566
+    Size: 0
+    FormComplexity: 3
+    SurfaceFacetDensity: 3
+    EdgeCharacter: 4
+    ShapeDiversity: 2
+    Grounding: 0
+    Lean: 0
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 0.811
+    DepthBias: 1
+    SurfaceVariation: 0.35
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 5734
+      SurfaceSeed: 7566
+      Size: 0
+      FormComplexity: 3
+      SurfaceFacetDensity: 3
+      EdgeCharacter: 4
+      ShapeDiversity: 2
+      Grounding: 0
+      Lean: 0
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 0.811
+      DepthBias: 1
+      SurfaceVariation: 0.35
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 1
+    EdgeWearWidth: 1
+    EdgeWearCoverage: 1
+    EdgeWearSoftness: 0.45
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
 --- !u!64 &2023166519
 MeshCollider:
   m_ObjectHideFlags: 0

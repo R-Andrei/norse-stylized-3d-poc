@@ -30,19 +30,9 @@ namespace ProgrammaticStylized3D.Rendering
         // those serialized debug values remain stable.
         GroundStandingWaterPotential = 27,
 
-        // Generated accepted projected-glyph coverage. When V3J.4B coverage
-        // is unavailable, the shader falls back to the historical line field.
-        // The value remains stable for serialized debug selections.
+        // Generated accepted projected-glyph coverage. This is the sole active
+        // Painted Accent shader diagnostic after legacy fold-field retirement.
         GroundPaintedAccentLines = 28,
-
-        // Painted accent visual-relief channels. These expose the wider soft
-        // fold body and signed side field separately from the thin contour.
-        GroundPaintedAccentRelief = 29,
-        GroundPaintedAccentSignedRelief = 30,
-
-        // Debug-only final-response proof for generated fold-field data. This
-        // deliberately does not re-enable normal final-render contribution.
-        GroundPaintedAccentFinalPrototype = 31,
 
         // GeneratedMass generic boundary-atlas diagnostics. These are
         // intentionally placed after the ground debug modes so existing

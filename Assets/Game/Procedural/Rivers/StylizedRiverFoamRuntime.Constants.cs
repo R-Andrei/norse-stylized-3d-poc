@@ -249,12 +249,46 @@ namespace ProgrammaticStylized3D.Rivers
             StaleCompatible
         }
 
-        private enum AutomaticDevelopmentRebuildReason
+        private enum TopologyCacheStartupOutcome
         {
-            None,
-            StartupMiss,
-            Settings,
-            Obstacles
+            NotEvaluated,
+            Exact,
+            StaleCompatible,
+            PreparationRequired,
+            Failed
+        }
+
+        [Flags]
+        private enum TopologyCacheStartupReason
+        {
+            None = 0,
+            InputsUnavailable = 1 << 0,
+            Unassigned = 1 << 1,
+            StorageVersion = 1 << 2,
+            EmptyPayload = 1 << 3,
+            InvalidPayload = 1 << 4,
+            MetadataMismatch = 1 << 5,
+            IncompleteContract = 1 << 6,
+            DomainMismatch = 1 << 7,
+            ObstacleMismatch = 1 << 8,
+            GenerationMismatch = 1 << 9,
+            CombinedMismatch = 1 << 10,
+            InstallRejected = 1 << 11
+        }
+
+        [Flags]
+        private enum TopologyStartupDirtyReason
+        {
+            None = 0,
+            RiverUnavailable = 1 << 0,
+            DomainInvalid = 1 << 1,
+            DomainChanged = 1 << 2,
+            QualityChanged = 1 << 3,
+            GeneratedSourceAdded = 1 << 4,
+            GeneratedSourceRemoved = 1 << 5,
+            GeneratedSourceChanged = 1 << 6,
+            ObstaclesChanged = 1 << 7,
+            TopologySettingsChanged = 1 << 8
         }
 
         private enum InitializationPhase
@@ -273,7 +307,7 @@ namespace ProgrammaticStylized3D.Rivers
             BuildBoundary,
             WaitForObstacleStability,
             ResolveTopologyCache,
-            AwaitExplicitTopologyGeneration,
+            CachePreparationRequired,
             InstallCachedTopology,
             BuildObstacleExclusion,
             BuildMajorTopology,
@@ -518,26 +552,44 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamInteriorOpacityFloor");
         private static readonly int FoamEdgeContrastId =
             Shader.PropertyToID("_FoamEdgeContrast");
-        private static readonly int FoamChipStrengthId =
-            Shader.PropertyToID("_FoamChipStrength");
         private static readonly int FoamFrayStrengthId =
             Shader.PropertyToID("_FoamFrayStrength");
         private static readonly int FoamBreakupScaleId =
             Shader.PropertyToID("_FoamBreakupScale");
+        private static readonly int FoamChipActivationId =
+            Shader.PropertyToID("_FoamChipActivation");
+        private static readonly int FoamChipCandidateSpacingId =
+            Shader.PropertyToID("_FoamChipCandidateSpacing");
+        private static readonly int FoamChipDistributionIrregularityId =
+            Shader.PropertyToID("_FoamChipDistributionIrregularity");
+        private static readonly int FoamChipRadiusRatioId =
+            Shader.PropertyToID("_FoamChipRadiusRatio");
+        private static readonly int FoamChipSizeIrregularityId =
+            Shader.PropertyToID("_FoamChipSizeIrregularity");
+        private static readonly int FoamChipShapeIrregularityId =
+            Shader.PropertyToID("_FoamChipShapeIrregularity");
+        private static readonly int FoamChipSelectionDepthId =
+            Shader.PropertyToID("_FoamChipSelectionDepth");
+        private static readonly int FoamChipFieldSpeedId =
+            Shader.PropertyToID("_FoamChipFieldSpeed");
+        private static readonly int FoamChipEvolutionRateId =
+            Shader.PropertyToID("_FoamChipEvolutionRate");
+        private static readonly int FoamChipEvolutionAmountId =
+            Shader.PropertyToID("_FoamChipEvolutionAmount");
+        private static readonly int FoamFraySelectionDepthId =
+            Shader.PropertyToID("_FoamFraySelectionDepth");
+        private static readonly int FoamFrayWavelengthId =
+            Shader.PropertyToID("_FoamFrayWavelength");
+        private static readonly int FoamFrayDepthId =
+            Shader.PropertyToID("_FoamFrayDepth");
         private static readonly int FoamStrandStrengthId =
             Shader.PropertyToID("_FoamStrandStrength");
-        private static readonly int FoamStrandSpacingId =
-            Shader.PropertyToID("_FoamStrandSpacing");
-        private static readonly int FoamStrandWidthId =
-            Shader.PropertyToID("_FoamStrandWidth");
-        private static readonly int FoamStrandCurvatureId =
-            Shader.PropertyToID("_FoamStrandCurvature");
-        private static readonly int FoamFragmentationStrengthId =
-            Shader.PropertyToID("_FoamFragmentationStrength");
-        private static readonly int FoamFragmentSizeId =
-            Shader.PropertyToID("_FoamFragmentSize");
-        private static readonly int FoamFragmentReachId =
-            Shader.PropertyToID("_FoamFragmentReach");
+        private static readonly int FoamStrandScaleId =
+            Shader.PropertyToID("_FoamStrandScale");
+        private static readonly int FoamStrandDensityId =
+            Shader.PropertyToID("_FoamStrandDensity");
+        private static readonly int FoamStrandReachId =
+            Shader.PropertyToID("_FoamStrandReach");
         private static readonly int FoamSharpnessId =
             Shader.PropertyToID("_FoamSharpness");
         private static readonly int FoamFinalVisibilityModeId =

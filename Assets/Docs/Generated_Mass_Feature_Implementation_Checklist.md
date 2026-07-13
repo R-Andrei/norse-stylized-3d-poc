@@ -1213,17 +1213,503 @@ MG-R6B.1 evidence proves that all 22 target overlaps are removed, but all 22 tra
 - [x] Expand `planeBevel=` with `seamPairs` after `conformalSplits`.
 - [x] Consolidate all progress history into this file and remove duplicate timelines, result censuses, and next-step lists from the inventory, architecture, and framework documents.
 
-### EW-K1.3 Unity exit criteria
+### EW-K1.3 Unity result
+
+- [x] Unity compiles with zero errors and zero warnings.
+- [x] Exactly 24 compact audits are emitted with every unrelated field unchanged.
+- [x] Every clone reports `planesBuilt=active` and `planesRejected=0`.
+- [x] The exceptional seam mass reports `seamPairs=2`, `open=0`, and `valid=1`.
+- [x] All 24 clones report zero open edges, non-manifold edges, T-junctions, and invalid faces.
+- [x] Valid clones increase from 20/24 to 21/24.
+- [ ] Three cuts still report `capsMissing=1`; each final mesh is topology-clean and already satisfies the cut plane, but the approximate source-line test still rejects redundancy.
+- [x] Rendered geometry remains unchanged and `geometryCommit=disabled` remains present.
+
+## EW-K1.4 — Strict half-space redundancy and editor preview
+
+- [x] Record each candidate's measured `MinimumSourceRemoval`.
+- [x] Define redundancy from the final convex half-space result under a tolerance strictly below half of `MinimumSourceRemoval`.
+- [x] Remove approximate source-line overlap as an authoritative redundancy gate.
+- [x] Keep `capsMissing` as a hard failure whenever any final vertex remains outside the candidate half-space.
+- [x] Return the audited clone from the kernel without changing normal generation.
+- [x] Add an editor-only, non-serialized `Show Plane-Cut Bevel Preview` control to `GeneratedMassEditor`.
+- [x] Apply preview faces only when the clone reports `valid=1`; otherwise retain normal geometry.
+- [x] Disable preview generation in Play Mode and provide an explicit `Show Production Geometry` action.
+- [x] Keep the production `MassGenerator.Generate` entry point and all runtime callers on normal geometry.
+- [x] Update progress only in this canonical ledger; update the code inventory only for current method/API ownership.
+
+### EW-K1.4 Unity result
+
+- [x] Unity compiles and emits the expected 24 compact audits.
+- [x] Every clone reports `planesBuilt=active`, `planesRejected=0`, `capsMissing=0`, zero polygon-topology failures, and `valid=1`.
+- [x] The three former no-cap cases are accounted for as verified redundancies.
+- [x] Normal inspector regeneration retains production geometry while preview is disabled.
+- [x] The editor-only preview can be displayed and restored explicitly.
+- [ ] Visual approval failed: representative previews lose or fold large surface regions and expose displaced-centre triangle fans.
+- [x] Root cause is a certification boundary mismatch: polygon faces are audited, then `TriangulatePolyhedron` sanitizes them again and applies displaced-centre surface relief before rendering.
+- [x] A second missing guard allows an infinite local bevel plane to remove unrelated source vertices while still passing broad retained-volume validation.
+- [x] Production geometry remains uncommitted; `geometryCommit=disabled` remains active.
+
+## EW-K1.5 — Audited mesh handoff and local-cut guard
+
+- [x] Localize every candidate plane so every unrelated original topology vertex remains inside its half-space.
+- [x] Reject a localized plane when retaining unrelated vertices prevents meaningful removal of both selected source-edge endpoints.
+- [x] Record localized-plane count in compact `planeBevel=` evidence.
+- [x] Sanitize the completed clone once before the authoritative final polygon audit.
+- [x] Run conformity and conservative seam repair after that sanitation, with no later polygon sanitation.
+- [x] Triangulate the exact audited faces directly with flat deterministic convex fans.
+- [x] Bypass displaced-centre relief and the ordinary second sanitation pass for editor preview only.
+- [x] Audit the exact preview triangle soup for degeneracy, winding, welded open/non-manifold edges, bounds agreement, and volume agreement.
+- [x] Add compact `planeMesh=triangles/degenerate/open/nonManifold/winding/bounds/volume/valid` evidence.
+- [x] Return the exact audited triangle soup to the editor preview; retain production geometry whenever either polygon or triangle audit fails.
+- [x] Keep runtime production generation, serialized assets, shaders, materials, scenes, prefabs, layers, tags, and components unchanged.
+
+### EW-K1.5 Unity result
+
+- [x] Unity compiles with zero errors and zero warnings.
+- [x] Exactly 24 compact audits are emitted with every unrelated field unchanged.
+- [x] Every accepted plane preserves all unrelated source vertices; impossible local candidates are rejected rather than clipping another region.
+- [x] Twenty-one masses report fully valid polygon and triangle-soup previews.
+- [x] Three masses each reject exactly one locality-incompatible edge; the other 495 active cuts remain valid.
+- [x] Each blocked mass falls back to production geometry because EW-K1.5 treats one locality rejection as fatal to the whole preview.
+- [x] The tested blocked rock therefore shows no preview change, a dark Edge Wear debug view, `planeMesh=0/0/0/0/0/0/0/0`, and repeated identical audit output while toggling.
+- [x] `Show Production Geometry` still restores the original geometry immediately.
+- [x] Production generation and `geometryCommit=disabled` remain unchanged.
+
+## EW-K1.6 — Safe partial preview and deferred-edge accounting
+
+- [x] Reclassify only the specific locality failure “retain unrelated vertices but cannot still remove the selected source edge” as a safe per-edge deferral.
+- [x] Keep malformed provenance, invalid normals, non-coplanar rails, non-local solved planes, duplicate caps, topology damage, and triangle-soup failures as hard rejections.
+- [x] Permit preview validity when `planesBuilt + planesDeferred = active`, `planesRejected = 0`, at least one plane is built, and all cap/topology/mesh gates pass.
+- [x] Continue auditing and rendering only the successfully built local cuts; deferred edges retain their original sharp source geometry.
+- [x] Add `planesDeferred` to compact `planeBevel=` evidence after `planesLocalized`.
+- [x] Return a non-serialized preview status containing active, built, deferred, rejected, applied, and concise diagnostic state.
+- [x] Show explicit inspector feedback when a partial preview is active, including built/active and deferred counts.
+- [x] Name the transient mesh as a plane-cut preview only when the audited preview was actually adopted.
+- [x] Keep production generation, Play Mode, serialization, materials, shaders, scenes, prefabs, tags, layers, and components unchanged.
+
+### EW-K1.6 Unity result
+
+- [x] Unity compiles with zero errors and zero warnings.
+- [x] Valid non-zero `planeMesh` previews render real bevel faces without the destructive clipping or displaced-centre fan failures seen in EW-K1.4.
+- [x] The Edge Wear debug view marks the accepted plane-cut bevel faces.
+- [x] Safe locality deferral permits useful partial previews rather than suppressing every valid bevel on a mass.
+- [x] Representative previews confirm controllable physical bevel geometry is now visually available for evaluation.
+- [x] Remaining visual issues are ordinary authoring/topology-quality issues: excessive width at current settings, uniform straight strips, some deferred edges, and artificial recessed base junctions where competing bevel planes trim a primary vertical strip into multiple triangles.
+- [x] `Show Production Geometry` and Play Mode remain on production geometry.
+- [x] `geometryCommit=disabled` remains active.
+
+## EW-K2 — Base-junction strip preservation and authoritative width control
+
+- [x] Keep the successful convex plane-cut and final triangle-soup audit architecture unchanged.
+- [x] Reuse the existing serialized `Edge Wear > Width` field as the sole authoritative physical bevel-width control; do not add a competing preview-only width setting.
+- [x] Preserve the established physical mapping for values `0.25-2.0`.
+- [x] Extend the same control below `0.25` with a thinner `0.0015-0.006` maximum-dimension range so the current oversized look can be reduced without changing existing serialized values.
+- [x] Detect selected multi-edge junctions close to the generated mass base.
+- [x] At a base junction with one clearly dominant vertical structural edge, preserve that primary bevel strip to the base and safely defer competing low-verticality base-edge cuts that would trim it into an inward triangular pit.
+- [x] Keep all non-junction locality deferral, malformed-candidate rejection, polygon audit, and exact triangle-soup audit gates unchanged.
+- [x] Add compact `planeJunction=vertices/protectedEdges/deferredEdges` evidence without adding verbose per-junction logs.
+- [x] Keep runtime production promotion disabled.
+
+### EW-K2 Unity result
+
+- [x] Unity compiles with zero errors and zero warnings.
+- [x] The existing `Edge Wear > Width` control works across the expanded thin range and remains the sole physical width control.
+- [x] Representative successful previews retain non-zero valid `planeMesh`.
+- [x] Width reduction exposes the junction defect more clearly because accidental narrow crevices receive stronger shadowing.
+- [ ] Visual junction approval failed: tapered strips, widening wedges, recessed endpoint pits, and several-triangle closures remain common at base, upper, side, and non-vertical junctions.
+- [x] Compact evidence confirms the base-only heuristic is non-general: almost every mass reports `planeJunction=0/0/0`; only one mass reports a non-zero result.
+- [x] The base-only dominant-vertical-edge deferral rule is rejected as the general solution and must not be extended with more orientation-specific cases.
+- [x] Production promotion remains disabled and `geometryCommit=disabled` remains present.
+
+## EW-K2.1 — General vertex junction caps
+
+- [x] Retire the base-only dominant-vertical-edge junction deferral heuristic.
+- [x] Preserve the validated edge-plane kernel, safe locality deferral, Width mapping, polygon audit, and exact triangle-soup audit.
+- [x] Record source edge index, endpoint vertex indices, and solved width on every accepted edge-plane candidate.
+- [x] Group accepted edge cuts by original source vertex after all edge planes are applied.
+- [x] Treat every original vertex with at least two built incident bevels as a general junction candidate.
+- [x] Derive one outward junction normal from the incident bevel-plane normals.
+- [x] Derive conservative cutback from the smallest incident solved width.
+- [x] Retain every unrelated original topology vertex and require all removed current points to remain within a local junction radius.
+- [x] Apply each junction cut transactionally; commit only one unique stable local `ConvexEdgeWear` cap.
+- [x] Classify accepted caps as triangle, quad, or larger convex polygon.
+- [x] Reject collapsed, remote, or pathological sliver caps without removing the already-valid incident edge bevels.
+- [x] Add compact `planeVertexJunction=candidates/built/deferred/triangleCaps/quadCaps/largerCaps/sliverRejected` evidence.
+- [x] Update progress only in this canonical ledger; update inventory and architecture only for current ownership and contracts.
+- [x] Keep runtime production promotion disabled.
+
+### EW-K2.1 Unity result
+
+- [x] Unity compiles with zero errors and zero warnings.
+- [x] Existing `planeBevel` and `planeMesh` topology validity remains intact.
+- [x] `planeVertexJunction` reports general candidates across all representative masses and multiple junction orientations.
+- [x] Accepted caps remain polygon-clean and exact-triangle-soup valid.
+- [x] Some previously defective junctions are visibly replaced by deliberate flat caps.
+- [ ] Visual completion failed: representative rocks still retain tapered wedges and dark crevice junctions where the one-shot cap attempt is deferred or sliver-rejected.
+- [x] The representative rock reports `10` candidates, `6` built, `3` deferred, and `1` sliver rejection; the same four unresolved junctions remain visible across width changes.
+- [x] The one-normal/one-depth attempt is therefore retained only as the direct first trial, not as the complete solver.
+- [x] Width values from `0.05` through `2.0` continue to control physical strip width.
+- [x] `Show Production Geometry`, Play Mode, and `geometryCommit=disabled` remain unchanged.
+
+## EW-K2.2 — Global junction solver with deterministic edge backtracking
+
+- [x] Rebuild every solver state from the original source polyhedron rather than mutating one failed junction attempt into the next.
+- [x] Maintain one explicit state containing active edge planes, accepted junction planes, and deterministically deferred source-edge IDs.
+- [x] Search a bounded deterministic family of junction normals: incident bevel-normal sum, angle-weighted original face-normal sum, radial direction, and fixed blends.
+- [x] Search fixed cutback factors derived from the local solved bevel width.
+- [x] Require every accepted trial to create one unique local cap, join every preserved incident bevel strip, retain unrelated original vertices, pass cap-quality gates, and pass the exact prepared polygon and triangle-soup audit.
+- [x] Score direct and adaptive junction candidates together by minimum cut depth, then compactness, lower polygon complexity, and stable normal rank.
+- [x] Use breadth-first edge backtracking so the first accepted solution preserves the maximum number of edge bevels within the bounded state search.
+- [x] At an unresolved vertex, branch only by deferring one incident edge, ordered deterministically by localization burden, strength, selection score, solved width, source-edge length, and source-edge index.
+- [x] Re-solve both endpoints and every downstream junction from the original polyhedron after each deferral.
+- [x] Retain a deterministic greedy fallback only after the bounded breadth-first search is exhausted; never retain an unresolved miter as a valid result.
+- [x] Permit final vertex states only as an audited junction cap, one remaining active bevel, or no active bevel.
+- [x] Replace compact evidence with `planeVertexJunction=candidates/directBuilt/adaptiveBuilt/backtrackBuilt/cleanSharp/unresolved/triangleCaps/quadCaps/largerCaps/edgesDeferred/rebuildPasses`.
+- [x] Require `unresolved=0` for polygon and preview validity.
+- [x] Keep progress history only in this canonical ledger and keep production promotion disabled.
+
+### EW-K2.2 Unity exit criteria
 
 - [ ] Unity compiles with zero errors and zero warnings.
-- [ ] Exactly 24 compact audits are emitted with every unrelated field unchanged.
-- [ ] Every clone reports `planesBuilt=active` and `planesRejected=0`.
-- [ ] The exceptional seam mass reports `seamPairs=2` and `open=0`, or remains rejected without arbitrary repair if the pairs are not mutually unique.
-- [ ] The three no-cap cuts are classified as verified redundant only when their original source edges are absent; `capsMissing=0`.
-- [ ] Every clone reports zero open edges, non-manifold edges, T-junctions, and invalid faces.
-- [ ] Every clone reports `valid=1`.
-- [ ] Rendered geometry remains unchanged and `geometryCommit=disabled` remains present.
-- [ ] On success, stop clone-topology development and expose an editor-only plane-cut visual preview.
+- [ ] All 24 masses report `planeVertexJunction.unresolved=0`.
+- [ ] Every preview-eligible mass reports valid `planeBevel` and `planeMesh` topology.
+- [ ] The representative `10`-candidate rock has no remaining tapered wedge or dark crevice junction.
+- [ ] Edge deferrals are deterministic and limited to the minimum compatible set found by the bounded global search.
+- [ ] Every excluded edge is accounted for by `planesDeferred` and `planeVertexJunction.edgesDeferred`.
+- [ ] Width remains functional across `0.05-2.0`.
+- [ ] Production geometry, Play Mode, and `geometryCommit=disabled` remain unchanged.
+
+
+## EW-K2.2R1 — Emergency solver isolation and explicit preview evaluation
+
+- [x] Hard-gate `AuditPlaneCutBevelKernel(...)` behind explicit plane-cut preview generation.
+- [x] Make normal `GeneratedMass.Regenerate()` production-only.
+- [x] Replace the persistent preview toggle with explicit `Evaluate`, `Refresh`, and `Show Production Geometry` editor actions.
+- [x] Mark evaluated previews stale after serialized changes without automatically rerunning the solver.
+- [x] Add a per-object regeneration re-entrancy guard.
+- [x] Preserve the EW-K2.2 solver implementation for later measured optimization.
+- [x] Keep production promotion disabled.
+
+### EW-K2.2R1 Unity result
+
+- [x] Unity compilation/domain reload returns to a usable duration instead of remaining in `Running Backend` indefinitely.
+- [x] Ordinary generation records report zero `planeBevel`, `planeVertexJunction`, and `planeMesh` work, proving the solver no longer runs from domain reload or normal regeneration.
+- [x] One explicit representative preview evaluates successfully and remains editor-only.
+- [x] Explicit evaluation still takes approximately eight seconds for one mass.
+- [x] The representative preview reports `planeBevel=18/15/12/0/3/0/12/0/0/0/2/0/0/0/0/1`.
+- [x] The same preview reports `planeVertexJunction=10/1/4/2/3/0/0/1/6/3/15` and a valid `198`-triangle preview mesh.
+- [ ] Visual approval still fails: a long narrow bevel/junction region reads as a dark trench and contains visibly different triangle lighting.
+- [x] The result proves topology validity alone is insufficient; final bevel/junction face planarity and junction-cap shape quality must become authoritative validity gates.
+- [x] The attached ordinary-generation log contains two matching 24-mass sequences, confirming the broader duplicate `OnEnable`/`OnValidate` regeneration issue remains for later `MG-P1`.
+- [x] `geometryCommit=disabled` remains active.
+
+## EW-K2.2R2 — Bounded solver and certified face quality
+
+- [x] Add compact `planeSolve=states/junctions/trials/rebuilds/polygonAudits/triangleAudits/edgesDeferred/elapsedMs/timedOut` metrics.
+- [x] Reduce the interactive breadth-first state ceiling from `512` to `48`.
+- [x] Add a hard three-second editor solve budget.
+- [x] Stop rebuilding all edge and prior junction planes for every local candidate.
+- [x] Build the edge-only state once, clone the current accepted state per local trial, and apply only the proposed new junction plane.
+- [x] Retain one authoritative full system rebuild and exact polygon/triangle audit per complete clean state.
+- [x] Remove exact polygon and triangle-soup audits from the inner normal/depth trial loop.
+- [x] Count candidate trials, state rebuilds, exact audits, deferred edges, elapsed time, and timeout state without per-trial logging.
+- [x] Raise the minimum accepted junction-cap compactness from `0.005` to `0.06`.
+- [x] Add a hard junction-cap aspect limit of `12`.
+- [x] Rank valid candidates by lower aspect ratio, then higher compactness, lower polygon complexity, lower cut depth, and stable normal rank.
+- [x] Reject complete states when final prepared junction caps fall outside the same compactness/aspect limits.
+- [x] Add final edge-wear face planarity and triangle-normal-spread certification.
+- [x] Reject final previews containing any edge-wear face over the scale-relative plane-deviation limit or `0.75` degrees of triangle-normal spread.
+- [x] Add compact `planeFaceQuality=faces/seamTouched/nonPlanar/elongated/maxDeviation/maxNormalSpread/minJunctionCompactness/maxJunctionAspect/worstVertices` evidence.
+- [x] Project conservative seam-repair snap targets onto the two incident analytical face planes.
+- [x] Reject and roll back seam repair if projected endpoints move beyond the narrow seam tolerance, disturb topology, or move any touched face off its original plane.
+- [x] Keep production generation, serialized assets, shaders, materials, scenes, prefabs, tags, layers, and components unchanged.
+- [x] Keep production promotion disabled.
+
+### EW-K2.2R2 Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] Normal domain reload still performs zero plane-cut solver work.
+- [ ] One representative explicit preview completes in at most the three-second solver budget.
+- [ ] `planeSolve.timedOut=0` for the representative mass, or the preview aborts cleanly with production geometry retained when the budget is exceeded.
+- [ ] Inner exact audit counts are bounded near completed-state count rather than candidate-trial count.
+- [ ] `planeFaceQuality.nonPlanar=0`.
+- [ ] `planeFaceQuality.elongated=0`.
+- [ ] Maximum triangle-normal spread remains below `0.75` degrees.
+- [ ] The pictured long dark trench is removed or the responsible edge/junction is deliberately deferred instead of certified.
+- [ ] Every accepted preview retains zero open edges, non-manifold edges, T-junctions, invalid faces, winding failures, bounds failures, and volume failures.
+- [ ] Width remains functional across `0.05-2.0`.
+- [ ] Production geometry, Play Mode, and `geometryCommit=disabled` remain unchanged.
+
+
+### EW-K2.2R2 Unity result
+
+- [x] Unity compiles and normal generation remains isolated from the plane-cut solver.
+- [x] Explicit single-object preview performance is substantially improved and no longer blocks every mass on every compile or inspector change.
+- [ ] Visual approval still fails: the same representative source-edge bevel remains a long dark crevice.
+- [x] Wireframe evidence proves the defect is real geometry rather than merely per-triangle lighting: one intended bevel corridor is partitioned into at least four generated faces and turns into the source mass.
+- [x] Face-level planarity, compactness, aspect, topology, bounds, and volume certification can all pass while the one-edge-to-one-band relationship is broken.
+- [x] The next authority must therefore certify final generating-plane provenance, endpoint-local junction influence, and longitudinal bevel-band integrity.
+- [x] Production promotion remains disabled and `geometryCommit=disabled` remains active.
+
+## EW-K2.2R3 — Bevel-band integrity audit and junction influence proof
+
+- [x] Add non-serialized polygon-face provenance for original source faces, edge-bevel cap planes, and vertex-junction cap planes.
+- [x] Preserve provenance through clipping, cloning, final sanitation, conformity, and conservative seam repair.
+- [x] Tag every edge cap with its source-edge index and every junction cap with its source-vertex index.
+- [x] Require every retained source-edge bevel to own exactly one surviving final bevel face.
+- [x] Measure the axial coverage of each owned bevel face along its original source edge.
+- [x] Measure each endpoint junction cap's maximum penetration and shared-axis span along every incident source edge.
+- [x] Bound junction influence by the smaller of a width/depth-derived local distance and `25%` of source-edge length.
+- [x] Reject local junction candidates whose intersection with an incident bevel runs longitudinally beyond the endpoint-local allowance.
+- [x] Detect generated faces from unrelated junction or bevel planes that split a bevel-band boundary in the interior of the source edge.
+- [x] Treat split, interrupted, foreign-cut, overlong-junction, or collapsed bands as unresolved solver states so deterministic edge backtracking can remove the weaker conflict.
+- [x] Add compact `planeBand=retained/singleFace/split/interrupted/foreignCut/overlongJunction/collapsed/minCoverage/maxJunctionInfluence/maxSharedAxisSpan` evidence.
+- [x] Keep the 48-state/three-second bounded solver, exact topology audits, production isolation, and `geometryCommit=disabled` unchanged.
+
+### EW-K2.2R3 Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] Ordinary generation reports `planeBand=0/0/0/0/0/0/0/0/0/0` and still performs zero solver work.
+- [ ] The representative explicit preview either produces one coherent outward bevel band or deliberately defers the conflicting edge.
+- [ ] Every accepted retained edge reports one owned bevel face with no split, interruption, foreign cut, overlong junction, or collapse.
+- [ ] `planeBand.split=0`.
+- [ ] `planeBand.interrupted=0`.
+- [ ] `planeBand.foreignCut=0`.
+- [ ] `planeBand.overlongJunction=0`.
+- [ ] `planeBand.collapsed=0`.
+- [ ] The wireframe no longer shows the intended bevel corridor partitioned into a long inward multi-face crease.
+- [ ] Every accepted preview retains valid `planeBevel`, `planeFaceQuality`, and `planeMesh` evidence.
+- [ ] Width remains functional across `0.05-2.0`.
+- [ ] Production geometry, Play Mode, and `geometryCommit=disabled` remain unchanged.
+
+
+### EW-K2.2R3 Unity result
+
+- [x] Unity compiles and the explicit preview remains isolated from ordinary generation.
+- [ ] Visual approval fails: the representative source-edge corridor is still divided into several generated faces and forms a long inward crease.
+- [x] Wireframe evidence confirms the failure is real generated geometry, not normal smoothing or triangle-lighting noise.
+- [x] Provenance and band-integrity rejection did not make global half-space junction planes reliably local.
+- [x] Global half-space planes are rejected as the final vertex-junction architecture; retained edge-plane, width, topology, and certification work remains reusable.
+- [x] Production promotion remains disabled.
+
+## MG-P1A — Production generation and diagnostic isolation
+
+- [x] Add an explicit internal edge-wear evaluation mode: `None`, `PlaneCutPreview`, or `LegacyDiagnosticAudit`.
+- [x] Make ordinary `MassGenerator.Generate(...)` use `None` and skip edge-wear candidate discovery, topology-context construction, corner solving, legacy reconstruction, corrected-clone diagnostics, plane-cut solving, and edge-wear logging.
+- [x] Keep `GeneratedMass.OnEnable`, `OnValidate`, and explicit production regeneration capable of rebuilding the transient production mesh without running diagnostic-grade edge-wear work.
+- [x] Make explicit plane-cut preview run only the shared selection/corner preparation and plane-cut kernel; do not run the legacy replacement/strip/patch audit beside it.
+- [x] Add one dedicated `GeneratedMass plane-cut bevel compact audit` for explicit preview evaluation.
+- [x] Preserve the full legacy replacement/strip/patch/corrected-clone audit behind an explicit single-object editor action.
+- [x] Ensure the legacy diagnostic action does not apply a mesh, recook a collider, refresh the world-geometry fingerprint, or notify geometry consumers.
+- [x] Keep all diagnostic geometry clone-only and keep `geometryCommit=disabled`.
+
+### MG-P1A Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] Script reload with all 24 masses emits zero `GeneratedMass edge wear compact audit` messages.
+- [ ] Entering Play Mode emits zero edge-wear diagnostic audits.
+- [ ] Exiting Play Mode emits zero edge-wear diagnostic audits.
+- [ ] All masses still restore valid production meshes and colliders.
+- [ ] Explicit production regeneration of one mass emits zero edge-wear diagnostic audits and preserves its production result.
+- [ ] Explicit plane-cut preview emits exactly one `GeneratedMass plane-cut bevel compact audit` and no legacy replacement/patch compact audit.
+- [ ] Explicit legacy audit on one selected mass emits exactly one `GeneratedMass edge wear compact audit` and does not change displayed geometry.
+- [ ] Domain-reload and Play Mode transition durations are recorded for comparison with the previous 79–96 second range.
+- [ ] `geometryCommit=disabled` remains active.
+
+### MG-P1A Unity result
+
+- [x] Unity compiles and ordinary script reload no longer runs Generated Mass edge-wear diagnostic audits.
+- [x] Entering and exiting Play Mode no longer runs automatic edge-wear diagnostic audits.
+- [x] Production meshes remain available after lifecycle restoration.
+- [x] Explicit plane-cut preview and explicit legacy diagnostics remain opt-in.
+- [ ] Exact post-P1A reload and Play Mode timing measurements were not supplied.
+
+## MG-P1B — Lifecycle coalescing and deterministic production-state reuse
+
+- [x] Replace direct `OnEnable` and `OnValidate` regeneration with deterministic generated-state synchronization.
+- [x] Add a serialized production-generation state covering every normal mesh input and a manually maintained generation-contract version.
+- [x] Re-adopt an existing restored production mesh only when the stored state matches, the mesh name matches the current production identity, and the mesh contains valid triangle geometry.
+- [x] Reject plane-cut preview meshes and arbitrary assigned meshes as reusable production state.
+- [x] Permit a missing or stale production mesh to rebuild once, then allow a later `OnEnable` or `OnValidate` callback to reuse the accepted result instead of rebuilding again.
+- [x] Keep manual `Regenerate` as an authoritative forced production rebuild.
+- [x] Classify feature-atlas state separately from production geometry and refresh diagnostic atlases without collider recooking or geometry notifications when positions and triangles are unchanged.
+- [x] Apply material properties without rebuilding geometry for material-only changes.
+- [x] Track river-interaction authoring separately and notify geometry consumers once without rebuilding the mass mesh.
+- [x] Rebind or recook the `MeshCollider` only when the mesh binding is missing or production/preview geometry was actually rebuilt.
+- [x] Replace eager exact world-triangle fingerprint calculation with invalidation plus lazy calculation on the first consumer request.
+- [x] Add low-overhead Profiler markers for synchronization, production generation, collider binding, fingerprint calculation, and consumer notification.
+- [x] Preserve explicit plane-cut preview, explicit legacy diagnostics, production visuals, and `geometryCommit=disabled`.
+
+### MG-P1B Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] The first reload after applying P1B may rebuild each legacy object once to establish its hidden accepted state, but no mass regenerates twice in the same restoration.
+- [ ] A later harmless script reload performs zero production regeneration when Unity restores each certified production mesh.
+- [ ] When Unity does not retain a transient mesh, each affected mass performs at most one fallback production rebuild.
+- [ ] Entering and exiting Play Mode produces no duplicate production regeneration per mass.
+- [ ] Changing Base Color or another material-only control produces zero `GeneratedMass.GenerateProduction` and zero `GeneratedMass.BindCollider` recook markers.
+- [ ] Changing one river-interaction control produces one `GeneratedMass.NotifyConsumers` marker and zero production-generation markers.
+- [ ] Changing Shape Seed produces exactly one production generation, one collider recook, one fingerprint invalidation, and one consumer notification.
+- [ ] Manual Regenerate performs exactly one forced production rebuild even when the accepted state already matches.
+- [ ] An atlas diagnostic view builds the required atlas while leaving collider geometry and river geometry notifications unchanged.
+- [ ] Exact world-triangle fingerprints are computed only when a consumer calls `TryGetStableWorldGeometryFingerprint`.
+- [ ] A retained plane-cut preview is rejected during restoration and production geometry is restored.
+- [ ] Explicit legacy diagnostics change no retained mesh, collider, production state, fingerprint, or registry state.
+
+### MG-P1B Unity result
+
+- [x] Unity compilation and editor lifecycle behavior are confirmed usable after deterministic production-state reuse.
+- [x] The performance-recovery sequence is accepted as complete enough to resume explicit edge-wear geometry work.
+- [x] No further retained-mesh asset persistence pass is currently justified.
+- [x] The inward multi-face bevel defect remains intentionally unchanged by the lifecycle patch.
+
+## EW-L1 — Edge-only baseline and bounded junction-star extraction
+
+- [x] Remove `SolvePlaneCutGlobalJunctionSystem(...)` from the active explicit preview path.
+- [x] Retain the global junction-solver source only as rejected experimental evidence; do not execute its state search, normal/depth trials, edge backtracking, or timeout budget.
+- [x] Build the preview shell by replaying only accepted `EdgeBevelPlane` candidates on a deep source clone.
+- [x] Preserve locality-only safe deferral, source/edge provenance, final sanitation, conformity, plane-preserving seam repair, cap/redundancy accounting, polygon topology audit, and exact triangle-soup certification.
+- [x] Keep `planeSolve=0/0/0/0/0/0/0/0/0` for explicit L1 preview evaluation.
+- [x] Identify every original source vertex with at least two retained incident bevel planes as one local-junction candidate.
+- [x] Bound each candidate neighborhood with planes perpendicular to every source edge incident to that vertex.
+- [x] Derive each cutback distance from solved bevel width and geometry scale, capped at `25%` of the corresponding source-edge length.
+- [x] Apply those bounds only to copied face polygons; do not clip the complete rock or emit any new junction cap.
+- [x] Collect the bounded surface star from source faces incident to the source vertex and bevel faces owned by incident retained edges.
+- [x] Reject unrelated source-face, edge-bevel, or junction provenance within the bounded star.
+- [x] Require every retained incident bevel to appear exactly once in the bounded star.
+- [x] Extract one one-use boundary component and require every boundary vertex to have degree two.
+- [x] Order the boundary deterministically and reject branches, disconnected components, duplicate incident bevels, missing incident bevels, and projected self-intersection.
+- [x] Add compact `localJunction=candidates/starsExtracted/closedLoops/branched/selfIntersecting/foreignFace/missingIncidentBevel/duplicateIncidentBevel/minLoopVertices/maxLoopVertices/maxExtentRatio` evidence.
+- [x] Render the exact certified edge-only shell even when local-loop extraction reports a diagnostic failure; L1 does not fill or alter any local loop.
+- [x] Keep production generation, editor lifecycle performance, serialized assets, and `geometryCommit=disabled` unchanged.
+
+### EW-L1 Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] Ordinary generation and lifecycle restoration remain unchanged from confirmed MG-P1B behavior.
+- [ ] One explicit representative preview reports `planeSolve=0/0/0/0/0/0/0/0/0`.
+- [ ] The exact edge-only polygon shell and triangle soup remain topology-, winding-, bounds-, and volume-valid.
+- [ ] The previously reported inward multi-face crevice disappears when all global junction planes are absent, or is proven to originate from interacting edge planes.
+- [ ] `localJunction.candidates` matches the number of source vertices with at least two retained incident bevels.
+- [ ] Every successful star reports one closed, non-branching, non-self-intersecting loop.
+- [ ] Every successful star contains no foreign provenance, missing incident bevel, or duplicate incident bevel.
+- [ ] Return `planeBevel`, `planeSolve`, `planeFaceQuality`, `planeBand`, `localJunction`, `planeMesh`, and `planeTrace` for the same representative rock.
+- [ ] Do not begin local cap construction until the representative edge-only shell and extracted loops are understood.
+- [ ] `geometryCommit=disabled` remains active.
+
+### EW-L1 Unity result
+
+- [x] Unity compiles and the active preview reports `planeVertexJunction=0/0/0/0/0/0/0/0/0/0/0` and `planeSolve=0/0/0/0/0/0/0/0/0`, proving the rejected global junction solver is absent.
+- [x] The representative edge-only preview remains polygon- and triangle-topology valid with `planeMesh=174/0/0/0/0/0/0/1`.
+- [ ] Visual approval fails: the long inward multi-face crevice remains without any global junction plane.
+- [x] `planeBand=15/15/0/1/1/0/0/0.904226/0/0` proves one retained edge band is interrupted by a foreign generated edge plane.
+- [x] `localJunction=10/10/9/0/0/1/1/0/8/9/28.1881` independently reports one foreign face, one missing incident bevel, and a non-local maximum extent.
+- [x] The result is authoritative Outcome B: interacting edge half-spaces, not only the rejected junction half-spaces, can corrupt the one-edge-to-one-band relationship.
+- [x] Do not begin bounded local cap construction on this shell. Resolve edge-plane conflicts first.
+
+## EW-L1.1 — Edge-plane conflict attribution and clean-band backtracking
+
+- [x] Make `planeBand` and `localJunction` compact output self-describing instead of requiring positional schema lookup.
+- [x] Add `edgeConflict=passes/deferred/resolved/budgetExhausted/victim/foreign/vertex/deferredEdge/victimCoverage/foreignAxial/foreignSpan` as named compact evidence.
+- [x] Attribute the first bevel-band failure to the victim source edge and, when provenance permits, the foreign cutting source edge.
+- [x] Record the nearest responsible source vertex, victim axial coverage, foreign axial location, and shared longitudinal span.
+- [x] Add a deterministic clean-band replay loop limited to `12` complete edge-only shell evaluations.
+- [x] On an attributed victim/foreign conflict, compare the two source edges with the existing stable backtracking priority and defer only the weaker edge.
+- [x] For split, collapsed, or otherwise unattributed single-edge failures, defer the victim edge itself.
+- [x] Rebuild every pass from the untouched source shell; do not incrementally mutate a previously failed shell.
+- [x] Accept the edge-only preview only when every retained band has one owned face and zero split, interruption, foreign cut, overlong influence, or collapse.
+- [x] Count conflict-driven deferrals in `planeBevel.planesDeferred` while preserving locality deferrals and hard rejections as distinct outcomes.
+- [x] Keep the global junction solver dormant, keep local-loop extraction non-mutating, and keep `geometryCommit=disabled`.
+
+### EW-L1.1 Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] The representative preview emits named `planeBand`, `edgeConflict`, and `localJunction` values.
+- [ ] `edgeConflict.victim` and `edgeConflict.foreign` identify the source edges responsible for the previously reported corridor split.
+- [ ] The bounded replay defers one or more weaker conflicting edges without invoking `planeSolve`.
+- [ ] An accepted preview reports `planeBand.split:0`, `interrupted:0`, `foreignCut:0`, `overlongJunction:0`, and `collapsed:0`.
+- [ ] `edgeConflict.resolved:1` when a detected conflict is eliminated, with `budgetExhausted:0`.
+- [ ] The long inward multi-face crevice disappears and is replaced either by one coherent retained band or by a clean sharp source edge where the weaker bevel was deferred.
+- [ ] If conflict deferrals cascade or the 12-pass budget is exhausted, preview adoption is refused and production geometry remains displayed.
+- [ ] Local-junction extraction is rerun only on the final clean retained-edge set.
+- [ ] Polygon, triangle, bounds, volume, lifecycle, and performance behavior remain valid.
+- [ ] `geometryCommit=disabled` remains active.
+
+### EW-L1.1 Unity result
+
+- [x] Unity compiles and the bounded conflict resolver identifies source-edge conflict `victim:36`, `foreign:18`, at source vertex `19`.
+- [x] The resolver deterministically defers edge `36` in two complete passes and reports `resolved:1`, `budgetExhausted:0`.
+- [x] The accepted edge-only state reports one face per retained edge and zero split, interruption, foreign cut, overlong influence, or collapse.
+- [x] The exact triangle soup remains valid with `planeMesh=168/0/0/0/0/0/0/1`.
+- [ ] Visual approval still fails: the same long inward crease remains after the attributed foreign edge is removed.
+- [x] This proves the malformed corridor can be intrinsic to one edge's own whole-rock half-space cap rather than only an interaction between two generated planes.
+- [x] Infinite whole-rock edge bevel planes are rejected as the final bevel primitive. Further plane-quality thresholds or conflict backtracking are not an admissible geometry direction.
+- [x] The next experiment must use the four solved rail points directly as a bounded local bevel polygon.
+
+## EW-B1 — Bounded single-edge bevel primitive
+
+- [x] Add an editor-only `BoundedSingleEdgePreview` evaluation mode independent of production, the rejected whole-rock plane diagnostic, and the legacy reconstruction audit.
+- [x] Build a deterministic eligible-edge list from selected internal manifold edges. The original isolated-edge corner solve was Unity-tested and rejected because valid full-solution edges could disappear when every neighbour was forced to zero width.
+- [x] Evaluate exactly one selected source edge at a time, addressed by stable source-edge order and a non-serialized editor ordinal.
+- [x] Attempt direct owner-loop rail splicing. Unity rejected this reconstruction because the retained owner polygon was frequently non-convex even when the source face and intended local trim were convex.
+- [x] Emit exactly one bounded bevel polygon from the four solved rail points `a0/b0/b1/a1`.
+- [x] Emit exactly two local endpoint-cap triangles using the original source endpoints and the two rail endpoints at each end.
+- [x] Preserve every unrelated source face geometrically; insert only the four required collinear rail-boundary subdivisions into endpoint-adjacent non-owner faces so the two local caps share exact watertight edges. Carry explicit bounded-bevel, bounded-endpoint, and source-face provenance through final preparation.
+- [x] The first prototype forced every other selected edge to zero width and required one isolated active edge. Unity rejected that requirement after source edges `8` and `10` lost their rail solve and multiple other edges failed owner convexity.
+- [x] Reuse the exact polygon topology, bounds, volume, winding, and triangle-soup certification gates before applying the editor preview.
+- [x] Add concise named `boundedEdge`, `boundedTopology`, and `boundedMesh` evidence with `geometryCommit=disabled`.
+- [x] Add editor-only Previous, Evaluate/Refresh, Next, and Show Production Geometry controls for one selected Generated Mass.
+- [x] Give the bounded preview a distinct transient mesh identity so lifecycle reuse can never adopt it as production geometry.
+- [x] Keep production generation, collider/fingerprint lifecycle behavior, serialized recipes, and Play Mode unchanged.
+
+### EW-B1 Unity result
+
+- [x] Unity compiles and the editor-only bounded-edge controls run without restoring the rejected whole-rock junction solver.
+- [x] Candidate traversal is deterministic and reports `candidateCount:18` for the representative mass.
+- [ ] No tested edge produced a valid bounded preview.
+- [x] Source edges `6`, `7`, `11`, `14`, `15`, and `16` reached one active isolated rail but failed with `a bounded owner polygon is not convex`.
+- [x] Source edges `8` and `10` failed with `isolatedActiveEdges:0`, proving that forcing neighbouring widths to zero does not preserve the established full corner solution.
+- [x] Failed bounded previews restored non-bevel production presentation. MG-X1 preview isolation remains deferred until bounded bevel implementation is complete; River cache validation is non-authoritative while any GeneratedMass preview is active.
+- [x] The next correction must reuse the normal full selected-edge rail solution and trim each convex owner face through a local face-plane half-plane clip rather than direct loop splicing.
+
+## EW-B1.1 — Direct rail reuse and convex owner-face clipping
+
+- [x] Run the established full selected-edge corner solution without forcing neighbouring edges to zero width.
+- [x] Select one source edge for emission and require that edge to retain a positive solved width and all four full-solution rail corners.
+- [x] Remove the `isolatedActiveEdges` acceptance rule and replace it with `selectedRailSolved` evidence.
+- [x] Project each convex owner face and its rail into a stable local 2D basis.
+- [x] Clip the owner polygon by the local rail half-plane, retaining the side containing the non-edge source vertices.
+- [x] Require exactly two boundary intersections matching the two solved rail endpoints and require the rail endpoints to form one adjacent retained boundary segment.
+- [x] Preserve the source-face analytical plane, winding, simplicity, convexity, area, and provenance after clipping.
+- [x] Add named `boundedOwner` evidence for attempted/clipped owners and intersection, degenerate, non-planar, non-simple, non-convex, and winding failures.
+- [x] Keep the bounded bevel quad, two local endpoint caps, four non-owner boundary subdivisions, exact topology/triangle certification, production isolation, and `geometryCommit=disabled` unchanged.
+- [x] Record the deferred MG-X1 rule: restore Production Geometry on every previewed mass before authoritative River cache preparation; do not weaken the River obstacle-fingerprint contract.
+
+### EW-B1.1 Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] Previously rejected edges `8` and `10` now report either `selectedRailSolved:1` or a precise full-solution missing-width/corner reason.
+- [ ] Previously non-convex edges no longer fail through direct owner-loop splicing.
+- [ ] A valid candidate reports `selectedRailSolved:1`, `ownerClips:2`, `boundarySubdivisions:4`, `bevelFaces:1`, `endpointCaps:2`, `modifiedSourceFaces:2`, and `foreignSourceFacesModified:0`.
+- [ ] `boundedOwner` reports `attempted:2`, `clipped:2`, and zero failure counters.
+- [ ] Polygon and exact triangle-soup topology remain watertight and valid.
+- [ ] The selected edge renders as one bounded outward bevel face with two short local endpoint closures.
+- [ ] Production geometry is restored before any authoritative River cache preparation.
+
+### EW-B1 Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] Ordinary generation, script reload, and Play Mode remain consistent with the confirmed MG-P1B behavior and emit no automatic bounded-edge audit.
+- [ ] Evaluating one bounded edge emits exactly one `GeneratedMass bounded edge compact audit`.
+- [ ] Superseded by EW-B1.1: the audit reports `selectedRailSolved:1`, `ownerClips:2`, `boundarySubdivisions:4`, `bevelFaces:1`, `endpointCaps:2`, `modifiedSourceFaces:2`, and `foreignSourceFacesModified:0`.
+- [ ] `railDeviation` and `maxExtentBeyondRails` remain within the certified geometry tolerance.
+- [ ] `boundedTopology` reports zero open, non-manifold, T-junction, and invalid-face failures.
+- [ ] `boundedMesh` reports zero degenerate, open, non-manifold, winding, bounds, and volume failures.
+- [ ] The selected edge renders as one outward bounded bevel face rather than a long inward whole-rock cap.
+- [ ] Previous/Next cycles deterministically through the eligible selected edges without altering production data.
+- [ ] A rejected bounded edge falls back to production geometry while retaining its candidate count, ordinal, source-edge index, and concise blocker.
+- [ ] Show Production Geometry restores the certified production mesh immediately.
+- [ ] `geometryCommit=disabled` remains active.
 
 ## EW-C4 — Commit and visual proof
 
@@ -1240,3 +1726,145 @@ MG-R6B.1 evidence proves that all 22 target overlaps are removed, but all 22 tra
 
 
 EW-C1R3 permits local candidate deferral: a selected candidate whose required solved width falls below the useful geometry threshold is assigned width zero and excluded from edge-strip emission. This is not a topology failure; it preserves the source surface while allowing compatible candidates to proceed.
+
+### EW-B1.1 Unity result
+
+- [x] Unity compiles and the direct full-solution rail reuse path runs across the representative candidate list.
+- [ ] No tested candidate produced a valid bounded bevel face or endpoint cap.
+- [x] Source edges `6`, `7`, `14`, `15`, and `16` retained a full-solution rail but that rail was embedded zero times in the original endpoint-adjacent boundaries.
+- [x] Source edges `8` and `10` had no active width in the full multi-edge corner solution.
+- [x] Source edge `11` completed both local owner clips and four boundary subdivisions, then failed later preparation with an un-attributed generic non-convex message.
+- [x] The result proves that a shared multi-edge solved corner cannot be reused for the isolated endpoint-cap prototype: neighbouring offsets can move the corner into the owner-face interior, away from the original adjacent source boundary.
+- [x] Full multi-edge rail reuse is rejected for EW-B1 isolated closure. It remains relevant only to the later shared multi-edge reconstruction and bounded vertex-cap stages.
+
+## EW-B1.2 — True isolated rail construction and exact boundary ownership
+
+- [x] Remove the shared multi-edge `ChamferCornerSolution` as an input to the isolated bounded primitive.
+- [x] Solve each of the selected edge's four rail points directly with the selected support line offset and the endpoint-adjacent support line fixed at zero offset.
+- [x] Start from the normal per-edge width and deterministically back off by `0.75` for at most `12` attempts, accepting the largest stable isolated width.
+- [x] Require every rail point to be finite, locally bounded, and strictly inside its exact adjacent source-edge segment.
+- [x] Record owner graph/source face, source endpoint, adjacent graph edge, and opposite target graph/source face for every rail point.
+- [x] Require four distinct exact target graph edges before bounded geometry emission.
+- [x] Replace nearest-segment boundary searching with graph-owned exact segment subdivision on the recorded target source face.
+- [x] Keep the local owner-face half-plane clipping, one bevel quad, two endpoint triangles, four collinear non-owner subdivisions, and exact topology/triangle certification.
+- [x] Add `isolatedRailSolved`, `widthAttempts`, `solvedWidth`, and `targetBoundaries` to `boundedEdge` evidence.
+- [x] Add `boundedPrepare` evidence for input validation, weld, conformity, seam repair, failure stage, exact face, polygon failure kind, and provenance.
+- [x] Keep MG-X1 deferred: diagnostic previews remain non-authoritative for River cache preparation until bounded bevel production integration is complete.
+- [x] Keep `geometryCommit=disabled` and make no production, lifecycle, River, scene, prefab, material, shader, tag, layer, or recipe changes.
+
+### EW-B1.2 Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] Previously full-solution-deferred edges `8` and `10` receive an independent isolated-width attempt rather than failing from the shared width map.
+- [ ] Every solved rail reports `isolatedRailSolved:1`, `targetBoundaries:4`, and a positive `solvedWidth`.
+- [ ] Every rail point splits its exact graph-owned endpoint-adjacent boundary exactly once.
+- [ ] At least one representative candidate reports `ownerClips:2`, `boundarySubdivisions:4`, `bevelFaces:1`, `endpointCaps:2`, and `valid:1`.
+- [ ] `boundedOwner` reports zero failure counters for an accepted candidate.
+- [ ] `boundedPrepare.failedStage:none`; otherwise the exact face/provenance and polygon category identify the remaining blocker.
+- [ ] Polygon and exact triangle-soup topology report zero open, non-manifold, T-junction, winding, bounds, and volume failures.
+- [ ] The valid candidate renders as one bounded outward bevel quad with two short endpoint closures and no long inward whole-rock crease.
+- [ ] Production Geometry is restored before authoritative River cache preparation.
+
+### EW-B1.2 Unity result
+
+- [x] Isolated rails, exact target ownership, and both owner clips succeeded for ordinary candidates.
+- [ ] No bounded bevel was emitted because endpoint-adjacent source faces failed input convexity after rail subdivision.
+- [x] The failure occurs before weld, conformity, seam repair, topology, or triangulation.
+- [x] The solved rail was accepted near the exact boundary but the unsnapped solved point was inserted, creating a microscopic reflex corner.
+
+## EW-B1.3 — Canonical boundary rails and subdivision-safe certification
+
+- [x] Replace each accepted solved rail position with its exact projection onto the graph-owned target boundary segment.
+- [x] Certify the canonical position against both analytical face planes and use it everywhere: owner clips, boundary subdivisions, bevel quad, endpoint caps, and rail audits.
+- [x] Track `canonicalRails` and `maxBoundarySnap` in the bounded audit.
+- [x] Preserve real subdivision vertices, but simplify duplicate/collinear points only for the convexity check.
+- [x] Report whether a preparation failure occurred on a canonical rail-subdivided source face.
+- [x] Keep production, lifecycle, River, scenes, prefabs, materials, shaders, tags, layers, and recipes unchanged.
+
+### EW-B1.3 Unity exit criteria
+
+- [ ] A representative candidate reports `canonicalRails:4`, `ownerClips:2`, `boundarySubdivisions:4`, and `valid:1`.
+- [ ] `boundedPrepare.failedStage:none`; otherwise the remaining blocker identifies the exact non-subdivision defect.
+- [ ] The preview is one bounded outward bevel with two local endpoint closures and no long inward crease.
+
+
+### EW-B1.3 Unity result
+
+- [x] Canonical rail snapping fixed input convexity: ordinary candidates now reach one bevel face, two endpoint caps, clean preparation, and clean polygon topology.
+- [ ] Preview adoption is blocked by `foreignSourceFacesModified:2` even though the two foreign faces only contain intentional collinear rail subdivisions plus narrow seam repair.
+- [x] The remaining blocker is certification, not bounded geometry construction.
+
+## EW-B1.4 — Planar region equivalence and foreign boundary certification
+
+- [x] Compare source faces as planar regions through common-plane projection, area agreement, and mutual containment rather than exact vertex-cycle identity.
+- [x] Preserve strict rejection when a foreign source surface changes area or region.
+- [x] Count equivalent non-identical foreign boundaries separately as `foreignBoundarySubdivided`.
+- [x] Keep preview validity gated by `foreignSourceFacesModified:0`; intentional boundary subdivision is not a surface modification.
+- [x] Make no bounded geometry, production, lifecycle, River, scene, prefab, material, shader, tag, layer, or recipe changes.
+
+### EW-B1.4 Unity exit criteria
+
+- [x] Edges `6` and `11` report `foreignSourceFacesModified:0` and `foreignBoundarySubdivided:2`.
+- [ ] Exact polygon and triangle certification passes and the bounded preview renders one outward bevel with two local endpoint caps.
+
+### EW-B1.4 Unity result
+
+- [x] Planar-region equivalence removed the false foreign-surface blocker while retaining exact region-change rejection.
+- [x] Edges `6`, `7`, and `11` reach clean polygon preparation and topology with one bevel face and two endpoint caps.
+- [ ] Edges `6` and `7` stop at the combined bounds/volume gate despite clean undirected topology.
+- [ ] Edge `11` is accepted by subdivision-safe preparation but rejected by the stricter unsimplified triangulation convexity test.
+- [x] The remaining blockers are final generated-face winding, split bounds/volume evidence, and consistent bounded triangulation rather than rail or owner-face construction.
+
+## EW-B1.5 — Outward winding certification and consistent bounded triangulation
+
+- [x] Certify the final prepared bevel quad and endpoint caps against the original solid centre, reverse only generated bounded faces that point inward, and reconstruct their immutable `PolygonFace` records.
+- [x] Run a second generated-face audit and require `outwardWindingFailures:0` before topology, volume, or triangulation can pass.
+- [x] Split the previous combined bounds/volume blocker into explicit `boundsValid`, source/result volume, `volumeRatio`, and `volumeValid` evidence without weakening thresholds.
+- [x] Make triangulation use the same duplicate/collinear-reduced convexity classification as preparation while emitting one triangle for every segment of the unchanged real boundary.
+- [x] Verify every emitted triangle exists and agrees with the parent polygon winding.
+- [x] Record exact triangulation face, provenance, failure category, and reason instead of the previous generic centre-fan error.
+- [x] Keep isolated rail solving, owner clipping, canonical boundary ownership, endpoint-cap topology, production generation, lifecycle, River, scenes, prefabs, materials, shaders, tags, layers, and recipes unchanged.
+
+### EW-B1.5 Unity result
+
+- [x] Edge `11` reached `valid:1`, emitted `98` triangles across `19` faces, and passed polygon, topology, bounds, retained-volume, winding, and exact triangle-soup certification.
+- [x] Subdivision-safe final triangulation is proven: edge `11` preserved all four canonical boundary subdivisions and reported no triangulation failure.
+- [x] Edges `6` and `7` reported `boundsValid:1`, `facesReoriented:0`, and `outwardWindingFailures:0`; their remaining blocker is not winding.
+- [x] Edges `6` and `7` exceeded the raw-source upper volume ratio by only `0.00531%` and `0.00174%` beyond the `1.0001` threshold respectively, while edge `11` passed at `1.000088`.
+- [x] The prior high-confidence winding diagnosis for edges `6` and `7` is rejected by direct telemetry.
+- [ ] A wireframe preview still must confirm that edge `11` is visually the intended local outward bevel with two endpoint closures.
+
+### EW-B1.5 methods decision
+
+- [x] Accepted: final outward certification relative to the original convex solid centre. A preferred bevel normal may guide construction but is not authoritative for shell winding.
+- [x] Accepted: simplify only a temporary classification loop; preserve the real subdivided boundary in emitted topology.
+- [x] Rejected: removing collinear rail subdivisions to satisfy triangulation.
+- [x] Rejected: treating the edges `6` and `7` retained-volume failure as evidence of inward generated-face winding.
+- [x] Rejected: weakening retained-volume limits before comparing preparation-equivalent shells.
+
+## EW-B1.5R1 — Preparation-equivalent retained-volume certification and cumulative telemetry
+
+- [x] Prepare a clone of the untouched source shell through the exact same polygon-copy, weld, boundary-conformity, seam-repair, and final validation pipeline used by the bounded result.
+- [x] Keep the raw source shell as the strict geometric-bounds authority while also reporting prepared-source bounds and containment margins.
+- [x] Use the prepared source volume, not the numerically unprepared raw source volume, as the retained-volume comparison baseline.
+- [x] Preserve the existing retained-volume acceptance interval `0.75 < ratio <= 1.0001`; do not loosen it.
+- [x] Retain raw-source volume, raw ratio, and raw delta as evidence rather than deleting the prior comparison.
+- [x] Add independent result-preparation and source-preparation telemetry for face/vertex/unique-vertex cardinality, weld, conformity, seam pairs, seam-touched faces, topology before/after, invalid faces, preparation volume drift, exact failure stage, face, kind, and provenance.
+- [x] Add raw/prepared/result bounds, bounds tolerance, per-side containment margins, raw/prepared volume ratios and deltas, source-preparation ratio, threshold values, and threshold margins.
+- [x] Keep all evidence in the existing single bounded-edge record. Do not emit per-face or per-success Console messages.
+- [x] Establish the cumulative diagnostic rule: when a new Generated Mass geometry blocker requires new evidence, add structured fields without deleting still-relevant earlier evidence.
+- [x] Keep rail solving, width solving, owner clipping, canonical rails, endpoint topology, triangulation, production generation, River, scenes, prefabs, materials, shaders, tags, layers, and recipes unchanged.
+
+### EW-B1.5R1 Unity exit criteria
+
+- [ ] Edges `6`, `7`, and `11` report successful `boundedSourcePrepare` records with zero final topology and polygon failures.
+- [ ] `boundedVolume.preparedRatio` identifies the preparation-equivalent retained-volume result while `rawRatio` remains available as comparison evidence.
+- [ ] At least one of edges `6` or `7` either reaches `valid:1` or proves a genuine post-preparation expansion through a negative `upperMargin`.
+- [ ] Edge `11` remains `valid:1` with `98` triangles and no regression in topology or triangle-soup certification.
+
+### EW-B1.5R1 methods decision
+
+- [x] Accepted: compare like with like. A prepared result must be volume-certified against a source shell subjected to the same deterministic numerical preparation.
+- [x] Accepted: exhaustive structured telemetry is preferable to repeated hypothesis-driven patches, provided it remains one record per physical evaluation.
+- [x] Rejected: increasing the `1.0001` upper threshold merely because two candidates narrowly miss it.
+- [x] Deferred: edges `8` and `10` minimum-width rail feasibility remains outside this patch.

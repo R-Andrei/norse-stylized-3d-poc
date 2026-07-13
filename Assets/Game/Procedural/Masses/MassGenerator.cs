@@ -7,6 +7,83 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 {
     public static partial class MassGenerator
     {
+        public readonly struct PlaneCutBevelPreviewStatus
+        {
+            public readonly bool PreviewApplied;
+            public readonly int ActiveEdgeCount;
+            public readonly int BuiltEdgeCount;
+            public readonly int DeferredEdgeCount;
+            public readonly int RejectedEdgeCount;
+            public readonly string Diagnostic;
+
+            public PlaneCutBevelPreviewStatus(
+                bool previewApplied,
+                int activeEdgeCount,
+                int builtEdgeCount,
+                int deferredEdgeCount,
+                int rejectedEdgeCount,
+                string diagnostic)
+            {
+                PreviewApplied = previewApplied;
+                ActiveEdgeCount = activeEdgeCount;
+                BuiltEdgeCount = builtEdgeCount;
+                DeferredEdgeCount = deferredEdgeCount;
+                RejectedEdgeCount = rejectedEdgeCount;
+                Diagnostic = diagnostic ?? string.Empty;
+            }
+        }
+
+
+        public readonly struct BoundedEdgePreviewStatus
+        {
+            public readonly bool PreviewApplied;
+            public readonly int CandidateCount;
+            public readonly int SelectedOrdinal;
+            public readonly int SourceEdgeIndex;
+            public readonly int BevelFaceCount;
+            public readonly int EndpointCapCount;
+            public readonly int ModifiedSourceFaceCount;
+            public readonly int ForeignSourceFaceModifiedCount;
+            public readonly float RailDeviation;
+            public readonly float MaximumExtentBeyondRails;
+            public readonly string Diagnostic;
+
+            public BoundedEdgePreviewStatus(
+                bool previewApplied,
+                int candidateCount,
+                int selectedOrdinal,
+                int sourceEdgeIndex,
+                int bevelFaceCount,
+                int endpointCapCount,
+                int modifiedSourceFaceCount,
+                int foreignSourceFaceModifiedCount,
+                float railDeviation,
+                float maximumExtentBeyondRails,
+                string diagnostic)
+            {
+                PreviewApplied = previewApplied;
+                CandidateCount = candidateCount;
+                SelectedOrdinal = selectedOrdinal;
+                SourceEdgeIndex = sourceEdgeIndex;
+                BevelFaceCount = bevelFaceCount;
+                EndpointCapCount = endpointCapCount;
+                ModifiedSourceFaceCount = modifiedSourceFaceCount;
+                ForeignSourceFaceModifiedCount =
+                    foreignSourceFaceModifiedCount;
+                RailDeviation = railDeviation;
+                MaximumExtentBeyondRails = maximumExtentBeyondRails;
+                Diagnostic = diagnostic ?? string.Empty;
+            }
+        }
+
+        private enum EdgeWearEvaluationMode
+        {
+            None,
+            PlaneCutPreview,
+            LegacyDiagnosticAudit,
+            BoundedSingleEdgePreview
+        }
+
         private const float PlaneEpsilon = 0.0001f;
 
         // Position welding tolerance in the normalized pre-scale mass.
@@ -70,6 +147,67 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MassRecipe recipe,
             MassSurfaceFeatureSettings? surfaceFeatures)
         {
+            return GenerateInternal(
+                recipe,
+                surfaceFeatures,
+                EdgeWearEvaluationMode.None,
+                -1,
+                out _,
+                out _);
+        }
+
+#if UNITY_EDITOR
+        public static MeshData GeneratePlaneCutBevelPreview(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures,
+            out PlaneCutBevelPreviewStatus previewStatus)
+        {
+            return GenerateInternal(
+                recipe,
+                surfaceFeatures,
+                EdgeWearEvaluationMode.PlaneCutPreview,
+                -1,
+                out previewStatus,
+                out _);
+        }
+
+        public static MeshData GenerateBoundedSingleEdgeBevelPreview(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures,
+            int selectedOrdinal,
+            out BoundedEdgePreviewStatus previewStatus)
+        {
+            return GenerateInternal(
+                recipe,
+                surfaceFeatures,
+                EdgeWearEvaluationMode.BoundedSingleEdgePreview,
+                selectedOrdinal,
+                out _,
+                out previewStatus);
+        }
+
+        public static void RunLegacyEdgeWearDiagnosticAudit(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures)
+        {
+            GenerateInternal(
+                recipe,
+                surfaceFeatures,
+                EdgeWearEvaluationMode.LegacyDiagnosticAudit,
+                -1,
+                out _,
+                out _);
+        }
+#endif
+
+        private static MeshData GenerateInternal(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures,
+            EdgeWearEvaluationMode edgeWearEvaluationMode,
+            int boundedEdgeOrdinal,
+            out PlaneCutBevelPreviewStatus previewStatus,
+            out BoundedEdgePreviewStatus boundedPreviewStatus)
+        {
             if (recipe == null)
             {
                 throw new ArgumentNullException(nameof(recipe));
@@ -77,7 +215,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             Vector3 dimensions = ResolveDimensions(recipe);
 
-            TriangleSoup soup = BuildMassSoup(recipe, surfaceFeatures);
+            TriangleSoup soup = BuildMassSoup(
+                recipe,
+                surfaceFeatures,
+                edgeWearEvaluationMode,
+                boundedEdgeOrdinal,
+                out previewStatus,
+                out boundedPreviewStatus);
 
             ApplyDimensions(soup.Positions, dimensions);
             ApplyLean(soup.Positions, recipe.Lean, recipe.ShapeSeed);
@@ -94,16 +238,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private static TriangleSoup BuildMassSoup(
             MassRecipe recipe,
-            MassSurfaceFeatureSettings? surfaceFeatures)
+            MassSurfaceFeatureSettings? surfaceFeatures,
+            EdgeWearEvaluationMode edgeWearEvaluationMode,
+            int boundedEdgeOrdinal,
+            out PlaneCutBevelPreviewStatus previewStatus,
+            out BoundedEdgePreviewStatus boundedPreviewStatus)
         {
-            return recipe.Archetype switch
+            previewStatus = default;
+            boundedPreviewStatus = default;
+            if (recipe.Archetype == MassArchetype.LayeredStone)
             {
-                MassArchetype.LayeredStone => BuildLayeredStoneMass(recipe),
-                MassArchetype.CarvedMarkerStone => BuildCarvedMarkerMass(recipe),
-                _ => UsesRadialBuilder(recipe.Archetype)
-                    ? BuildRadialMass(recipe)
-                    : BuildPlaneCutMass(recipe, surfaceFeatures)
-            };
+                return BuildLayeredStoneMass(recipe);
+            }
+            if (recipe.Archetype == MassArchetype.CarvedMarkerStone)
+            {
+                return BuildCarvedMarkerMass(recipe);
+            }
+            if (UsesRadialBuilder(recipe.Archetype))
+            {
+                return BuildRadialMass(recipe);
+            }
+
+            return BuildPlaneCutMass(
+                recipe,
+                surfaceFeatures,
+                edgeWearEvaluationMode,
+                boundedEdgeOrdinal,
+                out previewStatus,
+                out boundedPreviewStatus);
         }
     }
 }

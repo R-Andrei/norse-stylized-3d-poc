@@ -362,30 +362,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             StylizedRiverFoamRuntime runtime)
         {
             serializedObject.ApplyModifiedProperties();
-            StylizedRiverFoamTopologyCacheAsset asset =
-                river.FoamTopologyCacheAsset;
-            if (asset == null)
-            {
-                serializedObject.Update();
-                return;
-            }
-
-            if (!runtime.TryBuildTopologyCache(
-                    out StylizedRiverFoamTopologyCacheBuildArtifact artifact))
-            {
-                serializedObject.Update();
-                return;
-            }
-
-            Undo.RecordObject(
-                asset,
-                "Update River Foam Topology Cache");
-            asset.StoreBuild(artifact);
-            EditorUtility.SetDirty(asset);
-            AssetDatabase.SaveAssets();
+            bool prepared =
+                StylizedRiverFoamDevelopmentCacheCoordinator
+                    .TryPrepareAndPersist(
+                        river,
+                        runtime,
+                        out bool validationPassed,
+                        out string result);
             serializedObject.Update();
-            runtime.ValidateAssignedTopologyCache();
-            EditorGUIUtility.PingObject(asset);
+
+            string message = prepared
+                ? $"[River Foam P3] Prepared cache '{river.name}': {result}"
+                : $"[River Foam P3] Cache preparation failed for " +
+                  $"'{river.name}': {result}";
+            if (prepared && validationPassed)
+            {
+                Debug.Log(message, river);
+            }
+            else
+            {
+                Debug.LogWarning(message, river);
+            }
+
+            if (prepared && river.FoamTopologyCacheAsset != null)
+            {
+                EditorGUIUtility.PingObject(river.FoamTopologyCacheAsset);
+            }
         }
 
         private void DrawActions()
@@ -613,9 +615,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     ? runtime.TopologyCacheBuildState
                     : river == null
                         ? "Select one river for cache tools."
-                        : Application.isPlaying
-                            ? "Runtime unavailable"
-                            : "Enter Play Mode for runtime cache build");
+                        : "Runtime unavailable");
 
             using (new EditorGUI.DisabledScope(
                        river == null ||
@@ -634,23 +634,23 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             using (new EditorGUI.DisabledScope(
                        river == null ||
-                       !Application.isPlaying ||
+                       Application.isPlaying ||
                        runtime == null ||
-                       river.FoamTopologyCacheAsset == null ||
-                       !runtime.TopologyCacheBuildReady))
+                       river.FoamTopologyCacheAsset == null))
             {
                 if (GUILayout.Button(
                         new GUIContent(
-                            "Build / Update Cache",
-                            "Builds the current deterministic topology payload " +
-                            "and stores it in the assigned cache asset.")))
+                            "Prepare / Rebuild Foam Topology Cache",
+                            "Explicitly prepares deterministic Foam topology in " +
+                            "Edit Mode and stores one validated payload in the " +
+                            "assigned cache asset.")))
                 {
                     BuildOrUpdateFoamTopologyCache(river, runtime);
                 }
             }
 
             using (new EditorGUI.DisabledScope(
-                       !Application.isPlaying ||
+                       Application.isPlaying ||
                        runtime == null ||
                        river == null ||
                        river.FoamTopologyCacheAsset == null))
@@ -659,9 +659,45 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         new GUIContent(
                             "Validate Assigned Cache",
                             "Validates the assigned cache against the current " +
-                            "domain, obstacle, and generation fingerprints.")))
+                            "domain, obstacle, and generation fingerprints " +
+                            "without generating or mutating assets.")))
                 {
-                    runtime.ValidateAssignedTopologyCache();
+                    bool valid = runtime.TryValidateAssignedTopologyCacheForRelease(
+                        out string state,
+                        out string summary,
+                        out int payloadBytes,
+                        out string payloadHash,
+                        out int obstacleSourceCount);
+                    string message =
+                        $"[River Foam P3] Cache validation '{river.name}': " +
+                        $"{state}. {summary} Payload={payloadBytes:N0} bytes, " +
+                        $"hash={payloadHash}, obstacles={obstacleSourceCount:N0}.";
+                    if (valid)
+                    {
+                        Debug.Log(message, river);
+                    }
+                    else
+                    {
+                        Debug.LogWarning(message, river);
+                    }
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       Application.isPlaying ||
+                       runtime == null ||
+                       river == null ||
+                       river.FoamTopologyCacheAsset == null))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run Exhaustive Cache Integrity Proof",
+                            "Explicitly performs the expensive deterministic " +
+                            "round-trip, byte-reproduction, generated-channel, " +
+                            "and corruption-rejection proof. Normal cache " +
+                            "preparation deliberately does not run this work.")))
+                {
+                    runtime.RunTopologyCacheRoundTripValidation();
                 }
             }
 
@@ -768,6 +804,38 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             "peaks to the current update.")))
                 {
                     foamRuntime.ResetRecentPeaks();
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying ||
+                       foamRuntime == null))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Start / Reset P4 Accounting",
+                            "Starts a clean, explicit steady-state Foam work " +
+                            "accounting window after startup. The counters are " +
+                            "dormant until this action is used.")))
+                {
+                    foamRuntime.ResetSteadyStateWorkAccounting();
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying ||
+                       foamRuntime == null ||
+                       !foamRuntime.SteadyStateWorkAccountingActive))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Log P4 Work Summary",
+                            "Emits one compact River Foam work summary for the " +
+                            "current explicit accounting window.")))
+                {
+                    foamRuntime.LogSteadyStateWorkSummary();
                 }
             }
             EditorGUILayout.EndHorizontal();

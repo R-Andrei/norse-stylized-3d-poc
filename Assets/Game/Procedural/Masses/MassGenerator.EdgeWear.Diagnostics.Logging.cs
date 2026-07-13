@@ -151,6 +151,390 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return false;
         }
 
+        private static string FormatPlaneCutBandAudit(
+            PlaneCutBevelAuditResult audit)
+        {
+            return "retained:" + audit.BandRetainedEdgeCount +
+                ",single:" + audit.BandSingleFaceCount +
+                ",split:" + audit.BandSplitCount +
+                ",interrupted:" + audit.BandInterruptedCount +
+                ",foreignCut:" + audit.BandForeignCutCount +
+                ",overlongJunction:" +
+                    audit.BandOverlongJunctionCount +
+                ",collapsed:" + audit.BandCollapsedCount +
+                ",minCoverage:" +
+                    audit.BandMinimumCoverageRatio.ToString("G6") +
+                ",maxJunctionInfluence:" +
+                    audit.BandMaximumJunctionInfluenceRatio
+                        .ToString("G6") +
+                ",maxSharedAxisSpan:" +
+                    audit.BandMaximumSharedAxisSpanRatio
+                        .ToString("G6");
+        }
+
+        private static string FormatPlaneCutEdgeConflictAudit(
+            PlaneCutBevelAuditResult audit)
+        {
+            bool evaluated = audit.EdgeConflictPassCount > 0;
+            return "passes:" + audit.EdgeConflictPassCount +
+                ",deferred:" + audit.EdgeConflictEdgesDeferredCount +
+                ",resolved:" + audit.EdgeConflictResolvedCount +
+                ",budgetExhausted:" +
+                    audit.EdgeConflictBudgetExhausted +
+                ",victim:" +
+                    (evaluated
+                        ? audit.EdgeConflictVictimEdgeIndex
+                        : -1) +
+                ",foreign:" +
+                    (evaluated
+                        ? audit.EdgeConflictForeignEdgeIndex
+                        : -1) +
+                ",vertex:" +
+                    (evaluated
+                        ? audit.EdgeConflictVertexIndex
+                        : -1) +
+                ",deferredEdge:" +
+                    (evaluated
+                        ? audit.EdgeConflictDeferredEdgeIndex
+                        : -1) +
+                ",victimCoverage:" +
+                    audit.EdgeConflictVictimCoverageRatio
+                        .ToString("G6") +
+                ",foreignAxial:" +
+                    audit.EdgeConflictForeignAxialParameter
+                        .ToString("G6") +
+                ",foreignSpan:" +
+                    audit.EdgeConflictForeignSharedSpanRatio
+                        .ToString("G6");
+        }
+
+        private static string FormatPlaneCutLocalJunctionAudit(
+            PlaneCutBevelAuditResult audit)
+        {
+            return "candidates:" +
+                    audit.LocalJunctionCandidateCount +
+                ",extracted:" +
+                    audit.LocalJunctionStarsExtractedCount +
+                ",closed:" + audit.LocalJunctionClosedLoopCount +
+                ",branched:" + audit.LocalJunctionBranchedCount +
+                ",selfX:" +
+                    audit.LocalJunctionSelfIntersectingCount +
+                ",foreign:" +
+                    audit.LocalJunctionForeignFaceCount +
+                ",missing:" +
+                    audit.LocalJunctionMissingIncidentBevelCount +
+                ",duplicate:" +
+                    audit.LocalJunctionDuplicateIncidentBevelCount +
+                ",loopVertices:" +
+                    audit.LocalJunctionMinimumLoopVertexCount + "-" +
+                    audit.LocalJunctionMaximumLoopVertexCount +
+                ",maxExtent:" +
+                    audit.LocalJunctionMaximumExtentRatio
+                        .ToString("G6");
+        }
+
+        private static void LogPlaneCutBevelAudit(
+            PlaneCutBevelAuditResult planeCutAudit)
+        {
+#if UNITY_EDITOR
+            string message =
+                "GeneratedMass plane-cut bevel compact audit. " +
+                "planeBevel=" +
+                    planeCutAudit.SelectedEdgeCount + "/" +
+                    planeCutAudit.ActiveEdgeCount + "/" +
+                    planeCutAudit.PlanesBuilt + "/" +
+                    planeCutAudit.PlanesLocalized + "/" +
+                    planeCutAudit.PlanesDeferred + "/" +
+                    planeCutAudit.PlanesRejected + "/" +
+                    planeCutAudit.CapsBuilt + "/" +
+                    planeCutAudit.CapsMissing + "/" +
+                    planeCutAudit.CapsRedundant + "/" +
+                    planeCutAudit.ConformalSplitCount + "/" +
+                    planeCutAudit.SeamPairCount + "/" +
+                    planeCutAudit.OpenEdgeCount + "/" +
+                    planeCutAudit.NonManifoldEdgeCount + "/" +
+                    planeCutAudit.TJunctionCount + "/" +
+                    planeCutAudit.InvalidFaceCount + "/" +
+                    planeCutAudit.GeometryValid +
+                ", planeVertexJunction=" +
+                    planeCutAudit.VertexJunctionCandidateCount + "/" +
+                    planeCutAudit.VertexJunctionDirectBuiltCount + "/" +
+                    planeCutAudit.VertexJunctionAdaptiveBuiltCount + "/" +
+                    planeCutAudit.VertexJunctionBacktrackBuiltCount + "/" +
+                    planeCutAudit.VertexJunctionCleanSharpCount + "/" +
+                    planeCutAudit.VertexJunctionUnresolvedCount + "/" +
+                    planeCutAudit.VertexJunctionTriangleCapCount + "/" +
+                    planeCutAudit.VertexJunctionQuadCapCount + "/" +
+                    planeCutAudit.VertexJunctionLargerCapCount + "/" +
+                    planeCutAudit.VertexJunctionEdgesDeferredCount + "/" +
+                    planeCutAudit.VertexJunctionRebuildPassCount +
+                ", planeSolve=" +
+                    planeCutAudit.SolveStatesEvaluated + "/" +
+                    planeCutAudit.SolveJunctionsVisited + "/" +
+                    planeCutAudit.SolveCandidateTrials + "/" +
+                    planeCutAudit.SolveSystemRebuilds + "/" +
+                    planeCutAudit.SolvePolygonAudits + "/" +
+                    planeCutAudit.SolveTriangleAudits + "/" +
+                    planeCutAudit.SolveEdgesDeferred + "/" +
+                    planeCutAudit.SolveElapsedMilliseconds + "/" +
+                    planeCutAudit.SolveTimedOut +
+                ", planeFaceQuality=" +
+                    planeCutAudit.FaceQualityFaceCount + "/" +
+                    planeCutAudit.FaceQualitySeamTouchedFaceCount + "/" +
+                    planeCutAudit.FaceQualityNonPlanarCount + "/" +
+                    planeCutAudit.FaceQualityElongatedJunctionCount + "/" +
+                    planeCutAudit.FaceQualityMaxPlaneDeviation
+                        .ToString("G6") + "/" +
+                    planeCutAudit.FaceQualityMaxNormalSpreadDegrees
+                        .ToString("G6") + "/" +
+                    planeCutAudit.FaceQualityMinimumJunctionCompactness
+                        .ToString("G6") + "/" +
+                    planeCutAudit.FaceQualityMaximumJunctionAspectRatio
+                        .ToString("G6") + "/" +
+                    planeCutAudit.FaceQualityWorstVertexCount +
+                ", planeBand=" +
+                    FormatPlaneCutBandAudit(planeCutAudit) +
+                ", edgeConflict=" +
+                    FormatPlaneCutEdgeConflictAudit(planeCutAudit) +
+                ", localJunction=" +
+                    FormatPlaneCutLocalJunctionAudit(planeCutAudit) +
+                ", planeMesh=" +
+                    planeCutAudit.PreviewTriangleCount + "/" +
+                    planeCutAudit.PreviewDegenerateTriangleCount + "/" +
+                    planeCutAudit.PreviewOpenEdgeCount + "/" +
+                    planeCutAudit.PreviewNonManifoldEdgeCount + "/" +
+                    planeCutAudit.PreviewWindingFailureCount + "/" +
+                    planeCutAudit.PreviewBoundsFailureCount + "/" +
+                    planeCutAudit.PreviewVolumeFailureCount + "/" +
+                    planeCutAudit.PreviewGeometryValid +
+                (string.IsNullOrEmpty(planeCutAudit.Diagnostic)
+                    ? string.Empty
+                    : ", planeTrace=" + planeCutAudit.Diagnostic) +
+                ", geometryCommit=disabled";
+            LogChamferNoStackTrace(
+                message,
+                planeCutAudit.GeometryValid != 1);
+#endif
+        }
+
+        private static void LogBoundedSingleEdgeAudit(
+            BoundedSingleEdgeAuditResult audit)
+        {
+#if UNITY_EDITOR
+            string message =
+                "GeneratedMass bounded edge compact audit. " +
+                "boundedEdge=" +
+                    "candidateCount:" + audit.CandidateCount +
+                    ",selectedOrdinal:" + audit.SelectedOrdinal +
+                    ",sourceEdge:" + audit.SourceEdgeIndex +
+                    ",isolatedRailSolved:" +
+                        audit.IsolatedRailSolved +
+                    ",widthAttempts:" + audit.WidthAttemptCount +
+                    ",solvedWidth:" +
+                        audit.SolvedWidth.ToString("G6") +
+                    ",canonicalRails:" +
+                        audit.CanonicalRailCount +
+                    ",maxBoundarySnap:" +
+                        audit.MaximumBoundarySnapDistance.ToString("G6") +
+                    ",targetBoundaries:" +
+                        audit.TargetBoundaryCount +
+                    ",ownerClips:" + audit.OwnerClipCount +
+                    ",boundarySubdivisions:" +
+                        audit.BoundarySubdivisionCount +
+                    ",bevelFaces:" + audit.BevelFaceCount +
+                    ",endpointCaps:" + audit.EndpointCapCount +
+                    ",modifiedSourceFaces:" +
+                        audit.ModifiedSourceFaceCount +
+                    ",foreignSourceFacesModified:" +
+                        audit.ForeignSourceFaceModifiedCount +
+                    ",foreignBoundarySubdivided:" +
+                        audit.ForeignBoundarySubdividedCount +
+                    ",railDeviation:" +
+                        audit.RailDeviation.ToString("G6") +
+                    ",maxExtentBeyondRails:" +
+                        audit.MaximumExtentBeyondRails.ToString("G6") +
+                    ",valid:" + audit.GeometryValid +
+                ", boundedOwner=" +
+                    "attempted:" + audit.OwnerClipAttemptedCount +
+                    ",clipped:" + audit.OwnerClipCount +
+                    ",intersectionFailure:" +
+                        audit.OwnerIntersectionFailureCount +
+                    ",degenerate:" + audit.OwnerDegenerateCount +
+                    ",nonPlanar:" + audit.OwnerNonPlanarCount +
+                    ",nonSimple:" + audit.OwnerNonSimpleCount +
+                    ",nonConvex:" + audit.OwnerNonConvexCount +
+                    ",windingFailure:" +
+                        audit.OwnerWindingFailureCount +
+                ", boundedPrepare=" +
+                    FormatBoundedPreparationAudit(
+                        audit.ResultPreparation) +
+                    ",failedCanonicalSubdivision:" +
+                        audit.PrepareFailedCanonicalSubdivision +
+                ", boundedSourcePrepare=" +
+                    FormatBoundedPreparationAudit(
+                        audit.SourcePreparation) +
+                ", boundedTopology=" +
+                    "open:" + audit.OpenEdgeCount +
+                    ",nonManifold:" + audit.NonManifoldEdgeCount +
+                    ",tJunction:" + audit.TJunctionCount +
+                    ",invalidFaces:" + audit.InvalidFaceCount +
+                ", boundedBounds=" +
+                    "attempted:" + audit.CertificationAttempted +
+                    ",rawValid:" + audit.BoundsValid +
+                    ",preparedValid:" +
+                        audit.PreparedBoundsValid +
+                    ",tolerance:" +
+                        audit.BoundsTolerance.ToString("G9") +
+                    ",rawMin:" + FormatBoundedAuditVector(
+                        audit.RawSourceBoundsMinimum) +
+                    ",rawMax:" + FormatBoundedAuditVector(
+                        audit.RawSourceBoundsMaximum) +
+                    ",preparedMin:" + FormatBoundedAuditVector(
+                        audit.PreparedSourceBoundsMinimum) +
+                    ",preparedMax:" + FormatBoundedAuditVector(
+                        audit.PreparedSourceBoundsMaximum) +
+                    ",resultMin:" + FormatBoundedAuditVector(
+                        audit.ResultBoundsMinimum) +
+                    ",resultMax:" + FormatBoundedAuditVector(
+                        audit.ResultBoundsMaximum) +
+                    ",rawMinMargin:" + FormatBoundedAuditVector(
+                        audit.RawBoundsMinimumMargin) +
+                    ",rawMaxMargin:" + FormatBoundedAuditVector(
+                        audit.RawBoundsMaximumMargin) +
+                    ",preparedMinMargin:" +
+                        FormatBoundedAuditVector(
+                            audit.PreparedBoundsMinimumMargin) +
+                    ",preparedMaxMargin:" +
+                        FormatBoundedAuditVector(
+                            audit.PreparedBoundsMaximumMargin) +
+                ", boundedVolume=" +
+                    "rawSource:" +
+                        audit.SourceVolume.ToString("G9") +
+                    ",preparedSource:" +
+                        audit.PreparedSourceVolume.ToString("G9") +
+                    ",result:" +
+                        audit.ResultVolume.ToString("G9") +
+                    ",rawRatio:" +
+                        audit.RawVolumeRatio.ToString("G9") +
+                    ",preparedRatio:" +
+                        audit.VolumeRatio.ToString("G9") +
+                    ",sourcePreparationRatio:" +
+                        audit.SourcePreparationVolumeRatio.ToString("G9") +
+                    ",rawDelta:" +
+                        audit.RawVolumeDelta.ToString("G9") +
+                    ",preparedDelta:" +
+                        audit.PreparedVolumeDelta.ToString("G9") +
+                    ",minimumRatio:" +
+                        audit.VolumeMinimumRatio.ToString("G9") +
+                    ",maximumRatio:" +
+                        audit.VolumeMaximumRatio.ToString("G9") +
+                    ",lowerMargin:" +
+                        audit.VolumeLowerMargin.ToString("G9") +
+                    ",upperMargin:" +
+                        audit.VolumeUpperMargin.ToString("G9") +
+                    ",valid:" + audit.VolumeValid +
+                ", boundedCertification=" +
+                    "attempted:" + audit.CertificationAttempted +
+                    ",facesReoriented:" +
+                        audit.FacesReoriented +
+                    ",outwardWindingFailures:" +
+                        audit.OutwardWindingFailureCount +
+                ", boundedMesh=" +
+                    "triangles:" + audit.PreviewTriangleCount +
+                    ",triangulatedFaces:" +
+                        audit.TriangulatedFaceCount +
+                    ",degenerate:" +
+                        audit.PreviewDegenerateTriangleCount +
+                    ",open:" + audit.PreviewOpenEdgeCount +
+                    ",nonManifold:" +
+                        audit.PreviewNonManifoldEdgeCount +
+                    ",winding:" +
+                        audit.PreviewWindingFailureCount +
+                    ",bounds:" + audit.PreviewBoundsFailureCount +
+                    ",volume:" + audit.PreviewVolumeFailureCount +
+                    ",failureFace:" +
+                        audit.TriangulationFailureFace +
+                    ",failureKind:" +
+                        audit.TriangulationFailureKind +
+                    ",failureProvenance:" +
+                        audit.TriangulationFailureProvenanceKind + ":" +
+                        audit.TriangulationFailureProvenanceIndex +
+                    ",failureReason:" +
+                        (string.IsNullOrEmpty(
+                            audit.TriangulationFailureReason)
+                            ? "none"
+                            : audit.TriangulationFailureReason) +
+                (string.IsNullOrEmpty(audit.Diagnostic)
+                    ? string.Empty
+                    : ", boundedTrace=" + audit.Diagnostic) +
+                ", geometryCommit=disabled";
+            LogChamferNoStackTrace(message, audit.GeometryValid != 1);
+#endif
+        }
+
+        private static string FormatBoundedPreparationAudit(
+            BoundedPreparationAudit audit)
+        {
+            return "attempted:" + audit.Attempted +
+                ",succeeded:" + audit.Succeeded +
+                ",inputFaces:" + audit.InputFaceCount +
+                ",inputVertices:" + audit.InputVertexCount +
+                ",inputUniqueVertices:" +
+                    audit.InputUniqueVertexCount +
+                ",outputFaces:" + audit.OutputFaceCount +
+                ",outputVertices:" + audit.OutputVertexCount +
+                ",outputUniqueVertices:" +
+                    audit.OutputUniqueVertexCount +
+                ",welded:" + audit.Welded +
+                ",conformed:" + audit.ConformedCount +
+                ",seamPairs:" + audit.SeamRepairCount +
+                ",seamTouchedFaces:" +
+                    audit.SeamTouchedFaceCount +
+                ",inputOpen:" + audit.InputOpenEdgeCount +
+                ",inputNonManifold:" +
+                    audit.InputNonManifoldEdgeCount +
+                ",inputTJunction:" + audit.InputTJunctionCount +
+                ",inputInvalidFaces:" +
+                    audit.InputInvalidFaceCount +
+                ",outputOpen:" + audit.OutputOpenEdgeCount +
+                ",outputNonManifold:" +
+                    audit.OutputNonManifoldEdgeCount +
+                ",outputTJunction:" + audit.OutputTJunctionCount +
+                ",outputInvalidFaces:" +
+                    audit.OutputInvalidFaceCount +
+                ",inputVolume:" +
+                    audit.InputVolume.ToString("G9") +
+                ",outputVolume:" +
+                    audit.OutputVolume.ToString("G9") +
+                ",volumeDelta:" +
+                    audit.VolumeDelta.ToString("G9") +
+                ",volumeRatio:" +
+                    audit.VolumeRatio.ToString("G9") +
+                ",failedStage:" +
+                    (string.IsNullOrEmpty(audit.FailedStage)
+                        ? "none"
+                        : audit.FailedStage) +
+                ",failedFace:" + audit.FailedFace +
+                ",failedKind:" + audit.FailedKind +
+                ",failedProvenance:" +
+                    audit.FailedProvenanceKind + ":" +
+                    audit.FailedProvenanceIndex +
+                ",degenerate:" + audit.DegenerateCount +
+                ",nonPlanar:" + audit.NonPlanarCount +
+                ",nonSimple:" + audit.NonSimpleCount +
+                ",nonConvex:" + audit.NonConvexCount +
+                ",windingFailure:" +
+                    audit.WindingFailureCount;
+        }
+
+        private static string FormatBoundedAuditVector(
+            Vector3 value)
+        {
+            return "(" + value.x.ToString("G9") + "/" +
+                value.y.ToString("G9") + "/" +
+                value.z.ToString("G9") + ")";
+        }
+
         private static void LogChamferEmissionAudit(
             ChamferEmissionStats stats,
             bool ready,
@@ -247,6 +631,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     planeCutAudit.SelectedEdgeCount + "/" +
                     planeCutAudit.ActiveEdgeCount + "/" +
                     planeCutAudit.PlanesBuilt + "/" +
+                    planeCutAudit.PlanesLocalized + "/" +
+                    planeCutAudit.PlanesDeferred + "/" +
                     planeCutAudit.PlanesRejected + "/" +
                     planeCutAudit.CapsBuilt + "/" +
                     planeCutAudit.CapsMissing + "/" +
@@ -258,6 +644,57 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     planeCutAudit.TJunctionCount + "/" +
                     planeCutAudit.InvalidFaceCount + "/" +
                     planeCutAudit.GeometryValid +
+                ", planeVertexJunction=" +
+                    planeCutAudit.VertexJunctionCandidateCount + "/" +
+                    planeCutAudit.VertexJunctionDirectBuiltCount + "/" +
+                    planeCutAudit.VertexJunctionAdaptiveBuiltCount + "/" +
+                    planeCutAudit.VertexJunctionBacktrackBuiltCount + "/" +
+                    planeCutAudit.VertexJunctionCleanSharpCount + "/" +
+                    planeCutAudit.VertexJunctionUnresolvedCount + "/" +
+                    planeCutAudit.VertexJunctionTriangleCapCount + "/" +
+                    planeCutAudit.VertexJunctionQuadCapCount + "/" +
+                    planeCutAudit.VertexJunctionLargerCapCount + "/" +
+                    planeCutAudit.VertexJunctionEdgesDeferredCount + "/" +
+                    planeCutAudit.VertexJunctionRebuildPassCount +
+                ", planeSolve=" +
+                    planeCutAudit.SolveStatesEvaluated + "/" +
+                    planeCutAudit.SolveJunctionsVisited + "/" +
+                    planeCutAudit.SolveCandidateTrials + "/" +
+                    planeCutAudit.SolveSystemRebuilds + "/" +
+                    planeCutAudit.SolvePolygonAudits + "/" +
+                    planeCutAudit.SolveTriangleAudits + "/" +
+                    planeCutAudit.SolveEdgesDeferred + "/" +
+                    planeCutAudit.SolveElapsedMilliseconds + "/" +
+                    planeCutAudit.SolveTimedOut +
+                ", planeFaceQuality=" +
+                    planeCutAudit.FaceQualityFaceCount + "/" +
+                    planeCutAudit.FaceQualitySeamTouchedFaceCount + "/" +
+                    planeCutAudit.FaceQualityNonPlanarCount + "/" +
+                    planeCutAudit.FaceQualityElongatedJunctionCount + "/" +
+                    planeCutAudit.FaceQualityMaxPlaneDeviation
+                        .ToString("G6") + "/" +
+                    planeCutAudit.FaceQualityMaxNormalSpreadDegrees
+                        .ToString("G6") + "/" +
+                    planeCutAudit.FaceQualityMinimumJunctionCompactness
+                        .ToString("G6") + "/" +
+                    planeCutAudit.FaceQualityMaximumJunctionAspectRatio
+                        .ToString("G6") + "/" +
+                    planeCutAudit.FaceQualityWorstVertexCount +
+                ", planeBand=" +
+                    FormatPlaneCutBandAudit(planeCutAudit) +
+                ", edgeConflict=" +
+                    FormatPlaneCutEdgeConflictAudit(planeCutAudit) +
+                ", localJunction=" +
+                    FormatPlaneCutLocalJunctionAudit(planeCutAudit) +
+                ", planeMesh=" +
+                    planeCutAudit.PreviewTriangleCount + "/" +
+                    planeCutAudit.PreviewDegenerateTriangleCount + "/" +
+                    planeCutAudit.PreviewOpenEdgeCount + "/" +
+                    planeCutAudit.PreviewNonManifoldEdgeCount + "/" +
+                    planeCutAudit.PreviewWindingFailureCount + "/" +
+                    planeCutAudit.PreviewBoundsFailureCount + "/" +
+                    planeCutAudit.PreviewVolumeFailureCount + "/" +
+                    planeCutAudit.PreviewGeometryValid +
                 (string.IsNullOrEmpty(planeCutAudit.Diagnostic)
                     ? string.Empty
                     : ", planeTrace=" + planeCutAudit.Diagnostic) +

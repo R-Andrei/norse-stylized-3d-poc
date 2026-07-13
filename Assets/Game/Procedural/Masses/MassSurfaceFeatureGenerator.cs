@@ -19,7 +19,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Archetype = archetype;
             SurfaceSeed = surfaceSeed;
             EdgeWearAmount = Mathf.Clamp(edgeWearAmount, 0f, 2f);
-            EdgeWearWidth = Mathf.Clamp(edgeWearWidth, 0.25f, 2f);
+            EdgeWearWidth = Mathf.Clamp(edgeWearWidth, 0.05f, 2f);
             EdgeWearCoverage = Mathf.Clamp(edgeWearCoverage, 0.1f, 2f);
             EdgeWearSoftness = Mathf.Clamp01(edgeWearSoftness);
             CreaseAmount = Mathf.Clamp(creaseAmount, 0f, 2f);

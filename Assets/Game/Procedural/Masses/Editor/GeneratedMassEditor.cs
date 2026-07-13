@@ -335,6 +335,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             serializedObject.ApplyModifiedProperties();
 
+            DrawPlaneCutBevelPreview();
+
             EditorGUILayout.Space(10f);
             EditorGUILayout.LabelField(
                 "Variant Controls",
@@ -396,6 +398,324 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "Surface Seed changes surface triangulation, subtle facet relief " +
                 "and vertex-colour variation.",
                 MessageType.Info);
+        }
+
+        private void DrawBoundedSingleEdgePreview()
+        {
+            EditorGUILayout.Space(10f);
+            EditorGUILayout.LabelField(
+                "EW-B1 Bounded Single-Edge Prototype",
+                EditorStyles.boldLabel);
+
+            if (targets.Length != 1)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select exactly one Generated Mass to evaluate and cycle bounded source edges.",
+                    MessageType.Info);
+                return;
+            }
+
+            GeneratedMass mass = target as GeneratedMass;
+            if (mass == null)
+            {
+                return;
+            }
+
+            string message;
+            MessageType messageType;
+            if (!mass.BoundedEdgePreviewEnabled)
+            {
+                message =
+                    "Evaluates one selected source edge as one bounded bevel polygon, two locally modified owner faces, and two bounded endpoint caps. " +
+                    "No whole-rock bevel plane is used.";
+                messageType = MessageType.Info;
+            }
+            else if (mass.BoundedEdgePreviewStale)
+            {
+                message =
+                    "The bounded edge preview is out of date. Refresh explicitly; no automatic diagnostic generation occurred.";
+                messageType = MessageType.Warning;
+            }
+            else if (mass.BoundedEdgePreviewApplied)
+            {
+                message =
+                    "Bounded edge " +
+                    (mass.BoundedEdgePreviewOrdinal + 1) + " of " +
+                    mass.BoundedEdgePreviewCandidateCount +
+                    " is active. Source edge " +
+                    mass.BoundedEdgePreviewSourceEdgeIndex +
+                    "; bevel faces=" +
+                    mass.BoundedEdgePreviewBevelFaceCount +
+                    ", endpoint caps=" +
+                    mass.BoundedEdgePreviewEndpointCapCount +
+                    ", modified source faces=" +
+                    mass.BoundedEdgePreviewModifiedSourceFaceCount +
+                    ", foreign source faces modified=" +
+                    mass.BoundedEdgePreviewForeignSourceFaceModifiedCount +
+                    ", rail deviation=" +
+                    mass.BoundedEdgePreviewRailDeviation.ToString("G6") +
+                    ", extent beyond rails=" +
+                    mass.BoundedEdgePreviewMaximumExtentBeyondRails
+                        .ToString("G6") + ".";
+                messageType = MessageType.Info;
+            }
+            else
+            {
+                message =
+                    "The bounded edge preview was rejected" +
+                    (mass.BoundedEdgePreviewSourceEdgeIndex >= 0
+                        ? " for source edge " +
+                            mass.BoundedEdgePreviewSourceEdgeIndex
+                        : string.Empty) +
+                    ".";
+                if (!string.IsNullOrEmpty(
+                        mass.BoundedEdgePreviewDiagnostic))
+                {
+                    message += " " +
+                        mass.BoundedEdgePreviewDiagnostic + ".";
+                }
+                messageType = MessageType.Error;
+            }
+
+            EditorGUILayout.HelpBox(message, messageType);
+
+            bool disabled = Application.isPlaying;
+            using (new EditorGUI.DisabledScope(disabled))
+            {
+                EditorGUILayout.BeginHorizontal();
+                using (new EditorGUI.DisabledScope(
+                    !mass.BoundedEdgePreviewEnabled ||
+                    mass.BoundedEdgePreviewCandidateCount <= 1))
+                {
+                    if (GUILayout.Button("Previous Bounded Edge"))
+                    {
+                        mass.PreviousBoundedEdgePreview();
+                        serializedObject.Update();
+                        Repaint();
+                        SceneView.RepaintAll();
+                    }
+                }
+
+                string evaluateLabel = mass.BoundedEdgePreviewEnabled
+                    ? "Refresh Bounded Edge"
+                    : "Evaluate Bounded Edge";
+                if (GUILayout.Button(evaluateLabel))
+                {
+                    mass.EvaluateBoundedEdgePreview();
+                    serializedObject.Update();
+                    Repaint();
+                    SceneView.RepaintAll();
+                }
+
+                using (new EditorGUI.DisabledScope(
+                    !mass.BoundedEdgePreviewEnabled ||
+                    mass.BoundedEdgePreviewCandidateCount <= 1))
+                {
+                    if (GUILayout.Button("Next Bounded Edge"))
+                    {
+                        mass.NextBoundedEdgePreview();
+                        serializedObject.Update();
+                        Repaint();
+                        SceneView.RepaintAll();
+                    }
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (mass.BoundedEdgePreviewEnabled &&
+                    GUILayout.Button("Show Production Geometry"))
+                {
+                    mass.ShowProductionGeometry();
+                    serializedObject.Update();
+                    Repaint();
+                    SceneView.RepaintAll();
+                }
+            }
+        }
+
+        private void DrawPlaneCutBevelPreview()
+        {
+            DrawBoundedSingleEdgePreview();
+
+            EditorGUILayout.Space(10f);
+            EditorGUILayout.LabelField(
+                "Rejected Whole-Rock Plane Diagnostic",
+                EditorStyles.boldLabel);
+
+            bool anyEvaluated = false;
+            int evaluatedCount = 0;
+            int staleCount = 0;
+            int appliedCount = 0;
+            int activeEdges = 0;
+            int builtEdges = 0;
+            int deferredEdges = 0;
+            int rejectedEdges = 0;
+            string firstDiagnostic = string.Empty;
+            for (int targetIndex = 0;
+                 targetIndex < targets.Length;
+                 targetIndex++)
+            {
+                GeneratedMass mass = targets[targetIndex] as GeneratedMass;
+                bool evaluated = mass != null &&
+                    mass.PlaneCutBevelPreviewEnabled;
+                anyEvaluated |= evaluated;
+                if (!evaluated || mass == null)
+                {
+                    continue;
+                }
+
+                evaluatedCount++;
+                if (mass.PlaneCutBevelPreviewStale)
+                {
+                    staleCount++;
+                }
+                if (mass.PlaneCutBevelPreviewApplied)
+                {
+                    appliedCount++;
+                }
+                activeEdges += mass.PlaneCutBevelPreviewActiveEdges;
+                builtEdges += mass.PlaneCutBevelPreviewBuiltEdges;
+                deferredEdges += mass.PlaneCutBevelPreviewDeferredEdges;
+                rejectedEdges += mass.PlaneCutBevelPreviewRejectedEdges;
+                if (string.IsNullOrEmpty(firstDiagnostic) &&
+                    !string.IsNullOrEmpty(
+                        mass.PlaneCutBevelPreviewDiagnostic))
+                {
+                    firstDiagnostic = mass.PlaneCutBevelPreviewDiagnostic;
+                }
+            }
+
+            string previewMessage;
+            MessageType previewMessageType;
+            if (!anyEvaluated)
+            {
+                previewMessage =
+                    "Retained only as rejected architecture evidence. It applies selected infinite edge planes to the whole rock. " +
+                    "Use the bounded single-edge prototype above for new geometry work.";
+                previewMessageType = MessageType.Info;
+            }
+            else if (staleCount > 0)
+            {
+                previewMessage =
+                    "Plane-cut preview is out of date for " + staleCount +
+                    " object(s). No automatic solver run occurred. " +
+                    "Press Refresh Plane-Cut Bevel Preview to evaluate the current settings, " +
+                    "or Show Production Geometry to discard the preview state.";
+                previewMessageType = MessageType.Warning;
+            }
+            else if (appliedCount == evaluatedCount)
+            {
+                previewMessage =
+                    "Editor-only plane-cut preview is active for " +
+                    appliedCount + " object(s): " +
+                    builtEdges + " of " + activeEdges +
+                    " active edges are shown.";
+                if (deferredEdges > 0)
+                {
+                    previewMessage += " " + deferredEdges +
+                        " edge(s) were safely deferred because no local cut could retain unrelated vertices.";
+                }
+                previewMessage +=
+                    " The transient mesh is never used in Play Mode.";
+                previewMessageType = deferredEdges > 0
+                    ? MessageType.Warning
+                    : MessageType.Info;
+            }
+            else
+            {
+                previewMessage =
+                    "Plane-cut preview was evaluated for " + evaluatedCount +
+                    " object(s), but " + (evaluatedCount - appliedCount) +
+                    " fell back to production geometry. Hard rejections: " +
+                    rejectedEdges + ".";
+                if (!string.IsNullOrEmpty(firstDiagnostic))
+                {
+                    previewMessage += " " + firstDiagnostic + ".";
+                }
+                previewMessageType = MessageType.Error;
+            }
+
+            EditorGUILayout.HelpBox(
+                previewMessage,
+                previewMessageType);
+
+            using (new EditorGUI.DisabledScope(Application.isPlaying))
+            {
+                string evaluationButtonLabel = anyEvaluated
+                    ? "Refresh Plane-Cut Bevel Preview"
+                    : "Evaluate Plane-Cut Bevel Preview";
+                if (GUILayout.Button(evaluationButtonLabel))
+                {
+                    for (int targetIndex = 0;
+                         targetIndex < targets.Length;
+                         targetIndex++)
+                    {
+                        GeneratedMass mass =
+                            targets[targetIndex] as GeneratedMass;
+                        if (anyEvaluated)
+                        {
+                            mass?.RefreshPlaneCutBevelPreview();
+                        }
+                        else
+                        {
+                            mass?.EvaluatePlaneCutBevelPreview();
+                        }
+                    }
+
+                    serializedObject.Update();
+                    Repaint();
+                    SceneView.RepaintAll();
+                }
+
+                if (anyEvaluated &&
+                    GUILayout.Button("Show Production Geometry"))
+                {
+                    for (int targetIndex = 0;
+                         targetIndex < targets.Length;
+                         targetIndex++)
+                    {
+                        GeneratedMass mass =
+                            targets[targetIndex] as GeneratedMass;
+                        mass?.ShowProductionGeometry();
+                    }
+
+                    serializedObject.Update();
+                    Repaint();
+                    SceneView.RepaintAll();
+                }
+            }
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.HelpBox(
+                "Legacy replacement/strip/patch reconstruction is diagnostic comparison evidence only. " +
+                "It never changes the displayed mesh and runs only from the explicit single-object action below.",
+                MessageType.None);
+
+            bool legacyAuditUnavailable =
+                Application.isPlaying || targets.Length != 1;
+            using (new EditorGUI.DisabledScope(legacyAuditUnavailable))
+            {
+                if (GUILayout.Button(
+                        "Run Legacy Edge-Wear Diagnostic Audit"))
+                {
+                    GeneratedMass mass = target as GeneratedMass;
+                    mass?.RunLegacyEdgeWearDiagnosticAudit();
+                    Repaint();
+                }
+            }
+
+            if (targets.Length != 1)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select exactly one Generated Mass to run the expensive legacy diagnostic audit.",
+                    MessageType.Warning);
+            }
+
+            if (Application.isPlaying)
+            {
+                EditorGUILayout.HelpBox(
+                    "Plane-cut preview evaluation is disabled in Play Mode; production geometry is used.",
+                    MessageType.None);
+            }
         }
 
         private void DrawFeatureRecipeWorkflow()
@@ -1196,7 +1516,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     edgeWearWidth,
                     new GUIContent(
                         "Width",
-                        "Controls generated bevel/chamfer depth on selected convex edges."));
+                        "Authoritative physical bevel depth for both normal edge-wear candidates and the editor plane-cut preview. Values below 0.25 provide an extra thin range without changing the established 0.25-2 mapping."));
                 EditorGUILayout.PropertyField(
                     edgeWearCoverage,
                     new GUIContent(

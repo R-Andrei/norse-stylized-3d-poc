@@ -30,6 +30,25 @@ namespace ProgrammaticStylized3D.Rivers
             topologyStartupValidationMajorBuildCount = 0;
             topologyStartupValidationConnectorBuildCount = 0;
             topologyStartupValidationPocketBuildCount = 0;
+            int phaseCount = Enum.GetValues(typeof(InitializationPhase)).Length;
+            if (topologyStartupPhaseCallCounts.Length != phaseCount)
+            {
+                topologyStartupPhaseCallCounts = new int[phaseCount];
+                topologyStartupPhaseAccumulatedMilliseconds =
+                    new double[phaseCount];
+            }
+            else
+            {
+                Array.Clear(
+                    topologyStartupPhaseCallCounts,
+                    0,
+                    topologyStartupPhaseCallCounts.Length);
+                Array.Clear(
+                    topologyStartupPhaseAccumulatedMilliseconds,
+                    0,
+                    topologyStartupPhaseAccumulatedMilliseconds.Length);
+            }
+            topologyStartupSummaryLogged = false;
         }
 
         private void RecordTopologyStartupStep(
@@ -42,6 +61,14 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             topologyStartupValidationStepCount++;
+            int phaseIndex = (int)phase;
+            if (phaseIndex >= 0 &&
+                phaseIndex < topologyStartupPhaseCallCounts.Length)
+            {
+                topologyStartupPhaseCallCounts[phaseIndex]++;
+                topologyStartupPhaseAccumulatedMilliseconds[phaseIndex] +=
+                    elapsedMilliseconds;
+            }
             if (elapsedMilliseconds >
                 topologyStartupValidationSlowestStepMilliseconds)
             {
@@ -64,6 +91,77 @@ namespace ProgrammaticStylized3D.Rivers
                  topologyStartupValidationStartedAt) * 1000.0);
             topologyStartupValidationActive = false;
             topologyStartupValidationComplete = true;
+            if (!editorTopologyPreparationInProgress)
+            {
+                LogTopologyStartupSummaryOnce();
+            }
+        }
+
+        private string BuildTopologyStartupPhaseSummary()
+        {
+            if (topologyStartupPhaseCallCounts.Length == 0)
+            {
+                return "—";
+            }
+
+            var parts = new List<string>();
+            for (int index = 0;
+                 index < topologyStartupPhaseCallCounts.Length;
+                 index++)
+            {
+                int count = topologyStartupPhaseCallCounts[index];
+                if (count <= 0)
+                {
+                    continue;
+                }
+
+                parts.Add(
+                    $"{(InitializationPhase)index} {count}x/" +
+                    $"{topologyStartupPhaseAccumulatedMilliseconds[index]:0.000}ms");
+            }
+
+            return parts.Count > 0 ? string.Join(", ", parts) : "—";
+        }
+
+        private void LogTopologyStartupSummaryOnce()
+        {
+            if (topologyStartupSummaryLogged || river == null)
+            {
+                return;
+            }
+
+            topologyStartupSummaryLogged = true;
+            Debug.Log(
+                $"[River Foam P1] Startup '{river.name}': " +
+                $"outcome={topologyCacheStartupOutcome}, " +
+                $"reasons={TopologyCacheStartupReasonNames}, " +
+                $"total={topologyStartupValidationTotalMilliseconds:0.000}ms, " +
+                $"field={fieldWidth}x{fieldHeight}, " +
+                $"cells={(long)fieldWidth * fieldHeight:N0}, " +
+                $"cache=attempt:{topologyCacheStartupAttemptCount}/" +
+                $"hit:{topologyCacheStartupHitCount}/" +
+                $"miss:{topologyCacheStartupMissCount}/" +
+                $"install:{topologyStartupValidationCacheInstallCount}/" +
+                $"build:{topologyStartupCacheBuildAttemptCount}/" +
+                $"load:{topologyCacheStartupLoadMilliseconds:0.000}ms, " +
+                $"builds=obstacle:{topologyStartupValidationObstacleBuildCount}/" +
+                $"major:{topologyStartupValidationMajorBuildCount}/" +
+                $"connector:{topologyStartupValidationConnectorBuildCount}/" +
+                $"pocket:{topologyStartupValidationPocketBuildCount}, " +
+                $"replacementAttempts={topologyStartupReplacementAttemptCount}, " +
+                $"writes=attempt:{topologyStartupCacheWriteAttemptCount}/" +
+                $"success:{topologyStartupCacheWriteSuccessCount}, " +
+                $"registry=add:{topologyStartupSourceAddedCount}/" +
+                $"remove:{topologyStartupSourceRemovedCount}/" +
+                $"change:{topologyStartupSourceChangedCount}/" +
+                $"distinct:{topologyStartupDistinctGeneratedSources.Count}, " +
+                $"dirtyCycles={topologyStartupDirtyCycleCount}, " +
+                $"dirtyReasons={TopologyStartupDirtyReasonNames}, " +
+                $"restarts={topologyStartupRestartCount}, " +
+                $"phases=[{BuildTopologyStartupPhaseSummary()}], " +
+                $"slowest={topologyStartupValidationSlowestStep}/" +
+                $"{topologyStartupValidationSlowestStepMilliseconds:0.000}ms.",
+                river);
         }
 
         private void MarkActiveTopologyCacheStale(
@@ -76,17 +174,13 @@ namespace ProgrammaticStylized3D.Rivers
 
         public bool RequestIdenticalTopologyReplacementValidation()
         {
-            if (!Application.isPlaying ||
-                initializationPhase != InitializationPhase.Ready ||
-                !AreResourcesCompleteAndCurrent())
+            if (!topologyStartupValidationComplete)
             {
-                return false;
+                topologyStartupReplacementAttemptCount++;
             }
-
-            RequestTopologyReplacement(
-                TopologyReplacementReason.IdenticalValidation,
-                true);
-            return topologyReplacementBuild != null;
+            topologyReplacementLastReason =
+                "Unavailable — Play Mode topology generation is disabled";
+            return false;
         }
 
         public bool RunTopologyCacheRoundTripValidation()
@@ -95,47 +189,94 @@ namespace ProgrammaticStylized3D.Rivers
             topologyCacheRoundTripRunCount++;
             topologyCacheRoundTripState = "Running";
             topologyCacheRoundTripSummary =
-                "Capturing the immutable prepared topology graph.";
+                "Running the explicit exhaustive payload proof.";
 
-            if (!Application.isPlaying ||
-                !TopologyCacheRoundTripReady ||
-                river == null ||
-                !river.Domain.IsValid ||
-                TopologyReplacementInProgress)
+            river ??= GetComponent<StylizedRiver>();
+            if (river == null)
             {
                 topologyCacheRoundTripState = "Unavailable";
                 topologyCacheRoundTripSummary =
-                    "The proof requires a fully initialized Play-mode topology " +
-                    "with no replacement build in progress.";
+                    "The proof requires a StylizedRiver owner.";
                 return false;
             }
 
             try
             {
-                if (!TryCaptureTopologyCacheFingerprints(
-                        out StylizedRiverFoamTopologyFingerprint
-                            domainFingerprint,
-                        out StylizedRiverFoamTopologyFingerprint
-                            obstacleFingerprint,
-                        out StylizedRiverFoamTopologyFingerprint
-                            generationFingerprint,
-                        out _,
-                        out string fingerprintError))
-                {
-                    topologyCacheRoundTripState = "Failed";
-                    topologyCacheRoundTripSummary = fingerprintError;
-                    return false;
-                }
+                StylizedRiverFoamTopologyCachePackage package;
+                int assignedPayloadBytes = 0;
+                ulong assignedPayloadHash = 0ul;
 
-                StylizedRiverFoamTopologyCachePackage package =
-                    CreateTopologyCachePackage(
+                if (Application.isPlaying)
+                {
+                    if (!river.Domain.IsValid ||
+                        !TopologyCacheRoundTripReady ||
+                        TopologyReplacementInProgress)
+                    {
+                        topologyCacheRoundTripState = "Unavailable";
+                        topologyCacheRoundTripSummary =
+                            "Play Mode proof requires one fully initialized " +
+                            "topology with no replacement build in progress.";
+                        return false;
+                    }
+
+                    if (!TryCaptureTopologyCacheFingerprints(
+                            out StylizedRiverFoamTopologyFingerprint
+                                domainFingerprint,
+                            out StylizedRiverFoamTopologyFingerprint
+                                obstacleFingerprint,
+                            out StylizedRiverFoamTopologyFingerprint
+                                generationFingerprint,
+                            out _,
+                            out string fingerprintError))
+                    {
+                        topologyCacheRoundTripState = "Failed";
+                        topologyCacheRoundTripSummary = fingerprintError;
+                        return false;
+                    }
+
+                    package = CreateTopologyCachePackage(
                         domainFingerprint,
                         obstacleFingerprint,
                         generationFingerprint);
+                }
+                else
+                {
+                    StylizedRiverFoamTopologyCacheAsset asset =
+                        river.FoamTopologyCacheAsset;
+                    if (asset == null || !asset.HasSupportedStorageContract ||
+                        !asset.HasPayload)
+                    {
+                        topologyCacheRoundTripState = "Unavailable";
+                        topologyCacheRoundTripSummary =
+                            "Assign and prepare a supported non-empty cache " +
+                            "before running the exhaustive integrity proof.";
+                        return false;
+                    }
+
+                    byte[] assignedPayload = asset.GetPayloadReadOnlyReference();
+                    assignedPayloadBytes = assignedPayload.Length;
+                    assignedPayloadHash =
+                        StylizedRiverFoamTopologyCacheCodec.ReadPayloadHash(
+                            assignedPayload);
+                    if (!StylizedRiverFoamTopologyCacheCodec.TryDeserialize(
+                            assignedPayload,
+                            out package,
+                            out string loadError))
+                    {
+                        topologyCacheRoundTripState = "Failed";
+                        topologyCacheRoundTripSummary =
+                            $"Assigned payload load failed: {loadError}";
+                        return false;
+                    }
+                }
 
                 StylizedRiverFoamTopologyCacheRoundTripResult result =
                     StylizedRiverFoamTopologyCacheCodec.ValidateRoundTrip(
                         package);
+                bool matchesAssignedPayload = assignedPayloadBytes == 0 ||
+                    (result.PayloadByteCount == assignedPayloadBytes &&
+                     result.PayloadHash == assignedPayloadHash);
+
                 topologyCacheRoundTripPayloadBytes = result.PayloadByteCount;
                 topologyCacheRoundTripPayloadHash = result.PayloadHash;
                 topologyCacheRoundTripSerializationMilliseconds =
@@ -144,15 +285,23 @@ namespace ProgrammaticStylized3D.Rivers
                     result.LoadMilliseconds;
                 topologyCacheRoundTripVerificationMilliseconds =
                     result.VerificationMilliseconds;
-                topologyCacheRoundTripSummary = result.Summary;
-                topologyCacheRoundTripState = result.Passed
-                    ? "Passed"
-                    : "Failed";
-                if (result.Passed)
+                topologyCacheRoundTripState = result.Passed &&
+                    matchesAssignedPayload
+                        ? "Passed"
+                        : "Failed";
+                topologyCacheRoundTripSummary = !result.Passed
+                    ? result.Summary
+                    : !matchesAssignedPayload
+                        ? "The assigned payload did not reproduce the exact " +
+                          "validated payload size and checksum."
+                        : result.Summary;
+
+                bool passed = result.Passed && matchesAssignedPayload;
+                if (passed)
                 {
                     topologyCacheRoundTripPassCount++;
                     Debug.Log(
-                        $"[River Foam 4.9A] Cache round-trip passed for " +
+                        $"[River Foam P3] Exhaustive cache proof passed for " +
                         $"'{river.name}': {result.PayloadByteCount:N0} bytes, " +
                         $"hash {result.PayloadHash:X16}.",
                         river);
@@ -160,12 +309,12 @@ namespace ProgrammaticStylized3D.Rivers
                 else
                 {
                     Debug.LogError(
-                        $"[River Foam 4.9A] Cache round-trip failed for " +
-                        $"'{river.name}': {result.Summary}",
+                        $"[River Foam P3] Exhaustive cache proof failed for " +
+                        $"'{river.name}': {topologyCacheRoundTripSummary}",
                         river);
                 }
 
-                return result.Passed;
+                return passed;
             }
             catch (Exception exception)
             {
@@ -185,11 +334,18 @@ namespace ProgrammaticStylized3D.Rivers
             artifact = default;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             topologyCacheBuildCount++;
+            topologyCacheLastBuildSerializationCount = 0;
+            if (topologyStartupValidationActive &&
+                !editorTopologyPreparationInProgress)
+            {
+                topologyStartupCacheBuildAttemptCount++;
+            }
             topologyCacheBuildState = "Building";
             topologyCacheBuildSummary =
-                "Capturing stable inputs and validating the complete payload.";
+                "Capturing stable inputs and serializing one complete payload.";
 
-            if (!Application.isPlaying ||
+            if ((!Application.isPlaying &&
+                 !editorTopologyPreparationInProgress) ||
                 !TopologyCacheBuildReady ||
                 river == null ||
                 !river.Domain.IsValid ||
@@ -197,8 +353,9 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 topologyCacheBuildState = "Unavailable";
                 topologyCacheBuildSummary =
-                    "Cache building requires a fully initialized Play-mode " +
-                    "topology whose maintenance and replacement work is complete.";
+                    "Cache building requires a fully initialized topology " +
+                    "from Play Mode or the explicit Edit Mode preparation action, " +
+                    "with no maintenance or replacement work in progress.";
                 return false;
             }
 
@@ -230,34 +387,19 @@ namespace ProgrammaticStylized3D.Rivers
                         domainFingerprint,
                         obstacleFingerprint,
                         generationFingerprint);
-                StylizedRiverFoamTopologyCacheRoundTripResult proof =
-                    StylizedRiverFoamTopologyCacheCodec.ValidateRoundTrip(
-                        package);
-                if (!proof.Passed)
-                {
-                    stopwatch.Stop();
-                    topologyCacheBuildState = "Failed";
-                    topologyCacheBuildSummary =
-                        $"The accepted 4.9A proof failed during cache build: " +
-                        proof.Summary;
-                    topologyCacheBuildMilliseconds =
-                        stopwatch.Elapsed.TotalMilliseconds;
-                    return false;
-                }
-
                 byte[] payload =
                     StylizedRiverFoamTopologyCacheCodec.Serialize(package);
+                topologyCacheLastBuildSerializationCount++;
                 ulong payloadHash =
                     StylizedRiverFoamTopologyCacheCodec.ReadPayloadHash(
                         payload);
-                if (payload.Length != proof.PayloadByteCount ||
-                    payloadHash != proof.PayloadHash)
+                if (payload.Length < sizeof(ulong))
                 {
                     stopwatch.Stop();
                     topologyCacheBuildState = "Failed";
                     topologyCacheBuildSummary =
-                        "The final cache payload did not reproduce the " +
-                        "validated round-trip size and checksum.";
+                        "The serialized cache payload did not contain a valid " +
+                        "checksum contract.";
                     topologyCacheBuildMilliseconds =
                         stopwatch.Elapsed.TotalMilliseconds;
                     return false;
@@ -271,8 +413,9 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyCacheBuildSuccessCount++;
                 topologyCacheBuildState = "Built";
                 topologyCacheBuildSummary =
-                    "A complete versioned payload was built from the active " +
-                    "prepared topology. It has not been loaded or activated.";
+                    "A complete versioned payload was validated and serialized " +
+                    "once from the active prepared topology. Exhaustive " +
+                    "round-trip and corruption proof remains an explicit action.";
 
                 artifact = new StylizedRiverFoamTopologyCacheBuildArtifact(
                     payload,
@@ -372,7 +515,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            byte[] payload = asset.GetPayloadCopy();
+            byte[] payload = asset.GetPayloadReadOnlyReference();
             payloadBytes = payload.Length;
             if (!StylizedRiverFoamTopologyCacheCodec.TryDeserialize(
                     payload,
@@ -597,7 +740,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            byte[] payload = asset.GetPayloadCopy();
+            byte[] payload = asset.GetPayloadReadOnlyReference();
             if (!StylizedRiverFoamTopologyCacheCodec.TryDeserialize(
                     payload,
                     out StylizedRiverFoamTopologyCachePackage package,
@@ -828,311 +971,40 @@ namespace ProgrammaticStylized3D.Rivers
             return true;
         }
 
-        private void BeginAutomaticDevelopmentStartupGeneration()
+        private void CompleteDevelopmentTopologyGeneration()
         {
-            automaticTopologyGenerationInProgress = true;
-            automaticDevelopmentRebuildReason =
-                AutomaticDevelopmentRebuildReason.StartupMiss;
-            pendingAutomaticDevelopmentRebuildAfterStartup = false;
-            pendingStartupCacheStaleObstacles = false;
-            pendingStartupCacheStaleSettings = false;
-            topologyCacheLoadedForActiveResources = false;
-            topologyCacheStartupState = "Auto-Generating Cache Miss";
-            topologyCacheStartupSummary =
-                "No current persistent payload could be installed. This " +
-                "Editor/Development session is running the accepted expensive " +
-                "preparation path automatically. The Editor will validate and " +
-                "save the completed result without additional user actions.";
-        }
-
-        private void BeginAutomaticDevelopmentRebuildAfterStartup()
-        {
-            if (!pendingAutomaticDevelopmentRebuildAfterStartup ||
-                !IsAutomaticDevelopmentCacheEnabled ||
-                initializationPhase != InitializationPhase.Ready)
-            {
-                return;
-            }
-
-            pendingAutomaticDevelopmentRebuildAfterStartup = false;
-            automaticTopologyGenerationInProgress = true;
-            automaticDevelopmentObservedSignature =
-                ResolveRequestedTopologySignature();
-            automaticDevelopmentRebuildNotBefore =
-                Time.realtimeSinceStartupAsDouble;
-
-            if (pendingStartupCacheStaleObstacles)
-            {
-                automaticDevelopmentRebuildReason =
-                    AutomaticDevelopmentRebuildReason.Obstacles;
-                obstacleExclusionUsesCachedScalar = false;
-                RequestObstacleRebuild(
-                    ResolveCurrentObstacleGeometryVersion(),
-                    true);
-            }
-            else
-            {
-                automaticDevelopmentRebuildReason =
-                    AutomaticDevelopmentRebuildReason.Settings;
-                RequestTopologyReplacement(
-                    TopologyReplacementReason.Settings,
-                    false);
-            }
-
-            pendingStartupCacheStaleObstacles = false;
-            pendingStartupCacheStaleSettings = false;
-        }
-
-        private void CompleteDevelopmentTopologyGeneration(
-            string completedPath)
-        {
-            bool completedAutomatically =
-                automaticTopologyGenerationInProgress;
             bool completedExplicitly =
                 explicitTopologyGenerationInProgress;
-            automaticTopologyGenerationInProgress = false;
             explicitTopologyGenerationInProgress = false;
-            automaticDevelopmentRebuildReason =
-                AutomaticDevelopmentRebuildReason.None;
             activeTopologyObstacleStale = false;
-            if (completedAutomatically || completedExplicitly)
+            if (completedExplicitly)
             {
                 topologyCacheLoadedForActiveResources = false;
-            }
-
-            if (completedAutomatically)
-            {
-                QueueAutomaticTopologyCachePersistence(completedPath);
-            }
-            else if (completedExplicitly)
-            {
                 topologyCacheStartupState = "Generated Explicitly";
                 topologyCacheStartupSummary =
-                    "Development diagnostics explicitly ran the expensive " +
-                    "preparation path. Automatic development caching was not " +
-                    "required for this operation.";
+                    "The explicit Edit Mode preparation path completed. " +
+                    "No automatic Play Mode cache persistence was requested.";
             }
         }
 
-        private void QueueAutomaticTopologyCachePersistence(
-            string completedPath)
-        {
-            if (!TryCaptureTopologyCacheFingerprints(
-                    out _,
-                    out _,
-                    out _,
-                    out StylizedRiverFoamTopologyFingerprint currentCombined,
-                    out string fingerprintError))
-            {
-                automaticTopologyCacheWritePending = false;
-                automaticTopologyCachePersistenceState =
-                    "Cache Write Failed";
-                automaticTopologyCachePersistenceSummary =
-                    "The generated topology is active, but its stable input " +
-                    $"key could not be captured: {fingerprintError}";
-                topologyCacheStartupState =
-                    "Generated — Cache Write Failed";
-                topologyCacheStartupSummary =
-                    automaticTopologyCachePersistenceSummary;
-                return;
-            }
-
-            string currentInputKey = currentCombined.ToString();
-            if (!topologyCacheSessionPersistentInputCaptured ||
-                topologyCacheSessionPersistentInputKey != currentInputKey)
-            {
-                automaticTopologyCacheWritePending = false;
-                automaticTopologyCachePersistenceState =
-                    "Session-Only Development Topology";
-                automaticTopologyCachePersistenceSummary =
-                    "The generated topology is active for this Play session, " +
-                    "but its inputs differ from the persistent values captured " +
-                    "at Play entry, so the authored cache was not overwritten.";
-                topologyCacheStartupState =
-                    "Session-Only Development Topology";
-                topologyCacheStartupSummary =
-                    automaticTopologyCachePersistenceSummary;
-                return;
-            }
-
-#if UNITY_EDITOR
-            automaticTopologyCacheWritePending = true;
-            automaticTopologyCachePersistenceState =
-                "Pending Automatic Save";
-            automaticTopologyCachePersistenceSummary =
-                $"The complete topology produced by {completedPath} is active. " +
-                "The Editor cache coordinator will build, validate, and save " +
-                "its persistent payload automatically.";
-            topologyCacheStartupState = "Auto-Generated — Saving Cache";
-            topologyCacheStartupSummary =
-                automaticTopologyCachePersistenceSummary;
-#else
-            automaticTopologyCacheWritePending = false;
-            automaticTopologyCachePersistenceState =
-                "Session-Only Development Topology";
-            automaticTopologyCachePersistenceSummary =
-                "A Development Player generated the topology successfully. " +
-                "Asset persistence is Editor-only, so this result remains " +
-                "session-local.";
-            topologyCacheStartupState =
-                "Session-Only Development Topology";
-            topologyCacheStartupSummary =
-                automaticTopologyCachePersistenceSummary;
-#endif
-        }
-
+        // Retained as a compatibility surface for older Editor callers. P1
+        // deliberately rejects every automatic build or persistence attempt.
         public bool TryBuildAutomaticTopologyCache(
             out StylizedRiverFoamTopologyCacheBuildArtifact artifact)
         {
             artifact = default;
-#if UNITY_EDITOR
-            if (!automaticTopologyCacheWritePending ||
-                !TopologyCacheBuildReady)
-            {
-                return false;
-            }
-
-            automaticTopologyCacheWritePending = false;
             automaticTopologyCacheWriteCount++;
-            if (!TryBuildTopologyCache(out artifact))
+            if (!topologyStartupValidationComplete)
             {
-                automaticTopologyCachePersistenceState =
-                    "Cache Write Failed";
-                automaticTopologyCachePersistenceSummary =
-                    "The automatic payload build failed. The generated topology " +
-                    "remains active and any previous cache asset remains available.";
-                topologyCacheStartupState =
-                    "Generated — Cache Write Failed";
-                topologyCacheStartupSummary =
-                    automaticTopologyCachePersistenceSummary;
-                return false;
+                topologyStartupCacheBuildAttemptCount++;
+                topologyStartupCacheWriteAttemptCount++;
             }
-
-            automaticTopologyCachePersistenceState =
-                "Built — Awaiting Editor Save";
+            automaticTopologyCacheWritePending = false;
+            automaticTopologyCachePersistenceState = "Blocked";
             automaticTopologyCachePersistenceSummary =
-                "The payload passed the exact round-trip proof and is ready for " +
-                "the Editor coordinator to store in the assigned asset.";
-            return true;
-#else
+                "An automatic topology-cache build was rejected. Prepare the " +
+                "cache explicitly in Edit Mode.";
             return false;
-#endif
-        }
-
-        public bool ValidateAutomaticTopologyCacheArtifact(
-            StylizedRiverFoamTopologyCacheBuildArtifact artifact,
-            out string error)
-        {
-            error = string.Empty;
-#if UNITY_EDITOR
-            topologyCacheValidationCount++;
-            if (!Application.isPlaying || !TopologyCacheBuildReady ||
-                river == null || !river.Domain.IsValid)
-            {
-                error =
-                    "Automatic persistence requires a complete current topology.";
-                SetTopologyCacheValidationMiss(
-                    "Unavailable",
-                    error);
-                return false;
-            }
-
-            if (artifact.PayloadByteCount <= 0 ||
-                artifact.FormatVersion !=
-                    StylizedRiverFoamTopologyCacheCodec.FormatVersion ||
-                artifact.GeneratorContractVersion !=
-                    StylizedRiverFoamTopologyCacheCodec
-                        .GeneratorContractVersion)
-            {
-                error =
-                    "The automatic build artifact is empty or uses an unsupported contract.";
-                SetTopologyCacheValidationMiss(
-                    "Miss — Build Artifact",
-                    error);
-                return false;
-            }
-
-            byte[] payload = artifact.CopyPayload();
-            if (!StylizedRiverFoamTopologyCacheCodec.TryDeserialize(
-                    payload,
-                    out StylizedRiverFoamTopologyCachePackage package,
-                    out string loadError))
-            {
-                error = loadError;
-                SetTopologyCacheValidationMiss(
-                    "Miss — Invalid Build Artifact",
-                    error);
-                return false;
-            }
-
-            ulong payloadHash =
-                StylizedRiverFoamTopologyCacheCodec.ReadPayloadHash(payload);
-            StylizedRiverFoamTopologyFingerprint storedCombined =
-                StylizedRiverFoamTopologyFingerprints.ComputeCombined(
-                    package.DomainFingerprint,
-                    package.ObstacleFingerprint,
-                    package.GenerationFingerprint);
-            bool artifactMetadataMatches =
-                artifact.PayloadHash == payloadHash.ToString("X16") &&
-                artifact.DomainFingerprint ==
-                    package.DomainFingerprint.ToString() &&
-                artifact.ObstacleFingerprint ==
-                    package.ObstacleFingerprint.ToString() &&
-                artifact.GenerationFingerprint ==
-                    package.GenerationFingerprint.ToString() &&
-                artifact.CombinedFingerprint == storedCombined.ToString();
-            if (!artifactMetadataMatches)
-            {
-                error =
-                    "The automatic build artifact metadata does not match its payload.";
-                SetTopologyCacheValidationMiss(
-                    "Miss — Build Metadata",
-                    error);
-                return false;
-            }
-
-            if (!TryCaptureTopologyCacheFingerprints(
-                    out StylizedRiverFoamTopologyFingerprint currentDomain,
-                    out StylizedRiverFoamTopologyFingerprint currentObstacles,
-                    out StylizedRiverFoamTopologyFingerprint currentGeneration,
-                    out StylizedRiverFoamTopologyFingerprint currentCombined,
-                    out string fingerprintError))
-            {
-                error = fingerprintError;
-                SetTopologyCacheValidationMiss(
-                    "Miss — Inputs Unavailable",
-                    error);
-                return false;
-            }
-
-            bool current = package.FieldWidth == fieldWidth &&
-                package.FieldHeight == fieldHeight &&
-                package.DomainFingerprint == currentDomain &&
-                package.ObstacleFingerprint == currentObstacles &&
-                package.GenerationFingerprint == currentGeneration &&
-                artifact.CombinedFingerprint == currentCombined.ToString();
-            if (!current)
-            {
-                error =
-                    "Stable inputs changed after the automatic payload was built; the previous persistent cache was retained.";
-                SetTopologyCacheValidationMiss(
-                    "Miss — Inputs Changed During Save",
-                    error);
-                return false;
-            }
-
-            topologyCacheValidationHitCount++;
-            topologyCacheValidationState = "Hit Candidate";
-            topologyCacheValidationSummary =
-                "The automatic payload passed its binary contract, metadata, " +
-                "field-dimension, and current stable-input checks before the " +
-                "persistent asset was modified.";
-            return true;
-#else
-            error =
-                "Automatic persistent asset validation is Editor-only.";
-            return false;
-#endif
         }
 
         public void ReportAutomaticTopologyCachePersisted(
@@ -1140,111 +1012,166 @@ namespace ProgrammaticStylized3D.Rivers
             string payloadHash,
             string assetPath)
         {
-#if UNITY_EDITOR
-            automaticTopologyCacheWriteSuccessCount++;
-            automaticTopologyCachePersistenceState =
-                "Automatically Generated and Cached";
+            if (!topologyStartupValidationComplete)
+            {
+                topologyStartupCacheWriteAttemptCount++;
+                topologyStartupCacheWriteSuccessCount++;
+            }
+            automaticTopologyCacheWritePending = false;
+            automaticTopologyCachePersistenceState = "Blocked";
             automaticTopologyCachePersistenceSummary =
-                $"The complete payload was validated and saved to " +
-                $"'{assetPath}'. Future matching Play entries load it directly.";
-            topologyCacheStartupPayloadBytes = Mathf.Max(0, payloadBytes);
-            topologyCacheStartupPayloadHash =
-                string.IsNullOrEmpty(payloadHash) ? "—" : payloadHash;
-            topologyCacheStartupState =
-                "Automatically Generated and Cached";
-            topologyCacheStartupSummary =
-                automaticTopologyCachePersistenceSummary;
-            Debug.Log(
-                $"[River Foam 4.9C.1] Automatically cached topology for " +
-                $"'{river.name}': {payloadBytes:N0} bytes, hash {payloadHash}.",
-                river);
-#endif
+                "Automatic Play Mode cache persistence is disabled; a legacy " +
+                "persistence callback was ignored.";
         }
 
         public void ReportAutomaticTopologyCachePersistenceFailure(
             string reason)
         {
-#if UNITY_EDITOR
+            if (!topologyStartupValidationComplete)
+            {
+                topologyStartupCacheWriteAttemptCount++;
+            }
             automaticTopologyCacheWritePending = false;
-            automaticTopologyCachePersistenceState = "Cache Write Failed";
+            automaticTopologyCachePersistenceState = "Disabled";
             automaticTopologyCachePersistenceSummary =
                 string.IsNullOrEmpty(reason)
-                    ? "The automatic Editor cache write failed."
-                    : reason;
-            topologyCacheStartupState =
-                "Generated — Cache Write Failed";
-            topologyCacheStartupSummary =
-                automaticTopologyCachePersistenceSummary;
-            Debug.LogWarning(
-                $"[River Foam 4.9C.1] Automatic cache persistence failed for " +
-                $"'{river.name}': {automaticTopologyCachePersistenceSummary}",
-                river);
-#endif
+                    ? "Automatic Play Mode cache persistence is disabled."
+                    : $"Automatic persistence is disabled. Legacy report: {reason}";
         }
 
         public bool RequestExplicitTopologyGeneration()
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (!Application.isPlaying || DevelopmentTopologyGenerationInProgress)
+            topologyCacheStartupState = "Preparation Required";
+            topologyCacheStartupSummary =
+                "Play Mode topology generation is disabled. Use Prepare / " +
+                "Rebuild Foam Topology Cache in Edit Mode.";
+            return false;
+        }
+
+        public bool TryPrepareTopologyCacheInEditor(
+            out StylizedRiverFoamTopologyCacheBuildArtifact artifact)
+        {
+            artifact = default;
+#if UNITY_EDITOR
+            if (Application.isPlaying || editorTopologyPreparationInProgress)
             {
+                topologyCacheBuildState = "Unavailable";
+                topologyCacheBuildSummary =
+                    "Edit Mode cache preparation cannot run during Play Mode " +
+                    "or while another preparation is active.";
                 return false;
             }
 
-            if (initializationPhase ==
-                InitializationPhase.AwaitExplicitTopologyGeneration)
+            river = GetComponent<StylizedRiver>();
+            surfaceRenderer = river != null ? river.SurfaceRenderer : null;
+            if (river == null || !river.Domain.IsValid)
             {
-                explicitTopologyGenerationRequested = true;
-                explicitTopologyGenerationInProgress = true;
-                automaticTopologyGenerationInProgress = false;
-                automaticTopologyCacheWritePending = false;
-                topologyCacheStartupState = "Generating Explicitly";
-                topologyCacheStartupSummary =
-                    "Development tooling explicitly authorized the expensive " +
-                    "obstacle and topology preparation path.";
-                return true;
+                topologyCacheBuildState = "Unavailable";
+                topologyCacheBuildSummary =
+                    "The River domain is not ready. Regenerate the River " +
+                    "structure before preparing its Foam topology cache.";
+                return false;
             }
 
-            if (initializationPhase == InitializationPhase.Ready)
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+            if (disturbanceRuntime != null &&
+                !disturbanceRuntime
+                    .PrepareGeneratedGeometrySourcesForCacheValidation(
+                        out string registryPreparationStatus))
             {
-                int obstacleVersion = ResolveCurrentObstacleGeometryVersion();
-                bool obstacleTopologyStale =
-                    obstacleVersion != obstacleGeometryVersion ||
-                    activeTopologyObstacleStale;
-                bool settingsTopologyStale =
-                    ResolveRequestedTopologySignature() !=
-                    ResolveActiveTopologySignature();
-                if (!obstacleTopologyStale && !settingsTopologyStale)
+                topologyCacheBuildState = "Unavailable";
+                topologyCacheBuildSummary = registryPreparationStatus;
+                return false;
+            }
+
+            try
+            {
+                ReleaseResources();
+                topologyCachePreparationGeneratedUploadCount = 0;
+                editorTopologyPreparationInProgress = true;
+                explicitTopologyGenerationInProgress = true;
+                activeTopologyRequiresExplicitPreparation = false;
+                resourcesDirty = true;
+                boundaryDirty = true;
+                initializationPhase = InitializationPhase.NotStarted;
+
+                const int maximumSteps = 96;
+                for (int step = 0; step < maximumSteps; step++)
+                {
+                    if (EnsureResources())
+                    {
+                        break;
+                    }
+
+                    if (initializationPhase == InitializationPhase.Failed ||
+                        initializationPhase ==
+                            InitializationPhase.CachePreparationRequired)
+                    {
+                        break;
+                    }
+                }
+
+                if (initializationPhase != InitializationPhase.Ready ||
+                    !AreResourcesCompleteAndCurrent())
+                {
+                    topologyCacheBuildState = "Failed";
+                    topologyCacheBuildSummary =
+                        "Explicit Edit Mode preparation did not reach a complete " +
+                        $"topology state (phase {initializationPhase}).";
+                    return false;
+                }
+
+                if (topologyCachePreparationGeneratedUploadCount != 1)
+                {
+                    topologyCacheBuildState = "Failed";
+                    topologyCacheBuildSummary =
+                        "Explicit preparation must publish generated topology " +
+                        "exactly once after the complete Major, Connector, and " +
+                        $"Pocket graph is ready; observed " +
+                        $"{topologyCachePreparationGeneratedUploadCount:N0} uploads.";
+                    return false;
+                }
+
+                if (!TryBuildTopologyCache(out artifact))
                 {
                     return false;
                 }
 
-                explicitTopologyGenerationInProgress = true;
-                automaticTopologyGenerationInProgress = false;
-                automaticTopologyCacheWritePending = false;
-                topologyCacheLoadedForActiveResources = false;
-                if (obstacleTopologyStale)
+                if (topologyCacheLastBuildSerializationCount != 1)
                 {
-                    obstacleExclusionUsesCachedScalar = false;
-                    RequestObstacleRebuild(
-                        obstacleVersion,
-                        true);
-                }
-                else
-                {
-                    RequestTopologyReplacement(
-                        TopologyReplacementReason.Settings,
-                        false);
+                    artifact = default;
+                    topologyCacheBuildState = "Failed";
+                    topologyCacheBuildSummary =
+                        "Explicit preparation must serialize the normal cache " +
+                        "payload exactly once; observed " +
+                        $"{topologyCacheLastBuildSerializationCount:N0} serializations.";
+                    return false;
                 }
 
-                topologyCacheStartupState = "Generating Explicitly";
-                topologyCacheStartupSummary =
-                    "Development tooling explicitly authorized replacement " +
-                    "generation for the stale active topology.";
                 return true;
             }
-
-            return false;
+            catch (Exception exception)
+            {
+                topologyCacheBuildState = "Failed";
+                topologyCacheBuildSummary = exception.Message;
+                Debug.LogException(exception, river);
+                return false;
+            }
+            finally
+            {
+                ReleaseResources();
+                editorTopologyPreparationInProgress = false;
+                explicitTopologyGenerationInProgress = false;
+                initializationPhase = InitializationPhase.NotStarted;
+                resourcesDirty = true;
+                boundaryDirty = true;
+                BindDisabled();
+            }
 #else
+            topologyCacheBuildState = "Unavailable";
+            topologyCacheBuildSummary =
+                "Explicit cache preparation is Editor-only.";
             return false;
 #endif
         }
@@ -1277,18 +1204,18 @@ namespace ProgrammaticStylized3D.Rivers
                     IsAutomaticDevelopmentCacheEnabled))
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.InputsUnavailable,
                     "Miss — Inputs Unavailable",
                     fingerprintError);
                 return TopologyCacheStartupResolution.Miss;
             }
-
-            CaptureTopologyCacheSessionPersistentInputKey(currentCombined);
 
             StylizedRiverFoamTopologyCacheAsset asset =
                 river != null ? river.FoamTopologyCacheAsset : null;
             if (asset == null)
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.Unassigned,
                     "Miss — Unassigned",
                     "No Foam topology cache asset is assigned.");
                 return TopologyCacheStartupResolution.Miss;
@@ -1297,6 +1224,7 @@ namespace ProgrammaticStylized3D.Rivers
             if (!asset.HasSupportedStorageContract)
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.StorageVersion,
                     "Miss — Storage Version",
                     "The assigned asset uses an unsupported storage contract.");
                 return TopologyCacheStartupResolution.Miss;
@@ -1305,18 +1233,20 @@ namespace ProgrammaticStylized3D.Rivers
             if (!asset.HasPayload)
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.EmptyPayload,
                     "Miss — Empty",
                     "The assigned cache asset contains no payload bytes.");
                 return TopologyCacheStartupResolution.Miss;
             }
 
-            byte[] payload = asset.GetPayloadCopy();
+            byte[] payload = asset.GetPayloadReadOnlyReference();
             if (!StylizedRiverFoamTopologyCacheCodec.TryDeserialize(
                     payload,
                     out package,
                     out string loadError))
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.InvalidPayload,
                     "Miss — Invalid Payload",
                     loadError);
                 package = null;
@@ -1347,6 +1277,7 @@ namespace ProgrammaticStylized3D.Rivers
             if (!metadataMatches)
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.MetadataMismatch,
                     "Miss — Metadata Mismatch",
                     "The asset metadata does not match its binary payload.");
                 package = null;
@@ -1364,6 +1295,7 @@ namespace ProgrammaticStylized3D.Rivers
             if (!completeCurrentContract)
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.IncompleteContract,
                     "Miss — Incomplete Contract",
                     "The payload does not contain a complete topology graph " +
                     "for the current field dimensions.");
@@ -1389,6 +1321,8 @@ namespace ProgrammaticStylized3D.Rivers
                 combinedMatches)
             {
                 topologyCacheStartupHitCount++;
+                topologyCacheStartupOutcome = TopologyCacheStartupOutcome.Exact;
+                topologyCacheStartupReasons = TopologyCacheStartupReason.None;
                 topologyCacheStartupState = "Hit — Ready to Install";
                 topologyCacheStartupSummary =
                     "The complete payload and all stable inputs match. No " +
@@ -1399,35 +1333,53 @@ namespace ProgrammaticStylized3D.Rivers
 
             staleObstacles = !obstaclesMatch;
             staleSettings = !generationMatches || !combinedMatches;
-            if (IsAutomaticDevelopmentCacheEnabled && domainMatches &&
-                (staleObstacles || staleSettings))
+            if (domainMatches && (staleObstacles || staleSettings))
             {
                 topologyCacheStartupMissCount++;
-                topologyCacheStartupState =
-                    "Using Previous Cache — Rebuilding";
+                topologyCacheStartupOutcome =
+                    TopologyCacheStartupOutcome.StaleCompatible;
+                topologyCacheStartupReasons = TopologyCacheStartupReason.None;
+                if (staleObstacles)
+                {
+                    topologyCacheStartupReasons |=
+                        TopologyCacheStartupReason.ObstacleMismatch;
+                }
+                if (!generationMatches)
+                {
+                    topologyCacheStartupReasons |=
+                        TopologyCacheStartupReason.GenerationMismatch;
+                }
+                if (!combinedMatches)
+                {
+                    topologyCacheStartupReasons |=
+                        TopologyCacheStartupReason.CombinedMismatch;
+                }
+                topologyCacheStartupState = "Loaded — Stale Compatible";
                 topologyCacheStartupSummary =
-                    "The assigned cache is structurally valid and uses the " +
-                    "same river mapping and dimensions. Its previous generated " +
-                    "topology will remain visible while current development " +
-                    "inputs regenerate automatically.";
+                    "The assigned cache is structurally compatible and will be " +
+                    "used for this session. Play Mode will not rebuild or save " +
+                    "a replacement; prepare the cache explicitly in Edit Mode.";
                 return TopologyCacheStartupResolution.StaleCompatible;
             }
 
             if (!domainMatches)
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.DomainMismatch,
                     "Miss — Stale Domain",
                     "The complete resampled river-domain content changed.");
             }
             else if (staleObstacles)
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.ObstacleMismatch,
                     "Miss — Stale Obstacles",
                     "The exact transformed static obstacle geometry changed.");
             }
             else
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.GenerationMismatch,
                     "Miss — Stale Settings",
                     "Quality, mapping, or topology-generation settings changed.");
             }
@@ -1436,40 +1388,19 @@ namespace ProgrammaticStylized3D.Rivers
             return TopologyCacheStartupResolution.Miss;
         }
 
-        private void CaptureTopologyCacheSessionPersistentInputKey(
-            StylizedRiverFoamTopologyFingerprint combinedFingerprint)
-        {
-            if (topologyCacheSessionPersistentInputCaptured)
-            {
-                return;
-            }
-
-            topologyCacheSessionPersistentInputKey =
-                combinedFingerprint.ToString();
-            topologyCacheSessionPersistentInputCaptured = true;
-        }
-
         private void SetTopologyCacheStartupMiss(
+            TopologyCacheStartupReason reason,
             string state,
             string summary)
         {
             topologyCacheStartupMissCount++;
-            topologyCacheStartupState = state ?? "Miss";
-            topologyCacheStartupSummary = summary ?? string.Empty;
-            if (IsAutomaticDevelopmentCacheEnabled)
-            {
-                topologyCacheStartupSummary +=
-                    " Development startup will generate the complete topology " +
-                    "automatically; the Editor will persist it when the inputs " +
-                    "still match the values present at Play entry.";
-            }
-            else
-            {
-                topologyCacheStartupSummary +=
-                    " Production startup remains neutral and never runs the " +
-                    "expensive generator path automatically.";
-            }
-
+            topologyCacheStartupOutcome =
+                TopologyCacheStartupOutcome.PreparationRequired;
+            topologyCacheStartupReasons = reason;
+            topologyCacheStartupState = state ?? "Preparation Required";
+            topologyCacheStartupSummary = (summary ?? string.Empty) +
+                " Play Mode will not generate or persist topology. Use Prepare / " +
+                "Rebuild Foam Topology Cache in Edit Mode.";
             topologyCacheStartupPayloadBytes = 0;
             topologyCacheStartupPayloadHash = "—";
             topologyCacheStartupLoadMilliseconds = 0.0;
@@ -1491,6 +1422,7 @@ namespace ProgrammaticStylized3D.Rivers
                 package.PocketTopology == null)
             {
                 SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.InstallRejected,
                     "Miss — Install Rejected",
                     "The resolved payload became incomplete before installation.");
                 return false;
@@ -1540,38 +1472,27 @@ namespace ProgrammaticStylized3D.Rivers
 
             pendingStartupCacheStaleObstacles = staleObstacles;
             pendingStartupCacheStaleSettings = staleSettings;
-            pendingAutomaticDevelopmentRebuildAfterStartup =
-                IsAutomaticDevelopmentCacheEnabled &&
-                (staleObstacles || staleSettings);
+            activeTopologyRequiresExplicitPreparation =
+                staleObstacles || staleSettings;
 
-            if (pendingAutomaticDevelopmentRebuildAfterStartup)
+            if (activeTopologyRequiresExplicitPreparation)
             {
-                topologyCacheStartupState =
-                    "Using Previous Cache — Rebuilding";
-                topologyCacheStartupSummary = staleObstacles
-                    ? "The previous generated topology was installed. The live " +
-                      "obstacle field and a complete replacement will now be " +
-                      "prepared automatically without a neutral frame."
-                    : "The previous generated topology was installed and will " +
-                      "remain visible while current settings prepare a complete " +
-                      "replacement automatically.";
-                Debug.Log(
-                    $"[River Foam 4.9C.1] Retained stale cache for " +
-                    $"'{river.name}' while automatic regeneration starts.",
-                    river);
+                topologyCacheStartupOutcome =
+                    TopologyCacheStartupOutcome.StaleCompatible;
+                topologyCacheStartupState = "Loaded — Stale Compatible";
+                topologyCacheStartupSummary =
+                    "The structurally compatible cache is active for this " +
+                    "session. Play Mode will not regenerate or save it; use " +
+                    "Prepare / Rebuild Foam Topology Cache in Edit Mode.";
             }
             else
             {
-                topologyCacheStartupState = "Loaded";
+                topologyCacheStartupOutcome = TopologyCacheStartupOutcome.Exact;
+                topologyCacheStartupReasons = TopologyCacheStartupReason.None;
+                topologyCacheStartupState = "Loaded — Exact";
                 topologyCacheStartupSummary =
                     "Persistent topology and the exact cached obstacle scalar " +
-                    "were installed. Runtime shore, obstacle, pressure, lee, " +
-                    "wake, and other live sources remain composed normally.";
-                Debug.Log(
-                    $"[River Foam 4.9C] Loaded cache for '{river.name}': " +
-                    $"{topologyCacheStartupPayloadBytes:N0} bytes, hash " +
-                    $"{topologyCacheStartupPayloadHash}.",
-                    river);
+                    "were installed without generation or asset persistence.";
             }
 
             return true;

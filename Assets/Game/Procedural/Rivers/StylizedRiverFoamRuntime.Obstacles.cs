@@ -53,51 +53,42 @@ namespace ProgrammaticStylized3D.Rivers
         {
             disturbanceRuntime ??=
                 GetComponent<StylizedRiverDisturbanceRuntime>();
+            if (disturbanceRuntime != null &&
+                !disturbanceRuntime.GeneratedObstacleRegistryReady)
+            {
+                return;
+            }
+
             int currentObstacleVersion = disturbanceRuntime != null
                 ? disturbanceRuntime.ObstacleGeometryVersion
                 : -1;
+
+            // Many registry notifications may describe one restoration wave.
+            // Observe the final disturbance-runtime version once after that
+            // wave settles instead of rebuilding the unrelated river-boundary
+            // texture for every SourceAdded/Removed/Changed callback.
+            generatedSourceNotificationBurstPending = false;
 
             if (currentObstacleVersion == obstacleGeometryVersion)
             {
                 return;
             }
 
-            if (DevelopmentTopologyGenerationInProgress)
+            obstacleGeometryVersion = currentObstacleVersion;
+            if (!topologyStartupValidationComplete)
             {
-                RequestObstacleRebuild(
-                    currentObstacleVersion,
-                    true);
-                return;
+                topologyStartupDirtyReasons |=
+                    TopologyStartupDirtyReason.ObstaclesChanged;
             }
-
             activeTopologyObstacleStale = true;
-            if (IsAutomaticDevelopmentCacheEnabled)
-            {
-                automaticTopologyGenerationInProgress = true;
-                automaticDevelopmentRebuildReason =
-                    AutomaticDevelopmentRebuildReason.Obstacles;
-                topologyCacheStartupState =
-                    "Using Previous Cache — Rebuilding";
-                topologyCacheStartupSummary =
-                    "Static obstacle geometry changed. The previous generated " +
-                    "topology remains visible while the exact live obstacle " +
-                    "field and a complete replacement are prepared " +
-                    "automatically.";
-                RequestObstacleRebuild(
-                    currentObstacleVersion,
-                    true);
-                return;
-            }
-
+            activeTopologyRequiresExplicitPreparation = true;
             MarkActiveTopologyCacheStale(
                 "Stale — Obstacles Changed",
                 "Static obstacle geometry changed after activation. The " +
-                "exact live obstacle field is refreshed, while the generated " +
-                "topology is retained until explicit development regeneration " +
-                "or a valid cache reload.");
-            RequestObstacleRebuild(
-                currentObstacleVersion,
-                false);
+                "current cached obstacle scalar and prepared topology remain " +
+                "active for this session; Play Mode will not rescan meshes, " +
+                "block on GPU readback, rebuild topology, or save an asset. " +
+                "Prepare the cache explicitly in Edit Mode.");
         }
 
         private int ResolveCurrentObstacleGeometryVersion()

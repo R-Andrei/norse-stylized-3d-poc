@@ -89,6 +89,17 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            bool recordMaterialWork = steadyStateWorkAccountingActive;
+            long materialWorkStartedAt = recordMaterialWork
+                ? CaptureWorkTimestamp()
+                : 0L;
+            int materialDispatchesBefore = recordMaterialWork
+                ? lastUpdateDispatches
+                : 0;
+            long materialCellIterationsBefore = recordMaterialWork
+                ? lastUpdateCellIterations
+                : 0L;
+
             previousState = currentState;
             float transportMetricsInterval = 1f /
                 TransportMetricsUpdateRate;
@@ -135,6 +146,15 @@ namespace ProgrammaticStylized3D.Rivers
             if (captureTransportMetrics)
             {
                 RequestTransportMetricReadback();
+            }
+
+            if (recordMaterialWork)
+            {
+                RecordMaterialSimulationWork(
+                    materialWorkStartedAt,
+                    materialDispatchesBefore,
+                    materialCellIterationsBefore,
+                    transportSubsteps);
             }
         }
 

@@ -4,6 +4,27 @@
 >
 > This handoff is historical for earlier rock/river refactor context. Any river Foam architecture, static-foam, morphing, lateral motion, or rendering responsibility statement in this document is superseded by `Docs/River_Foam_Stage6_Architecture.md` and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`. Use those documents as the active Foam source of truth.
 
+
+## Current River Foam continuation — `4.11C.5.17B.2D2B-B.2C`
+
+P1/P3/P4 remain accepted. A/A.1 diagnostics, B production Chipping, B.1 control divorce, B.1A formula correction, and the B.2A single-contour representation are retained. B.2B provides useful large analytical motion and geometric turnover, but Unity showed that high Evolution Amount could stretch blobs into long ribbons because the coordinate warp also distorted local contour distance.
+
+B.2C keeps the B.2B lookup/advection field and adds a bounded local metric correction before contour evaluation. Candidate movement, growth/shrink, turnover, and transient clustering remain; local chip aspect ratio returns to the unwarped River metric.
+
+Two new debug views are the immediate evidence gate:
+
+```text
+Chip Eligibility Composite
+Fray Eligibility Composite
+
+Dark gray     exact current Final Foam;
+Cyan          eligibility outside rendered Foam;
+Bright yellow overlap.
+```
+
+The Chip Edge Eligibility and Fray Permitted Band formulas are unchanged by B.2C. After Unity validation, use the composites to define the next Chip eligibility correction; do not tune the field blindly. No new texture, compute pass, persistent state, control, candidate-loop expansion, Strand change, or production Fray change is included.
+
+
 ## Current River Foam continuation — `4.11C.5.16E.2` committed Final Foam
 
 The presentation audit is complete. Final Foam stuttered around blocked rock/bank regions, while both committed and evaluated production-style previews were stable. This proves the residual point-velocity predictor, not Layer C transport, caused the oscillation.
@@ -76,16 +97,23 @@ The current continuation contract is now locked by:
 4.11C.5.17B — Layer E Edge Breakup Proof (visually rejected)
 4.11C.5.17B.1 — Breakup Authority Calibration (visually rejected)
 4.11C.5.17B.2 — Pre-Hardening Binary Edge Cuts (Unity-validated for Chip/Fray)
-4.11C.5.17B.2A — Foam Strand Extraction and Stability Controls (provisionally retained)
-4.11C.5.17B.2B — Edge-Band Regional Fragmentation (visually rejected)
-4.11C.5.17B.2C — State-Preserving Foam Authoring (implemented; Unity validation pending)
+4.11C.5.17B.2A — original periodic Strand proof (superseded)
+4.11C.5.17B.2B — Edge-Band Regional Fragmentation (visually rejected and removed)
+4.11C.5.17B.2C — State-Preserving Foam Authoring
+4.11C.5.17B.2D1 — reconstructed Lineification Extraction Proof (visually rejected)
+4.11C.5.17B.2D1A — Exact Lineification Extraction (Unity-validated)
+4.11C.5.17B.2D1B — Strand Shaping and Projected Detail Floor (visually rejected)
+4.11C.5.17B.2D1C — Strand Spatial Controls and Resolution Cutoff (visually rejected)
+4.11C.5.17B.2D1D — Strand Control Model Reset and Coherent Pattern Transport (Unity-validated and accepted)
+4.11C.5.17B.2D2 — Chip and Fray Role Separation (visually rejected)
+4.11C.5.17B.2D2A — Presence-Space Chip and Fray Reconstruction (partially useful; not accepted)
 ```
 
 The original `5.17A` controls were bound correctly but lacked visual authority: fill operated after established coverage was already hardened, the floor was capped by Foam Colour alpha, and edge emphasis did not control the existing bright rim. `5.17A.1` removes Interior Fill, makes Interior Opacity Floor absolute for established Foam, and replaces Edge Emphasis with signed Edge Contrast that directly suppresses or intensifies the current edge-versus-interior lighting transition. Normal Final Foam and Foam Evaluated Final Preview still share one arithmetic-only helper. Floor `0` and Contrast `0` preserve the previous render. The patch adds no texture sample, persistent resource, compute work, morphology, lifecycle rule, or topology lookup.
 
-`5.17B` and `5.17B.1` are rejected. `5.17B.2` fixes breakup authority; Chip, Fray, and Breakup Scale are provisionally accepted. `5.17B.2A` retains optional independent Foam Strands with Strength, Spacing, Width, and Curvature; future refinement or removal remains possible. `5.17B.2B` is visually rejected: its partial-presence/soft-edge selector remained perimeter erosion rather than the requested medium regional splitting. Leave Fragmentation Strength at `0` and do not attempt another threshold-only calibration.
+`5.17B` and `5.17B.1` are rejected. `5.17B.2` fixes breakup authority. Same-state evidence proved that the desirable lineification came from the hidden anisotropic band breaker combined with current Chip and Fray, not the explicit periodic Strand path. `5.17B.2B` and its three Fragmentation controls are removed.
 
-`5.17B.2C` removes blanket Inspector regeneration. Only Setup, River Domain, Channel Shape, Shoreline Safety, Natural Variation, Surface Mesh, and spline edits queue the debounced full rebuild. Other rendering/runtime/Foam/debug edits preserve the current domain and active Foam textures. `Foam -> Runtime & Quality -> Hold Foam State` is a non-persistent Play Mode diagnostic that freezes Layer C, current Layer D products, births, transport, aging, and topology evolution while continuing live Layer E binding for exact-state comparison. Structural/resource changes may still legitimately rebuild state. Unity validation of this authoring workflow precedes a replacement regional-splitting design and later Remaining-Life orchestration.
+`5.17B.2C` preserves Foam state during non-structural Inspector tuning and provides Hold Foam State. D1 retained a coherent neutral body and separate lineified soft signal but its reconstructed Strand mask was rejected. D1A proved exact equality; D1B and D1C were rejected control models. D1D is now Unity-validated and accepted: Strength, Scale, Density, and Reach produce viable controlled Strands. D2 preserved the accepted Strand implementation but was visually rejected because it still thresholded procedurally eroded coherent visibility and exposed internal iso-contours. D2A preserves Strands and carries a transient base-material edge depth with the coherent render sample. Unity evidence found Chip more recognizably chip-like but still too scattered and insufficiently biased toward medium-to-large bites; Fray remained visually ineffective. Chip, Fray, and Strands still compete for the same partial-presence territory. Remaining-Life orchestration remains blocked until a real post-Strand → Chip → final-boundary Fray hierarchy is accepted.
 
 Do not reintroduce duplicate selectors, editable diagnostic controls, dynamic-height warning boxes, or ordinary-authoring repaint conditions while validating those metrics.
 

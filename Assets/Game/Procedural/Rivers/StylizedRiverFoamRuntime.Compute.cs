@@ -492,6 +492,17 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            bool recordShapeWork = steadyStateWorkAccountingActive;
+            long shapeWorkStartedAt = recordShapeWork
+                ? CaptureWorkTimestamp()
+                : 0L;
+            int shapeDispatchesBefore = recordShapeWork
+                ? lastUpdateDispatches
+                : 0;
+            long shapeCellIterationsBefore = recordShapeWork
+                ? lastUpdateCellIterations
+                : 0L;
+
             ConfigureVisualShapeParameters(materialStepDuration);
             DispatchBuildFilmProducts();
 
@@ -506,6 +517,13 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             DispatchEvaluateShapeMask();
+            if (recordShapeWork)
+            {
+                RecordShapeEvaluationWork(
+                    shapeWorkStartedAt,
+                    shapeDispatchesBefore,
+                    shapeCellIterationsBefore);
+            }
             return true;
         }
 
@@ -516,9 +534,27 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            bool recordShapeWork = steadyStateWorkAccountingActive;
+            long shapeWorkStartedAt = recordShapeWork
+                ? CaptureWorkTimestamp()
+                : 0L;
+            int shapeDispatchesBefore = recordShapeWork
+                ? lastUpdateDispatches
+                : 0;
+            long shapeCellIterationsBefore = recordShapeWork
+                ? lastUpdateCellIterations
+                : 0L;
+
             ConfigureVisualShapeParameters(0f);
             DispatchBuildFilmProducts();
             DispatchEvaluateShapeMask();
+            if (recordShapeWork)
+            {
+                RecordShapeEvaluationWork(
+                    shapeWorkStartedAt,
+                    shapeDispatchesBefore,
+                    shapeCellIterationsBefore);
+            }
         }
 
         private bool BeginTransportMetricCapture()
@@ -562,6 +598,12 @@ namespace ProgrammaticStylized3D.Rivers
             transportMetricsReadbackPending = true;
             transportMetricsReadbackRequestedAt =
                 Time.realtimeSinceStartupAsDouble;
+            if (steadyStateWorkAccountingActive)
+            {
+                steadyStateWorkTransportMetricRequestCount++;
+                steadyStateWorkTransportMetricGeneration =
+                    steadyStateWorkAccountingGeneration;
+            }
             int generation = transportMetricsGeneration;
             ComputeBuffer requestedBuffer = transportMetricsBuffer;
             AsyncGPUReadback.Request(
@@ -579,6 +621,12 @@ namespace ProgrammaticStylized3D.Rivers
                     if (request.hasError)
                     {
                         transportMetricsAvailable = false;
+                        if (steadyStateWorkAccountingActive &&
+                            steadyStateWorkTransportMetricGeneration ==
+                                steadyStateWorkAccountingGeneration)
+                        {
+                            steadyStateWorkTransportMetricErrorCount++;
+                        }
                         return;
                     }
 
@@ -592,6 +640,18 @@ namespace ProgrammaticStylized3D.Rivers
                     if (count == TransportMetricCount)
                     {
                         ApplyTransportMetricReadback(latestTransportMetrics);
+                        if (steadyStateWorkAccountingActive &&
+                            steadyStateWorkTransportMetricGeneration ==
+                                steadyStateWorkAccountingGeneration)
+                        {
+                            steadyStateWorkTransportMetricCompletionCount++;
+                        }
+                    }
+                    else if (steadyStateWorkAccountingActive &&
+                        steadyStateWorkTransportMetricGeneration ==
+                            steadyStateWorkAccountingGeneration)
+                    {
+                        steadyStateWorkTransportMetricErrorCount++;
                     }
                 });
         }
@@ -794,7 +854,13 @@ namespace ProgrammaticStylized3D.Rivers
             int groupsY = Mathf.CeilToInt(height / (float)ThreadGroupSize);
             computeShader.Dispatch(kernel, groupsX, groupsY, 1);
             lastUpdateDispatches++;
-            lastUpdateCellIterations += (long)width * height;
+            long cellIterations = (long)width * height;
+            lastUpdateCellIterations += cellIterations;
+            if (steadyStateWorkAccountingActive)
+            {
+                steadyStateWorkTotalDispatchCount++;
+                steadyStateWorkTotalCellIterations += cellIterations;
+            }
         }
 
         private void DispatchOneDimensional(
@@ -812,6 +878,11 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.Dispatch(kernel, groups, 1, 1);
             lastUpdateDispatches++;
             lastUpdateCellIterations += count;
+            if (steadyStateWorkAccountingActive)
+            {
+                steadyStateWorkTotalDispatchCount++;
+                steadyStateWorkTotalCellIterations += count;
+            }
         }
     }
 }

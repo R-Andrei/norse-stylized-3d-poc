@@ -15,7 +15,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float texelWorldSizeX,
             float texelWorldSizeZ,
             float minimumAuthoredHalfWidth,
-            float minimumEffectiveHalfWidth)
+            float minimumEffectiveHalfWidth,
+            float minimumEdgeFeatherWidth,
+            float minimumEstimatedVisibleFullWidth)
         {
             TextureWidth = Mathf.Max(0, textureWidth);
             TextureHeight = Mathf.Max(0, textureHeight);
@@ -27,6 +29,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             TexelWorldSizeZ = Mathf.Max(0f, texelWorldSizeZ);
             MinimumAuthoredHalfWidth = Mathf.Max(0f, minimumAuthoredHalfWidth);
             MinimumEffectiveHalfWidth = Mathf.Max(0f, minimumEffectiveHalfWidth);
+            MinimumEdgeFeatherWidth = Mathf.Max(0f, minimumEdgeFeatherWidth);
+            MinimumEstimatedVisibleFullWidth =
+                Mathf.Max(0f, minimumEstimatedVisibleFullWidth);
         }
 
         public int TextureWidth { get; }
@@ -39,6 +44,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float TexelWorldSizeZ { get; }
         public float MinimumAuthoredHalfWidth { get; }
         public float MinimumEffectiveHalfWidth { get; }
+        public float MinimumEdgeFeatherWidth { get; }
+        public float MinimumEstimatedVisibleFullWidth { get; }
+
+        public float MinimumAuthoredFullWidth =>
+            MinimumAuthoredHalfWidth * 2f;
+
+        public float MinimumEffectiveCoreFullWidth =>
+            MinimumEffectiveHalfWidth * 2f;
 
         public bool IsValid =>
             TextureWidth > 0 &&
@@ -51,14 +64,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
     public static class GroundPaintedAccentCoverageBaker
     {
-        public const int Revision = 1;
+        public const int Revision = 4;
 
         private const int MinimumResolution = 64;
         private const int MaximumResolution = 2048;
         private const int ResolutionAlignment = 8;
         private const float TargetTexelWorldSize = 0.0125f;
-        private const float MinimumHalfWidthInTexels = 0.45f;
-        private const float EdgeFeatherInTexels = 1.15f;
+        private const float MinimumHalfWidthInTexels = 0.08f;
+        private const float EdgeFeatherInTexels = 0.10f;
+        private const float RelativeEdgeFeatherFraction = 0.12f;
         private const float MinimumEndpointFadeFraction = 0.025f;
         private const float MaximumEndpointFadeFraction = 0.055f;
         private const byte CoveredTexelThreshold = 8;
@@ -66,10 +80,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public static Texture2D Bake(
             Bounds localBounds,
             IReadOnlyList<GroundPaintedAccentProjectedGlyph> glyphs,
+            Texture2D reusableTexture,
+            ref byte[] reusablePixels,
             out Vector4 originSize,
-            out Vector4 texelSize,
-            out GroundPaintedAccentCoverageDiagnostics diagnostics)
+            out GroundPaintedAccentCoverageDiagnostics diagnostics,
+            out double rasterMilliseconds,
+            out double uploadMilliseconds)
         {
+            rasterMilliseconds = 0d;
+            uploadMilliseconds = 0d;
             Vector3 boundsSize = localBounds.size;
             float sizeX = Mathf.Max(0.0001f, boundsSize.x);
             float sizeZ = Mathf.Max(0.0001f, boundsSize.z);
@@ -86,24 +105,35 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float texelWorldSizeZ = sizeZ / height;
             float maximumTexelWorldSize =
                 Mathf.Max(texelWorldSizeX, texelWorldSizeZ);
-            texelSize =
-                new Vector4(
-                    1f / width,
-                    1f / height,
-                    width,
-                    height);
+            long rasterStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            byte[] pixels = EnsurePixelBuffer(
+                ref reusablePixels,
+                width * height);
+            System.Array.Clear(pixels, 0, pixels.Length);
 
             if (glyphs == null || glyphs.Count == 0)
             {
                 diagnostics = GroundPaintedAccentCoverageDiagnostics.Empty;
-                return CreateTexture(width, height, new byte[width * height]);
+                long emptyUploadStartedAt =
+                    System.Diagnostics.Stopwatch.GetTimestamp();
+                Texture2D emptyTexture =
+                    CreateOrUpdateTexture(
+                        width,
+                        height,
+                        pixels,
+                        reusableTexture);
+                uploadMilliseconds =
+                    ResolveElapsedMilliseconds(emptyUploadStartedAt);
+                return emptyTexture;
             }
 
-            byte[] pixels = new byte[width * height];
             int validGlyphCount = 0;
             int segmentCount = 0;
             float minimumAuthoredHalfWidth = float.PositiveInfinity;
             float minimumEffectiveHalfWidth = float.PositiveInfinity;
+            float minimumEdgeFeatherWidth = float.PositiveInfinity;
+            float minimumEstimatedVisibleFullWidth = float.PositiveInfinity;
 
             for (int glyphIndex = 0;
                  glyphIndex < glyphs.Count;
@@ -119,6 +149,41 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 Vector3[] points = glyph.LocalSurfacePoints;
                 float[] halfWidths = glyph.HalfWidths;
                 int lastPointIndex = points.Length - 1;
+                float authoredCoreHalfWidth = 0f;
+                for (int widthIndex = 0;
+                     widthIndex < halfWidths.Length;
+                     widthIndex++)
+                {
+                    authoredCoreHalfWidth =
+                        Mathf.Max(
+                            authoredCoreHalfWidth,
+                            Mathf.Max(0.0001f, halfWidths[widthIndex]));
+                }
+
+                float minimumRasterCoreHalfWidth =
+                    maximumTexelWorldSize * MinimumHalfWidthInTexels;
+                float effectiveCoreHalfWidth =
+                    Mathf.Max(
+                        authoredCoreHalfWidth,
+                        minimumRasterCoreHalfWidth);
+                float coreFeather =
+                    Mathf.Max(
+                        maximumTexelWorldSize * EdgeFeatherInTexels,
+                        effectiveCoreHalfWidth * RelativeEdgeFeatherFraction);
+                minimumAuthoredHalfWidth =
+                    Mathf.Min(
+                        minimumAuthoredHalfWidth,
+                        authoredCoreHalfWidth);
+                minimumEffectiveHalfWidth =
+                    Mathf.Min(
+                        minimumEffectiveHalfWidth,
+                        effectiveCoreHalfWidth);
+                minimumEdgeFeatherWidth =
+                    Mathf.Min(minimumEdgeFeatherWidth, coreFeather);
+                minimumEstimatedVisibleFullWidth =
+                    Mathf.Min(
+                        minimumEstimatedVisibleFullWidth,
+                        2f * (effectiveCoreHalfWidth + coreFeather));
 
                 for (int pointIndex = 0;
                      pointIndex < lastPointIndex;
@@ -160,20 +225,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     float maximumFeather =
                         Mathf.Max(
                             maximumTexelWorldSize * EdgeFeatherInTexels,
-                            maximumHalfWidth * 0.28f);
+                            maximumHalfWidth * RelativeEdgeFeatherFraction);
                     float expansion = maximumHalfWidth + maximumFeather;
-
-                    minimumAuthoredHalfWidth =
-                        Mathf.Min(
-                            minimumAuthoredHalfWidth,
-                            authoredStartHalfWidth,
-                            authoredEndHalfWidth);
-                    minimumEffectiveHalfWidth =
-                        Mathf.Min(
-                            minimumEffectiveHalfWidth,
-                            effectiveStartHalfWidth,
-                            effectiveEndHalfWidth);
-
                     ResolvePixelRange(
                         Mathf.Min(start.x, end.x) - expansion,
                         Mathf.Max(start.x, end.x) + expansion,
@@ -225,7 +278,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             float feather =
                                 Mathf.Max(
                                     maximumTexelWorldSize * EdgeFeatherInTexels,
-                                    halfWidth * 0.28f);
+                                    halfWidth * RelativeEdgeFeatherFraction);
                             float coverage =
                                 1f - SmoothStep(
                                     halfWidth,
@@ -291,6 +344,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 minimumEffectiveHalfWidth = 0f;
             }
 
+            if (float.IsPositiveInfinity(minimumEdgeFeatherWidth))
+            {
+                minimumEdgeFeatherWidth = 0f;
+            }
+
+            if (float.IsPositiveInfinity(minimumEstimatedVisibleFullWidth))
+            {
+                minimumEstimatedVisibleFullWidth = 0f;
+            }
+
             diagnostics =
                 new GroundPaintedAccentCoverageDiagnostics(
                     width,
@@ -304,14 +367,36 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     texelWorldSizeX,
                     texelWorldSizeZ,
                     minimumAuthoredHalfWidth,
-                    minimumEffectiveHalfWidth);
+                    minimumEffectiveHalfWidth,
+                    minimumEdgeFeatherWidth,
+                    minimumEstimatedVisibleFullWidth);
 
-            return CreateTexture(width, height, pixels);
+            rasterMilliseconds =
+                ResolveElapsedMilliseconds(rasterStartedAt);
+            long uploadStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            Texture2D texture =
+                CreateOrUpdateTexture(
+                    width,
+                    height,
+                    pixels,
+                    reusableTexture);
+            uploadMilliseconds =
+                ResolveElapsedMilliseconds(uploadStartedAt);
+            return texture;
         }
 
         public static Texture2D CreateNeutralTexture()
         {
-            return CreateTexture(1, 1, new byte[1]);
+            return CreateTexture(1, 1, new byte[1], true);
+        }
+
+        private static double ResolveElapsedMilliseconds(long startedAt)
+        {
+            long elapsedTicks =
+                System.Diagnostics.Stopwatch.GetTimestamp() - startedAt;
+            return elapsedTicks * 1000d /
+                   System.Diagnostics.Stopwatch.Frequency;
         }
 
         private static int ResolveResolution(float worldSize)
@@ -371,10 +456,59 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return t * t * (3f - 2f * t);
         }
 
+        private static byte[] EnsurePixelBuffer(
+            ref byte[] reusablePixels,
+            int requiredLength)
+        {
+            int safeLength = Mathf.Max(1, requiredLength);
+            if (reusablePixels == null ||
+                reusablePixels.Length != safeLength)
+            {
+                reusablePixels = new byte[safeLength];
+            }
+
+            return reusablePixels;
+        }
+
+        private static Texture2D CreateOrUpdateTexture(
+            int width,
+            int height,
+            byte[] pixels,
+            Texture2D reusableTexture)
+        {
+            int safeWidth = Mathf.Max(1, width);
+            int safeHeight = Mathf.Max(1, height);
+            bool canReuse =
+                reusableTexture != null &&
+                reusableTexture.width == safeWidth &&
+                reusableTexture.height == safeHeight &&
+                reusableTexture.format == TextureFormat.R8 &&
+                reusableTexture.isReadable;
+            if (!canReuse)
+            {
+                return CreateTexture(
+                    safeWidth,
+                    safeHeight,
+                    pixels,
+                    false);
+            }
+
+            Texture2D texture = reusableTexture;
+            texture.name = "PS3D_GroundPaintedAccentCoverage_R8";
+            texture.hideFlags = HideFlags.DontSave;
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.anisoLevel = 0;
+            texture.LoadRawTextureData(pixels);
+            texture.Apply(false, false);
+            return texture;
+        }
+
         private static Texture2D CreateTexture(
             int width,
             int height,
-            byte[] pixels)
+            byte[] pixels,
+            bool makeNoLongerReadable)
         {
             int safeWidth = Mathf.Max(1, width);
             int safeHeight = Mathf.Max(1, height);
@@ -400,8 +534,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 };
 
             texture.LoadRawTextureData(uploadPixels);
-            texture.Apply(false, true);
+            texture.Apply(false, makeNoLongerReadable);
             return texture;
         }
+
     }
 }

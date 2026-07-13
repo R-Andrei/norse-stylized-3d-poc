@@ -169,7 +169,10 @@ namespace ProgrammaticStylized3D.Rivers
             connectorTopologyInputSignature = int.MinValue;
             pocketTopologyInputSignature = int.MinValue;
             InitializeMajorEvolution();
-            UploadGeneratedTopology();
+            if (!editorTopologyPreparationInProgress)
+            {
+                UploadGeneratedTopology();
+            }
             majorTopologyInputSignature = ResolveMajorTopologyInputSignature();
         }
 
@@ -190,8 +193,11 @@ namespace ProgrammaticStylized3D.Rivers
                 pocketTopologyInputSignature = int.MinValue;
                 InitializeHostedNegativeEvolution(false);
                 InitializeFreeWaterEvolution(false);
-                UploadGeneratedTopology();
-                BuildEvolvingMajorField();
+                if (!editorTopologyPreparationInProgress)
+                {
+                    UploadGeneratedTopology();
+                    BuildEvolvingMajorField();
+                }
                 return;
             }
 
@@ -217,8 +223,11 @@ namespace ProgrammaticStylized3D.Rivers
             pocketTopologyInputSignature = int.MinValue;
             InitializeHostedNegativeEvolution(false);
             InitializeFreeWaterEvolution(false);
-            UploadGeneratedTopology();
-            BuildEvolvingMajorField();
+            if (!editorTopologyPreparationInProgress)
+            {
+                UploadGeneratedTopology();
+                BuildEvolvingMajorField();
+            }
         }
 
         private void BuildPocketTopology()
@@ -235,8 +244,11 @@ namespace ProgrammaticStylized3D.Rivers
                 pocketTopologyInputSignature = int.MinValue;
                 InitializeHostedNegativeEvolution(false);
                 InitializeFreeWaterEvolution(false);
-                UploadGeneratedTopology();
-                BuildEvolvingMajorField();
+                if (!editorTopologyPreparationInProgress)
+                {
+                    UploadGeneratedTopology();
+                    BuildEvolvingMajorField();
+                }
                 return;
             }
 
@@ -272,6 +284,11 @@ namespace ProgrammaticStylized3D.Rivers
                 fieldWidth < 1 || fieldHeight < 1)
             {
                 return;
+            }
+
+            if (editorTopologyPreparationInProgress)
+            {
+                topologyCachePreparationGeneratedUploadCount++;
             }
 
             int cellCount = fieldWidth * fieldHeight;
@@ -641,6 +658,17 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            bool recordTopologyRefresh = steadyStateWorkAccountingActive;
+            long topologyRefreshStartedAt = recordTopologyRefresh
+                ? CaptureWorkTimestamp()
+                : 0L;
+            int topologyDispatchesBefore = recordTopologyRefresh
+                ? lastUpdateDispatches
+                : 0;
+            long topologyCellIterationsBefore = recordTopologyRefresh
+                ? lastUpdateCellIterations
+                : 0L;
+
             ConfigureTopologyParameters(0f);
 
             disturbanceRuntime ??=
@@ -747,6 +775,14 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 MeasureTopologyMetrics();
             }
+
+            if (recordTopologyRefresh)
+            {
+                RecordTopologyRefreshWork(
+                    topologyRefreshStartedAt,
+                    topologyDispatchesBefore,
+                    topologyCellIterationsBefore);
+            }
         }
 
         private bool MeasureTopologyMetrics(
@@ -763,6 +799,12 @@ namespace ProgrammaticStylized3D.Rivers
                 // permanently blind diagnostics.
                 topologyMetricsReadbackPending = false;
                 topologyMetricsReadbackRequestedAt = -1.0;
+                if (steadyStateWorkAccountingActive &&
+                    steadyStateWorkTopologyMetricGeneration ==
+                        steadyStateWorkAccountingGeneration)
+                {
+                    steadyStateWorkTopologyMetricTimeoutCount++;
+                }
             }
 
             if (topologyMetricsReadbackPending ||
@@ -853,6 +895,12 @@ namespace ProgrammaticStylized3D.Rivers
             topologyMetricsReadbackPending = true;
             topologyMetricsReadbackRequestedAt =
                 Time.realtimeSinceStartupAsDouble;
+            if (steadyStateWorkAccountingActive)
+            {
+                steadyStateWorkTopologyMetricRequestCount++;
+                steadyStateWorkTopologyMetricGeneration =
+                    steadyStateWorkAccountingGeneration;
+            }
             int generation = topologyMetricsGeneration;
             ComputeBuffer requestedBuffer = topologyMetricsBuffer;
             AsyncGPUReadback.Request(
@@ -870,6 +918,12 @@ namespace ProgrammaticStylized3D.Rivers
                     if (request.hasError)
                     {
                         topologyMetricsAvailable = false;
+                        if (steadyStateWorkAccountingActive &&
+                            steadyStateWorkTopologyMetricGeneration ==
+                                steadyStateWorkAccountingGeneration)
+                        {
+                            steadyStateWorkTopologyMetricErrorCount++;
+                        }
                         return;
                     }
 
@@ -885,6 +939,12 @@ namespace ProgrammaticStylized3D.Rivers
                     topologyMetricsAvailable = count == TopologyMetricCount;
                     if (topologyMetricsAvailable)
                     {
+                        if (steadyStateWorkAccountingActive &&
+                            steadyStateWorkTopologyMetricGeneration ==
+                                steadyStateWorkAccountingGeneration)
+                        {
+                            steadyStateWorkTopologyMetricCompletionCount++;
+                        }
                         topologyMetricsLastCompletedAt =
                             Time.realtimeSinceStartupAsDouble;
                         integratedPresenceArea =

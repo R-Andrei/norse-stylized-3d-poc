@@ -17,6 +17,13 @@
 - Address the user's primary question before secondary diagnostics.
 - Do not propose likely fixes before reading the actual implementation.
 
+
+## Response and validation style
+
+- Be concise, direct, and action-oriented by default. Do not restate obvious setup steps or narrate routine actions.
+- Validation instructions must contain **at most** six numbered items and only include steps that materially test the patch. Omit instructions such as closing Unity, copying files, reopening the project, or selecting the already-known test object unless unusually necessary.
+- When evidence is needed, ask for the complete relevant log or screenshot once. Do not enumerate every telemetry field the user must copy unless a specific field is uniquely required.
+
 ## Unity constraints
 
 - The project uses Unity 6000.5.0f1 and URP.
@@ -37,17 +44,11 @@ Keep this file at the invariant level. Detailed formulas, tuning values, current
 
 ## Patch delivery
 
-Every implementation response must include:
-
-- Outcome.
-- Changed files.
-- A short explanation of the implementation.
-- Evidence that the approved scope was respected.
-- Concise numbered Unity validation steps.
-- Known limitations.
-- Next work items.
-
-If no Unity validation is required, state that explicitly.
+Every implementation response must include, briefly:
+- Outcome and changed files.
+- What materially changed.
+- Up to fix validation steps, or a statement that no Unity validation is required.
+- Known blocker or limitation and CONCRETE next actions.
 
 ## Documentation
 

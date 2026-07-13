@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace ProgrammaticStylized3D.Rivers
@@ -433,6 +434,10 @@ namespace ProgrammaticStylized3D.Rivers
             topologyCacheBuildPayloadHash;
         public double TopologyCacheBuildMilliseconds =>
             topologyCacheBuildMilliseconds;
+        public int TopologyCacheLastBuildSerializationCount =>
+            topologyCacheLastBuildSerializationCount;
+        public int TopologyCachePreparationGeneratedUploadCount =>
+            topologyCachePreparationGeneratedUploadCount;
         public string TopologyCacheValidationState =>
             topologyCacheValidationState;
         public string TopologyCacheValidationSummary =>
@@ -513,6 +518,42 @@ namespace ProgrammaticStylized3D.Rivers
             automaticTopologyCacheWriteCount;
         public int AutomaticTopologyCacheWriteSuccessCount =>
             automaticTopologyCacheWriteSuccessCount;
+        public string TopologyCacheStartupOutcomeName =>
+            topologyCacheStartupOutcome.ToString();
+        public string TopologyCacheStartupReasonNames =>
+            topologyCacheStartupReasons == TopologyCacheStartupReason.None
+                ? "None"
+                : topologyCacheStartupReasons.ToString();
+        public int TopologyStartupSourceAddedCount =>
+            topologyStartupSourceAddedCount;
+        public int TopologyStartupSourceRemovedCount =>
+            topologyStartupSourceRemovedCount;
+        public int TopologyStartupSourceChangedCount =>
+            topologyStartupSourceChangedCount;
+        public int TopologyStartupDistinctSourceCount =>
+            topologyStartupDistinctGeneratedSources.Count;
+        public int TopologyStartupDirtyCycleCount =>
+            topologyStartupDirtyCycleCount;
+        public int TopologyStartupRestartCount =>
+            topologyStartupRestartCount;
+        public int TopologyStartupCacheBuildAttemptCount =>
+            topologyStartupCacheBuildAttemptCount;
+        public int TopologyStartupReplacementAttemptCount =>
+            topologyStartupReplacementAttemptCount;
+        public int TopologyStartupCacheWriteAttemptCount =>
+            topologyStartupCacheWriteAttemptCount;
+        public int TopologyStartupCacheWriteSuccessCount =>
+            topologyStartupCacheWriteSuccessCount;
+        public string TopologyStartupDirtyReasonNames =>
+            topologyStartupDirtyReasons == TopologyStartupDirtyReason.None
+                ? "None"
+                : topologyStartupDirtyReasons.ToString();
+        public string TopologyStartupPhaseSummary =>
+            BuildTopologyStartupPhaseSummary();
+        public bool TopologyCachePreparationRequired =>
+            initializationPhase == InitializationPhase.CachePreparationRequired;
+        public bool EditorTopologyPreparationInProgress =>
+            editorTopologyPreparationInProgress;
         public bool TopologyStartupValidationComplete =>
             topologyStartupValidationComplete;
         public double TopologyStartupTotalMilliseconds =>
@@ -538,16 +579,7 @@ namespace ProgrammaticStylized3D.Rivers
             topologyStartupValidationMajorBuildCount +
             topologyStartupValidationConnectorBuildCount +
             topologyStartupValidationPocketBuildCount;
-        public bool ExplicitTopologyGenerationAvailable =>
-            Application.isPlaying &&
-            !DevelopmentTopologyGenerationInProgress &&
-            (initializationPhase ==
-                InitializationPhase.AwaitExplicitTopologyGeneration ||
-             (initializationPhase == InitializationPhase.Ready &&
-              (ResolveRequestedTopologySignature() !=
-                   ResolveActiveTopologySignature() ||
-               ResolveCurrentObstacleGeometryVersion() !=
-                   obstacleGeometryVersion)));
+        public bool ExplicitTopologyGenerationAvailable => false;
         public int DynamicShoreRowCount => currentShoreEdgesTexture != null
             ? currentShoreEdgesTexture.width
             : 0;
@@ -745,6 +777,80 @@ namespace ProgrammaticStylized3D.Rivers
         public float UpdateRate => ResolveUpdateRate();
         public float MaterialStepDuration => lastMaterialStepDuration;
         public int MaterialStepsLastFrame => lastMaterialStepsThisFrame;
+        public bool SteadyStateWorkAccountingActive =>
+            steadyStateWorkAccountingActive;
+        public double SteadyStateWorkElapsedSeconds =>
+            steadyStateWorkAccountingActive
+                ? Math.Max(
+                    0.0,
+                    Time.realtimeSinceStartupAsDouble -
+                    steadyStateWorkAccountingStartedAt)
+                : 0.0;
+        public long SteadyStateWorkFrameCount => steadyStateWorkFrameCount;
+        public long SteadyStateWorkVisibleFrameCount =>
+            steadyStateWorkVisibleFrameCount;
+        public long SteadyStateWorkOffscreenFrameCount =>
+            steadyStateWorkOffscreenFrameCount;
+        public long SteadyStateWorkTotalDispatchCount =>
+            steadyStateWorkTotalDispatchCount;
+        public long SteadyStateWorkTotalCellIterations =>
+            steadyStateWorkTotalCellIterations;
+        public long SteadyStateWorkMaterialStepCount =>
+            steadyStateWorkMaterialStepCount;
+        public long SteadyStateWorkTransportSubstepCount =>
+            steadyStateWorkTransportSubstepCount;
+        public int SteadyStateWorkMaximumTransportSubsteps =>
+            steadyStateWorkMaximumTransportSubsteps;
+        public float SteadyStateWorkMaximumTransportCfl =>
+            steadyStateWorkMaximumTransportCfl;
+        public long SteadyStateWorkMaterialDispatchCount =>
+            steadyStateWorkMaterialDispatchCount;
+        public long SteadyStateWorkMaterialCellIterations =>
+            steadyStateWorkMaterialCellIterations;
+        public double SteadyStateWorkMaterialCpuMilliseconds =>
+            steadyStateWorkMaterialCpuMilliseconds;
+        public long SteadyStateWorkEmptyMaterialStepCount =>
+            steadyStateWorkEmptyMaterialStepCount;
+        public long SteadyStateWorkTopologyDirtyEvaluationCount =>
+            steadyStateWorkTopologyDirtyEvaluationCount;
+        public long SteadyStateWorkTopologyDirtyPositiveCount =>
+            steadyStateWorkTopologyDirtyPositiveCount;
+        public long SteadyStateWorkTopologyMaintenanceCount =>
+            steadyStateWorkTopologyMaintenanceCount;
+        public long SteadyStateWorkTopologyEvolutionCount =>
+            steadyStateWorkTopologyEvolutionCount;
+        public double SteadyStateWorkTopologyEvolutionCpuMilliseconds =>
+            steadyStateWorkTopologyEvolutionCpuMilliseconds;
+        public long SteadyStateWorkTopologyRefreshCount =>
+            steadyStateWorkTopologyRefreshCount;
+        public long SteadyStateWorkTopologyDispatchCount =>
+            steadyStateWorkTopologyDispatchCount;
+        public long SteadyStateWorkTopologyCellIterations =>
+            steadyStateWorkTopologyCellIterations;
+        public double SteadyStateWorkTopologyCpuMilliseconds =>
+            steadyStateWorkTopologyCpuMilliseconds;
+        public long SteadyStateWorkShapeEvaluationCount =>
+            steadyStateWorkShapeEvaluationCount;
+        public long SteadyStateWorkShapeDispatchCount =>
+            steadyStateWorkShapeDispatchCount;
+        public long SteadyStateWorkShapeCellIterations =>
+            steadyStateWorkShapeCellIterations;
+        public double SteadyStateWorkShapeCpuMilliseconds =>
+            steadyStateWorkShapeCpuMilliseconds;
+        public long SteadyStateWorkTopologyMetricRequestCount =>
+            steadyStateWorkTopologyMetricRequestCount;
+        public long SteadyStateWorkTopologyMetricCompletionCount =>
+            steadyStateWorkTopologyMetricCompletionCount;
+        public long SteadyStateWorkTopologyMetricErrorCount =>
+            steadyStateWorkTopologyMetricErrorCount;
+        public long SteadyStateWorkTopologyMetricTimeoutCount =>
+            steadyStateWorkTopologyMetricTimeoutCount;
+        public long SteadyStateWorkTransportMetricRequestCount =>
+            steadyStateWorkTransportMetricRequestCount;
+        public long SteadyStateWorkTransportMetricCompletionCount =>
+            steadyStateWorkTransportMetricCompletionCount;
+        public long SteadyStateWorkTransportMetricErrorCount =>
+            steadyStateWorkTransportMetricErrorCount;
         public float RenderInterpolationAlpha => lastRenderInterpolationAlpha;
         public float EstimatedTransportCellsPerStep =>
             lastEstimatedTransportCellsPerStep;
@@ -929,21 +1035,10 @@ namespace ProgrammaticStylized3D.Rivers
                     weakSpanIdentityBuffer.stride
                 : 0L);
 
-        private static bool IsAutomaticDevelopmentCacheEnabled
-        {
-            get
-            {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                return true;
-#else
-                return false;
-#endif
-            }
-        }
+        private static bool IsAutomaticDevelopmentCacheEnabled => false;
 
         private bool DevelopmentTopologyGenerationInProgress =>
-            explicitTopologyGenerationInProgress ||
-            automaticTopologyGenerationInProgress;
+            explicitTopologyGenerationInProgress;
 
         private bool IsTopologyDebugActive
         {

@@ -20,7 +20,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty showPaintedAccentDistributionOverlay;
         private SerializedProperty showPaintedAccentWeightedProposals;
         private SerializedProperty showPaintedAccentLastAcceptedPositions;
+        private SerializedProperty showPaintedAccentCompositionDebug;
         private SerializedProperty showPaintedAccentProjectedGlyphDebug;
+        private SerializedProperty paintedAccentGlyphFamilyPreview;
         private SerializedProperty paintedAccentPlacementOverlayWeight;
 
         private int paintedAccentPlacementDebugSignature = int.MinValue;
@@ -87,10 +89,65 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty smoothness;
         private SerializedProperty specularStrength;
 
+        private bool showGroundSurface = true;
+        private bool showResolvedFeatureSummary;
+        private bool showGroundDebug;
+        private bool showPaintedAccentStrokes = true;
+        private bool showPaintedAccentBasics = true;
+        private bool showPaintedAccentBroadDistribution;
+        private bool showPaintedAccentRegionalComposition;
+        private bool showPaintedAccentHorizontalCompanions = true;
+        private bool showPaintedAccentFamilyMix;
+        private bool showPaintedAccentGeometry;
+        private bool showPaintedAccentProfile;
+        private bool showPaintedAccentInk;
+        private bool showPaintedAccentPlacementDebug;
+        private bool showPaintedAccentPlacementOverlays;
+        private bool showPaintedAccentShapeOverlay;
+        private bool showPaintedAccentDiagnostics;
+        private bool showGeneration;
+        private bool showPatch;
+        private bool showTransition;
+        private bool showShape;
+        private bool showSurface;
+        private bool showSurfaceDiagnostics;
+        private bool showModifiers;
         private bool showMaterialControls;
+        private bool showMaterialPalette;
+        private bool showMaterialPixelVariation;
+        private bool showMaterialSemanticResponse;
+        private bool showMaterialWeatherFinish;
         private bool showStyleAssetDetails;
         private bool showAdvanced;
 
+
+        private static bool DrawSectionFoldout(
+            ref bool expanded,
+            string label,
+            float spacing = 8f)
+        {
+            if (spacing > 0f)
+            {
+                EditorGUILayout.Space(spacing);
+            }
+
+            expanded = EditorGUILayout.Foldout(
+                expanded,
+                label,
+                true);
+            return expanded;
+        }
+
+        private static bool DrawSubsectionFoldout(
+            ref bool expanded,
+            string label)
+        {
+            expanded = EditorGUILayout.Foldout(
+                expanded,
+                label,
+                true);
+            return expanded;
+        }
 
         private void OnEnable()
         {
@@ -134,9 +191,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 serializedObject.FindProperty(
                     "showPaintedAccentLastAcceptedPositions");
 
+            showPaintedAccentCompositionDebug =
+                serializedObject.FindProperty(
+                    "showPaintedAccentCompositionDebug");
+
             showPaintedAccentProjectedGlyphDebug =
                 serializedObject.FindProperty(
                     "showPaintedAccentProjectedGlyphDebug");
+
+            paintedAccentGlyphFamilyPreview =
+                serializedObject.FindProperty(
+                    "paintedAccentGlyphFamilyPreview");
 
             paintedAccentPlacementOverlayWeight =
                 serializedObject.FindProperty(
@@ -322,9 +387,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
         private void DrawGroundSurfaceAuthoringSection()
         {
-            EditorGUILayout.LabelField(
-                "Ground Surface",
-                EditorStyles.boldLabel);
+            if (!DrawSectionFoldout(
+                    ref showGroundSurface,
+                    "Ground Surface",
+                    0f))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
 
             DrawSurfaceFamilyPopup();
 
@@ -337,6 +408,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             DrawSurfaceProfileOverride(style);
             DrawResolvedFeatureSummary();
             DrawStyleAssetDetails(style);
+
+            EditorGUI.indentLevel--;
         }
 
         private void DrawSurfaceFamilyPopup()
@@ -552,10 +625,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
         private void DrawGroundDebugSection()
         {
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField(
-                "Ground Debug",
-                EditorStyles.boldLabel);
+            if (!DrawSectionFoldout(
+                    ref showGroundDebug,
+                    "Ground Debug"))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
 
             EditorGUILayout.HelpBox(
                 "Ground debug views are applied through this GeneratedGround object's MaterialPropertyBlock. They do not require editing shared material assets and do not regenerate terrain.",
@@ -588,6 +665,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         ground => ground.ClearDebugView());
                 }
             }
+
+            EditorGUI.indentLevel--;
         }
 
         private void DrawPaintedAccentStrokeControls()
@@ -630,6 +709,30 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentDistributionPatchiness");
             SerializedProperty distributionSparseFloor =
                 feature.FindPropertyRelative("paintedAccentDistributionSparseFloor");
+            SerializedProperty compositionRegionScale =
+                feature.FindPropertyRelative("paintedAccentCompositionRegionScale");
+            SerializedProperty compositionDensityContrast =
+                feature.FindPropertyRelative("paintedAccentCompositionDensityContrast");
+            SerializedProperty horizontalCompanionStrength =
+                feature.FindPropertyRelative("paintedAccentHorizontalCompanionStrength");
+            SerializedProperty companionTightness =
+                feature.FindPropertyRelative("paintedAccentCompanionTightness");
+            SerializedProperty companionTripletVerticality =
+                feature.FindPropertyRelative("paintedAccentCompanionTripletVerticality");
+            SerializedProperty companionTripletVerticalityInitialized =
+                feature.FindPropertyRelative("paintedAccentCompanionTripletVerticalityInitialized");
+            SerializedProperty horizontalCompanionsInitialized =
+                feature.FindPropertyRelative("paintedAccentHorizontalCompanionsInitialized");
+            SerializedProperty completeMoundWeight =
+                feature.FindPropertyRelative("paintedAccentCompleteMoundWeight");
+            SerializedProperty asymmetricMoundWeight =
+                feature.FindPropertyRelative("paintedAccentAsymmetricMoundWeight");
+            SerializedProperty singleShoulderWeight =
+                feature.FindPropertyRelative("paintedAccentSingleShoulderWeight");
+            SerializedProperty shallowCrestWeight =
+                feature.FindPropertyRelative("paintedAccentShallowCrestWeight");
+            SerializedProperty familyWeightsInitialized =
+                feature.FindPropertyRelative("paintedAccentGlyphFamilyWeightsInitialized");
             SerializedProperty strokeLengthMin =
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
             SerializedProperty strokeLengthMax =
@@ -638,6 +741,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeFacingDirectionDegrees");
             SerializedProperty strokeAngleJitterDegrees =
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
+            SerializedProperty strokePathWiggle =
+                feature.FindPropertyRelative("paintedAccentStrokePathWiggle");
+            SerializedProperty strokePathWiggleInitialized =
+                feature.FindPropertyRelative("paintedAccentStrokePathWiggleInitialized");
             SerializedProperty foldHeight =
                 feature.FindPropertyRelative("paintedAccentFoldHeight");
             SerializedProperty crestCrownHeight =
@@ -648,15 +755,30 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
             SerializedProperty inkColor =
                 feature.FindPropertyRelative("paintedAccentInkColor");
+
             if (strokeWidth == null ||
                 strokeDensity == null ||
                 distributionPatchScale == null ||
                 distributionPatchiness == null ||
                 distributionSparseFloor == null ||
+                compositionRegionScale == null ||
+                compositionDensityContrast == null ||
+                horizontalCompanionStrength == null ||
+                companionTightness == null ||
+                companionTripletVerticality == null ||
+                companionTripletVerticalityInitialized == null ||
+                horizontalCompanionsInitialized == null ||
+                completeMoundWeight == null ||
+                asymmetricMoundWeight == null ||
+                singleShoulderWeight == null ||
+                shallowCrestWeight == null ||
+                familyWeightsInitialized == null ||
                 strokeLengthMin == null ||
                 strokeLengthMax == null ||
                 strokeFacingDirectionDegrees == null ||
                 strokeAngleJitterDegrees == null ||
+                strokePathWiggle == null ||
+                strokePathWiggleInitialized == null ||
                 foldHeight == null ||
                 crestCrownHeight == null ||
                 foldIrregularity == null ||
@@ -666,140 +788,329 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 return;
             }
 
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(
-                "Painted Accent Strokes",
-                EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Edits accepted placement descriptors, the mesh-free projected contour profile, and authored ink colour. The accepted profile is baked into a generated R8 coverage texture and blended into the normal ground albedo; Scene handles remain an independent geometry diagnostic.",
-                MessageType.None);
+            bool styleChanged = false;
 
-            EditorGUI.BeginChangeCheck();
-            EditorGUILayout.Slider(
-                strokeWidth,
-                0.01f,
-                0.35f,
-                new GUIContent(
-                    "Stroke Width",
-                    "Visible authored projected-contour width in metres. BodyWidth remains texture/debug support only."));
-            EditorGUILayout.Slider(
-                strokeDensity,
-                0f,
-                240f,
-                new GUIContent(
-                    "Stroke Density",
-                    "Approximate number of weighted stroke proposals per standard 40x40 ground patch before river, modifier, sampling, slope, and grade rejection. Final accepted count may be lower because rejected proposals are not backfilled."));
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField(
-                "Distribution & Placement",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.Slider(
-                distributionPatchScale,
-                2f,
-                24f,
-                new GUIContent(
-                    "Distribution Patch Scale",
-                    "World-space size in metres of soft continuous density patches. Larger values create broader sparse and dense regions without hard island boundaries."));
-            EditorGUILayout.Slider(
-                distributionPatchiness,
-                0f,
-                1f,
-                new GUIContent(
-                    "Distribution Patchiness",
-                    "Strength of weighted patch placement. Zero approaches broad random coverage; one strongly prefers dense noise regions while retaining a non-zero chance elsewhere."));
-            EditorGUILayout.Slider(
-                distributionSparseFloor,
-                0.02f,
-                0.40f,
-                new GUIContent(
-                    "Distribution Sparse Floor",
-                    "Minimum patch preference retained in cold regions before semantic weighting. Lower values create stronger sparse/dense contrast while preserving a non-zero chance outside warm patches."));
-            EditorGUILayout.Slider(
-                strokeLengthMin,
-                0.20f,
-                4.0f,
-                new GUIContent(
-                    "Stroke Length Min",
-                    "Minimum accepted ground-surface descriptor length in metres."));
-            EditorGUILayout.Slider(
-                strokeLengthMax,
-                0.25f,
-                6.0f,
-                new GUIContent(
-                    "Stroke Length Max",
-                    "Maximum accepted ground-surface descriptor length in metres."));
-            EditorGUILayout.Slider(
-                strokeFacingDirectionDegrees,
-                0f,
-                360f,
-                new GUIContent(
-                    "Facing Direction Degrees",
-                    "Local X/Z orientation reference. Accepted descriptor strokes are perpendicular to this direction before signed Angle Jitter is applied."));
-            EditorGUILayout.Slider(
-                strokeAngleJitterDegrees,
-                0f,
-                30f,
-                new GUIContent(
-                    "Angle Jitter Degrees",
-                    "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField(
-                "Projected Contour Profile",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox(
-                "The mesh-free projected contour applies its solved scalar profile toward fixed world +Z, which is permanent gameplay screen-up.",
-                MessageType.None);
-            EditorGUILayout.Slider(
-                foldHeight,
-                0f,
-                0.50f,
-                new GUIContent(
-                    "Profile Height",
-                    "Primary projected contour amplitude in metres, applied toward fixed world +Z."));
-            EditorGUILayout.Slider(
-                crestCrownHeight,
-                0f,
-                0.05f,
-                new GUIContent(
-                    "Crest Crown Height",
-                    "Additional projected crest/cap amplitude added directly to fixed world +Z displacement."));
-            EditorGUILayout.Slider(
-                foldIrregularity,
-                0f,
-                1f,
-                new GUIContent(
-                    "Profile Irregularity",
-                    "Seeded longitudinal variation in the projected contour silhouette."));
-            EditorGUILayout.Slider(
-                foldEndTaper,
-                0f,
-                1f,
-                new GUIContent(
-                    "End Taper",
-                    "Projected contour and visible-width endpoint envelope."));
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField(
-                "Authored Ink",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(
-                inkColor,
-                new GUIContent(
-                    "Ink Color",
-                    "Family/variant-authored opaque ink colour blended through the generated projected coverage texture into ground albedo."));
+            if (compositionRegionScale.floatValue < 1f)
+            {
+                compositionRegionScale.floatValue = 4f;
+                compositionDensityContrast.floatValue = 0.70f;
+                styleChanged = true;
+            }
+
+            if (!horizontalCompanionsInitialized.boolValue)
+            {
+                horizontalCompanionStrength.floatValue = 0f;
+                companionTightness.floatValue = 0.65f;
+                horizontalCompanionsInitialized.boolValue = true;
+                styleChanged = true;
+            }
+
+            if (!companionTripletVerticalityInitialized.boolValue)
+            {
+                companionTripletVerticality.floatValue = 1f;
+                companionTripletVerticalityInitialized.boolValue = true;
+                styleChanged = true;
+            }
+
+            if (!familyWeightsInitialized.boolValue)
+            {
+                completeMoundWeight.floatValue = 0.20f;
+                asymmetricMoundWeight.floatValue = 0.30f;
+                singleShoulderWeight.floatValue = 0.30f;
+                shallowCrestWeight.floatValue = 0.20f;
+                familyWeightsInitialized.boolValue = true;
+                styleChanged = true;
+            }
+
+            if (!strokePathWiggleInitialized.boolValue)
+            {
+                strokePathWiggle.floatValue = 0.35f;
+                strokePathWiggleInitialized.boolValue = true;
+                styleChanged = true;
+            }
+
+            bool expanded = DrawSectionFoldout(
+                ref showPaintedAccentStrokes,
+                "Painted Accent Strokes");
+
+            if (expanded)
+            {
+                EditorGUI.indentLevel++;
+
+                EditorGUILayout.HelpBox(
+                    "Edits placement descriptors, projected contour families, horizontal companion composition, and authored ink. Production glyphs remain mesh-free and bake into the shared R8 coverage texture.",
+                    MessageType.None);
+
+                if (DrawSubsectionFoldout(
+                        ref showPaintedAccentBasics,
+                        "Stroke Basics"))
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.Slider(
+                        strokeWidth,
+                        0.002f,
+                        0.20f,
+                        new GUIContent(
+                            "Stroke Width",
+                            "Visible authored projected-contour width in metres. BodyWidth remains texture/debug support only."));
+                    EditorGUILayout.Slider(
+                        strokeDensity,
+                        0f,
+                        2000f,
+                        new GUIContent(
+                            "Stroke Density",
+                            "Approximate requested stroke proposals per standard 40x40 ground patch. Regional concentration redistributes a fixed average share of this population; physical validation may reduce the final count."));
+                    styleChanged |= EditorGUI.EndChangeCheck();
+                    EditorGUI.indentLevel--;
+                }
+
+                if (DrawSubsectionFoldout(
+                        ref showPaintedAccentBroadDistribution,
+                        "Broad Distribution"))
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.Slider(
+                        distributionPatchScale,
+                        2f,
+                        24f,
+                        new GUIContent(
+                            "Distribution Patch Scale",
+                            "World-space size in metres of soft continuous density patches. Larger values create broader sparse and dense regions without hard island boundaries."));
+                    EditorGUILayout.Slider(
+                        distributionPatchiness,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Distribution Patchiness",
+                            "Strength of weighted patch placement. Zero approaches broad random coverage; one strongly prefers dense noise regions while retaining a non-zero chance elsewhere."));
+                    EditorGUILayout.Slider(
+                        distributionSparseFloor,
+                        0.02f,
+                        0.40f,
+                        new GUIContent(
+                            "Distribution Sparse Floor",
+                            "Minimum patch preference retained in cold regions before semantic weighting."));
+                    styleChanged |= EditorGUI.EndChangeCheck();
+                    EditorGUI.indentLevel--;
+                }
+
+                if (DrawSubsectionFoldout(
+                        ref showPaintedAccentRegionalComposition,
+                        "Regional Composition"))
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.Slider(
+                        compositionRegionScale,
+                        1f,
+                        16f,
+                        new GUIContent(
+                            "Regional Zone Scale",
+                            "World-space size in metres of jittered zones that share density mode and broad direction. This is independent from Distribution Patch Scale."));
+                    EditorGUILayout.Slider(
+                        compositionDensityContrast,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Regional Density Contrast",
+                            "Redistributes a fixed average regional survival rate into denser accent zones without raising Stroke Density."));
+                    styleChanged |= EditorGUI.EndChangeCheck();
+                    EditorGUI.indentLevel--;
+                }
+
+                if (DrawSubsectionFoldout(
+                        ref showPaintedAccentHorizontalCompanions,
+                        "Horizontal Companions"))
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.Slider(
+                        horizontalCompanionStrength,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Horizontal Companion Strength",
+                            "Bounded share of surviving candidates arranged as independent two- or three-mark clusters. Zero preserves fully independent placement; one enables the strongest bounded participant budget."));
+                    using (new EditorGUI.DisabledScope(
+                               !horizontalCompanionStrength.hasMultipleDifferentValues &&
+                               horizontalCompanionStrength.floatValue <= 0f))
+                    {
+                        EditorGUILayout.Slider(
+                            companionTightness,
+                            0f,
+                            1f,
+                            new GUIContent(
+                                "Companion Tightness",
+                                "Endpoint spacing inside two- or three-mark clusters. Zero leaves broader gaps; one targets touching marks or an approximately one-to-two-pixel rendered break."));
+                        EditorGUILayout.Slider(
+                            companionTripletVerticality,
+                            0f,
+                            1f,
+                            new GUIContent(
+                                "Triplet Verticality",
+                                "How strongly three-mark clusters depart from a straight run. One gives structured triplets a steep vertical member and rejects layouts that remain visually linear; flat triplets remain a rare exception."));
+                    }
+                    styleChanged |= EditorGUI.EndChangeCheck();
+                    EditorGUI.indentLevel--;
+                }
+
+                if (DrawSubsectionFoldout(
+                        ref showPaintedAccentFamilyMix,
+                        "Glyph Family Mix"))
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.Slider(
+                        completeMoundWeight,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Complete Mound Weight",
+                            "Relative weight for the accepted two-sided mound family. Values are normalized against the other family weights."));
+                    EditorGUILayout.Slider(
+                        asymmetricMoundWeight,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Asymmetric Mound Weight",
+                            "Relative weight for strongly unequal two-sided mound silhouettes. Values are normalized internally."));
+                    EditorGUILayout.Slider(
+                        singleShoulderWeight,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Single Shoulder Weight",
+                            "Relative weight for open one-sided shoulder silhouettes. Values are normalized internally."));
+                    EditorGUILayout.Slider(
+                        shallowCrestWeight,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Shallow Crest Weight",
+                            "Relative weight for low predominantly lateral crest silhouettes. Values are normalized internally."));
+                    styleChanged |= EditorGUI.EndChangeCheck();
+                    EditorGUI.indentLevel--;
+                }
+
+                if (DrawSubsectionFoldout(
+                        ref showPaintedAccentGeometry,
+                        "Stroke Geometry"))
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.Slider(
+                        strokeLengthMin,
+                        0.20f,
+                        4.0f,
+                        new GUIContent(
+                            "Stroke Length Min",
+                            "Minimum accepted ground-surface descriptor length in metres."));
+                    EditorGUILayout.Slider(
+                        strokeLengthMax,
+                        0.25f,
+                        6.0f,
+                        new GUIContent(
+                            "Stroke Length Max",
+                            "Maximum accepted ground-surface descriptor length in metres."));
+                    EditorGUILayout.Slider(
+                        strokeFacingDirectionDegrees,
+                        0f,
+                        360f,
+                        new GUIContent(
+                            "Facing Direction Degrees",
+                            "Local X/Z orientation reference. Accepted descriptor strokes are perpendicular to this direction before signed Angle Jitter is applied."));
+                    EditorGUILayout.Slider(
+                        strokeAngleJitterDegrees,
+                        0f,
+                        30f,
+                        new GUIContent(
+                            "Angle Jitter Degrees",
+                            "Maximum signed angle offset around the perpendicular stroke angle."));
+                    EditorGUILayout.Slider(
+                        strokePathWiggle,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Stroke Path Wiggle",
+                            "Smooth lateral curvature of the ground-surface stroke path. This does not alter Profile Irregularity or family height."));
+                    styleChanged |= EditorGUI.EndChangeCheck();
+                    EditorGUI.indentLevel--;
+                }
+
+                if (DrawSubsectionFoldout(
+                        ref showPaintedAccentProfile,
+                        "Projected Contour Profile"))
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.HelpBox(
+                        "The mesh-free projected contour applies its solved scalar profile toward fixed world +Z, which is permanent gameplay screen-up.",
+                        MessageType.None);
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.Slider(
+                        foldHeight,
+                        0f,
+                        0.50f,
+                        new GUIContent(
+                            "Profile Height",
+                            "Primary projected contour amplitude in metres, applied toward fixed world +Z."));
+                    EditorGUILayout.Slider(
+                        crestCrownHeight,
+                        0f,
+                        0.05f,
+                        new GUIContent(
+                            "Crest Crown Height",
+                            "Additional projected crest/cap amplitude added directly to fixed world +Z displacement."));
+                    EditorGUILayout.Slider(
+                        foldIrregularity,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Profile Irregularity",
+                            "Seeded longitudinal variation in the projected contour silhouette."));
+                    EditorGUILayout.Slider(
+                        foldEndTaper,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "End Taper",
+                            "Projected contour and visible-width endpoint envelope."));
+                    styleChanged |= EditorGUI.EndChangeCheck();
+                    EditorGUI.indentLevel--;
+                }
+
+                if (DrawSubsectionFoldout(
+                        ref showPaintedAccentInk,
+                        "Authored Ink"))
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.PropertyField(
+                        inkColor,
+                        new GUIContent(
+                            "Ink Color",
+                            "Family/variant-authored opaque ink colour blended through the generated projected coverage texture into ground albedo."));
+                    styleChanged |= EditorGUI.EndChangeCheck();
+                    EditorGUI.indentLevel--;
+                }
+
+                EditorGUI.indentLevel--;
+            }
 
             if (strokeLengthMax.floatValue < strokeLengthMin.floatValue + 0.05f)
             {
                 strokeLengthMax.floatValue = strokeLengthMin.floatValue + 0.05f;
+                styleChanged = true;
             }
 
-            bool styleChanged = EditorGUI.EndChangeCheck();
             if (styleChanged)
             {
                 styleObject.ApplyModifiedProperties();
                 EditorUtility.SetDirty(style);
                 paintedAccentPlacementDebugSignature = int.MinValue;
                 ApplyToTargets(
-                    "Tune Painted Accent Distribution, Projected Profile, and Ink",
+                    "Tune Painted Accent Distribution, Companions, Families, Profile, and Ink",
                     ground => ground.RefreshSurfaceMaterialProperties());
             }
 
@@ -808,49 +1119,77 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
         private void DrawPaintedAccentPlacementDebugControls()
         {
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(
-                "Painted Accent Placement Debug",
-                EditorStyles.miniBoldLabel);
+            if (!DrawSectionFoldout(
+                    ref showPaintedAccentPlacementDebug,
+                    "Painted Accent Placement Debug",
+                    4f))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
             EditorGUILayout.HelpBox(
-                "Editor-only Scene view overlays. Distribution uses the exact production patch-weight function; Weighted Proposals uses the exact production candidate pool and weighted selection before exclusions. Last Accepted Positions comes from the most recent placement generation.",
+                "Editor-only Scene view overlays and read-only generation diagnostics. These controls do not change production coverage.",
                 MessageType.None);
 
-            EditorGUI.BeginChangeCheck();
-            EditorGUILayout.PropertyField(
-                paintedAccentPlacementOverlayWeight,
-                new GUIContent(
-                    "Overlay Weight",
-                    "Patch Preference displays only the continuous noise-driven patch weight. Effective Proposal Weight displays patch weight multiplied by semantic support, matching the final weight used by weighted proposal selection."));
-            EditorGUILayout.PropertyField(
-                showPaintedAccentDistributionOverlay,
-                new GUIContent(
-                    "Show Distribution Overlay",
-                    "Displays a live filled-cell heatmap of the continuous patch-weight field. Cool cells are sparse preference; warm cells are dense preference."));
-            EditorGUILayout.PropertyField(
-                showPaintedAccentWeightedProposals,
-                new GUIContent(
-                    "Show Weighted Proposals",
-                    "Displays the live weighted proposal centres selected before river, modifier, sampling, slope, and grade rejection."));
-            EditorGUILayout.PropertyField(
-                showPaintedAccentLastAcceptedPositions,
-                new GUIContent(
-                    "Show Last Accepted Positions",
-                    "Displays accepted stroke centres from the most recent placement generation."));
-            EditorGUILayout.Space(5f);
-            EditorGUILayout.LabelField(
-                "Painted Accent Shape Overlay",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox(
-                "Displays the accepted complete A6/A7 projected glyphs. The rejected A9A, A10A, and A10B candidate systems have been retired.",
-                MessageType.None);
-            EditorGUILayout.PropertyField(
-                showPaintedAccentProjectedGlyphDebug,
-                new GUIContent(
-                    "Show Accepted Projected Debug",
-                    "Displays the accepted complete A6/A7 projected glyphs at their true positions."));
+            bool debugChanged = false;
 
-            if (EditorGUI.EndChangeCheck())
+            if (DrawSubsectionFoldout(
+                    ref showPaintedAccentPlacementOverlays,
+                    "Placement and Composition Overlays"))
+            {
+                EditorGUI.indentLevel++;
+                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.PropertyField(
+                    paintedAccentPlacementOverlayWeight,
+                    new GUIContent(
+                        "Overlay Weight",
+                        "Patch Preference displays only continuous patch weight. Effective Proposal Weight also includes semantic support."));
+                EditorGUILayout.PropertyField(
+                    showPaintedAccentDistributionOverlay,
+                    new GUIContent(
+                        "Show Distribution Overlay",
+                        "Displays a filled-cell heatmap of the continuous patch-weight field."));
+                EditorGUILayout.PropertyField(
+                    showPaintedAccentWeightedProposals,
+                    new GUIContent(
+                        "Show Weighted Proposals",
+                        "Displays weighted proposal centres before physical rejection."));
+                EditorGUILayout.PropertyField(
+                    showPaintedAccentLastAcceptedPositions,
+                    new GUIContent(
+                        "Show Last Accepted Positions",
+                        "Displays accepted stroke centres from the most recent placement generation."));
+                EditorGUILayout.PropertyField(
+                    showPaintedAccentCompositionDebug,
+                    new GUIContent(
+                        "Show Composition Debug",
+                        "Displays region modes, directions, thinning survival, mark roles, and selected glyph families."));
+                debugChanged |= EditorGUI.EndChangeCheck();
+                EditorGUI.indentLevel--;
+            }
+
+            if (DrawSubsectionFoldout(
+                    ref showPaintedAccentShapeOverlay,
+                    "Projected Shape Overlay"))
+            {
+                EditorGUI.indentLevel++;
+                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.PropertyField(
+                    showPaintedAccentProjectedGlyphDebug,
+                    new GUIContent(
+                        "Show Accepted Projected Debug",
+                        "Displays accepted projected glyphs at their true positions."));
+                EditorGUILayout.PropertyField(
+                    paintedAccentGlyphFamilyPreview,
+                    new GUIContent(
+                        "Family Preview",
+                        "Filters only Scene debug drawing. It never changes generation or baked production coverage."));
+                debugChanged |= EditorGUI.EndChangeCheck();
+                EditorGUI.indentLevel--;
+            }
+
+            if (debugChanged)
             {
                 serializedObject.ApplyModifiedProperties();
                 paintedAccentPlacementDebugSignature = int.MinValue;
@@ -860,7 +1199,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 SceneView.RepaintAll();
             }
 
-            if ((showPaintedAccentDistributionOverlay.boolValue ||
+            if (showPaintedAccentPlacementOverlays &&
+                (showPaintedAccentDistributionOverlay.boolValue ||
                  showPaintedAccentWeightedProposals.boolValue) &&
                 paintedAccentPlacementDebugSnapshotBuildFailed)
             {
@@ -869,7 +1209,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     MessageType.Warning);
             }
 
-            if (showPaintedAccentProjectedGlyphDebug.boolValue &&
+            if (showPaintedAccentShapeOverlay &&
+                showPaintedAccentProjectedGlyphDebug.boolValue &&
                 paintedAccentProjectedGlyphDebugSnapshotBuildFailed)
             {
                 EditorGUILayout.HelpBox(
@@ -880,35 +1221,59 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             GeneratedGround ground = target as GeneratedGround;
             if (ground == null)
             {
+                EditorGUI.indentLevel--;
                 return;
             }
 
-            EditorGUILayout.Space(3f);
-            EditorGUILayout.LabelField(
-                "Last Generated",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox(
-                ground.GetLastPaintedAccentPlacementStatistics(),
-                MessageType.None);
-
-            EditorGUILayout.Space(3f);
-            EditorGUILayout.LabelField(
-                "Projected Coverage Bake",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox(
-                ground.GetLastPaintedAccentCoverageStatistics(),
-                MessageType.None);
-
-            if (showPaintedAccentProjectedGlyphDebug.boolValue)
+            if (showPaintedAccentPlacementOverlays &&
+                showPaintedAccentCompositionDebug.boolValue &&
+                !ground.GetLastPaintedAccentCompositionDebugSnapshot().IsValid)
             {
-                EditorGUILayout.Space(3f);
+                EditorGUILayout.HelpBox(
+                    "The composition snapshot is unavailable. Regenerate Painted Accent placement before using the composition overlay.",
+                    MessageType.Warning);
+            }
+
+            if (DrawSubsectionFoldout(
+                    ref showPaintedAccentDiagnostics,
+                    "Last Generation Diagnostics"))
+            {
+                EditorGUI.indentLevel++;
                 EditorGUILayout.LabelField(
-                    "Accepted Projected Baseline",
+                    "Last Regeneration Timing",
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.HelpBox(
-                    ground.GetLastPaintedAccentProjectedGlyphStatistics(),
+                    ground.LastRegenerationTimingDiagnostics,
                     MessageType.None);
+
+                EditorGUILayout.LabelField(
+                    "Last Generated",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.HelpBox(
+                    ground.GetLastPaintedAccentPlacementStatistics(),
+                    MessageType.None);
+
+                EditorGUILayout.LabelField(
+                    "Projected Coverage Bake",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.HelpBox(
+                    ground.GetLastPaintedAccentCoverageStatistics(),
+                    MessageType.None);
+
+                if (showPaintedAccentProjectedGlyphDebug.boolValue)
+                {
+                    EditorGUILayout.LabelField(
+                        "Accepted Projected Baseline",
+                        EditorStyles.miniBoldLabel);
+                    EditorGUILayout.HelpBox(
+                        ground.GetLastPaintedAccentProjectedGlyphStatistics(),
+                        MessageType.None);
+                }
+
+                EditorGUI.indentLevel--;
             }
+
+            EditorGUI.indentLevel--;
         }
 
         private static SerializedProperty FindSelectedPaintedAccentFeatureProperty(
@@ -970,10 +1335,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
         private void DrawGenerationSection()
         {
-            EditorGUILayout.LabelField(
-                "Generation",
-                EditorStyles.boldLabel);
+            if (!DrawSectionFoldout(
+                    ref showGeneration,
+                    "Generation"))
+            {
+                return;
+            }
 
+            EditorGUI.indentLevel++;
             EditorGUILayout.IntSlider(
                 shapeSeed,
                 GroundRecipe.MinimumSeed,
@@ -987,15 +1356,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 new GUIContent(
                     "Live Regeneration",
                     "Regenerate when recipe values change."));
+            EditorGUI.indentLevel--;
         }
 
         private void DrawPatchSection()
         {
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField(
-                "Patch",
-                EditorStyles.boldLabel);
+            if (!DrawSectionFoldout(
+                    ref showPatch,
+                    "Patch"))
+            {
+                return;
+            }
 
+            EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(
                 patchSize,
                 new GUIContent("Patch Size"));
@@ -1006,18 +1379,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             GroundPatchSize selectedSize =
                 (GroundPatchSize)patchSize.enumValueIndex;
-
             GroundResolution selectedResolution =
                 (GroundResolution)resolution.enumValueIndex;
-
-            float metres =
-                GroundGenerator.ResolvePatchSize(
-                    selectedSize);
-
+            float metres = GroundGenerator.ResolvePatchSize(selectedSize);
             int verticesPerSide =
-                GroundGenerator.ResolveResolution(
-                    selectedResolution);
-
+                GroundGenerator.ResolveResolution(selectedResolution);
             int triangleCount =
                 (verticesPerSide - 1) *
                 (verticesPerSide - 1) *
@@ -1028,15 +1394,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 $"{verticesPerSide} × {verticesPerSide} vertices, " +
                 $"{triangleCount:N0} triangles.",
                 MessageType.None);
+            EditorGUI.indentLevel--;
         }
 
         private void DrawTransitionSection()
         {
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField(
-                "Mountain Transition",
-                EditorStyles.boldLabel);
+            if (!DrawSectionFoldout(
+                    ref showTransition,
+                    "Mountain Transition"))
+            {
+                return;
+            }
 
+            EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(
                 transitionDirection,
                 new GUIContent(
@@ -1055,15 +1425,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         "Height Change",
                         "Metres from the low side to the high side."));
             }
+            EditorGUI.indentLevel--;
         }
 
         private void DrawShapeSection()
         {
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField(
-                "Ground Shape",
-                EditorStyles.boldLabel);
+            if (!DrawSectionFoldout(
+                    ref showShape,
+                    "Ground Shape"))
+            {
+                return;
+            }
 
+            EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(
                 profile,
                 new GUIContent("Profile"));
@@ -1089,17 +1463,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 new GUIContent(
                     "Edge Blend",
                     "Fades generated variation near patch borders."));
+            EditorGUI.indentLevel--;
         }
 
         private void DrawSurfaceSection()
         {
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField(
-                "Surface",
-                EditorStyles.boldLabel);
+            if (!DrawSectionFoldout(
+                    ref showSurface,
+                    "Surface"))
+            {
+                return;
+            }
 
+            EditorGUI.indentLevel++;
             EditorGUILayout.HelpBox(
-                "Shape controls still define playable height. The selected surface family and variant resolve visual recipes at the top of the Inspector. This section controls the generated material masks: R tonal variation, G exposure, B damp/deposit, A vegetation suitability.",
+                "Shape controls define playable height. The selected surface family and variant resolve visual recipes. This section controls generated material masks and optional local material overrides.",
                 MessageType.None);
 
             EditorGUILayout.Slider(
@@ -1118,21 +1496,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Material Variation",
                     "Overall strength of generated tonal variation written to vertex colour red."));
 
-            if (targets.Length == 1)
+            if (targets.Length == 1 &&
+                DrawSubsectionFoldout(
+                    ref showSurfaceDiagnostics,
+                    "Last Surface Mask Diagnostics"))
             {
-                GeneratedGround ground =
-                    target as GeneratedGround;
-
+                GeneratedGround ground = target as GeneratedGround;
                 if (ground != null)
                 {
-                    EditorGUILayout.Space(4f);
+                    EditorGUI.indentLevel++;
                     EditorGUILayout.HelpBox(
                         ground.LastSurfaceMaskDiagnostics,
                         MessageType.None);
+                    EditorGUI.indentLevel--;
                 }
             }
 
             DrawMaterialOverrideControls();
+            EditorGUI.indentLevel--;
         }
 
         private void DrawSurfaceVariantPopup(
@@ -1229,21 +1610,25 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
         private void DrawResolvedFeatureSummary()
         {
-            if (targets.Length != 1)
+            if (targets.Length != 1 ||
+                !DrawSubsectionFoldout(
+                    ref showResolvedFeatureSummary,
+                    "Resolved Feature Summary"))
             {
                 return;
             }
 
             GeneratedGround ground = target as GeneratedGround;
-
             if (ground == null)
             {
                 return;
             }
 
+            EditorGUI.indentLevel++;
             EditorGUILayout.HelpBox(
                 ground.ResolvedSurfaceFeatureSummary,
                 MessageType.None);
+            EditorGUI.indentLevel--;
         }
 
         private void DrawSurfaceProfileOverride(
@@ -1294,11 +1679,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
         private void DrawMaterialOverrideControls()
         {
-            showMaterialControls =
-                EditorGUILayout.Foldout(
-                    showMaterialControls,
-                    "Advanced Material Overrides",
-                    true);
+            showMaterialControls = EditorGUILayout.Foldout(
+                showMaterialControls,
+                "Advanced Material Overrides",
+                true);
 
             if (!showMaterialControls)
             {
@@ -1316,7 +1700,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             else
             {
                 EditorGUI.BeginChangeCheck();
-
                 bool enabled = EditorGUILayout.Toggle(
                     new GUIContent(
                         "Override Material Controls",
@@ -1326,7 +1709,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 if (EditorGUI.EndChangeCheck())
                 {
                     serializedObject.ApplyModifiedProperties();
-
                     if (enabled)
                     {
                         ApplyToTargets(
@@ -1352,9 +1734,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 return;
             }
 
-            EditorGUI.BeginChangeCheck();
-
-            DrawMaterialSubsection(
+            bool materialChanged = false;
+            materialChanged |= DrawMaterialSubsection(
+                ref showMaterialPalette,
                 "Palette",
                 baseColor,
                 frostColor,
@@ -1365,7 +1747,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 vegetationTint,
                 vegetationTintStrength);
 
-            DrawMaterialSubsection(
+            materialChanged |= DrawMaterialSubsection(
+                ref showMaterialPixelVariation,
                 "Pixel and Macro Variation",
                 pixelCellSize,
                 pixelToneCount,
@@ -1377,7 +1760,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 cellWarpStrength,
                 groundMacroPatchScale);
 
-            DrawMaterialSubsection(
+            materialChanged |= DrawMaterialSubsection(
+                ref showMaterialSemanticResponse,
                 "Semantic Response",
                 profileContrastScale,
                 profilePixelContrastScale,
@@ -1391,7 +1775,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 groundSnowBrightness,
                 groundDampDarkenStrength);
 
-            DrawMaterialSubsection(
+            materialChanged |= DrawMaterialSubsection(
+                ref showMaterialWeatherFinish,
                 "Weather and Finish",
                 wetness,
                 wetDarkenStrength,
@@ -1404,10 +1789,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 smoothness,
                 specularStrength);
 
-            if (EditorGUI.EndChangeCheck())
+            if (materialChanged)
             {
                 serializedObject.ApplyModifiedProperties();
-
                 ApplyToTargets(
                     "Customize Ground Material Controls",
                     ground => ground.MarkGroundVisualControlsCustom());
@@ -1416,54 +1800,60 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             EditorGUI.indentLevel--;
         }
 
-        private static void DrawMaterialSubsection(
+        private static bool DrawMaterialSubsection(
+            ref bool expanded,
             string label,
             params SerializedProperty[] properties)
         {
-            EditorGUILayout.Space(3f);
-            EditorGUILayout.LabelField(
+            expanded = EditorGUILayout.Foldout(
+                expanded,
                 label,
-                EditorStyles.miniBoldLabel);
+                true);
 
-            EditorGUI.indentLevel++;
-
-            for (int i = 0; i < properties.Length; i++)
+            if (!expanded)
             {
-                SerializedProperty property = properties[i];
-
-                if (property == null)
-                {
-                    continue;
-                }
-
-                EditorGUILayout.PropertyField(property);
+                return false;
             }
 
+            EditorGUI.indentLevel++;
+            EditorGUI.BeginChangeCheck();
+
+            for (int index = 0; index < properties.Length; index++)
+            {
+                SerializedProperty property = properties[index];
+                if (property != null)
+                {
+                    EditorGUILayout.PropertyField(property);
+                }
+            }
+
+            bool changed = EditorGUI.EndChangeCheck();
             EditorGUI.indentLevel--;
+            return changed;
         }
 
         private void DrawModifierSection()
         {
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField(
-                "Modifiers",
-                EditorStyles.boldLabel);
+            if (!DrawSectionFoldout(
+                    ref showModifiers,
+                    "Modifiers"))
+            {
+                return;
+            }
 
+            EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(
                 useModifiers,
                 new GUIContent("Use Modifiers"));
 
             if (targets.Length == 1)
             {
-                GeneratedGround ground =
-                    target as GeneratedGround;
-
+                GeneratedGround ground = target as GeneratedGround;
                 if (ground != null)
                 {
                     EditorGUILayout.LabelField(
                         "Found Ground Modifiers",
                         ground.ModifierCount.ToString());
-
                     EditorGUILayout.LabelField(
                         "Found River Channels",
                         ground.RiverCount.ToString());
@@ -1471,34 +1861,26 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
 
             EditorGUILayout.HelpBox(
-                "GroundModifier and StylizedRiver components are discovered " +
-                "below this GeneratedGround object in the Hierarchy.",
+                "GroundModifier and StylizedRiver components are discovered below this GeneratedGround object in the Hierarchy.",
                 MessageType.Info);
+            EditorGUI.indentLevel--;
         }
 
         private void DrawAdvancedSection()
         {
-            EditorGUILayout.Space(8f);
-
-            showAdvanced =
-                EditorGUILayout.Foldout(
-                    showAdvanced,
-                    "Advanced",
-                    true);
-
-            if (!showAdvanced)
+            if (!DrawSectionFoldout(
+                    ref showAdvanced,
+                    "Advanced"))
             {
                 return;
             }
 
             EditorGUI.indentLevel++;
-
             EditorGUILayout.PropertyField(
                 patchCoordinate,
                 new GUIContent(
                     "Patch Coordinate",
                     "Stable noise coordinate used by future chunk assembly."));
-
             EditorGUI.indentLevel--;
         }
 
@@ -1554,6 +1936,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 ground.ShowPaintedAccentWeightedProposals;
             bool showAccepted =
                 ground.ShowPaintedAccentLastAcceptedPositions;
+            bool showComposition =
+                ground.ShowPaintedAccentCompositionDebug;
             bool showProjectedGlyphs =
                 ground.ShowPaintedAccentProjectedGlyphDebug;
             PaintedAccentPlacementOverlayWeightMode overlayWeightMode =
@@ -1562,6 +1946,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             if (!showDistribution &&
                 !showProposals &&
                 !showAccepted &&
+                !showComposition &&
                 !showProjectedGlyphs)
             {
                 return;
@@ -1620,6 +2005,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 showAccepted
                     ? ground.GetLastPaintedAccentAcceptedLocalPositions()
                     : System.Array.Empty<Vector3>();
+            GroundPaintedAccentCompositionDebugSnapshot compositionSnapshot =
+                showComposition
+                    ? ground.GetLastPaintedAccentCompositionDebugSnapshot()
+                    : GroundPaintedAccentCompositionDebugSnapshot.Empty;
 
             Color previousColor = Handles.color;
             CompareFunction previousZTest = Handles.zTest;
@@ -1647,6 +2036,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     acceptedLocalPositions);
             }
 
+            if (showComposition)
+            {
+                DrawPaintedAccentCompositionOverlay(
+                    ground,
+                    compositionSnapshot);
+            }
+
             if (showProjectedGlyphs)
             {
                 DrawPaintedAccentProjectedGlyphOverlay(
@@ -1661,13 +2057,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 showDistribution,
                 showProposals,
                 showAccepted,
+                showComposition,
                 showProjectedGlyphs,
                 overlayWeightMode,
                 paintedAccentPlacementDebugSnapshot,
                 acceptedLocalPositions,
                 paintedAccentPlacementDebugSnapshotBuildFailed,
                 paintedAccentProjectedGlyphDebugSnapshotBuildFailed,
-                paintedAccentProjectedGlyphDebugSnapshot);
+                paintedAccentProjectedGlyphDebugSnapshot,
+                compositionSnapshot);
         }
 
         private static void DrawPaintedAccentDistributionOverlay(
@@ -1831,6 +2229,149 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
         }
 
+        private static void DrawPaintedAccentCompositionOverlay(
+            GeneratedGround ground,
+            GroundPaintedAccentCompositionDebugSnapshot snapshot)
+        {
+            if (!snapshot.IsValid)
+            {
+                return;
+            }
+
+            Transform groundTransform = ground.transform;
+            Vector3 groundNormal = groundTransform.up;
+            GroundPaintedAccentCompositionProposalDebugPoint[] proposals =
+                snapshot.Proposals;
+
+            for (int index = 0;
+                 proposals != null && index < proposals.Length;
+                 index++)
+            {
+                GroundPaintedAccentCompositionProposalDebugPoint proposal =
+                    proposals[index];
+                Vector3 worldPosition =
+                    groundTransform.TransformPoint(proposal.LocalPosition);
+                float size =
+                    HandleUtility.GetHandleSize(worldPosition) * 0.030f;
+                Vector3 right = groundTransform.right * size;
+                Vector3 forward = groundTransform.forward * size;
+                Color modeColor =
+                    ResolvePaintedAccentCompositionRegionColor(
+                        proposal.RegionMode);
+                modeColor.a =
+                    proposal.SurvivedRegionalThinning
+                        ? 0.92f
+                        : 0.24f;
+                Handles.color = modeColor;
+                float lineWidth =
+                    proposal.SurvivedRegionalThinning ? 2.5f : 1.5f;
+                Handles.DrawAAPolyLine(
+                    lineWidth,
+                    worldPosition - right,
+                    worldPosition + right);
+                Handles.DrawAAPolyLine(
+                    lineWidth,
+                    worldPosition - forward,
+                    worldPosition + forward);
+            }
+
+            GroundPaintedAccentCompositionRegionDebug[] regions =
+                snapshot.Regions;
+            for (int index = 0;
+                 regions != null && index < regions.Length;
+                 index++)
+            {
+                GroundPaintedAccentCompositionRegionDebug region =
+                    regions[index];
+                if (!region.IsOccupied)
+                {
+                    continue;
+                }
+
+                Vector3 worldPosition =
+                    groundTransform.TransformPoint(region.LocalPosition);
+                Vector3 worldDirection =
+                    groundTransform.TransformDirection(
+                        new Vector3(
+                            region.LocalDirection.x,
+                            0f,
+                            region.LocalDirection.y));
+                if (worldDirection.sqrMagnitude <= 0.000001f)
+                {
+                    worldDirection = groundTransform.right;
+                }
+                else
+                {
+                    worldDirection.Normalize();
+                }
+
+                float halfLength =
+                    HandleUtility.GetHandleSize(worldPosition) * 0.18f;
+                Vector3 start = worldPosition - worldDirection * halfLength;
+                Vector3 end = worldPosition + worldDirection * halfLength;
+                Handles.color = new Color(0f, 0f, 0f, 0.90f);
+                Handles.DrawAAPolyLine(5f, start, end);
+                Handles.color =
+                    ResolvePaintedAccentCompositionRegionColor(
+                        region.RegionMode);
+                Handles.DrawAAPolyLine(2.5f, start, end);
+                Handles.DrawWireDisc(
+                    worldPosition,
+                    groundNormal,
+                    halfLength * 0.22f);
+            }
+
+            GroundPaintedAccentCompositionMarkDebugPoint[] marks =
+                snapshot.AcceptedMarks;
+            for (int index = 0;
+                 marks != null && index < marks.Length;
+                 index++)
+            {
+                GroundPaintedAccentCompositionMarkDebugPoint mark = marks[index];
+                Vector3 worldPosition =
+                    groundTransform.TransformPoint(mark.LocalPosition);
+                float handleSize = HandleUtility.GetHandleSize(worldPosition);
+                float radius;
+
+                switch (mark.Role)
+                {
+                    case GroundPaintedAccentCompositionRole.Dominant:
+                        radius = handleSize * 0.065f;
+                        break;
+                    case GroundPaintedAccentCompositionRole.Support:
+                        radius = handleSize * 0.028f;
+                        break;
+                    case GroundPaintedAccentCompositionRole.Standard:
+                    default:
+                        radius = handleSize * 0.044f;
+                        break;
+                }
+
+                Handles.color = new Color(0f, 0f, 0f, 0.95f);
+                Handles.DrawWireDisc(
+                    worldPosition,
+                    groundNormal,
+                    radius * 1.28f);
+                Handles.color = ResolvePaintedAccentGlyphFamilyColor(mark.Family);
+                Handles.DrawWireDisc(worldPosition, groundNormal, radius);
+            }
+        }
+
+        private static Color ResolvePaintedAccentCompositionRegionColor(
+            GroundPaintedAccentCompositionRegionMode mode)
+        {
+            switch (mode)
+            {
+                case GroundPaintedAccentCompositionRegionMode.Quiet:
+                    return new Color(0.25f, 0.55f, 1.00f, 0.95f);
+                case GroundPaintedAccentCompositionRegionMode.Accent:
+                    return new Color(1.00f, 0.42f, 0.06f, 0.98f);
+                case GroundPaintedAccentCompositionRegionMode.Supporting:
+                default:
+                    return new Color(0.12f, 1.00f, 0.65f, 0.95f);
+            }
+        }
+
         private static void DrawPaintedAccentProjectedGlyphOverlay(
             GeneratedGround ground,
             GroundPaintedAccentProjectedGlyphDebugSnapshot snapshot)
@@ -1848,7 +2389,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                  glyphIndex++)
             {
                 GroundPaintedAccentProjectedGlyph glyph = glyphs[glyphIndex];
-                if (!glyph.IsValid)
+                if (!glyph.IsValid ||
+                    !ShouldDrawPaintedAccentGlyphFamily(
+                        ground.PaintedAccentGlyphFamilyFilter,
+                        glyph.Family))
                 {
                     continue;
                 }
@@ -1932,6 +2476,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             {
                 GroundPaintedAccentProjectedGlyphRejectionDebugPoint rejection =
                     rejections[rejectionIndex];
+                if (!ShouldDrawPaintedAccentGlyphFamily(
+                        ground.PaintedAccentGlyphFamilyFilter,
+                        rejection.Family))
+                {
+                    continue;
+                }
+
                 Vector3 worldPosition =
                     groundTransform.TransformPoint(rejection.LocalPosition);
                 float size =
@@ -1956,6 +2507,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 Handles.DrawAAPolyLine(2.5f,
                     worldPosition - right + forward,
                     worldPosition + right - forward);
+            }
+        }
+
+        private static bool ShouldDrawPaintedAccentGlyphFamily(
+            PaintedAccentGlyphFamilyPreview preview,
+            GroundPaintedAccentGlyphFamily family)
+        {
+            switch (preview)
+            {
+                case PaintedAccentGlyphFamilyPreview.CompleteMound:
+                    return family == GroundPaintedAccentGlyphFamily.CompleteMound;
+                case PaintedAccentGlyphFamilyPreview.AsymmetricMound:
+                    return family == GroundPaintedAccentGlyphFamily.AsymmetricMound;
+                case PaintedAccentGlyphFamilyPreview.SingleShoulder:
+                    return family == GroundPaintedAccentGlyphFamily.SingleShoulder;
+                case PaintedAccentGlyphFamilyPreview.ShallowCrest:
+                    return family == GroundPaintedAccentGlyphFamily.ShallowCrest;
+                case PaintedAccentGlyphFamilyPreview.All:
+                default:
+                    return true;
+            }
+        }
+
+        private static Color ResolvePaintedAccentGlyphFamilyColor(
+            GroundPaintedAccentGlyphFamily family)
+        {
+            switch (family)
+            {
+                case GroundPaintedAccentGlyphFamily.AsymmetricMound:
+                    return new Color(0.20f, 0.85f, 1.00f, 1.00f);
+                case GroundPaintedAccentGlyphFamily.SingleShoulder:
+                    return new Color(1.00f, 0.55f, 0.12f, 1.00f);
+                case GroundPaintedAccentGlyphFamily.ShallowCrest:
+                    return new Color(0.38f, 1.00f, 0.42f, 1.00f);
+                case GroundPaintedAccentGlyphFamily.CompleteMound:
+                default:
+                    return new Color(1.00f, 0.25f, 0.75f, 1.00f);
             }
         }
 
@@ -1988,6 +2576,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     return new Color(1.00f, 0.10f, 0.08f, 1.00f);
                 case GroundPaintedAccentProjectedGlyphRejectionReason.LocalGrade:
                     return new Color(0.75f, 0.18f, 1.00f, 1.00f);
+                case GroundPaintedAccentProjectedGlyphRejectionReason.FamilyShape:
+                    return new Color(1.00f, 0.10f, 0.75f, 1.00f);
+                // Keep the editor compatible with a runtime assembly that may still expose
+                // rejection value 7 without the newer symbolic enum member during Unity's
+                // incremental compile pass. The projected generator owns the stable value.
+                case (GroundPaintedAccentProjectedGlyphRejectionReason)7:
+                    return new Color(1.00f, 0.28f, 0.28f, 1.00f);
                 case GroundPaintedAccentProjectedGlyphRejectionReason.Sampling:
                 default:
                     return new Color(1.00f, 0.45f, 0.05f, 1.00f);
@@ -2082,13 +2677,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             bool showDistribution,
             bool showProposals,
             bool showAccepted,
+            bool showComposition,
             bool showProjectedGlyphs,
             PaintedAccentPlacementOverlayWeightMode overlayWeightMode,
             GroundPaintedAccentPlacementDebugSnapshot snapshot,
             Vector3[] acceptedPositions,
             bool snapshotBuildFailed,
             bool projectedSnapshotBuildFailed,
-            GroundPaintedAccentProjectedGlyphDebugSnapshot projectedSnapshot)
+            GroundPaintedAccentProjectedGlyphDebugSnapshot projectedSnapshot,
+            GroundPaintedAccentCompositionDebugSnapshot compositionSnapshot)
         {
             int validSampleCount = 0;
             GroundPaintedAccentDistributionDebugSample[] samples =
@@ -2151,10 +2748,32 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 text.AppendLine("Green ring: accepted base stroke");
             }
 
+            if (showComposition)
+            {
+                text.AppendLine(
+                    "Blue/green/orange crosses: quiet/supporting/accent proposals");
+                text.AppendLine(
+                    "Region bars: occupied-region direction");
+                text.AppendLine(
+                    "Ring size: dominant/standard/support; ring colour: glyph family");
+                int regionCount =
+                    compositionSnapshot.Regions != null
+                        ? compositionSnapshot.Regions.Length
+                        : 0;
+                int markCount =
+                    compositionSnapshot.AcceptedMarks != null
+                        ? compositionSnapshot.AcceptedMarks.Length
+                        : 0;
+                text.Append("Composition occupied regions/marks: ");
+                text.Append(regionCount);
+                text.Append(" / ");
+                text.AppendLine(markCount.ToString());
+            }
+
             if (showProjectedGlyphs)
             {
-                text.AppendLine("Red/purple: accepted projected baseline");
-                text.AppendLine("Yellow ring: accepted projected crest");
+                text.AppendLine("Red/purple: accepted projected glyphs");
+                text.AppendLine("Yellow ring: projected peak; Family Preview filters debug only");
                 GroundPaintedAccentProjectedGlyphDiagnostics diagnostics =
                     projectedSnapshot.Diagnostics;
                 text.Append("Projected accepted/rejected: ");

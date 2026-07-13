@@ -71,10 +71,24 @@ MonoBehaviour:
       paintedAccentDistributionPatchScale: 9
       paintedAccentDistributionPatchiness: 0.7
       paintedAccentDistributionSparseFloor: 0.18
+      paintedAccentCompositionRegionScale: 4
+      paintedAccentCompositionDensityContrast: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
       paintedAccentFoldHeight: 0.12
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
@@ -89,20 +103,34 @@ MonoBehaviour:
       maskInfluence: 0.56
       direction: {x: 0.82, y: 0.36}
       seedOffset: 301
-      paintedAccentStrokeWidth: 0.02
-      paintedAccentStrokeDensity: 220
-      paintedAccentDistributionPatchScale: 11
-      paintedAccentDistributionPatchiness: 0.92
-      paintedAccentDistributionSparseFloor: 0.05
-      paintedAccentStrokeLengthMin: 0.4
+      paintedAccentStrokeWidth: 0.017
+      paintedAccentStrokeDensity: 800
+      paintedAccentDistributionPatchScale: 18.17
+      paintedAccentDistributionPatchiness: 1
+      paintedAccentDistributionSparseFloor: 0.181
+      paintedAccentCompositionRegionScale: 7.14
+      paintedAccentCompositionDensityContrast: 0.7
+      paintedAccentHorizontalCompanionStrength: 1
+      paintedAccentCompanionTightness: 1
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 1
+      paintedAccentCompanionTripletVerticalityInitialized: 1
+      paintedAccentCompleteMoundWeight: 0.5
+      paintedAccentAsymmetricMoundWeight: 0.2
+      paintedAccentSingleShoulderWeight: 0.5
+      paintedAccentShallowCrestWeight: 0.5
+      paintedAccentGlyphFamilyWeightsInitialized: 1
+      paintedAccentStrokeLengthMin: 0.2
       paintedAccentStrokeLengthMax: 0.6
       paintedAccentStrokeFacingDirectionDegrees: 90
-      paintedAccentStrokeAngleJitterDegrees: 15
-      paintedAccentFoldHeight: 0.1
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.873
+      paintedAccentStrokePathWiggleInitialized: 1
+      paintedAccentFoldHeight: 0.12
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.8
       paintedAccentFoldEndTaper: 0.4
-      paintedAccentInkColor: {r: 0.5895336, g: 0.59665364, b: 0.6037736, a: 1}
+      paintedAccentInkColor: {r: 0.5781417, g: 0.5927885, b: 0.6037736, a: 1}
   - id: snowfield.patchy
     displayName: Patchy
     materialControls:
@@ -159,10 +187,24 @@ MonoBehaviour:
       paintedAccentDistributionPatchScale: 9
       paintedAccentDistributionPatchiness: 0.7
       paintedAccentDistributionSparseFloor: 0.18
+      paintedAccentCompositionRegionScale: 4
+      paintedAccentCompositionDensityContrast: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
       paintedAccentFoldHeight: 0.12
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
@@ -182,10 +224,24 @@ MonoBehaviour:
       paintedAccentDistributionPatchScale: 9
       paintedAccentDistributionPatchiness: 0.7
       paintedAccentDistributionSparseFloor: 0.18
+      paintedAccentCompositionRegionScale: 4
+      paintedAccentCompositionDensityContrast: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
       paintedAccentFoldHeight: 0.018
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
@@ -247,10 +303,24 @@ MonoBehaviour:
       paintedAccentDistributionPatchScale: 9
       paintedAccentDistributionPatchiness: 0.7
       paintedAccentDistributionSparseFloor: 0.18
+      paintedAccentCompositionRegionScale: 4
+      paintedAccentCompositionDensityContrast: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
       paintedAccentFoldHeight: 0.018
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
@@ -312,10 +382,24 @@ MonoBehaviour:
       paintedAccentDistributionPatchScale: 9
       paintedAccentDistributionPatchiness: 0.7
       paintedAccentDistributionSparseFloor: 0.18
+      paintedAccentCompositionRegionScale: 4
+      paintedAccentCompositionDensityContrast: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
       paintedAccentFoldHeight: 0.12
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
@@ -335,10 +419,24 @@ MonoBehaviour:
       paintedAccentDistributionPatchScale: 9
       paintedAccentDistributionPatchiness: 0.7
       paintedAccentDistributionSparseFloor: 0.18
+      paintedAccentCompositionRegionScale: 4
+      paintedAccentCompositionDensityContrast: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
       paintedAccentFoldHeight: 0.018
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55

@@ -153,6 +153,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         }
     }
 
+
+    internal readonly struct GroundProjectedFootprintSample
+    {
+        public GroundProjectedFootprintSample(
+            float height,
+            Vector3 renderNormal)
+        {
+            Height = height;
+            RenderNormal =
+                renderNormal.sqrMagnitude > 0.000001f
+                    ? renderNormal.normalized
+                    : Vector3.up;
+        }
+
+        public float Height { get; }
+        public Vector3 RenderNormal { get; }
+    }
+
     /// <summary>
     /// Immutable local-space snapshot of generated ground after ordinary ground
     /// modifiers. It retains the pre-river geometry, the visible broad-ground
@@ -311,6 +329,44 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return succeeded;
         }
 
+        internal bool TrySampleProjectedFootprint(
+            Vector2 centerPoint,
+            Vector2 leftPoint,
+            Vector2 rightPoint,
+            out GroundProjectedFootprintSample centerSample,
+            out GroundProjectedFootprintSample leftSample,
+            out GroundProjectedFootprintSample rightSample)
+        {
+            centerSample = default;
+            leftSample = default;
+            rightSample = default;
+
+            if (!IsValid ||
+                !TryResolveGridPointUnchecked(
+                    centerPoint,
+                    out float centerGridX,
+                    out float centerGridZ) ||
+                !TryResolveGridPointUnchecked(
+                    leftPoint,
+                    out float leftGridX,
+                    out float leftGridZ) ||
+                !TryResolveGridPointUnchecked(
+                    rightPoint,
+                    out float rightGridX,
+                    out float rightGridZ))
+            {
+                return false;
+            }
+
+            centerSample =
+                SampleProjectedFootprint(centerGridX, centerGridZ);
+            leftSample =
+                SampleProjectedFootprint(leftGridX, leftGridZ);
+            rightSample =
+                SampleProjectedFootprint(rightGridX, rightGridZ);
+            return true;
+        }
+
         public bool TrySample(
             Vector2 localPoint,
             out GroundSurfaceSample sample)
@@ -344,14 +400,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             out float gridX,
             out float gridZ)
         {
-            gridX = 0f;
-            gridZ = 0f;
-
             if (!IsValid)
             {
+                gridX = 0f;
+                gridZ = 0f;
                 return false;
             }
 
+            return TryResolveGridPointUnchecked(
+                localPoint,
+                out gridX,
+                out gridZ);
+        }
+
+        private bool TryResolveGridPointUnchecked(
+            Vector2 localPoint,
+            out float gridX,
+            out float gridZ)
+        {
             gridX = (localPoint.x + HalfSize) / Spacing;
             gridZ = (localPoint.y + HalfSize) / Spacing;
             float maximum = Resolution - 1f;
@@ -360,6 +426,36 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                    gridZ >= 0f &&
                    gridX <= maximum &&
                    gridZ <= maximum;
+        }
+
+        private GroundProjectedFootprintSample SampleProjectedFootprint(
+            float gridX,
+            float gridZ)
+        {
+            ResolveTriangle(
+                gridX,
+                gridZ,
+                out int i0,
+                out int i1,
+                out int i2,
+                out Vector3 weights);
+
+            float height =
+                baseHeights[i0] * weights.x +
+                baseHeights[i1] * weights.y +
+                baseHeights[i2] * weights.z;
+            Vector3 renderNormal =
+                renderNormals[i0] * weights.x +
+                renderNormals[i1] * weights.y +
+                renderNormals[i2] * weights.z;
+            renderNormal =
+                renderNormal.sqrMagnitude > 0.000001f
+                    ? renderNormal.normalized
+                    : Vector3.up;
+
+            return new GroundProjectedFootprintSample(
+                height,
+                renderNormal);
         }
 
         private float SampleTriangulated(

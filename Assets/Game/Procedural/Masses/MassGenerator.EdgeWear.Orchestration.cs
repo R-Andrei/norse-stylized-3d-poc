@@ -9,21 +9,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
     {
         #region Edge wear orchestration
 
-        private static void ApplyGeneratedEdgeWearBevels(
+        private static TriangleSoup ApplyGeneratedEdgeWearBevels(
             List<PolygonFace> faces,
             MassRecipe recipe,
-            MassSurfaceFeatureSettings? surfaceFeatures)
+            MassSurfaceFeatureSettings? surfaceFeatures,
+            EdgeWearEvaluationMode evaluationMode,
+            int boundedEdgeOrdinal,
+            out PlaneCutBevelPreviewStatus previewStatus,
+            out BoundedEdgePreviewStatus boundedPreviewStatus)
         {
+            previewStatus = default;
+            boundedPreviewStatus = default;
+            if (evaluationMode == EdgeWearEvaluationMode.None)
+            {
+                return null;
+            }
+
+            bool applyPlaneCutBevelPreview =
+                evaluationMode == EdgeWearEvaluationMode.PlaneCutPreview;
+            bool runLegacyDiagnosticAudit =
+                evaluationMode == EdgeWearEvaluationMode.LegacyDiagnosticAudit;
+            bool applyBoundedSingleEdgePreview =
+                evaluationMode ==
+                    EdgeWearEvaluationMode.BoundedSingleEdgePreview;
             if (!surfaceFeatures.HasValue || faces == null || faces.Count < 4)
             {
-                return;
+                return null;
             }
 
             MassSurfaceFeatureSettings settings = surfaceFeatures.Value;
             float amount01 = Mathf.Clamp01(settings.EdgeWearAmount * 0.5f);
             if (amount01 <= 0.0001f)
             {
-                return;
+                return null;
             }
 
             Bounds bounds = CalculateFaceBounds(faces);
@@ -45,7 +63,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     new ChamferReadinessStats(0, 0),
                     false,
                     "no convex edge-wear candidates");
-                return;
+                return null;
             }
 
             candidates.Sort((left, right) => right.Score.CompareTo(left.Score));
@@ -57,7 +75,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 candidates.Count);
             if (selectedCount <= 0)
             {
-                return;
+                return null;
             }
 
             float minimumStableEdgeLength = maximumDimension * 0.0012f;
@@ -78,51 +96,114 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             if (ready)
             {
-                float requestedWidth = maximumDimension * Mathf.Lerp(
-                    0.006f,
-                    0.028f,
-                    Mathf.InverseLerp(0.25f, 2f, settings.EdgeWearWidth));
-                ChamferCornerStats cornerStats = new ChamferCornerStats();
-                bool cornersReady = AuditExplicitChamferCornerSolution(
-                    faces,
-                    context,
-                    requestedWidth,
-                    minimumStableEdgeLength,
-                    maximumDimension * maximumDimension * 0.000001f,
-                    null,
-                    ref cornerStats,
-                    out ChamferCornerSolution cornerSolution,
-                    out string cornerBlocker);
+                float requestedWidth = ResolveGeneratedEdgeWearWidth(
+                    maximumDimension,
+                    settings.EdgeWearWidth);
+                float minimumStableFaceArea =
+                    maximumDimension * maximumDimension * 0.000001f;
 
-                LogChamferCornerAudit(
-                    cornerStats,
-                    cornersReady,
-                    cornerBlocker);
-                if (cornersReady)
+                if (applyBoundedSingleEdgePreview)
                 {
-                    float minimumStableFaceArea =
-                        maximumDimension * maximumDimension * 0.000001f;
-                    PlaneCutBevelAuditResult planeCutAudit =
-                        AuditPlaneCutBevelKernel(
+                    BoundedSingleEdgeAuditResult boundedAudit =
+                        AuditBoundedSingleEdgeBevel(
                             faces,
                             context,
-                            cornerSolution,
+                            boundedEdgeOrdinal,
+                            requestedWidth,
                             minimumStableEdgeLength,
-                            minimumStableFaceArea);
-                    ChamferEmissionStats emissionStats = new ChamferEmissionStats();
-                    bool emissionReady = AuditProvisionalChamferEmission(
+                            minimumStableFaceArea,
+                            out TriangleSoup boundedPreviewSoup);
+                    LogBoundedSingleEdgeAudit(boundedAudit);
+
+                    bool previewApplied =
+                        boundedAudit.GeometryValid == 1 &&
+                        boundedPreviewSoup != null;
+                    boundedPreviewStatus =
+                        new BoundedEdgePreviewStatus(
+                            previewApplied,
+                            boundedAudit.CandidateCount,
+                            boundedAudit.SelectedOrdinal,
+                            boundedAudit.SourceEdgeIndex,
+                            boundedAudit.BevelFaceCount,
+                            boundedAudit.EndpointCapCount,
+                            boundedAudit.ModifiedSourceFaceCount,
+                            boundedAudit.ForeignSourceFaceModifiedCount,
+                            boundedAudit.RailDeviation,
+                            boundedAudit.MaximumExtentBeyondRails,
+                            boundedAudit.Diagnostic);
+                    if (previewApplied)
+                    {
+                        return boundedPreviewSoup;
+                    }
+                }
+                else
+                {
+                    ChamferCornerStats cornerStats =
+                        new ChamferCornerStats();
+                    bool cornersReady = AuditExplicitChamferCornerSolution(
                         faces,
                         context,
-                        cornerSolution,
+                        requestedWidth,
                         minimumStableEdgeLength,
                         minimumStableFaceArea,
-                        ref emissionStats,
-                        out string emissionBlocker);
-                    LogChamferEmissionAudit(
-                        emissionStats,
-                        emissionReady,
-                        emissionBlocker,
-                        planeCutAudit);
+                        null,
+                        ref cornerStats,
+                        out ChamferCornerSolution cornerSolution,
+                        out string cornerBlocker);
+
+                    LogChamferCornerAudit(
+                        cornerStats,
+                        cornersReady,
+                        cornerBlocker);
+                    if (cornersReady)
+                    {
+                        if (applyPlaneCutBevelPreview)
+                        {
+                            PlaneCutBevelAuditResult planeCutAudit =
+                                AuditPlaneCutBevelKernel(
+                                    faces,
+                                    context,
+                                    cornerSolution,
+                                    minimumStableEdgeLength,
+                                    minimumStableFaceArea,
+                                    out TriangleSoup planeCutPreviewSoup);
+                            LogPlaneCutBevelAudit(planeCutAudit);
+
+                            bool previewApplied =
+                                planeCutAudit.GeometryValid == 1 &&
+                                planeCutPreviewSoup != null;
+                            previewStatus = new PlaneCutBevelPreviewStatus(
+                                previewApplied,
+                                planeCutAudit.ActiveEdgeCount,
+                                planeCutAudit.PlanesBuilt,
+                                planeCutAudit.PlanesDeferred,
+                                planeCutAudit.PlanesRejected,
+                                planeCutAudit.Diagnostic);
+                            if (previewApplied)
+                            {
+                                return planeCutPreviewSoup;
+                            }
+                        }
+                        else if (runLegacyDiagnosticAudit)
+                        {
+                            ChamferEmissionStats emissionStats =
+                                new ChamferEmissionStats();
+                            bool emissionReady =
+                                AuditProvisionalChamferEmission(
+                                    faces,
+                                    context,
+                                    cornerSolution,
+                                    minimumStableEdgeLength,
+                                    minimumStableFaceArea,
+                                    ref emissionStats,
+                                    out string emissionBlocker);
+                            LogChamferEmissionAudit(
+                                emissionStats,
+                                emissionReady,
+                                emissionBlocker,
+                                default);
+                        }
+                    }
                 }
             }
 
@@ -132,6 +213,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             // split boundary ownership, audits compact unique failures, then discards
             // the provisional result. The original PolygonFace list remains rendered
             // until explicit vertex patches pass.
+            return null;
+        }
+
+        private static float ResolveGeneratedEdgeWearWidth(
+            float maximumDimension,
+            float widthSetting)
+        {
+            float clampedSetting = Mathf.Clamp(widthSetting, 0.05f, 2f);
+            float relativeWidth;
+            if (clampedSetting < 0.25f)
+            {
+                relativeWidth = Mathf.Lerp(
+                    0.0015f,
+                    0.006f,
+                    Mathf.InverseLerp(0.05f, 0.25f, clampedSetting));
+            }
+            else
+            {
+                relativeWidth = Mathf.Lerp(
+                    0.006f,
+                    0.028f,
+                    Mathf.InverseLerp(0.25f, 2f, clampedSetting));
+            }
+
+            return Mathf.Max(0.0001f, maximumDimension) * relativeWidth;
         }
 
         private static bool AuditProvisionalChamferEmission(

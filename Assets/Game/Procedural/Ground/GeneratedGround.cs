@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
+using Unity.Profiling;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -103,15 +104,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         [InspectorName("Ground Painted Accent Lines")]
         GroundPaintedAccentLines = 28,
+    }
 
-        [InspectorName("Ground Painted Accent Relief")]
-        GroundPaintedAccentRelief = 29,
+    public enum PaintedAccentGlyphFamilyPreview
+    {
+        [InspectorName("All Families")]
+        All = 0,
 
-        [InspectorName("Ground Painted Accent Signed Relief")]
-        GroundPaintedAccentSignedRelief = 30,
+        [InspectorName("Complete Mound")]
+        CompleteMound = 1,
 
-        [InspectorName("Ground Painted Accent Final Prototype")]
-        GroundPaintedAccentFinalPrototype = 31
+        [InspectorName("Asymmetric Mound")]
+        AsymmetricMound = 2,
+
+        [InspectorName("Single Shoulder")]
+        SingleShoulder = 3,
+
+        [InspectorName("Shallow Crest")]
+        ShallowCrest = 4
     }
 
     public enum PaintedAccentPlacementOverlayWeightMode
@@ -233,6 +243,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     [RequireComponent(typeof(MeshCollider))]
     public sealed class GeneratedGround : MonoBehaviour
     {
+        [Flags]
+        private enum GroundRegenerationStage
+        {
+            None = 0,
+            Snapshots = 1 << 0,
+            Geometry = 1 << 1,
+            Mesh = 1 << 2,
+            Collider = 1 << 3,
+            SurfaceStrokes = 1 << 4,
+            ProjectedGlyphs = 1 << 5,
+            Coverage = 1 << 6,
+            Material = 1 << 7,
+            RiverCorridor = 1 << 8
+        }
         public const string SnowfieldCleanVariantId = "snowfield.clean";
         public const string SnowfieldPatchyVariantId = "snowfield.patchy";
         public const string SnowfieldDirtyThawingVariantId =
@@ -300,7 +324,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private bool showPaintedAccentLastAcceptedPositions;
 
         [SerializeField, HideInInspector]
+        private bool showPaintedAccentCompositionDebug;
+
+        [SerializeField, HideInInspector]
         private bool showPaintedAccentProjectedGlyphDebug;
+
+        [SerializeField, HideInInspector]
+        private PaintedAccentGlyphFamilyPreview paintedAccentGlyphFamilyPreview =
+            PaintedAccentGlyphFamilyPreview.All;
 
         [SerializeField, HideInInspector]
         private PaintedAccentPlacementOverlayWeightMode
@@ -324,38 +355,82 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             "Surface masks have not been generated yet.";
         [SerializeField, HideInInspector]
         private int lastValidatedGenerationSignature;
+        private int appliedGroundGeometrySignature;
+        private bool groundGeometryInitialized;
+        private int groundGeometryRevision;
+        private int runtimeRiverNotificationRevision;
+        private int currentSnapshotSignature;
+        private int currentPaintedAccentDomainSignature;
+        private GroundRegenerationStage lastExecutedRegenerationStages;
         private MaterialPropertyBlock materialProperties;
-        private Texture2D paintedAccentFoldFieldTexture;
-        private bool paintedAccentFoldFieldEnabled;
-        private Vector4 paintedAccentFoldFieldOriginSize =
-            new Vector4(0f, 0f, 1f, 1f);
-        private Vector4 paintedAccentFoldFieldTexelSize =
-            new Vector4(1f, 1f, 1f, 1f);
-        private int paintedAccentFoldFieldSignature;
+        private int paintedAccentSurfaceStrokeSignature;
+        private bool paintedAccentSurfaceStrokesInitialized;
         private GroundPaintedAccentSurfaceStroke[] paintedAccentSurfaceStrokes =
             Array.Empty<GroundPaintedAccentSurfaceStroke>();
         private int paintedAccentSurfaceStrokeRevision;
         private GroundPaintedAccentPlacementDiagnostics
             paintedAccentPlacementDiagnostics =
                 GroundPaintedAccentPlacementDiagnostics.Empty;
+        private GroundPaintedAccentCompositionDebugSnapshot
+            paintedAccentCompositionDebugSnapshot =
+                GroundPaintedAccentCompositionDebugSnapshot.Empty;
         private GroundModifierSnapshot[] paintedAccentModifierSnapshots =
             Array.Empty<GroundModifierSnapshot>();
         private StylizedRiverGroundSnapshot[] paintedAccentRiverSnapshots =
             Array.Empty<StylizedRiverGroundSnapshot>();
+        private GroundPaintedAccentRiverExclusionSnapshot[]
+            paintedAccentRiverExclusionSnapshots =
+                Array.Empty<GroundPaintedAccentRiverExclusionSnapshot>();
         private int paintedAccentProjectedGlyphSignature;
         private GroundPaintedAccentProjectedGlyphDebugSnapshot
             paintedAccentProjectedGlyphDebugSnapshot =
                 GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
+        private GroundPaintedAccentProjectedGlyphBuildTimings
+            paintedAccentProjectedGlyphBuildTimings =
+                GroundPaintedAccentProjectedGlyphBuildTimings.Empty;
         private Texture2D paintedAccentCoverageTexture;
+        private byte[] paintedAccentCoveragePixels = Array.Empty<byte>();
         private bool paintedAccentCoverageEnabled;
         private Vector4 paintedAccentCoverageOriginSize =
             new Vector4(0f, 0f, 1f, 1f);
-        private Vector4 paintedAccentCoverageTexelSize =
-            new Vector4(1f, 1f, 1f, 1f);
         private int paintedAccentCoverageSignature;
         private GroundPaintedAccentCoverageDiagnostics
             paintedAccentCoverageDiagnostics =
                 GroundPaintedAccentCoverageDiagnostics.Empty;
+        private string lastRegenerationTimingDiagnostics =
+            "Ground regeneration has not been measured yet.";
+        private double lastSnapshotsMilliseconds;
+        private double lastGeometryMilliseconds;
+        private double lastMeshApplyMilliseconds;
+        private double lastColliderMilliseconds;
+        private double lastSurfaceStrokeMilliseconds;
+        private double lastProjectedGlyphMilliseconds;
+        private double lastCoverageRasterMilliseconds;
+        private double lastCoverageUploadMilliseconds;
+        private double lastMaterialMilliseconds;
+        private double lastRiverCorridorMilliseconds;
+        private double lastTotalRegenerationMilliseconds;
+
+        private static readonly ProfilerMarker RegenerateProfilerMarker =
+            new ProfilerMarker("GeneratedGround.Regenerate.Total");
+        private static readonly ProfilerMarker SnapshotsProfilerMarker =
+            new ProfilerMarker("GeneratedGround.Snapshots");
+        private static readonly ProfilerMarker GeometryProfilerMarker =
+            new ProfilerMarker("GeneratedGround.Geometry.Generate");
+        private static readonly ProfilerMarker MeshApplyProfilerMarker =
+            new ProfilerMarker("GeneratedGround.Mesh.Apply");
+        private static readonly ProfilerMarker ColliderProfilerMarker =
+            new ProfilerMarker("GeneratedGround.Collider.Cook");
+        private static readonly ProfilerMarker SurfaceStrokeProfilerMarker =
+            new ProfilerMarker("GeneratedGround.PaintedAccent.SurfaceStrokes");
+        private static readonly ProfilerMarker ProjectedGlyphProfilerMarker =
+            new ProfilerMarker("GeneratedGround.PaintedAccent.ProjectedGlyphs");
+        private static readonly ProfilerMarker CoverageProfilerMarker =
+            new ProfilerMarker("GeneratedGround.PaintedAccent.Coverage");
+        private static readonly ProfilerMarker MaterialProfilerMarker =
+            new ProfilerMarker("GeneratedGround.Material.Apply");
+        private static readonly ProfilerMarker RiverCorridorProfilerMarker =
+            new ProfilerMarker("GeneratedGround.River.CorridorNotification");
 
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
@@ -437,22 +512,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_SpecularStrength");
         private static readonly int MaskDebugModeId =
             Shader.PropertyToID("_MaskDebugMode");
-        private static readonly int GroundPaintedAccentFoldFieldId =
-            Shader.PropertyToID("_GroundPaintedAccentFoldField");
-        private static readonly int GroundPaintedAccentFoldFieldEnabledId =
-            Shader.PropertyToID("_GroundPaintedAccentFoldFieldEnabled");
-        private static readonly int GroundPaintedAccentFoldFieldOriginSizeId =
-            Shader.PropertyToID("_GroundPaintedAccentFoldFieldOriginSize");
-        private static readonly int GroundPaintedAccentFoldFieldTexelSizeId =
-            Shader.PropertyToID("_GroundPaintedAccentFoldFieldTexelSize");
         private static readonly int GroundPaintedAccentCoverageId =
             Shader.PropertyToID("_GroundPaintedAccentCoverage");
         private static readonly int GroundPaintedAccentCoverageEnabledId =
             Shader.PropertyToID("_GroundPaintedAccentCoverageEnabled");
         private static readonly int GroundPaintedAccentCoverageOriginSizeId =
             Shader.PropertyToID("_GroundPaintedAccentCoverageOriginSize");
-        private static readonly int GroundPaintedAccentCoverageTexelSizeId =
-            Shader.PropertyToID("_GroundPaintedAccentCoverageTexelSize");
         private static readonly int GroundPaintedAccentCoverageWorldToLocalId =
             Shader.PropertyToID("_GroundPaintedAccentCoverageWorldToLocal");
         private static readonly int GroundPaintedAccentInkColorId =
@@ -481,9 +546,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private static readonly GroundShaderFeaturePropertyIds
             GroundTrampledWearFeatureIds =
                 new GroundShaderFeaturePropertyIds("_GroundTrampledWear");
-        private static readonly GroundShaderFeaturePropertyIds
-            GroundPaintedAccentLineFeatureIds =
-                new GroundShaderFeaturePropertyIds("_GroundPaintedAccentLine");
+        private static readonly int GroundPaintedAccentLineStrengthId =
+            Shader.PropertyToID("_GroundPaintedAccentLineStrength");
 
         private struct GroundShaderFeaturePropertyIds
         {
@@ -525,6 +589,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             string.IsNullOrWhiteSpace(lastSurfaceMaskDiagnostics)
                 ? "Surface masks have not been generated yet."
                 : lastSurfaceMaskDiagnostics;
+
+        public string LastRegenerationTimingDiagnostics =>
+            string.IsNullOrWhiteSpace(lastRegenerationTimingDiagnostics)
+                ? "Ground regeneration has not been measured yet."
+                : lastRegenerationTimingDiagnostics;
         public string ResolvedSurfaceFeatureSummary =>
             ResolveSurfaceVariant() != null
                 ? ResolveSurfaceVariant().BuildFeatureSummary()
@@ -589,70 +658,184 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [ContextMenu("Regenerate Ground")]
         public void Regenerate()
         {
-            CacheComponents();
+            ResetRegenerationTiming();
+            long totalStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            GroundRegenerationStage executedStages =
+                GroundRegenerationStage.None;
 
-            if (recipe == null)
+            using (RegenerateProfilerMarker.Auto())
             {
-                ClearGeneratedAssignments();
-                return;
+                CacheComponents();
+
+                if (recipe == null)
+                {
+                    ClearGeneratedAssignments();
+                    lastTotalRegenerationMilliseconds =
+                        ResolveElapsedMilliseconds(totalStartedAt);
+                    lastExecutedRegenerationStages = executedStages;
+                    UpdateRegenerationTimingDiagnostics();
+                    return;
+                }
+
+                EnsureGeneratedMesh();
+
+                List<GroundModifierSnapshot> allModifierSnapshots;
+                IReadOnlyList<GroundModifierSnapshot> heightModifierSnapshots;
+                List<StylizedRiverGroundSnapshot> riverSnapshots;
+                long stageStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+                using (SnapshotsProfilerMarker.Auto())
+                {
+                    allModifierSnapshots = BuildModifierSnapshots();
+                    heightModifierSnapshots = allModifierSnapshots;
+                    if (!recipe.UseModifiers)
+                    {
+                        heightModifierSnapshots =
+                            Array.Empty<GroundModifierSnapshot>();
+                    }
+
+                    riverSnapshots = BuildRiverSnapshots(
+                        out paintedAccentRiverExclusionSnapshots);
+                    paintedAccentModifierSnapshots =
+                        allModifierSnapshots.ToArray();
+                    paintedAccentRiverSnapshots =
+                        riverSnapshots.ToArray();
+                    currentSnapshotSignature =
+                        CalculateGroundSnapshotSignature(
+                            allModifierSnapshots,
+                            riverSnapshots,
+                            false);
+                    currentPaintedAccentDomainSignature =
+                        CalculateGroundSnapshotSignature(
+                            allModifierSnapshots,
+                            riverSnapshots,
+                            true);
+                }
+                lastSnapshotsMilliseconds =
+                    ResolveElapsedMilliseconds(stageStartedAt);
+                executedStages |= GroundRegenerationStage.Snapshots;
+
+                int geometrySignature =
+                    CalculateGroundGeometrySignature(currentSnapshotSignature);
+                bool geometryOutputMissing =
+                    generatedMesh == null ||
+                    meshFilter == null ||
+                    meshFilter.sharedMesh != generatedMesh ||
+                    baseSurface == null ||
+                    !baseSurface.IsValid;
+                bool geometryChanged =
+                    !groundGeometryInitialized ||
+                    geometryOutputMissing ||
+                    appliedGroundGeometrySignature != geometrySignature;
+
+                if (geometryChanged)
+                {
+                    GroundSurfaceProfile resolvedSurfaceProfile =
+                        ResolveSurfaceProfile();
+                    MeshData meshData;
+                    stageStartedAt =
+                        System.Diagnostics.Stopwatch.GetTimestamp();
+                    using (GeometryProfilerMarker.Auto())
+                    {
+                        meshData = GroundGenerator.Generate(
+                            recipe,
+                            resolvedSurfaceProfile,
+                            heightModifierSnapshots,
+                            riverSnapshots,
+                            out baseSurface,
+                            out lastSurfaceMaskDiagnostics);
+                    }
+                    lastGeometryMilliseconds =
+                        ResolveElapsedMilliseconds(stageStartedAt);
+                    executedStages |= GroundRegenerationStage.Geometry;
+
+                    string meshName =
+                        $"GeneratedGround_{recipe.PatchSize}_{recipe.Resolution}_Seed{recipe.ShapeSeed}";
+                    stageStartedAt =
+                        System.Diagnostics.Stopwatch.GetTimestamp();
+                    using (MeshApplyProfilerMarker.Auto())
+                    {
+                        MeshBuilder.ApplyToMesh(
+                            meshData,
+                            generatedMesh,
+                            meshName);
+                        meshFilter.sharedMesh = generatedMesh;
+                    }
+                    lastMeshApplyMilliseconds =
+                        ResolveElapsedMilliseconds(stageStartedAt);
+                    executedStages |= GroundRegenerationStage.Mesh;
+
+                    stageStartedAt =
+                        System.Diagnostics.Stopwatch.GetTimestamp();
+                    using (ColliderProfilerMarker.Auto())
+                    {
+                        meshCollider.sharedMesh = null;
+                        meshCollider.sharedMesh = generatedMesh;
+                        meshCollider.convex = false;
+                    }
+                    lastColliderMilliseconds =
+                        ResolveElapsedMilliseconds(stageStartedAt);
+                    executedStages |= GroundRegenerationStage.Collider;
+
+                    appliedGroundGeometrySignature = geometrySignature;
+                    groundGeometryInitialized = true;
+                    groundGeometryRevision++;
+                }
+
+                lastValidatedGenerationSignature =
+                    CalculateGenerationSignature();
+
+                int previousSurfaceRevision =
+                    paintedAccentSurfaceStrokeRevision;
+                EnsurePaintedAccentSurfaceStrokesCurrent();
+                if (paintedAccentSurfaceStrokeRevision !=
+                    previousSurfaceRevision)
+                {
+                    executedStages |= GroundRegenerationStage.SurfaceStrokes;
+                }
+
+                int previousProjectedSignature =
+                    paintedAccentProjectedGlyphSignature;
+                int previousCoverageSignature =
+                    paintedAccentCoverageSignature;
+                EnsurePaintedAccentCoverageCurrent();
+                if (paintedAccentProjectedGlyphSignature !=
+                    previousProjectedSignature)
+                {
+                    executedStages |= GroundRegenerationStage.ProjectedGlyphs;
+                }
+                if (paintedAccentCoverageSignature !=
+                    previousCoverageSignature)
+                {
+                    executedStages |= GroundRegenerationStage.Coverage;
+                }
+
+                stageStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+                using (MaterialProfilerMarker.Auto())
+                {
+                    ApplySurfaceProfileMaterialProperties();
+                }
+                lastMaterialMilliseconds =
+                    ResolveElapsedMilliseconds(stageStartedAt);
+                executedStages |= GroundRegenerationStage.Material;
+
+                if (geometryChanged)
+                {
+                    stageStartedAt =
+                        System.Diagnostics.Stopwatch.GetTimestamp();
+                    using (RiverCorridorProfilerMarker.Auto())
+                    {
+                        NotifyRiverCorridorsChanged();
+                    }
+                    lastRiverCorridorMilliseconds =
+                        ResolveElapsedMilliseconds(stageStartedAt);
+                    executedStages |= GroundRegenerationStage.RiverCorridor;
+                }
             }
 
-            EnsureGeneratedMesh();
-
-            List<GroundModifierSnapshot> allModifierSnapshots =
-                BuildModifierSnapshots();
-
-            IReadOnlyList<GroundModifierSnapshot> heightModifierSnapshots =
-                allModifierSnapshots;
-            if (!recipe.UseModifiers)
-            {
-                heightModifierSnapshots =
-                    Array.Empty<GroundModifierSnapshot>();
-            }
-
-            List<StylizedRiverGroundSnapshot> riverSnapshots =
-                BuildRiverSnapshots();
-
-            paintedAccentModifierSnapshots =
-                allModifierSnapshots.ToArray();
-            paintedAccentRiverSnapshots =
-                riverSnapshots.ToArray();
-
-            GroundSurfaceProfile resolvedSurfaceProfile =
-                ResolveSurfaceProfile();
-
-            MeshData meshData = GroundGenerator.Generate(
-                recipe,
-                resolvedSurfaceProfile,
-                heightModifierSnapshots,
-                riverSnapshots,
-                out baseSurface,
-                out lastSurfaceMaskDiagnostics);
-
-            string meshName =
-                $"GeneratedGround_{recipe.PatchSize}_{recipe.Resolution}_Seed{recipe.ShapeSeed}";
-
-            MeshBuilder.ApplyToMesh(
-                meshData,
-                generatedMesh,
-                meshName);
-
-            meshFilter.sharedMesh = generatedMesh;
-
-            meshCollider.sharedMesh = null;
-            meshCollider.sharedMesh = generatedMesh;
-            meshCollider.convex = false;
-
-            lastValidatedGenerationSignature =
-                CalculateGenerationSignature();
-
-            paintedAccentFoldFieldSignature = 0;
-            ClearPaintedAccentProjectedGlyphDebugCache();
-            EnsurePaintedAccentFoldFieldCurrent();
-            EnsurePaintedAccentCoverageCurrent();
-
-            ApplySurfaceProfileMaterialProperties();
-            NotifyRiverCorridorsChanged();
+            lastTotalRegenerationMilliseconds =
+                ResolveElapsedMilliseconds(totalStartedAt);
+            lastExecutedRegenerationStages = executedStages;
+            UpdateRegenerationTimingDiagnostics();
         }
 
         [ContextMenu("New Ground Shape")]
@@ -699,6 +882,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             RefreshModifiers();
+#if !UNITY_EDITOR
+            runtimeRiverNotificationRevision++;
+#endif
             Regenerate();
         }
 
@@ -812,8 +998,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public bool ShowPaintedAccentLastAcceptedPositions =>
             showPaintedAccentLastAcceptedPositions;
 
+        public bool ShowPaintedAccentCompositionDebug =>
+            showPaintedAccentCompositionDebug;
+
         public bool ShowPaintedAccentProjectedGlyphDebug =>
             showPaintedAccentProjectedGlyphDebug;
+
+        public PaintedAccentGlyphFamilyPreview PaintedAccentGlyphFamilyFilter =>
+            paintedAccentGlyphFamilyPreview;
 
         public PaintedAccentPlacementOverlayWeightMode
             PaintedAccentPlacementOverlayWeight =>
@@ -824,7 +1016,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundSurfaceFeatureRecipe feature =
                 ResolveShaderFeature(
                     GroundSurfaceFeatureKind.PaintedAccentLines);
-            return CalculatePaintedAccentFoldFieldSignature(feature);
+            return CalculatePaintedAccentSurfaceStrokeSignature(feature);
         }
 
         public bool TryBuildPaintedAccentPlacementDebugSnapshot(
@@ -837,13 +1029,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ResolveShaderFeature(
                     GroundSurfaceFeatureKind.PaintedAccentLines);
 
-            if (!CanGeneratePaintedAccentFoldField(feature))
+            if (!CanGeneratePaintedAccentSurfaceStrokes(feature))
             {
                 return false;
             }
 
             snapshot =
-                GroundPaintedAccentFoldFieldGenerator
+                GroundPaintedAccentSurfaceStrokeGenerator
                     .BuildPlacementDebugSnapshot(
                         generatedMesh.bounds,
                         baseSurface,
@@ -853,6 +1045,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             ? recipe.PatchCoordinate
                             : Vector2Int.zero);
             return snapshot.IsValid;
+        }
+
+        public GroundPaintedAccentCompositionDebugSnapshot
+            GetLastPaintedAccentCompositionDebugSnapshot()
+        {
+            return paintedAccentCompositionDebugSnapshot;
         }
 
         public Vector3[] GetLastPaintedAccentAcceptedLocalPositions()
@@ -889,28 +1087,116 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         public string GetLastPaintedAccentPlacementStatistics()
         {
-            if (!paintedAccentFoldFieldEnabled)
+            if (!paintedAccentSurfaceStrokesInitialized)
             {
                 return "No Painted Accent placement has been generated yet.";
             }
 
+            GroundPaintedAccentPlacementDiagnostics diagnostics =
+                paintedAccentPlacementDiagnostics;
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            float densityContrast =
+                feature != null
+                    ? feature.PaintedAccentCompositionDensityContrast
+                    : 0f;
+            float pathWiggle =
+                feature != null
+                    ? feature.PaintedAccentStrokePathWiggle
+                    : 0f;
+            float horizontalCompanionStrength =
+                feature != null
+                    ? feature.PaintedAccentHorizontalCompanionStrength
+                    : 0f;
+            float companionTightness =
+                feature != null
+                    ? feature.PaintedAccentCompanionTightness
+                    : 0f;
+            float companionTripletVerticality =
+                feature != null
+                    ? feature.PaintedAccentCompanionTripletVerticality
+                    : 1f;
+            Vector4 familyWeights =
+                feature != null
+                    ? feature.PaintedAccentGlyphFamilyWeights
+                    : Vector4.zero;
+
             return
-                $"Target proposals: " +
-                $"{paintedAccentPlacementDiagnostics.TargetProposals}\n" +
-                $"Candidate pool: " +
-                $"{paintedAccentPlacementDiagnostics.CandidatePool}\n" +
-                $"Proposed: {paintedAccentPlacementDiagnostics.Proposed}\n" +
-                $"Accepted: {paintedAccentPlacementDiagnostics.Accepted}\n\n" +
-                $"Rejected sampling: " +
-                $"{paintedAccentPlacementDiagnostics.RejectedSampling}\n" +
-                $"Rejected river: " +
-                $"{paintedAccentPlacementDiagnostics.RejectedRiver}\n" +
-                $"Rejected modifier: " +
-                $"{paintedAccentPlacementDiagnostics.RejectedModifierExclusion}\n" +
-                $"Rejected broad slope: " +
-                $"{paintedAccentPlacementDiagnostics.RejectedBroadSlope}\n" +
-                $"Rejected local grade: " +
-                $"{paintedAccentPlacementDiagnostics.RejectedLocalGrade}";
+                $"Target proposals / candidate pool: " +
+                $"{diagnostics.TargetProposals} / {diagnostics.CandidatePool}\n" +
+                $"Proposed / final accepted: " +
+                $"{diagnostics.Proposed} / {diagnostics.Accepted}\n" +
+                $"Rejected regional thinning: " +
+                $"{diagnostics.RejectedRegionalThinning}\n" +
+                $"Rejected physical validation: " +
+                $"{diagnostics.RejectedPhysicalValidation}\n\n" +
+                $"Proposal-bearing regions: " +
+                $"{diagnostics.CompositionRegionCount}\n" +
+                $"Quiet / supporting / accent regions: " +
+                $"{diagnostics.QuietRegionCount} / " +
+                $"{diagnostics.SupportingRegionCount} / " +
+                $"{diagnostics.AccentRegionCount}\n" +
+                $"Region scale: {diagnostics.CompositionRegionScale:F3} m\n" +
+                $"Regional density contrast: {densityContrast:F2}\n" +
+                $"Stroke path wiggle: {pathWiggle:F2}\n" +
+                $"Horizontal companion strength / tightness / triplet verticality: " +
+                $"{horizontalCompanionStrength:F2} / " +
+                $"{companionTightness:F2} / " +
+                $"{companionTripletVerticality:F2}\n" +
+                $"Companion clusters composed (pairs / triplets): " +
+                $"{diagnostics.HorizontalCompanionClusterCount} (" +
+                $"{diagnostics.HorizontalCompanionPairClusterCount} / " +
+                $"{diagnostics.HorizontalCompanionTripletClusterCount})\n" +
+                $"Companion participants composed / accepted: " +
+                $"{diagnostics.HorizontalCompanionParticipantCount} / " +
+                $"{diagnostics.HorizontalCompanionAcceptedParticipantCount}\n" +
+                $"Companion full clusters accepted: " +
+                $"{diagnostics.HorizontalCompanionAcceptedClusterCount}\n" +
+                $"Proposals quiet / supporting / accent: " +
+                $"{diagnostics.QuietProposalCount} / " +
+                $"{diagnostics.SupportingProposalCount} / " +
+                $"{diagnostics.AccentProposalCount}\n" +
+                $"Accepted quiet / supporting / accent: " +
+                $"{diagnostics.QuietAcceptedCount} / " +
+                $"{diagnostics.SupportingAcceptedCount} / " +
+                $"{diagnostics.AccentAcceptedCount}\n" +
+                $"Accepted dominant / standard / support: " +
+                $"{diagnostics.DominantAcceptedCount} / " +
+                $"{diagnostics.StandardAcceptedCount} / " +
+                $"{diagnostics.SupportAcceptedCount}\n\n" +
+                $"Family weights complete / asymmetric / shoulder / shallow: " +
+                $"{familyWeights.x:F2} / {familyWeights.y:F2} / " +
+                $"{familyWeights.z:F2} / {familyWeights.w:F2}\n" +
+                $"Family selected complete / asymmetric / shoulder / shallow: " +
+                $"{diagnostics.CompleteMoundSelectedCount} / " +
+                $"{diagnostics.AsymmetricMoundSelectedCount} / " +
+                $"{diagnostics.SingleShoulderSelectedCount} / " +
+                $"{diagnostics.ShallowCrestSelectedCount}\n" +
+                $"Surface descriptors accepted by family: " +
+                $"{diagnostics.CompleteMoundAcceptedCount} / " +
+                $"{diagnostics.AsymmetricMoundAcceptedCount} / " +
+                $"{diagnostics.SingleShoulderAcceptedCount} / " +
+                $"{diagnostics.ShallowCrestAcceptedCount}\n\n" +
+                $"Accepted length min/mean/max: " +
+                $"{diagnostics.AcceptedLengthMin:F3} / " +
+                $"{diagnostics.AcceptedLengthMean:F3} / " +
+                $"{diagnostics.AcceptedLengthMax:F3} m\n" +
+                $"Accepted angle offset min/mean/max: " +
+                $"{diagnostics.AcceptedAngleOffsetMin:F1} / " +
+                $"{diagnostics.AcceptedAngleOffsetMean:F1} / " +
+                $"{diagnostics.AcceptedAngleOffsetMax:F1} deg\n" +
+                $"Accepted companion angle min/mean/max: " +
+                $"{diagnostics.AcceptedCompanionAngleOffsetMin:F1} / " +
+                $"{diagnostics.AcceptedCompanionAngleOffsetMean:F1} / " +
+                $"{diagnostics.AcceptedCompanionAngleOffsetMax:F1} deg\n\n" +
+                $"Rejected sampling / river / modifier: " +
+                $"{diagnostics.RejectedSampling} / " +
+                $"{diagnostics.RejectedRiver} / " +
+                $"{diagnostics.RejectedModifierExclusion}\n" +
+                $"Rejected broad slope / local grade: " +
+                $"{diagnostics.RejectedBroadSlope} / " +
+                $"{diagnostics.RejectedLocalGrade}";
         }
 
         public int CalculatePaintedAccentProjectedGlyphDebugSignature()
@@ -931,12 +1217,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ResolveShaderFeature(
                     GroundSurfaceFeatureKind.PaintedAccentLines);
 
-            if (!CanGeneratePaintedAccentFoldField(feature))
+            if (!CanGeneratePaintedAccentSurfaceStrokes(feature))
             {
                 return false;
             }
 
-            EnsurePaintedAccentFoldFieldCurrent();
+            EnsurePaintedAccentSurfaceStrokesCurrent();
             EnsurePaintedAccentProjectedGlyphsCurrent(feature);
             snapshot = paintedAccentProjectedGlyphDebugSnapshot;
             return snapshot.IsValid;
@@ -949,12 +1235,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ResolveShaderFeature(
                     GroundSurfaceFeatureKind.PaintedAccentLines);
 
-            if (!CanGeneratePaintedAccentFoldField(feature))
+            if (!CanGeneratePaintedAccentSurfaceStrokes(feature))
             {
                 return "No Painted Accent projected glyphs can be generated from the current ground and feature settings.";
             }
 
-            EnsurePaintedAccentFoldFieldCurrent();
+            EnsurePaintedAccentSurfaceStrokesCurrent();
             EnsurePaintedAccentProjectedGlyphsCurrent(feature);
 
             GroundPaintedAccentProjectedGlyphDiagnostics diagnostics =
@@ -968,7 +1254,39 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"Rejected river: {diagnostics.ProjectedGlyphsRejectedRiver}\n" +
                 $"Rejected modifier: {diagnostics.ProjectedGlyphsRejectedModifier}\n" +
                 $"Rejected broad slope: {diagnostics.ProjectedGlyphsRejectedBroadSlope}\n" +
-                $"Rejected local grade: {diagnostics.ProjectedGlyphsRejectedLocalGrade}\n\n" +
+                $"Rejected local grade: {diagnostics.ProjectedGlyphsRejectedLocalGrade}\n" +
+                $"Rejected family shape: {diagnostics.ProjectedGlyphsRejectedFamilyShape}\n" +
+                $"Rejected sharp projected turn: {diagnostics.ProjectedGlyphsRejectedSharpTurn}\n\n" +
+                $"Projected companion clusters requested / accepted / fallback: " +
+                $"{diagnostics.CompanionClustersRequested} / " +
+                $"{diagnostics.CompanionClustersAccepted} / " +
+                $"{diagnostics.CompanionClustersFallback}\n" +
+                $"Projected complete pairs / triplets: " +
+                $"{diagnostics.CompanionPairsAccepted} / " +
+                $"{diagnostics.CompanionTripletsAccepted}\n" +
+                $"Companion fallback incomplete / prototype / contact / surface / external: " +
+                $"{diagnostics.CompanionRejectedIncomplete} / " +
+                $"{diagnostics.CompanionRejectedPrototype} / " +
+                $"{diagnostics.CompanionRejectedContact} / " +
+                $"{diagnostics.CompanionRejectedSurface} / " +
+                $"{diagnostics.CompanionRejectedExternalConflict}\n\n" +
+                FormatPaintedAccentFamilyStatistics(
+                    GroundPaintedAccentGlyphFamily.CompleteMound,
+                    "Complete",
+                    diagnostics.CompleteMoundStatistics) +
+                FormatPaintedAccentFamilyStatistics(
+                    GroundPaintedAccentGlyphFamily.AsymmetricMound,
+                    "Asymmetric",
+                    diagnostics.AsymmetricMoundStatistics) +
+                FormatPaintedAccentFamilyStatistics(
+                    GroundPaintedAccentGlyphFamily.SingleShoulder,
+                    "Shoulder",
+                    diagnostics.SingleShoulderStatistics) +
+                FormatPaintedAccentFamilyStatistics(
+                    GroundPaintedAccentGlyphFamily.ShallowCrest,
+                    "Shallow",
+                    diagnostics.ShallowCrestStatistics) +
+                "\n" +
                 $"Projection world direction: +Z\n" +
                 $"Projection local X/Z: " +
                 $"({diagnostics.ProjectionLocalDirection.x:F4}, " +
@@ -993,10 +1311,94 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"{diagnostics.CombinedPeakHeightMin:F4} / " +
                 $"{diagnostics.CombinedPeakHeightMean:F4} / " +
                 $"{diagnostics.CombinedPeakHeightMax:F4} m\n" +
+                $"Projected turn min/mean/max: " +
+                $"{diagnostics.ProjectedTurnDegreesMin:F2} / " +
+                $"{diagnostics.ProjectedTurnDegreesMean:F2} / " +
+                $"{diagnostics.ProjectedTurnDegreesMax:F2} deg\n" +
                 $"Maximum north displacement error: " +
                 $"{diagnostics.MaximumNorthDisplacementError:F7} m\n" +
                 $"Maximum cross-axis drift: " +
                 $"{diagnostics.MaximumCrossAxisDrift:F7} m";
+        }
+
+        private static string FormatPaintedAccentFamilyStatistics(
+            GroundPaintedAccentGlyphFamily family,
+            string label,
+            GroundPaintedAccentGlyphFamilyStatistics statistics)
+        {
+            string common =
+                $"{label} attempted / accepted / rejected: " +
+                $"{statistics.Attempted} / {statistics.Accepted} / " +
+                $"{statistics.Rejected}\n" +
+                $"{label} length min/mean/max: " +
+                $"{statistics.AuthoredLengthMin:F3} / " +
+                $"{statistics.AuthoredLengthMean:F3} / " +
+                $"{statistics.AuthoredLengthMax:F3} m\n" +
+                $"{label} peak min/mean/max: " +
+                $"{statistics.PeakHeightMin:F4} / " +
+                $"{statistics.PeakHeightMean:F4} / " +
+                $"{statistics.PeakHeightMax:F4} m\n";
+
+            GroundPaintedAccentGlyphFamilyShapeStatistics shape =
+                statistics.ShapeStatistics;
+            switch (family)
+            {
+                case GroundPaintedAccentGlyphFamily.AsymmetricMound:
+                    return
+                        common +
+                        FormatPaintedAccentMetricRange(
+                            "Asymmetric crest position",
+                            shape.CrestPosition) +
+                        FormatPaintedAccentMetricRange(
+                            "Asymmetric leg-span ratio",
+                            shape.LegSpanRatio) +
+                        FormatPaintedAccentMetricRange(
+                            "Asymmetric leg-slope ratio",
+                            shape.LegSlopeRatio);
+                case GroundPaintedAccentGlyphFamily.SingleShoulder:
+                    return
+                        common +
+                        FormatPaintedAccentMetricRange(
+                            "Shoulder upper-run fraction",
+                            shape.UpperRunFraction) +
+                        FormatPaintedAccentMetricRange(
+                            "Shoulder upper-end drop fraction",
+                            shape.UpperEndpointDropFraction) +
+                        FormatPaintedAccentMetricRange(
+                            "Shoulder descending-drop fraction",
+                            shape.DescendingDropFraction);
+                case GroundPaintedAccentGlyphFamily.ShallowCrest:
+                    return
+                        common +
+                        FormatPaintedAccentMetricRange(
+                            "Shallow plateau fraction",
+                            shape.PlateauFraction) +
+                        FormatPaintedAccentMetricRange(
+                            "Shallow vertical-range fraction",
+                            shape.VerticalRangeFraction) +
+                        FormatPaintedAccentMetricRange(
+                            "Shallow endpoint-difference fraction",
+                            shape.EndpointDifferenceFraction) +
+                        $"Shallow endpoint-difference world min/mean/max: " +
+                        $"{shape.EndpointDifferenceWorld.Minimum:F4} / " +
+                        $"{shape.EndpointDifferenceWorld.Mean:F4} / " +
+                        $"{shape.EndpointDifferenceWorld.Maximum:F4} m\n" +
+                        $"Shallow near-straight accepted: " +
+                        $"{shape.NearStraightCount}\n";
+                case GroundPaintedAccentGlyphFamily.CompleteMound:
+                default:
+                    return common;
+            }
+        }
+
+        private static string FormatPaintedAccentMetricRange(
+            string label,
+            GroundPaintedAccentMetricRange range)
+        {
+            return
+                $"{label} min/mean/max: " +
+                $"{range.Minimum:F3} / {range.Mean:F3} / " +
+                $"{range.Maximum:F3}\n";
         }
 
         public string GetLastPaintedAccentCoverageStatistics()
@@ -1019,18 +1421,63 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"World texel X/Z: " +
                 $"{diagnostics.TexelWorldSizeX:F5} / " +
                 $"{diagnostics.TexelWorldSizeZ:F5} m\n" +
-                $"Minimum authored/effective half-width: " +
-                $"{diagnostics.MinimumAuthoredHalfWidth:F5} / " +
-                $"{diagnostics.MinimumEffectiveHalfWidth:F5} m";
+                $"Minimum authored full width: " +
+                $"{diagnostics.MinimumAuthoredFullWidth:F5} m\n" +
+                $"Minimum effective raster core width: " +
+                $"{diagnostics.MinimumEffectiveCoreFullWidth:F5} m\n" +
+                $"Minimum edge feather width: " +
+                $"{diagnostics.MinimumEdgeFeatherWidth:F5} m per side\n" +
+                $"Minimum estimated visible full width: " +
+                $"{diagnostics.MinimumEstimatedVisibleFullWidth:F5} m";
         }
 
         public void RefreshSurfaceMaterialProperties()
         {
+            ResetRegenerationTiming();
+            long totalStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            GroundRegenerationStage executedStages =
+                GroundRegenerationStage.None;
+
             CacheComponents();
-            EnsurePaintedAccentFoldFieldCurrent();
+            int previousSurfaceRevision =
+                paintedAccentSurfaceStrokeRevision;
+            EnsurePaintedAccentSurfaceStrokesCurrent();
+            if (paintedAccentSurfaceStrokeRevision != previousSurfaceRevision)
+            {
+                executedStages |= GroundRegenerationStage.SurfaceStrokes;
+            }
+
+            int previousProjectedSignature =
+                paintedAccentProjectedGlyphSignature;
+            int previousCoverageSignature =
+                paintedAccentCoverageSignature;
             EnsurePaintedAccentCoverageCurrent();
-            ApplySurfaceProfileMaterialProperties();
-            RefreshRiverCorridorMaterialProperties();
+            if (paintedAccentProjectedGlyphSignature !=
+                previousProjectedSignature)
+            {
+                executedStages |= GroundRegenerationStage.ProjectedGlyphs;
+            }
+            if (paintedAccentCoverageSignature !=
+                previousCoverageSignature)
+            {
+                executedStages |= GroundRegenerationStage.Coverage;
+            }
+
+            long materialStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            using (MaterialProfilerMarker.Auto())
+            {
+                ApplySurfaceProfileMaterialProperties();
+                RefreshRiverCorridorMaterialProperties();
+            }
+            lastMaterialMilliseconds =
+                ResolveElapsedMilliseconds(materialStartedAt);
+            executedStages |= GroundRegenerationStage.Material;
+
+            lastTotalRegenerationMilliseconds =
+                ResolveElapsedMilliseconds(totalStartedAt);
+            lastExecutedRegenerationStages = executedStages;
+            UpdateRegenerationTimingDiagnostics();
         }
 
         public bool TrySampleBaseSurface(
@@ -1179,19 +1626,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return snapshots;
         }
 
-        private List<StylizedRiverGroundSnapshot> BuildRiverSnapshots()
+        private List<StylizedRiverGroundSnapshot> BuildRiverSnapshots(
+            out GroundPaintedAccentRiverExclusionSnapshot[] exclusionSnapshots)
         {
             List<StylizedRiverGroundSnapshot> snapshots =
                 new List<StylizedRiverGroundSnapshot>();
+            List<GroundPaintedAccentRiverExclusionSnapshot> exclusions =
+                new List<GroundPaintedAccentRiverExclusionSnapshot>();
+            List<StylizedRiverSplineSample> splineSamples =
+                new List<StylizedRiverSplineSample>();
 
             if (rivers == null)
             {
+                exclusionSnapshots =
+                    Array.Empty<GroundPaintedAccentRiverExclusionSnapshot>();
                 return snapshots;
             }
 
-            for (int index = 0;
-                 index < rivers.Length;
-                 index++)
+            for (int index = 0; index < rivers.Length; index++)
             {
                 StylizedRiver river = rivers[index];
 
@@ -1204,13 +1656,71 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 StylizedRiverGroundSnapshot snapshot =
                     river.CreateGroundSnapshot(transform);
 
-                if (snapshot.IsValid)
+                if (!snapshot.IsValid)
                 {
-                    snapshots.Add(snapshot);
+                    continue;
                 }
+
+                snapshots.Add(snapshot);
+                exclusions.Add(
+                    BuildPaintedAccentRiverExclusionSnapshot(
+                        river,
+                        snapshot,
+                        splineSamples));
             }
 
+            exclusionSnapshots = exclusions.ToArray();
             return snapshots;
+        }
+
+        private GroundPaintedAccentRiverExclusionSnapshot
+            BuildPaintedAccentRiverExclusionSnapshot(
+                StylizedRiver river,
+                StylizedRiverGroundSnapshot snapshot,
+                List<StylizedRiverSplineSample> splineSamples)
+        {
+            if (river == null || splineSamples == null)
+            {
+                return new GroundPaintedAccentRiverExclusionSnapshot(
+                    snapshot,
+                    Vector2.zero,
+                    Vector2.zero,
+                    false);
+            }
+
+            river.BuildSharedSplineSamples(splineSamples);
+            if (splineSamples.Count < 2)
+            {
+                return new GroundPaintedAccentRiverExclusionSnapshot(
+                    snapshot,
+                    Vector2.zero,
+                    Vector2.zero,
+                    false);
+            }
+
+            Vector2 minimum =
+                new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            Vector2 maximum =
+                new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            for (int sampleIndex = 0;
+                 sampleIndex < splineSamples.Count;
+                 sampleIndex++)
+            {
+                Vector3 localPoint =
+                    transform.InverseTransformPoint(
+                        splineSamples[sampleIndex].SurfacePoint);
+                Vector2 localXZ = new Vector2(localPoint.x, localPoint.z);
+                minimum = Vector2.Min(minimum, localXZ);
+                maximum = Vector2.Max(maximum, localXZ);
+            }
+
+            Vector2 expansion =
+                Vector2.one * snapshot.MaximumInfluenceDistance;
+            return new GroundPaintedAccentRiverExclusionSnapshot(
+                snapshot,
+                minimum - expansion,
+                maximum + expansion,
+                true);
         }
 
         private void NotifyRiverCorridorsChanged()
@@ -1468,6 +1978,112 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
         }
 
+        private int CalculateGroundGeometrySignature(
+            int snapshotSignature)
+        {
+            unchecked
+            {
+                int hash = CalculateGenerationSignature();
+                hash = hash * 31 + snapshotSignature;
+                return hash;
+            }
+        }
+
+        private int CalculateGroundSnapshotSignature(
+            IReadOnlyList<GroundModifierSnapshot> modifierSnapshots,
+            IReadOnlyList<StylizedRiverGroundSnapshot> riverSnapshots,
+            bool includeFeatureExclusions)
+        {
+            unchecked
+            {
+                int hash = 17;
+                int modifierCount =
+                    modifierSnapshots != null ? modifierSnapshots.Count : 0;
+                hash = hash * 31 + modifierCount;
+                for (int index = 0; index < modifierCount; index++)
+                {
+                    GroundModifierSnapshot modifier = modifierSnapshots[index];
+                    hash = hash * 31 + (int)modifier.Mode;
+                    hash = hash * 31 + (int)modifier.Shape;
+                    hash = hash * 31 + modifier.Priority;
+                    hash = hash * 31 + (int)modifier.SurfaceEffectMode;
+                    if (includeFeatureExclusions)
+                    {
+                        hash = hash * 31 + (int)modifier.FeatureExclusions;
+                    }
+                    hash = hash * 31 + Quantize(modifier.SurfaceCompactionStrength);
+                    hash = hash * 31 + Quantize(modifier.SurfaceDampDepositStrength);
+                    hash = hash * 31 + Quantize(modifier.SurfaceStandingWaterStrength);
+                    hash = hash * 31 + Quantize(modifier.Strength);
+                    hash = hash * 31 + Quantize(modifier.BlendDistance);
+                    hash = hash * 31 + Quantize(modifier.Centre.x);
+                    hash = hash * 31 + Quantize(modifier.Centre.y);
+                    hash = hash * 31 + Quantize(modifier.TargetHeight);
+                    hash = hash * 31 + Quantize(modifier.Right.x);
+                    hash = hash * 31 + Quantize(modifier.Right.y);
+                    hash = hash * 31 + Quantize(modifier.Forward.x);
+                    hash = hash * 31 + Quantize(modifier.Forward.y);
+                    hash = hash * 31 + Quantize(modifier.CircleRadius);
+                    hash = hash * 31 + Quantize(modifier.BoxSize.x);
+                    hash = hash * 31 + Quantize(modifier.BoxSize.y);
+                    hash = hash * 31 + Quantize(modifier.HeightAmount);
+                    hash = hash * 31 + Quantize(modifier.PreserveDetail);
+                }
+
+                int riverCount = rivers != null ? rivers.Length : 0;
+                hash = hash * 31 + riverCount;
+                for (int index = 0; index < riverCount; index++)
+                {
+                    StylizedRiver river = rivers[index];
+                    if (river == null)
+                    {
+                        hash = hash * 31;
+                        continue;
+                    }
+
+                    hash = hash * 31 +
+                        HashDeterministicString(river.GetEntityId().ToString());
+                    Matrix4x4 matrix = river.transform.localToWorldMatrix;
+                    for (int element = 0; element < 16; element++)
+                    {
+                        hash = hash * 31 + Quantize(matrix[element]);
+                    }
+                    hash = hash * 31 +
+                        (river.isActiveAndEnabled ? 1 : 0);
+#if UNITY_EDITOR
+                    hash = hash * 31 + HashDeterministicString(
+                        EditorJsonUtility.ToJson(river, false));
+#else
+                    hash = hash * 31 + runtimeRiverNotificationRevision;
+#endif
+                }
+
+                int validRiverSnapshotCount =
+                    riverSnapshots != null ? riverSnapshots.Count : 0;
+                hash = hash * 31 + validRiverSnapshotCount;
+                return hash;
+            }
+        }
+
+        private static int HashDeterministicString(string value)
+        {
+            unchecked
+            {
+                int hash = 17;
+                if (string.IsNullOrEmpty(value))
+                {
+                    return hash;
+                }
+
+                for (int index = 0; index < value.Length; index++)
+                {
+                    hash = hash * 31 + value[index];
+                }
+
+                return hash;
+            }
+        }
+
         private static int Quantize(float value)
         {
             return Mathf.RoundToInt(value * 10000f);
@@ -1684,7 +2300,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 (float)debugView);
 
             ApplyResolvedFeatureMaterialProperties(materialProperties);
-            ApplyPaintedAccentFoldFieldProperties(materialProperties);
             ApplyPaintedAccentCoverageProperties(materialProperties);
 
             targetRenderer.SetPropertyBlock(materialProperties);
@@ -1718,41 +2333,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 properties,
                 ResolveShaderFeature(GroundSurfaceFeatureKind.TrampledWear),
                 GroundTrampledWearFeatureIds);
-            ApplyFeatureRecipe(
-                properties,
-                ResolveShaderFeature(GroundSurfaceFeatureKind.PaintedAccentLines),
-                GroundPaintedAccentLineFeatureIds);
-        }
-
-        private void ApplyPaintedAccentFoldFieldProperties(
-            MaterialPropertyBlock properties)
-        {
-            properties.SetTexture(
-                GroundPaintedAccentFoldFieldId,
-                ResolvePaintedAccentFoldFieldTexture());
-
+            GroundSurfaceFeatureRecipe paintedAccentFeature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
             properties.SetFloat(
-                GroundPaintedAccentFoldFieldEnabledId,
-                paintedAccentFoldFieldEnabled ? 1f : 0f);
-
-            properties.SetVector(
-                GroundPaintedAccentFoldFieldOriginSizeId,
-                paintedAccentFoldFieldOriginSize);
-
-            properties.SetVector(
-                GroundPaintedAccentFoldFieldTexelSizeId,
-                paintedAccentFoldFieldTexelSize);
-        }
-
-        private Texture2D ResolvePaintedAccentFoldFieldTexture()
-        {
-            if (paintedAccentFoldFieldTexture == null)
-            {
-                paintedAccentFoldFieldTexture =
-                    CreateNeutralPaintedAccentFoldFieldTexture();
-            }
-
-            return paintedAccentFoldFieldTexture;
+                GroundPaintedAccentLineStrengthId,
+                paintedAccentFeature != null &&
+                paintedAccentFeature.CanApplyAsShaderOnly
+                    ? paintedAccentFeature.Strength
+                    : 0f);
         }
 
         private void ApplyPaintedAccentCoverageProperties(
@@ -1775,9 +2364,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             properties.SetVector(
                 GroundPaintedAccentCoverageOriginSizeId,
                 paintedAccentCoverageOriginSize);
-            properties.SetVector(
-                GroundPaintedAccentCoverageTexelSizeId,
-                paintedAccentCoverageTexelSize);
             properties.SetMatrix(
                 GroundPaintedAccentCoverageWorldToLocalId,
                 transform.worldToLocalMatrix);
@@ -1797,88 +2383,66 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return paintedAccentCoverageTexture;
         }
 
-        private static Texture2D CreateNeutralPaintedAccentFoldFieldTexture()
-        {
-            Texture2D texture =
-                new Texture2D(
-                    1,
-                    1,
-                    TextureFormat.RGBA32,
-                    false,
-                    true)
-                {
-                    name = "GeneratedGround_NeutralPaintedAccentFoldField",
-                    hideFlags = HideFlags.DontSave,
-                    wrapMode = TextureWrapMode.Clamp,
-                    filterMode = FilterMode.Bilinear
-                };
-
-            texture.SetPixel(0, 0, new Color32(0, 0, 128, 0));
-            texture.Apply(false, true);
-            return texture;
-        }
-
-        private void EnsurePaintedAccentFoldFieldCurrent()
+        private void EnsurePaintedAccentSurfaceStrokesCurrent()
         {
             GroundSurfaceFeatureRecipe feature =
-                ResolveShaderFeature(GroundSurfaceFeatureKind.PaintedAccentLines);
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
             int signature =
-                CalculatePaintedAccentFoldFieldSignature(feature);
+                CalculatePaintedAccentSurfaceStrokeSignature(feature);
 
-            if (paintedAccentFoldFieldTexture != null &&
-                paintedAccentFoldFieldSignature == signature)
+            if (paintedAccentSurfaceStrokesInitialized &&
+                paintedAccentSurfaceStrokeSignature == signature)
             {
+                lastSurfaceStrokeMilliseconds = 0d;
                 return;
             }
 
-            paintedAccentFoldFieldSignature = signature;
+            paintedAccentSurfaceStrokeSignature = signature;
+            paintedAccentSurfaceStrokesInitialized = true;
 
-            if (!CanGeneratePaintedAccentFoldField(feature))
+            if (!CanGeneratePaintedAccentSurfaceStrokes(feature))
             {
-                ApplyNeutralPaintedAccentFoldField();
+                ApplyNeutralPaintedAccentSurfaceStrokes();
+                paintedAccentSurfaceStrokeSignature = signature;
                 return;
             }
 
-            GroundPaintedAccentSurfaceStroke[] surfaceStrokes =
-                GroundPaintedAccentFoldFieldGenerator.GenerateSurfaceStrokes(
-                    generatedMesh.bounds,
-                    baseSurface,
-                    feature,
-                    recipe != null ? recipe.ShapeSeed : 0,
-                    recipe != null
-                        ? recipe.PatchCoordinate
-                        : Vector2Int.zero,
-                    paintedAccentRiverSnapshots,
-                    paintedAccentModifierSnapshots,
-                    out Vector4 descriptorOriginSize,
-                    out GroundPaintedAccentPlacementDiagnostics diagnostics);
+            long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            using (SurfaceStrokeProfilerMarker.Auto())
+            {
+                GroundPaintedAccentSurfaceStroke[] surfaceStrokes =
+                    GroundPaintedAccentSurfaceStrokeGenerator.GenerateSurfaceStrokes(
+                        generatedMesh.bounds,
+                        baseSurface,
+                        feature,
+                        recipe != null ? recipe.ShapeSeed : 0,
+                        recipe != null
+                            ? recipe.PatchCoordinate
+                            : Vector2Int.zero,
+                        ResolvePaintedAccentVisualHorizontalLocalXZ(),
+                        paintedAccentRiverSnapshots,
+                        paintedAccentModifierSnapshots,
+                        out _,
+                        out GroundPaintedAccentPlacementDiagnostics diagnostics,
+                        out GroundPaintedAccentCompositionDebugSnapshot
+                            compositionDebugSnapshot);
 
-            Texture2D generatedTexture =
-                GroundPaintedAccentFoldFieldGenerator.RasterizeSurfaceStrokes(
-                    generatedMesh.bounds,
-                    baseSurface,
-                    feature,
-                    recipe != null ? recipe.ShapeSeed : 0,
-                    surfaceStrokes,
-                    out Vector4 rasterOriginSize,
-                    out Vector4 texelSize,
-                    out _);
+                paintedAccentSurfaceStrokes =
+                    surfaceStrokes ??
+                    Array.Empty<GroundPaintedAccentSurfaceStroke>();
+                paintedAccentPlacementDiagnostics = diagnostics;
+                paintedAccentCompositionDebugSnapshot =
+                    compositionDebugSnapshot;
+                paintedAccentSurfaceStrokeRevision++;
+                ClearPaintedAccentProjectedGlyphDebugCache();
+            }
 
-            paintedAccentSurfaceStrokes =
-                surfaceStrokes ?? Array.Empty<GroundPaintedAccentSurfaceStroke>();
-            paintedAccentPlacementDiagnostics = diagnostics;
-            paintedAccentSurfaceStrokeRevision++;
-            ClearPaintedAccentProjectedGlyphDebugCache();
-            ReplacePaintedAccentFoldFieldTexture(generatedTexture);
-            paintedAccentFoldFieldEnabled = true;
-            paintedAccentFoldFieldOriginSize =
-                rasterOriginSize.z > 0f && rasterOriginSize.w > 0f
-                    ? rasterOriginSize
-                    : descriptorOriginSize;
-            paintedAccentFoldFieldTexelSize = texelSize;
+            lastSurfaceStrokeMilliseconds =
+                ResolveElapsedMilliseconds(startedAt);
         }
 
-        private bool CanGeneratePaintedAccentFoldField(
+        private bool CanGeneratePaintedAccentSurfaceStrokes(
             GroundSurfaceFeatureRecipe feature)
         {
             return feature != null &&
@@ -1889,50 +2453,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                    baseSurface.IsValid;
         }
 
-        private void ApplyNeutralPaintedAccentFoldField()
+        private void ApplyNeutralPaintedAccentSurfaceStrokes()
         {
-            paintedAccentFoldFieldEnabled = false;
-            paintedAccentSurfaceStrokes = Array.Empty<GroundPaintedAccentSurfaceStroke>();
+            paintedAccentSurfaceStrokes =
+                Array.Empty<GroundPaintedAccentSurfaceStroke>();
             paintedAccentPlacementDiagnostics =
                 GroundPaintedAccentPlacementDiagnostics.Empty;
+            paintedAccentCompositionDebugSnapshot =
+                GroundPaintedAccentCompositionDebugSnapshot.Empty;
             paintedAccentSurfaceStrokeRevision++;
+            lastSurfaceStrokeMilliseconds = 0d;
             ClearPaintedAccentProjectedGlyphDebugCache();
-            ReplacePaintedAccentFoldFieldTexture(
-                CreateNeutralPaintedAccentFoldFieldTexture());
-
-            Bounds localBounds =
-                generatedMesh != null
-                    ? generatedMesh.bounds
-                    : new Bounds(Vector3.zero, Vector3.one);
-
-            paintedAccentFoldFieldOriginSize =
-                new Vector4(
-                    localBounds.min.x,
-                    localBounds.min.z,
-                    Mathf.Max(0.0001f, localBounds.size.x),
-                    Mathf.Max(0.0001f, localBounds.size.z));
-
-            paintedAccentFoldFieldTexelSize =
-                new Vector4(1f, 1f, 1f, 1f);
-        }
-
-        private void ReplacePaintedAccentFoldFieldTexture(
-            Texture2D texture)
-        {
-            if (paintedAccentFoldFieldTexture != null &&
-                paintedAccentFoldFieldTexture != texture)
-            {
-                if (Application.isPlaying)
-                {
-                    Destroy(paintedAccentFoldFieldTexture);
-                }
-                else
-                {
-                    DestroyImmediate(paintedAccentFoldFieldTexture);
-                }
-            }
-
-            paintedAccentFoldFieldTexture = texture;
         }
 
         private void EnsurePaintedAccentCoverageCurrent()
@@ -1946,13 +2477,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             if (paintedAccentCoverageSignature == signature &&
                 paintedAccentCoverageTexture != null)
             {
+                lastCoverageRasterMilliseconds = 0d;
+                lastCoverageUploadMilliseconds = 0d;
                 return;
             }
 
             paintedAccentCoverageSignature = signature;
             EnsurePaintedAccentProjectedGlyphsCurrent(feature);
 
-            if (!CanGeneratePaintedAccentFoldField(feature) ||
+            if (!CanGeneratePaintedAccentSurfaceStrokes(feature) ||
                 !paintedAccentProjectedGlyphDebugSnapshot.IsValid ||
                 paintedAccentProjectedGlyphDebugSnapshot.Glyphs == null ||
                 paintedAccentProjectedGlyphDebugSnapshot.Glyphs.Length == 0)
@@ -1962,19 +2495,31 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 return;
             }
 
-            Texture2D generatedTexture =
-                GroundPaintedAccentCoverageBaker.Bake(
-                    generatedMesh.bounds,
-                    paintedAccentProjectedGlyphDebugSnapshot.Glyphs,
-                    out Vector4 originSize,
-                    out Vector4 texelSize,
-                    out GroundPaintedAccentCoverageDiagnostics diagnostics);
+            Texture2D generatedTexture;
+            Vector4 originSize;
+            GroundPaintedAccentCoverageDiagnostics diagnostics;
+            double rasterMilliseconds;
+            double uploadMilliseconds;
+            using (CoverageProfilerMarker.Auto())
+            {
+                generatedTexture =
+                    GroundPaintedAccentCoverageBaker.Bake(
+                        generatedMesh.bounds,
+                        paintedAccentProjectedGlyphDebugSnapshot.Glyphs,
+                        paintedAccentCoverageTexture,
+                        ref paintedAccentCoveragePixels,
+                        out originSize,
+                        out diagnostics,
+                        out rasterMilliseconds,
+                        out uploadMilliseconds);
+            }
 
             ReplacePaintedAccentCoverageTexture(generatedTexture);
             paintedAccentCoverageEnabled = diagnostics.IsValid;
             paintedAccentCoverageOriginSize = originSize;
-            paintedAccentCoverageTexelSize = texelSize;
             paintedAccentCoverageDiagnostics = diagnostics;
+            lastCoverageRasterMilliseconds = rasterMilliseconds;
+            lastCoverageUploadMilliseconds = uploadMilliseconds;
         }
 
         private int CalculatePaintedAccentCoverageSignature(
@@ -2008,8 +2553,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     localBounds.min.z,
                     Mathf.Max(0.0001f, localBounds.size.x),
                     Mathf.Max(0.0001f, localBounds.size.z));
-            paintedAccentCoverageTexelSize =
-                new Vector4(1f, 1f, 1f, 1f);
         }
 
         private void ReplacePaintedAccentCoverageTexture(
@@ -2040,27 +2583,41 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             if (paintedAccentProjectedGlyphSignature == signature &&
                 paintedAccentProjectedGlyphDebugSnapshot.IsValid)
             {
+                paintedAccentProjectedGlyphBuildTimings =
+                    GroundPaintedAccentProjectedGlyphBuildTimings.Empty;
+                lastProjectedGlyphMilliseconds = 0d;
                 return;
             }
 
             paintedAccentProjectedGlyphSignature = signature;
 
-            if (!CanGeneratePaintedAccentFoldField(feature) ||
+            if (!CanGeneratePaintedAccentSurfaceStrokes(feature) ||
                 paintedAccentSurfaceStrokes == null)
             {
                 paintedAccentProjectedGlyphDebugSnapshot =
                     GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
+                paintedAccentProjectedGlyphBuildTimings =
+                    GroundPaintedAccentProjectedGlyphBuildTimings.Empty;
+                lastProjectedGlyphMilliseconds = 0d;
                 return;
             }
 
-            paintedAccentProjectedGlyphDebugSnapshot =
-                GroundPaintedAccentProjectedGlyphGenerator.Build(
-                    paintedAccentSurfaceStrokes,
-                    baseSurface,
-                    feature,
-                    paintedAccentRiverSnapshots,
-                    paintedAccentModifierSnapshots,
-                    ResolvePaintedAccentProjectedNorthLocalXZ());
+            long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            using (ProjectedGlyphProfilerMarker.Auto())
+            {
+                paintedAccentProjectedGlyphDebugSnapshot =
+                    GroundPaintedAccentProjectedGlyphGenerator.Build(
+                        paintedAccentSurfaceStrokes,
+                        baseSurface,
+                        feature,
+                        paintedAccentRiverExclusionSnapshots,
+                        paintedAccentModifierSnapshots,
+                        ResolvePaintedAccentProjectedNorthLocalXZ(),
+                        out paintedAccentProjectedGlyphBuildTimings);
+            }
+
+            lastProjectedGlyphMilliseconds =
+                ResolveElapsedMilliseconds(startedAt);
         }
 
         private int CalculatePaintedAccentProjectedGlyphSignature(
@@ -2068,17 +2625,36 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         {
             unchecked
             {
-                int hash = CalculatePaintedAccentFoldFieldSignature(feature);
+                int hash = CalculatePaintedAccentSurfaceStrokeSignature(feature);
+                hash = hash * 31 +
+                    GroundPaintedAccentProjectedGlyphGenerator.Revision;
                 hash = hash * 31 + paintedAccentSurfaceStrokeRevision;
                 hash = hash * 31 + Quantize(
                     feature != null
                         ? feature.PaintedAccentCrestCrownHeight
                         : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentFoldHeight : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentFoldIrregularity : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentFoldEndTaper : 0f);
                 Vector2 localNorth = ResolvePaintedAccentProjectedNorthLocalXZ();
                 hash = hash * 31 + Quantize(localNorth.x);
                 hash = hash * 31 + Quantize(localNorth.y);
                 return hash;
             }
+        }
+
+        private Vector2 ResolvePaintedAccentVisualHorizontalLocalXZ()
+        {
+            Vector3 localHorizontal3 =
+                transform.InverseTransformDirection(Vector3.right);
+            Vector2 localHorizontal =
+                new Vector2(localHorizontal3.x, localHorizontal3.z);
+            return localHorizontal.sqrMagnitude > 0.000001f
+                ? localHorizontal.normalized
+                : Vector2.right;
         }
 
         private Vector2 ResolvePaintedAccentProjectedNorthLocalXZ()
@@ -2100,13 +2676,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentCoverageSignature = 0;
         }
 
-        private int CalculatePaintedAccentFoldFieldSignature(
+        private int CalculatePaintedAccentSurfaceStrokeSignature(
             GroundSurfaceFeatureRecipe feature)
         {
             unchecked
             {
                 int hash = 17;
-                hash = hash * 31 + CalculateGenerationSignature();
+                hash = hash * 31 + appliedGroundGeometrySignature;
+                hash = hash * 31 + currentPaintedAccentDomainSignature;
+                hash = hash * 31 + groundGeometryRevision;
+                hash = hash * 31 +
+                    GroundPaintedAccentSurfaceStrokeGenerator.Revision;
                 hash = hash * 31 +
                     (feature != null && feature.CanApplyAsShaderOnly ? 1 : 0);
                 hash = hash * 31 + Quantize(
@@ -2128,6 +2708,38 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentDistributionSparseFloor : 0f);
                 hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentCompositionRegionScale : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentCompositionDensityContrast : 0f);
+                float horizontalCompanionStrength =
+                    feature != null
+                        ? feature.PaintedAccentHorizontalCompanionStrength
+                        : 0f;
+                hash = hash * 31 + Quantize(horizontalCompanionStrength);
+                if (horizontalCompanionStrength > 0.0001f)
+                {
+                    hash = hash * 31 + Quantize(
+                        feature != null
+                            ? feature.PaintedAccentCompanionTightness
+                            : 0f);
+                    hash = hash * 31 + Quantize(
+                        feature != null
+                            ? feature.PaintedAccentCompanionTripletVerticality
+                            : 1f);
+                    Vector2 visualHorizontal =
+                        ResolvePaintedAccentVisualHorizontalLocalXZ();
+                    hash = hash * 31 + Quantize(visualHorizontal.x);
+                    hash = hash * 31 + Quantize(visualHorizontal.y);
+                }
+                Vector4 familyWeights =
+                    feature != null
+                        ? feature.PaintedAccentGlyphFamilyWeights
+                        : Vector4.zero;
+                hash = hash * 31 + Quantize(familyWeights.x);
+                hash = hash * 31 + Quantize(familyWeights.y);
+                hash = hash * 31 + Quantize(familyWeights.z);
+                hash = hash * 31 + Quantize(familyWeights.w);
+                hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentStrokeLengthMin : 0f);
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentStrokeLengthMax : 0f);
@@ -2136,11 +2748,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentStrokeAngleJitterDegrees : 0f);
                 hash = hash * 31 + Quantize(
-                    feature != null ? feature.PaintedAccentFoldHeight : 0f);
-                hash = hash * 31 + Quantize(
-                    feature != null ? feature.PaintedAccentFoldIrregularity : 0f);
-                hash = hash * 31 + Quantize(
-                    feature != null ? feature.PaintedAccentFoldEndTaper : 0f);
+                    feature != null ? feature.PaintedAccentStrokePathWiggle : 0f);
 
                 hash = hash * 31 +
                     (feature != null ? feature.SeedOffset : 0);
@@ -2198,6 +2806,62 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 feature.SeedOffset);
         }
 
+        private static double ResolveElapsedMilliseconds(long startedAt)
+        {
+            long elapsedTicks =
+                System.Diagnostics.Stopwatch.GetTimestamp() - startedAt;
+            return elapsedTicks * 1000d /
+                   System.Diagnostics.Stopwatch.Frequency;
+        }
+
+        private void ResetRegenerationTiming()
+        {
+            lastSnapshotsMilliseconds = 0d;
+            lastGeometryMilliseconds = 0d;
+            lastMeshApplyMilliseconds = 0d;
+            lastColliderMilliseconds = 0d;
+            lastSurfaceStrokeMilliseconds = 0d;
+            lastProjectedGlyphMilliseconds = 0d;
+            paintedAccentProjectedGlyphBuildTimings =
+                GroundPaintedAccentProjectedGlyphBuildTimings.Empty;
+            lastCoverageRasterMilliseconds = 0d;
+            lastCoverageUploadMilliseconds = 0d;
+            lastMaterialMilliseconds = 0d;
+            lastRiverCorridorMilliseconds = 0d;
+            lastTotalRegenerationMilliseconds = 0d;
+        }
+
+        private void UpdateRegenerationTimingDiagnostics()
+        {
+            lastRegenerationTimingDiagnostics =
+                $"Executed stages: {lastExecutedRegenerationStages}\n" +
+                $"Total: {lastTotalRegenerationMilliseconds:F2} ms\n" +
+                $"Snapshots: {lastSnapshotsMilliseconds:F2} ms\n" +
+                $"Ground generation: {lastGeometryMilliseconds:F2} ms\n" +
+                $"Mesh apply: {lastMeshApplyMilliseconds:F2} ms\n" +
+                $"Collider cook: {lastColliderMilliseconds:F2} ms\n" +
+                $"Painted Accent strokes: {lastSurfaceStrokeMilliseconds:F2} ms\n" +
+                $"Painted Accent projection: {lastProjectedGlyphMilliseconds:F2} ms\n" +
+                $"  profile build: {paintedAccentProjectedGlyphBuildTimings.ProfileBuildMilliseconds:F2} ms\n" +
+                $"  family validation: {paintedAccentProjectedGlyphBuildTimings.FamilyValidationMilliseconds:F2} ms\n" +
+                $"  point construction: {paintedAccentProjectedGlyphBuildTimings.PointConstructionMilliseconds:F2} ms\n" +
+                $"  topology + turn: {paintedAccentProjectedGlyphBuildTimings.TopologyValidationMilliseconds:F2} ms\n" +
+                $"  projected cluster composition: {paintedAccentProjectedGlyphBuildTimings.ClusterCompositionMilliseconds:F2} ms\n" +
+                $"  surface/domain validation: {paintedAccentProjectedGlyphBuildTimings.SurfaceValidationMilliseconds:F2} ms\n" +
+                $"    footprint preparation: {paintedAccentProjectedGlyphBuildTimings.FootprintPreparationMilliseconds:F2} ms\n" +
+                $"    ground sampling: {paintedAccentProjectedGlyphBuildTimings.GroundSamplingMilliseconds:F2} ms\n" +
+                $"    broad slope: {paintedAccentProjectedGlyphBuildTimings.BroadSlopeMilliseconds:F2} ms\n" +
+                $"    river exclusion: {paintedAccentProjectedGlyphBuildTimings.RiverExclusionMilliseconds:F2} ms\n" +
+                $"    modifier exclusion: {paintedAccentProjectedGlyphBuildTimings.ModifierExclusionMilliseconds:F2} ms\n" +
+                $"    transverse grade: {paintedAccentProjectedGlyphBuildTimings.TransverseGradeMilliseconds:F2} ms\n" +
+                $"    longitudinal grade: {paintedAccentProjectedGlyphBuildTimings.LongitudinalGradeMilliseconds:F2} ms\n" +
+                $"  diagnostics: {paintedAccentProjectedGlyphBuildTimings.DiagnosticsMilliseconds:F2} ms\n" +
+                $"Coverage raster: {lastCoverageRasterMilliseconds:F2} ms\n" +
+                $"Coverage upload: {lastCoverageUploadMilliseconds:F2} ms\n" +
+                $"Material apply: {lastMaterialMilliseconds:F2} ms\n" +
+                $"River corridor notification: {lastRiverCorridorMilliseconds:F2} ms";
+        }
+
         private void EnsureGeneratedMesh()
         {
             if (generatedMesh != null)
@@ -2217,10 +2881,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             baseSurface = GroundHeightFieldSnapshot.Empty;
             lastSurfaceMaskDiagnostics =
                 "Surface masks have not been generated yet.";
-            paintedAccentFoldFieldSignature = 0;
+            appliedGroundGeometrySignature = 0;
+            groundGeometryInitialized = false;
+            groundGeometryRevision = 0;
+            currentSnapshotSignature = 0;
+            currentPaintedAccentDomainSignature = 0;
+            paintedAccentSurfaceStrokeSignature = 0;
+            paintedAccentSurfaceStrokesInitialized = false;
             paintedAccentModifierSnapshots = Array.Empty<GroundModifierSnapshot>();
             paintedAccentRiverSnapshots = Array.Empty<StylizedRiverGroundSnapshot>();
-            ApplyNeutralPaintedAccentFoldField();
+            paintedAccentRiverExclusionSnapshots =
+                Array.Empty<GroundPaintedAccentRiverExclusionSnapshot>();
+            ApplyNeutralPaintedAccentSurfaceStrokes();
             ApplyNeutralPaintedAccentCoverage();
 
             if (meshFilter != null &&
@@ -2239,20 +2911,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private void OnDestroy()
         {
             ClearGeneratedAssignments();
-
-            if (paintedAccentFoldFieldTexture != null)
-            {
-                if (Application.isPlaying)
-                {
-                    Destroy(paintedAccentFoldFieldTexture);
-                }
-                else
-                {
-                    DestroyImmediate(paintedAccentFoldFieldTexture);
-                }
-
-                paintedAccentFoldFieldTexture = null;
-            }
 
             if (paintedAccentCoverageTexture != null)
             {

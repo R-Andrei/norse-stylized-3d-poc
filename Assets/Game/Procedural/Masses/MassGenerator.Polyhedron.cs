@@ -68,7 +68,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float capFeatureStrength = 0f,
             bool clampIntersectionsToSegment = false,
             float insideEpsilon = PlaneEpsilon,
-            bool canonicalizeSharedIntersections = false)
+            bool canonicalizeSharedIntersections = false,
+            PolygonFaceProvenanceKind capProvenanceKind =
+                PolygonFaceProvenanceKind.None,
+            int capProvenanceIndex = -1)
         {
             float effectiveInsideEpsilon = Mathf.Clamp(
                 insideEpsilon,
@@ -103,7 +106,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             clipped,
                             faces[i].Normal,
                             faces[i].Feature,
-                            faces[i].FeatureStrength));
+                            faces[i].FeatureStrength,
+                            faces[i].ProvenanceKind,
+                            faces[i].ProvenanceIndex));
                 }
             }
 
@@ -130,7 +135,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             sanitizedCap,
                             capFace.Normal,
                             capFace.Feature,
-                            capFace.FeatureStrength));
+                            capFace.FeatureStrength,
+                            capProvenanceKind,
+                            capProvenanceIndex));
                 }
             }
 

@@ -17,8 +17,8 @@ namespace ProgrammaticStylized3D.Rivers
                 river.DomainChanged += HandleDomainChanged;
             }
 
-            GeneratedGeometryRegistry.SourceAdded += HandleGeneratedSourceChanged;
-            GeneratedGeometryRegistry.SourceRemoved += HandleGeneratedSourceChanged;
+            GeneratedGeometryRegistry.SourceAdded += HandleGeneratedSourceAdded;
+            GeneratedGeometryRegistry.SourceRemoved += HandleGeneratedSourceRemoved;
             GeneratedGeometryRegistry.SourceChanged += HandleGeneratedSourceChanged;
 
             lastRuntimeTime = Time.realtimeSinceStartup;
@@ -33,24 +33,42 @@ namespace ProgrammaticStylized3D.Rivers
             pendingObstacleStableFrameCount = 0;
             initializationObstacleObservedVersion = int.MinValue;
             initializationObstacleStableFrameCount = 0;
-            automaticTopologyGenerationInProgress = false;
-            automaticDevelopmentObservedSignature = int.MinValue;
-            automaticDevelopmentRebuildReason =
-                AutomaticDevelopmentRebuildReason.None;
-            pendingAutomaticDevelopmentRebuildAfterStartup = false;
+            editorTopologyPreparationInProgress = false;
+            activeTopologyRequiresExplicitPreparation = false;
+            generatedSourceNotificationBurstPending = false;
+            topologyCacheStartupOutcome = TopologyCacheStartupOutcome.NotEvaluated;
+            topologyCacheStartupReasons = TopologyCacheStartupReason.None;
+            topologyCacheStartupAttemptCount = 0;
+            topologyCacheStartupHitCount = 0;
+            topologyCacheStartupMissCount = 0;
+            topologyCacheStartupPayloadBytes = 0;
+            topologyCacheStartupPayloadHash = "—";
+            topologyCacheStartupLoadMilliseconds = 0.0;
+            topologyCacheLoadedForActiveResources = false;
+            automaticTopologyCacheWritePending = false;
+            automaticTopologyCacheWriteCount = 0;
+            automaticTopologyCacheWriteSuccessCount = 0;
+            automaticTopologyCachePersistenceState = "Disabled";
+            automaticTopologyCachePersistenceSummary =
+                "Play Mode cache persistence is disabled. Prepare the cache " +
+                "explicitly in Edit Mode.";
+            topologyStartupSourceAddedCount = 0;
+            topologyStartupSourceRemovedCount = 0;
+            topologyStartupSourceChangedCount = 0;
+            topologyStartupDirtyCycleCount = 0;
+            topologyStartupRestartCount = 0;
+            topologyStartupCacheBuildAttemptCount = 0;
+            topologyStartupReplacementAttemptCount = 0;
+            topologyStartupCacheWriteAttemptCount = 0;
+            topologyStartupCacheWriteSuccessCount = 0;
+            topologyStartupDirtyReasons = TopologyStartupDirtyReason.None;
+            topologyStartupDistinctGeneratedSources.Clear();
+            topologyStartupSummaryLogged = false;
+            ClearSteadyStateWorkAccounting(false);
             pendingStartupCacheStaleObstacles = false;
             pendingStartupCacheStaleSettings = false;
             topologyStartupValidationActive = false;
             topologyStartupValidationComplete = false;
-            if (!Application.isPlaying)
-            {
-                topologyCacheSessionPersistentInputKey = string.Empty;
-                topologyCacheSessionPersistentInputCaptured = false;
-                automaticTopologyCacheWritePending = false;
-                automaticTopologyCachePersistenceState = "Idle";
-                automaticTopologyCachePersistenceSummary =
-                    "No automatic development cache write is pending.";
-            }
             ReleaseTopologyReplacementBuild(true);
             ReleaseTopologyTransition(true);
             initializationPhase = InitializationPhase.NotStarted;
@@ -64,8 +82,8 @@ namespace ProgrammaticStylized3D.Rivers
                 river.DomainChanged -= HandleDomainChanged;
             }
 
-            GeneratedGeometryRegistry.SourceAdded -= HandleGeneratedSourceChanged;
-            GeneratedGeometryRegistry.SourceRemoved -= HandleGeneratedSourceChanged;
+            GeneratedGeometryRegistry.SourceAdded -= HandleGeneratedSourceAdded;
+            GeneratedGeometryRegistry.SourceRemoved -= HandleGeneratedSourceRemoved;
             GeneratedGeometryRegistry.SourceChanged -= HandleGeneratedSourceChanged;
 
             BindDisabled();
@@ -77,6 +95,7 @@ namespace ProgrammaticStylized3D.Rivers
             isolatedLifeProbeAbsoluteAgingActive = false;
             isolatedLifeProbeWrittenAt = -1.0;
             ClearFoamCompositionEvents();
+            steadyStateWorkAccountingActive = false;
         }
 
         private void OnDestroy()
@@ -223,13 +242,36 @@ namespace ProgrammaticStylized3D.Rivers
                 simulationInterpolation = 1f;
                 lastRenderInterpolationAlpha = simulationInterpolation;
                 idleSince = 0.0;
+                RecordSteadyStateWorkFrame(materialWork, true);
                 BindField();
                 UpdateRecentPeaks();
                 return;
             }
 
+            bool recordTopologyMaintenance =
+                steadyStateWorkAccountingActive;
+            long topologyMaintenanceStartedAt = recordTopologyMaintenance
+                ? CaptureWorkTimestamp()
+                : 0L;
+            int topologyMaintenanceDispatchesBefore = recordTopologyMaintenance
+                ? lastUpdateDispatches
+                : 0;
+            long topologyMaintenanceCellIterationsBefore =
+                recordTopologyMaintenance
+                    ? lastUpdateCellIterations
+                    : 0L;
+            bool queuedWorkBeforeDirtyEvaluation = HasQueuedRebuildWork;
+            if (steadyStateWorkAccountingActive)
+            {
+                steadyStateWorkTopologyDirtyEvaluationCount += 2;
+            }
             QueueObstacleRebuildIfNeeded();
             QueueMajorTopologyRebuildIfNeeded();
+            if (steadyStateWorkAccountingActive &&
+                !queuedWorkBeforeDirtyEvaluation && HasQueuedRebuildWork)
+            {
+                steadyStateWorkTopologyDirtyPositiveCount++;
+            }
             bool rebuildPhaseAdvanced = AdvanceQueuedRebuild();
             bool topologyReplacementActivated = false;
             if (!rebuildPhaseAdvanced && !HasQueuedRebuildWork)
@@ -240,6 +282,13 @@ namespace ProgrammaticStylized3D.Rivers
             bool topologyMaintenanceBlocked =
                 rebuildPhaseAdvanced || HasQueuedRebuildWork ||
                 topologyReplacementActivated;
+            if (recordTopologyMaintenance)
+            {
+                RecordTopologyMaintenanceWork(
+                    topologyMaintenanceStartedAt,
+                    topologyMaintenanceDispatchesBefore,
+                    topologyMaintenanceCellIterationsBefore);
+            }
 
             float now = Time.realtimeSinceStartup;
             float deltaTime = Mathf.Clamp(now - lastRuntimeTime, 0f, 0.1f);
@@ -247,6 +296,11 @@ namespace ProgrammaticStylized3D.Rivers
             AdvanceMotionLaneScroll(deltaTime);
             EnsureMotionFieldsCurrent();
 
+            bool recordTopologyEvolution =
+                steadyStateWorkAccountingActive;
+            long topologyEvolutionStartedAt = recordTopologyEvolution
+                ? CaptureWorkTimestamp()
+                : 0L;
             bool topologyTransitionChanged =
                 AdvanceTopologyTransition(deltaTime);
             bool evolvingTopologyRebuilt = false;
@@ -263,6 +317,10 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
+            if (recordTopologyEvolution)
+            {
+                RecordTopologyEvolutionWork(topologyEvolutionStartedAt);
+            }
             if (evolvingTopologyRebuilt || topologyTransitionChanged)
             {
                 RefreshDynamicTopologySources(false, false);
@@ -430,6 +488,7 @@ namespace ProgrammaticStylized3D.Rivers
                 DispatchEvaluateShape();
             }
 
+            RecordSteadyStateWorkFrame(materialWork, false);
             BindField();
             UpdateRecentPeaks();
         }

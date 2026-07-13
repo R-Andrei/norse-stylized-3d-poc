@@ -32,6 +32,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ConvexEdgeWear
         }
 
+        private enum PolygonFaceProvenanceKind
+        {
+            None,
+            SourceFace,
+            EdgeBevelPlane,
+            VertexJunctionPlane,
+            BoundedEdgeBevel,
+            BoundedEndpointCap
+        }
+
         private sealed class TriangleSoup
         {
             public readonly List<Vector3> Positions = new List<Vector3>();
@@ -149,12 +159,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public readonly Vector3 Normal;
             public readonly PolygonFaceFeature Feature;
             public readonly float FeatureStrength;
+            public readonly PolygonFaceProvenanceKind ProvenanceKind;
+            public readonly int ProvenanceIndex;
 
             public PolygonFace(
                 List<Vector3> vertices,
                 Vector3 normal,
                 PolygonFaceFeature feature = PolygonFaceFeature.Base,
-                float featureStrength = 0f)
+                float featureStrength = 0f,
+                PolygonFaceProvenanceKind provenanceKind =
+                    PolygonFaceProvenanceKind.None,
+                int provenanceIndex = -1)
             {
                 Vertices = vertices;
                 Normal = normal.normalized;
@@ -162,6 +177,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ? PolygonFaceFeature.ConvexEdgeWear
                     : PolygonFaceFeature.Base;
                 FeatureStrength = Mathf.Clamp01(featureStrength);
+                ProvenanceKind = provenanceKind;
+                ProvenanceIndex = provenanceIndex;
             }
         }
 

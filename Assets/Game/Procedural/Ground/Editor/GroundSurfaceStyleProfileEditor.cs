@@ -315,6 +315,30 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentDistributionPatchiness");
             SerializedProperty paintedAccentDistributionSparseFloor =
                 feature.FindPropertyRelative("paintedAccentDistributionSparseFloor");
+            SerializedProperty paintedAccentCompositionRegionScale =
+                feature.FindPropertyRelative("paintedAccentCompositionRegionScale");
+            SerializedProperty paintedAccentCompositionDensityContrast =
+                feature.FindPropertyRelative("paintedAccentCompositionDensityContrast");
+            SerializedProperty paintedAccentHorizontalCompanionStrength =
+                feature.FindPropertyRelative("paintedAccentHorizontalCompanionStrength");
+            SerializedProperty paintedAccentCompanionTightness =
+                feature.FindPropertyRelative("paintedAccentCompanionTightness");
+            SerializedProperty paintedAccentCompanionTripletVerticality =
+                feature.FindPropertyRelative("paintedAccentCompanionTripletVerticality");
+            SerializedProperty paintedAccentCompanionTripletVerticalityInitialized =
+                feature.FindPropertyRelative("paintedAccentCompanionTripletVerticalityInitialized");
+            SerializedProperty paintedAccentHorizontalCompanionsInitialized =
+                feature.FindPropertyRelative("paintedAccentHorizontalCompanionsInitialized");
+            SerializedProperty paintedAccentCompleteMoundWeight =
+                feature.FindPropertyRelative("paintedAccentCompleteMoundWeight");
+            SerializedProperty paintedAccentAsymmetricMoundWeight =
+                feature.FindPropertyRelative("paintedAccentAsymmetricMoundWeight");
+            SerializedProperty paintedAccentSingleShoulderWeight =
+                feature.FindPropertyRelative("paintedAccentSingleShoulderWeight");
+            SerializedProperty paintedAccentShallowCrestWeight =
+                feature.FindPropertyRelative("paintedAccentShallowCrestWeight");
+            SerializedProperty paintedAccentGlyphFamilyWeightsInitialized =
+                feature.FindPropertyRelative("paintedAccentGlyphFamilyWeightsInitialized");
             SerializedProperty paintedAccentStrokeLengthMin =
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
             SerializedProperty paintedAccentStrokeLengthMax =
@@ -323,6 +347,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeFacingDirectionDegrees");
             SerializedProperty paintedAccentStrokeAngleJitterDegrees =
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
+            SerializedProperty paintedAccentStrokePathWiggle =
+                feature.FindPropertyRelative("paintedAccentStrokePathWiggle");
+            SerializedProperty paintedAccentStrokePathWiggleInitialized =
+                feature.FindPropertyRelative("paintedAccentStrokePathWiggleInitialized");
             SerializedProperty paintedAccentFoldHeight =
                 feature.FindPropertyRelative("paintedAccentFoldHeight");
             SerializedProperty paintedAccentCrestCrownHeight =
@@ -383,27 +411,61 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 if ((GroundSurfaceFeatureKind)kind.intValue ==
                     GroundSurfaceFeatureKind.PaintedAccentLines)
                 {
+                    if (paintedAccentCompositionRegionScale.floatValue < 1f)
+                    {
+                        paintedAccentCompositionRegionScale.floatValue = 4f;
+                        paintedAccentCompositionDensityContrast.floatValue = 0.70f;
+                    }
+
+                    if (!paintedAccentHorizontalCompanionsInitialized.boolValue)
+                    {
+                        paintedAccentHorizontalCompanionStrength.floatValue = 0f;
+                        paintedAccentCompanionTightness.floatValue = 0.65f;
+                        paintedAccentHorizontalCompanionsInitialized.boolValue = true;
+                    }
+
+                    if (!paintedAccentCompanionTripletVerticalityInitialized.boolValue)
+                    {
+                        paintedAccentCompanionTripletVerticality.floatValue = 1f;
+                        paintedAccentCompanionTripletVerticalityInitialized.boolValue = true;
+                    }
+
+                    if (!paintedAccentGlyphFamilyWeightsInitialized.boolValue)
+                    {
+                        paintedAccentCompleteMoundWeight.floatValue = 0.20f;
+                        paintedAccentAsymmetricMoundWeight.floatValue = 0.30f;
+                        paintedAccentSingleShoulderWeight.floatValue = 0.30f;
+                        paintedAccentShallowCrestWeight.floatValue = 0.20f;
+                        paintedAccentGlyphFamilyWeightsInitialized.boolValue = true;
+                    }
+
+                    if (!paintedAccentStrokePathWiggleInitialized.boolValue)
+                    {
+                        paintedAccentStrokePathWiggle.floatValue = 0.35f;
+                        paintedAccentStrokePathWiggleInitialized.boolValue = true;
+                    }
+
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
                         "Painted Accent Strokes",
                         EditorStyles.miniBoldLabel);
                     EditorGUILayout.Slider(
                         paintedAccentStrokeWidth,
-                        0.01f,
-                        0.35f,
+                        0.002f,
+                        0.20f,
                         new GUIContent(
                             "Stroke Width",
                             "Visible authored projected-contour width in metres. BodyWidth remains texture/debug support only."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeDensity,
                         0f,
-                        240f,
+                        2000f,
                         new GUIContent(
                             "Stroke Density",
-                            "Approximate number of weighted stroke proposals per standard 40x40 ground patch before river, modifier, sampling, slope, and grade rejection. Final accepted count may be lower because rejected proposals are not backfilled."));
+                            "Approximate requested stroke proposals per standard 40x40 ground patch. Regional concentration redistributes a fixed average share of this population; physical validation may reduce the final count. Supports substantially denser baked fields than the earlier 240-stroke limit."));
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
-                        "Distribution & Placement",
+                        "Broad Distribution",
                         EditorStyles.miniBoldLabel);
                     EditorGUILayout.Slider(
                         paintedAccentDistributionPatchScale,
@@ -426,6 +488,88 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         new GUIContent(
                             "Distribution Sparse Floor",
                             "Minimum patch preference retained in cold regions before semantic weighting. Lower values create stronger sparse/dense contrast while preserving a non-zero chance outside warm patches."));
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField(
+                        "Regional Composition",
+                        EditorStyles.miniBoldLabel);
+                    EditorGUILayout.Slider(
+                        paintedAccentCompositionRegionScale,
+                        1f,
+                        16f,
+                        new GUIContent(
+                            "Regional Zone Scale",
+                            "World-space size in metres of jittered zones that share density mode and broad direction. This is independent from the softer Distribution Patch Scale field."));
+                    EditorGUILayout.Slider(
+                        paintedAccentCompositionDensityContrast,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Regional Density Contrast",
+                            "Redistributes a fixed average regional survival rate into denser accent zones. Zero keeps quiet, supporting, and accent zones equally populated; one maximizes their contrast without raising Stroke Density."));
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField(
+                        "Horizontal Companions",
+                        EditorStyles.miniBoldLabel);
+                    EditorGUILayout.HelpBox(
+                        "Companions redistribute the existing surviving population into bounded two- or three-mark clusters. They add no connectors, shared topology, or extra stroke budget, and each member still passes physical validation independently.",
+                        MessageType.None);
+                    EditorGUILayout.Slider(
+                        paintedAccentHorizontalCompanionStrength,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Horizontal Companion Strength",
+                            "Bounded share of surviving candidates arranged as independent two- or three-mark clusters. Zero preserves fully independent placement; one enables the strongest bounded participant budget."));
+                    EditorGUILayout.Slider(
+                        paintedAccentCompanionTightness,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Companion Tightness",
+                            "Endpoint spacing inside two- or three-mark clusters. Zero leaves broader gaps; one targets touching marks or an approximately one-to-two-pixel rendered break."));
+                    EditorGUILayout.Slider(
+                        paintedAccentCompanionTripletVerticality,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Triplet Verticality",
+                            "How strongly three-mark clusters depart from a straight run. One gives structured triplets a steep vertical member and rejects layouts that remain visually linear; flat triplets remain a rare exception."));
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField(
+                        "Glyph Family Mix",
+                        EditorStyles.miniBoldLabel);
+                    EditorGUILayout.Slider(
+                        paintedAccentCompleteMoundWeight,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Complete Mound Weight",
+                            "Relative weight for the complete two-sided mound family. Family weights are normalized internally."));
+                    EditorGUILayout.Slider(
+                        paintedAccentAsymmetricMoundWeight,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Asymmetric Mound Weight",
+                            "Relative weight for strongly unequal two-sided mound silhouettes. Family weights are normalized internally."));
+                    EditorGUILayout.Slider(
+                        paintedAccentSingleShoulderWeight,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Single Shoulder Weight",
+                            "Relative weight for open one-sided shoulder silhouettes. Family weights are normalized internally."));
+                    EditorGUILayout.Slider(
+                        paintedAccentShallowCrestWeight,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Shallow Crest Weight",
+                            "Relative weight for low predominantly lateral crest silhouettes. Family weights are normalized internally."));
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField(
+                        "Stroke Geometry",
+                        EditorStyles.miniBoldLabel);
                     EditorGUILayout.Slider(
                         paintedAccentStrokeLengthMin,
                         0.20f,
@@ -454,6 +598,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         new GUIContent(
                             "Angle Jitter Degrees",
                             "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
+                    EditorGUILayout.Slider(
+                        paintedAccentStrokePathWiggle,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Stroke Path Wiggle",
+                            "Smooth lateral curvature of the ground-surface stroke path. Zero keeps the baseline nearly straight; one permits the strongest non-looping organic bend. This does not alter Profile Irregularity or family height."));
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
                         "Projected Contour Profile",
@@ -756,6 +907,30 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentDistributionPatchiness");
             SerializedProperty distributionSparseFloor =
                 feature.FindPropertyRelative("paintedAccentDistributionSparseFloor");
+            SerializedProperty compositionRegionScale =
+                feature.FindPropertyRelative("paintedAccentCompositionRegionScale");
+            SerializedProperty compositionDensityContrast =
+                feature.FindPropertyRelative("paintedAccentCompositionDensityContrast");
+            SerializedProperty horizontalCompanionStrength =
+                feature.FindPropertyRelative("paintedAccentHorizontalCompanionStrength");
+            SerializedProperty companionTightness =
+                feature.FindPropertyRelative("paintedAccentCompanionTightness");
+            SerializedProperty companionTripletVerticality =
+                feature.FindPropertyRelative("paintedAccentCompanionTripletVerticality");
+            SerializedProperty companionTripletVerticalityInitialized =
+                feature.FindPropertyRelative("paintedAccentCompanionTripletVerticalityInitialized");
+            SerializedProperty horizontalCompanionsInitialized =
+                feature.FindPropertyRelative("paintedAccentHorizontalCompanionsInitialized");
+            SerializedProperty completeMoundWeight =
+                feature.FindPropertyRelative("paintedAccentCompleteMoundWeight");
+            SerializedProperty asymmetricMoundWeight =
+                feature.FindPropertyRelative("paintedAccentAsymmetricMoundWeight");
+            SerializedProperty singleShoulderWeight =
+                feature.FindPropertyRelative("paintedAccentSingleShoulderWeight");
+            SerializedProperty shallowCrestWeight =
+                feature.FindPropertyRelative("paintedAccentShallowCrestWeight");
+            SerializedProperty familyWeightsInitialized =
+                feature.FindPropertyRelative("paintedAccentGlyphFamilyWeightsInitialized");
             SerializedProperty strokeLengthMin =
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
             SerializedProperty strokeLengthMax =
@@ -764,6 +939,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeFacingDirectionDegrees");
             SerializedProperty strokeAngleJitterDegrees =
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
+            SerializedProperty strokePathWiggle =
+                feature.FindPropertyRelative("paintedAccentStrokePathWiggle");
+            SerializedProperty strokePathWiggleInitialized =
+                feature.FindPropertyRelative("paintedAccentStrokePathWiggleInitialized");
             SerializedProperty foldHeight =
                 feature.FindPropertyRelative("paintedAccentFoldHeight");
             SerializedProperty crestCrownHeight =
@@ -800,6 +979,66 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 distributionSparseFloor.floatValue = 0.18f;
             }
 
+            if (compositionRegionScale != null)
+            {
+                compositionRegionScale.floatValue = 4f;
+            }
+
+            if (compositionDensityContrast != null)
+            {
+                compositionDensityContrast.floatValue = 0.70f;
+            }
+
+            if (horizontalCompanionStrength != null)
+            {
+                horizontalCompanionStrength.floatValue = 0f;
+            }
+
+            if (companionTightness != null)
+            {
+                companionTightness.floatValue = 0.65f;
+            }
+
+            if (companionTripletVerticality != null)
+            {
+                companionTripletVerticality.floatValue = 1f;
+            }
+
+            if (companionTripletVerticalityInitialized != null)
+            {
+                companionTripletVerticalityInitialized.boolValue = true;
+            }
+
+            if (horizontalCompanionsInitialized != null)
+            {
+                horizontalCompanionsInitialized.boolValue = true;
+            }
+
+            if (completeMoundWeight != null)
+            {
+                completeMoundWeight.floatValue = 0.20f;
+            }
+
+            if (asymmetricMoundWeight != null)
+            {
+                asymmetricMoundWeight.floatValue = 0.30f;
+            }
+
+            if (singleShoulderWeight != null)
+            {
+                singleShoulderWeight.floatValue = 0.30f;
+            }
+
+            if (shallowCrestWeight != null)
+            {
+                shallowCrestWeight.floatValue = 0.20f;
+            }
+
+            if (familyWeightsInitialized != null)
+            {
+                familyWeightsInitialized.boolValue = true;
+            }
+
             if (strokeLengthMin != null)
             {
                 strokeLengthMin.floatValue = 0.55f;
@@ -818,6 +1057,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             if (strokeAngleJitterDegrees != null)
             {
                 strokeAngleJitterDegrees.floatValue = 18f;
+            }
+
+            if (strokePathWiggle != null)
+            {
+                strokePathWiggle.floatValue = 0.35f;
+            }
+
+            if (strokePathWiggleInitialized != null)
+            {
+                strokePathWiggleInitialized.boolValue = true;
             }
 
             if (foldHeight != null)

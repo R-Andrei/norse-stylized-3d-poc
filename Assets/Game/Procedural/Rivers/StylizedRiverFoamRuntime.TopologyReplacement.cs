@@ -14,7 +14,8 @@ namespace ProgrammaticStylized3D.Rivers
         {
             if (river == null || !river.Domain.IsValid ||
                 initializationPhase != InitializationPhase.Ready ||
-                resourcesDirty || fieldWidth < 2 || fieldHeight < 2)
+                resourcesDirty || activeTopologyRequiresExplicitPreparation ||
+                fieldWidth < 2 || fieldHeight < 2)
             {
                 return;
             }
@@ -23,118 +24,54 @@ namespace ProgrammaticStylized3D.Rivers
             int activeSignature = ResolveActiveTopologySignature();
             if (requestedSignature == activeSignature)
             {
-                automaticDevelopmentObservedSignature = requestedSignature;
-                if (topologyReplacementBuild != null &&
-                    !topologyReplacementBuild.IsIdenticalValidation &&
-                    topologyReplacementBuild.TargetSignature !=
-                        requestedSignature)
-                {
-                    CancelTopologyReplacementBuild(true);
-                }
-
-                // A development setting may be dragged away from the active
-                // value and then restored before its replacement completes.
-                // Once the superseded settings-only build and maintenance
-                // work are both gone, release automatic-generation ownership
-                // instead of leaving the runtime permanently marked busy.
-                if (automaticTopologyGenerationInProgress &&
-                    automaticDevelopmentRebuildReason ==
-                        AutomaticDevelopmentRebuildReason.Settings &&
-                    topologyReplacementBuild == null &&
-                    !HasQueuedRebuildWork)
-                {
-                    automaticTopologyGenerationInProgress = false;
-                    automaticDevelopmentRebuildReason =
-                        AutomaticDevelopmentRebuildReason.None;
-                    topologyCacheStartupState =
-                        topologyCacheLoadedForActiveResources
-                            ? "Loaded"
-                            : "Development Topology Current";
-                    topologyCacheStartupSummary =
-                        "The temporary setting change returned to the active " +
-                        "topology before a replacement completed. No cache " +
-                        "write or additional generation is required.";
-                }
                 return;
             }
 
-            if (IsAutomaticDevelopmentCacheEnabled &&
-                !explicitTopologyGenerationInProgress)
+            if (!topologyStartupValidationComplete)
             {
-                double now = Time.realtimeSinceStartupAsDouble;
-                if (automaticDevelopmentObservedSignature !=
-                    requestedSignature)
-                {
-                    automaticDevelopmentObservedSignature =
-                        requestedSignature;
-                    automaticDevelopmentRebuildNotBefore = now +
-                        AutomaticDevelopmentRebuildDebounceSeconds;
-                    if (topologyReplacementBuild != null &&
-                        !topologyReplacementBuild.IsIdenticalValidation &&
-                        topologyReplacementBuild.TargetSignature !=
-                            requestedSignature)
-                    {
-                        CancelTopologyReplacementBuild(true);
-                    }
-                }
-
-                if (!activeTopologyObstacleStale)
-                {
-                    topologyCacheStartupState =
-                        "Using Previous Cache — Rebuilding";
-                    topologyCacheStartupSummary =
-                        "Topology settings changed. The active topology remains " +
-                        "visible while the replacement request waits for the " +
-                        "development debounce and then regenerates automatically.";
-                }
-
-                if (now < automaticDevelopmentRebuildNotBefore ||
-                    HasQueuedRebuildWork)
-                {
-                    return;
-                }
-
-                automaticTopologyGenerationInProgress = true;
-                if (automaticDevelopmentRebuildReason !=
-                    AutomaticDevelopmentRebuildReason.Obstacles)
-                {
-                    automaticDevelopmentRebuildReason =
-                        AutomaticDevelopmentRebuildReason.Settings;
-                }
+                topologyStartupDirtyReasons |=
+                    TopologyStartupDirtyReason.TopologySettingsChanged;
             }
-            else if (!DevelopmentTopologyGenerationInProgress)
+            activeTopologyRequiresExplicitPreparation = true;
+            if (!activeTopologyObstacleStale)
             {
-                if (!activeTopologyObstacleStale)
-                {
-                    MarkActiveTopologyCacheStale(
-                        "Stale — Settings Changed",
-                        "Topology-generation settings changed after activation. " +
-                        "The active prepared topology is retained until explicit " +
-                        "development regeneration or a valid cache reload.");
-                }
-
-                CancelTopologyReplacementBuild(true);
-                return;
+                MarkActiveTopologyCacheStale(
+                    "Stale — Settings Changed",
+                    "Topology-generation settings changed after activation. " +
+                    "The active prepared topology remains visible; Play Mode " +
+                    "will not build a replacement or save an asset. Prepare " +
+                    "the cache explicitly in Edit Mode.");
             }
 
-            RequestTopologyReplacement(
-                automaticDevelopmentRebuildReason ==
-                    AutomaticDevelopmentRebuildReason.Obstacles
-                        ? TopologyReplacementReason.Obstacle
-                        : TopologyReplacementReason.Settings,
-                false);
+            CancelTopologyReplacementBuild(true);
         }
 
         private void RequestTopologyReplacement(
             TopologyReplacementReason reason,
             bool identicalValidation)
         {
+            if (!topologyStartupValidationComplete)
+            {
+                topologyStartupReplacementAttemptCount++;
+            }
             if (river == null || !river.Domain.IsValid ||
                 initializationPhase != InitializationPhase.Ready ||
                 resourcesDirty || domainVersion != river.Domain.Version ||
                 allocatedQuality != river.Quality ||
                 fieldWidth < 2 || fieldHeight < 2)
             {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                activeTopologyRequiresExplicitPreparation = true;
+                MarkActiveTopologyCacheStale(
+                    "Stale — Explicit Preparation Required",
+                    "A topology replacement was requested during Play Mode. " +
+                    "P1 blocks runtime topology generation; prepare the cache " +
+                    "explicitly in Edit Mode.");
+                CancelTopologyReplacementBuild(true);
                 return;
             }
 
@@ -423,8 +360,7 @@ namespace ProgrammaticStylized3D.Rivers
             activeTopologyObstacleStale = false;
             if (DevelopmentTopologyGenerationInProgress)
             {
-                CompleteDevelopmentTopologyGeneration(
-                    "an automatic in-session replacement");
+                CompleteDevelopmentTopologyGeneration();
             }
             return true;
         }
@@ -990,6 +926,24 @@ namespace ProgrammaticStylized3D.Rivers
 
                 case RebuildPhase.BuildObstacleExclusion:
                 {
+                    if (Application.isPlaying &&
+                        !editorTopologyPreparationInProgress)
+                    {
+                        activeTopologyObstacleStale = true;
+                        activeTopologyRequiresExplicitPreparation = true;
+                        MarkActiveTopologyCacheStale(
+                            "Stale — Obstacles Changed",
+                            "A queued obstacle rebuild reached Play Mode. P1 " +
+                            "blocked mesh scanning and GPU readback; prepare " +
+                            "the Foam topology cache explicitly in Edit Mode.");
+                        pendingObstacleRebuild = false;
+                        pendingTopologyReplacementAfterMaintenance = false;
+                        pendingObstacleObservedVersion = int.MinValue;
+                        pendingObstacleStableFrameCount = 0;
+                        rebuildPhase = RebuildPhase.RefreshTopologySources;
+                        break;
+                    }
+
                     bool prepareTopologyReplacement =
                         pendingTopologyReplacementAfterMaintenance;
                     using (RebuildBuildObstacleProfilerMarker.Auto())

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
@@ -69,6 +70,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float minimumProfileMinusFloor,
             int samplesBelowPositiveFloor,
             int dominantPeakViolations,
+            GroundPaintedAccentGlyphFamilyShapeMetrics shapeMetrics,
             float maximumSplineTangentDiscontinuity,
             float maximumSampledTurnDegrees)
         {
@@ -96,6 +98,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             MinimumProfileMinusFloor = minimumProfileMinusFloor;
             SamplesBelowPositiveFloor = samplesBelowPositiveFloor;
             DominantPeakViolations = dominantPeakViolations;
+            ShapeMetrics = shapeMetrics;
             MaximumSplineTangentDiscontinuity = maximumSplineTangentDiscontinuity;
             MaximumSampledTurnDegrees = maximumSampledTurnDegrees;
         }
@@ -125,6 +128,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float MinimumProfileMinusFloor { get; }
         public int SamplesBelowPositiveFloor { get; }
         public int DominantPeakViolations { get; }
+        public GroundPaintedAccentGlyphFamilyShapeMetrics ShapeMetrics { get; }
         public float MaximumSplineTangentDiscontinuity { get; }
         public float MaximumSampledTurnDegrees { get; }
 
@@ -186,6 +190,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         internal const float NonDominantPeakCeiling = 0.985f;
         internal const float PositiveFloorTolerance = 0.00001f;
         internal const float SmoothFloorTransitionFraction = 0.012f;
+        internal const float MinimumShallowShoulderWorldDisplacement = 0.0035f;
+        private const float MinimumSignificantInteriorValleyDepthFraction = 0.08f;
+        private const float MinimumSignificantInteriorValleyDepthWorld = 0.001f;
+        private const float MinimumFamilyTransitionSpanFraction = 0.18f;
 
         internal static bool TryBuild(
             GroundPaintedAccentSurfaceStroke stroke,
@@ -449,7 +457,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     finalSampleCount <= 1
                         ? 0f
                         : index / (float)(finalSampleCount - 1);
-                float normalizedHeight =
+                float baseNormalizedHeight =
                     EvaluateProfileSpline(
                         sourceProfile,
                         sourceTangents,
@@ -463,25 +471,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         leftGuideDerivative,
                         rightGuideDerivative);
                 float floor = guide * positiveFloorFraction;
-                if (normalizedHeight < floor - PositiveFloorTolerance)
-                {
-                    floorCorrectionSampleCount++;
-                }
+                float normalizedHeight;
 
-                if (index == 0 || index == finalSampleCount - 1)
+                if (stroke.Family ==
+                    GroundPaintedAccentGlyphFamily.CompleteMound)
                 {
-                    normalizedHeight = 0f;
+                    normalizedHeight = baseNormalizedHeight;
+                    if (normalizedHeight < floor - PositiveFloorTolerance)
+                    {
+                        floorCorrectionSampleCount++;
+                    }
+
+                    if (index == 0 || index == finalSampleCount - 1)
+                    {
+                        normalizedHeight = 0f;
+                    }
+                    else
+                    {
+                        normalizedHeight =
+                            ResolveSmoothMaximum(
+                                normalizedHeight,
+                                floor,
+                                moundPeakTarget *
+                                SmoothFloorTransitionFraction);
+                        normalizedHeight =
+                            Mathf.Clamp(normalizedHeight, 0f, 1.15f);
+                    }
                 }
                 else
                 {
+                    floor = 0f;
                     normalizedHeight =
-                        ResolveSmoothMaximum(
-                            normalizedHeight,
-                            floor,
-                            moundPeakTarget *
-                            SmoothFloorTransitionFraction);
-                    normalizedHeight =
-                        Mathf.Clamp(normalizedHeight, 0f, 1.15f);
+                        ResolveGlyphFamilyNormalizedHeight(
+                            stroke.Family,
+                            stroke.Seed,
+                            t,
+                            foldIrregularity,
+                            moundPeakTarget);
                 }
 
                 float finalFloorDifference = normalizedHeight - floor;
@@ -509,13 +535,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     out Vector3 centerlinePoint,
                     out Vector3 normal);
                 float crestHeight = strokeHeight * normalizedHeight;
-                float crownEndEnvelope =
-                    ResolvePaintedAccentCrownEndEnvelope(t, endEnvelope);
-                float crownHeight = crestCrownHeight * crownEndEnvelope;
+                float crownHeight =
+                    ResolveGlyphFamilyCrownHeight(
+                        stroke.Family,
+                        crestCrownHeight,
+                        t,
+                        endEnvelope,
+                        normalizedHeight,
+                        moundPeakTarget);
                 float combinedHeight = crestHeight + crownHeight;
 
-                if (normalizedHeight >
-                    moundPeakTarget + PositiveFloorTolerance &&
+                if (stroke.Family ==
+                        GroundPaintedAccentGlyphFamily.CompleteMound &&
+                    normalizedHeight >
+                        moundPeakTarget + PositiveFloorTolerance &&
                     Mathf.Abs(t - peakT) > sourceStep)
                 {
                     dominantPeakViolations++;
@@ -563,6 +596,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     rightAppliedAngle);
             float maximumSampledTurnDegrees =
                 ResolveMaximumSampledTurnDegrees(physicalProfilePoints);
+            GroundPaintedAccentGlyphFamilyShapeMetrics shapeMetrics =
+                ResolveFamilyShapeMetrics(stroke.Family, samples);
             profile =
                 new GroundPaintedAccentLongitudinalProfile(
                     samples,
@@ -589,9 +624,571 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     minimumProfileMinusFloor,
                     samplesBelowPositiveFloor,
                     dominantPeakViolations,
+                    shapeMetrics,
                     0f,
                     maximumSampledTurnDegrees);
             return profile.IsValid;
+        }
+
+        internal static bool ValidateFamilyProfile(
+            GroundPaintedAccentGlyphFamily family,
+            GroundPaintedAccentLongitudinalProfile profile)
+        {
+            if (!profile.IsValid || profile.Samples.Length < 5)
+            {
+                return false;
+            }
+
+            GroundPaintedAccentLongitudinalProfileSample[] samples =
+                profile.Samples;
+            float peak = 0f;
+            for (int index = 0; index < samples.Length; index++)
+            {
+                float height = samples[index].CombinedHeight;
+                if (height < -0.00001f ||
+                    float.IsNaN(height) ||
+                    float.IsInfinity(height))
+                {
+                    return false;
+                }
+
+                peak = Mathf.Max(peak, height);
+            }
+
+            if (peak <= 0.00001f)
+            {
+                // Zero Profile Height and zero Crown Height remain valid
+                // authored settings. In that deliberate flat case every family
+                // reduces to the accepted baseline stroke.
+                return true;
+            }
+
+            if (HasSignificantInteriorValley(samples, peak))
+            {
+                // No accepted family may form two edge-local peaks with a
+                // significant lower middle. This is the final-sample guard
+                // against the observed cat-ear silhouette.
+                return false;
+            }
+
+            GroundPaintedAccentGlyphFamilyShapeMetrics metrics =
+                profile.ShapeMetrics;
+            float left = samples[0].CombinedHeight;
+            float right = samples[samples.Length - 1].CombinedHeight;
+            switch (family)
+            {
+                case GroundPaintedAccentGlyphFamily.AsymmetricMound:
+                {
+                    bool crestInLeftBand =
+                        metrics.CrestPosition >= 0.18f &&
+                        metrics.CrestPosition <= 0.30f;
+                    bool crestInRightBand =
+                        metrics.CrestPosition >= 0.70f &&
+                        metrics.CrestPosition <= 0.82f;
+                    float leftDrop = (peak - left) / peak;
+                    float rightDrop = (peak - right) / peak;
+                    return (crestInLeftBand || crestInRightBand) &&
+                           metrics.LegSpanRatio >= 2.00f &&
+                           metrics.LegSlopeRatio >= 1.50f &&
+                           leftDrop >= 0.72f &&
+                           rightDrop >= 0.72f;
+                }
+                case GroundPaintedAccentGlyphFamily.SingleShoulder:
+                {
+                    bool highPeakOnLeft =
+                        left >= right && metrics.CrestPosition <= 0.12f;
+                    bool highPeakOnRight =
+                        right > left && metrics.CrestPosition >= 0.88f;
+                    if (!highPeakOnLeft && !highPeakOnRight)
+                    {
+                        return false;
+                    }
+
+                    if (metrics.UpperRunFraction < 0.30f ||
+                        metrics.UpperRunFraction > 0.55f ||
+                        metrics.UpperEndpointDropFraction > 0.20f ||
+                        metrics.DescendingDropFraction < 0.65f)
+                    {
+                        return false;
+                    }
+
+                    if (ResolvePrimaryTransitionSpanFraction(samples) <
+                        MinimumFamilyTransitionSpanFraction)
+                    {
+                        return false;
+                    }
+
+                    bool descendsLeftToRight = left >= right;
+                    float previous = descendsLeftToRight ? left : right;
+                    for (int step = 1; step < samples.Length; step++)
+                    {
+                        int index =
+                            descendsLeftToRight
+                                ? step
+                                : samples.Length - 1 - step;
+                        float height = samples[index].CombinedHeight;
+                        if (height > previous + peak * 0.010f)
+                        {
+                            return false;
+                        }
+
+                        previous = height;
+                    }
+
+                    return true;
+                }
+                case GroundPaintedAccentGlyphFamily.ShallowCrest:
+                {
+                    if (metrics.IsNearStraightVariant)
+                    {
+                        return metrics.VerticalRangeFraction <= 0.07f &&
+                               metrics.PlateauFraction >= 0.88f;
+                    }
+
+                    return metrics.VerticalRangeFraction >= 0.55f &&
+                           metrics.VerticalRangeFraction <= 0.82f &&
+                           metrics.EndpointDifferenceFraction >= 0.50f &&
+                           metrics.EndpointDifferenceWorld >=
+                               MinimumShallowShoulderWorldDisplacement &&
+                           metrics.PlateauFraction >= 0.60f &&
+                           ResolvePrimaryTransitionSpanFraction(samples) >=
+                               MinimumFamilyTransitionSpanFraction;
+                }
+                case GroundPaintedAccentGlyphFamily.CompleteMound:
+                default:
+                    // Complete Mound is the accepted A6/A7 baseline. Preserve
+                    // its existing acceptance contract rather than wrapping the
+                    // old family in a new perceptual-shape rejection gate.
+                    return true;
+            }
+        }
+
+        private static float ResolveGlyphFamilyNormalizedHeight(
+            GroundPaintedAccentGlyphFamily family,
+            int seed,
+            float t,
+            float irregularity,
+            float moundPeakTarget)
+        {
+            float clampedT = Mathf.Clamp01(t);
+            float irregularity01 = Mathf.Clamp01(irregularity);
+            switch (family)
+            {
+                case GroundPaintedAccentGlyphFamily.AsymmetricMound:
+                {
+                    bool mirror = ResolvePaintedAccentPreviewHash01(seed, 811u) < 0.5f;
+                    float peakT =
+                        Mathf.Lerp(
+                            0.19f,
+                            0.28f,
+                            ResolvePaintedAccentPreviewHash01(seed, 821u));
+                    if (mirror)
+                    {
+                        peakT = 1f - peakT;
+                    }
+
+                    float normalized;
+                    if (clampedT <= peakT)
+                    {
+                        float legT = clampedT / Mathf.Max(0.0001f, peakT);
+                        normalized = SmoothStep01(legT);
+                    }
+                    else
+                    {
+                        float legT =
+                            (clampedT - peakT) /
+                            Mathf.Max(0.0001f, 1f - peakT);
+                        // The long leg holds near the crest slightly longer and
+                        // then resolves gradually, reinforcing a clearly shallow
+                        // side rather than another centred arch.
+                        normalized = 1f - SmoothStep01(Mathf.Pow(legT, 1.18f));
+                    }
+
+                    float scale =
+                        Mathf.Lerp(
+                            0.72f,
+                            1.00f,
+                            ResolvePaintedAccentPreviewHash01(seed, 823u));
+                    float skew =
+                        (ResolvePaintedAccentPreviewHash01(seed, 827u) * 2f - 1f) *
+                        0.025f * irregularity01;
+                    return Mathf.Max(
+                               0f,
+                               normalized +
+                               skew * Mathf.Sin(clampedT * Mathf.PI)) *
+                           moundPeakTarget * scale;
+                }
+                case GroundPaintedAccentGlyphFamily.SingleShoulder:
+                {
+                    bool mirror = ResolvePaintedAccentPreviewHash01(seed, 829u) < 0.5f;
+                    float u = mirror ? 1f - clampedT : clampedT;
+                    float shoulderStart =
+                        Mathf.Lerp(
+                            0.32f,
+                            0.42f,
+                            ResolvePaintedAccentPreviewHash01(seed, 839u));
+                    float plateauDrop =
+                        Mathf.Lerp(
+                            0.010f,
+                            0.045f,
+                            ResolvePaintedAccentPreviewHash01(seed, 847u)) *
+                        Mathf.Lerp(0.35f, 1f, irregularity01);
+                    float normalized;
+                    if (u <= shoulderStart)
+                    {
+                        normalized =
+                            1f -
+                            plateauDrop *
+                            SmootherStep01(
+                                u / Mathf.Max(0.0001f, shoulderStart));
+                    }
+                    else
+                    {
+                        float descentT =
+                            (u - shoulderStart) /
+                            Mathf.Max(0.0001f, 1f - shoulderStart);
+                        float shoulderLevel = 1f - plateauDrop;
+                        normalized =
+                            shoulderLevel *
+                            (1f - SmootherStep01(descentT));
+                    }
+
+                    float scale =
+                        Mathf.Lerp(
+                            0.52f,
+                            0.85f,
+                            ResolvePaintedAccentPreviewHash01(seed, 853u));
+                    return Mathf.Clamp01(normalized) *
+                           moundPeakTarget * scale;
+                }
+                case GroundPaintedAccentGlyphFamily.ShallowCrest:
+                {
+                    bool nearStraight =
+                        ResolvePaintedAccentPreviewHash01(seed, 857u) < 0.04f;
+                    bool mirror =
+                        ResolvePaintedAccentPreviewHash01(seed, 859u) < 0.5f;
+                    float u = mirror ? 1f - clampedT : clampedT;
+                    if (nearStraight)
+                    {
+                        float totalDrop =
+                            Mathf.Lerp(
+                                0.010f,
+                                0.035f,
+                                ResolvePaintedAccentPreviewHash01(seed, 863u));
+                        float normalized =
+                            1f - totalDrop * SmootherStep01(u);
+                        float scale =
+                            Mathf.Lerp(
+                                0.24f,
+                                0.40f,
+                                ResolvePaintedAccentPreviewHash01(seed, 877u));
+                        return normalized * moundPeakTarget * scale;
+                    }
+
+                    float transitionEnd =
+                        Mathf.Lerp(
+                            0.34f,
+                            0.44f,
+                            ResolvePaintedAccentPreviewHash01(seed, 881u));
+                    float lowLevel =
+                        Mathf.Lerp(
+                            0.20f,
+                            0.38f,
+                            ResolvePaintedAccentPreviewHash01(seed, 883u));
+                    float rise =
+                        SmootherStep01(
+                            Mathf.Clamp01(
+                                u / Mathf.Max(0.0001f, transitionEnd)));
+                    float normalizedShoulder = Mathf.Lerp(lowLevel, 1f, rise);
+                    float plateauT =
+                        Mathf.InverseLerp(transitionEnd, 1f, u);
+                    float plateauDrop =
+                        Mathf.Lerp(
+                            0.00f,
+                            0.025f,
+                            ResolvePaintedAccentPreviewHash01(seed, 887u)) *
+                        irregularity01;
+                    normalizedShoulder *=
+                        1f - plateauDrop * SmootherStep01(plateauT);
+                    float shoulderScale =
+                        Mathf.Lerp(
+                            0.42f,
+                            0.58f,
+                            ResolvePaintedAccentPreviewHash01(seed, 907u));
+                    return Mathf.Clamp01(normalizedShoulder) *
+                           moundPeakTarget * shoulderScale;
+                }
+                case GroundPaintedAccentGlyphFamily.CompleteMound:
+                default:
+                    return 0f;
+            }
+        }
+
+        private static float SmoothStep01(float value)
+        {
+            float clamped = Mathf.Clamp01(value);
+            return clamped * clamped * (3f - 2f * clamped);
+        }
+
+        private static float SmootherStep01(float value)
+        {
+            float clamped = Mathf.Clamp01(value);
+            return
+                clamped * clamped * clamped *
+                (clamped * (clamped * 6f - 15f) + 10f);
+        }
+
+        private static float ResolveGlyphFamilyCrownHeight(
+            GroundPaintedAccentGlyphFamily family,
+            float crestCrownHeight,
+            float t,
+            float endEnvelope,
+            float normalizedHeight,
+            float moundPeakTarget)
+        {
+            if (family == GroundPaintedAccentGlyphFamily.CompleteMound)
+            {
+                return
+                    crestCrownHeight *
+                    ResolvePaintedAccentCrownEndEnvelope(t, endEnvelope);
+            }
+
+            float multiplier;
+            switch (family)
+            {
+                case GroundPaintedAccentGlyphFamily.AsymmetricMound:
+                    multiplier = 0.75f;
+                    break;
+                case GroundPaintedAccentGlyphFamily.SingleShoulder:
+                    multiplier = 0.18f;
+                    break;
+                case GroundPaintedAccentGlyphFamily.ShallowCrest:
+                    multiplier = 0.08f;
+                    break;
+                default:
+                    multiplier = 0f;
+                    break;
+            }
+
+            float shape =
+                Mathf.Clamp01(
+                    normalizedHeight /
+                    Mathf.Max(0.0001f, moundPeakTarget));
+            return crestCrownHeight * multiplier * shape;
+        }
+
+        private static GroundPaintedAccentGlyphFamilyShapeMetrics
+            ResolveFamilyShapeMetrics(
+                GroundPaintedAccentGlyphFamily family,
+                GroundPaintedAccentLongitudinalProfileSample[] samples)
+        {
+            if (samples == null || samples.Length < 2)
+            {
+                return default;
+            }
+
+            float peak = 0f;
+            float minimum = float.PositiveInfinity;
+            int peakIndex = 0;
+            for (int index = 0; index < samples.Length; index++)
+            {
+                float height = samples[index].CombinedHeight;
+                minimum = Mathf.Min(minimum, height);
+                if (height > peak)
+                {
+                    peak = height;
+                    peakIndex = index;
+                }
+            }
+
+            if (peak <= 0.00001f)
+            {
+                return default;
+            }
+
+            int lastIndex = samples.Length - 1;
+            float crestPosition = peakIndex / (float)lastIndex;
+            float left = samples[0].CombinedHeight;
+            float right = samples[lastIndex].CombinedHeight;
+            float leftSpan = Mathf.Max(0.0001f, crestPosition);
+            float rightSpan = Mathf.Max(0.0001f, 1f - crestPosition);
+            float shortSpan = Mathf.Min(leftSpan, rightSpan);
+            float longSpan = Mathf.Max(leftSpan, rightSpan);
+            float leftSlope =
+                Mathf.Max(0f, peak - left) / leftSpan;
+            float rightSlope =
+                Mathf.Max(0f, peak - right) / rightSpan;
+            float shallowSlope = Mathf.Max(0.0001f, Mathf.Min(leftSlope, rightSlope));
+            float steepSlope = Mathf.Max(leftSlope, rightSlope);
+
+            bool descendsLeftToRight = left >= right;
+            float highEnd = descendsLeftToRight ? left : right;
+            float lowEnd = descendsLeftToRight ? right : left;
+            float upperBandFloor = highEnd - peak * 0.15f;
+            int upperRunSteps = 0;
+            for (int step = 0; step < samples.Length; step++)
+            {
+                int index =
+                    descendsLeftToRight
+                        ? step
+                        : lastIndex - step;
+                if (samples[index].CombinedHeight < upperBandFloor)
+                {
+                    break;
+                }
+
+                upperRunSteps = step;
+            }
+
+            int plateauCount = 0;
+            for (int index = 0; index < samples.Length; index++)
+            {
+                if (samples[index].CombinedHeight >= peak * 0.90f)
+                {
+                    plateauCount++;
+                }
+            }
+
+            float verticalRangeFraction =
+                Mathf.Clamp01((peak - minimum) / peak);
+            bool nearStraight =
+                family == GroundPaintedAccentGlyphFamily.ShallowCrest &&
+                verticalRangeFraction <= 0.07f;
+            return new GroundPaintedAccentGlyphFamilyShapeMetrics(
+                crestPosition,
+                longSpan / Mathf.Max(0.0001f, shortSpan),
+                steepSlope / shallowSlope,
+                upperRunSteps / (float)lastIndex,
+                Mathf.Clamp01((peak - highEnd) / peak),
+                Mathf.Clamp01((highEnd - lowEnd) / peak),
+                plateauCount / (float)samples.Length,
+                verticalRangeFraction,
+                Mathf.Clamp01(Mathf.Abs(left - right) / peak),
+                Mathf.Abs(left - right),
+                nearStraight);
+        }
+
+        private static bool HasSignificantInteriorValley(
+            IReadOnlyList<GroundPaintedAccentLongitudinalProfileSample> samples,
+            float peak)
+        {
+            if (samples == null || samples.Count < 7 || peak <= 0.00001f)
+            {
+                return false;
+            }
+
+            int count = samples.Count;
+            int separation = Mathf.Max(2, Mathf.RoundToInt(count * 0.055f));
+            float minimumDepth =
+                Mathf.Max(
+                    MinimumSignificantInteriorValleyDepthWorld,
+                    peak * MinimumSignificantInteriorValleyDepthFraction);
+            float[] prefixMaximum = new float[count];
+            float[] suffixMaximum = new float[count];
+            float runningMaximum = float.NegativeInfinity;
+            for (int index = 0; index < count; index++)
+            {
+                runningMaximum =
+                    Mathf.Max(
+                        runningMaximum,
+                        samples[index].CombinedHeight);
+                prefixMaximum[index] = runningMaximum;
+            }
+
+            runningMaximum = float.NegativeInfinity;
+            for (int index = count - 1; index >= 0; index--)
+            {
+                runningMaximum =
+                    Mathf.Max(
+                        runningMaximum,
+                        samples[index].CombinedHeight);
+                suffixMaximum[index] = runningMaximum;
+            }
+
+            for (int index = separation;
+                 index < count - separation;
+                 index++)
+            {
+                float valley = samples[index].CombinedHeight;
+                float leftPeak = prefixMaximum[index - separation];
+                float rightPeak = suffixMaximum[index + separation];
+                if (leftPeak - valley >= minimumDepth &&
+                    rightPeak - valley >= minimumDepth)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static float ResolvePrimaryTransitionSpanFraction(
+            IReadOnlyList<GroundPaintedAccentLongitudinalProfileSample> samples)
+        {
+            if (samples == null || samples.Count < 3)
+            {
+                return 0f;
+            }
+
+            float minimum = float.PositiveInfinity;
+            float maximum = float.NegativeInfinity;
+            for (int index = 0; index < samples.Count; index++)
+            {
+                float height = samples[index].CombinedHeight;
+                minimum = Mathf.Min(minimum, height);
+                maximum = Mathf.Max(maximum, height);
+            }
+
+            float range = maximum - minimum;
+            if (range <= 0.00001f)
+            {
+                return 1f;
+            }
+
+            float lowThreshold = minimum + range * 0.05f;
+            float highThreshold = minimum + range * 0.95f;
+            int firstLowOrHigh = -1;
+            int lastOpposite = -1;
+            bool risesLeftToRight =
+                samples[samples.Count - 1].CombinedHeight >
+                samples[0].CombinedHeight;
+
+            for (int index = 0; index < samples.Count; index++)
+            {
+                float height = samples[index].CombinedHeight;
+                bool reached =
+                    risesLeftToRight
+                        ? height >= lowThreshold
+                        : height <= highThreshold;
+                if (reached)
+                {
+                    firstLowOrHigh = index;
+                    break;
+                }
+            }
+
+            for (int index = samples.Count - 1; index >= 0; index--)
+            {
+                float height = samples[index].CombinedHeight;
+                bool reached =
+                    risesLeftToRight
+                        ? height <= highThreshold
+                        : height >= lowThreshold;
+                if (reached)
+                {
+                    lastOpposite = index;
+                    break;
+                }
+            }
+
+            if (firstLowOrHigh < 0 || lastOpposite < 0)
+            {
+                return 0f;
+            }
+
+            return
+                Mathf.Abs(lastOpposite - firstLowOrHigh) /
+                Mathf.Max(1f, samples.Count - 1f);
         }
 
         private static int ResolvePeakIndex(float[] values)

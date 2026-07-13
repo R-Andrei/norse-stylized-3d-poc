@@ -78,35 +78,66 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamEdgeContrastId,
                 river != null ? river.FoamEdgeContrast : 0f);
             propertyBlock.SetFloat(
-                FoamChipStrengthId,
-                river != null ? river.FoamChipStrength : 0f);
-            propertyBlock.SetFloat(
                 FoamFrayStrengthId,
                 river != null ? river.FoamFrayStrength : 0f);
             propertyBlock.SetFloat(
                 FoamBreakupScaleId,
                 river != null ? river.FoamBreakupScale : 0.5f);
             propertyBlock.SetFloat(
+                FoamChipActivationId,
+                river != null ? river.FoamChipActivation : 0f);
+            propertyBlock.SetFloat(
+                FoamChipCandidateSpacingId,
+                river != null ? river.FoamChipCandidateSpacing : 1.15f);
+            propertyBlock.SetFloat(
+                FoamChipDistributionIrregularityId,
+                river != null
+                    ? river.FoamChipDistributionIrregularity
+                    : 1f);
+            propertyBlock.SetFloat(
+                FoamChipRadiusRatioId,
+                river != null
+                    ? river.FoamChipRadiusRatio
+                    : 0.275f / 1.15f);
+            propertyBlock.SetFloat(
+                FoamChipSizeIrregularityId,
+                river != null ? river.FoamChipSizeIrregularity : 1f);
+            propertyBlock.SetFloat(
+                FoamChipShapeIrregularityId,
+                river != null ? river.FoamChipShapeIrregularity : 1f);
+            propertyBlock.SetFloat(
+                FoamChipSelectionDepthId,
+                river != null ? river.FoamChipSelectionDepth : 0.42f);
+            propertyBlock.SetFloat(
+                FoamChipFieldSpeedId,
+                river != null ? river.FoamChipFieldSpeed : 0f);
+            propertyBlock.SetFloat(
+                FoamChipEvolutionRateId,
+                river != null ? river.FoamChipEvolutionRate : 0.20f);
+            propertyBlock.SetFloat(
+                FoamChipEvolutionAmountId,
+                river != null ? river.FoamChipEvolutionAmount : 0f);
+            propertyBlock.SetFloat(
+                FoamFraySelectionDepthId,
+                river != null ? river.FoamFraySelectionDepth : 0.68f);
+            propertyBlock.SetFloat(
+                FoamFrayWavelengthId,
+                river != null ? river.FoamFrayWavelength : 0.12f);
+            propertyBlock.SetFloat(
+                FoamFrayDepthId,
+                river != null ? river.FoamFrayDepth : 0f);
+            propertyBlock.SetFloat(
                 FoamStrandStrengthId,
                 river != null ? river.FoamStrandStrength : 0f);
             propertyBlock.SetFloat(
-                FoamStrandSpacingId,
-                river != null ? river.FoamStrandSpacing : 0.55f);
+                FoamStrandScaleId,
+                river != null ? river.FoamStrandScale : 0.55f);
             propertyBlock.SetFloat(
-                FoamStrandWidthId,
-                river != null ? river.FoamStrandWidth : 0.5f);
+                FoamStrandDensityId,
+                river != null ? river.FoamStrandDensity : 0.5f);
             propertyBlock.SetFloat(
-                FoamStrandCurvatureId,
-                river != null ? river.FoamStrandCurvature : 0.55f);
-            propertyBlock.SetFloat(
-                FoamFragmentationStrengthId,
-                river != null ? river.FoamFragmentationStrength : 0f);
-            propertyBlock.SetFloat(
-                FoamFragmentSizeId,
-                river != null ? river.FoamFragmentSize : 0.5f);
-            propertyBlock.SetFloat(
-                FoamFragmentReachId,
-                river != null ? river.FoamFragmentReach : 0.5f);
+                FoamStrandReachId,
+                river != null ? river.FoamStrandReach : 0.55f);
             propertyBlock.SetFloat(
                 FoamSharpnessId,
                 MaterialContourSharpness);
@@ -193,35 +224,62 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamEdgeContrastId,
                 river.FoamEdgeContrast);
             propertyBlock.SetFloat(
-                FoamChipStrengthId,
-                river.FoamChipStrength);
-            propertyBlock.SetFloat(
                 FoamFrayStrengthId,
                 river.FoamFrayStrength);
             propertyBlock.SetFloat(
                 FoamBreakupScaleId,
                 river.FoamBreakupScale);
             propertyBlock.SetFloat(
+                FoamChipActivationId,
+                river.FoamChipActivation);
+            propertyBlock.SetFloat(
+                FoamChipCandidateSpacingId,
+                river.FoamChipCandidateSpacing);
+            propertyBlock.SetFloat(
+                FoamChipDistributionIrregularityId,
+                river.FoamChipDistributionIrregularity);
+            propertyBlock.SetFloat(
+                FoamChipRadiusRatioId,
+                river.FoamChipRadiusRatio);
+            propertyBlock.SetFloat(
+                FoamChipSizeIrregularityId,
+                river.FoamChipSizeIrregularity);
+            propertyBlock.SetFloat(
+                FoamChipShapeIrregularityId,
+                river.FoamChipShapeIrregularity);
+            propertyBlock.SetFloat(
+                FoamChipSelectionDepthId,
+                river.FoamChipSelectionDepth);
+            propertyBlock.SetFloat(
+                FoamChipFieldSpeedId,
+                river.FoamChipFieldSpeed);
+            propertyBlock.SetFloat(
+                FoamChipEvolutionRateId,
+                river.FoamChipEvolutionRate);
+            propertyBlock.SetFloat(
+                FoamChipEvolutionAmountId,
+                river.FoamChipEvolutionAmount);
+            propertyBlock.SetFloat(
+                FoamFraySelectionDepthId,
+                river.FoamFraySelectionDepth);
+            propertyBlock.SetFloat(
+                FoamFrayWavelengthId,
+                river.FoamFrayWavelength);
+            propertyBlock.SetFloat(
+                FoamFrayDepthId,
+                river.FoamFrayDepth);
+            propertyBlock.SetFloat(
                 FoamStrandStrengthId,
                 river.FoamStrandStrength);
             propertyBlock.SetFloat(
-                FoamStrandSpacingId,
-                river.FoamStrandSpacing);
+                FoamStrandScaleId,
+                river.FoamStrandScale);
             propertyBlock.SetFloat(
-                FoamStrandWidthId,
-                river.FoamStrandWidth);
+                FoamStrandDensityId,
+                river.FoamStrandDensity);
             propertyBlock.SetFloat(
-                FoamStrandCurvatureId,
-                river.FoamStrandCurvature);
-            propertyBlock.SetFloat(
-                FoamFragmentationStrengthId,
-                river.FoamFragmentationStrength);
-            propertyBlock.SetFloat(
-                FoamFragmentSizeId,
-                river.FoamFragmentSize);
-            propertyBlock.SetFloat(
-                FoamFragmentReachId,
-                river.FoamFragmentReach);
+                FoamStrandReachId,
+                river.FoamStrandReach);
             propertyBlock.SetFloat(
                 FoamSharpnessId,
                 MaterialContourSharpness);
@@ -278,16 +336,25 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetColor(FoamColourId, Color.clear);
             propertyBlock.SetFloat(FoamInteriorOpacityFloorId, 0f);
             propertyBlock.SetFloat(FoamEdgeContrastId, 0f);
-            propertyBlock.SetFloat(FoamChipStrengthId, 0f);
             propertyBlock.SetFloat(FoamFrayStrengthId, 0f);
             propertyBlock.SetFloat(FoamBreakupScaleId, 0.5f);
+            propertyBlock.SetFloat(FoamChipActivationId, 0f);
+            propertyBlock.SetFloat(FoamChipCandidateSpacingId, 1.15f);
+            propertyBlock.SetFloat(FoamChipDistributionIrregularityId, 1f);
+            propertyBlock.SetFloat(FoamChipRadiusRatioId, 0.275f / 1.15f);
+            propertyBlock.SetFloat(FoamChipSizeIrregularityId, 1f);
+            propertyBlock.SetFloat(FoamChipShapeIrregularityId, 1f);
+            propertyBlock.SetFloat(FoamChipSelectionDepthId, 0.42f);
+            propertyBlock.SetFloat(FoamChipFieldSpeedId, 0f);
+            propertyBlock.SetFloat(FoamChipEvolutionRateId, 0.20f);
+            propertyBlock.SetFloat(FoamChipEvolutionAmountId, 0f);
+            propertyBlock.SetFloat(FoamFraySelectionDepthId, 0.68f);
+            propertyBlock.SetFloat(FoamFrayWavelengthId, 0.12f);
+            propertyBlock.SetFloat(FoamFrayDepthId, 0f);
             propertyBlock.SetFloat(FoamStrandStrengthId, 0f);
-            propertyBlock.SetFloat(FoamStrandSpacingId, 0.55f);
-            propertyBlock.SetFloat(FoamStrandWidthId, 0.5f);
-            propertyBlock.SetFloat(FoamStrandCurvatureId, 0.55f);
-            propertyBlock.SetFloat(FoamFragmentationStrengthId, 0f);
-            propertyBlock.SetFloat(FoamFragmentSizeId, 0.5f);
-            propertyBlock.SetFloat(FoamFragmentReachId, 0.5f);
+            propertyBlock.SetFloat(FoamStrandScaleId, 0.55f);
+            propertyBlock.SetFloat(FoamStrandDensityId, 0.5f);
+            propertyBlock.SetFloat(FoamStrandReachId, 0.55f);
             propertyBlock.SetFloat(FoamSharpnessId, 1f);
             propertyBlock.SetFloat(FoamFinalVisibilityModeId, 0f);
             propertyBlock.SetFloat(FoamDebugViewId, 0f);

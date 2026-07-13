@@ -1182,15 +1182,68 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                       $"{runtime.TopologyStartupSlowestStepMilliseconds:0.000} ms"
                     : unavailable);
             DrawReadOnlyRow(
+                new GUIContent("Cache Outcome / Reasons"),
+                runtime != null
+                    ? $"{runtime.TopologyCacheStartupOutcomeName} / " +
+                      runtime.TopologyCacheStartupReasonNames
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("Startup Phase Totals"),
+                runtime != null
+                    ? runtime.TopologyStartupPhaseSummary
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("Registry Events"),
+                runtime != null
+                    ? $"add {runtime.TopologyStartupSourceAddedCount:N0} / " +
+                      $"remove {runtime.TopologyStartupSourceRemovedCount:N0} / " +
+                      $"change {runtime.TopologyStartupSourceChangedCount:N0} / " +
+                      $"distinct {runtime.TopologyStartupDistinctSourceCount:N0}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("Startup Restarts / Dirty Cycles"),
+                runtime != null
+                    ? $"{runtime.TopologyStartupRestartCount:N0} / " +
+                      $"{runtime.TopologyStartupDirtyCycleCount:N0}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("Startup Dirty Reasons"),
+                runtime != null
+                    ? runtime.TopologyStartupDirtyReasonNames
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("Cache / Replacement Attempts"),
+                runtime != null
+                    ? $"build {runtime.TopologyStartupCacheBuildAttemptCount:N0} / " +
+                      $"replace {runtime.TopologyStartupReplacementAttemptCount:N0}"
+                    : unavailable);
+            DrawReadOnlyRow(
                 new GUIContent("Cache Hits / Misses"),
                 runtime != null
                     ? $"{runtime.TopologyCacheStartupHitCount:N0} / " +
                       $"{runtime.TopologyCacheStartupMissCount:N0}"
                     : unavailable);
             DrawReadOnlyRow(
-                new GUIContent("Automatic Cache Persistence"),
+                new GUIContent("Play Cache Persistence"),
                 runtime != null
-                    ? runtime.AutomaticTopologyCachePersistenceState
+                    ? $"{runtime.AutomaticTopologyCachePersistenceState} / " +
+                      $"startup attempts " +
+                      $"{runtime.TopologyStartupCacheWriteAttemptCount:N0} / " +
+                      $"saved {runtime.TopologyStartupCacheWriteSuccessCount:N0}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("Explicit Cache Build Work"),
+                runtime != null
+                    ? $"GPU publications " +
+                      $"{runtime.TopologyCachePreparationGeneratedUploadCount:N0} / " +
+                      $"serializations " +
+                      $"{runtime.TopologyCacheLastBuildSerializationCount:N0}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("Exhaustive Cache Proof"),
+                runtime != null
+                    ? $"{runtime.TopologyCacheRoundTripState} / " +
+                      runtime.TopologyCacheRoundTripSummary
                     : unavailable);
             DrawReadOnlyRow(
                 new GUIContent("Major Evolution"),
@@ -1204,6 +1257,100 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 runtime != null
                     ? $"{runtime.ConnectorEvolutionActiveCount} active / " +
                       $"{runtime.ConnectorEvolutionTemporaryAbsenceCount} absent"
+                    : unavailable);
+
+            double workSeconds = runtime != null
+                ? runtime.SteadyStateWorkElapsedSeconds
+                : 0.0;
+            double inverseWorkSeconds = workSeconds > 0.0001
+                ? 1.0 / workSeconds
+                : 0.0;
+            double averageSubsteps = runtime != null &&
+                runtime.SteadyStateWorkMaterialStepCount > 0
+                    ? runtime.SteadyStateWorkTransportSubstepCount /
+                      (double)runtime.SteadyStateWorkMaterialStepCount
+                    : 0.0;
+            double emptyStepPercent = runtime != null &&
+                runtime.SteadyStateWorkMaterialStepCount > 0
+                    ? runtime.SteadyStateWorkEmptyMaterialStepCount * 100.0 /
+                      runtime.SteadyStateWorkMaterialStepCount
+                    : 0.0;
+            double topologyCpuMilliseconds = runtime != null
+                ? runtime.SteadyStateWorkTopologyCpuMilliseconds +
+                  runtime.SteadyStateWorkTopologyEvolutionCpuMilliseconds
+                : 0.0;
+
+            DrawReadOnlyRow(
+                new GUIContent("P4 Work Window"),
+                runtime != null
+                    ? $"{(runtime.SteadyStateWorkAccountingActive ? "Active" : "Inactive")} / " +
+                      $"{workSeconds:0.000}s / " +
+                      $"{runtime.SteadyStateWorkFrameCount:N0} frames"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("P4 Dispatch / Cell Rate"),
+                runtime != null
+                    ? $"{runtime.SteadyStateWorkTotalDispatchCount * inverseWorkSeconds:0.00}/s / " +
+                      $"{runtime.SteadyStateWorkTotalCellIterations * inverseWorkSeconds:0.00}/s"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("P4 Material Work"),
+                runtime != null
+                    ? $"{runtime.SteadyStateWorkMaterialStepCount * inverseWorkSeconds:0.00} steps/s / " +
+                      $"substeps avg {averageSubsteps:0.00}, max " +
+                      $"{runtime.SteadyStateWorkMaximumTransportSubsteps} / " +
+                      $"CFL/substep max {runtime.SteadyStateWorkMaximumTransportCfl:0.000} / " +
+                      $"CPU submit {runtime.SteadyStateWorkMaterialCpuMilliseconds:0.000} ms"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("P4 Material Dispatch / Cells"),
+                runtime != null
+                    ? $"{runtime.SteadyStateWorkMaterialDispatchCount:N0} / " +
+                      $"{runtime.SteadyStateWorkMaterialCellIterations:N0}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("P4 Topology Work"),
+                runtime != null
+                    ? $"maintenance {runtime.SteadyStateWorkTopologyMaintenanceCount:N0} / " +
+                      $"refresh {runtime.SteadyStateWorkTopologyRefreshCount:N0} / " +
+                      $"evolution checks {runtime.SteadyStateWorkTopologyEvolutionCount:N0} / " +
+                      $"dispatch {runtime.SteadyStateWorkTopologyDispatchCount:N0} / " +
+                      $"cells {runtime.SteadyStateWorkTopologyCellIterations:N0} / " +
+                      $"CPU submit {topologyCpuMilliseconds:0.000} ms"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("P4 Shape Debug Work"),
+                runtime != null
+                    ? $"eval {runtime.SteadyStateWorkShapeEvaluationCount:N0} / " +
+                      $"dispatch {runtime.SteadyStateWorkShapeDispatchCount:N0} / " +
+                      $"cells {runtime.SteadyStateWorkShapeCellIterations:N0} / " +
+                      $"CPU submit {runtime.SteadyStateWorkShapeCpuMilliseconds:0.000} ms"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("P4 Dirty Checks"),
+                runtime != null
+                    ? $"{runtime.SteadyStateWorkTopologyDirtyEvaluationCount:N0} / " +
+                      $"positive {runtime.SteadyStateWorkTopologyDirtyPositiveCount:N0}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("P4 Metric Readbacks"),
+                runtime != null
+                    ? $"topology {runtime.SteadyStateWorkTopologyMetricRequestCount:N0}/" +
+                      $"{runtime.SteadyStateWorkTopologyMetricCompletionCount:N0}, " +
+                      $"transport {runtime.SteadyStateWorkTransportMetricRequestCount:N0}/" +
+                      $"{runtime.SteadyStateWorkTransportMetricCompletionCount:N0}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("P4 Empty Material Steps"),
+                runtime != null
+                    ? $"{runtime.SteadyStateWorkEmptyMaterialStepCount:N0} / " +
+                      $"{emptyStepPercent:0.0}% latest-metric qualified"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("P4 Visibility Frames"),
+                runtime != null
+                    ? $"visible {runtime.SteadyStateWorkVisibleFrameCount:N0} / " +
+                      $"offscreen {runtime.SteadyStateWorkOffscreenFrameCount:N0}"
                     : unavailable);
         }
 

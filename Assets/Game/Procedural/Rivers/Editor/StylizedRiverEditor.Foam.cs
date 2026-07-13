@@ -114,7 +114,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamTopologyCacheAsset"),
                     new GUIContent(
                         "Topology Cache Asset",
-                        "Persistent topology payload associated with this river. In development, missing or stale cache data is generated and persisted automatically; release builds remain cache-only."));
+                        "Persistent prepared topology associated with this river. Exact caches load directly; stale-compatible caches remain session-local, while missing or incompatible caches require explicit Edit Mode preparation."));
             }
 
             if (targets.Length == 1 &&
@@ -123,8 +123,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 EditorGUILayout.HelpBox(
                     Application.isPlaying
-                        ? "No persistent topology cache was available for this Play session. Development generation may continue session-only."
-                        : "No topology cache is assigned. Normal Play entry from a saved scene can create and assign the deterministic cache.",
+                        ? "No usable topology cache was available. Foam topology remains disabled for this session; leave Play Mode and prepare a cache explicitly."
+                        : "No topology cache is assigned. Create one, then use Prepare / Rebuild Foam Topology Cache before entering Play Mode.",
                     MessageType.Info);
             }
 
@@ -306,6 +306,114 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private void DrawFoamLayerD()
         {
+            EditorGUILayout.LabelField(
+                "Production Chipping",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "These controls now drive the production Chip cut before the accepted Strand result. Candidate selection is gated by transported Material Pattern; use Chip Material Gate and Production Chip Mask to inspect the exact handoff.",
+                MessageType.Info);
+            EditorGUILayout.PropertyField(
+                Find("foamChipActivation"),
+                new GUIContent(
+                    "Chip Activation",
+                    "Fraction of analytical candidates retained for production Chipping. Zero disables Chipping; one retains every available candidate before edge and material gating."));
+            EditorGUILayout.PropertyField(
+                Find("foamChipCandidateSpacing"),
+                new GUIContent(
+                    "Candidate Spacing (m)",
+                    "Average world-space spacing between possible Chip centres. Absolute mean radius is derived as Spacing × Candidate Radius Ratio; spacing does not control placement jitter or silhouette shape."));
+            EditorGUILayout.PropertyField(
+                Find("foamChipDistributionIrregularity"),
+                new GUIContent(
+                    "Distribution Irregularity",
+                    "How far candidate centres deviate from the regular lattice. Zero is evenly spaced; one uses maximum deterministic jitter without changing candidate size or shape."));
+            SerializedProperty chipSpacing = Find("foamChipCandidateSpacing");
+            SerializedProperty chipRadiusRatio = Find("foamChipRadiusRatio");
+            SerializedProperty chipSizeIrregularity = Find(
+                "foamChipSizeIrregularity");
+            EditorGUILayout.PropertyField(
+                chipRadiusRatio,
+                new GUIContent(
+                    "Candidate Radius Ratio",
+                    "Mean candidate radius as a fraction of Candidate Spacing. Absolute radius is Spacing × Ratio; the bounded ratio preserves the fixed low-cost 3×3 candidate search."));
+            EditorGUILayout.PropertyField(
+                chipSizeIrregularity,
+                new GUIContent(
+                    "Size Irregularity",
+                    "Candidate-to-candidate radius variation around the authored mean. Zero gives identical sizes; one spans approximately 0.58× to 1.42× the mean radius."));
+
+            bool mixedRadiusInputs =
+                chipSpacing.hasMultipleDifferentValues ||
+                chipRadiusRatio.hasMultipleDifferentValues ||
+                chipSizeIrregularity.hasMultipleDifferentValues;
+            if (mixedRadiusInputs)
+            {
+                DrawReadOnlyRow(
+                    new GUIContent("Effective Mean Radius"),
+                    "Mixed");
+                DrawReadOnlyRow(
+                    new GUIContent("Effective Radius Range"),
+                    "Mixed");
+            }
+            else
+            {
+                float meanRadius = Mathf.Max(0f, chipSpacing.floatValue) *
+                    Mathf.Max(0f, chipRadiusRatio.floatValue);
+                float irregularity = Mathf.Clamp01(
+                    chipSizeIrregularity.floatValue);
+                float minimumMultiplier = Mathf.Lerp(
+                    1f,
+                    0.58f,
+                    irregularity);
+                float maximumMultiplier = Mathf.Lerp(
+                    1f,
+                    1.42f,
+                    irregularity);
+                DrawReadOnlyRow(
+                    new GUIContent("Effective Mean Radius"),
+                    $"{meanRadius:0.###} m");
+                DrawReadOnlyRow(
+                    new GUIContent("Effective Radius Range"),
+                    $"{meanRadius * minimumMultiplier:0.###}–" +
+                    $"{meanRadius * maximumMultiplier:0.###} m");
+            }
+            EditorGUILayout.PropertyField(
+                Find("foamChipShapeIrregularity"),
+                new GUIContent(
+                    "Shape Irregularity",
+                    "Individual silhouette distortion at a fixed outer radius. Zero produces a circle; one warps a single connected contour into a strongly asymmetric blob."));
+            EditorGUILayout.PropertyField(
+                Find("foamChipSelectionDepth"),
+                new GUIContent(
+                    "Chip Selection Depth",
+                    "Maximum normalized material-edge depth where production Chip candidates may remove Foam. Lower values confine cuts to a narrow perimeter; higher values extend farther inward and may include an entire thin ribbon."));
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Lightweight Evolution",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "Render-only evolution advects the analytical candidate field through a large animated coordinate warp, then grows, shrinks, morphs, and turns candidates over independently. The warp moves candidate centres, while local contour distance is reconstructed in the unwarped River metric to prevent ribbon stretching. It is a visual approximation, not exact material ownership, and adds no texture or compute pass.",
+                MessageType.Info);
+            EditorGUILayout.PropertyField(
+                Find("foamChipFieldSpeed"),
+                new GUIContent(
+                    "Chip Field Speed (m/s)",
+                    "Downstream translation speed of the complete candidate field. Zero keeps candidate centres fixed in River space. Tune this visually against persistent Foam transport."));
+            EditorGUILayout.PropertyField(
+                Find("foamChipEvolutionRate"),
+                new GUIContent(
+                    "Chip Evolution Rate",
+                    "General evolution cycles per second for the animated coordinate warp, geometric lifecycle, and contour morphing. Zero freezes those phases without stopping Chip Field Speed."));
+            EditorGUILayout.PropertyField(
+                Find("foamChipEvolutionAmount"),
+                new GUIContent(
+                    "Chip Evolution Amount",
+                    "Combined authority of multi-spacing downstream/lateral advection, visible geometric growth and shrinkage, contour morphing, and smooth asynchronous turnover. Zero disables those effects."));
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Temporal Shape",
+                EditorStyles.miniBoldLabel);
             EditorGUILayout.PropertyField(
                 Find("foamVisualOccupancyBuildTime"),
                 new GUIContent(
@@ -346,23 +454,26 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
-                "Edge Breakup — Chips & Fray",
+                "Fray Selection Prototype",
                 EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "These controls drive Fray diagnostics only. Final Foam still uses the hidden legacy Fray implementation until the separately approved final-edge Fray patch.",
+                MessageType.Info);
             EditorGUILayout.PropertyField(
-                Find("foamChipStrength"),
+                Find("foamFraySelectionDepth"),
                 new GUIContent(
-                    "Chip Strength",
-                    "Strength of medium render-only edge bites. Zero preserves the accepted pre-5.17B silhouette; this never changes stored Foam material or Layer D shape."));
+                    "Fray Selection Depth",
+                    "Maximum normalized material-edge depth where Fray may occur. Lower values confine the permitted band to a narrow perimeter; higher values extend it farther into Foam and may include an entire thin ribbon."));
             EditorGUILayout.PropertyField(
-                Find("foamFrayStrength"),
+                Find("foamFrayWavelength"),
                 new GUIContent(
-                    "Fray Strength",
-                    "Strength of fine render-only shredding confined to weak Foam fringe coverage. Zero preserves the accepted pre-5.17B silhouette."));
+                    "Wavelength (m)",
+                    "World-space wavelength of the fine Fray selection pattern."));
             EditorGUILayout.PropertyField(
-                Find("foamBreakupScale"),
+                Find("foamFrayDepth"),
                 new GUIContent(
-                    "Breakup Scale",
-                    "Chooses between finer, more frequent and broader, less frequent Chip/Fray features in river/material space. It does not affect Foam Strands and has no authority while Chip and Fray Strength are both zero."));
+                    "Depth",
+                    "Reserved normalized threshold displacement. In this diagnostic patch it scales only the pattern preview and does not change Final Foam."));
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
@@ -372,42 +483,26 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamStrandStrength"),
                 new GUIContent(
                     "Strand Strength",
-                    "Independent render-only strength for edge-connected strand channels. Zero disables the feature without changing Chip, Fray, stored material, or Layer D shape."));
+                    "Controls the extracted Chip-plus-Fray lineification family. Zero gives the coherent Foam body; shaping and projected-detail filtering are owned by the controls below."));
             EditorGUILayout.PropertyField(
-                Find("foamStrandSpacing"),
+                Find("foamStrandScale"),
                 new GUIContent(
-                    "Strand Spacing",
-                    "Zero permits closer strand groups; one produces broader separation. Unresolved dense combs are suppressed automatically in screen space."));
+                    "Strand Scale",
+                    "Controls the independent Strand-only size hierarchy. Zero retains finer subdivisions; one keeps broader, simpler structures. Production Chip and the separate Fray prototype do not alter it."));
             EditorGUILayout.PropertyField(
-                Find("foamStrandWidth"),
+                Find("foamStrandDensity"),
                 new GUIContent(
-                    "Strand Width",
-                    "Controls antialiased channel width inside a safe range. Unresolvable subpixel widths are widened or suppressed rather than allowed to shimmer."));
+                    "Strand Density",
+                    "Controls how much of the candidate Strand field survives. Zero gives sparse selected groups; one gives denser groups without changing cut depth."));
             EditorGUILayout.PropertyField(
-                Find("foamStrandCurvature"),
+                Find("foamStrandReach"),
                 new GUIContent(
-                    "Strand Curvature",
-                    "Zero is mostly flow-aligned; one adds stronger stable broad bends. The curvature is anchored in river/material space and does not time-scroll."));
+                    "Strand Reach",
+                    "Controls how deeply selected Strand regions penetrate weak-to-medium Foam. Zero stays shallow near weak edges; one permits deeper channels without changing candidate density."));
+            EditorGUILayout.HelpBox(
+                "D1D replaces the misleading geometric controls with truthful Scale, Density, and Reach controls. Strand patterns are transported with their owning soft shape, and unresolved fine/medium detail falls back hierarchically before broad lineification returns to coherent Foam.",
+                MessageType.None);
 
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField(
-                "Edge Fragmentation",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(
-                Find("foamFragmentationStrength"),
-                new GUIContent(
-                    "Fragmentation Strength",
-                    "Strength of medium-to-large render-only losses inside weak and transitional Foam edge bands. Zero is exactly neutral and never changes stored material or Layer D shape."));
-            EditorGUILayout.PropertyField(
-                Find("foamFragmentSize"),
-                new GUIContent(
-                    "Fragment Size",
-                    "Zero subdivides the same broad fragmentation zones into smaller coherent sections; one preserves broader connected missing regions without reseeding their large-scale placement."));
-            EditorGUILayout.PropertyField(
-                Find("foamFragmentReach"),
-                new GUIContent(
-                    "Fragment Reach",
-                    "Controls how deeply selected regions may cut inward from partial-presence Foam. Zero stays shallow; one reaches substantially farther while protecting the fully established core."));
         }
 
         private void DrawNormalizedPatternWeight(

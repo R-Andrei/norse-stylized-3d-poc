@@ -164,6 +164,8 @@ namespace ProgrammaticStylized3D.Rivers
         private int topologyCacheBuildPayloadBytes;
         private string topologyCacheBuildPayloadHash = "—";
         private double topologyCacheBuildMilliseconds;
+        private int topologyCacheLastBuildSerializationCount;
+        private int topologyCachePreparationGeneratedUploadCount;
         private string topologyCacheValidationState = "Not Evaluated";
         private string topologyCacheValidationSummary =
             "Assigned cache has not been checked against current stable inputs.";
@@ -175,11 +177,10 @@ namespace ProgrammaticStylized3D.Rivers
         private string topologyCacheCombinedFingerprint = "—";
         private int topologyCacheObstacleSourceCount;
 
-        // Patch 4.9C changes ordinary startup from generation-first to
-        // cache-first. Patch 4.9C.1 keeps the strict production miss policy,
-        // while Editor and Development builds automatically generate a missing
-        // or stale topology and the Editor coordinator persists the completed,
-        // round-trip-validated payload.
+        // P1 makes ordinary startup cache-only. Exact and stale-compatible
+        // payloads may install for the session, while missing or incompatible
+        // payloads stop in a stable preparation-required state. Topology
+        // generation and cache persistence are explicit Edit Mode work.
         private string topologyCacheStartupState = "Not Evaluated";
         private string topologyCacheStartupSummary =
             "Ordinary startup has not evaluated the assigned cache.";
@@ -192,24 +193,20 @@ namespace ProgrammaticStylized3D.Rivers
         private bool topologyCacheLoadedForActiveResources;
         private bool obstacleExclusionUsesCachedScalar;
         private bool activeTopologyObstacleStale;
-        private bool explicitTopologyGenerationRequested;
         private bool explicitTopologyGenerationInProgress;
-        private bool automaticTopologyGenerationInProgress;
-        private double automaticDevelopmentRebuildNotBefore;
-        private int automaticDevelopmentObservedSignature = int.MinValue;
-        private AutomaticDevelopmentRebuildReason
-            automaticDevelopmentRebuildReason;
-        private bool pendingAutomaticDevelopmentRebuildAfterStartup;
         private bool pendingStartupCacheStaleObstacles;
         private bool pendingStartupCacheStaleSettings;
         private bool automaticTopologyCacheWritePending;
-        private string automaticTopologyCachePersistenceState = "Idle";
+        private bool editorTopologyPreparationInProgress;
+        private bool activeTopologyRequiresExplicitPreparation;
+        private bool generatedSourceNotificationBurstPending;
+        private TopologyCacheStartupOutcome topologyCacheStartupOutcome;
+        private TopologyCacheStartupReason topologyCacheStartupReasons;
+        private string automaticTopologyCachePersistenceState = "Disabled";
         private string automaticTopologyCachePersistenceSummary =
-            "No automatic development cache write is pending.";
+            "Play Mode cache persistence is disabled. Prepare the cache explicitly in Edit Mode.";
         private int automaticTopologyCacheWriteCount;
         private int automaticTopologyCacheWriteSuccessCount;
-        private string topologyCacheSessionPersistentInputKey = string.Empty;
-        private bool topologyCacheSessionPersistentInputCaptured;
         private StylizedRiverFoamTopologyCachePackage
             pendingStartupCachePackage;
 
@@ -229,6 +226,23 @@ namespace ProgrammaticStylized3D.Rivers
         private int topologyStartupValidationMajorBuildCount;
         private int topologyStartupValidationConnectorBuildCount;
         private int topologyStartupValidationPocketBuildCount;
+        private int[] topologyStartupPhaseCallCounts =
+            Array.Empty<int>();
+        private double[] topologyStartupPhaseAccumulatedMilliseconds =
+            Array.Empty<double>();
+        private int topologyStartupSourceAddedCount;
+        private int topologyStartupSourceRemovedCount;
+        private int topologyStartupSourceChangedCount;
+        private int topologyStartupDirtyCycleCount;
+        private int topologyStartupRestartCount;
+        private int topologyStartupCacheBuildAttemptCount;
+        private int topologyStartupReplacementAttemptCount;
+        private int topologyStartupCacheWriteAttemptCount;
+        private int topologyStartupCacheWriteSuccessCount;
+        private TopologyStartupDirtyReason topologyStartupDirtyReasons;
+        private readonly HashSet<IGeneratedGeometrySource>
+            topologyStartupDistinctGeneratedSources = new();
+        private bool topologyStartupSummaryLogged;
 
         private readonly List<PendingInjection> pendingInjections = new();
         private readonly List<PendingInjection> pendingMaterialBirths = new();
@@ -491,6 +505,51 @@ namespace ProgrammaticStylized3D.Rivers
         private long lastUpdateCellIterations;
         private long recentPeakCellIterations;
         private double recentPeakWindowEnd;
+
+        // P4 records steady-state River Foam work without changing scheduling.
+        // The accounting window is reset explicitly or when Play startup begins;
+        // it never gates simulation, topology evolution, or diagnostics.
+        private bool steadyStateWorkAccountingActive;
+        private int steadyStateWorkAccountingGeneration;
+        private int steadyStateWorkTopologyMetricGeneration;
+        private int steadyStateWorkTransportMetricGeneration;
+        private double steadyStateWorkAccountingStartedAt;
+        private long steadyStateWorkFrameCount;
+        private long steadyStateWorkVisibleFrameCount;
+        private long steadyStateWorkOffscreenFrameCount;
+        private long steadyStateWorkHeldFrameCount;
+        private long steadyStateWorkMaterialFrameCount;
+        private long steadyStateWorkTotalDispatchCount;
+        private long steadyStateWorkTotalCellIterations;
+        private long steadyStateWorkMaterialStepCount;
+        private long steadyStateWorkTransportSubstepCount;
+        private int steadyStateWorkMaximumTransportSubsteps;
+        private float steadyStateWorkMaximumTransportCfl;
+        private long steadyStateWorkMaterialDispatchCount;
+        private long steadyStateWorkMaterialCellIterations;
+        private double steadyStateWorkMaterialCpuMilliseconds;
+        private long steadyStateWorkEmptyMaterialStepCount;
+        private long steadyStateWorkTopologyDirtyEvaluationCount;
+        private long steadyStateWorkTopologyDirtyPositiveCount;
+        private long steadyStateWorkTopologyMaintenanceCount;
+        private long steadyStateWorkTopologyEvolutionCount;
+        private double steadyStateWorkTopologyEvolutionCpuMilliseconds;
+        private long steadyStateWorkTopologyRefreshCount;
+        private long steadyStateWorkTopologyDispatchCount;
+        private long steadyStateWorkTopologyCellIterations;
+        private double steadyStateWorkTopologyCpuMilliseconds;
+        private long steadyStateWorkShapeEvaluationCount;
+        private long steadyStateWorkShapeDispatchCount;
+        private long steadyStateWorkShapeCellIterations;
+        private double steadyStateWorkShapeCpuMilliseconds;
+        private long steadyStateWorkTopologyMetricRequestCount;
+        private long steadyStateWorkTopologyMetricCompletionCount;
+        private long steadyStateWorkTopologyMetricErrorCount;
+        private long steadyStateWorkTopologyMetricTimeoutCount;
+        private long steadyStateWorkTransportMetricRequestCount;
+        private long steadyStateWorkTransportMetricCompletionCount;
+        private long steadyStateWorkTransportMetricErrorCount;
+
         private int injectedLastUpdate;
         private float lastInjectionBoundaryCoverage = -1f;
         private bool lastInjectionStateSynchronized;

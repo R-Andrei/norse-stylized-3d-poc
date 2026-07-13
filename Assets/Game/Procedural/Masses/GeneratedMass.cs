@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.Serialization;
+using Unity.Profiling;
 using ProgrammaticStylized3D.Geometry;
 
 namespace ProgrammaticStylized3D.Geometry.Masses
@@ -28,7 +29,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         XXL,
         Monumental
     }
-    
+
 
     public enum FormComplexity
     {
@@ -360,6 +361,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private const int StandardFeatureAtlasResolution = 256;
         private const int DetailedFeatureAtlasResolution = 256;
         private const int HeroFeatureAtlasResolution = 512;
+        private const int ProductionGenerationContractVersion = 1;
+        private const int FeatureAtlasGenerationContractVersion = 1;
+        private const string GeneratedMeshNamePrefix = "GeneratedMass_";
+        private const string PlaneCutPreviewMeshNameSuffix =
+            "_PlaneCutBevelPreview";
+        private const string BoundedEdgePreviewMeshNameSuffix =
+            "_BoundedEdgeBevelPreview";
+
+        private enum PreviewGenerationMode
+        {
+            Production,
+            PlaneCut,
+            BoundedSingleEdge
+        }
+        private static readonly ProfilerMarker SynchronizeProfilerMarker =
+            new ProfilerMarker("GeneratedMass.Synchronize");
+        private static readonly ProfilerMarker GenerateProductionProfilerMarker =
+            new ProfilerMarker("GeneratedMass.GenerateProduction");
+        private static readonly ProfilerMarker BindColliderProfilerMarker =
+            new ProfilerMarker("GeneratedMass.BindCollider");
+        private static readonly ProfilerMarker ComputeFingerprintProfilerMarker =
+            new ProfilerMarker("GeneratedMass.ComputeFingerprint");
+        private static readonly ProfilerMarker NotifyConsumersProfilerMarker =
+            new ProfilerMarker("GeneratedMass.NotifyConsumers");
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
         private static readonly int LegacyBaseColorId =
@@ -494,6 +519,122 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float CreaseLength;
             public float CreaseBranching;
             public float CreaseSoftness;
+        }
+
+        [Serializable]
+        private struct ProductionGenerationState
+        {
+            public int ContractVersion;
+            public MassArchetype Archetype;
+            public int ShapeSeed;
+            public int SurfaceSeed;
+            public MassScaleStep Size;
+            public FormComplexity FormComplexity;
+            public SurfaceFacetDensity SurfaceFacetDensity;
+            public EdgeCharacter EdgeCharacter;
+            public ShapeDiversity ShapeDiversity;
+            public GroundingStyle Grounding;
+            public LeanStyle Lean;
+            public float FineScale;
+            public float WidthBias;
+            public float HeightBias;
+            public float DepthBias;
+            public float SurfaceVariation;
+
+            public bool Matches(ProductionGenerationState other)
+            {
+                return ContractVersion == other.ContractVersion &&
+                       Archetype == other.Archetype &&
+                       ShapeSeed == other.ShapeSeed &&
+                       SurfaceSeed == other.SurfaceSeed &&
+                       Size == other.Size &&
+                       FormComplexity == other.FormComplexity &&
+                       SurfaceFacetDensity == other.SurfaceFacetDensity &&
+                       EdgeCharacter == other.EdgeCharacter &&
+                       ShapeDiversity == other.ShapeDiversity &&
+                       Grounding == other.Grounding &&
+                       Lean == other.Lean &&
+                       FineScale == other.FineScale &&
+                       WidthBias == other.WidthBias &&
+                       HeightBias == other.HeightBias &&
+                       DepthBias == other.DepthBias &&
+                       SurfaceVariation == other.SurfaceVariation;
+            }
+        }
+
+        [Serializable]
+        private struct FeatureAtlasGenerationState
+        {
+            public int ContractVersion;
+            public ProductionGenerationState ProductionState;
+            public GeneratedMassFeatureAtlasRequest Request;
+            public int Resolution;
+            public float EdgeWearAmount;
+            public float EdgeWearWidth;
+            public float EdgeWearCoverage;
+            public float EdgeWearSoftness;
+            public float CreaseAmount;
+            public float CreaseWidth;
+            public float CreaseLength;
+            public float CreaseBranching;
+
+            public bool Matches(FeatureAtlasGenerationState other)
+            {
+                return ContractVersion == other.ContractVersion &&
+                       ProductionState.Matches(other.ProductionState) &&
+                       Request == other.Request &&
+                       Resolution == other.Resolution &&
+                       EdgeWearAmount == other.EdgeWearAmount &&
+                       EdgeWearWidth == other.EdgeWearWidth &&
+                       EdgeWearCoverage == other.EdgeWearCoverage &&
+                       EdgeWearSoftness == other.EdgeWearSoftness &&
+                       CreaseAmount == other.CreaseAmount &&
+                       CreaseWidth == other.CreaseWidth &&
+                       CreaseLength == other.CreaseLength &&
+                       CreaseBranching == other.CreaseBranching;
+            }
+        }
+
+        [Serializable]
+        private struct RiverInteractionState
+        {
+            public GeneratedRiverInteractionParticipation Participation;
+            public GeneratedRiverFeatureMode PressureMode;
+            public float PressureStrength;
+            public float PressureContactSharpness;
+            public float PressureProfileVariation;
+            public float PressureProfileChangeIntervalMin;
+            public float PressureProfileChangeIntervalMax;
+            public GeneratedRiverFeatureMode WakeMode;
+            public float WakeStrength;
+            public float WakeReach;
+            public float WakeSpread;
+            public float WakeVariation;
+            public GeneratedRiverRippleCollisionMode ImpactRippleCollisionMode;
+            public float FootprintPadding;
+
+            public bool Matches(RiverInteractionState other)
+            {
+                return Participation == other.Participation &&
+                       PressureMode == other.PressureMode &&
+                       PressureStrength == other.PressureStrength &&
+                       PressureContactSharpness ==
+                           other.PressureContactSharpness &&
+                       PressureProfileVariation ==
+                           other.PressureProfileVariation &&
+                       PressureProfileChangeIntervalMin ==
+                           other.PressureProfileChangeIntervalMin &&
+                       PressureProfileChangeIntervalMax ==
+                           other.PressureProfileChangeIntervalMax &&
+                       WakeMode == other.WakeMode &&
+                       WakeStrength == other.WakeStrength &&
+                       WakeReach == other.WakeReach &&
+                       WakeSpread == other.WakeSpread &&
+                       WakeVariation == other.WakeVariation &&
+                       ImpactRippleCollisionMode ==
+                           other.ImpactRippleCollisionMode &&
+                       FootprintPadding == other.FootprintPadding;
+            }
         }
 
         [SerializeField]
@@ -638,8 +779,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float edgeWearAmount = 1f;
 
-        [Tooltip("Convex edge-wear bevel/chamfer width. Higher values cut deeper generated worn-edge faces.")]
-        [Range(0.25f, 2f)]
+        [Tooltip("Authoritative convex edge-wear bevel/chamfer width for both production candidates and the plane-cut preview. Values below 0.25 unlock a thinner preview range; existing values from 0.25 to 2 keep their previous physical mapping.")]
+        [Range(0.05f, 2f)]
         [SerializeField]
         private float edgeWearWidth = 1f;
 
@@ -735,6 +876,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private GeneratedMassFeatureRecipe lastAppliedFeatureRecipe =
             GeneratedMassFeatureRecipe.GenericTestMass;
 
+        [SerializeField, HideInInspector]
+        private bool acceptedProductionStateValid;
+
+        [SerializeField, HideInInspector]
+        private ProductionGenerationState acceptedProductionState;
+
+        [SerializeField, HideInInspector]
+        private bool acceptedFeatureAtlasStateValid;
+
+        [SerializeField, HideInInspector]
+        private FeatureAtlasGenerationState acceptedFeatureAtlasState;
+
+        [SerializeField, HideInInspector]
+        private bool acceptedRiverInteractionStateValid;
+
+        [SerializeField, HideInInspector]
+        private RiverInteractionState acceptedRiverInteractionState;
+
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
         private MeshCollider meshCollider;
@@ -747,6 +906,51 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             stableWorldGeometryFingerprint;
         private Mesh stableWorldGeometryFingerprintMesh;
         private Matrix4x4 stableWorldGeometryFingerprintMatrix;
+        private bool regenerationInProgress;
+#if UNITY_EDITOR
+        [NonSerialized]
+        private bool planeCutBevelPreviewEnabled;
+        [NonSerialized]
+        private bool planeCutBevelPreviewStale;
+        [NonSerialized]
+        private bool planeCutBevelPreviewApplied;
+        [NonSerialized]
+        private int planeCutBevelPreviewActiveEdges;
+        [NonSerialized]
+        private int planeCutBevelPreviewBuiltEdges;
+        [NonSerialized]
+        private int planeCutBevelPreviewDeferredEdges;
+        [NonSerialized]
+        private int planeCutBevelPreviewRejectedEdges;
+        [NonSerialized]
+        private string planeCutBevelPreviewDiagnostic;
+        [NonSerialized]
+        private bool boundedEdgePreviewEnabled;
+        [NonSerialized]
+        private bool boundedEdgePreviewStale;
+        [NonSerialized]
+        private bool boundedEdgePreviewApplied;
+        [NonSerialized]
+        private int boundedEdgePreviewOrdinal;
+        [NonSerialized]
+        private int boundedEdgePreviewCandidateCount;
+        [NonSerialized]
+        private int boundedEdgePreviewSourceEdgeIndex = -1;
+        [NonSerialized]
+        private int boundedEdgePreviewBevelFaceCount;
+        [NonSerialized]
+        private int boundedEdgePreviewEndpointCapCount;
+        [NonSerialized]
+        private int boundedEdgePreviewModifiedSourceFaceCount;
+        [NonSerialized]
+        private int boundedEdgePreviewForeignSourceFaceModifiedCount;
+        [NonSerialized]
+        private float boundedEdgePreviewRailDeviation;
+        [NonSerialized]
+        private float boundedEdgePreviewMaximumExtentBeyondRails;
+        [NonSerialized]
+        private string boundedEdgePreviewDiagnostic;
+#endif
 
         public event Action GeometryChanged;
 
@@ -790,6 +994,206 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public float CreaseLength => creaseLength;
         public float CreaseBranching => creaseBranching;
         public float CreaseSoftness => creaseSoftness;
+#if UNITY_EDITOR
+        public bool PlaneCutBevelPreviewEnabled =>
+            planeCutBevelPreviewEnabled;
+        public bool PlaneCutBevelPreviewStale =>
+            planeCutBevelPreviewStale;
+        public bool PlaneCutBevelPreviewApplied =>
+            planeCutBevelPreviewApplied;
+        public int PlaneCutBevelPreviewActiveEdges =>
+            planeCutBevelPreviewActiveEdges;
+        public int PlaneCutBevelPreviewBuiltEdges =>
+            planeCutBevelPreviewBuiltEdges;
+        public int PlaneCutBevelPreviewDeferredEdges =>
+            planeCutBevelPreviewDeferredEdges;
+        public int PlaneCutBevelPreviewRejectedEdges =>
+            planeCutBevelPreviewRejectedEdges;
+        public string PlaneCutBevelPreviewDiagnostic =>
+            planeCutBevelPreviewDiagnostic ?? string.Empty;
+        public bool BoundedEdgePreviewEnabled =>
+            boundedEdgePreviewEnabled;
+        public bool BoundedEdgePreviewStale =>
+            boundedEdgePreviewStale;
+        public bool BoundedEdgePreviewApplied =>
+            boundedEdgePreviewApplied;
+        public int BoundedEdgePreviewOrdinal =>
+            boundedEdgePreviewOrdinal;
+        public int BoundedEdgePreviewCandidateCount =>
+            boundedEdgePreviewCandidateCount;
+        public int BoundedEdgePreviewSourceEdgeIndex =>
+            boundedEdgePreviewSourceEdgeIndex;
+        public int BoundedEdgePreviewBevelFaceCount =>
+            boundedEdgePreviewBevelFaceCount;
+        public int BoundedEdgePreviewEndpointCapCount =>
+            boundedEdgePreviewEndpointCapCount;
+        public int BoundedEdgePreviewModifiedSourceFaceCount =>
+            boundedEdgePreviewModifiedSourceFaceCount;
+        public int BoundedEdgePreviewForeignSourceFaceModifiedCount =>
+            boundedEdgePreviewForeignSourceFaceModifiedCount;
+        public float BoundedEdgePreviewRailDeviation =>
+            boundedEdgePreviewRailDeviation;
+        public float BoundedEdgePreviewMaximumExtentBeyondRails =>
+            boundedEdgePreviewMaximumExtentBeyondRails;
+        public string BoundedEdgePreviewDiagnostic =>
+            boundedEdgePreviewDiagnostic ?? string.Empty;
+
+        public void EvaluatePlaneCutBevelPreview()
+        {
+            if (Application.isPlaying || regenerationInProgress)
+            {
+                return;
+            }
+
+            regenerationInProgress = true;
+            boundedEdgePreviewEnabled = false;
+            boundedEdgePreviewStale = false;
+            ClearBoundedEdgePreviewStatus();
+            planeCutBevelPreviewEnabled = true;
+            planeCutBevelPreviewStale = false;
+            ClearPlaneCutBevelPreviewStatus();
+            try
+            {
+                RegenerateInternal(PreviewGenerationMode.PlaneCut);
+            }
+            catch
+            {
+                planeCutBevelPreviewStale = true;
+                throw;
+            }
+            finally
+            {
+                regenerationInProgress = false;
+            }
+        }
+
+        public void RefreshPlaneCutBevelPreview()
+        {
+            EvaluatePlaneCutBevelPreview();
+        }
+
+        public void EvaluateBoundedEdgePreview()
+        {
+            EvaluateBoundedEdgePreviewAtOrdinal(
+                boundedEdgePreviewOrdinal);
+        }
+
+        public void PreviousBoundedEdgePreview()
+        {
+            int count = Mathf.Max(1, boundedEdgePreviewCandidateCount);
+            int next = boundedEdgePreviewOrdinal - 1;
+            if (next < 0)
+            {
+                next = count - 1;
+            }
+            EvaluateBoundedEdgePreviewAtOrdinal(next);
+        }
+
+        public void NextBoundedEdgePreview()
+        {
+            int count = Mathf.Max(1, boundedEdgePreviewCandidateCount);
+            int next = (boundedEdgePreviewOrdinal + 1) % count;
+            EvaluateBoundedEdgePreviewAtOrdinal(next);
+        }
+
+        private void EvaluateBoundedEdgePreviewAtOrdinal(int ordinal)
+        {
+            if (Application.isPlaying || regenerationInProgress)
+            {
+                return;
+            }
+
+            regenerationInProgress = true;
+            planeCutBevelPreviewEnabled = false;
+            planeCutBevelPreviewStale = false;
+            ClearPlaneCutBevelPreviewStatus();
+            boundedEdgePreviewEnabled = true;
+            boundedEdgePreviewStale = false;
+            boundedEdgePreviewOrdinal = Mathf.Max(0, ordinal);
+            ClearBoundedEdgePreviewStatus(preserveOrdinal: true);
+            try
+            {
+                RegenerateInternal(
+                    PreviewGenerationMode.BoundedSingleEdge);
+            }
+            catch
+            {
+                boundedEdgePreviewStale = true;
+                throw;
+            }
+            finally
+            {
+                regenerationInProgress = false;
+            }
+        }
+
+        public void RunLegacyEdgeWearDiagnosticAudit()
+        {
+            if (Application.isPlaying || regenerationInProgress)
+            {
+                return;
+            }
+
+            regenerationInProgress = true;
+            try
+            {
+                EnsureRecipeState();
+                MassGenerator.RunLegacyEdgeWearDiagnosticAudit(
+                    recipe,
+                    CreateSurfaceFeatureSettings());
+            }
+            finally
+            {
+                regenerationInProgress = false;
+            }
+        }
+
+        public void ShowProductionGeometry()
+        {
+            if (regenerationInProgress)
+            {
+                return;
+            }
+
+            planeCutBevelPreviewEnabled = false;
+            planeCutBevelPreviewStale = false;
+            ClearPlaneCutBevelPreviewStatus();
+            boundedEdgePreviewEnabled = false;
+            boundedEdgePreviewStale = false;
+            ClearBoundedEdgePreviewStatus();
+            Regenerate();
+        }
+
+        private void ClearPlaneCutBevelPreviewStatus()
+        {
+            planeCutBevelPreviewApplied = false;
+            planeCutBevelPreviewActiveEdges = 0;
+            planeCutBevelPreviewBuiltEdges = 0;
+            planeCutBevelPreviewDeferredEdges = 0;
+            planeCutBevelPreviewRejectedEdges = 0;
+            planeCutBevelPreviewDiagnostic = string.Empty;
+        }
+
+        private void ClearBoundedEdgePreviewStatus(
+            bool preserveOrdinal = false)
+        {
+            boundedEdgePreviewApplied = false;
+            if (!preserveOrdinal)
+            {
+                boundedEdgePreviewOrdinal = 0;
+            }
+            boundedEdgePreviewCandidateCount = 0;
+            boundedEdgePreviewSourceEdgeIndex = -1;
+            boundedEdgePreviewBevelFaceCount = 0;
+            boundedEdgePreviewEndpointCapCount = 0;
+            boundedEdgePreviewModifiedSourceFaceCount = 0;
+            boundedEdgePreviewForeignSourceFaceModifiedCount = 0;
+            boundedEdgePreviewRailDeviation = 0f;
+            boundedEdgePreviewMaximumExtentBeyondRails = 0f;
+            boundedEdgePreviewDiagnostic = string.Empty;
+        }
+#endif
+
         public MeshFilter GeometryMeshFilter
         {
             get
@@ -830,7 +1234,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             EnsureRecipeState();
             CacheComponents();
-            Regenerate();
+            SynchronizeGeneratedState(
+                forceRegeneration: false,
+                allowAutomaticRegeneration: true);
             GeneratedGeometryRegistry.Register(this);
         }
 
@@ -844,17 +1250,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EnsureRecipeState();
             RemoveLegacyRiverFoamProxy();
             RemoveLegacySurfaceFeatureObjects();
-
-            if (!regenerateOnValidate)
+#if UNITY_EDITOR
+            if (!regenerationInProgress)
             {
-                CacheComponents();
-                ApplyMaterialProperties();
-                GeneratedGeometryRegistry.NotifyChanged(this);
-                return;
+                if (planeCutBevelPreviewEnabled)
+                {
+                    planeCutBevelPreviewStale = true;
+                }
+                if (boundedEdgePreviewEnabled)
+                {
+                    boundedEdgePreviewStale = true;
+                }
             }
+#endif
 
             CacheComponents();
-            Regenerate();
+            SynchronizeGeneratedState(
+                forceRegeneration: false,
+                allowAutomaticRegeneration: regenerateOnValidate);
         }
 
         private void EnsureRecipeState()
@@ -884,6 +1297,396 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [ContextMenu("Regenerate Mass")]
         public void Regenerate()
         {
+            SynchronizeGeneratedState(
+                forceRegeneration: true,
+                allowAutomaticRegeneration: true);
+        }
+
+        private void SynchronizeGeneratedState(
+            bool forceRegeneration,
+            bool allowAutomaticRegeneration)
+        {
+            if (regenerationInProgress)
+            {
+                return;
+            }
+
+            using (SynchronizeProfilerMarker.Auto())
+            {
+                regenerationInProgress = true;
+                try
+                {
+                    CacheComponents();
+                    RemoveLegacySurfaceFeatureObjects();
+
+                    ProductionGenerationState productionState =
+                        CaptureProductionGenerationState();
+                    FeatureAtlasGenerationState featureAtlasState =
+                        CaptureFeatureAtlasGenerationState(productionState);
+                    RiverInteractionState riverInteractionState =
+                        CaptureRiverInteractionState();
+
+                    bool riverInteractionChanged =
+                        acceptedRiverInteractionStateValid &&
+                        !acceptedRiverInteractionState.Matches(
+                            riverInteractionState);
+
+                    bool reusableProductionMesh =
+                        !forceRegeneration &&
+                        acceptedProductionStateValid &&
+                        acceptedProductionState.Matches(productionState) &&
+                        TryAdoptReusableProductionMesh();
+
+                    bool productionRegenerated = false;
+                    if (forceRegeneration ||
+                        (!reusableProductionMesh &&
+                         allowAutomaticRegeneration))
+                    {
+                        PrepareForProductionRegeneration();
+                        using (GenerateProductionProfilerMarker.Auto())
+                        {
+                            RegenerateInternal(
+                                PreviewGenerationMode.Production);
+                        }
+
+                        acceptedProductionState = productionState;
+                        acceptedProductionStateValid = true;
+                        acceptedFeatureAtlasState = featureAtlasState;
+                        acceptedFeatureAtlasStateValid =
+                            IsFeatureAtlasStateSatisfied(featureAtlasState);
+                        productionRegenerated = true;
+                    }
+                    else
+                    {
+                        if (reusableProductionMesh &&
+                            allowAutomaticRegeneration)
+                        {
+                            SynchronizeFeatureAtlas(featureAtlasState);
+                        }
+
+                        ApplyMaterialProperties();
+                        RemoveLegacyRiverFoamProxy();
+                    }
+
+                    if (!productionRegenerated &&
+                        riverInteractionChanged)
+                    {
+                        NotifyGeometryChanged();
+                    }
+
+                    acceptedRiverInteractionState =
+                        riverInteractionState;
+                    acceptedRiverInteractionStateValid = true;
+                }
+                finally
+                {
+                    regenerationInProgress = false;
+                }
+            }
+        }
+
+        private void PrepareForProductionRegeneration()
+        {
+#if UNITY_EDITOR
+            if (planeCutBevelPreviewEnabled)
+            {
+                planeCutBevelPreviewStale = true;
+                planeCutBevelPreviewApplied = false;
+            }
+            else
+            {
+                ClearPlaneCutBevelPreviewStatus();
+            }
+
+            if (boundedEdgePreviewEnabled)
+            {
+                boundedEdgePreviewStale = true;
+                boundedEdgePreviewApplied = false;
+            }
+            else
+            {
+                ClearBoundedEdgePreviewStatus();
+            }
+#endif
+        }
+
+        private ProductionGenerationState CaptureProductionGenerationState()
+        {
+            if (recipe == null)
+            {
+                return default;
+            }
+
+            return new ProductionGenerationState
+            {
+                ContractVersion = ProductionGenerationContractVersion,
+                Archetype = recipe.Archetype,
+                ShapeSeed = recipe.ShapeSeed,
+                SurfaceSeed = recipe.SurfaceSeed,
+                Size = recipe.Size,
+                FormComplexity = recipe.FormComplexity,
+                SurfaceFacetDensity = recipe.SurfaceFacetDensity,
+                EdgeCharacter = recipe.EdgeCharacter,
+                ShapeDiversity = recipe.ShapeDiversity,
+                Grounding = recipe.Grounding,
+                Lean = recipe.Lean,
+                FineScale = recipe.FineScale,
+                WidthBias = recipe.WidthBias,
+                HeightBias = recipe.HeightBias,
+                DepthBias = recipe.DepthBias,
+                SurfaceVariation = recipe.SurfaceVariation
+            };
+        }
+
+        private FeatureAtlasGenerationState
+            CaptureFeatureAtlasGenerationState(
+                ProductionGenerationState productionState)
+        {
+            MassSurfaceFeatureSettings featureSettings =
+                CreateSurfaceFeatureSettings();
+            GeneratedMassFeatureAtlasRequest request =
+                ResolveFeatureAtlasRequest();
+
+            return new FeatureAtlasGenerationState
+            {
+                ContractVersion = FeatureAtlasGenerationContractVersion,
+                ProductionState = productionState,
+                Request = request,
+                Resolution = ResolveFeatureAtlasResolution(request),
+                EdgeWearAmount = featureSettings.EdgeWearAmount,
+                EdgeWearWidth = featureSettings.EdgeWearWidth,
+                EdgeWearCoverage = featureSettings.EdgeWearCoverage,
+                EdgeWearSoftness = featureSettings.EdgeWearSoftness,
+                CreaseAmount = featureSettings.CreaseAmount,
+                CreaseWidth = featureSettings.CreaseWidth,
+                CreaseLength = featureSettings.CreaseLength,
+                CreaseBranching = featureSettings.CreaseBranching
+            };
+        }
+
+        private RiverInteractionState CaptureRiverInteractionState()
+        {
+            GeneratedRiverInteractionSettings settings =
+                RiverInteractionSettings;
+            return new RiverInteractionState
+            {
+                Participation = settings.Participation,
+                PressureMode = settings.PressureMode,
+                PressureStrength = settings.PressureStrength,
+                PressureContactSharpness =
+                    settings.PressureContactSharpness,
+                PressureProfileVariation =
+                    settings.PressureProfileVariation,
+                PressureProfileChangeIntervalMin =
+                    settings.PressureProfileChangeIntervalMin,
+                PressureProfileChangeIntervalMax =
+                    settings.PressureProfileChangeIntervalMax,
+                WakeMode = settings.WakeMode,
+                WakeStrength = settings.WakeStrength,
+                WakeReach = settings.WakeReach,
+                WakeSpread = settings.WakeSpread,
+                WakeVariation = settings.WakeVariation,
+                ImpactRippleCollisionMode =
+                    settings.ImpactRippleCollisionMode,
+                FootprintPadding = settings.FootprintPadding
+            };
+        }
+
+        private bool TryAdoptReusableProductionMesh()
+        {
+            Mesh candidate = meshFilter != null
+                ? meshFilter.sharedMesh
+                : null;
+            if (candidate == null)
+            {
+                candidate = generatedMesh;
+            }
+
+            if (!IsReusableProductionMesh(candidate))
+            {
+                return false;
+            }
+
+            generatedMesh = candidate;
+            generatedMesh.hideFlags = HideFlags.DontSave;
+            BindGeneratedMeshToComponents(forceColliderRecook: false);
+            return true;
+        }
+
+        private bool IsReusableProductionMesh(Mesh candidate)
+        {
+            if (candidate == null ||
+                recipe == null ||
+                !string.Equals(
+                    candidate.name,
+                    BuildProductionMeshName(),
+                    StringComparison.Ordinal) ||
+                candidate.vertexCount < 3 ||
+                candidate.subMeshCount < 1 ||
+                candidate.GetTopology(0) != MeshTopology.Triangles ||
+                candidate.GetIndexCount(0) < 3)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private string BuildProductionMeshName()
+        {
+            return recipe == null
+                ? "GeneratedMass_Temporary"
+                : $"GeneratedMass_{recipe.Archetype}_" +
+                  $"Shape{recipe.ShapeSeed}_Surface{recipe.SurfaceSeed}";
+        }
+
+        private void SynchronizeFeatureAtlas(
+            FeatureAtlasGenerationState currentState)
+        {
+            bool stateMatches =
+                acceptedFeatureAtlasStateValid &&
+                acceptedFeatureAtlasState.Matches(currentState);
+            if (stateMatches &&
+                IsFeatureAtlasStateSatisfied(currentState))
+            {
+                return;
+            }
+
+            if (currentState.Request ==
+                GeneratedMassFeatureAtlasRequest.None)
+            {
+                ReleaseGeneratedFeatureAtlas();
+                acceptedFeatureAtlasState = currentState;
+                acceptedFeatureAtlasStateValid = true;
+                return;
+            }
+
+            if (!IsReusableProductionMesh(generatedMesh))
+            {
+                acceptedFeatureAtlasStateValid = false;
+                return;
+            }
+
+            MassSurfaceFeatureSettings featureSettings =
+                CreateSurfaceFeatureSettings();
+            MeshData sourceMeshData = MassGenerator.Generate(
+                recipe,
+                featureSettings);
+            GeneratedMassFeatureAtlasBaker.Result featureAtlas =
+                GeneratedMassFeatureAtlasBaker.Bake(
+                    sourceMeshData,
+                    featureSettings,
+                    currentState.Resolution,
+                    currentState.Request);
+
+            if (TryApplyFeatureAtlasResult(featureAtlas))
+            {
+                acceptedFeatureAtlasState = currentState;
+                acceptedFeatureAtlasStateValid =
+                    IsFeatureAtlasStateSatisfied(currentState);
+            }
+            else
+            {
+                acceptedFeatureAtlasStateValid = false;
+            }
+        }
+
+        private bool TryApplyFeatureAtlasResult(
+            GeneratedMassFeatureAtlasBaker.Result featureAtlas)
+        {
+            if (featureAtlas == null ||
+                featureAtlas.FeatureAtlasUV == null ||
+                generatedMesh == null ||
+                featureAtlas.FeatureAtlasUV.Count !=
+                    generatedMesh.vertexCount)
+            {
+                if (featureAtlas != null)
+                {
+                    DestroyGeneratedTexture(featureAtlas.Atlas0);
+                    DestroyGeneratedTexture(featureAtlas.Atlas1);
+                }
+
+                return false;
+            }
+
+            ReleaseGeneratedFeatureAtlas();
+            generatedFeatureAtlas0 = featureAtlas.Atlas0;
+            generatedFeatureAtlas1 = featureAtlas.Atlas1;
+            generatedMesh.SetUVs(3, featureAtlas.FeatureAtlasUV);
+            return true;
+        }
+
+        private bool IsFeatureAtlasStateSatisfied(
+            FeatureAtlasGenerationState state)
+        {
+            bool requiresAtlas0 =
+                (state.Request &
+                 GeneratedMassFeatureAtlasRequest.FeatureAtlas0) != 0;
+            bool requiresAtlas1 =
+                (state.Request &
+                 GeneratedMassFeatureAtlasRequest.FeatureAtlas1) != 0;
+
+            if (!requiresAtlas0 && generatedFeatureAtlas0 != null)
+            {
+                return false;
+            }
+
+            if (!requiresAtlas1 && generatedFeatureAtlas1 != null)
+            {
+                return false;
+            }
+
+            if (requiresAtlas0 &&
+                (generatedFeatureAtlas0 == null ||
+                 generatedFeatureAtlas0.width != state.Resolution ||
+                 generatedFeatureAtlas0.height != state.Resolution))
+            {
+                return false;
+            }
+
+            if (requiresAtlas1 &&
+                (generatedFeatureAtlas1 == null ||
+                 generatedFeatureAtlas1.width != state.Resolution ||
+                 generatedFeatureAtlas1.height != state.Resolution))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private void BindGeneratedMeshToComponents(
+            bool forceColliderRecook)
+        {
+            if (meshFilter != null &&
+                meshFilter.sharedMesh != generatedMesh)
+            {
+                meshFilter.sharedMesh = generatedMesh;
+            }
+
+            if (meshCollider == null)
+            {
+                return;
+            }
+
+            using (BindColliderProfilerMarker.Auto())
+            {
+                if (forceColliderRecook)
+                {
+                    meshCollider.sharedMesh = null;
+                    meshCollider.sharedMesh = generatedMesh;
+                }
+                else if (meshCollider.sharedMesh != generatedMesh)
+                {
+                    meshCollider.sharedMesh = generatedMesh;
+                }
+
+                meshCollider.convex = false;
+            }
+        }
+
+        private void RegenerateInternal(PreviewGenerationMode previewMode)
+        {
             CacheComponents();
             RemoveLegacySurfaceFeatureObjects();
 
@@ -891,6 +1694,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 ReleaseGeneratedFeatureAtlas();
                 ClearGeneratedAssignments();
+                acceptedProductionStateValid = false;
+                acceptedFeatureAtlasStateValid = false;
                 ApplyMaterialProperties();
                 InvalidateStableWorldGeometryFingerprint();
                 NotifyGeometryChanged();
@@ -902,9 +1707,72 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             MassSurfaceFeatureSettings featureSettings =
                 CreateSurfaceFeatureSettings();
+#if UNITY_EDITOR
+            MassGenerator.PlaneCutBevelPreviewStatus previewStatus = default;
+            MassGenerator.BoundedEdgePreviewStatus boundedStatus = default;
+            MeshData sourceMeshData;
+            if (previewMode == PreviewGenerationMode.PlaneCut)
+            {
+                sourceMeshData = MassGenerator.GeneratePlaneCutBevelPreview(
+                    recipe,
+                    featureSettings,
+                    out previewStatus);
+                planeCutBevelPreviewApplied =
+                    previewStatus.PreviewApplied;
+                planeCutBevelPreviewActiveEdges =
+                    previewStatus.ActiveEdgeCount;
+                planeCutBevelPreviewBuiltEdges =
+                    previewStatus.BuiltEdgeCount;
+                planeCutBevelPreviewDeferredEdges =
+                    previewStatus.DeferredEdgeCount;
+                planeCutBevelPreviewRejectedEdges =
+                    previewStatus.RejectedEdgeCount;
+                planeCutBevelPreviewDiagnostic = previewStatus.Diagnostic;
+                planeCutBevelPreviewStale = false;
+            }
+            else if (previewMode ==
+                PreviewGenerationMode.BoundedSingleEdge)
+            {
+                sourceMeshData =
+                    MassGenerator.GenerateBoundedSingleEdgeBevelPreview(
+                        recipe,
+                        featureSettings,
+                        boundedEdgePreviewOrdinal,
+                        out boundedStatus);
+                boundedEdgePreviewApplied = boundedStatus.PreviewApplied;
+                boundedEdgePreviewCandidateCount =
+                    boundedStatus.CandidateCount;
+                boundedEdgePreviewOrdinal = Mathf.Max(
+                    0,
+                    boundedStatus.SelectedOrdinal);
+                boundedEdgePreviewSourceEdgeIndex =
+                    boundedStatus.SourceEdgeIndex;
+                boundedEdgePreviewBevelFaceCount =
+                    boundedStatus.BevelFaceCount;
+                boundedEdgePreviewEndpointCapCount =
+                    boundedStatus.EndpointCapCount;
+                boundedEdgePreviewModifiedSourceFaceCount =
+                    boundedStatus.ModifiedSourceFaceCount;
+                boundedEdgePreviewForeignSourceFaceModifiedCount =
+                    boundedStatus.ForeignSourceFaceModifiedCount;
+                boundedEdgePreviewRailDeviation =
+                    boundedStatus.RailDeviation;
+                boundedEdgePreviewMaximumExtentBeyondRails =
+                    boundedStatus.MaximumExtentBeyondRails;
+                boundedEdgePreviewDiagnostic = boundedStatus.Diagnostic;
+                boundedEdgePreviewStale = false;
+            }
+            else
+            {
+                sourceMeshData = MassGenerator.Generate(
+                    recipe,
+                    featureSettings);
+            }
+#else
             MeshData sourceMeshData = MassGenerator.Generate(
                 recipe,
                 featureSettings);
+#endif
             GeneratedMassFeatureAtlasRequest atlasRequest =
                 ResolveFeatureAtlasRequest();
             int featureAtlasResolution =
@@ -918,54 +1786,56 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         atlasRequest)
                     : null;
 
-            string meshName =
-                $"GeneratedMass_{recipe.Archetype}_Shape{recipe.ShapeSeed}_Surface{recipe.SurfaceSeed}";
+            string meshName = BuildProductionMeshName();
+#if UNITY_EDITOR
+            if (previewMode == PreviewGenerationMode.PlaneCut &&
+                planeCutBevelPreviewApplied)
+            {
+                meshName += PlaneCutPreviewMeshNameSuffix;
+            }
+            else if (previewMode ==
+                    PreviewGenerationMode.BoundedSingleEdge &&
+                boundedEdgePreviewApplied)
+            {
+                meshName += BoundedEdgePreviewMeshNameSuffix;
+            }
+#endif
 
             MeshBuilder.ApplyToMesh(
                 sourceMeshData,
                 generatedMesh,
                 meshName);
 
-            if (featureAtlas != null &&
-                featureAtlas.FeatureAtlasUV != null &&
-                featureAtlas.FeatureAtlasUV.Count == generatedMesh.vertexCount)
+            if (featureAtlas != null)
             {
-                generatedFeatureAtlas0 = featureAtlas.Atlas0;
-                generatedFeatureAtlas1 = featureAtlas.Atlas1;
-                generatedMesh.SetUVs(3, featureAtlas.FeatureAtlasUV);
-            }
-            else if (featureAtlas != null)
-            {
-                DestroyGeneratedTexture(featureAtlas.Atlas0);
-                DestroyGeneratedTexture(featureAtlas.Atlas1);
+                TryApplyFeatureAtlasResult(featureAtlas);
             }
 
-            meshFilter.sharedMesh = generatedMesh;
-
-            meshCollider.sharedMesh = null;
-            meshCollider.sharedMesh = generatedMesh;
-            meshCollider.convex = false;
+            BindGeneratedMeshToComponents(forceColliderRecook: true);
 
             ApplyMaterialProperties();
-            RefreshStableWorldGeometryFingerprint();
+            InvalidateStableWorldGeometryFingerprint();
             RemoveLegacyRiverFoamProxy();
             NotifyGeometryChanged();
         }
 
         private void RefreshStableWorldGeometryFingerprint()
         {
-            stableWorldGeometryFingerprintValid =
-                GeneratedGeometryStableFingerprintUtility
-                    .TryComputeExactWorldTriangleFingerprint(
-                        meshFilter,
-                        out stableWorldGeometryFingerprint,
-                        out _);
-            stableWorldGeometryFingerprintMesh = meshFilter != null
-                ? meshFilter.sharedMesh
-                : null;
-            stableWorldGeometryFingerprintMatrix = meshFilter != null
-                ? meshFilter.transform.localToWorldMatrix
-                : Matrix4x4.identity;
+            using (ComputeFingerprintProfilerMarker.Auto())
+            {
+                stableWorldGeometryFingerprintValid =
+                    GeneratedGeometryStableFingerprintUtility
+                        .TryComputeExactWorldTriangleFingerprint(
+                            meshFilter,
+                            out stableWorldGeometryFingerprint,
+                            out _);
+                stableWorldGeometryFingerprintMesh = meshFilter != null
+                    ? meshFilter.sharedMesh
+                    : null;
+                stableWorldGeometryFingerprintMatrix = meshFilter != null
+                    ? meshFilter.transform.localToWorldMatrix
+                    : Matrix4x4.identity;
+            }
         }
 
         private void InvalidateStableWorldGeometryFingerprint()
@@ -1060,7 +1930,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ResolveFeatureRecipeValues(selectedRecipe);
             ApplyFeatureRecipeValues(values);
             lastAppliedFeatureRecipe = selectedRecipe;
-            Regenerate();
+            SynchronizeGeneratedState(
+                forceRegeneration: false,
+                allowAutomaticRegeneration: true);
         }
 
         private void ApplyFeatureRecipeValues(FeatureRecipeValues values)
@@ -1715,6 +2587,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return;
             }
 
+            Mesh existingMesh = meshFilter != null
+                ? meshFilter.sharedMesh
+                : null;
+            if (existingMesh != null &&
+                existingMesh.name.StartsWith(
+                    GeneratedMeshNamePrefix,
+                    StringComparison.Ordinal))
+            {
+                generatedMesh = existingMesh;
+                generatedMesh.hideFlags = HideFlags.DontSave;
+                return;
+            }
+
             generatedMesh = new Mesh
             {
                 name = "GeneratedMass_Temporary",
@@ -1742,7 +2627,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private void NotifyGeometryChanged()
         {
-            GeometryChanged?.Invoke();
+            using (NotifyConsumersProfilerMarker.Auto())
+            {
+                GeometryChanged?.Invoke();
+            }
         }
 
         private void ReleaseGeneratedFeatureAtlas()
