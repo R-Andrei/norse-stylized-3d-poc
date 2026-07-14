@@ -1,3 +1,52 @@
+# Current River continuation — `4.11C.5.17D.0`
+
+Final-Edge Fray is retired after gameplay-camera validation. Small teeth did not survive the production isometric view, while large teeth became visually equivalent to Chipping or broad erosion. All Fray-only controls, active serialized fields, shader properties, runtime bindings, helper mathematics, debug views, and dead transient carriers are removed from code. No scene, prefab, material, or other serialized Unity asset is modified; stale serialized values remain inert and owner-controlled.
+
+Current Layer E order:
+
+```text
+coherent Foam → analytical Chipping → structural Strands → composition
+```
+
+Retained compatibility is limited to historical serialized aliases needed to preserve Chip migration data; no Fray runtime path remains. Debug values `22`, `23`, and `27` are retired and safely fall back to Final. The next active work is `4.11C.5.17D.1 — Chipping Readability Audit`, followed by an evidence-driven Chipping rework. Remaining-Life morphology is still deferred.
+
+> **Historical note:** The C.1/C.1A/C.1B sections below record rejected experiments and are no longer active architecture.
+
+# Historical River continuation — C.1B
+
+C.1B is the active Fray isolation patch. C.1A's monotonic Coverage mapping was not sufficient: an independent Strand Fray helper ignored the visible Fray controls, and the final Fray profile continuously removed at least `55%` authority across admitted regions. The resulting system could not turn Fray off globally and read as broad hiding rather than teeth.
+
+Current contract:
+
+```text
+Fray Amount = 0 OR Tooth Depth = 0
+→ exact post-Chip/post-Strand silhouette
+→ no tooth-like Fray on ordinary, Chip, or Strand boundaries
+```
+
+Strands own structural lineification only. Final Fray owns intermittent camera-readable teeth through separate cluster and tooth patterns with real gaps. `Tooth Size (m)` is authored for the isometric camera over `0.12–1.20 m`. C.1B preserves the exact post-Strand baseline, hybrid boundary reconstruction, adaptive rolled Chip loops, and all Ground/River performance work. Remaining Life coupling is still excluded. Unity validation pending.
+
+## Deferred Chipping validation — `4.11C.5.17B.2D2B-B.2L`
+
+B.2J permission is accepted. B.2K supplies independent multi-axis contour geometry. B.2L remains implemented as a deferred Chipping timing validation patch. Its former sequencing before Fray is obsolete because Fray was retired by D.0.
+
+Current controls:
+
+```text
+Shape Change Amount
+= geometric excursion only
+
+Shape Change Cadence (changes/s)
+= how often a new deterministic contour target is selected
+
+Shape Transition Time (s)
+= how long the geometry takes to reach that target
+```
+
+Targets use a constant golden-angle separation in the accepted B.2K two-axis coefficient plane. Quintic interpolation reaches zero velocity at both target endpoints. The resolved Inspector timing reports `effective transition / hold`, where the effective transition is clamped to the cadence interval. Existing candidate phase offsets stagger changes.
+
+Validate isolated candidates with Size Pulse, Rotation, and Lateral Motion disabled. Confirm that Cadence changes event spacing, Transition Time changes actual morph speed, Amount changes only geometric extent, and no size/lifecycle/motion behavior changed. After acceptance, return to the D.1 Chipping Readability Audit rather than any Fray continuation.
+
 # Rock And River Refactor Handoff
 
 > **River Foam supersession notice — 2026-07-07**
@@ -5,7 +54,60 @@
 > This handoff is historical for earlier rock/river refactor context. Any river Foam architecture, static-foam, morphing, lateral motion, or rendering responsibility statement in this document is superseded by `Docs/River_Foam_Stage6_Architecture.md` and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`. Use those documents as the active Foam source of truth.
 
 
-## Current River Foam continuation — `4.11C.5.17B.2D2B-B.2C`
+## Accepted Chipping geometry foundation — `4.11C.5.17B.2D2B-B.2K`
+
+B.2K's multi-axis contour geometry is retained. It owns independent sine-harmonic shape evolution, temporal radial-area preservation, and the bounded `1.52×` lobe/search contract. B.2L changes timing only: target cadence and transition duration are now separate.
+
+## Superseded River Foam continuation — `4.11C.5.17B.2D2B-B.2E`
+
+B.2D body access and binary Material Admission remain the production foundation. B.2E is implemented and awaits Unity validation for exactly three corrections:
+
+```text
+Eligibility Composite
+  candidate-independent potential permission;
+  pre-Chip visible support × Material Admission
+  × max(Edge Coverage eligibility, Interior Access probability);
+  Activation and current candidate contours no longer define the view.
+
+Complete turnover
+  at Evolution Amount 1, candidate radius and visibility reach exact zero at
+  birth/release, reach the authored maximum at maturity, and return on the next
+  deterministic asynchronous cycle;
+  subpixel lifecycle remnants are footprint-gated.
+
+Warp safety
+  spatial coordinate warp stops increasing above Amount 0.20;
+  higher values still increase lifecycle, pulse, and contour morphing;
+  derivative-basis correction rejects collapsed/reversed bases and is bounded
+  to 0.67×–1.50× instead of the former 6× amplification allowance.
+```
+
+No control, texture, sample, dispatch, persistent state, candidate-loop size, Strand behavior, Fray behavior, or production order is changed. Validate the permission view first, then complete lifecycle, then maximum-amount smear/noise stress behavior. Final-boundary Fray remains blocked until B.2E is accepted.
+
+
+## B.2D production foundation — `4.11C.5.17B.2D2B-B.2D`
+
+The production Chipping blocker is source-proven. `materialEdgeDepth` was a local Presence-derived coverage value, not geometric boundary distance. It saturates to `1` throughout established Foam, while the serialized selector stopped at `0.95`; most visible bodies were therefore impossible to chip. The smooth transported Material Pattern gate then acted as removal strength and was often erased by later hardening.
+
+B.2D is implemented and awaits Unity validation:
+
+```text
+Chip Edge Coverage
+  truthful edge-only control over the Presence transition;
+
+Chip Interior Access
+  deterministic candidate-level permission for established visible Foam;
+
+Chip Material Admission (historical B.2D source, removed by B.2J)
+  binary antialiased threshold over the transported ranking signal.
+```
+
+The complete pre-material selection is clipped to pre-Chip base coverage. `materialBody` is no longer multiplied twice. At Activation `1` and Interior Access `1`, every activated candidate can fully cut visible established Foam beneath its contour. Historical Rivers migrated to Interior Access `0`; the removed admission value is now ignored. No texture, sample, compute pass, persistent state, or candidate-loop expansion was added by B.2D. Its historical statement that temporary legacy Fray remained unchanged is superseded by C.1.
+
+B.2D validation remains relevant for Chipping, while C.1 separately validates exact neutral Fray equivalence and final-boundary behavior.
+
+
+## Superseded River Foam continuation — `4.11C.5.17B.2D2B-B.2C`
 
 P1/P3/P4 remain accepted. A/A.1 diagnostics, B production Chipping, B.1 control divorce, B.1A formula correction, and the B.2A single-contour representation are retained. B.2B provides useful large analytical motion and geometric turnover, but Unity showed that high Evolution Amount could stretch blobs into long ribbons because the coordinate warp also distorted local contour distance.
 
@@ -22,7 +124,7 @@ Cyan          eligibility outside rendered Foam;
 Bright yellow overlap.
 ```
 
-The Chip Edge Eligibility and Fray Permitted Band formulas are unchanged by B.2C. After Unity validation, use the composites to define the next Chip eligibility correction; do not tune the field blindly. No new texture, compute pass, persistent state, control, candidate-loop expansion, Strand change, or production Fray change is included.
+The Chip Edge Eligibility and Fray Permitted Band formulas were unchanged by B.2C. B.2D above now supersedes the Chip formula and composite contract; Fray remains pending. No new texture, compute pass, persistent state, control, candidate-loop expansion, Strand change, or production Fray change was included in B.2C.
 
 
 ## Current River Foam continuation — `4.11C.5.16E.2` committed Final Foam

@@ -1,4 +1,486 @@
+# Current continuation — `4.11C.5.17D.0` Final-Edge Fray Retirement
+
+Gameplay-camera validation rejected Fray as a useful independent morphology category. Centimetre-scale teeth were not readable from the production isometric camera, while enlarged teeth became indistinguishable from Chipping. C.1, C.1A, and C.1B improved ordering and control ownership but did not establish a stable visual category worth its shader, Inspector, migration, or diagnostic cost.
+
+Fray is therefore retired completely. The active Layer E order is now:
+
+```text
+coherent Foam
+→ analytical Chipping
+→ structural Strands
+→ composition
+```
+
+Removed production ownership:
+
+```text
+final-boundary Fray helper and result structure;
+cluster/tooth procedural fields and boundary reconstruction;
+Fray shader properties and runtime bindings;
+Fray serialized authoring fields, Inspector controls, and tooltips;
+Fray diagnostics and debug categories;
+dead transient breakupField carrier and runtime _FoamBreakupScale path.
+
+No scene, prefab, material, or other serialized Unity asset is modified. Existing stale Fray values may remain in serialized assets and are ignored because their active fields and bindings no longer exist; any manual asset cleanup is left to the project owner.
+```
+
+Serialized debug values `22`, `23`, and `27` are retired and resolve safely to Final. A hidden `legacyFoamBreakupScale` field remains only as a `FormerlySerializedAs` migration source for historical Chip tuning; it has no shader property, runtime binding, Inspector control, or production effect. The historical tuning-version alias containing `ChipFray` is also retained only so old Chip migration state deserializes correctly.
+
+The settled readable morphology ownership is:
+
+```text
+Chipping = medium/large subtractive bites and holes
+Strands  = elongated anisotropic cuts and remnants
+Base lifecycle morphology = broad coherent deterioration
+Fray = retired
+```
+
+The next morphology task is `4.11C.5.17D.1 — Chipping Readability Audit` from the gameplay camera. Remaining-Life morphology integration stays blocked until the surviving Chip and Strand vocabularies are accepted.
+
+## Methods-tried decision — Fray
+
+| Method | Status | Reason |
+| --- | --- | --- |
+| Legacy pre-Strand Fray | Rejected | Could not see Chip- or Strand-created final boundaries. |
+| C.1 post-Strand hybrid-boundary Fray | Structurally useful, artistically rejected | Correct order, but weak scale readability and control authority. |
+| C.1A monotonic Coverage | Rejected | High coverage became broad silhouette recession. |
+| C.1B master authority and intermittent teeth | Rejected and retired | Small teeth vanished at production distance; large teeth duplicated Chipping. |
+| Final decision | Accepted | Remove Fray and invest in camera-readable Chipping. |
+
+> **Supersession note:** Later sections retain historical Fray experiments and terminology as the canonical methods-tried record. Any statement below that describes Fray as active, pending, or planned is superseded by `4.11C.5.17D.0` above.
+
+## Decoupled Chip shape cadence and transition — `4.11C.5.17B.2D2B-B.2L` — implemented, Unity validation pending
+
+B.2K established meaningful multi-axis contour geometry, but its single cycles-per-second control simultaneously determined when the trajectory advanced and how fast the geometry crossed between configurations. Runtime evidence showed short, visually abrupt contour switches. B.2L keeps the B.2K Fourier geometry and separates the two timing responsibilities:
+
+```text
+Shape Change Cadence (changes/s)
+= how often a candidate selects its next deterministic contour target
+
+Shape Transition Time (seconds)
+= how long the actual geometry takes to move from the previous target to the next
+```
+
+Consecutive targets are fixed golden-angle steps through each candidate's accepted two-axis morph plane. The target distance is therefore constant instead of varying randomly. A quintic transition moves between targets, then holds the target for the remainder of the cadence interval. Candidate-specific phase offsets stagger target events across the field. If Transition Time exceeds the cadence interval, the effective transition uses the complete interval and remains continuously in motion.
+
+The timing equation is:
+
+```text
+interval = 1 / cadence
+effective transition = min(authored transition time, interval)
+hold = interval - effective transition
+```
+
+The average coefficient-plane angular speed during a transition is the fixed golden-angle step divided by effective transition time. Shape Change Amount remains the sole geometric-excursion control. Candidate Radius, Size Pulse, lifecycle scale, movement, rotation, projected-size LOD, permission, and Strands are unchanged. Fray was later retired by D.0.
+
 # River Foam Stage 6 Canonical Architecture
+
+
+## Multi-axis Chip contour geometry — `4.11C.5.17B.2D2B-B.2K` — geometry accepted; timing superseded by B.2L
+
+B.2J permission behavior is Unity-validated and accepted. B.2K changes only the analytical candidate silhouette because the previous temporal contour could not produce meaningful geometry evolution: it used three cosine harmonics, stayed mirror-symmetric, interpolated along one A-to-B coefficient line, and multiplied all temporal change by Shape Irregularity.
+
+The static B.2J contour remains the cosine-harmonic baseline:
+
+```text
+S(theta) = ShapeIrregularity × [a1 cos(theta) + a2 cos(2theta) + a3 cos(3theta)]
+```
+
+Temporal Shape Change now occupies the independent sine-harmonic subspace:
+
+```text
+T(theta,t) = b1(t) sin(theta) + b2(t) sin(2theta) + b3(t) sin(3theta)
+```
+
+Two deterministic, candidate-specific sine-coefficient directions are orthonormalized. A normalized quarter-cycle trajectory moves through that two-dimensional plane. The temporal coefficient direction is normalized to a constant L1 budget of `0.55`, so its raw radial target remains positive in `[0.45, 1.55]` before normalization.
+
+The temporal target is normalized in squared-radius space. Fourier orthogonality gives its exact angular mean, and the final contour blends static and temporal squared radii:
+
+```text
+temporalArea = constant for every trajectory phase
+finalRadiusSquared = lerp(staticRadiusSquared, temporalRadiusSquared, ShapeChangeAmount)
+```
+
+This preserves temporal radial area exactly instead of turning Shape Change into another Size Pulse. Shape Irregularity owns static cosine asymmetry, while Shape Change independently owns temporal sine geometry; either may be zero without disabling the other. Candidate Radius remains the area-equivalent authored scale. Redistributed lobes can reach at most `1.52x` that radius, so B.2K extends only the adaptive lateral search ceiling from `5x9` to `5x11`; no texture, sample, buffer, compute, persistent-state, lifecycle, motion, rotation, view-readability, eligibility, Strand, or Fray behavior changes.
+
+## Simplified orthogonal Chip permission — `4.11C.5.17B.2D2B-B.2J` — Unity-validated and accepted
+
+Unity validation rejected B.2I. Its local visible-support/material-depth proxy contained no reliable established-body distance information, compressed useful response into the top of the slider, and was multiplied after both Edge Coverage and Interior Access. `Chip Inward Admission` therefore duplicated and serially gated the two existing permissions instead of owning an independent domain.
+
+B.2J removes that third gate entirely. Production Chipping now has two parallel, truthful permissions:
+
+```text
+Chip Edge Coverage
+  owns only the weak Presence-transition fringe;
+
+Chip Interior Access
+  deterministically grants a fraction of activated candidate identities
+  full permission over established pre-Chip visible Foam.
+```
+
+For pre-Chip visible support `V`, edge eligibility `E`, activated candidate field `C`, and candidate-level interior admission `I_c`:
+
+```text
+edgeSelection = C × E
+interiorSelection = I_c
+productionSelection = V × max(edgeSelection, interiorSelection)
+```
+
+There is no Material Pattern gate, inward-depth proxy, or final serial admission multiplier. At `Interior Access = 0`, Edge Coverage remains fully operational. At `Edge Coverage` minimum, Interior Access remains fully operational. `Chip Activation` controls the participating candidate population; `Interior Access` controls the fraction of that population permitted to cut established body.
+
+Candidate-independent diagnostics use:
+
+```text
+edgeAuthority = V × E
+interiorAuthority = V × InteriorAccess
+potentialEligibility = max(edgeAuthority, interiorAuthority)
+```
+
+The dedicated debug slot formerly used by Inward Admission now shows `Chip Interior Access` authority. No candidate lifecycle, rigid motion, projected-size LOD, search bounds, Strand logic, Fray logic, texture, sample, buffer, dispatch, or persistent state changes are included. Removing the failed gate also removes its square root, derivative, smoothstep, shader property, binding, and serialized Inspector control.
+
+
+## Extended rigid lateral Chip travel — `4.11C.5.17B.2D2B-B.2H` — implemented, Unity validation pending
+
+B.2F/B.2G are Unity-validated and accepted for lifecycle, rigid evolution, and bounded projected-size readability. B.2H changes only the authority and search completeness of the existing rigid lateral centre motion.
+
+### Control and physical meaning
+
+```text
+Lateral Motion Amount (spacing)
+  maximum plus/minus candidate-centre excursion measured in Candidate Spacing;
+  range 0–2.5.
+
+Lateral Motion Speed (cycles/s)
+  independent frequency of the existing smooth periodic lateral wave.
+```
+
+For Candidate Spacing `S`, amount `A`, frequency `f`, candidate phase `phi`, and the existing signed smooth periodic wave `W`:
+
+```text
+centreY(t) = staticCentreY + S × A × W(f × t + phi)
+excursion = ±S × A
+peak-to-peak travel = 2 × S × A
+peak centre speed = 6 × f × S × A
+```
+
+The factor `6` is the exact maximum derivative per cycle of `RiverWaterFoamResolveChipSignedWave`; the Inspector exposes resolved excursion and peak physical speed. Translation remains rigid, so the larger range cannot shear, rotate, or stretch an individual contour.
+
+### Exact adaptive rectangular search
+
+The previous `0.25 × spacing` maximum fit inside the B.2F `3×3`/`5×5` search. At the new `2.5 × spacing` maximum, candidate source cells can originate farther laterally. Let:
+
+```text
+R = maximum candidate radius in spacings after bounded view scale,
+    size irregularity, and size pulse
+A = Lateral Motion Amount
+J = 0.39 × Distribution Irregularity
+C = 0.5 + J
+
+required downstream offset = floor(R + C), clamped to 1–2
+required lateral offset    = floor(R + A + C), clamped to 1–4
+```
+
+The shader evaluates the smallest enclosing rectangle from `3×3` through `5×9`. At the complete authored maxima:
+
+```text
+R <= 0.65 × 1.42 × 1.45 = 1.338 spacings
+A <= 2.5 spacings
+C <= 0.89 spacings
+
+required downstream offset = floor(1.338 + 0.89) = 2
+required lateral offset    = floor(1.338 + 2.5 + 0.89) = 4
+maximum search             = 5×9
+```
+
+Lower settings retain smaller rectangles, including `3×3`, `3×5`, `3×7`, `3×9`, `5×3`, `5×5`, `5×7`, and `5×9` as required. No texture, sample, buffer, compute dispatch, candidate identity, lifecycle, eligibility, Strand, Fray, Layer C/D, or production-order change is added.
+
+
+## Bounded projected-size Chip LOD — `4.11C.5.17B.2D2B-B.2G` — Unity-validated and accepted
+
+B.2F remains authoritative for candidate identity, lifecycle, rigid motion, pulse, and shape change. B.2G changes only how each static candidate radius is rendered when projection would make stable Chips unreadably small.
+
+### Controls and ownership
+
+```text
+Minimum Stable Radius (px)
+  target screen radius for each fully formed candidate;
+  zero preserves pure world-space sizing.
+
+Maximum View Scale
+  upper bound on readability enlargement;
+  one disables enlargement.
+```
+
+Candidate positions, hashes, activation, eligibility, lifecycle phase, motion, rotation, pulse, and contour coefficients remain River-space systems. No candidate is generated or anchored in screen space.
+
+### Metric-correct projected radius
+
+For River coordinate `p = (distance, lateral)`, the fragment shader forms the screen-to-River Jacobian from `ddx(p)` and `ddy(p)`. `metresPerPixel` is the largest singular value of that Jacobian: the square root of the largest eigenvalue of its Gram matrix. It therefore measures the most compressed projected direction and automatically accounts for camera distance, field of view, resolution, and surface foreshortening.
+
+For one candidate’s static authored radius `R`, projected radius `r`, target `P`, and maximum scale `S`:
+
+```text
+r = R / metresPerPixel
+w = 1 - smoothstep(0.75 P, P, r)
+required = clamp(P / max(r, epsilon), 1, S)
+viewScale = lerp(1, required, w)
+stabilizedStaticRadius = min(
+    R × viewScale,
+    0.65 × CandidateSpacing × candidateSizeMultiplier)
+```
+
+The scale is never below one, so close Chips are never shrunk. The target is a readability floor rather than exact billboard locking. `Maximum View Scale` and the existing `0.65 × spacing × sizeMultiplier` static-radius cap prevent unbounded world-space growth.
+
+The target is evaluated after deterministic size irregularity, so each candidate receives its own readability decision. The spacing-relative cap is scaled by that same size multiplier, preserving the accepted authored maximum. Size pulse and lifecycle are applied last:
+
+```text
+finalRadius = stabilizedStaticRadius
+              × sizePulse
+              × lifecycleScale
+```
+
+Formation and Dissolve therefore still reach exact zero, and Dormant Time remains exact zero coverage.
+
+### Subpixel tail and search completeness
+
+The old whole-candidate attenuation between approximately `0.75–2.0 px` radius is removed. Only the genuinely unresolved lifecycle tail is faded:
+
+```text
+subpixelVisibility = smoothstep(0.25, 0.75, finalRadius / metresPerPixel)
+```
+
+The same singular-value metric is used as conservative world-space contour antialias width. Candidate-search selection and the Inspector readout use the conservative `Maximum View Scale` ceiling. The existing `3×3`/`5×5` search and `1.34 × spacing` final-radius cap remain sufficient.
+
+Serialized tuning version 8 assigns `Minimum Stable Radius = 2 px` and `Maximum View Scale = 1.75`. No texture, texture sample, buffer, compute dispatch, persistent state, candidate identity change, density LOD, Strand change, Fray change, or production-order change is added.
+
+
+## Independent Chip lifecycle and rigid evolution — `4.11C.5.17B.2D2B-B.2F` — Unity-validated and accepted
+
+B.2F supersedes the coupled B.2E Evolution Amount/Rate model. B.2D production eligibility and B.2E candidate-independent permission diagnostics remain unchanged.
+
+### Control ownership
+
+```text
+Lifecycle — always active for every candidate retained by Chip Activation
+  Formation Time
+  Stable Time
+  Dissolve Time
+  Dormant Time
+
+Rigid Motion
+  Downstream Speed
+  Lateral Motion Amount / Speed
+  Rotation Amount / Speed
+
+Living Variation — established stage only
+  Size Pulse Amount / Speed
+  Shape Change Amount / Cadence / Transition Time
+```
+
+The retired hidden `foamChipEvolutionAmount` and `foamChipEvolutionRate` fields remain serialized only for one-way tuning-version-7 migration. They are no longer bound to the shader.
+
+### Four-stage lifecycle
+
+For authored durations `F`, `S`, `D`, and `Q`:
+
+```text
+T = F + S + D + Q
+τ = frac(time / T + candidatePhase) × T
+smooth5(x) = 6x^5 - 15x^4 + 10x^3
+
+formation = smooth5(τ / F)
+dissolution = 1 - smooth5((τ - F - S) / D)
+lifeRadiusScale = min(formation, dissolution)
+```
+
+This guarantees monotonic zero-to-one Formation, exact one during Stable Time, monotonic one-to-zero Dissolve, and exact zero throughout Dormant Time. Candidate phase is deterministic per lattice cell, so the same identity returns asynchronously on the next cycle. Lifecycle does not depend on any motion, pulse, rotation, or shape amount.
+
+Size pulse and shape change are eased in and out inside Stable Time. Formation and Dissolve therefore return to the accepted authored base contour and cannot be reversed by a pulse wave.
+
+### Rigid evolution and smear removal
+
+The nonlinear value-noise coordinate warp, derivative-basis inversion, and local metric correction are removed. Candidate-local position is now:
+
+```text
+Delta_i(p,t) = p - Centre_i(t)
+Centre_i.y(t) = StaticCentre_i.y
+                + CandidateSpacing × LateralAmount × wave_i(t)
+```
+
+The spatial Jacobian of translation is the identity. Rotation uses an orthonormal axis transform. Neither operation can shear, fold, or stretch a candidate. Downstream Speed remains a uniform River-space translation of the complete field.
+
+### Independent living variation
+
+```text
+livingRadius = authoredRadius
+               × lifeRadiusScale
+               × (1 + SizePulseAmount × pulseWave × stableAuthority)
+```
+
+`Size Pulse Amount` is a direct fractional radius excursion: `0.20` means `80%–120%` while established. It never controls death or Dormant Time.
+
+B.2K supersedes the old single-axis A-to-B contour interpolation. Static Shape Irregularity remains the accepted cosine-harmonic contour. Shape Change independently adds a candidate-specific sine-harmonic target moving through an orthonormal two-axis coefficient plane. The target uses a positive fixed coefficient budget and squared-radius blending with a phase-invariant angular mean, so the silhouette redistributes area without becoming a Size Pulse. Candidate Radius remains the area-equivalent scale; the bounded `1.52x` lobe reach is handled by the adaptive search.
+
+### Candidate-search completeness
+
+B.2F originally used an adaptive `3×3`/`5×5` search for the then-approved `0.25 × spacing` lateral excursion. B.2H expanded rigid travel to an adaptive `3×3` through `5×9` contract. B.2K retains the same rectangular derivation but multiplies radius reach by the conservative multi-axis lobe factor:
+
+```text
+shapeReach = sqrt(lerp(1, 1.52^2, ShapeChangeAmount))
+```
+
+The maximum lateral offset therefore extends to five source cells, producing a `5×11` maximum only when the combined radius, morph, jitter, and lateral settings require it. The area-equivalent candidate-radius base remains:
+
+```text
+0.65 Radius Ratio × 1.42 Size Irregularity × 1.45 Size Pulse
+= 1.338 × Candidate Spacing
+```
+
+No texture, texture sample, compute dispatch, persistent field, Layer C/D write, Strand change, Fray change, or production-order change is added.
+
+### Migration
+
+Serialized tuning version 7 assigns the deliberate slow lifecycle defaults `2.5 / 5 / 2.5 / 4 seconds`. The rejected nonlinear warp is not preserved. Legacy Evolution Amount migrates only to the bounded authorities that have a truthful equivalent:
+
+```text
+Lateral Motion Amount = 0
+Rotation Amount       = 0
+Size Pulse Amount     = old amount × 0.08 radius
+Shape Change Amount   = old amount
+```
+
+The rejected nonlinear warp is not reinterpreted as rigid movement. Lateral and rotation therefore start neutral and require deliberate authoring.
+
+All independent speeds receive slow defaults. Existing Edge Coverage, Interior Access, candidate construction, Strands, and temporary legacy Fray remain unchanged.
+
+
+## Superseded Chip turnover and warp-safety model — `4.11C.5.17B.2D2B-B.2E`
+
+B.2D production selection is retained. B.2E changes exactly three remaining responsibilities without adding a resource or changing Strands, Fray, Layer C, or Layer D.
+
+### Candidate-independent eligibility domain
+
+`Chip Eligibility Composite` no longer consumes current candidate contours, Activation, lifecycle phase, or current Evolution position. It now displays the potential permission field:
+
+```text
+preChipVisibleSupport
+× binaryAntialiasedMaterialAdmission
+× max(edgeEligibility, Chip Interior Access)
+```
+
+`Chip Interior Access` is a probability over deterministic candidate cells, so its candidate-independent representation is expected permission authority across the visible body. Fractional Interior Access therefore changes yellow intensity rather than drawing current candidate blobs. `Chip Final Selection` and `Production Chip Mask` remain the current-candidate diagnostics.
+
+### Complete candidate turnover
+
+At full Evolution Amount, each participating candidate now has exact lifecycle endpoints:
+
+```text
+birth:  radius = 0, visibility = 0
+mature: radius reaches the authored maximum, visibility = 1
+release: radius = 0, visibility = 0
+next cycle: deterministic asynchronous return through frac(candidate clock)
+```
+
+The old `0.13×` minimum radius is removed. A pixel-footprint gate suppresses unresolved birth/death remnants; Evolution Amount `0` remains on the unchanged static path.
+
+### Bounded spatial evolution
+
+Spatial coordinate warp authority is capped at `0.20`. Values above `0.20` continue increasing lifecycle, pulse, and contour-morph authority but cannot increase coordinate displacement or fold severity. The derivative-basis correction now:
+
+```text
+rejects reversed or near-collapsed bases through a smooth stability weight;
+limits corrected local-vector magnitude to 0.67×–1.50×;
+blends to the uncorrected evolved-space delta when the basis is unstable.
+```
+
+This replaces the former inverse correction that permitted up to `6×` local-vector amplification. No texture, sample, kernel, dispatch, buffer, persistent write, serialized control, migration, or candidate-loop expansion is added.
+
+
+## Visible Chip domain and binary admission — `4.11C.5.17B.2D2B-B.2D` — implemented, Unity validation pending
+
+The B.2C composite exposed a real production limitation, not merely a diagnostic mismatch. Production `Chip Selection Depth` was evaluated against `materialEdgeDepth = baseMask`, which is a local Presence-derived coverage value rather than geometric distance from the Foam boundary. Established material saturates that scalar to `1`, while the serialized selector stops at `0.95`; established Foam was therefore mathematically unavailable to the Chip path. The same path multiplied `materialBody` twice and used a smooth Material Pattern value as cut strength, allowing hardening to erase many partial cuts.
+
+B.2D makes the zero-resource contract explicit instead of pretending that local Presence amplitude contains interior distance:
+
+```text
+Chip Edge Coverage
+  retains the old low-cost Presence-transition selector;
+  low values permit thin weak-material strips;
+  high values permit all non-saturated edge material;
+  it does not claim geometric distance through an established body.
+
+Chip Interior Access
+  candidate-level deterministic permission for established visible Foam;
+  0 keeps every activated candidate edge-only;
+  1 grants every activated candidate full visible-body permission;
+  intermediate values admit complete connected candidates, not pixel noise.
+
+```
+
+The production formula is now:
+
+```text
+preChipVisibleSupport = ResolveBaseCoverage(preChipMask)
+
+edgeSelection =
+    activatedCandidates
+    × materialBody
+    × edgeBand(Chip Edge Coverage)
+
+interiorSelection =
+    activated candidates admitted by Chip Interior Access
+
+productionChipSelection =
+    preChipVisibleSupport
+    × max(edgeSelection, interiorSelection)
+```
+
+`materialBody` is applied once. At `Chip Activation = 1` and `Chip Interior Access = 1`, every activated candidate can reach selection value `1` anywhere beneath the pre-Chip visible Foam body. Candidate spacing, radius ratio, irregularity, lifecycle, motion, and contour coverage are then the only remaining spatial limits. B.2J adds no texture, texture sample, compute kernel, dispatch, buffer, Layer C write, Layer D write, or candidate-search expansion; the existing adaptive B.2H rectangular search remains unchanged.
+
+Serialized tuning version 6 still initializes existing Rivers to `Interior Access = 0`. The removed historical admission value is no longer read, bound, or clamped.
+
+At B.2D, the Chip composite was corrected only to compare pre-material Chip Final Selection against pre-Chip rendered coverage rather than a post-breakup mask. B.2E then made the permission diagnostic candidate-independent. B.2J preserves that contract while reducing the domain to the independent Edge Coverage and Interior Access authorities.
+
+### Canonical methods-tried ledger
+
+| Method | Status | Reason |
+| --- | --- | --- |
+| Treat Presence-derived `baseMask` as geometric Chip depth | Rejected | Saturates throughout established Foam and cannot encode inward distance. |
+| Raise the existing threshold alone | Rejected | Cannot recover information absent from a flat saturated scalar; even `1` remains derivative-band dependent. |
+| Smooth Material Pattern multiplied as Chip strength | Rejected | Partial values are frequently swallowed by the later hardening thresholds. |
+| New Chip distance texture or compute pass | Rejected by current constraint | Would provide real distance but violates the approved zero-resource architecture. |
+| Separate edge coverage from candidate-level interior permission | Implemented in B.2D | Gives truthful edge-only control and guaranteed whole-body endpoint without new resources. |
+| Binary antialiased Material Pattern admission | Rejected after Unity evidence | Produced disconnected transported ranking islands and duplicated Activation/Interior Access ownership. |
+| Threshold visible-support/material-depth geometric mean | Rejected after B.2I validation | Local coverage saturated through established bodies, useful response collapsed near one, and the serial multiplier made it dependent on Interior Access. |
+| Remove the third gate; keep Edge Coverage and Interior Access as parallel permissions | Implemented in B.2J | Restores independent control ownership and removes unnecessary per-fragment admission work. |
+| Single soft Fray threshold from `0.88` to `0.30` with unbounded `fwidth` | Rejected after C.1 Unity evidence | Maximum Coverage never admitted the complete perimeter, while wide threshold antialiasing changed partial displacement across mostly the same locations. |
+| `1 - Coverage` admission plus a `0.55–1.0` continuous serration profile | Rejected after C.1A Unity evidence | High Coverage admitted broad edge areas but never restored untouched gaps, so Fray read as smooth large-area recession rather than teeth. |
+| Independent Strand-side Fray cutter | Rejected after C.1A Unity evidence | Ignored all Fray controls and produced visible tooth-like cuts when Fray Amount and Tooth Depth were zero. |
+| Fray master-off contract plus separate cluster/tooth patterns | Implemented in C.1B, validation pending | Makes zero authoritative across final and Strand boundaries, retains untouched gaps at maximum Amount, and uses camera-readable tooth sizes without new resources. |
+| Three cosine harmonics interpolated along one A-to-B line | Rejected after B.2J validation | Stayed mirror-symmetric, depended on Shape Irregularity, and read as one dragged blob with weak pulse-like flexing. |
+| Independent sine-harmonic two-axis temporal geometry | Accepted in B.2K; timing decoupled in B.2L | Decouples temporal shape from static irregularity, keeps coefficient authority constant, and redistributes lobes without changing radius controls. |
+| One cycles-per-second control for both target cadence and transition speed | Rejected after B.2K validation | Correct geometry could still switch abruptly because event spacing and interpolation duration were inseparable. |
+| Shape Change Cadence plus Shape Transition Time | Implemented in B.2L, validation pending | Uses constant-distance deterministic targets and quintic transitions so event frequency and actual geometric speed are independently authored. |
+| Candidate-shaped Eligibility Composite | Rejected after B.2D validation | Showed where current chips landed, not the candidate-independent area where Chipping is permitted. |
+| Expected permission field for fractional Interior Access | Implemented in B.2E | Represents candidate-level admission probability without changing production behavior. |
+| Lifecycle radius floor of `0.13×` | Rejected | Prevented true growth from and return to zero. |
+| Spatial warp authority across the full Evolution Amount range | Rejected | Increased coordinate fold and smear risk beyond the visually usable range. |
+| Warp capped at `0.20`, full-range lifecycle/morph authority retained | Implemented in B.2E | Separates useful turnover from unsafe coordinate deformation. |
+| Up to `6×` inverse-basis correction | Rejected | Allowed near-fold metric reconstruction to amplify local deltas into streaks. |
+| Stability-gated `0.67×–1.50×` local correction | Implemented in B.2E | Bounds correction and falls back smoothly near collapsed or reversed bases. |
+| Coupled Evolution Amount/Rate for lifecycle, motion, pulse, and morph | Rejected after B.2E validation | Could not provide slow death/dormancy and independent tuning. |
+| Zero-duration dormant phase | Rejected | Candidate immediately re-entered formation and read as twinkling. |
+| Nonlinear coordinate warp plus inverse metric correction | Rejected and removed in B.2F | Continued to permit smeared or elongated candidates. |
+| Explicit four-stage lifecycle independent of variation | Implemented in B.2F | Guarantees formation, stable dwell, dissolve, and exact dormant dwell. |
+| Rigid translation/rotation with bounded pulse/morph pairs | Implemented in B.2F | Gives independent physical ownership and removes motion-induced stretching. |
+| Adaptive `3×3`/`5×5` candidate search | Implemented in B.2F | Preserves complete coverage when pulse or lateral travel exceeds compact reach. |
+| Whole-candidate fade from `0.75–2.0 px` projected radius | Rejected after B.2F validation | Combined with Foam hardening, it erased stable distant Chips rather than merely antialiasing them. |
+| Increase all world-space Chip radii for distant readability | Rejected | Would make close Chips oversized and would not account for projection angle or resolution. |
+| Unbounded exact screen-size locking | Rejected | Would create arbitrarily large world-space cuts and excessive overlap at extreme distance. |
+| Bounded singular-value projected-size LOD | Implemented in B.2G | Preserves world-space identity, enlarges only undersized Chips, keeps lifecycle zero endpoints, and caps world growth. |
+| Raise Lateral Motion Amount without expanding source-cell search | Rejected | Candidates can clip or disappear when translated beyond the searched lattice rows. |
+| Rigid `0–2.5 spacing` lateral travel with exact adaptive rectangular search | Implemented in B.2H | Provides tenfold travel authority while preserving complete candidate contours and smaller search tiers at lower settings. |
+
 
 ## Purpose
 
@@ -11,7 +493,7 @@ The goal is to reproduce the broad behavior of the visual inspiration river: sty
 The target is not a physically exact fluid solver and not a foam entity database. The target is a fixed-grid mathematical field system with strict ownership boundaries and no circular dependencies.
 
 
-## Eligibility composites and shape-preserving Chip advection — `4.11C.5.17B.2D2B-B.2C`
+## Historical evidence gate — eligibility composites and shape-preserving Chip advection — `4.11C.5.17B.2D2B-B.2C`
 
 Unity evidence from B.2B showed that the large coordinate warp could stretch otherwise valid Chip blobs into long ribbons. The cause was architectural: the warped coordinate controlled both candidate movement and local contour distance. B.2C keeps the same large animated lookup field, but converts each candidate-local delta back into the unwarped River metric through screen-space derivative bases before evaluating the connected contour. The field still controls candidate translation, compression, turnover, and clustering; it no longer owns local chip aspect ratio. Near coordinate folds, the inverse is bounded to prevent unbounded correction.
 
@@ -26,7 +508,7 @@ Cyan        eligibility outside the rendered mask;
 Bright yellow rendered Foam overlapping eligibility.
 ```
 
-These views compare the actual rendered silhouette against the existing Chip Edge Eligibility and Fray Permitted Band. B.2C deliberately does not alter either eligibility formula; their correction is evidence-gated by the composite results. No texture, compute dispatch, buffer, persistent state, authoring control, candidate-loop expansion, Strand change, or Fray production change is introduced.
+At B.2C time these views compared the post-breakup rendered silhouette against the then-current Chip Edge Eligibility and Fray Permitted Band. B.2C deliberately did not alter either formula. Its Chip comparison contract and production eligibility are superseded by B.2D above; the Fray evidence remains preliminary until `2D2B-C`. No texture, compute dispatch, buffer, persistent state, authoring control, candidate-loop expansion, Strand change, or Fray production change was introduced.
 
 ## Chaotic Chip advection and geometric turnover — `4.11C.5.17B.2D2B-B.2B`
 
@@ -87,14 +569,13 @@ At Shape Irregularity `0`, one circle occupies the candidate outer radius. B.1A 
 
 Distribution, size, and shape hashes remain stable and independent. B.2B adds coordinate advection, geometric turnover, and contour morphing without changing those authoring meanings.
 
-## Production Chip handoff and remaining Fray contract — `4.11C.5.17B.2D2B-B`
+## Superseded production Chip handoff — `4.11C.5.17B.2D2B-B`
 
-The active order is:
+This section records the original B production contract and is superseded for Chip domain/admission mathematics by B.2D above. C.1 later inserted final-boundary Fray, and D.0 retired that feature. Current production order is:
 
 ```text
 Layer C persistent material and transported Material Pattern
 → analytical production Chip selection
-→ temporary legacy Fray
 → accepted Layer E Strands
 → final composition
 ```
@@ -125,8 +606,10 @@ Size Irregularity
   candidate-to-candidate radius variation only;
 Shape Irregularity
   circle to asymmetric connected-contour distortion only;
-Chip Selection Depth
-  maximum normalized material-edge depth eligible for removal.
+Chip Edge Coverage
+  edge-only Presence-transition territory eligible for removal;
+Chip Interior Access
+  deterministic fraction of candidate identities allowed beyond the edge band.
 ```
 
 Chip diagnostics are ordered and authoritative:
@@ -134,15 +617,16 @@ Chip diagnostics are ordered and authoritative:
 ```text
 Chip Candidate Field
 Chip Activated Candidates
-Chip Edge Eligibility
-Chip Final Selection       pre-material-gate proposal
-Chip Material Gate         transported Layer C eligibility
+Chip Edge Coverage
+Chip Eligibility Composite candidate-independent permission domain
+Chip Final Selection       current candidate intersections after both permissions
+Chip Interior Access       candidate-independent established-body authority
 Production Chip Mask       exact hardened coverage removed
 ```
 
 `Production Chip Mask` must agree with Final Foam. `Chip Activation = 0` must reproduce the pre-B result exactly. Strands remain unchanged and are clipped only because the already-chipped body reaches them first.
 
-Fray remains deliberately separate and unfinished. `Fray Selection Depth`, `Fray Wavelength`, and `Fray Depth` still drive diagnostics, while the hidden legacy Fray remains temporarily active until `2D2B-C` applies simple final-edge Fray after Strands. No new Fray resource or compute pass is planned.
+Historical C.1 superseded the diagnostic-only Fray prototype, but D.0 later retired the entire Fray production, authoring, binding, and diagnostic path. No Fray resource, control, helper, or debug view remains active.
 
 
 ## Play Mode topology startup policy — `4.11C.5.17B.P1`
@@ -454,7 +938,7 @@ The old serialized Spacing, Width, and Curvature values migrate into Scale, Dens
 
 D1D gives Strands a dedicated candidate-pattern pair without modifying the legacy Chip/Fray pair. Strand Scale builds that pair hierarchically from the existing broad, medium, and fine bands. Fine and medium contribution disappear first as their projected footprint becomes unresolved; if even the broad organization is unresolved, Strand authority returns to the coherent Foam body. Candidate thresholds receive derivative-aware antialiasing.
 
-Projected resolution now includes the transported Material Pattern derivative multiplied by the same seed factors used by the broad, diagonal, medium, fine, and anisotropic sources. The derivative is resolved outside wake/lee branching. Stored, warped, lead, and trail Strand patterns and resolution authority are transported with the soft shape that owns them; `max` paths choose the winning sample's pattern rather than applying the stored pattern to a different visible shape. The legacy Chip/Fray `breakupField` remains stored-authority exactly as before.
+Projected resolution now includes the transported Material Pattern derivative multiplied by the same seed factors used by the broad, diagonal, medium, fine, and anisotropic sources. The derivative is resolved outside wake/lee branching. Stored, warped, lead, and trail Strand patterns and resolution authority are transported with the soft shape that owns them; `max` paths choose the winning sample's pattern rather than applying the stored pattern to a different visible shape. At D1D time, the legacy Chip/Fray `breakupField` remained stored-authority; D.0 later removed that dead carrier after Fray retirement.
 
 D1D adds no texture sample, texture, buffer, persistent field, compute kernel, dispatch, readback, Layer C mutation, or Layer D mutation. It removes the extra D1C shaped-coordinate noise call and replaces it with arithmetic, transient Strand pattern/resolution values, and derivative-aware candidate selection.
 

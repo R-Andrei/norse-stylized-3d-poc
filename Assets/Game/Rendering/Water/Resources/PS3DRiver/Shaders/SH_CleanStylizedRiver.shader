@@ -106,21 +106,30 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamColour("Foam Colour", Color) = (0.94, 0.97, 0.94, 1)
         [HideInInspector] _FoamInteriorOpacityFloor("Foam Interior Opacity Floor", Range(0, 1)) = 0
         [HideInInspector] _FoamEdgeContrast("Foam Edge Contrast", Range(-1, 1)) = 0
-        [HideInInspector] _FoamFrayStrength("Foam Fray Strength", Range(0, 1)) = 0
-        [HideInInspector] _FoamBreakupScale("Foam Breakup Scale", Range(0, 1)) = 0.5
         [HideInInspector] _FoamChipActivation("Foam Chip Activation", Range(0, 1)) = 0
         [HideInInspector] _FoamChipCandidateSpacing("Foam Chip Candidate Spacing", Float) = 1.15
         [HideInInspector] _FoamChipDistributionIrregularity("Foam Chip Distribution Irregularity", Range(0, 1)) = 1
         [HideInInspector] _FoamChipRadiusRatio("Foam Chip Radius Ratio", Range(0.05, 0.65)) = 0.23913043
         [HideInInspector] _FoamChipSizeIrregularity("Foam Chip Size Irregularity", Range(0, 1)) = 1
         [HideInInspector] _FoamChipShapeIrregularity("Foam Chip Shape Irregularity", Range(0, 1)) = 1
-        [HideInInspector] _FoamChipSelectionDepth("Foam Chip Selection Depth", Range(0, 1)) = 0.42
-        [HideInInspector] _FoamChipFieldSpeed("Foam Chip Field Speed", Float) = 0
-        [HideInInspector] _FoamChipEvolutionRate("Foam Chip Evolution Rate", Float) = 0.2
-        [HideInInspector] _FoamChipEvolutionAmount("Foam Chip Evolution Amount", Range(0, 1)) = 0
-        [HideInInspector] _FoamFraySelectionDepth("Foam Fray Selection Depth", Range(0, 1)) = 0.68
-        [HideInInspector] _FoamFrayWavelength("Foam Fray Wavelength", Float) = 0.12
-        [HideInInspector] _FoamFrayDepth("Foam Fray Depth", Range(0, 1)) = 0
+        [HideInInspector] _FoamChipStableScreenRadiusPixels("Foam Chip Stable Screen Radius Pixels", Range(0, 4)) = 2
+        [HideInInspector] _FoamChipMaximumViewScale("Foam Chip Maximum View Scale", Range(1, 2.5)) = 1.75
+        [HideInInspector] _FoamChipSelectionDepth("Foam Chip Edge Coverage", Range(0, 1)) = 0.42
+        [HideInInspector] _FoamChipInteriorAccess("Foam Chip Interior Access", Range(0, 1)) = 0
+        [HideInInspector] _FoamChipFieldSpeed("Foam Chip Downstream Speed", Float) = 0
+        [HideInInspector] _FoamChipFormationTime("Foam Chip Formation Time", Float) = 2.5
+        [HideInInspector] _FoamChipStableTime("Foam Chip Stable Time", Float) = 5
+        [HideInInspector] _FoamChipDissolveTime("Foam Chip Dissolve Time", Float) = 2.5
+        [HideInInspector] _FoamChipDormantTime("Foam Chip Dormant Time", Float) = 4
+        [HideInInspector] _FoamChipLateralMotionAmount("Foam Chip Lateral Motion Amount", Range(0, 2.5)) = 0
+        [HideInInspector] _FoamChipLateralMotionSpeed("Foam Chip Lateral Motion Speed", Float) = 0.04
+        [HideInInspector] _FoamChipRotationAmountDegrees("Foam Chip Rotation Amount Degrees", Range(0, 180)) = 0
+        [HideInInspector] _FoamChipRotationSpeed("Foam Chip Rotation Speed", Float) = 0.04
+        [HideInInspector] _FoamChipSizePulseAmount("Foam Chip Size Pulse Amount", Range(0, 0.45)) = 0
+        [HideInInspector] _FoamChipSizePulseSpeed("Foam Chip Size Pulse Speed", Float) = 0.06
+        [HideInInspector] _FoamChipShapeChangeAmount("Foam Chip Shape Change Amount", Range(0, 1)) = 0
+        [HideInInspector] _FoamChipShapeChangeSpeed("Foam Chip Shape Change Cadence", Float) = 0.04
+        [HideInInspector] _FoamChipShapeTransitionTime("Foam Chip Shape Transition Time", Float) = 4
         [HideInInspector] _FoamStrandStrength("Foam Strand Strength", Range(0, 1)) = 0
         [HideInInspector] _FoamStrandScale("Foam Strand Scale", Range(0, 1)) = 0.55
         [HideInInspector] _FoamStrandDensity("Foam Strand Density", Range(0, 1)) = 0.5
@@ -276,21 +285,30 @@ Shader "PS3D/Stylized River Water"
                 half4 _FoamColour;
                 float _FoamInteriorOpacityFloor;
                 float _FoamEdgeContrast;
-                float _FoamFrayStrength;
-                float _FoamBreakupScale;
                 float _FoamChipActivation;
                 float _FoamChipCandidateSpacing;
                 float _FoamChipDistributionIrregularity;
                 float _FoamChipRadiusRatio;
                 float _FoamChipSizeIrregularity;
                 float _FoamChipShapeIrregularity;
+                float _FoamChipStableScreenRadiusPixels;
+                float _FoamChipMaximumViewScale;
                 float _FoamChipSelectionDepth;
+                float _FoamChipInteriorAccess;
                 float _FoamChipFieldSpeed;
-                float _FoamChipEvolutionRate;
-                float _FoamChipEvolutionAmount;
-                float _FoamFraySelectionDepth;
-                float _FoamFrayWavelength;
-                float _FoamFrayDepth;
+                float _FoamChipFormationTime;
+                float _FoamChipStableTime;
+                float _FoamChipDissolveTime;
+                float _FoamChipDormantTime;
+                float _FoamChipLateralMotionAmount;
+                float _FoamChipLateralMotionSpeed;
+                float _FoamChipRotationAmountDegrees;
+                float _FoamChipRotationSpeed;
+                float _FoamChipSizePulseAmount;
+                float _FoamChipSizePulseSpeed;
+                float _FoamChipShapeChangeAmount;
+                float _FoamChipShapeChangeSpeed;
+                float _FoamChipShapeTransitionTime;
                 float _FoamStrandStrength;
                 float _FoamStrandScale;
                 float _FoamStrandDensity;
@@ -865,7 +883,6 @@ Shader "PS3D/Stylized River Water"
                     _FoamInterpolation,
                     _FoamSharpness,
                     _FoamFinalVisibilityMode,
-                    _FoamBreakupScale,
                     _FoamStrandStrength,
                     _FoamStrandScale,
                     _FoamStrandReach,
@@ -897,47 +914,50 @@ Shader "PS3D/Stylized River Water"
                     (foamDebug == 18 || foamDebug == 19)
                         ? 1.0
                         : 0.0;
-                float evaluateFrayDiagnostics =
-                    (foamDebug == 22 || foamDebug == 23 ||
-                        foamDebug == 27)
-                        ? 1.0
-                        : 0.0;
                 RiverWaterFoamSelectionDiagnostics selectionDiagnostics =
                     RiverWaterFoamEvaluateSelectionDiagnostics(
                         foam.materialPattern,
                         input.domainData.x,
                         input.domainData.y,
                         foam.materialEdgeDepth,
+                        foam.mask,
                         evaluateChipSelection,
                         evaluateChipCandidates,
                         evaluateCandidatesOutsideMaterial,
-                        evaluateFrayDiagnostics,
                         _FoamChipActivation,
                         _FoamChipCandidateSpacing,
                         _FoamChipDistributionIrregularity,
                         _FoamChipRadiusRatio,
                         _FoamChipSizeIrregularity,
                         _FoamChipShapeIrregularity,
+                        _FoamChipStableScreenRadiusPixels,
+                        _FoamChipMaximumViewScale,
                         _FoamChipSelectionDepth,
+                        _FoamChipInteriorAccess,
                         _FoamChipFieldSpeed,
-                        _FoamChipEvolutionRate,
-                        _FoamChipEvolutionAmount,
-                        _Time.y,
-                        _FoamFraySelectionDepth,
-                        _FoamFrayWavelength,
-                        _FoamFrayDepth);
+                        _FoamChipFormationTime,
+                        _FoamChipStableTime,
+                        _FoamChipDissolveTime,
+                        _FoamChipDormantTime,
+                        _FoamChipLateralMotionAmount,
+                        _FoamChipLateralMotionSpeed,
+                        _FoamChipRotationAmountDegrees,
+                        _FoamChipRotationSpeed,
+                        _FoamChipSizePulseAmount,
+                        _FoamChipSizePulseSpeed,
+                        _FoamChipShapeChangeAmount,
+                        _FoamChipShapeChangeSpeed,
+                        _FoamChipShapeTransitionTime,
+                        _Time.y);
 
                 float productionChipRemovedMask;
                 float finalFoamMask = RiverWaterFoamApplyEdgeBreakup(
                     foam.mask,
                     foam.softVisibility,
-                    foam.materialEdgeDepth,
                     foam.strandSoftVisibility,
-                    foam.breakupField,
                     foam.strandPattern,
                     foam.strandResolution,
                     selectionDiagnostics.chipProductionSelection,
-                    _FoamFrayStrength,
                     _FoamStrandStrength,
                     _FoamStrandDensity,
                     _FoamStrandReach,
@@ -968,7 +988,8 @@ Shader "PS3D/Stylized River Water"
                     foamComposition.opacity);
                 finalColour = MixFog(finalColour, input.motionData.w);
 
-                if (foamDebug >= 18 && foamDebug <= 27)
+                if ((foamDebug >= 18 && foamDebug <= 21) ||
+                    (foamDebug >= 24 && foamDebug <= 26))
                 {
                     if (foamDebug == 18)
                     {
@@ -1004,36 +1025,15 @@ Shader "PS3D/Stylized River Water"
                             1.0);
                     }
 
-                    if (foamDebug == 22)
-                    {
-                        float permitted =
-                            selectionDiagnostics.frayPermittedBand;
-                        return half4(
-                            float3(0.0, permitted, permitted),
-                            1.0);
-                    }
-
-                    if (foamDebug == 23)
-                    {
-                        float frayPreview =
-                            selectionDiagnostics.frayPatternPreview;
-                        return half4(
-                            float3(
-                                frayPreview,
-                                frayPreview * 0.42,
-                                0.0),
-                            1.0);
-                    }
-
                     if (foamDebug == 24)
                     {
-                        float materialGate =
-                            selectionDiagnostics.chipMaterialGate;
+                        float interiorAuthority =
+                            selectionDiagnostics.chipInteriorAuthority;
                         return half4(
                             float3(
-                                materialGate * 0.16,
-                                materialGate,
-                                materialGate * 0.24),
+                                interiorAuthority * 0.16,
+                                interiorAuthority,
+                                interiorAuthority * 0.24),
                             1.0);
                     }
 
@@ -1048,22 +1048,32 @@ Shader "PS3D/Stylized River Water"
                             1.0);
                     }
 
-                    float renderedFoam = saturate(finalFoamMask);
-                    float eligibility = foamDebug == 26
-                        ? saturate(
-                            selectionDiagnostics.chipEdgeEligibility)
-                        : saturate(
-                            selectionDiagnostics.frayPermittedBand);
-                    float overlap = renderedFoam * eligibility;
-                    float renderedOnly =
-                        renderedFoam * (1.0 - eligibility);
-                    float eligibilityOnly =
-                        eligibility * (1.0 - renderedFoam);
-                    float3 compositeColour =
-                        renderedOnly * float3(0.18, 0.18, 0.18) +
-                        eligibilityOnly * float3(0.0, 0.72, 0.82) +
-                        overlap * float3(1.0, 0.88, 0.10);
-                    return half4(compositeColour, 1.0);
+                    if (foamDebug == 26)
+                    {
+                        float renderedFoam =
+                            RiverWaterFoamResolveBaseCoverage(foam.mask);
+                        float eligibility = saturate(
+                            selectionDiagnostics.chipPotentialEligibility);
+                        // Potential eligibility is already clipped by the same
+                        // visible support. Do not multiply it by that soft mask
+                        // a second time: yellow intensity must remain the exact
+                        // expected permission authority authored by the three
+                        // eligibility controls.
+                        float supportMembership = step(
+                            0.0001,
+                            renderedFoam);
+                        float overlap =
+                            eligibility * supportMembership;
+                        float renderedOnly =
+                            renderedFoam * (1.0 - eligibility);
+                        float eligibilityOnly =
+                            eligibility * (1.0 - supportMembership);
+                        float3 compositeColour =
+                            renderedOnly * float3(0.18, 0.18, 0.18) +
+                            eligibilityOnly * float3(0.0, 0.72, 0.82) +
+                            overlap * float3(1.0, 0.88, 0.10);
+                        return half4(compositeColour, 1.0);
+                    }
                 }
 
                 if (foamDebug == 17)
@@ -1087,13 +1097,10 @@ Shader "PS3D/Stylized River Water"
                         RiverWaterFoamApplyEdgeBreakup(
                             evaluatedShape,
                             evaluatedShape,
-                            foam.materialEdgeDepth,
                             evaluatedStrandShape,
-                            foam.breakupField,
                             foam.strandPattern,
                             foam.strandResolution,
                             selectionDiagnostics.chipProductionSelection,
-                            _FoamFrayStrength,
                             _FoamStrandStrength,
                             _FoamStrandDensity,
                             _FoamStrandReach,

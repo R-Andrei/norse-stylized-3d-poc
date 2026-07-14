@@ -67,7 +67,7 @@ MassGenerator.GenerateBoundedSingleEdgeBevelPreview(...)
     -> EdgeWearEvaluationMode.BoundedSingleEdgePreview
     -> shared selection and corner solve
     -> one bounded source edge selected by stable ordinal
-    -> one bounded bevel polygon plus two endpoint caps
+    -> one bounded bevel polygon, two clipped endpoint-support faces, and zero endpoint caps
     -> one bounded-edge compact audit
 ```
 
@@ -97,14 +97,17 @@ The following files retain the previous replacement-face, strip, patch, boundary
 | `BuildBoundedSingleEdgeEligibleList` | Produces the stable source-edge order from selected internal manifold edges. Eligibility does not depend on the shared multi-edge width solution. |
 | `TrySolveBoundedIsolatedSingleEdgeRails` | Starts from the normal per-edge width and tries at most twelve deterministic reductions until four stable isolated rail points are available. |
 | `TrySolveBoundedIsolatedRailPoint` | Offsets only the selected edge support line, leaves the endpoint-adjacent support line at zero, projects the accepted solution onto the exact graph-owned target boundary, certifies both analytical face planes, and records the canonical point plus snap distance. |
-| `TryBuildBoundedSingleEdgeFaces` | Clones the source shell, inserts four exact graph-owned collinear endpoint-boundary subdivisions, geometrically modifies only the two owner faces, and emits one bounded rail quadrilateral plus two local endpoint caps. |
+| `TryBuildBoundedSingleEdgeFaces` | Clones the source shell, clips the two endpoint-support corners and two selected-edge owner faces, then emits one bounded rail quadrilateral with no endpoint-cap polygons. |
 | `TryClipBoundedOwnerSourceFace` | Projects one convex owner face and its isolated rail into a local 2D basis, clips the polygon against the rail half-plane while retaining the non-edge side, snaps the two intersections to the rail endpoints, and certifies planarity, simplicity, convexity, and winding. |
-| `TryInsertBoundedRailSubdivisions` | Uses the stored adjacent graph-edge and opposite-face provenance to split each exact target boundary once; it performs no nearest-segment search across unrelated faces. |
+| `TryClipBoundedEndpointSupportFaces` | Pairs rails `0/2` and `1/3` by source endpoint, requires one exact support face per pair, and installs both validated support-face replacements. |
+| `TryClipBoundedEndpointSupportFace` | Verifies exact graph-face and incident-edge ownership, replaces one original endpoint vertex with the ordered previous/next rail pair, and certifies the clipped support polygon. |
 | `TryPrepareBoundedPreviewFaces` | Preserves collinear boundary subdivisions through input validation, weld, conformity, seam repair, and final validation. Convexity uses a temporary duplicate/collinear-simplified loop without altering the audited topology, and failures record exact stage, face, provenance, polygon category, and canonical-subdivision involvement. |
-| `TryCreateBoundedFace` | Creates one bounded bevel or endpoint-cap polygon with explicit bounded provenance and construction-time preferred orientation. Final shell outwardness is certified separately after preparation. |
-| `TryOrientBoundedGeneratedFacesOutward` | Uses the original convex solid centre to reverse and reconstruct only inward `BoundedEdgeBevel` or `BoundedEndpointCap` faces, then requires zero remaining generated-face winding failures. Original source faces are not reordered. |
-| `AuditBoundedSourceFaceChanges` | Normalizes collinear subdivisions before comparison, requiring exactly two geometrically modified owner faces and zero unrelated source-surface changes after final preparation. |
+| `TryCreateBoundedFace` | Creates the one bounded bevel polygon with explicit provenance and construction-time preferred orientation. Final shell outwardness is certified separately after preparation. |
+| `TryOrientBoundedGeneratedFacesOutward` | Uses the original convex solid centre to reverse and reconstruct an inward `BoundedEdgeBevel`, then requires zero remaining generated-face winding failures. Historical endpoint-cap handling remains inert because EW-B1.6 emits no caps. Original source faces are not reordered. |
+| `AuditBoundedSourceFaceChanges` | Requires exactly two modified owners and two modified endpoint-support faces, while separately reporting any unexpected source-surface or boundary-only change. |
 | `AuditBoundedRailFidelity` | Measures solved-corner retention and any final bevel-polygon extent beyond the four rail bounds. |
+| `AuditBoundedResultConvexity` | Tests every result vertex against every outward result-face half-space and records the worst violation provenance. |
+| `AuditBoundedFaceIntersections` | Reuses directed triangle intersection predicates to report improper coplanar overlaps and non-coplanar face intersections. |
 | `TryTriangulateBoundedPreviewFaces` | Classifies convexity through the same temporary duplicate/collinear-reduced loop used by preparation, chooses an interior fan centre from that region, and emits one oriented triangle per segment of the unchanged real boundary. Failures record exact face and provenance. |
 
 ## Plane-cut kernel
@@ -189,13 +192,18 @@ The active preview no longer calls the global solve. This file remains compiled 
 ```text
 GeneratedMass bounded edge compact audit.
 boundedEdge=candidateCount/selectedOrdinal/sourceEdge/isolatedRailSolved/widthAttempts/solvedWidth/targetBoundaries/ownerClips/boundarySubdivisions/bevelFaces/endpointCaps/modifiedSourceFaces/foreignSourceFacesModified/railDeviation/maxExtentBeyondRails/valid
+boundedEdgeClass=selected owner faces/normals/normal dot/dihedral/cross-face interior signed distances/solid-centre sidedness/tolerance/classification and full eligible-pool classification counts
 boundedOwner=attempted/clipped/intersectionFailure/degenerate/nonPlanar/nonSimple/nonConvex/windingFailure
 boundedPrepare=attempted/succeeded/inputFaces/inputVertices/inputUniqueVertices/outputFaces/outputVertices/outputUniqueVertices/welded/conformed/seamPairs/seamTouchedFaces/inputTopology/outputTopology/inputVolume/outputVolume/volumeDelta/volumeRatio/exactFailure
 boundedSourcePrepare=the same complete preparation evidence for the untouched source baseline
 boundedTopology=open/nonManifold/tJunction/invalidFaces
 boundedBounds=raw/prepared validity, tolerance, raw/prepared/result minima and maxima, and per-side containment margins
+boundedSolid=source-convexity plane violations and exact result-versus-source-plane containment violations with provenance
 boundedVolume=rawSource/preparedSource/result/rawRatio/preparedRatio/sourcePreparationRatio/rawDelta/preparedDelta/minimumRatio/maximumRatio/lowerMargin/upperMargin/valid
+boundedLocalVolume=signed source/result volumes plus original/replacement owner, bevel, endpoint-cap, foreign, local/global delta, and residual attribution
 boundedCertification=attempted/facesReoriented/outwardWindingFailures
+boundedBevelPlane=construction plane/final face normals, agreement, plane distance, solid/source-edge sidedness, and rail residual
+boundedVolumeCrossCheck=diagnostic triangulation attempt/validity, signed/absolute triangle volume, and polygon/triangle deltas
 boundedMesh=triangles/triangulatedFaces/degenerate/open/nonManifold/winding/bounds/volume/exact triangulation failure
 geometryCommit=disabled
 ```
@@ -329,3 +337,524 @@ In Edit Mode only, `GeneratedMassEditor` can request the audited clone through t
 ## EW-B1.5R1 preparation-equivalent telemetry
 
 `TryPrepareBoundedFaces` is the single numerical preparation implementation for both the bounded shell and the untouched source baseline. `BoundedPreparationAudit` records input/output cardinality, topology, weld/conform/seam repair, volume drift, and exact failure provenance. `AuditBoundedSingleEdgeBevel` volume-certifies the result against the prepared source while preserving raw-source comparisons. `MassGenerator.EdgeWear.Diagnostics.Logging.cs` emits all cumulative fields in one bounded-edge record.
+
+## EW-B1.5R2 classification and attribution telemetry
+
+`AuditBoundedEdgeClassificationPool` and `AuditBoundedSelectedEdgeClassification` classify selected manifold edges without changing eligibility. `AuditBoundedSourceSolidContainment` distinguishes coarse AABB containment from exact half-space containment against every original source plane. `AuditBoundedLocalVolumeAttribution` decomposes the signed volume delta by source/replacement owner faces, bounded bevel, endpoint caps, and foreign faces using one common interior reference point. `AuditBoundedBevelPlaneSidedness` records the construction plane relationship to the solid centre and source edge. Topology-valid shells are triangulated for diagnostic cross-check even when bounds or retained-volume certification rejects preview adoption.
+
+
+## EW-B1.6 endpoint support clipping and shell certification
+
+`MassGenerator.EdgeWear.BoundedSingleEdge.cs` now builds the bounded single-edge shell without endpoint-cap polygons. `TryClipBoundedEndpointSupportFaces` pairs rails `0/2` at source endpoint A and rails `1/3` at endpoint B. `TryClipBoundedEndpointSupportFace` verifies exact graph-face ownership and incident-edge provenance, removes the original source vertex, inserts the two canonical rail vertices in source-boundary order, and validates the resulting convex support polygon.
+
+`AuditBoundedSourceFaceChanges` distinguishes the two owner modifications, two endpoint-support modifications, and any unexpected source-surface change. `AuditBoundedLocalVolumeAttribution` separately records original and replacement support-face contributions. Historical cap fields remain in telemetry and should report zero.
+
+`AuditBoundedResultConvexity` tests the final shell against every result face half-space. `AuditBoundedFaceIntersections` reuses the existing directed triangle intersection implementation to report improper coplanar overlaps and non-coplanar face intersections. Preview adoption now requires zero result-convexity violations and zero improper face-pair intersections in addition to the existing polygon, topology, bounds, volume, winding, and triangle-soup gates.
+Endpoint-support telemetry includes exact source/rail positions, support normals, graph-edge parameters, edge residuals, and support-plane residuals. The retained-volume upper ratio is `1.0`, so a shell that adds any measured material cannot be adopted as a valid bevel preview.
+
+
+## EW-B1.6R1 prepared source-change and intersection-delta audit
+
+`MassGenerator.EdgeWear.BoundedSingleEdge.cs` now executes `AuditBoundedSourceFaceChanges` twice: raw source versus prepared result is retained as historical numerical evidence, while prepared source versus prepared result drives the exact four-face modification gate. `ApplyBoundedSourceFaceChangeAudits` stores both datasets without deleting the earlier counters.
+
+`AuditBoundedFaceIntersections` now returns provenance-keyed pair evidence rather than mutating one result-only count. It runs over both prepared source and prepared result. `ApplyBoundedFaceIntersectionDelta` partitions pairs into unchanged, changed, new, and resolved sets and counts only introduced improper interior pairs as a hard failure. Every pair record includes transient face indices, provenance, coplanarity, shared vertices, shared boundary edges, source-graph adjacency, and boundary-contact status. `MassGenerator.EdgeWear.Diagnostics.Logging.cs` emits the complete datasets in the existing single bounded-edge record.
+
+No endpoint-support clipping, owner clipping, rail solving, bevel emission, candidate selection, volume threshold, production path, or River behavior changes in EW-B1.6R1.
+
+## EW-B1.6R2 prepared-source provenance certification
+
+`MassGenerator.EdgeWear.BoundedSingleEdge.cs` now creates an attributed raw source clone through `ClonePolygonFacesForPlaneCutAudit(..., assignSourceFaceProvenance:true)` before source-baseline preparation. `TryPrepareBoundedFaces` preserves those identities. Raw source-face changes use the attributed raw clone, while raw bounds, volume, containment, and source-solid authority continue to use the original source shell.
+
+`AuditBoundedSourceFaceProvenance` records the expected and observed source identity sets for attributed raw source, prepared source, and prepared result. It reports total/source/non-source/null face counts, unique valid identities, missing identities, duplicates, out-of-range identities, and first failure indices. `SourceProvenanceCertificationValid` is a hard prerequisite for source-change, intersection-delta, triangulation, and preview validity.
+
+`MassGenerator.EdgeWear.Diagnostics.Logging.cs` emits the cumulative `boundedSourceProvenance` group in the existing one-record bounded audit. No per-face Console messages are added.
+
+## EW-B2 unified all-edge implementation
+
+`MassGenerator.EdgeWear.BoundedAllEdges.cs` owns the experimental shared all-edge reconstruction. It evaluates each selected manifold edge with the isolated rail solver, builds one point cloud from retained source vertices and active rails, extracts supporting hull planes, orders and sanitizes hull facets, classifies source/bevel/junction provenance, and passes the result through the existing bounded preparation and certification pipeline.
+
+`GeneratedMass.cs` and `GeneratedMassEditor.cs` expose one authoritative `Rebuild Edge-Wear Bevel Preview` action. `MassGenerator.EdgeWear.Orchestration.cs` runs retained corner and plane-cut diagnostics, calls the unified bounded evaluator, logs one result, and publishes only a valid unified soup.
+
+## EW-B2.1 hull localization telemetry
+
+`BoundedAllEdgesAuditResult` now stores:
+
+```text
+stage / failureStage
+pointCloudRank / pointCloudBounds
+hullTriplesTested
+hullDegenerateTriples
+hullSupportingTriples
+hullStraddlingTriples
+hullPlanesCreated
+hullPlanesMerged
+hullPlanesBeforePrune
+hullPlanesRemovedUnderThreePoints
+hullPlaneCount
+hullPlanesAttempted
+hullFacesCompleted
+hullFailurePlaneIndex
+hullFailurePlaneNormal
+hullFailurePlaneDistance
+hullFailurePlanePointCount
+hullFailureOrderedVertexCount
+hullFailureSanitizedVertexCount
+hullFailureFacetArea
+hullFailureConvexityValid
+hullFailureReason
+```
+
+`TryBuildBoundedConvexHullPlanes` populates extraction counters before any return. `TryBuildBoundedHullFaces` records the exact facet stage and plane before returning. `RefreshBoundedAllEdgePlanCounts` prevents early hull failures from reporting a false zero active-edge count.
+
+`MassGenerator.EdgeWear.Diagnostics.Logging.cs` writes one concise Console summary and one complete UTF-8 telemetry file at `Library/GeneratedMassEdgeWearTelemetry.txt`. The file is overwritten per physical evaluation and contains the full retained plane diagnostic, hull points, hull faces, edge plans, and certification evidence. File-write success or exact failure is included in the Console summary.
+
+
+## EW-B2.2 normalization-safe hull-plane extraction
+
+`MassGenerator.EdgeWear.BoundedAllEdges.cs` extends `BoundedAllEdgesAuditResult` with:
+
+```text
+hullNearDegenerateTriples
+hullNormalizationRejectedTriples
+hullPostNormalizationInvalidTriples
+hullPlaneMinimumCrossMagnitude
+hullMinimumRejectedCrossMagnitude
+hullMaximumRejectedCrossMagnitude
+hullMinimumAcceptedCrossMagnitude
+hullInvalidPlanesRemoved
+hullFirstInvalidPlaneIndex
+hullFirstInvalidSeedA/B/C
+hullFirstInvalidSeedCrossMagnitude
+hullFirstInvalidPlaneReason
+hullPlaneEvidence
+```
+
+`BoundedHullPlane` now retains `SeedPointA/B/C`, `SeedCrossMagnitude`, and the minimum/maximum merged seed magnitude.
+
+`TryBuildBoundedConvexHullPlanes` explicitly measures and divides the raw normal rather than using implicit Unity normalization. `RecordBoundedHullRejectedCrossMagnitude` preserves the rejected magnitude range. `TryValidateBoundedHullPlaneInvariant` certifies finite unit normal, finite distance, valid support references, plane residuals, and non-degenerate support rank before any facet is ordered. `FormatBoundedHullPlaneEvidence` writes complete retained-plane evidence to the detailed telemetry file.
+
+`MassGenerator.EdgeWear.Diagnostics.Logging.cs` keeps the Console summary bounded while reporting threshold/rejection/invariant counters and writes the full `hullPlanes` dataset to `Library/GeneratedMassEdgeWearTelemetry.txt`.
+
+## EW-B1.7 planar bevel rendering
+
+`MassGenerator.EdgeWear.BoundedSingleEdge.cs` now treats `PolygonFaceProvenanceKind.BoundedEdgeBevel` separately during final triangulation. It emits a direct convex fan anchored at an existing boundary vertex, producing `n - 2` triangles and zero inserted centre vertices. The complete bevel boundary is certified against the authoritative polygon plane before emission. `BoundedSingleEdgeAuditResult` retains region-level surface evidence and is reused by the unified evaluator through `CertificationAudit`.
+
+`MassGenerator.Types.cs` extends `TriangleSoup` with optional authored surface normals and authored surface-group keys. Existing triangle calls remain unchanged and store neither. Bevel-region triangles explicitly store their `PolygonFace.Normal` and one stable polygon group for all emitted vertices.
+
+`MassGenerator.MeshOutput.cs` resolves an authored surface normal before applying the fallback geometric flat normal. It writes one normal for every emitted vertex into `MeshData.Normals`, preserving prior flat normals for ordinary triangles while forcing all triangles of one bevel polygon to share the same plane normal. When a surface-group key exists, surface variation is hashed from that shared key rather than the duplicated triangle-soup vertex index, preventing internal colour/mask seams.
+
+`MassGenerator.EdgeWear.Diagnostics.Logging.cs` adds `boundedBevelRegion` to both single-edge and unified summaries and to the full telemetry file. The record includes polygon faces, boundary vertices, direct triangles, authored-normal triangles, authored surface-group triangles, internal fan vertices, plane residual, geometric-normal deviation, render validity, and exact failure evidence.
+
+`MassGenerator.EdgeWear.BoundedAllEdges.cs` requires the region render contract to pass before a unified preview may report geometry validity. No all-edge hull, suppression, rail, or point-cloud behavior changes in EW-B1.7.
+
+## EW-B3 all-edge preview authority
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+The `applyUnifiedBoundedPreview` branch no longer calls `AuditBoundedAllEdgesBevel`. It runs one shared `AuditExplicitChamferCornerSolution`, calls `AuditPlaneCutBevelKernel` once, logs the authoritative all-edge result, and returns the resulting complete shell. `UnifiedEdgeWearPreviewStatus` now maps:
+
+```text
+CandidateCount      = SelectedEdgeCount
+RailSolvedEdgeCount = ActiveEdgeCount
+ActiveEdgeCount     = PlanesBuilt
+DeferredEdgeCount   = PlanesDeferred
+RejectedEdgeCount   = PlanesRejected
+BevelFaceCount      = BevelRegionFaceCount
+TriangleCount       = PreviewTriangleCount
+```
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+The edge-only shell now records:
+
+```text
+BevelRegionFaceCount
+BevelRegionBoundaryVertexCount
+BevelRegionTriangleCount
+BevelRegionAuthoredNormalTriangleCount
+BevelRegionAuthoredSurfaceGroupTriangleCount
+BevelRegionInternalFanVertexCount
+BevelRegionMaximumPlaneResidual
+BevelRegionMaximumNormalDeviationDegrees
+BevelRegionRenderValid
+MaterializedEdgeCoverageValid
+ActiveEdgeEvidence
+BuiltEdgeEvidence
+DeferredEdgeEvidence
+```
+
+The old local `TriangulatePlaneCutPreviewFaces` centre-fan implementation is removed. Plane-shell faces pass through `TryTriangulateBoundedPreviewFaces`, and preview validity requires one rendered bevel surface for every built edge.
+
+### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+`IsOneSurfaceBevelFace` recognizes both `BoundedEdgeBevel` and `EdgeBevelPlane`. `TryFindStableOneSurfaceFanAnchor` selects an existing boundary vertex whose direct fan preserves every boundary segment without degenerate triangles. Surface-group keys include provenance kind and provenance index so separate bevel polygons cannot accidentally share material variation identity.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+`LogUnifiedAllEdgeBevelAudit` emits the authoritative one-line summary and rewrites `Library/GeneratedMassEdgeWearTelemetry.txt`. The record places selected/active/built/deferred/rejected coverage and one-surface evidence before secondary topology details. `FormatPlaneCutBevelAuditFields` now includes `planeSurface` and exact active/built/deferred edge sets.
+
+### `GeneratedMassEditor.cs`
+
+The sole button remains `Rebuild Edge-Wear Bevel Preview`. Inspector help now describes the all-edge edge-plane shell rather than the retired point-cloud hull. Success text reports materialized bevels, active selected edges, one-surface face count, triangles, and explicit deferred/rejected warnings.
+
+### `MassGenerator.EdgeWear.BoundedAllEdges.cs`
+
+Historical rejected point-cloud hull implementation. It remains source evidence only and is no longer called by the authoritative inspector action. Do not extend or repair this path unless a future decision explicitly reopens it.
+
+## EW-B3.1 staged failure telemetry additions
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutStageSnapshot` | Stores per-stage face, vertex, topology, invalidity, and face-planarity invariants. |
+| `PlaneCutFaceQualityFailureRecord` | Stores exact stable face identity, source edge, measured planarity failure, thresholds, offending geometry, preparation touches, and complete vertex residual evidence. |
+| `PlaneCutOpenEdgeFailureRecord` | Stores exact open-edge owner, geometry, source-vertex association, expected neighbour, nearest boundary mismatch, and cause. |
+| `PlaneCutJunctionCoverageRecord` | Stores per-source-vertex incident bevel coverage, junction expectation/emission, assigned open edges, and failure reason. |
+| `CapturePlaneCutStageSnapshot` | Audits one material polygon stage and records first-open/first-non-planar introduction. |
+| `CapturePlaneCutModifiedFaceIdentities` | Attributes boundary-conformity and seam-repair movement to stable face identities. |
+| `MeasurePlaneCutFacePlanarityDetailed` | Produces exact residual, normal-spread, offending vertex/segment, area, and minimum-edge evidence. |
+| `AuditPlaneCutOpenEdgeFailures` | Builds complete final open-edge dossiers and nearest expected-neighbour evidence. |
+| `AuditPlaneCutJunctionCoverage` | Summarizes every touched source vertex and identifies missing/duplicate junction coverage. |
+
+`TryPreparePlaneCutPreviewFaces` now accepts the active audit by reference so sanitation, welding, conformity, and seam repair are captured without changing their geometry behavior. Junction-solver trial preparation passes a local scratch audit and remains semantically unchanged.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `FormatPlaneCutPrimaryFailure` | Places the exact first failed face or open edge at the start of the Console record. |
+| `FormatPlaneCutStageTimeline` | Emits six compact stage snapshots. |
+| `FormatCappedPlaneCutFaceFailures` | Emits at most three representative face-quality dossiers in Console. |
+| `FormatCappedPlaneCutOpenEdges` | Emits at most four complete open-edge dossiers in Console. |
+| `FormatCappedPlaneCutJunctionFailures` | Emits at most three failed junction-coverage records in Console. |
+| `BuildPlaneCutDetailedTelemetry` | Writes named, structured failure sections to `Library/GeneratedMassEdgeWearTelemetry.txt` without expanding all successful geometry. |
+
+## EW-B3.2 numerical construction additions
+
+### `MassGenerator.Polyhedron.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `ClipPolyhedron(... enforceExactPlaneIntersections, useDistanceWelding, numericalRepairs)` | Enables the strict numerical contract only for an explicitly opted-in caller. |
+| `IntersectEdge` exact branch | Distinguishes genuine line-plane crossings from tolerance-only transitions and projects every emitted intersection onto the analytical cut plane. |
+| `ProjectPointOntoCutPlane` | Performs the authoritative orthogonal point-to-plane correction. |
+| cap residual gate | Reprojects cap points, measures residual before and after projection, and suppresses any cap exceeding `PointMergeDistance * 0.25`. |
+
+### `MassGenerator.Helpers.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `WeldSharedVerticesByDistance` | Deterministically chooses the nearest earlier canonical vertex inside `PointMergeDistance`; records comparisons, matches, actual movement, and maximum movement. |
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutNumericalRepairTelemetry` | Cumulative per-evaluation evidence for exact intersections, cap projection/certification, and radius welding. |
+| `TryBuildCleanPlaneCutEdgeOnlyShell` | Creates one numerical telemetry record per conflict pass and enables the strict contract for the authoritative shell. |
+| `TryPreparePlaneCutPreviewFaces(... numericalRepairs)` | Uses true-distance welding at the explicit `AfterWeld` stage when the authoritative shell supplied telemetry. |
+
+### `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`
+
+`TryBuildPlaneCutSystemFaces` accepts optional numerical telemetry. When present, every edge and junction cut uses exact plane intersections and true-distance welding. Existing junction-search and legacy callers that omit the telemetry remain unchanged.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+`FormatPlaneCutNumericalRepairs` adds a bounded `numerics:{...}` Console block and a `[Numerical Repairs]` detailed-file section. It reports intersection requests, strict crossings, projected tolerance fallbacks, cache reuse, projection count and maximum movement, cap projection/residual/rejection, and distance-weld comparison/match/movement evidence.
+## EW-B3.3 strict clipping additions
+
+### `MassGenerator.Polyhedron.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneClipPointClassification` | Separates exact `Inside`, `OnPlane`, and `Outside` states from the broader candidate removal epsilon. |
+| `ClipPolygonExact` | Executes strict Sutherland–Hodgman transitions and emits no same-side fallback geometry. |
+| `TryResolveExactClipIntersection` | Accepts only genuine strict crossings, validates shared-cache reuse, preserves owner and cut planes, and fails closed on any invariant violation. |
+| `TryConstrainPointToOwnerAndCutPlanes` | Computes the closest correction satisfying both analytical planes when raw segment interpolation exceeds strict residual tolerance. |
+| `SnapOnPlanePoint` | Canonically snaps only strict on-plane endpoints and records movement plus owner/cut residuals. |
+| `RecordExactClipFailure` | Captures the first stable owner/cut provenance, classifications, distances, residuals, and exact failure reason. |
+| cap validation path | Validates collected points without global one-plane reprojection and aborts the cut transaction on residual failure. |
+
+Legacy callers continue through `ClipPolygonLegacy`. The authoritative all-edge shell opts into `ClipPolygonExact` through its existing numerical-telemetry argument.
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+`PlaneCutNumericalRepairTelemetry` adds strict classification counts, on-plane snap evidence, prohibited fallback attempts, two-plane correction evidence, owner/cut residual maxima, exact construction failure count, cap validation count, and a first exact-failure dossier.
+
+### `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`
+
+`TryBuildPlaneCutSystemFaces` compares the cumulative exact-failure count around each edge or junction cut. A new failure aborts the shell with an explicit strict-clipping blocker; partial faces are never accepted.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+`FormatPlaneCutNumericalRepairs` extends the bounded Console `numerics` block. `AppendPlaneCutNumericalRepairDossier` writes the complete `[Strict Intersection Contract]` section, and `FormatPlaneCutPrimaryFailure` promotes an exact construction failure when no later face/topology dossier exists.
+
+## EW-B4.1 exhaustive Coverage and lifecycle additions
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `EdgeWearCoverageAudit` | Holds the per-evaluation source-edge population, structural/artistic/selection/materialization counts, stable lookup tables, and lifecycle records. |
+| `EdgeWearEdgeLifecycleRecord` | Stores one compact cumulative record for a source edge from eligibility through final plane-shell outcome. |
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `BuildEdgeWearBevelCandidates(..., out EdgeWearCoverageAudit)` | Builds all source-edge records, separates structural eligibility from artistic preference, and makes maximum Coverage exhaustive. |
+| `TryClassifyEdgeWearStructuralEdge` | Applies the established solid-centre/owner-plane convexity classifier before exhaustive selection. |
+| `MapEdgeWearCoverageAuditToGraph` | Assigns stable topology graph-edge IDs and selected state to lifecycle records. |
+| `ApplyEdgeWearCoverageCornerSolution` | Attributes solved width, width inactivity, and positive-width activity to selected records. |
+| `RecalculateEdgeWearCoverageAudit` | Rebuilds aggregate counts from the cumulative record set after each material stage. |
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutBevelAuditResult.CoverageAudit` | Carries complete selection/materialization evidence into Console and file telemetry. |
+| `FinalizeEdgeWearCoverageAfterPlaneShell` | Marks retained planes as built and attributes unresolved active edges to explicit deferral. |
+| `MarkUnresolvedEdgeWearCoverageAsRejected` | Gives active edges a stable failure reason when the shell transaction fails. |
+| `IsEdgeWearCoverageMaterialized` | Enforces the exhaustive maximum-Coverage equality contract while retaining lower-Coverage active-edge semantics. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `FormatEdgeWearCoverageSummary` | Emits bounded structural, artistic, selected, width, active, built, deferred, rejected, and unmapped counts. |
+| `FormatEdgeWearCoverageIdSummary` | Emits exact source-edge ID sets for each omission category. |
+| `AppendEdgeWearCoverageLifecycle` | Writes one detailed but compact line per source edge to `[Edge Lifecycle]`. |
+
+The primary Console record now labels explicit-junction counting as `legacyJunctionHeuristic=nonAuthoritative:1`. Full legacy records remain in the file for historical comparison but are not geometry blockers for a closed manifold shell.
+
+
+## EW-B4.2 conflict-cluster width reduction additions
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutConflictWidthReductionRecord` | Stores one bounded conflict retry: stable victim/foreign/source-vertex identities, cluster edge IDs, scale evidence, band metrics, and outcome. |
+| `TryBuildCleanPlaneCutEdgeOnlyShell` | Dispatches maximum Coverage to coordinated width reduction and lower Coverage to the historical candidate-deferral policy. |
+| `TryBuildCleanPlaneCutEdgeOnlyShellWithWidthReduction` | Rebuilds the complete selected shell, reduces local conflict clusters without removing candidates, and fails explicitly at a geometric floor or bounded pass budget. |
+| `BuildScaledPlaneCutCandidates` | Reconstructs one complete pass from immutable original candidates and cumulative per-edge scales. |
+| `ScalePlaneCutBevelCandidate` | Moves a bevel plane toward its source edge while preserving normal/provenance and recomputing strict positive removal and clip epsilon. |
+| `ResolvePlaneCutCandidateMinimumScale` | Derives the numerical width/removal floor from existing geometry tolerances. |
+| `TryBuildPlaneCutConflictCluster` | Expands victim/foreign/offending-vertex evidence into a deterministic local incident-edge cluster. |
+| `FinalizeEdgeWearCoverageAfterPlaneShell` | Records final materialized width, width scale, and width-reduced state for every built selected edge. |
+| maximum-Coverage preview gate | Publishes triangle soup only when both geometric certification and exhaustive coverage certification pass; a manifold partial shell remains diagnostics-only. |
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+`EdgeWearEdgeLifecycleRecord` now distinguishes solved width from final materialized width and records the final scale plus whether conflict resolution reduced the edge. `EdgeWearCoverageAudit` counts reduced built edges separately.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+`FormatPlaneCutEdgeConflictAudit` reports conflict mode, pass count, reduction count, minimum final scale, unresolved count, and legacy deferral evidence. `[Conflict Width Reduction]` contains one compact dossier per retry. The Console record now separates `geometryValid` and `coverageValid`, and maximum-Coverage artistic exclusions are labelled `wouldBeArtisticallyFiltered`.
+
+The local-junction-star text is retained as `legacyLocalJunctionDiagnostic` in the detailed file only; it is not an authoritative primary failure for a closed edge-plane shell.
+
+## EW-B4.2R1 diagnostic additions
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutTJunctionFailureRecord` | Stores one exact stage-specific T-junction vertex/host/ownership/provenance/scale/conflict dossier. |
+| `PlaneCutLocalityDeferralRecord` | Stores the complete solved-versus-localized plane and source-removal evidence for an active edge deferred before shell construction. |
+| `PlaneCutDiagnosticSegment` | Retains stable face and segment provenance while reproducing the topology T-junction predicate. |
+| `CapturePlaneCutTJunctionFailures` | Re-runs the authoritative T-junction geometry test with the same tolerance and creates exact records without modifying faces. |
+| `TryMeasurePlaneCutTJunction` | Measures interior segment parameter, closest point, and residual using the same endpoint exclusions as `AuditEdgeWearTopology`. |
+| `ResolvePlaneCutLastConflictForEdges` | Links a T-junction's associated bevel IDs to the latest width-reduction cluster that modified them. |
+| `FormatPlaneCutCandidateScaleEvidence` | Reports current materialized candidate widths and scales for associated edges. |
+| `TryBuildPlaneCutBevelCandidate` locality dossier | Records the limiting unrelated vertex and solved/localized source-removal values whenever the locality guard defers an edge. |
+| `PlaneCutConflictWidthReductionRecord.PreviousScaleEvidence / AppliedScaleEvidence` | Preserves exact per-edge scales for every conflict pass instead of only the cluster minimum. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `FormatPlaneCutTJunctionFailure` | Emits compact or complete host-segment and owner-face T-junction evidence. |
+| `FormatPlaneCutLocalityDeferral` | Emits compact or complete plane-locality evidence, including edge `0`'s limiting vertex and removal failure. |
+| `[T-Junction Failures]` | Contains every stage-specific T-junction dossier in the overwritten telemetry file. |
+| `[Locality Deferrals]` | Contains every active edge deferred by the locality guard before shell construction. |
+| `FormatPlaneCutPrimaryFailure` | Promotes the exact T-junction record ahead of the generic topology blocker. |
+
+EW-B4.2R1 is diagnostic-only. The stable EW-B4.1 implementation remains preserved separately as the rollback baseline.
+## EW-B4.2R2 topology-aware conflict closure additions
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `IsPlaneCutRetryGeometryClean` | Requires zero open, non-manifold, T-junction, invalid-face, and non-planar counts before a width-reduction retry may be accepted. |
+| `ClonePlaneCutScaleMap` | Preserves and restores a complete deterministic scale state for topology rollback. |
+| `TryBuildPlaneCutTopologyConflictCluster` | Legacy R2 broad-cluster helper retained for historical comparison; EW-B4.2R4 no longer calls it for T-junction recovery. |
+| `AddPlaneCutTopologyClusterEdge` | Adds stable edge/vertex membership and cumulative entry reasons to a topology cluster. |
+| `FindLatestPlaneCutConflictIntersectingEdges` | Resolves the latest previous reduction that touched any implicated bevel edge. |
+| `FormatPlaneCutClusterReasonEvidence` | Produces compact per-edge cluster-entry evidence for the structured telemetry file. |
+| `PlaneCutTJunctionFailureRecord.LinkedEdgeIndices` | Retains structured implicated source-edge IDs for solver use instead of reparsing formatted telemetry strings. |
+| `PlaneCutConflictWidthReductionRecord` topology fields | Records trigger category, band/topology state, topology counts, rollback application, cluster reasons, and previous/rollback/applied scale evidence. |
+| `TryBuildCleanPlaneCutEdgeOnlyShellWithWidthReduction` | Rejects topology-invalid retries, rolls back to the last topology-clean scale state, expands the interaction cluster, and accepts only band-clean plus topology-clean prepared shells. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+`FormatPlaneCutEdgeConflictAudit` reports topology rejection, expansion, and rollback totals. `[Conflict Width Reduction]` now records each retry's trigger, band/topology validity, topology counters, rollback, cluster reasons, and scale-state transition.
+
+## EW-B4.2R3 generalized retry and transaction additions
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `EdgeWearCoverageAudit.AttemptedBuiltCount` | Counts selected edges whose bevel planes existed in the latest attempted shell. |
+| `EdgeWearCoverageAudit.TrialRejectedCount` | Counts attempted bevels excluded because the solver trial failed certification, not because the source edge was structurally rejected. |
+| `EdgeWearEdgeLifecycleRecord.AttemptedBuilt` | Distinguishes attempted plane construction from certified materialization. |
+| `EdgeWearEdgeLifecycleRecord.TrialRejected` | Marks an edge belonging to an invalid solver transaction while keeping `Rejected` reserved for structural/construction rejection. |
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`RecalculateEdgeWearCoverageAudit` now aggregates attempted, certified, trial-rejected, locality-deferred, and rejected states independently.
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutSolverTransactionState` | Immutable cloned snapshot of one attempted, band-clean, topology-clean, or fully certified pass: candidates, faces, scales, pass identity, and stage invariants. |
+| `PlaneCutRetryFailureDossier` | Generalized exact retry evidence for open, non-manifold, T-junction, invalid-face, and non-planar failures plus linked bevel IDs and cluster attribution. |
+| `CapturePlaneCutSolverTransactionState` | Clones a retry state so later scale mutations cannot overwrite prior clean evidence. |
+| `CapturePlaneCutRetryFailureDossier` | Re-audits the earliest failed-stage faces and stores exact per-category failure records. |
+| `ResolvePlaneCutFirstRetryFailureStage` | Selects the earliest material stage across open-edge, T-junction, and non-planar evidence. |
+| `CollectPlaneCutRetryLinkedEdges` | Combines face provenance, open-edge neighbours, T-junction provenance, and nearby candidate-plane matches into stable implicated edge IDs. |
+| `BuildPlaneCutNonManifoldFailureEvidence` | Emits deterministic non-manifold segment/face provenance and contributes implicated bevel IDs. |
+| `BuildPlaneCutInvalidFaceFailureEvidence` | Emits exact invalid-face reasons and stable provenance. |
+| `TryBuildPlaneCutGeneralizedFailureCluster` | Maps any generalized retry dossier to implicated bevels, the latest intersecting conflict pass, and an incident source-vertex star. |
+| `ApplyPlaneCutRetryFailureToResult` | Copies the latest exact failed-trial topology and face-quality evidence into the primary audit instead of leaving default zeros. |
+| `FinalizeEdgeWearCoverageAfterFailedPlaneShell` | Replaces the obsolete unresolved-as-rejected path; records attempted bevels as trial-rejected and preserves locality deferrals and true rejections separately. |
+| `FormatPlaneCutCandidateDifferenceEvidence` | Emits the exact attempted-minus-certified source-edge set. |
+
+The removed `MarkUnresolvedEdgeWearCoverageAsRejected` behaviour is obsolete: an invalid solver transaction no longer converts all active source edges into structural rejections.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `FormatPlaneCutSolverTransactionState` | Emits bounded pass, candidate, scale, and stage evidence for one immutable transaction snapshot. |
+| `FormatPlaneCutRetryFailureDossier` | Emits compact Console or complete file evidence for a generalized retry failure. |
+| `AppendPlaneCutRetryFailureDossiers` | Writes all exact non-planar-face, open-edge, and T-junction records under `[Retry Failure Dossiers]`. |
+| `[Transactional Solver States]` | Records latest attempted, band-clean, topology-clean, and fully certified states independently. |
+| coverage/lifecycle formatters | Report `attemptedBuilt`, `certifiedBuilt`, and `trialRejected` separately and list exact trial-rejected edge IDs. |
+| `FormatPlaneCutPrimaryFailure` | Promotes exact face/open/T-junction evidence and falls back to the latest generalized retry dossier rather than a misleading generic/default-zero result. |
+
+EW-B4.2R3 changes diagnostic and state semantics only. Width reduction, conflict cluster geometry, clipping, welding, preparation, rendering, and edge `0` locality remain unchanged.
+
+## EW-B4.2R4 minimal topology scale-search additions
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutTopologyScaleTrialRecord` | Retains one factor trial's base pass, exact cluster, factor, rollback/requested/effective scale evidence, floor hits, collateral changes, attempted built count, per-stage evaluation status, all certification counters, and every captured exact failure record. |
+| `TryBuildMinimalPlaneCutTopologyCluster` | Derives the topology-recovery cluster only from structured exact T-junction-linked bevel IDs. |
+| `TrySearchMinimalPlaneCutTopologyScales` | Restores the immutable topology-clean scale map for every trial, tests bounded rollback-relative factors, rejects collateral changes, and commits only the highest tested fully valid factor. |
+| `TryEvaluatePlaneCutTopologyScaleTrial` | Rebuilds from original source faces/candidates and certifies band, caps, topology, face quality, volume, bounds, one-surface rendering, triangulation, and preview mesh validity. |
+| `FormatPlaneCutScaleDifferencesOutsideCluster` | Enforces the `collateralChanged={none}` invariant against the complete rollback scale map. |
+| `ApplyPlaneCutTopologyTrialAuditToResult` | Promotes only the committed trial's exact geometry and render evidence into the main audit. |
+| final certification lifecycle | Keeps a successful solver result in `solver-clean` state; only the outer final certification promotes it to `fully-certified` and populates `certifiedBuilt`. |
+
+The active T-junction path no longer uses the R2 previous-conflict/incident-star expansion. Generalized non-T-junction dossiers remain diagnostic-only and do not trigger another automatic geometry reduction.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `FormatPlaneCutTopologyScaleSearchAudit` | Adds compact topology-clean base-state, failed-state-scale-reuse invariant, exact cluster, factor, failure-count, collateral, fallback, and unresolved evidence to the Console summary. |
+| `FormatPlaneCutTopologyScaleTrial` | Formats one complete factor trial with attempted built count, scale transitions, stage-evaluation status, certification evidence, and all exact captured failures. |
+| `AppendPlaneCutTopologyScaleTrials` | Writes the `[Minimal Topology Scale Search]` telemetry section. |
+
+EW-B4.2R4 changes only topology-triggered retry strategy, telemetry, and certification lifecycle accuracy. It does not change artistic selection, plane construction, clipping, welding, seam repair, tolerances, edge `0` locality, or geometry commit.
+
+## EW-B4.2R5 direct foreign band-plane retreat additions
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `TopologyScaleSearchMode` | Identifies the active bounded search strategy without replacing the existing cumulative trial structure. |
+| `TopologyScaleSearchTriggerEvidence` | Retains the exact prior band record that justified the retreat target, including source pass, victim, foreign edge, axial parameter, and shared span. |
+| `TopologyScaleSearchTopologyLinkedEvidence` | Preserves the exact T-junction-linked bevel set independently from the edges whose scales are adjusted. |
+| `TryResolvePlaneCutForeignBandRetreatTarget` | Walks structured prior `band-integrity` reductions newest-first and selects the directly evidenced foreign plane whose victim belongs to the topology-linked set. |
+| R5 direct-retreat search path | Originally isolated the directly evidenced foreign edge and tested `{0.95/0.90/0.85/0.80/0.75}` from the immutable topology-clean state. In R6 this responsibility is retained through the shared `TrySearchPlaneCutRetreatScales` implementation. |
+| R5 direct-retreat trial certification | Originally enforced complete transaction certification and zero outside-retreat changes. In R6 this responsibility is retained through `TryEvaluatePlaneCutRetreatTrial`. |
+
+The existing `PlaneCutTopologyScaleTrialRecord` remains the cumulative per-trial evidence record. R5 deliberately extends its interpretation rather than creating a competing telemetry family.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `FormatPlaneCutTopologyScaleSearchAudit` | Adds search mode, direct trigger evidence, unchanged topology-linked edges, and exact retreat edges to the compact Console summary. |
+| `FormatPlaneCutTopologyScaleTrial` | Preserves the complete factor-trial record while labelling the adjusted set as `retreatEdges`. |
+| `AppendPlaneCutTopologyScaleTrials` | Writes search mode, trigger, topology-linked evidence, retreat set, and all unchanged detailed trial dossiers. |
+| `[Direct Foreign Band-Plane Retreat Search]` | Replaces the R4 section title for the active experiment while preserving the same detailed telemetry structure and all prior failure categories. |
+
+EW-B4.2R5 changes only the topology-triggered retry target selection, bounded factor sequence, telemetry labels, and canonical documentation. It does not change selection, clipping, welding, preparation, tolerances, rendering, edge `0` locality, inspector workflow, or production geometry commit.
+
+
+
+## EW-B4.2R6 dual-endpoint search and edge-index overlay additions
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutTopologyScaleTrialRecord.SearchMode` | Distinguishes direct foreign-plane and dual-endpoint trials while retaining one cumulative schema. |
+| `PlaneCutTopologyScaleTrialRecord.BandVictimEdgeIndex` / `BandForeignEdgeIndex` | Store the structured active band pair from each factor trial. |
+| `BandForeignAxialParameter` / `BandForeignSharedSpanRatio` | Preserve the exact location and magnitude of the active foreign-plane incursion. |
+| `ProtectedEdgeEvidence` | Records topology-linked edges whose pass-7 scales must remain unchanged in the active search. |
+| `TryResolvePlaneCutOpposingBandRetreatTarget` | Finds the second endpoint plane from topology-clean direct-retreat trials with the same victim and a different structured foreign edge. |
+| `BuildPlaneCutProtectedEdgeSet` | Computes `topologyLinked - retreatEdges` deterministically. |
+| `SetPlaneCutDebugFocusEdges` | Publishes the union of topology-linked and active retreat edges for the editor overlay. |
+| `TrySearchPlaneCutRetreatScales` | Shared immutable transaction search for one-edge direct retreat and two-edge dual-endpoint retreat. |
+| `TryEvaluatePlaneCutRetreatTrial` | Rebuilds and fully certifies one direct or dual trial while enforcing zero collateral scale changes. |
+| `ApplyPlaneCutActiveSearchFailure` | Separates the current terminal search blocker from the historical primary retry failure. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `FormatPlaneCutTopologyScaleSearchAudit` | Adds protected edges and active-search failure evidence to the compact Console summary. |
+| `FormatPlaneCutTopologyScaleTrial` | Emits search mode, protected set, active band victim/foreign pair, axial parameter, span, and all existing certification evidence. |
+| filtered `AppendPlaneCutTopologyScaleTrials` | Writes direct and dual trial records into separate cumulative telemetry sections. |
+| `[Dual-Endpoint Foreign-Plane Retreat Search]` | Full factor-by-factor evidence for the current R6 experiment. |
+
+### `MassGenerator.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `EdgeWearDebugEdgeRecord` | Editor preview record containing authoritative source-edge index, transformed endpoints, selection state, and current search-focus state. |
+| debug transform helpers | Apply the same dimensions, deterministic lean, grounding, and recenter operations to graph-edge endpoints without changing production mesh transforms. |
+| `UnifiedEdgeWearPreviewStatus.DebugEdges` | Carries non-serialized source-edge records from generation to the custom editor. |
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`BuildUnifiedEdgeWearDebugEdges` snapshots every topology-graph edge and marks the structured current focus set when constructing unified preview status.
+
+### `GeneratedMass.cs`
+
+Stores transformed debug-edge records only in non-serialized `UNITY_EDITOR` preview state and clears them with the existing unified-preview status.
+
+### `Editor/GeneratedMassEditor.cs`
+
+| Control or method | Responsibility |
+|---|---|
+| `Show Source Edge Numbers in Scene` | Enables graph-edge lines and authoritative source-edge labels. |
+| `Only Active Search Edges` | Filters the overlay to the structured focus neighbourhood. |
+| `RegisterEdgeWearSceneOverlayRenderer` | Registers the editor-global Scene callback once per domain load; it replaces the unreliable per-inspector overlay callback. |
+| `DrawGlobalEdgeWearSceneOverlay` | Resolves the explicitly enabled Generated Mass by instance ID and draws available source-edge records even when the bevel transaction has failed. |
+| `SetEdgeWearSceneOverlayState` | Publishes non-serialized enabled/filter/target state and requests a Scene repaint only when that state changes. |
+| `DrawEdgeWearEdgeNumberOverlay` | Draws transformed source edges and indices as an always-visible x-ray overlay with endpoint markers and separated callout labels, without modifying scene objects or generated geometry. |
+| edge-overlay status evidence | Reports visible/total record counts and focused source-edge IDs in both the inspector and a small Scene panel so an empty or filtered overlay is explicit. |
+
+EW-B4.2R6 changes only bounded topology-recovery search, diagnostic telemetry, and editor visualization. Selection, clipping, welding, preparation, tolerances, surface rendering, edge `0` locality, production geometry, and the one-button rebuild action remain unchanged.

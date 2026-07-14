@@ -16,8 +16,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float maximumDimension,
             MassRecipe recipe,
             MassSurfaceFeatureSettings settings,
-            float amount01)
+            float amount01,
+            out EdgeWearCoverageAudit coverageAudit)
         {
+            bool maximumCoverageMode =
+                settings.EdgeWearCoverage >= 2f - 0.0001f;
+            coverageAudit = new EdgeWearCoverageAudit(
+                maximumCoverageMode);
+
             Dictionary<EdgeKey, EdgeWearEdgeAggregate> edges =
                 new Dictionary<EdgeKey, EdgeWearEdgeAggregate>();
 
@@ -51,47 +57,144 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             List<EdgeWearBevelCandidate> candidates =
                 new List<EdgeWearBevelCandidate>(edges.Count);
+            Vector3 solidCentre = CalculatePlaneCutFaceVertexCentre(faces);
+            float structuralTolerance = Mathf.Max(
+                PointMergeDistance * 8f,
+                maximumDimension * 0.00001f);
+            float structuralMinimumLength = Mathf.Max(
+                PointMergeDistance * 4f,
+                maximumDimension * 0.00001f);
+            float artisticMinimumLength = Mathf.Max(
+                0.0001f,
+                maximumDimension * 0.015f);
             int candidateIndex = 0;
 
-            foreach (EdgeWearEdgeAggregate edge in edges.Values)
+            foreach (KeyValuePair<EdgeKey, EdgeWearEdgeAggregate> pair in edges)
             {
+                EdgeWearEdgeAggregate edge = pair.Value;
+                Vector3 midpoint = (edge.Start + edge.End) * 0.5f;
+                float length = (edge.End - edge.Start).magnitude;
+                EdgeWearEdgeLifecycleRecord lifecycle =
+                    new EdgeWearEdgeLifecycleRecord
+                    {
+                        Key = pair.Key,
+                        Start = edge.Start,
+                        End = edge.End,
+                        FaceCount = edge.FaceIndices.Count,
+                        Length = length,
+                        Vertical01 = Mathf.InverseLerp(
+                            bounds.min.y,
+                            bounds.max.y,
+                            midpoint.y)
+                    };
+                coverageAudit.Records.Add(lifecycle);
+                coverageAudit.RecordByKey[pair.Key] = lifecycle;
+
                 if (edge.FaceIndices.Count != 2)
                 {
+                    lifecycle.CandidateReason = edge.FaceIndices.Count < 2
+                        ? "boundary-edge"
+                        : "non-manifold-edge";
                     continue;
                 }
 
                 int faceA = edge.FaceIndices[0];
                 int faceB = edge.FaceIndices[1];
+                lifecycle.FaceA = faceA;
+                lifecycle.FaceB = faceB;
                 PolygonFace first = faces[faceA];
                 PolygonFace second = faces[faceB];
+                if (first == null || second == null ||
+                    !IsFinite(first.Normal) || !IsFinite(second.Normal) ||
+                    first.Normal.sqrMagnitude <= MinimumEdgeLengthSqr ||
+                    second.Normal.sqrMagnitude <= MinimumEdgeLengthSqr)
+                {
+                    lifecycle.CandidateReason = "invalid-owner-normal";
+                    continue;
+                }
+
                 Vector3 normalSum = first.Normal + second.Normal;
-                if (normalSum.sqrMagnitude <= MinimumEdgeLengthSqr)
+                if (!IsFinite(normalSum) ||
+                    normalSum.sqrMagnitude <= MinimumEdgeLengthSqr)
                 {
+                    lifecycle.CandidateReason = "opposed-owner-normals";
                     continue;
                 }
 
+                if (length <= structuralMinimumLength)
+                {
+                    lifecycle.CandidateReason = "numerically-short-edge";
+                    continue;
+                }
+
+                if (!TryClassifyEdgeWearStructuralEdge(
+                        faces,
+                        faceA,
+                        faceB,
+                        edge.Start,
+                        edge.End,
+                        solidCentre,
+                        structuralTolerance,
+                        out BoundedEdgeClassificationEvidence evidence))
+                {
+                    lifecycle.Classification =
+                        BoundedEdgeClassification.Ambiguous;
+                    lifecycle.CandidateReason =
+                        "structural-classification-failed";
+                    continue;
+                }
+
+                lifecycle.Classification = evidence.Classification;
+                lifecycle.DihedralDegrees = evidence.DihedralDegrees;
+                if (evidence.Classification !=
+                    BoundedEdgeClassification.Convex)
+                {
+                    lifecycle.CandidateReason =
+                        "structurally-" +
+                        evidence.Classification.ToString().ToLowerInvariant();
+                    continue;
+                }
+
+                lifecycle.StructuralEligible = true;
                 Vector3 bevelNormal = normalSum.normalized;
-                Vector3 edgeVector = edge.End - edge.Start;
-                float length = edgeVector.magnitude;
-                if (length <= Mathf.Max(0.0001f, maximumDimension * 0.015f))
-                {
-                    continue;
-                }
-
                 float angleScore = Mathf.Clamp01(
                     (1f - Vector3.Dot(first.Normal, second.Normal)) * 0.72f);
-                if (angleScore <= 0.035f)
+                float baseSuppression = Mathf.SmoothStep(
+                    0.06f,
+                    0.20f,
+                    lifecycle.Vertical01);
+                bool artisticLengthEligible =
+                    length > artisticMinimumLength;
+                bool artisticAngleEligible = angleScore > 0.035f;
+                bool artisticBaseEligible = baseSuppression > 0.001f;
+                lifecycle.ArtisticEligible =
+                    artisticLengthEligible &&
+                    artisticAngleEligible &&
+                    artisticBaseEligible;
+
+                if (!artisticLengthEligible)
                 {
-                    continue;
+                    lifecycle.CandidateReason =
+                        "artistically-short-edge";
+                }
+                else if (!artisticAngleEligible)
+                {
+                    lifecycle.CandidateReason =
+                        "artistically-shallow-edge";
+                }
+                else if (!artisticBaseEligible)
+                {
+                    lifecycle.CandidateReason =
+                        "artistically-base-suppressed";
+                }
+                else
+                {
+                    lifecycle.CandidateReason = "eligible";
                 }
 
-                Vector3 midpoint = (edge.Start + edge.End) * 0.5f;
-                float vertical01 = Mathf.InverseLerp(
-                    bounds.min.y,
-                    bounds.max.y,
-                    midpoint.y);
-                float baseSuppression = Mathf.SmoothStep(0.06f, 0.20f, vertical01);
-                if (baseSuppression <= 0.001f)
+                bool includeCandidate =
+                    maximumCoverageMode || lifecycle.ArtisticEligible;
+                if (!includeCandidate)
                 {
                     continue;
                 }
@@ -101,7 +204,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float upwardEdgeBoost = Mathf.Lerp(
                     0.82f,
                     1.08f,
-                    Mathf.Clamp01((first.Normal.y + second.Normal.y) * 0.5f + 0.5f));
+                    Mathf.Clamp01(
+                        (first.Normal.y + second.Normal.y) * 0.5f + 0.5f));
                 float characterBoost = recipe.EdgeCharacter switch
                 {
                     EdgeCharacter.Sharp => 1.08f,
@@ -114,7 +218,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     settings.SurfaceSeed + 0x4A17,
                     midpoint + bevelNormal * 0.173f);
                 float score =
-                    (angleScore * 0.58f + lengthScore * 0.27f + random * 0.15f) *
+                    (angleScore * 0.58f +
+                     lengthScore * 0.27f +
+                     random * 0.15f) *
                     baseSuppression *
                     upwardEdgeBoost *
                     characterBoost;
@@ -137,6 +243,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     0.78f,
                     1.15f);
 
+                lifecycle.Candidate = true;
+                lifecycle.CandidateIndex = candidateIndex;
+                lifecycle.Score = score;
                 candidates.Add(
                     new EdgeWearBevelCandidate(
                         candidateIndex,
@@ -154,7 +263,325 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 candidateIndex++;
             }
 
+            RecalculateEdgeWearCoverageAudit(coverageAudit);
             return candidates;
+        }
+
+        private static bool TryClassifyEdgeWearStructuralEdge(
+            List<PolygonFace> sourceFaces,
+            int sourceFaceA,
+            int sourceFaceB,
+            Vector3 edgeA,
+            Vector3 edgeB,
+            Vector3 solidCentre,
+            float tolerance,
+            out BoundedEdgeClassificationEvidence evidence)
+        {
+            evidence = new BoundedEdgeClassificationEvidence
+            {
+                SourceFaceA = sourceFaceA,
+                SourceFaceB = sourceFaceB,
+                Classification = BoundedEdgeClassification.Ambiguous
+            };
+            if (sourceFaces == null ||
+                sourceFaceA < 0 || sourceFaceB < 0 ||
+                sourceFaceA >= sourceFaces.Count ||
+                sourceFaceB >= sourceFaces.Count ||
+                sourceFaceA == sourceFaceB ||
+                !IsFinite(edgeA) || !IsFinite(edgeB) ||
+                !IsFinite(solidCentre))
+            {
+                return false;
+            }
+
+            PolygonFace faceA = sourceFaces[sourceFaceA];
+            PolygonFace faceB = sourceFaces[sourceFaceB];
+            if (faceA == null || faceB == null ||
+                !IsFinite(faceA.Normal) || !IsFinite(faceB.Normal) ||
+                faceA.Normal.sqrMagnitude <= MinimumEdgeLengthSqr ||
+                faceB.Normal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            Vector3 normalA = faceA.Normal.normalized;
+            Vector3 normalB = faceB.Normal.normalized;
+            float planeA = CalculateBoundedFacePlaneDistance(faceA, normalA);
+            float planeB = CalculateBoundedFacePlaneDistance(faceB, normalB);
+            bool measuredA = TryMeasureBoundedFaceInteriorAgainstPlane(
+                faceA,
+                edgeA,
+                edgeB,
+                normalB,
+                planeB,
+                tolerance,
+                out float faceAAgainstB);
+            bool measuredB = TryMeasureBoundedFaceInteriorAgainstPlane(
+                faceB,
+                edgeA,
+                edgeB,
+                normalA,
+                planeA,
+                tolerance,
+                out float faceBAgainstA);
+
+            float normalDot = Mathf.Clamp(
+                Vector3.Dot(normalA, normalB),
+                -1f,
+                1f);
+            float solidAgainstA =
+                Vector3.Dot(normalA, solidCentre) - planeA;
+            float solidAgainstB =
+                Vector3.Dot(normalB, solidCentre) - planeB;
+            BoundedEdgeClassification classification;
+            if (solidAgainstA > tolerance || solidAgainstB > tolerance)
+            {
+                classification =
+                    BoundedEdgeClassification.InvalidOrientation;
+            }
+            else if (!measuredA || !measuredB)
+            {
+                classification = BoundedEdgeClassification.Ambiguous;
+            }
+            else if (normalDot >= 0.9999f &&
+                Mathf.Abs(faceAAgainstB) <= tolerance &&
+                Mathf.Abs(faceBAgainstA) <= tolerance)
+            {
+                classification = BoundedEdgeClassification.Coplanar;
+            }
+            else if (faceAAgainstB <= tolerance &&
+                faceBAgainstA <= tolerance)
+            {
+                classification = BoundedEdgeClassification.Convex;
+            }
+            else if (faceAAgainstB > tolerance ||
+                faceBAgainstA > tolerance)
+            {
+                classification = BoundedEdgeClassification.Concave;
+            }
+            else
+            {
+                classification = BoundedEdgeClassification.Ambiguous;
+            }
+
+            evidence.NormalA = normalA;
+            evidence.NormalB = normalB;
+            evidence.NormalDot = normalDot;
+            evidence.DihedralDegrees =
+                Mathf.Acos(normalDot) * Mathf.Rad2Deg;
+            evidence.FaceAInteriorAgainstFaceB = faceAAgainstB;
+            evidence.FaceBInteriorAgainstFaceA = faceBAgainstA;
+            evidence.SolidCentreAgainstFaceA = solidAgainstA;
+            evidence.SolidCentreAgainstFaceB = solidAgainstB;
+            evidence.Classification = classification;
+            return true;
+        }
+
+        private static void MapEdgeWearCoverageAuditToGraph(
+            EdgeWearCoverageAudit audit,
+            ChamferTopologyContext context)
+        {
+            if (audit == null || context == null)
+            {
+                return;
+            }
+
+            audit.RecordByGraphEdge.Clear();
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                if (!context.Graph.EdgeByKey.TryGetValue(
+                        record.Key,
+                        out int graphEdgeIndex))
+                {
+                    record.SourceEdgeIndex = -1;
+                    record.FinalReason = "source-edge-not-mapped";
+                    continue;
+                }
+
+                record.SourceEdgeIndex = graphEdgeIndex;
+                audit.RecordByGraphEdge[graphEdgeIndex] = record;
+                if (record.Candidate)
+                {
+                    record.FinalReason = "not-selected-by-coverage";
+                }
+                else if (record.StructuralEligible &&
+                    !record.ArtisticEligible)
+                {
+                    record.FinalReason = "artistic-filtered";
+                }
+                else if (!record.StructuralEligible)
+                {
+                    record.FinalReason = string.IsNullOrEmpty(
+                            record.CandidateReason)
+                        ? "structurally-ineligible"
+                        : record.CandidateReason;
+                }
+            }
+
+            for (int selectedIndex = 0;
+                 selectedIndex < context.SelectedEdges.Count;
+                 selectedIndex++)
+            {
+                EdgeWearSelectedGraphEdge selected =
+                    context.SelectedEdges[selectedIndex];
+                if (audit.RecordByGraphEdge.TryGetValue(
+                        selected.GraphEdgeIndex,
+                        out EdgeWearEdgeLifecycleRecord record))
+                {
+                    record.Selected = true;
+                    record.FinalReason = "selected";
+                }
+            }
+
+            RecalculateEdgeWearCoverageAudit(audit);
+        }
+
+        private static void ApplyEdgeWearCoverageCornerSolution(
+            EdgeWearCoverageAudit audit,
+            ChamferTopologyContext context,
+            ChamferCornerSolution solution)
+        {
+            if (audit == null || context == null || solution == null)
+            {
+                return;
+            }
+
+            for (int selectedIndex = 0;
+                 selectedIndex < context.SelectedEdges.Count;
+                 selectedIndex++)
+            {
+                EdgeWearSelectedGraphEdge selected =
+                    context.SelectedEdges[selectedIndex];
+                if (!audit.RecordByGraphEdge.TryGetValue(
+                        selected.GraphEdgeIndex,
+                        out EdgeWearEdgeLifecycleRecord record))
+                {
+                    continue;
+                }
+
+                if (!solution.WidthByEdge.TryGetValue(
+                        selected.GraphEdgeIndex,
+                        out float width))
+                {
+                    record.SolvedWidth = 0f;
+                    record.WidthInactive = true;
+                    record.FinalReason = "width-missing";
+                    continue;
+                }
+
+                record.SolvedWidth = width;
+                record.WidthInactive = width <= PointMergeDistance;
+                record.Active = !record.WidthInactive;
+                record.FinalReason = record.WidthInactive
+                    ? "width-inactive"
+                    : "active";
+            }
+
+            RecalculateEdgeWearCoverageAudit(audit);
+        }
+
+        private static bool TryGetEdgeWearCoverageRecord(
+            EdgeWearCoverageAudit audit,
+            int graphEdgeIndex,
+            out EdgeWearEdgeLifecycleRecord record)
+        {
+            record = null;
+            return audit != null &&
+                audit.RecordByGraphEdge.TryGetValue(
+                    graphEdgeIndex,
+                    out record);
+        }
+
+        private static void RecalculateEdgeWearCoverageAudit(
+            EdgeWearCoverageAudit audit)
+        {
+            if (audit == null)
+            {
+                return;
+            }
+
+            audit.SourceEdgeCount = audit.Records.Count;
+            audit.StructuralEligibleCount = 0;
+            audit.ArtisticEligibleCount = 0;
+            audit.ArtisticFilteredCount = 0;
+            audit.CandidateCount = 0;
+            audit.SelectedCount = 0;
+            audit.WidthInactiveCount = 0;
+            audit.WidthReducedCount = 0;
+            audit.ActiveCount = 0;
+            audit.AttemptedBuiltCount = 0;
+            audit.BuiltCount = 0;
+            audit.TrialRejectedCount = 0;
+            audit.DeferredCount = 0;
+            audit.RejectedCount = 0;
+            audit.UnmappedCount = 0;
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                if (record.StructuralEligible)
+                {
+                    audit.StructuralEligibleCount++;
+                    if (!record.ArtisticEligible)
+                    {
+                        audit.ArtisticFilteredCount++;
+                    }
+                }
+                if (record.ArtisticEligible)
+                {
+                    audit.ArtisticEligibleCount++;
+                }
+                if (record.Candidate)
+                {
+                    audit.CandidateCount++;
+                }
+                if (record.Selected)
+                {
+                    audit.SelectedCount++;
+                }
+                if (record.WidthInactive)
+                {
+                    audit.WidthInactiveCount++;
+                }
+                if (record.WidthReduced)
+                {
+                    audit.WidthReducedCount++;
+                }
+                if (record.Active)
+                {
+                    audit.ActiveCount++;
+                }
+                if (record.AttemptedBuilt)
+                {
+                    audit.AttemptedBuiltCount++;
+                }
+                if (record.Built)
+                {
+                    audit.BuiltCount++;
+                }
+                if (record.TrialRejected)
+                {
+                    audit.TrialRejectedCount++;
+                }
+                if (record.Deferred)
+                {
+                    audit.DeferredCount++;
+                }
+                if (record.Rejected)
+                {
+                    audit.RejectedCount++;
+                }
+                if (record.SourceEdgeIndex < 0)
+                {
+                    audit.UnmappedCount++;
+                }
+            }
         }
 
         private static bool TryBuildChamferTopologyContext(

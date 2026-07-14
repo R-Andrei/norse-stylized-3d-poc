@@ -1,6 +1,475 @@
-### 2026-07-13 — Patch V3J.4F2: Bounded Orientation, Translation-Driven Steps
+## PA-P4 — Deterministic External-Conflict Index and Incremental Reconciliation
 
-**Status:** Implemented; pending Unity validation. This supersedes V3J.4F as the active companion-shape architecture while retaining F's projected-space atomic cluster representation.
+**Status:** Implemented; pending Unity compilation, deterministic-output parity, and performance telemetry. This is an execution-only optimization of the accepted PA-P3 projected-cluster path.
+
+Authoritative cluster construction now maintains a deterministic fixed-grid index over the expanded projected bounds of glyphs already accepted before each candidate. A candidate member queries only the grid cells touched by its own expanded bounds, deduplicates returned glyph indices, sorts them back into original accepted-list order, and then runs the unchanged bounds and exact external-overlap authority. The grid can only omit glyphs whose expanded bounds occupy no common cell; any genuinely overlapping expanded bounds necessarily share at least one indexed cell.
+
+Final reconciliation no longer rechecks cluster-to-cluster and cluster-to-initial-independent relationships already validated during authoritative construction. It tests accepted clusters only against participant independents committed after cluster allocation and against fallback independents introduced by an earlier reconciliation removal. Each surviving cluster records how many late independents it has already checked, so subsequent passes evaluate only newly introduced relationships while preserving the existing descending record order and removal/restart behavior.
+
+Compact diagnostics report external spatial queries, visited cells, unique candidates, avoided full-list comparisons, actual bounds/detailed tests, reconciliation clusters examined, previously validated relationships skipped, new independent relationships tested, and legacy full-list relationships bypassed. The exact external-overlap predicate, cluster removal behavior, fallback glyphs, quotas, attempt budgets, and coverage remain authoritative. Projected-glyph generator revision advances from 18 to 19.
+
+PA-P4 invariants:
+
+- no candidate, donor, quota, layout, contact, attempt-budget, threshold, fallback, or coverage change;
+- candidate conflict tests retain original accepted-glyph order after spatial filtering;
+- the spatial index never declares validity or overlap; it only conservatively narrows the exact candidate set;
+- initial independent and cluster-to-cluster relationships are omitted from reconciliation only because they were already checked during construction;
+- newly committed and reconciliation-generated independent glyphs remain exact reconciliation authority;
+- PA-P1 through PA-P3 execution paths, Ground/River startup coalescing, and River shader compile recovery remain untouched.
+
+PA-P4 validation gate:
+
+1. The Tightness `1.00` authoritative baseline remains identical: 318 projected marks, pair/triplet 78/48, nine pair shortfalls, 1,127 attempts, 126 accepted clusters, 300 clustered participants, 20,356 baked segments, and 5,707 covered texels.
+2. Visual parity holds and final reconciliation removals remain zero for the current scene and seed.
+3. External index diagnostics show a material reduction from full-list candidates to unique spatial candidates without changing external-conflict fallbacks.
+4. Reconciliation tests only late/new independent relationships and materially reduces the accepted 665.07 ms reconciliation baseline.
+5. External-conflict validation falls materially below the accepted 361.92 ms baseline and complete projected regeneration falls below the accepted 1,900.85 ms PA-P3 baseline.
+
+## PA-P3 — Cheap Candidate Pruning and Precomputed Internal-Overlap Segments
+
+**Status:** Unity-validated and accepted. Tightness `1.00` preserved the complete deterministic output baseline and reduced contact solving from 2,121.62 ms to 379.78 ms, near-parallel validation from 555.82 ms to 121.90 ms, candidate internal-overlap validation from 1,546.27 ms to 194.31 ms, and complete regeneration from 3,705.96 ms to 1,900.85 ms.
+
+Candidate contact evaluation now performs deterministic scalar rejection before projected-polyline geometry checks. After terminal placement and the existing contact-side invariant, the solver resolves the translated centroid, pair-local or triplet step, near-collinear endpoint rule, and the exact existing candidate score. Candidates that fail step retention, fail the existing pair near-collinear rule, or cannot beat an already valid lower-scoring candidate are skipped before near-parallel and swept-width validation. `bestScore` is still updated only by a fully geometry-valid candidate, so a skipped noncompetitive candidate cannot become the selected result.
+
+Internal swept-width validation now prepares reusable per-segment metadata once per method invocation in the existing per-build scratch object. Each segment caches endpoints, endpoint half-widths, maximum half-width, and unexpanded X/Y bounds. The Cartesian pair loop reuses those values for the accepted PA-P1 conservative bounds test and unchanged exact intersection/distance/width interpolation authority. No per-call heap allocation is introduced in the authoritative path.
+
+Compact diagnostics report pre-geometry step-retention rejections, pre-geometry noncompetitive-score rejections, and candidates sent to geometric validation. The existing pair-step counter remains active but its classification point moves before geometry, so its numeric value may change even when output is identical. Projected-glyph generator revision advances from 17 to 18.
+
+PA-P3 invariants:
+
+- no quota, donor, layout, contact, threshold, attempt-budget, fallback, reconciliation, glyph, or coverage change;
+- no accepted-candidate score or tie-breaking change;
+- `bestScore` remains sourced only from candidates that pass all geometry checks;
+- the PA-P1 exact swept-width authority and PA-P2 near-parallel authority remain unchanged;
+- reusable segment metadata belongs to the existing per-build scratch object;
+- Ground/River startup coalescing and River shader compile recovery remain untouched.
+
+PA-P3 accepted evidence:
+
+1. Tightness `1.00` preserved 318 projected marks, pair/triplet 78/48, nine pair shortfalls, 1,127 attempts, 20,356 baked segments, and 5,707 covered texels with visual parity.
+2. Pre-geometry pruning rejected 4,102 candidates by step retention and 338 by noncompetitive score before only 1,242 candidates reached geometry.
+3. Candidate internal-overlap validation fell from 1,546.27 ms to 194.31 ms and near-parallel validation fell from 555.82 ms to 121.90 ms.
+4. Complete projected regeneration fell from 3,705.96 ms to 1,900.85 ms without shifting cost into contact placement, coverage, or surface validation.
+
+## PA-P2 — Precomputed Near-Parallel Segments and Conservative Distance Broad Phase
+
+**Status:** Unity-validated and accepted. Tightness `1.00` preserved the complete deterministic output baseline and reduced near-parallel validation from 5,144.74 ms to 555.82 ms, contact solving from 6,701.69 ms to 2,121.62 ms, and complete regeneration from 8,264.11 ms to 3,705.96 ms.
+
+The current near-parallel validator remains authoritative. Each invocation now prepares reusable metadata for the right-hand projected segments once: endpoints, normalized direction, length, average half-width, and unexpanded bounds. The nested pair loop reuses this metadata instead of recalculating right-segment magnitude, normalization, width, and bounds for every left segment.
+
+Before tangent alignment and exact segment-distance work, the validator compares unexpanded X/Y segment-bound gaps against the same exact near-parallel clearance derived from average half-widths and the existing 0.88 clearance fraction. A pair is skipped only when an axis gap is strictly greater than that clearance. Every uncertain pair retains the existing 22-degree alignment gate, exact segment distance, shared-axis interval overlap, 0.025 m / 14% accumulated blend threshold, and early-return behavior.
+
+Compact diagnostics report method calls, metadata preparations, right segments prepared, segment pairs considered, axis-gap rejections, alignment rejections, exact distance tests and passes, interval-overlap evaluations, and detected blends. The projected-glyph generator revision advances from 16 to 17 for the execution and diagnostic payload change.
+
+PA-P2 invariants:
+
+- no quota, donor, layout, contact, threshold, fallback, reconciliation, glyph, or coverage change;
+- no reduction of point count or quality authority;
+- reusable metadata belongs to the existing per-build scratch object;
+- the broad phase can only prove that a pair is too far apart and cannot accept a blend;
+- the previous PA-P1 exact swept-width broad phase remains unchanged.
+
+PA-P2 validation gate:
+
+1. The Tightness `1.00` deterministic baseline remains identical: 318 projected marks, pair/triplet 78/48, nine pair shortfalls, 1,127 attempts, 536 near-parallel rejections, 3,891 swept-width rejections, 20,356 baked segments, and 5,707 covered texels.
+2. Near-parallel exact distance tests fall materially below considered segment pairs while detected blends remain 536.
+3. Near-parallel validation falls materially below the accepted 5,144.74 ms baseline; below 2,500 ms is the initial success threshold.
+4. Visual parity holds at maximum participation, tightness, triplet share, and verticality.
+
+## PA-P1 — Conservative Internal Segment-Pair Broad Phase
+
+**Status:** Unity-validated and accepted. The deterministic Tightness `1.00` baseline remained identical. The conservative bound rejected 13,783,511 of 13,810,418 segment pairs (99.805%), reduced exact narrow-phase submissions to 26,907, and lowered the comparable complete regeneration from 9,969 ms to 8,264 ms.
+
+The exact internal-overlap validator remains authoritative. Before each exact segment intersection and closest-distance calculation, the generator now derives a conservative maximum possible swept clearance from both segments' maximum endpoint half-widths and the existing 0.98 body / 0.94 exact-contact clearance fraction. Unexpanded segment-axis gaps may skip a pair only when X or Y separation is strictly greater than that maximum possible clearance. The bound does not subtract numerical tolerance and never declares an overlap; uncertain pairs continue through the unchanged exact narrow phase.
+
+Compact workload diagnostics report internal-overlap method calls, final-silhouette overlap calls, segment pairs considered, conservative broad-phase skips, exact narrow-phase submissions, exact centreline intersections, and exact swept-clearance rejections. Timing further separates near-parallel validation, candidate internal-overlap validation, contact-placement/other work, and final-silhouette overlap validation. No per-segment timer or Console output is introduced.
+
+PA-P1 invariants:
+
+- no candidate, donor, quota, layout, contact, fallback, or reconciliation ordering changes;
+- no clearance threshold, tolerance, glyph geometry, point count, or coverage change;
+- the exact segment intersection/distance/width interpolation path remains the sole overlap authority;
+- Ground/River startup coalescing and the accepted River shader baseline remain untouched;
+- projected-glyph generator revision advances from 15 to 16 for the execution/diagnostic payload change.
+
+PA-P1 validation gate:
+
+1. The deterministic projected baseline remains identical, including 318 projected marks, pair/triplet 78/48, nine pair shortfalls, 1,127 attempts, 3,891 swept-width candidate rejections, 20,356 baked segments, and 5,707 covered texels.
+2. Broad-phase rejected pairs are substantial and exact narrow-phase submissions fall materially below total considered pairs.
+3. Projected cluster composition falls materially below the accepted 8.55–8.98 second baseline without shifting another Ground stage.
+4. Visual parity holds at maximum participation, tightness, triplet share, and verticality.
+
+## V3J.4F3.3A — Copyable Diagnostics and Projected Cluster Composition Audit
+
+**Status:** Unity-validated and accepted. This patch is instrumentation-only: it does not change Painted Accent population, distribution, companion quotas, geometry, rejection thresholds, coverage, or rendering.
+
+Implementation contract:
+
+- Add `Copy Full Generation Report` under `Last Generation Diagnostics`. The button copies cached timing, surface-funnel, projected-companion, and coverage records through `EditorGUIUtility.systemCopyBuffer`; it does not regenerate or write to the Console.
+- Display projected-glyph and companion diagnostics independently of the projected-glyph visual overlay toggle.
+- Separate the current regeneration timing from retained timings for the last completed `SurfaceStrokes` and `ProjectedGlyphs` executions. A material-only or cache-hit update must state that those stages were not executed rather than presenting retained substage values as part of the current operation.
+- Split authoritative projected-cluster allocation wall time into quota/spec preparation, participant scoring/partition, donor selection, prototype preparation, contact solving, internal silhouette/quality validation, cluster-attempt surface/domain validation, external accepted-glyph conflict validation, result commit/participant removal, final reconciliation, and residual loop overhead.
+- Record bounded construction effort: requested/succeeded/failed clusters before reconciliation, total attempts, successful-attempt min/mean/max, success buckets `1`, `2–4`, `5–8`, `9–16`, `17–32`, `33–72`, and failures exhausting their dynamic attempt budget.
+- Record external-conflict workload: glyph candidates examined, bounds tests, bounds-overlap passes, detailed overlap tests, and conflict rejections. Final accepted counts and reconciliation removals remain separate so construction success is not confused with final survival.
+- Advance projected-glyph generator revision to 15 because the cached diagnostics payload changes; projected geometry semantics remain unchanged.
+
+V3J.4F3.3A validation gate:
+
+1. The copy button produces one complete report without regeneration, asset dirtiness, or Console spam.
+2. Material-only and cache-hit operations identify unexecuted stages while retaining a clearly separated last-completed stage record.
+3. A full 450–500 proposal regeneration reports cluster wall time, every measured substage, residual overhead, attempt distribution, and external-conflict workload.
+4. Requested/achieved quotas, projected glyph output, coverage, and visual geometry remain unchanged relative to V3J.4F3.3 for the same seed and settings.
+
+## V3J.4F3.3 — Count-Neutral Regional Selection and Generation Funnel Audit
+
+**Status:** Unity-validated and accepted. This patch removes stochastic regional deletion without changing Stroke Density semantics, adding refill, or changing physical/projected validity rules.
+
+The previous production path selected the weighted proposal budget and then discarded proposals through a second regional survival roll whose probability-weighted mean was approximately 45%. That made Distribution Contrast simultaneously control location and hidden population loss. The active contract is now count-neutral:
+
+```text
+candidate pool
+→ one combined patch / semantic / regional weighted ranking
+→ fixed selected proposal count
+→ physical validation
+→ projected validation
+→ authoritative companion allocation
+```
+
+Implementation contract:
+
+- Remove the production regional-thinning roll and its approximately 55% average deletion. Every selected proposal reaches physical construction and validation exactly once.
+- Convert the quiet/supporting/accent weights into normalized ranking multipliers with probability-weighted mean `1.0`. Distribution Contrast therefore redistributes the fixed selected proposal budget instead of changing its size.
+- Preserve the current Stroke Density proposal target and candidate-pool multiplier for the first measurement. No accepted-count refill, density rebasing, river prefilter, partial sort, or validation relaxation is included.
+- Retire thinning-survival semantics from the composition overlay. Selected proposals are displayed by region mode without a survive/reject state.
+- Add one compact funnel record covering candidate pool, selected/evaluated/accepted counts, surface and projected acceptance, quiet/supporting/accent selection plus surface/projected validity, and proposal-rank quartile surface/projected validity.
+- Add source-stage timings for candidate construction/weighting, the regional-weighting subset, candidate ordering, composition setup, stroke setup, surface construction/validation, and placement diagnostics. Existing projected, coverage, and total timings remain authoritative.
+- Advance the surface-stroke generator revision to 23.
+
+V3J.4F3.3 validation gate:
+
+1. With the same seed and unchanged Stroke Density, selected proposals equal physically evaluated proposals; no regional-thinning rejection exists.
+2. Distribution Contrast still shifts selected marks among quiet/supporting/accent regions while the selected proposal count remains fixed.
+3. The full funnel reports actual surface/projected losses and Q1–Q4 acceptance so the next efficiency patch is selected from measured evidence.
+4. Companion quotas, projected contact geometry, cluster quality guards, coverage, and rendering remain unchanged.
+
+## V3J.4F3.2B — Contact-Side and Swept-Width Correction
+
+**Status:** Implemented; pending Unity compilation and same-seed visual validation. This is a geometric correctness correction over V3J.4F3.2A, not an additional aesthetic filter.
+
+Audit of the overlap regression found that projected contact placement used the moving terminal's outward direction with the wrong sign. The endpoint centre was placed on the far side of the anchor centreline, allowing the rest of the moving body to fold back through or alongside the anchor. The point-sampled overlap validator then permitted substantial visible-width overlap and exempted a broad contact neighbourhood.
+
+Implementation contract:
+
+- Position the moving terminal on the near side of the anchor with `anchorContact - outward * endpointCentreSeparation`. The separation remains the projected anchor silhouette distance plus the moving terminal cap and any authored loose gap.
+- Enforce a contact-side invariant after translation: the anchor must lie in the moving endpoint's outward direction and the moving body must lie inward from that endpoint.
+- Replace internal point-sampled clearance with variable-radius segment-to-segment swept-width validation. Closest parameters interpolate each segment's visible half-width; non-contact body pairs require 98% of combined width clearance.
+- Restrict the numerical contact tolerance to the actual moving terminal segment paired with the anchor segment containing the intended contact. That exact pair uses a 94% clearance tolerance; no multi-sample neighbourhood is exempt. Centreline crossings remain illegal everywhere.
+- Keep external independent-mark conflict thresholds, authoritative quotas, distribution, family mix, angle limits, compactness, and F3.2/F3.2A aesthetic guards unchanged.
+- Add compact cumulative counters for wrong-side terminal rejection and swept-width internal-overlap rejection.
+- Advance projected-glyph generator revision to 14.
+
+V3J.4F3.2B validation gate:
+
+1. Same-seed clusters terminate on the approaching side of their anchors; folded arches, doubled contacts, and triangular pass-through forms are materially removed.
+2. Visible member bodies no longer overlap between projected samples, including oblique and short terminal overlaps.
+3. Legal endpoint-to-edge contacts remain available and authoritative pair/triplet quotas do not silently change.
+4. Existing conservative unusual-shape policy remains active; no new generic fork, compactness, or branch-prominence rejection is introduced.
+
+## V3J.4F3.2A — Conservative Triplet Pseudo-Contact Guards
+
+**Status:** Implemented; pending Unity compilation and visual validation. V3J.4F3.2 remains the active broad cluster-quality baseline.
+
+The remaining malformed minority does not justify a broad symbolic-shape filter. This follow-up deliberately avoids generic fork, chevron, same-side attachment, branch-prominence, or stronger compactness rejection because those rules would remove useful unusual compositions and drive the field toward repeated stock shapes.
+
+Only two high-confidence post-composition failures are newly rejected:
+
+- **Crowded dual junctions:** the two real final triplet junction loci may not collapse into the same tiny visible knot, even when their source anchor samples came from different members. The final-locus threshold is intentionally weaker than the existing candidate-time shared-locus rule and applies only to complete triplets.
+- **Accidental free-end pseudo-contacts:** an unconnected terminal may not point directly into another unconnected terminal or another member body at almost-touching distance. This targets arrowhead/loop closures and tiny extra teeth, while close terminals that face away from one another remain legal.
+
+The existing severe-compression guard remains unchanged and conservative. Both new failures return donors to the authoritative bounded retry search; they do not alter participation, triplet share, layout quotas, distribution, or total descriptor count. Compact generation telemetry records each rejection class without per-cluster Console output.
+
+V3J.4F3.2A validation gate:
+
+1. Existing pair and triplet quotas, distribution, layout weights, and accepted unusual compositions remain materially unchanged.
+2. Final triplets no longer collapse both junctions into one tiny visible knot.
+3. Unconnected terminal tips no longer almost meet one another or stab into another member body to form a second accidental junction.
+4. The existing compactness counter and the two new counters are reviewed against quota shortfall; broad rejection is not accepted.
+
+### 2026-07-14 — Patch V3J.4F3.2: Projected Cluster Quality Guards
+
+**Status:** Implemented; pending Unity compilation and visual validation. Distribution control consolidation from V3J.4F3.1 and authoritative final companion quotas from V3J.4F3 remain active.
+
+Unity inspection after V3J.4F3.1 accepted the three-control distribution scheme but exposed a minority of technically legal, visually malformed clusters: long near-parallel members blending into one thick band, multiple triplet tips competing for essentially the same attachment locus, and a smaller number of severely compressed triplet knots. V3J.4F3.2 adds projected-space quality rejection and bounded retry without changing quotas, distribution, family selection, rotation limits, or authored controls.
+
+Implementation contract:
+
+- Reject member pairs whose centreline segments remain within 88% of combined visible half-width while aligned within 22 degrees for at least `max(0.025 m, 14% of the shorter authored length)`. This targets sustained body blending, not ordinary terminal contact.
+- For triplets, reserve attachment slots already consumed by an earlier contact. A later member cannot attach to the same or immediately adjacent projected sample on either side of the existing junction.
+- Reject triplet contact loci that collapse within `max(10% of the shorter authored length, 2.25 times the candidate combined half-width)` of either side of an existing junction.
+- Keep the compact-triplet guard deliberately conservative: reject only when all three member centroids fit inside 42% of the shortest authored member length. Interesting compact and irregular compositions remain eligible.
+- Feed all quality failures back into the existing authoritative bounded donor/layout retry loop. Do not silently substitute layout quotas or reduce requested participation.
+- Add compact cumulative telemetry for near-parallel body, occupied attachment slot, shared contact locus, and severe compactness candidate rejection. No per-cluster Console logging.
+- Advance projected-glyph generator revision to 12.
+
+V3J.4F3.2 validation gate:
+
+1. Existing distribution controls and resolved pair/triplet/layout quotas remain unchanged.
+2. Long near-parallel overlapping bands are materially reduced without eliminating ordinary shoulder or stepped contacts.
+3. Triplets no longer place two tips into the same tiny junction or immediately adjacent anchor samples.
+4. Only clearly collapsed knots are removed; unusual but readable compact clusters remain.
+5. Achieved quota and shortfall telemetry is reviewed alongside the four new rejection counters so quality improvement is not bought through silent population loss.
+
+### 2026-07-14 — Patch V3J.4F3.1: Distribution Control Consolidation
+
+**Status:** Implemented; pending Unity compilation and visual validation. This patch changes Painted Accent distribution authoring only. The authoritative companion-quota architecture from V3J.4F3 remains active and unchanged.
+
+The previous Inspector exposed five overlapping field controls—Distribution Patch Scale, Distribution Patchiness, Distribution Sparse Floor, Regional Zone Scale, and Regional Density Contrast—plus Companion Accent Bias. Although these values drove distinct implementation layers, they all changed related sparse/dense distribution behaviour and were not artistically separable enough to justify six normal authoring controls.
+
+The active normal Inspector now exposes exactly three distribution controls:
+
+```text
+Distribution Scale
+    size of spatial variation
+    low = smaller, more frequent changes
+    high = broader local patches and larger coherent regions
+
+Distribution Contrast
+    strength of sparse-versus-dense separation
+    low = comparatively even field
+    high = stronger local preference, stronger regional redistribution,
+           and a lower protected sparse-region floor
+
+Cluster Region Bias
+    location of the fixed companion quota only
+    low = clusters follow the overall field
+    high = clusters concentrate in denser accent regions
+```
+
+The serialized `paintedAccentDistributionPatchScale`, `paintedAccentDistributionPatchiness`, and `paintedAccentCompanionAccentBias` fields are retained to avoid asset migration. Their displayed and runtime meanings are now Distribution Scale, Distribution Contrast, and Cluster Region Bias. The three former subordinate distribution fields remain serialized but hidden for compatibility and no longer independently control production output.
+
+The production mapping is deterministic:
+
+- Distribution Scale drives the continuous patch scale directly over `2–24 m` and derives the coherent regional scale over `1–13.5 m` from the same normalized value.
+- Distribution Contrast directly drives patch preference and regional density redistribution. It also derives a protected sparse floor from `0.40` at zero contrast to `0.10` at full contrast.
+- Cluster Region Bias is unchanged mathematically; only its authoring name and placement are clarified. It never changes Companion Participation, Triplet Share, or total mark count.
+
+Only Distribution Scale and Distribution Contrast participate in the surface-stroke cache signature. Cluster Region Bias remains a projected-composition input. The old hidden values cannot cause invisible cache invalidation or alter output.
+
+The next cluster-quality patch remains intentionally conservative for compact triplets. It may add a light degeneracy guard, but must not broadly reject the interesting irregular compositions already accepted. Stronger work is reserved for proven near-parallel body blending and multi-tip attachment convergence.
+
+V3J.4F3.1 validation gate:
+
+1. Unity compiles with zero C# and shader errors.
+2. Both Painted Accent authoring inspectors show one Distribution group containing only Distribution Scale, Distribution Contrast, and Cluster Region Bias.
+3. Distribution Scale visibly changes spatial feature size without changing the total proposal target or companion quota.
+4. Distribution Contrast visibly changes sparse/dense separation while retaining non-zero sparse-area presence.
+5. Cluster Region Bias changes where clusters concentrate without changing requested or achieved pair/triplet counts.
+6. Existing style assets retain their serialized master scale, contrast, and cluster-bias values without a migration step.
+
+### 2026-07-14 — Patch V3J.4F3: Authoritative Final Companion Quotas
+
+**Status:** Active quota architecture; distribution authoring is superseded by V3J.4F3.1. This architecture supersedes V3J.4F2.3 population allocation while retaining its accepted pair-local shape grammar and exact terminal-contact validation.
+
+The previous source-stage companion pass was best-effort: it calculated a participant target before final validation, randomly requested pairs or triplets, searched for conveniently positioned existing candidates, and silently accepted whatever survived later surface and projected fallback. Unity telemetry proved that raising its source target did not make the authored result authoritative. V3J.4F3 therefore removes companion ownership from surface placement and resolves composition only after every ordinary independent mark has passed projected prototype and final ground/domain validation.
+
+The active authoring contract is now separated into independent responsibilities:
+
+```text
+Stroke Density
+    total proposal population
+
+Distribution Scale / Distribution Contrast
+    size and strength of independent source-mark distribution
+
+Companion Participation
+    exact target share of final valid projected marks assigned to clusters
+
+Triplet Share
+    exact target share of clustered participants assigned to triplets
+
+Cluster Region Bias
+    where cluster anchors are preferred; never changes the global quota
+
+Companion Tightness / Cluster Verticality
+    junction spacing and translation-driven shape only
+
+Advanced Pair/Triplet Layout Weights
+    normalized exact whole-cluster type quotas
+```
+
+The serialized `paintedAccentHorizontalCompanionStrength` field is retained for asset compatibility, but its Inspector label and runtime meaning are now `Companion Participation`. The serialized triplet-verticality field is likewise retained, while its displayed meaning is `Cluster Verticality`. New serialized controls are `Triplet Share`, the backing field now displayed as `Cluster Region Bias`, four pair-layout weights, and four triplet-layout weights. Existing assets receive deterministic fallback values without a field rename or migration.
+
+The production build sequence is:
+
+1. Generate, thin, and physically validate the ordinary independent surface descriptors.
+2. Build and finalize every valid independent projected prototype.
+3. Solve the closest feasible integer counts `P`, `T`, and `S`, where `2P + 3T + S = N`, from Companion Participation and participant-based Triplet Share.
+4. Normalize pair and triplet layout weights into exact whole-cluster counts by deterministic largest-remainder allocation.
+5. Rank eligible donor marks by deterministic order blended with local projected density according to Cluster Region Bias.
+6. Build requested triplets and pairs atomically from donor slots using the accepted projected contact, silhouette, ground/domain, and external-conflict validators. Donor family, seed, length, width, strength, and total population are preserved; only clustered projected placement changes.
+7. Commit non-participants and any explicit unresolved donor shortfall as independent glyphs. Never silently substitute a different layout or pair/triplet type.
+8. Report requested, achieved, and shortfall counts globally and per layout.
+
+`Companion Participation = 0` is an exact independent compatibility path. At nonzero participation, no hidden 68%/94% multiplier, random triplet roll, same-region candidate dependency, source target-plan rejection, or silent triplet-to-pair downgrade controls the final population. Surface-stroke cache signatures no longer include companion composition controls; those controls invalidate projected glyphs, coverage, and material only.
+
+Authoritative means the generator retries deterministic donor combinations within a bounded dirty-time budget and exposes any remaining geometrically impossible shortfall. It does not bypass river/modifier exclusion, ground sampling, projected silhouette safety, or exact terminal-contact rules. Total accepted projected mark count is preserved whether a requested cluster succeeds or falls back.
+
+Compact projected diagnostics report:
+
+- valid projected mark count and requested participation/triplet share;
+- resolved participant, pair-cluster, and triplet-cluster counts;
+- requested and achieved counts for every pair/triplet layout;
+- bounded build attempts and explicit pair/triplet shortfall;
+- final clustered participants, accepted glyphs, and achieved percentage;
+- contact/surface/external-conflict fallback and final reconciliation removal counts.
+
+**Canonical methods-tried ledger update:**
+
+- raising best-effort participant ceilings and repairing source plans: **rejected as the population authority**; telemetry showed the requested and final results could diverge substantially;
+- nearby pre-existing candidate search as a prerequisite for composition: **rejected**; descriptors now act as donor population slots;
+- random pair/triplet and layout probabilities: **rejected**; exact integer quotas replace them;
+- source-stage companion mutation: **retired from active production**; final valid projected prototypes own composition;
+- bounded projected-space atomic construction, pair-local stepping, layout-aware contact, exact silhouette-edge termination, fixed descriptor population, and explicit fallback evidence: **retained**.
+
+V3J.4F3 validation gate:
+
+1. Unity compiles with zero C# and shader errors; Companion Participation `0` reproduces the independent baseline.
+2. At `90%` participation and `45%` Triplet Share, diagnostics resolve whole-mark quotas against the final valid projected pool and the final clustered percentage closely matches the resolved target.
+3. Requested versus achieved pair/triplet and per-layout counts agree, or every difference appears as an explicit shortfall rather than silent substitution.
+4. Changing Participation or Triplet Share rebuilds projected glyphs/coverage without rebuilding surface placement; Tightness, Verticality, Accent Bias, and layout weights do not alter the total projected mark count.
+5. Existing accepted pair/triplet shapes, bounded orientation, pair-local stepping, and exact no-pass-through contacts remain intact.
+6. Record full projected quota diagnostics and regeneration timing before freezing shape/population and proceeding to the final spatial distribution pass.
+
+### 2026-07-14 — Historical Patch V3J.4F2.3: Majority Companion Source Completion and Exact Contact Stop
+
+**Status:** Superseded by V3J.4F3 for population allocation. Its pair-local geometry and exact contact-stop work remain active.
+
+The F2.2 Unity sample established that the pair-local shape correction works, but also proved that the low clustered population is not caused by the coarse reservation gates. The authoritative source telemetry was:
+
+```text
+post-thinning companion target / formed / source-accepted: 264 / 206 / 182
+primary attempts / target-plan rejected:                  311 / 301
+missing secondary / tertiary / triplet downgrades:        122 / 9 / 226
+reservation envelope / occupied cell:                     2 / 1
+structure rejected pair / triplet:                        94 / 207
+source-member fallback / incomplete clusters:             3 / 12
+clusters composed pairs / triplets:                       100 / 2
+```
+
+This evidence changes the earlier provisional population plan. The one-cluster-per-cell and padded-envelope gates are retained because they rejected only three attempts in this generation. The confirmed dominant source losses were the 68% participant ceiling, single-region candidate search, and pair/triplet target plans that failed their own structure gates before candidate placement.
+
+F2.3 therefore makes the following dirty-time-only changes:
+
+- raises the maximum source participant target from `0.68` to `0.94` of the post-thinning candidate population at Companion Strength `1`;
+- keeps same-region candidates preferred, then performs a bounded nearby cross-region fallback using the existing relocation radius when the same region contains no usable member;
+- repairs only pair plans that would otherwise fail by moving the secondary along the already accepted pair-local shared normal until both the centre-step and pair-normal-span requirements are satisfied with an 8% margin;
+- retries only failed structured triplet plans with `1.35x` and then `2.00x` translation scale, preserving the bounded angle contract and leaving already-valid triplets unchanged;
+- retains the anti-chain envelope, occupied-cell reservation, physical validation, projected atomic commit, fixed descriptor population, maximum three members, independent fallback, R8 coverage, and G3 performance architecture;
+- replaces negative projected centreline penetration with an exact silhouette-edge stop. Interior attachment distance accounts for the anchor half-width projected along the moving endpoint approach plus the moving cap half-width; near-tangent interior approaches are rejected;
+- removes the broad segment-intersection exemption around intended contacts. Point-clearance relaxation remains local to the contact, but any actual centreline crossing is now illegal;
+- adds final projected clustered-participant count and percentage plus the number of clusters removed during final independent reconciliation.
+
+Compact source diagnostics additionally report cross-region candidate selections, pair structure repairs, and triplet structure repairs. No per-cluster Console logging is added.
+
+**Canonical methods-tried ledger update:**
+
+- removing the occupied-cell or envelope gates as the primary population fix: **rejected for this pass** because telemetry showed only `1` and `2` rejections respectively;
+- raising the participant ceiling alone: **partially useful but insufficient**, because target-plan rejection and missing same-region candidates were dominant;
+- pair-local target repair without extra rotation: **active implementation**;
+- translation-only retry for failed triplet plans: **active implementation**;
+- nearby cross-region candidate fallback within the existing relocation bound: **active implementation**;
+- reversing projected independent/cluster priority or adding projected triplet-to-pair salvage: **deferred** until the new final clustered percentage and projected fallback telemetry prove that stage is dominant.
+
+V3J.4F2.3 validation gate:
+
+1. Unity compiles with zero C# and shader errors; Companion Strength `0` remains identical to the independent baseline.
+2. At Strength/Tightness/Verticality `1 / 1 / 1`, source target participation rises to approximately 94% of post-thinning candidates and formed/source-complete participation increases materially.
+3. Pair/triplet target-plan rejection drops sharply; the new repair counters explain how much was recovered without widening angle limits.
+4. Most accepted projected glyphs belong to complete pairs or triplets. Use the new final clustered-participant percentage, not visual counting alone.
+5. The isolated pass-through contact is absent: moving members stop at the visible edge of the anchor and do not cross its centreline.
+6. Pair-local stepping, the 10/15-degree companion allowances, 42-degree cap, atomic fallback, and accepted F2.2 shape language remain intact.
+7. Paste the complete Painted Accent Placement and Projected Glyph diagnostics, including final clustered percentage and reconciliation-removal count, before deciding whether projected conflict priority or triplet salvage needs one final targeted patch.
+
+### 2026-07-13 — Historical Patch V3J.4F2.2: Pair-Local Stepping and Cluster Attrition Audit
+
+**Status:** Implemented; pending Unity validation and telemetry review. This patch corrects the remaining pseudo-single-line pair geometry and adds cumulative evidence for the separate low-cluster-population problem. It does not yet relax the participant ceiling or any anti-overlap safety gate.
+
+F2.1 proved that bounded orientation and stronger translation work, but its pair gate measured displacement along permanent visual vertical. Two nearly collinear members could therefore pass merely by sharing a shallow diagonal slope. F2.2 makes pair-local departure authoritative:
+
+- source pair structure is measured perpendicular to the normalized average of the two member axes, so a straight horizontal or diagonal continuation measures approximately zero;
+- projected pair step retention uses that same pair-local normal, while triplets retain their existing fixed-north vertical contract;
+- maximum structured-pair prevalence rises from `0.82` to `0.94` at maximum Verticality; the remaining minority is renamed `Shallow Offset`, receives an explicit pair-local offset, and is no longer intended as a seamless axial continuation;
+- pair-layout intent is carried internally from source descriptors into projected composition;
+- structured projected pairs use layout-aware anchor samples: stepped and offset layouts prefer quarter/shoulder/interior contacts, shoulder layouts prefer centre/shoulder contacts, and routine structured endpoint-to-endpoint continuation is removed;
+- shallow-offset endpoint contacts use a positive rendered gap instead of Tightness overlap;
+- touching/overlapping endpoint candidates are rejected when their junction tangents are within 16 degrees and their pair-local step is below 12% of the shorter authored length;
+- pair and triplet angle allowances remain frozen at authored jitter plus 10/15 degrees with the same 42-degree absolute cap;
+- atomic cluster commit, projected silhouette checks, external conflict reconciliation, independent fallback, fixed population, R8 coverage, and G3 performance architecture remain unchanged.
+
+The 68% maximum companion-participant budget remains unchanged for this evidence pass. Compact source diagnostics now report target versus formed participants, primary attempts, target-plan and pair/triplet structure rejection, missing secondary/tertiary candidates, triplet-to-pair downgrades, envelope/cell reservation rejection, source-member physical fallback, and source-incomplete clusters. Projected diagnostics additionally report near-collinear endpoint candidates rejected. All evidence remains one aggregate record per generation; no per-cluster Console spam is added.
+
+**Canonical methods-tried ledger update:**
+
+- more pair rotation or blind translation increases: **rejected** because the remaining defect was the reference frame, not insufficient magnitude;
+- world/screen-vertical pair structure and retention: **rejected** because shallow collinear diagonals satisfy it;
+- pair-local shared-normal structure and retention: **active implementation pending validation**;
+- unrestricted projected endpoint-to-endpoint search for structured pairs: **rejected**;
+- raising the 68% participant ceiling or weakening cell/envelope/conflict gates before knowing the dominant attrition stage: **deferred pending telemetry**.
+
+V3J.4F2.2 validation gate:
+
+1. Unity compiles with zero C# and shader errors, and Strength `0` preserves the independent baseline.
+2. At Strength/Tightness/Verticality `1 / 1 / 1`, touching near-collinear horizontal and shallow-diagonal pseudo-single-lines are absent or materially reduced.
+3. Structured pairs visibly depart from their shared axis; the shallow-offset minority retains a rendered break and does not read as one crooked line.
+4. Triplets and the F2 bounded-angle result remain materially unchanged, with no return of hooks, chairs, trees, X/star crossings, or partial clusters.
+5. Capture the complete placement and projected-generation telemetry, especially target/formed/source-accepted participants and every new attrition category.
+6. Use that evidence to choose the final population/distribution patch; do not infer which safety gate to relax from screenshots alone.
+
+### 2026-07-13 — Historical Patch V3J.4F2.1: Pair Verticality Completion
+
+**Status:** Implemented; pending Unity validation. This is the final narrow shape-tuning pass on the accepted V3J.4F2 bounded-orientation architecture.
+
+Unity validation of F2 confirmed that the extreme-rotation defect is solved and that the new triplet grammar produces useful contour fragments. The remaining weakness is isolated to two-member clusters: too many pair proposals remain explicitly flat, the source step is modest, and the projected solver may retain too little of that step for the result to read clearly at coverage resolution. F2.1 changes pair placement only:
+
+- maximum structured-pair prevalence rises from `0.64` to `0.82` at maximum Verticality, leaving an intentional approximately 18% flat-proposal minority before later validation/fallback;
+- structured pair translation rises from `0.18` to `0.24` of the shorter authored length and from `3.25` to `4.25` stroke widths;
+- the gentlest `Offset Echo` translation scale rises from `0.82` to `0.90`;
+- the source-stage minimum pair centre step rises from `0.11` to `0.15` of the shorter member length;
+- final projected pairs must retain at least 65% of a meaningful requested step, while the validated triplet retention threshold remains unchanged at 42%;
+- a requested triplet that cannot commit all three source members now recomputes an actual pair target from scratch instead of reusing a triplet fragment as a pair;
+- pair and triplet orientation allowances remain unchanged at authored jitter plus 10/15 degrees with the same 42-degree absolute cap;
+- triplet layout, cluster population, anti-chain envelopes, projected contact samples, silhouette/external-conflict validation, atomic fallback, physical validation, R8 coverage, and G3 performance architecture remain unchanged.
+
+Compact cumulative diagnostics now report:
+
+```text
+source pair intent: flat / stepped / shoulder / offset
+final committed pair vertical step: min / mean / max
+final committed pair step fraction of shorter length: min / mean / max
+pair contact candidates rejected by the 65% step-retention gate
+pair fallback: incomplete / prototype / contact / surface / external
+```
+
+These are one aggregate record per generation. No per-pair Console logging is introduced.
+
+**Canonical methods-tried ledger update:**
+
+- increasing pair rotation again: **rejected**; F2's bounded-angle result is accepted and frozen;
+- globally tightening projected step retention: **rejected** because the validated triplets do not need the stricter pair threshold;
+- pair-only prevalence, translation, source gate, and projected retention tuning: **active implementation pending validation**.
+
+V3J.4F2.1 validation gate:
+
+1. Unity compiles with zero C# and shader errors.
+2. `Horizontal Companion Strength = 0` remains visually identical to the accepted independent baseline.
+3. At Strength/Tightness/Verticality `1 / 1 / 1`, the pair-intent diagnostic shows flat pairs as a clear minority and the final committed pair-step fraction has a visibly meaningful mean.
+4. Most visible pairs have a clear vertical centre difference while some horizontal pairs remain; the accepted F2 triplet shapes are materially unchanged.
+5. Companion angle extrema remain within the F2 bounds and no hook, chair, tree, near-vertical-member, X/star, deep-overlap, or partial-cluster regression appears.
+6. Record total regeneration, projected cluster composition time, complete pairs/triplets, contact fallback, and pair step-retention rejection count before freezing shape work.
+
+### 2026-07-13 — Historical Patch V3J.4F2: Bounded Orientation, Translation-Driven Steps
+
+**Status:** Unity-validated and superseded by V3J.4F2.1 only for final pair-verticality tuning. F2 superseded V3J.4F as the companion-shape architecture while retaining F's projected-space atomic cluster representation.
 
 Unity evidence after V3J.4F showed that projected contact quality improved, but the visible composition was still created primarily by rotating whole glyphs through the inherited E7/E8 64–84-degree ranges. The result was hooks, chairs, tree-like branches, near-vertical members, and approximately right-angle corners. F2 changes the division of responsibility:
 
@@ -26,7 +495,7 @@ F2 changes dirty-time composition only:
 
 - E7/E8 extreme rotation as the source of verticality: **rejected**.
 - V3J.4F actual projected contact and atomic fallback: **accepted and retained**.
-- V3J.4F2 bounded orientation plus translation-driven stepped intent: **active implementation pending validation**.
+- V3J.4F2 bounded orientation plus translation-driven stepped intent: **validated and retained as the base architecture**.
 
 V3J.4F2 validation gate:
 

@@ -16,10 +16,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EdgeWearEvaluationMode evaluationMode,
             int boundedEdgeOrdinal,
             out PlaneCutBevelPreviewStatus previewStatus,
-            out BoundedEdgePreviewStatus boundedPreviewStatus)
+            out BoundedEdgePreviewStatus boundedPreviewStatus,
+            out UnifiedEdgeWearPreviewStatus unifiedPreviewStatus)
         {
             previewStatus = default;
             boundedPreviewStatus = default;
+            unifiedPreviewStatus = default;
             if (evaluationMode == EdgeWearEvaluationMode.None)
             {
                 return null;
@@ -32,6 +34,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool applyBoundedSingleEdgePreview =
                 evaluationMode ==
                     EdgeWearEvaluationMode.BoundedSingleEdgePreview;
+            bool applyUnifiedBoundedPreview =
+                evaluationMode ==
+                    EdgeWearEvaluationMode.UnifiedBoundedPreview;
             if (!surfaceFeatures.HasValue || faces == null || faces.Count < 4)
             {
                 return null;
@@ -56,7 +61,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     maximumDimension,
                     recipe,
                     settings,
-                    amount01);
+                    amount01,
+                    out EdgeWearCoverageAudit coverageAudit);
             if (candidates.Count == 0)
             {
                 LogChamferReadiness(
@@ -92,6 +98,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 out ChamferTopologyContext context,
                 out string blocker);
 
+            if (ready)
+            {
+                MapEdgeWearCoverageAuditToGraph(
+                    coverageAudit,
+                    context);
+            }
+
             LogChamferReadiness(stats, ready, blocker);
 
             if (ready)
@@ -102,7 +115,78 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float minimumStableFaceArea =
                     maximumDimension * maximumDimension * 0.000001f;
 
-                if (applyBoundedSingleEdgePreview)
+                if (applyUnifiedBoundedPreview)
+                {
+                    ChamferCornerStats cornerStats =
+                        new ChamferCornerStats();
+                    bool cornersReady = AuditExplicitChamferCornerSolution(
+                        faces,
+                        context,
+                        requestedWidth,
+                        minimumStableEdgeLength,
+                        minimumStableFaceArea,
+                        null,
+                        ref cornerStats,
+                        out ChamferCornerSolution cornerSolution,
+                        out string cornerBlocker);
+                    PlaneCutBevelAuditResult allEdgeAudit = default;
+                    TriangleSoup allEdgePreviewSoup = null;
+                    if (cornersReady)
+                    {
+                        ApplyEdgeWearCoverageCornerSolution(
+                            coverageAudit,
+                            context,
+                            cornerSolution);
+                        allEdgeAudit = AuditPlaneCutBevelKernel(
+                            faces,
+                            context,
+                            cornerSolution,
+                            minimumStableEdgeLength,
+                            minimumStableFaceArea,
+                            coverageAudit,
+                            out allEdgePreviewSoup);
+                    }
+                    else
+                    {
+                        allEdgeAudit.CoverageAudit = coverageAudit;
+                        allEdgeAudit.SelectedEdgeCount =
+                            context.SelectedSourceEdges.Count;
+                        allEdgeAudit.Diagnostic =
+                            string.IsNullOrEmpty(cornerBlocker)
+                                ? "the shared all-edge corner solution failed"
+                                : cornerBlocker;
+                    }
+
+                    LogUnifiedAllEdgeBevelAudit(
+                        allEdgeAudit,
+                        cornersReady,
+                        cornerBlocker);
+
+                    bool previewApplied =
+                        cornersReady &&
+                        allEdgeAudit.GeometryValid == 1 &&
+                        allEdgePreviewSoup != null;
+                    unifiedPreviewStatus =
+                        new UnifiedEdgeWearPreviewStatus(
+                            previewApplied,
+                            allEdgeAudit.SelectedEdgeCount,
+                            allEdgeAudit.ActiveEdgeCount,
+                            allEdgeAudit.PlanesBuilt,
+                            allEdgeAudit.PlanesDeferred,
+                            allEdgeAudit.PlanesRejected,
+                            allEdgeAudit.BevelRegionFaceCount,
+                            0,
+                            allEdgeAudit.PreviewTriangleCount,
+                            allEdgeAudit.Diagnostic,
+                            BuildUnifiedEdgeWearDebugEdges(
+                                context,
+                                allEdgeAudit.DebugFocusEdgeIndices));
+                    if (previewApplied)
+                    {
+                        return allEdgePreviewSoup;
+                    }
+                }
+                else if (applyBoundedSingleEdgePreview)
                 {
                     BoundedSingleEdgeAuditResult boundedAudit =
                         AuditBoundedSingleEdgeBevel(
@@ -166,6 +250,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                     cornerSolution,
                                     minimumStableEdgeLength,
                                     minimumStableFaceArea,
+                                    coverageAudit,
                                     out TriangleSoup planeCutPreviewSoup);
                             LogPlaneCutBevelAudit(planeCutAudit);
 
@@ -679,6 +764,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
             return true;
+        }
+
+        private static EdgeWearDebugEdgeRecord[]
+            BuildUnifiedEdgeWearDebugEdges(
+                ChamferTopologyContext context,
+                List<int> focusEdgeIndices)
+        {
+            if (context == null || context.Graph == null)
+            {
+                return Array.Empty<EdgeWearDebugEdgeRecord>();
+            }
+            HashSet<int> focusEdges = focusEdgeIndices == null
+                ? new HashSet<int>()
+                : new HashSet<int>(focusEdgeIndices);
+            EdgeWearDebugEdgeRecord[] records =
+                new EdgeWearDebugEdgeRecord[
+                    context.Graph.Edges.Count];
+            for (int edgeIndex = 0;
+                 edgeIndex < context.Graph.Edges.Count;
+                 edgeIndex++)
+            {
+                EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
+                records[edgeIndex] = new EdgeWearDebugEdgeRecord(
+                    edgeIndex,
+                    context.Graph.Vertices[edge.VertexA].Position,
+                    context.Graph.Vertices[edge.VertexB].Position,
+                    edge.Selected,
+                    focusEdges.Contains(edgeIndex));
+            }
+            return records;
         }
 
         #endregion

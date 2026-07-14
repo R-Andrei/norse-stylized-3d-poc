@@ -368,12 +368,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             "_PlaneCutBevelPreview";
         private const string BoundedEdgePreviewMeshNameSuffix =
             "_BoundedEdgeBevelPreview";
+        private const string UnifiedEdgeWearPreviewMeshNameSuffix =
+            "_UnifiedEdgeWearBevelPreview";
 
         private enum PreviewGenerationMode
         {
             Production,
             PlaneCut,
-            BoundedSingleEdge
+            BoundedSingleEdge,
+            UnifiedEdgeWear
         }
         private static readonly ProfilerMarker SynchronizeProfilerMarker =
             new ProfilerMarker("GeneratedMass.Synchronize");
@@ -950,6 +953,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private float boundedEdgePreviewMaximumExtentBeyondRails;
         [NonSerialized]
         private string boundedEdgePreviewDiagnostic;
+        [NonSerialized]
+        private bool unifiedEdgeWearPreviewEnabled;
+        [NonSerialized]
+        private bool unifiedEdgeWearPreviewStale;
+        [NonSerialized]
+        private bool unifiedEdgeWearPreviewApplied;
+        [NonSerialized]
+        private int unifiedEdgeWearPreviewCandidateCount;
+        [NonSerialized]
+        private int unifiedEdgeWearPreviewRailSolvedEdgeCount;
+        [NonSerialized]
+        private int unifiedEdgeWearPreviewActiveEdgeCount;
+        [NonSerialized]
+        private int unifiedEdgeWearPreviewDeferredEdgeCount;
+        [NonSerialized]
+        private int unifiedEdgeWearPreviewRejectedEdgeCount;
+        [NonSerialized]
+        private int unifiedEdgeWearPreviewBevelFaceCount;
+        [NonSerialized]
+        private int unifiedEdgeWearPreviewVertexJunctionFaceCount;
+        [NonSerialized]
+        private int unifiedEdgeWearPreviewTriangleCount;
+        [NonSerialized]
+        private string unifiedEdgeWearPreviewDiagnostic;
+        [NonSerialized]
+        private MassGenerator.EdgeWearDebugEdgeRecord[]
+            unifiedEdgeWearPreviewDebugEdges =
+                Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
 #endif
 
         public event Action GeometryChanged;
@@ -1038,6 +1069,67 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public string BoundedEdgePreviewDiagnostic =>
             boundedEdgePreviewDiagnostic ?? string.Empty;
 
+        public bool UnifiedEdgeWearPreviewEnabled =>
+            unifiedEdgeWearPreviewEnabled;
+        public bool UnifiedEdgeWearPreviewStale =>
+            unifiedEdgeWearPreviewStale;
+        public bool UnifiedEdgeWearPreviewApplied =>
+            unifiedEdgeWearPreviewApplied;
+        public int UnifiedEdgeWearPreviewCandidateCount =>
+            unifiedEdgeWearPreviewCandidateCount;
+        public int UnifiedEdgeWearPreviewRailSolvedEdgeCount =>
+            unifiedEdgeWearPreviewRailSolvedEdgeCount;
+        public int UnifiedEdgeWearPreviewActiveEdgeCount =>
+            unifiedEdgeWearPreviewActiveEdgeCount;
+        public int UnifiedEdgeWearPreviewDeferredEdgeCount =>
+            unifiedEdgeWearPreviewDeferredEdgeCount;
+        public int UnifiedEdgeWearPreviewRejectedEdgeCount =>
+            unifiedEdgeWearPreviewRejectedEdgeCount;
+        public int UnifiedEdgeWearPreviewBevelFaceCount =>
+            unifiedEdgeWearPreviewBevelFaceCount;
+        public int UnifiedEdgeWearPreviewVertexJunctionFaceCount =>
+            unifiedEdgeWearPreviewVertexJunctionFaceCount;
+        public int UnifiedEdgeWearPreviewTriangleCount =>
+            unifiedEdgeWearPreviewTriangleCount;
+        public string UnifiedEdgeWearPreviewDiagnostic =>
+            unifiedEdgeWearPreviewDiagnostic ?? string.Empty;
+        public MassGenerator.EdgeWearDebugEdgeRecord[]
+            UnifiedEdgeWearPreviewDebugEdges =>
+                unifiedEdgeWearPreviewDebugEdges ??
+                    Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+
+        public void EvaluateUnifiedEdgeWearPreview()
+        {
+            if (Application.isPlaying || regenerationInProgress)
+            {
+                return;
+            }
+
+            regenerationInProgress = true;
+            planeCutBevelPreviewEnabled = false;
+            planeCutBevelPreviewStale = false;
+            ClearPlaneCutBevelPreviewStatus();
+            boundedEdgePreviewEnabled = false;
+            boundedEdgePreviewStale = false;
+            ClearBoundedEdgePreviewStatus();
+            unifiedEdgeWearPreviewEnabled = true;
+            unifiedEdgeWearPreviewStale = false;
+            ClearUnifiedEdgeWearPreviewStatus();
+            try
+            {
+                RegenerateInternal(PreviewGenerationMode.UnifiedEdgeWear);
+            }
+            catch
+            {
+                unifiedEdgeWearPreviewStale = true;
+                throw;
+            }
+            finally
+            {
+                regenerationInProgress = false;
+            }
+        }
+
         public void EvaluatePlaneCutBevelPreview()
         {
             if (Application.isPlaying || regenerationInProgress)
@@ -1049,6 +1141,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             boundedEdgePreviewEnabled = false;
             boundedEdgePreviewStale = false;
             ClearBoundedEdgePreviewStatus();
+            unifiedEdgeWearPreviewEnabled = false;
+            unifiedEdgeWearPreviewStale = false;
+            ClearUnifiedEdgeWearPreviewStatus();
             planeCutBevelPreviewEnabled = true;
             planeCutBevelPreviewStale = false;
             ClearPlaneCutBevelPreviewStatus();
@@ -1107,6 +1202,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             planeCutBevelPreviewEnabled = false;
             planeCutBevelPreviewStale = false;
             ClearPlaneCutBevelPreviewStatus();
+            unifiedEdgeWearPreviewEnabled = false;
+            unifiedEdgeWearPreviewStale = false;
+            ClearUnifiedEdgeWearPreviewStatus();
             boundedEdgePreviewEnabled = true;
             boundedEdgePreviewStale = false;
             boundedEdgePreviewOrdinal = Mathf.Max(0, ordinal);
@@ -1161,6 +1259,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             boundedEdgePreviewEnabled = false;
             boundedEdgePreviewStale = false;
             ClearBoundedEdgePreviewStatus();
+            unifiedEdgeWearPreviewEnabled = false;
+            unifiedEdgeWearPreviewStale = false;
+            ClearUnifiedEdgeWearPreviewStatus();
             Regenerate();
         }
 
@@ -1172,6 +1273,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             planeCutBevelPreviewDeferredEdges = 0;
             planeCutBevelPreviewRejectedEdges = 0;
             planeCutBevelPreviewDiagnostic = string.Empty;
+        }
+
+        private void ClearUnifiedEdgeWearPreviewStatus()
+        {
+            unifiedEdgeWearPreviewApplied = false;
+            unifiedEdgeWearPreviewCandidateCount = 0;
+            unifiedEdgeWearPreviewRailSolvedEdgeCount = 0;
+            unifiedEdgeWearPreviewActiveEdgeCount = 0;
+            unifiedEdgeWearPreviewDeferredEdgeCount = 0;
+            unifiedEdgeWearPreviewRejectedEdgeCount = 0;
+            unifiedEdgeWearPreviewBevelFaceCount = 0;
+            unifiedEdgeWearPreviewVertexJunctionFaceCount = 0;
+            unifiedEdgeWearPreviewTriangleCount = 0;
+            unifiedEdgeWearPreviewDiagnostic = string.Empty;
+            unifiedEdgeWearPreviewDebugEdges =
+                Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
         }
 
         private void ClearBoundedEdgePreviewStatus(
@@ -1260,6 +1377,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (boundedEdgePreviewEnabled)
                 {
                     boundedEdgePreviewStale = true;
+                }
+                if (unifiedEdgeWearPreviewEnabled)
+                {
+                    unifiedEdgeWearPreviewStale = true;
                 }
             }
 #endif
@@ -1406,6 +1527,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             else
             {
                 ClearBoundedEdgePreviewStatus();
+            }
+
+            if (unifiedEdgeWearPreviewEnabled)
+            {
+                unifiedEdgeWearPreviewStale = true;
+                unifiedEdgeWearPreviewApplied = false;
+            }
+            else
+            {
+                ClearUnifiedEdgeWearPreviewStatus();
             }
 #endif
         }
@@ -1710,6 +1841,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 #if UNITY_EDITOR
             MassGenerator.PlaneCutBevelPreviewStatus previewStatus = default;
             MassGenerator.BoundedEdgePreviewStatus boundedStatus = default;
+            MassGenerator.UnifiedEdgeWearPreviewStatus unifiedStatus = default;
             MeshData sourceMeshData;
             if (previewMode == PreviewGenerationMode.PlaneCut)
             {
@@ -1762,6 +1894,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 boundedEdgePreviewDiagnostic = boundedStatus.Diagnostic;
                 boundedEdgePreviewStale = false;
             }
+            else if (previewMode == PreviewGenerationMode.UnifiedEdgeWear)
+            {
+                sourceMeshData =
+                    MassGenerator.GenerateUnifiedEdgeWearPreview(
+                        recipe,
+                        featureSettings,
+                        out unifiedStatus);
+                unifiedEdgeWearPreviewApplied =
+                    unifiedStatus.PreviewApplied;
+                unifiedEdgeWearPreviewCandidateCount =
+                    unifiedStatus.CandidateCount;
+                unifiedEdgeWearPreviewRailSolvedEdgeCount =
+                    unifiedStatus.RailSolvedEdgeCount;
+                unifiedEdgeWearPreviewActiveEdgeCount =
+                    unifiedStatus.ActiveEdgeCount;
+                unifiedEdgeWearPreviewDeferredEdgeCount =
+                    unifiedStatus.DeferredEdgeCount;
+                unifiedEdgeWearPreviewRejectedEdgeCount =
+                    unifiedStatus.RejectedEdgeCount;
+                unifiedEdgeWearPreviewBevelFaceCount =
+                    unifiedStatus.BevelFaceCount;
+                unifiedEdgeWearPreviewVertexJunctionFaceCount =
+                    unifiedStatus.VertexJunctionFaceCount;
+                unifiedEdgeWearPreviewTriangleCount =
+                    unifiedStatus.TriangleCount;
+                unifiedEdgeWearPreviewDiagnostic =
+                    unifiedStatus.Diagnostic;
+                unifiedEdgeWearPreviewDebugEdges =
+                    unifiedStatus.DebugEdges ??
+                        Array.Empty<
+                            MassGenerator.EdgeWearDebugEdgeRecord>();
+                unifiedEdgeWearPreviewStale = false;
+            }
             else
             {
                 sourceMeshData = MassGenerator.Generate(
@@ -1798,6 +1963,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 boundedEdgePreviewApplied)
             {
                 meshName += BoundedEdgePreviewMeshNameSuffix;
+            }
+            else if (previewMode ==
+                    PreviewGenerationMode.UnifiedEdgeWear &&
+                unifiedEdgeWearPreviewApplied)
+            {
+                meshName += UnifiedEdgeWearPreviewMeshNameSuffix;
             }
 #endif
 

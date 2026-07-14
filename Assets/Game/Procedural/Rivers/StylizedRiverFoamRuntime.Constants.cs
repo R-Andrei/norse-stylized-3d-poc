@@ -552,10 +552,6 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamInteriorOpacityFloor");
         private static readonly int FoamEdgeContrastId =
             Shader.PropertyToID("_FoamEdgeContrast");
-        private static readonly int FoamFrayStrengthId =
-            Shader.PropertyToID("_FoamFrayStrength");
-        private static readonly int FoamBreakupScaleId =
-            Shader.PropertyToID("_FoamBreakupScale");
         private static readonly int FoamChipActivationId =
             Shader.PropertyToID("_FoamChipActivation");
         private static readonly int FoamChipCandidateSpacingId =
@@ -568,20 +564,42 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamChipSizeIrregularity");
         private static readonly int FoamChipShapeIrregularityId =
             Shader.PropertyToID("_FoamChipShapeIrregularity");
+        private static readonly int FoamChipStableScreenRadiusPixelsId =
+            Shader.PropertyToID("_FoamChipStableScreenRadiusPixels");
+        private static readonly int FoamChipMaximumViewScaleId =
+            Shader.PropertyToID("_FoamChipMaximumViewScale");
         private static readonly int FoamChipSelectionDepthId =
             Shader.PropertyToID("_FoamChipSelectionDepth");
+        private static readonly int FoamChipInteriorAccessId =
+            Shader.PropertyToID("_FoamChipInteriorAccess");
         private static readonly int FoamChipFieldSpeedId =
             Shader.PropertyToID("_FoamChipFieldSpeed");
-        private static readonly int FoamChipEvolutionRateId =
-            Shader.PropertyToID("_FoamChipEvolutionRate");
-        private static readonly int FoamChipEvolutionAmountId =
-            Shader.PropertyToID("_FoamChipEvolutionAmount");
-        private static readonly int FoamFraySelectionDepthId =
-            Shader.PropertyToID("_FoamFraySelectionDepth");
-        private static readonly int FoamFrayWavelengthId =
-            Shader.PropertyToID("_FoamFrayWavelength");
-        private static readonly int FoamFrayDepthId =
-            Shader.PropertyToID("_FoamFrayDepth");
+        private static readonly int FoamChipFormationTimeId =
+            Shader.PropertyToID("_FoamChipFormationTime");
+        private static readonly int FoamChipStableTimeId =
+            Shader.PropertyToID("_FoamChipStableTime");
+        private static readonly int FoamChipDissolveTimeId =
+            Shader.PropertyToID("_FoamChipDissolveTime");
+        private static readonly int FoamChipDormantTimeId =
+            Shader.PropertyToID("_FoamChipDormantTime");
+        private static readonly int FoamChipLateralMotionAmountId =
+            Shader.PropertyToID("_FoamChipLateralMotionAmount");
+        private static readonly int FoamChipLateralMotionSpeedId =
+            Shader.PropertyToID("_FoamChipLateralMotionSpeed");
+        private static readonly int FoamChipRotationAmountDegreesId =
+            Shader.PropertyToID("_FoamChipRotationAmountDegrees");
+        private static readonly int FoamChipRotationSpeedId =
+            Shader.PropertyToID("_FoamChipRotationSpeed");
+        private static readonly int FoamChipSizePulseAmountId =
+            Shader.PropertyToID("_FoamChipSizePulseAmount");
+        private static readonly int FoamChipSizePulseSpeedId =
+            Shader.PropertyToID("_FoamChipSizePulseSpeed");
+        private static readonly int FoamChipShapeChangeAmountId =
+            Shader.PropertyToID("_FoamChipShapeChangeAmount");
+        private static readonly int FoamChipShapeChangeSpeedId =
+            Shader.PropertyToID("_FoamChipShapeChangeSpeed");
+        private static readonly int FoamChipShapeTransitionTimeId =
+            Shader.PropertyToID("_FoamChipShapeTransitionTime");
         private static readonly int FoamStrandStrengthId =
             Shader.PropertyToID("_FoamStrandStrength");
         private static readonly int FoamStrandScaleId =

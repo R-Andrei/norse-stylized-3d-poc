@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Serialization;
 using UnityEngine.Splines;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+using ProgrammaticStylized3D.Geometry;
 using ProgrammaticStylized3D.Geometry.Ground;
 
 namespace ProgrammaticStylized3D.Rivers
@@ -161,12 +166,11 @@ namespace ProgrammaticStylized3D.Rivers
         ChipActivatedCandidates = 19,
         ChipEdgeEligibility = 20,
         ChipFinalSelection = 21,
-        FrayPermittedBand = 22,
-        FrayPatternPreview = 23,
-        ChipMaterialGate = 24,
+        // Serialized values 22 and 23 are retired and resolve safely to Final.
+        ChipInteriorAuthority = 24,
         ProductionChipMask = 25,
         ChipEligibilityComposite = 26,
-        FrayEligibilityComposite = 27
+        // Serialized value 27 is retired and resolves safely to Final.
     }
 
 
@@ -217,6 +221,69 @@ namespace ProgrammaticStylized3D.Rivers
     [RequireComponent(typeof(MeshRenderer))]
     public sealed class StylizedRiver : MonoBehaviour
     {
+        private enum RiverRegenerationRequestOrigin
+        {
+            OnEnable,
+            ExplicitRegenerateAll,
+            RebuildSurfaceOnly,
+            GroundCorridorChanged,
+            InspectorStructural,
+            SplineChanged,
+            ChannelPreset,
+            Count
+        }
+
+#if UNITY_EDITOR
+        private enum RiverEditorRegenerationPassKind
+        {
+            Full,
+            SurfaceOnly,
+            CorridorOnly,
+            Count
+        }
+
+        private sealed class RiverEditorRegenerationBatch
+        {
+            public int Id;
+            public double StartedAt;
+            public int StartFrame;
+            public int EndFrame;
+            public int RequestCount;
+            public readonly int[] RequestOrigins =
+                new int[(int)RiverRegenerationRequestOrigin.Count];
+            public int CoalescedRequestCount;
+            public int PassCount;
+            public readonly int[] PassKinds =
+                new int[(int)RiverEditorRegenerationPassKind.Count];
+            public double TotalPassMilliseconds;
+            public int DomainBuilds;
+            public int DomainFirstObservations;
+            public int DomainContentChanges;
+            public int DomainUnchangedRebuilds;
+            public int DomainVersionIncrements;
+            public int DomainPublications;
+            public bool HasDomainFingerprint;
+            public GeneratedGeometryStableFingerprint DomainPreviousFingerprint;
+            public GeneratedGeometryStableFingerprint DomainLatestFingerprint;
+            public int SurfaceBuilds;
+            public int CorridorBuilds;
+            public int CorridorColliderAssignments;
+            public int GroundSnapshotBuilds;
+            public int GroundSnapshotFirstObservations;
+            public int GroundSnapshotContentChanges;
+            public int GroundSnapshotUnchangedBuilds;
+            public bool HasGroundSnapshotFingerprint;
+            public GeneratedGeometryStableFingerprint GroundSnapshotPreviousFingerprint;
+            public GeneratedGeometryStableFingerprint GroundSnapshotLatestFingerprint;
+            public int GroundNotifications;
+            public int GroundNotificationMisses;
+            public int GroundDeferredNotifications;
+            public int FoamNotifications;
+            public int ReflectionRequests;
+            public readonly List<string> Timeline = new List<string>(32);
+            public int DroppedTimelineEvents;
+        }
+#endif
         public const string CompatibleShaderName =
             "PS3D/Stylized River Water";
 
@@ -248,7 +315,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private const int CurrentFoamMaterialLifecycleTuningVersion = 1;
         private const int CurrentFoamVelocityTuningVersion = 1;
-        private const int CurrentFoamChipFraySelectionTuningVersion = 5;
+        private const int CurrentFoamChipSelectionTuningVersion = 9;
         private const float MinimumFoamNeutralLifetime = 1f;
         private const float MaximumFoamNeutralLifetime = 10f;
         private const float DefaultFoamNeutralLifetime = 4f;
@@ -309,22 +376,48 @@ namespace ProgrammaticStylized3D.Rivers
             DefaultLegacyFoamChipRadius / DefaultFoamChipCandidateSpacing;
         private const float DefaultFoamChipSizeIrregularity = 1f;
         private const float DefaultFoamChipShapeIrregularity = 1f;
+        private const float MinimumFoamChipStableScreenRadiusPixels = 0f;
+        private const float MaximumFoamChipStableScreenRadiusPixels = 4f;
+        private const float DefaultFoamChipStableScreenRadiusPixels = 2f;
+        private const float MinimumFoamChipMaximumViewScale = 1f;
+        private const float MaximumFoamChipMaximumViewScale = 2.5f;
+        private const float DefaultFoamChipMaximumViewScale = 1.75f;
         private const float MinimumFoamChipSelectionDepth = 0.05f;
         private const float MaximumFoamChipSelectionDepth = 0.95f;
         private const float DefaultFoamChipSelectionDepth = 0.42f;
+        private const float DefaultFoamChipInteriorAccess = 0f;
         private const float MinimumFoamChipFieldSpeed = 0f;
         private const float MaximumFoamChipFieldSpeed = 12f;
         private const float DefaultFoamChipFieldSpeed = 0f;
+        private const float MinimumFoamChipLifecycleTime = 0.25f;
+        private const float MaximumFoamChipLifecycleTime = 30f;
+        private const float DefaultFoamChipFormationTime = 2.5f;
+        private const float DefaultFoamChipStableTime = 5f;
+        private const float DefaultFoamChipDissolveTime = 2.5f;
+        private const float DefaultFoamChipDormantTime = 4f;
+        private const float MinimumFoamChipLateralMotionAmount = 0f;
+        private const float MaximumFoamChipLateralMotionAmount = 2.5f;
+        private const float DefaultFoamChipLateralMotionAmount = 0f;
+        private const float MinimumFoamChipMotionSpeed = 0f;
+        private const float MaximumFoamChipMotionSpeed = 1f;
+        private const float DefaultFoamChipLateralMotionSpeed = 0.04f;
+        private const float MinimumFoamChipRotationAmountDegrees = 0f;
+        private const float MaximumFoamChipRotationAmountDegrees = 180f;
+        private const float DefaultFoamChipRotationAmountDegrees = 0f;
+        private const float DefaultFoamChipRotationSpeed = 0.04f;
+        private const float MinimumFoamChipSizePulseAmount = 0f;
+        private const float MaximumFoamChipSizePulseAmount = 0.45f;
+        private const float DefaultFoamChipSizePulseAmount = 0f;
+        private const float DefaultFoamChipSizePulseSpeed = 0.06f;
+        private const float DefaultFoamChipShapeChangeAmount = 0f;
+        private const float DefaultFoamChipShapeChangeSpeed = 0.04f;
+        private const float MinimumFoamChipShapeTransitionTime = 0.10f;
+        private const float MaximumFoamChipShapeTransitionTime = 30f;
+        private const float DefaultFoamChipShapeTransitionTime = 4f;
         private const float MinimumFoamChipEvolutionRate = 0f;
         private const float MaximumFoamChipEvolutionRate = 2f;
         private const float DefaultFoamChipEvolutionRate = 0.20f;
         private const float DefaultFoamChipEvolutionAmount = 0f;
-        private const float MinimumFoamFraySelectionDepth = 0.05f;
-        private const float MaximumFoamFraySelectionDepth = 0.95f;
-        private const float DefaultFoamFraySelectionDepth = 0.68f;
-        private const float MinimumFoamFrayWavelength = 0.03f;
-        private const float MaximumFoamFrayWavelength = 0.80f;
-        private const float DefaultFoamFrayWavelength = 0.12f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
         private const float MaximumFoamProgressiveRibbonDuration = 5f;
         private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
@@ -1503,17 +1596,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(-1f, 1f)]
         [SerializeField] private float foamEdgeContrast;
 
-        // Legacy production fields are retained only for serialized migration.
-        // Production Chip now uses the divorced analytical controls below;
-        // legacy Fray remains active until the dedicated final-edge patch.
+        // Legacy storage remains only for serialized Chip migration. It has no
+        // runtime shader binding or current artistic authority.
         [HideInInspector, Range(0f, 1f)]
         [SerializeField] private float foamChipStrength;
 
+        [FormerlySerializedAs("foamBreakupScale")]
         [HideInInspector, Range(0f, 1f)]
-        [SerializeField] private float foamFrayStrength;
-
-        [HideInInspector, Range(0f, 1f)]
-        [SerializeField] private float foamBreakupScale = 0.5f;
+        [SerializeField] private float legacyFoamBreakupScale = 0.5f;
 
         [Tooltip("Fraction of analytical Chip candidates selected for production removal. Zero disables production Chipping; one selects every available candidate before edge and transported-material gating.")]
         [Range(0f, 1f)]
@@ -1535,7 +1625,7 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamChipRadius =
             DefaultLegacyFoamChipRadius;
 
-        [Tooltip("Mean candidate radius as a fraction of Candidate Spacing. Absolute world-space radius is Spacing × Ratio. This bounded ratio keeps the fixed 3×3 analytical candidate search correct and cheap.")]
+        [Tooltip("Mean candidate radius as a fraction of Candidate Spacing. Absolute world-space radius is Spacing × Ratio. The shader uses a 3×3 search for compact settings and expands to 5×5 only when authored pulse or lateral reach requires it.")]
         [Range(MinimumFoamChipRadiusRatio, MaximumFoamChipRadiusRatio)]
         [SerializeField] private float foamChipRadiusRatio =
             DefaultFoamChipRadiusRatio;
@@ -1550,49 +1640,115 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamChipShapeIrregularity =
             DefaultFoamChipShapeIrregularity;
 
-        [Tooltip("Maximum normalized material-edge depth eligible for production Chipping. Larger values permit cuts farther into the Foam body; this is not a world-space distance.")]
+        [Tooltip("Minimum readable radius in screen pixels for each fully formed Chip. Zero preserves pure world-space sizing. Positive values smoothly enlarge only undersized distant Chips; formation, dissolution, dormancy, size irregularity, and pulse remain authoritative.")]
+        [Range(MinimumFoamChipStableScreenRadiusPixels, MaximumFoamChipStableScreenRadiusPixels)]
+        [SerializeField] private float foamChipStableScreenRadiusPixels =
+            DefaultFoamChipStableScreenRadiusPixels;
+
+        [Tooltip("Maximum multiplier permitted for view-readability enlargement. One disables enlargement even when Minimum Stable Radius is positive; larger values preserve distant readability while bounding world-space growth and overlap.")]
+        [Range(MinimumFoamChipMaximumViewScale, MaximumFoamChipMaximumViewScale)]
+        [SerializeField] private float foamChipMaximumViewScale =
+            DefaultFoamChipMaximumViewScale;
+
+        [Tooltip("Controls only the Presence-transition edge territory available to production Chipping. Low values permit very thin weak-material strips; high values permit all non-saturated edge material. Established interiors are controlled separately by Chip Interior Access; this is not a world-space distance.")]
         [Range(MinimumFoamChipSelectionDepth, MaximumFoamChipSelectionDepth)]
         [SerializeField] private float foamChipSelectionDepth =
             DefaultFoamChipSelectionDepth;
 
-        [Tooltip("Downstream speed in metres per second of the complete analytical Chip candidate field. Zero keeps candidate centres fixed in River space. This is a visual approximation and does not claim exact Layer C material ownership.")]
+        [Tooltip("Fraction of activated analytical candidate cells granted permission to cut established visible Foam beyond the edge-only band. Zero keeps every candidate edge-only; one grants every activated candidate full visible-body access. Admission is deterministic per candidate, so connected Chip contours remain intact.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamChipInteriorAccess =
+            DefaultFoamChipInteriorAccess;
+
+        [Tooltip("Downstream speed in metres per second of the complete analytical Chip candidate field. This is rigid translation in River space and cannot stretch an individual candidate.")]
         [Range(MinimumFoamChipFieldSpeed, MaximumFoamChipFieldSpeed)]
         [SerializeField] private float foamChipFieldSpeed =
             DefaultFoamChipFieldSpeed;
 
-        [Tooltip("General evolution cycles per second for the animated coordinate warp, geometric chip lifecycle, and contour morphing. Zero freezes that evolution without changing Field Speed.")]
-        [Range(MinimumFoamChipEvolutionRate, MaximumFoamChipEvolutionRate)]
+        [Tooltip("Seconds for an individual participating Chip to grow monotonically from zero radius to its authored living radius.")]
+        [Range(MinimumFoamChipLifecycleTime, MaximumFoamChipLifecycleTime)]
+        [SerializeField] private float foamChipFormationTime =
+            DefaultFoamChipFormationTime;
+
+        [Tooltip("Seconds an individual Chip remains fully formed before dissolution begins. Size pulse and shape change ease in and out inside this stage.")]
+        [Range(MinimumFoamChipLifecycleTime, MaximumFoamChipLifecycleTime)]
+        [SerializeField] private float foamChipStableTime =
+            DefaultFoamChipStableTime;
+
+        [Tooltip("Seconds for an individual Chip to shrink monotonically from its authored living radius to zero.")]
+        [Range(MinimumFoamChipLifecycleTime, MaximumFoamChipLifecycleTime)]
+        [SerializeField] private float foamChipDissolveTime =
+            DefaultFoamChipDissolveTime;
+
+        [Tooltip("Seconds the same deterministic Chip identity remains completely absent after dissolution before its next formation cycle.")]
+        [Range(MinimumFoamChipLifecycleTime, MaximumFoamChipLifecycleTime)]
+        [SerializeField] private float foamChipDormantTime =
+            DefaultFoamChipDormantTime;
+
+        [Tooltip("Maximum rigid lateral excursion of each Chip centre as a fraction of Candidate Spacing. Zero disables lateral movement; 1 moves plus or minus one full spacing, and 2.5 moves plus or minus two and a half spacings. The shader expands its lateral candidate search to keep the translated contours complete.")]
+        [Range(MinimumFoamChipLateralMotionAmount, MaximumFoamChipLateralMotionAmount)]
+        [SerializeField] private float foamChipLateralMotionAmount =
+            DefaultFoamChipLateralMotionAmount;
+
+        [Tooltip("Lateral oscillation cycles per second. Zero returns every candidate to its static lateral centre even when Lateral Motion Amount is nonzero.")]
+        [Range(MinimumFoamChipMotionSpeed, MaximumFoamChipMotionSpeed)]
+        [SerializeField] private float foamChipLateralMotionSpeed =
+            DefaultFoamChipLateralMotionSpeed;
+
+        [Tooltip("Maximum rigid angular excursion in degrees around each candidate's static orientation. Rotation preserves area and aspect ratio; circles are visually unchanged.")]
+        [Range(MinimumFoamChipRotationAmountDegrees, MaximumFoamChipRotationAmountDegrees)]
+        [SerializeField] private float foamChipRotationAmountDegrees =
+            DefaultFoamChipRotationAmountDegrees;
+
+        [Tooltip("Rotation oscillation cycles per second. Zero restores the static orientation even when Rotation Amount is nonzero.")]
+        [Range(MinimumFoamChipMotionSpeed, MaximumFoamChipMotionSpeed)]
+        [SerializeField] private float foamChipRotationSpeed =
+            DefaultFoamChipRotationSpeed;
+
+        [Tooltip("Fractional radius excursion while a Chip is established. For example, 0.20 pulses between 80% and 120% of its living radius. This never controls birth, death, or Dormant Time.")]
+        [Range(MinimumFoamChipSizePulseAmount, MaximumFoamChipSizePulseAmount)]
+        [SerializeField] private float foamChipSizePulseAmount =
+            DefaultFoamChipSizePulseAmount;
+
+        [Tooltip("Size-pulse cycles per second during the established lifecycle stage. Zero keeps the living radius at its authored value without disabling lifecycle turnover.")]
+        [Range(MinimumFoamChipMotionSpeed, MaximumFoamChipMotionSpeed)]
+        [SerializeField] private float foamChipSizePulseSpeed =
+            DefaultFoamChipSizePulseSpeed;
+
+        [Tooltip("Authority of multi-axis temporal silhouette morphing while a Chip is established. Zero preserves the static contour; one blends toward a strong candidate-specific sine-harmonic geometry trajectory with exact temporal radial-area preservation. This is independent of Shape Irregularity and does not change Candidate Radius, Size Pulse, or lifecycle scale; redistributed lobes are covered by the adaptive search.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamChipShapeChangeAmount =
+            DefaultFoamChipShapeChangeAmount;
+
+        [Tooltip("How often each deterministic Chip selects its next contour target, in changes per second. This controls cadence only. Candidate phases stagger target changes so the field does not switch in unison. Zero preserves the current static contour even when Shape Change Amount is nonzero.")]
+        [Range(MinimumFoamChipMotionSpeed, MaximumFoamChipMotionSpeed)]
+        [SerializeField] private float foamChipShapeChangeSpeed =
+            DefaultFoamChipShapeChangeSpeed;
+
+        [Tooltip("Seconds spent smoothly morphing from the previous contour target to the next one. This controls the actual geometric transition speed independently of Shape Change Cadence. If it exceeds the cadence interval, the transition uses the full interval and remains continuously in motion rather than popping.")]
+        [Range(MinimumFoamChipShapeTransitionTime, MaximumFoamChipShapeTransitionTime)]
+        [SerializeField] private float foamChipShapeTransitionTime =
+            DefaultFoamChipShapeTransitionTime;
+
+        // Retained only for one-way migration from the rejected coupled B.2E
+        // control model. Production code does not bind or read these fields.
+        [HideInInspector]
         [SerializeField] private float foamChipEvolutionRate =
             DefaultFoamChipEvolutionRate;
 
-        [Tooltip("Authority of multi-spacing downstream/lateral coordinate advection, geometric growth and shrinkage, contour morphing, and smooth turnover. Zero disables those effects while still allowing Field Speed to scroll the field.")]
-        [Range(0f, 1f)]
+        [HideInInspector]
         [SerializeField] private float foamChipEvolutionAmount =
             DefaultFoamChipEvolutionAmount;
 
-        [FormerlySerializedAs("foamFrayEdgeDepth")]
-        [Tooltip("Maximum normalized material-edge depth eligible for Fray diagnostics. Larger values permit Fray farther into the Foam body; this is not a world-space distance.")]
-        [Range(MinimumFoamFraySelectionDepth, MaximumFoamFraySelectionDepth)]
-        [SerializeField] private float foamFraySelectionDepth =
-            DefaultFoamFraySelectionDepth;
-
-        [Tooltip("World-space wavelength in metres of the fine Fray diagnostic pattern.")]
-        [Range(MinimumFoamFrayWavelength, MaximumFoamFrayWavelength)]
-        [SerializeField] private float foamFrayWavelength =
-            DefaultFoamFrayWavelength;
-
-        [Tooltip("Normalized amplitude reserved for the future final-edge Fray threshold displacement. In Patch 2D2B-A it scales only the Fray Pattern Preview and does not modify Final Foam.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamFrayDepth;
-
+        [FormerlySerializedAs("foamChipFraySelectionTuningVersion")]
         [SerializeField, HideInInspector]
-        private int foamChipFraySelectionTuningVersion;
+        private int foamChipSelectionTuningVersion;
 
-        [Tooltip("Strength of the extracted render-only Foam lineification: the stable anisotropic band signal combined with the established Chip/Fray survival language. Zero produces a coherent body and does not change stored material or Layer D shape.")]
+        [Tooltip("Strength of the render-only structural Foam lineification. Zero produces the coherent Foam body; higher values create elongated anisotropic cuts and remnants.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamStrandStrength;
 
-        [Tooltip("Controls the size hierarchy used by the independent Strand pattern. Zero retains finer subdivisions; one keeps broader, simpler structures. Production Chip and the separate Fray prototype do not alter Strand pattern construction.")]
+        [Tooltip("Controls the broad-to-medium size hierarchy used by structural Strands. Zero retains medium subdivisions; one keeps broader, simpler structures.")]
         [FormerlySerializedAs("foamStrandSpacing")]
         [Range(0f, 1f)]
         [SerializeField] private float foamStrandScale =
@@ -1943,6 +2099,21 @@ namespace ProgrammaticStylized3D.Rivers
         private double lastEditorTime;
         private double pendingRegenerationTime;
         private bool pendingRegeneration;
+
+#if UNITY_EDITOR
+        private RiverEditorRegenerationBatch activeEditorRegenerationBatch;
+        private string lastEditorRegenerationAccountingReport =
+            "No River regeneration-accounting batch has completed yet.";
+        private int nextEditorRegenerationBatchId = 1;
+        private int editorRegenerationActivityRevision;
+        private int scheduledEditorRegenerationActivityRevision;
+        private bool editorRegenerationCompletionScheduled;
+        private bool logNextEditorRegenerationBatch;
+        private bool hasEditorDomainFingerprint;
+        private GeneratedGeometryStableFingerprint lastEditorDomainFingerprint;
+        private bool hasEditorGroundSnapshotFingerprint;
+        private GeneratedGeometryStableFingerprint lastEditorGroundSnapshotFingerprint;
+#endif
         private bool subscribedToSplineChanges;
         private StylizedRiverDisturbanceRuntime disturbanceRuntime;
         private StylizedRiverFoamRuntime foamRuntime;
@@ -2578,10 +2749,6 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamInteriorOpacityFloor);
         public float FoamEdgeContrast =>
             Mathf.Clamp(foamEdgeContrast, -1f, 1f);
-        public float FoamFrayStrength =>
-            Mathf.Clamp01(foamFrayStrength);
-        public float FoamBreakupScale =>
-            Mathf.Clamp01(foamBreakupScale);
         public float FoamChipActivation =>
             Mathf.Clamp01(foamChipActivation);
         public float FoamChipCandidateSpacing =>
@@ -2600,35 +2767,90 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamChipSizeIrregularity);
         public float FoamChipShapeIrregularity =>
             Mathf.Clamp01(foamChipShapeIrregularity);
+        public float FoamChipStableScreenRadiusPixels =>
+            Mathf.Clamp(
+                foamChipStableScreenRadiusPixels,
+                MinimumFoamChipStableScreenRadiusPixels,
+                MaximumFoamChipStableScreenRadiusPixels);
+        public float FoamChipMaximumViewScale =>
+            Mathf.Clamp(
+                foamChipMaximumViewScale,
+                MinimumFoamChipMaximumViewScale,
+                MaximumFoamChipMaximumViewScale);
         public float FoamChipSelectionDepth =>
             Mathf.Clamp(
                 foamChipSelectionDepth,
                 MinimumFoamChipSelectionDepth,
                 MaximumFoamChipSelectionDepth);
+        public float FoamChipInteriorAccess =>
+            Mathf.Clamp01(foamChipInteriorAccess);
         public float FoamChipFieldSpeed =>
             Mathf.Clamp(
                 foamChipFieldSpeed,
                 MinimumFoamChipFieldSpeed,
                 MaximumFoamChipFieldSpeed);
-        public float FoamChipEvolutionRate =>
+        public float FoamChipFormationTime =>
             Mathf.Clamp(
-                foamChipEvolutionRate,
-                MinimumFoamChipEvolutionRate,
-                MaximumFoamChipEvolutionRate);
-        public float FoamChipEvolutionAmount =>
-            Mathf.Clamp01(foamChipEvolutionAmount);
-        public float FoamFraySelectionDepth =>
+                foamChipFormationTime,
+                MinimumFoamChipLifecycleTime,
+                MaximumFoamChipLifecycleTime);
+        public float FoamChipStableTime =>
             Mathf.Clamp(
-                foamFraySelectionDepth,
-                MinimumFoamFraySelectionDepth,
-                MaximumFoamFraySelectionDepth);
-        public float FoamFrayWavelength =>
+                foamChipStableTime,
+                MinimumFoamChipLifecycleTime,
+                MaximumFoamChipLifecycleTime);
+        public float FoamChipDissolveTime =>
             Mathf.Clamp(
-                foamFrayWavelength,
-                MinimumFoamFrayWavelength,
-                MaximumFoamFrayWavelength);
-        public float FoamFrayDepth =>
-            Mathf.Clamp01(foamFrayDepth);
+                foamChipDissolveTime,
+                MinimumFoamChipLifecycleTime,
+                MaximumFoamChipLifecycleTime);
+        public float FoamChipDormantTime =>
+            Mathf.Clamp(
+                foamChipDormantTime,
+                MinimumFoamChipLifecycleTime,
+                MaximumFoamChipLifecycleTime);
+        public float FoamChipLateralMotionAmount =>
+            Mathf.Clamp(
+                foamChipLateralMotionAmount,
+                MinimumFoamChipLateralMotionAmount,
+                MaximumFoamChipLateralMotionAmount);
+        public float FoamChipLateralMotionSpeed =>
+            Mathf.Clamp(
+                foamChipLateralMotionSpeed,
+                MinimumFoamChipMotionSpeed,
+                MaximumFoamChipMotionSpeed);
+        public float FoamChipRotationAmountDegrees =>
+            Mathf.Clamp(
+                foamChipRotationAmountDegrees,
+                MinimumFoamChipRotationAmountDegrees,
+                MaximumFoamChipRotationAmountDegrees);
+        public float FoamChipRotationSpeed =>
+            Mathf.Clamp(
+                foamChipRotationSpeed,
+                MinimumFoamChipMotionSpeed,
+                MaximumFoamChipMotionSpeed);
+        public float FoamChipSizePulseAmount =>
+            Mathf.Clamp(
+                foamChipSizePulseAmount,
+                MinimumFoamChipSizePulseAmount,
+                MaximumFoamChipSizePulseAmount);
+        public float FoamChipSizePulseSpeed =>
+            Mathf.Clamp(
+                foamChipSizePulseSpeed,
+                MinimumFoamChipMotionSpeed,
+                MaximumFoamChipMotionSpeed);
+        public float FoamChipShapeChangeAmount =>
+            Mathf.Clamp01(foamChipShapeChangeAmount);
+        public float FoamChipShapeChangeSpeed =>
+            Mathf.Clamp(
+                foamChipShapeChangeSpeed,
+                MinimumFoamChipMotionSpeed,
+                MaximumFoamChipMotionSpeed);
+        public float FoamChipShapeTransitionTime =>
+            Mathf.Clamp(
+                foamChipShapeTransitionTime,
+                MinimumFoamChipShapeTransitionTime,
+                MaximumFoamChipShapeTransitionTime);
         public float FoamStrandStrength =>
             Mathf.Clamp01(foamStrandStrength);
         public float FoamStrandScale =>
@@ -3151,6 +3373,24 @@ namespace ProgrammaticStylized3D.Rivers
                 ? (int)surfaceMesh.GetIndexCount(0) / 3
                 : 0;
 
+#if UNITY_EDITOR
+        public string LastEditorRegenerationAccountingReport =>
+            lastEditorRegenerationAccountingReport;
+
+        public void ClearEditorRegenerationAccounting()
+        {
+            activeEditorRegenerationBatch = null;
+            lastEditorRegenerationAccountingReport =
+                "No River regeneration-accounting batch has completed yet.";
+            editorRegenerationActivityRevision++;
+        }
+
+        public void LogNextEditorRegenerationBatchOnce()
+        {
+            logNextEditorRegenerationBatch = true;
+        }
+#endif
+
         private void Reset()
         {
             splineContainer = GetComponent<SplineContainer>();
@@ -3162,7 +3402,7 @@ namespace ProgrammaticStylized3D.Rivers
             foamStateHeld = false;
             MigrateFoamMaterialLifecycleTuningIfRequired();
             MigrateFoamVelocityTuningIfRequired();
-            MigrateFoamChipFraySelectionTuningIfRequired();
+            MigrateFoamChipSelectionTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -3176,7 +3416,9 @@ namespace ProgrammaticStylized3D.Rivers
             EnsureDisturbanceRuntime();
             EnsureFoamRuntime();
             SetRendererEnabled(true);
-            RegenerateAll();
+            RegenerateAll(
+                RiverRegenerationRequestOrigin.OnEnable,
+                true);
             lastEditorTime = Time.realtimeSinceStartupAsDouble;
         }
 
@@ -3280,18 +3522,12 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.ChipEdgeEligibility;
                 case (int)StylizedRiverFoamDebugView.ChipFinalSelection:
                     return StylizedRiverFoamDebugView.ChipFinalSelection;
-                case (int)StylizedRiverFoamDebugView.FrayPermittedBand:
-                    return StylizedRiverFoamDebugView.FrayPermittedBand;
-                case (int)StylizedRiverFoamDebugView.FrayPatternPreview:
-                    return StylizedRiverFoamDebugView.FrayPatternPreview;
-                case (int)StylizedRiverFoamDebugView.ChipMaterialGate:
-                    return StylizedRiverFoamDebugView.ChipMaterialGate;
+                case (int)StylizedRiverFoamDebugView.ChipInteriorAuthority:
+                    return StylizedRiverFoamDebugView.ChipInteriorAuthority;
                 case (int)StylizedRiverFoamDebugView.ProductionChipMask:
                     return StylizedRiverFoamDebugView.ProductionChipMask;
                 case (int)StylizedRiverFoamDebugView.ChipEligibilityComposite:
                     return StylizedRiverFoamDebugView.ChipEligibilityComposite;
-                case (int)StylizedRiverFoamDebugView.FrayEligibilityComposite:
-                    return StylizedRiverFoamDebugView.FrayEligibilityComposite;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -3357,36 +3593,30 @@ namespace ProgrammaticStylized3D.Rivers
             foamVelocityTuningVersion = CurrentFoamVelocityTuningVersion;
         }
 
-        private void MigrateFoamChipFraySelectionTuningIfRequired()
+        private void MigrateFoamChipSelectionTuningIfRequired()
         {
-            if (foamChipFraySelectionTuningVersion < 1)
+            if (foamChipSelectionTuningVersion < 1)
             {
-                float legacyScale = Mathf.Clamp01(foamBreakupScale);
+                float legacyScale = Mathf.Clamp01(legacyFoamBreakupScale);
                 foamChipActivation = Mathf.Clamp01(foamChipStrength);
                 foamChipCandidateSpacing = Mathf.Lerp(
                     0.70f,
                     1.60f,
                     legacyScale);
                 foamChipRadius = Mathf.Lerp(0.18f, 0.37f, legacyScale);
-                foamFraySelectionDepth = DefaultFoamFraySelectionDepth;
-                foamFrayWavelength = Mathf.Lerp(
-                    0.06f,
-                    0.18f,
-                    legacyScale);
-                foamFrayDepth = Mathf.Clamp01(foamFrayStrength);
-                foamChipFraySelectionTuningVersion = 1;
+                foamChipSelectionTuningVersion = 1;
             }
 
-            if (foamChipFraySelectionTuningVersion < 2)
+            if (foamChipSelectionTuningVersion < 2)
             {
                 // A.1 adds independent selection-depth authority. Preserve
                 // every already-authored A control and initialize only the new
-                // Chip depth; FormerlySerializedAs preserves Fray depth.
+                // Chip depth; the historical serialized field alias preserves existing data.
                 foamChipSelectionDepth = DefaultFoamChipSelectionDepth;
-                foamChipFraySelectionTuningVersion = 2;
+                foamChipSelectionTuningVersion = 2;
             }
 
-            if (foamChipFraySelectionTuningVersion < 3)
+            if (foamChipSelectionTuningVersion < 3)
             {
                 // B.1 exposes the fixed A.1 candidate variation as three
                 // independent mathematical controls. Defaults preserve the
@@ -3397,10 +3627,10 @@ namespace ProgrammaticStylized3D.Rivers
                     DefaultFoamChipSizeIrregularity;
                 foamChipShapeIrregularity =
                     DefaultFoamChipShapeIrregularity;
-                foamChipFraySelectionTuningVersion = 3;
+                foamChipSelectionTuningVersion = 3;
             }
 
-            if (foamChipFraySelectionTuningVersion < 4)
+            if (foamChipSelectionTuningVersion < 4)
             {
                 // B.1A removes the hidden spacing cap from the authoring
                 // contract. Preserve the previously visible effective radius
@@ -3421,10 +3651,10 @@ namespace ProgrammaticStylized3D.Rivers
                     legacyEffectiveRadius / Mathf.Max(spacing, 0.0001f),
                     MinimumFoamChipRadiusRatio,
                     MaximumFoamChipRadiusRatio);
-                foamChipFraySelectionTuningVersion = 4;
+                foamChipSelectionTuningVersion = 4;
             }
 
-            if (foamChipFraySelectionTuningVersion < 5)
+            if (foamChipSelectionTuningVersion < 5)
             {
                 // B.2 adds optional render-only evolution. Preserve every
                 // existing River's validated static result until the author
@@ -3432,15 +3662,78 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipFieldSpeed = DefaultFoamChipFieldSpeed;
                 foamChipEvolutionRate = DefaultFoamChipEvolutionRate;
                 foamChipEvolutionAmount = DefaultFoamChipEvolutionAmount;
-                foamChipFraySelectionTuningVersion = 5;
+                foamChipSelectionTuningVersion = 5;
             }
+
+            if (foamChipSelectionTuningVersion < 6)
+            {
+                // B.2D separates edge-only coverage from explicit established-
+                // body permission. Existing Rivers remain edge-only by default;
+                // the new binary material admission starts at a neutral 0.5.
+                foamChipInteriorAccess = DefaultFoamChipInteriorAccess;
+                foamChipSelectionTuningVersion = 6;
+            }
+
+            if (foamChipSelectionTuningVersion < 7)
+            {
+                // B.2F retires the coupled Evolution Amount/Rate model. Every
+                // participating candidate receives an always-active, slow,
+                // explicit lifecycle. Preserve only the old small pulse and
+                // contour authorities. The rejected nonlinear warp has no
+                // trustworthy rigid-motion equivalent, so migration leaves the
+                // new lateral and rotation amounts neutral for deliberate tuning.
+                float legacyEvolutionAmount = Mathf.Clamp01(
+                    foamChipEvolutionAmount);
+                foamChipFormationTime = DefaultFoamChipFormationTime;
+                foamChipStableTime = DefaultFoamChipStableTime;
+                foamChipDissolveTime = DefaultFoamChipDissolveTime;
+                foamChipDormantTime = DefaultFoamChipDormantTime;
+                foamChipLateralMotionAmount =
+                    DefaultFoamChipLateralMotionAmount;
+                foamChipLateralMotionSpeed =
+                    DefaultFoamChipLateralMotionSpeed;
+                foamChipRotationAmountDegrees =
+                    DefaultFoamChipRotationAmountDegrees;
+                foamChipRotationSpeed = DefaultFoamChipRotationSpeed;
+                foamChipSizePulseAmount = Mathf.Clamp(
+                    legacyEvolutionAmount * 0.08f,
+                    MinimumFoamChipSizePulseAmount,
+                    MaximumFoamChipSizePulseAmount);
+                foamChipSizePulseSpeed = DefaultFoamChipSizePulseSpeed;
+                foamChipShapeChangeAmount = legacyEvolutionAmount;
+                foamChipShapeChangeSpeed = DefaultFoamChipShapeChangeSpeed;
+                foamChipSelectionTuningVersion = 7;
+            }
+
+            if (foamChipSelectionTuningVersion < 8)
+            {
+                // B.2G adds bounded projected-size LOD. Existing Rivers receive
+                // the accepted readability defaults; the scale cap and existing
+                // spacing-relative radius cap prevent unbounded world growth.
+                foamChipStableScreenRadiusPixels =
+                    DefaultFoamChipStableScreenRadiusPixels;
+                foamChipMaximumViewScale =
+                    DefaultFoamChipMaximumViewScale;
+                foamChipSelectionTuningVersion = 8;
+            }
+
+            if (foamChipSelectionTuningVersion < 9)
+            {
+                // B.2L separates target-change cadence from the duration of the
+                // actual contour transition. Preserve the authored cadence and
+                // initialize a deliberately slow four-second geometric morph.
+                foamChipShapeTransitionTime =
+                    DefaultFoamChipShapeTransitionTime;
+                foamChipSelectionTuningVersion = 9;
+            }
+
         }
 
         private void OnValidate()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
             MigrateFoamVelocityTuningIfRequired();
-            MigrateFoamChipFraySelectionTuningIfRequired();
+            MigrateFoamChipSelectionTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -3482,7 +3775,9 @@ namespace ProgrammaticStylized3D.Rivers
             if (pendingRegeneration && now >= pendingRegenerationTime)
             {
                 pendingRegeneration = false;
-                RegenerateAll();
+                RegenerateAll(
+                    RiverRegenerationRequestOrigin.InspectorStructural,
+                    false);
             }
 
             if (deltaTime <= 0f)
@@ -3497,6 +3792,23 @@ namespace ProgrammaticStylized3D.Rivers
         [ContextMenu("Regenerate River and Ground")]
         public void RegenerateAll()
         {
+            RegenerateAll(
+                RiverRegenerationRequestOrigin.ExplicitRegenerateAll,
+                true);
+        }
+
+        private void RegenerateAll(
+            RiverRegenerationRequestOrigin origin,
+            bool recordRequest)
+        {
+#if UNITY_EDITOR
+            if (recordRequest)
+            {
+                BeginEditorRegenerationRequest(origin, false);
+            }
+            long editorPassStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+#endif
             ValidateSettings();
             CacheComponents();
             ResolveSplineContainer();
@@ -3507,19 +3819,39 @@ namespace ProgrammaticStylized3D.Rivers
             BuildRiverDomain();
             BuildSurface();
 
-            if (!NotifyParentGround())
+            bool parentGroundCommitted =
+                NotifyParentGround(
+                    origin == RiverRegenerationRequestOrigin.OnEnable);
+            if (!parentGroundCommitted)
             {
+                // A deferred Play-startup Ground transaction has not yet
+                // committed its final height field. Build a cheap immediate
+                // corridor against retained Ground data when available, or the
+                // established fallback sampler otherwise, so River output stays
+                // available until Ground commits once.
                 BuildCorridor();
             }
 
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
             NotifyFoamRuntimeChanged();
+#if UNITY_EDITOR
+            RecordEditorRegenerationPass(
+                RiverEditorRegenerationPassKind.Full,
+                ResolveEditorElapsedMilliseconds(editorPassStartedAt));
+#endif
         }
 
         [ContextMenu("Rebuild Surface Only")]
         public void RebuildSurfaceOnly()
         {
+#if UNITY_EDITOR
+            BeginEditorRegenerationRequest(
+                RiverRegenerationRequestOrigin.RebuildSurfaceOnly,
+                false);
+            long editorPassStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+#endif
             ValidateSettings();
             CacheComponents();
             ResolveSplineContainer();
@@ -3533,6 +3865,11 @@ namespace ProgrammaticStylized3D.Rivers
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
             NotifyFoamRuntimeChanged();
+#if UNITY_EDITOR
+            RecordEditorRegenerationPass(
+                RiverEditorRegenerationPassKind.SurfaceOnly,
+                ResolveEditorElapsedMilliseconds(editorPassStartedAt));
+#endif
         }
 
         /// <summary>
@@ -3542,16 +3879,30 @@ namespace ProgrammaticStylized3D.Rivers
         /// </summary>
         public void RebuildCorridorFromGround()
         {
+#if UNITY_EDITOR
+            BeginEditorRegenerationRequest(
+                RiverRegenerationRequestOrigin.GroundCorridorChanged,
+                false);
+#endif
             if (!isActiveAndEnabled)
             {
                 return;
             }
 
+#if UNITY_EDITOR
+            long editorPassStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+#endif
             ValidateSettings();
             CacheComponents();
             EnsureRiverDomain();
             EnsureCorridorOutput();
             BuildCorridor();
+#if UNITY_EDITOR
+            RecordEditorRegenerationPass(
+                RiverEditorRegenerationPassKind.CorridorOnly,
+                ResolveEditorElapsedMilliseconds(editorPassStartedAt));
+#endif
         }
 
         [ContextMenu("Clear Generated River")]
@@ -3654,7 +4005,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             ValidateSettings();
-            RequestRegeneration();
+            RequestRegeneration(
+                RiverRegenerationRequestOrigin.ChannelPreset);
         }
 
         public void MarkChannelCharacterCustom()
@@ -4318,22 +4670,44 @@ namespace ProgrammaticStylized3D.Rivers
                     sample.RightSurfaceHalfWidth;
             }
 
-            return new StylizedRiverGroundSnapshot(
-                localPoints,
-                localSides,
-                leftVisibleHalfWidths,
-                rightVisibleHalfWidths,
-                leftSurfaceHalfWidths,
-                rightSurfaceHalfWidths,
-                bankBlend,
-                depth,
-                bedFlatness,
-                bankProfile,
-                terrainConformity,
-                ResolveGroundGridSpacing(),
-                shorelineWetClearance,
-                shorelineBankCover,
-                reservedDownwardSurfaceDisplacement);
+            float resolvedGroundGridSpacing = ResolveGroundGridSpacing();
+            StylizedRiverGroundSnapshot snapshot =
+                new StylizedRiverGroundSnapshot(
+                    localPoints,
+                    localSides,
+                    leftVisibleHalfWidths,
+                    rightVisibleHalfWidths,
+                    leftSurfaceHalfWidths,
+                    rightSurfaceHalfWidths,
+                    bankBlend,
+                    depth,
+                    bedFlatness,
+                    bankProfile,
+                    terrainConformity,
+                    resolvedGroundGridSpacing,
+                    shorelineWetClearance,
+                    shorelineBankCover,
+                    reservedDownwardSurfaceDisplacement);
+#if UNITY_EDITOR
+            RecordEditorGroundSnapshotFingerprint(
+                CalculateEditorGroundSnapshotFingerprint(
+                    localPoints,
+                    localSides,
+                    leftVisibleHalfWidths,
+                    rightVisibleHalfWidths,
+                    leftSurfaceHalfWidths,
+                    rightSurfaceHalfWidths,
+                    bankBlend,
+                    depth,
+                    bedFlatness,
+                    bankProfile,
+                    terrainConformity,
+                    resolvedGroundGridSpacing,
+                    shorelineWetClearance,
+                    shorelineBankCover,
+                    reservedDownwardSurfaceDisplacement));
+#endif
+            return snapshot;
         }
 
         public bool UsesSpline(Spline spline)
@@ -4775,8 +5149,6 @@ namespace ProgrammaticStylized3D.Rivers
                 -1f,
                 1f);
             foamChipStrength = Mathf.Clamp01(foamChipStrength);
-            foamFrayStrength = Mathf.Clamp01(foamFrayStrength);
-            foamBreakupScale = Mathf.Clamp01(foamBreakupScale);
             foamChipActivation = Mathf.Clamp01(foamChipActivation);
             foamChipCandidateSpacing = Mathf.Clamp(
                 foamChipCandidateSpacing,
@@ -4796,29 +5168,80 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipSizeIrregularity);
             foamChipShapeIrregularity = Mathf.Clamp01(
                 foamChipShapeIrregularity);
+            foamChipStableScreenRadiusPixels = Mathf.Clamp(
+                foamChipStableScreenRadiusPixels,
+                MinimumFoamChipStableScreenRadiusPixels,
+                MaximumFoamChipStableScreenRadiusPixels);
+            foamChipMaximumViewScale = Mathf.Clamp(
+                foamChipMaximumViewScale,
+                MinimumFoamChipMaximumViewScale,
+                MaximumFoamChipMaximumViewScale);
             foamChipSelectionDepth = Mathf.Clamp(
                 foamChipSelectionDepth,
                 MinimumFoamChipSelectionDepth,
                 MaximumFoamChipSelectionDepth);
+            foamChipInteriorAccess = Mathf.Clamp01(
+                foamChipInteriorAccess);
             foamChipFieldSpeed = Mathf.Clamp(
                 foamChipFieldSpeed,
                 MinimumFoamChipFieldSpeed,
                 MaximumFoamChipFieldSpeed);
+            foamChipFormationTime = Mathf.Clamp(
+                foamChipFormationTime,
+                MinimumFoamChipLifecycleTime,
+                MaximumFoamChipLifecycleTime);
+            foamChipStableTime = Mathf.Clamp(
+                foamChipStableTime,
+                MinimumFoamChipLifecycleTime,
+                MaximumFoamChipLifecycleTime);
+            foamChipDissolveTime = Mathf.Clamp(
+                foamChipDissolveTime,
+                MinimumFoamChipLifecycleTime,
+                MaximumFoamChipLifecycleTime);
+            foamChipDormantTime = Mathf.Clamp(
+                foamChipDormantTime,
+                MinimumFoamChipLifecycleTime,
+                MaximumFoamChipLifecycleTime);
+            foamChipLateralMotionAmount = Mathf.Clamp(
+                foamChipLateralMotionAmount,
+                MinimumFoamChipLateralMotionAmount,
+                MaximumFoamChipLateralMotionAmount);
+            foamChipLateralMotionSpeed = Mathf.Clamp(
+                foamChipLateralMotionSpeed,
+                MinimumFoamChipMotionSpeed,
+                MaximumFoamChipMotionSpeed);
+            foamChipRotationAmountDegrees = Mathf.Clamp(
+                foamChipRotationAmountDegrees,
+                MinimumFoamChipRotationAmountDegrees,
+                MaximumFoamChipRotationAmountDegrees);
+            foamChipRotationSpeed = Mathf.Clamp(
+                foamChipRotationSpeed,
+                MinimumFoamChipMotionSpeed,
+                MaximumFoamChipMotionSpeed);
+            foamChipSizePulseAmount = Mathf.Clamp(
+                foamChipSizePulseAmount,
+                MinimumFoamChipSizePulseAmount,
+                MaximumFoamChipSizePulseAmount);
+            foamChipSizePulseSpeed = Mathf.Clamp(
+                foamChipSizePulseSpeed,
+                MinimumFoamChipMotionSpeed,
+                MaximumFoamChipMotionSpeed);
+            foamChipShapeChangeAmount = Mathf.Clamp01(
+                foamChipShapeChangeAmount);
+            foamChipShapeChangeSpeed = Mathf.Clamp(
+                foamChipShapeChangeSpeed,
+                MinimumFoamChipMotionSpeed,
+                MaximumFoamChipMotionSpeed);
+            foamChipShapeTransitionTime = Mathf.Clamp(
+                foamChipShapeTransitionTime,
+                MinimumFoamChipShapeTransitionTime,
+                MaximumFoamChipShapeTransitionTime);
             foamChipEvolutionRate = Mathf.Clamp(
                 foamChipEvolutionRate,
                 MinimumFoamChipEvolutionRate,
                 MaximumFoamChipEvolutionRate);
             foamChipEvolutionAmount = Mathf.Clamp01(
                 foamChipEvolutionAmount);
-            foamFraySelectionDepth = Mathf.Clamp(
-                foamFraySelectionDepth,
-                MinimumFoamFraySelectionDepth,
-                MaximumFoamFraySelectionDepth);
-            foamFrayWavelength = Mathf.Clamp(
-                foamFrayWavelength,
-                MinimumFoamFrayWavelength,
-                MaximumFoamFrayWavelength);
-            foamFrayDepth = Mathf.Clamp01(foamFrayDepth);
             foamStrandStrength = Mathf.Clamp01(foamStrandStrength);
             foamStrandScale = Mathf.Clamp01(foamStrandScale);
             foamStrandDensity = Mathf.Clamp01(foamStrandDensity);
@@ -5328,6 +5751,9 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void BuildRiverDomain()
         {
+#if UNITY_EDITOR
+            int previousDomainVersion = riverDomainVersion;
+#endif
             riverDomainVersion++;
 
             riverDomain =
@@ -5341,6 +5767,11 @@ namespace ProgrammaticStylized3D.Rivers
                     reverseFlow,
                     riverDomainVersion,
                     ResolveNaturalVariationSettings());
+#if UNITY_EDITOR
+            RecordEditorDomainBuild(
+                CalculateEditorDomainFingerprint(Domain),
+                riverDomainVersion != previousDomainVersion);
+#endif
 
             riverLength = Domain.LocalLength;
 
@@ -5348,6 +5779,9 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 averageSurfaceHeight = transform.position.y + surfaceOffset;
                 DomainChanged?.Invoke(Domain);
+#if UNITY_EDITOR
+                RecordEditorDomainPublication();
+#endif
                 return;
             }
 
@@ -5362,6 +5796,9 @@ namespace ProgrammaticStylized3D.Rivers
                 (float)(heightSum / Domain.SampleCount);
 
             DomainChanged?.Invoke(Domain);
+#if UNITY_EDITOR
+            RecordEditorDomainPublication();
+#endif
         }
 
         private void BuildSurface()
@@ -5378,6 +5815,9 @@ namespace ProgrammaticStylized3D.Rivers
                             .MaximumStaticPressureHeightMetres
                         : 0f),
                 surfaceMesh);
+#if UNITY_EDITOR
+            RecordEditorSurfaceBuild();
+#endif
         }
 
         private void BuildCorridor()
@@ -5406,6 +5846,9 @@ namespace ProgrammaticStylized3D.Rivers
                     ResolveNaturalVariationSettings(),
                     corridorMesh,
                     corridorColliderMesh);
+#if UNITY_EDITOR
+            RecordEditorCorridorBuild();
+#endif
 
             if (corridorMeshCollider != null)
             {
@@ -5414,6 +5857,9 @@ namespace ProgrammaticStylized3D.Rivers
                 if (corridorBuildResult.IsValid)
                 {
                     corridorMeshCollider.sharedMesh = corridorColliderMesh;
+#if UNITY_EDITOR
+                    RecordEditorCorridorColliderAssignment();
+#endif
                 }
             }
 
@@ -5672,6 +6118,9 @@ namespace ProgrammaticStylized3D.Rivers
         {
             EnsureFoamRuntime();
             foamRuntime?.NotifyRiverChanged();
+#if UNITY_EDITOR
+            RecordEditorFoamNotification();
+#endif
         }
 
         public void SetFoamStateHeld(bool held)
@@ -5687,12 +6136,17 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            RequestRegeneration();
+            RequestRegeneration(
+                RiverRegenerationRequestOrigin.InspectorStructural);
         }
 #endif
 
-        private void RequestRegeneration()
+        private void RequestRegeneration(
+            RiverRegenerationRequestOrigin origin)
         {
+#if UNITY_EDITOR
+            BeginEditorRegenerationRequest(origin, pendingRegeneration);
+#endif
             pendingRegeneration = true;
             pendingRegenerationTime =
                 Time.realtimeSinceStartupAsDouble + 0.08;
@@ -5730,20 +6184,33 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            RequestRegeneration();
+            RequestRegeneration(
+                RiverRegenerationRequestOrigin.SplineChanged);
         }
 
-        private bool NotifyParentGround()
+        private bool NotifyParentGround(
+            bool allowPlayStartupCoalescing)
         {
             GeneratedGround ground = GetComponentInParent<GeneratedGround>();
 
             if (ground == null)
             {
+#if UNITY_EDITOR
+                RecordEditorGroundNotification(false, false);
+#endif
                 return false;
             }
 
-            ground.NotifyRiverChanged(this);
-            return true;
+            bool committedBeforeReturn =
+                ground.NotifyRiverChanged(
+                    this,
+                    allowPlayStartupCoalescing);
+#if UNITY_EDITOR
+            RecordEditorGroundNotification(
+                true,
+                !committedBeforeReturn);
+#endif
+            return committedBeforeReturn;
         }
 
         private void NotifyReflectionSurfaceChanged()
@@ -5754,8 +6221,539 @@ namespace ProgrammaticStylized3D.Rivers
             if (reflection != null)
             {
                 reflection.RequestRender();
+#if UNITY_EDITOR
+                RecordEditorReflectionRequest();
+#endif
             }
         }
+
+#if UNITY_EDITOR
+        private void BeginEditorRegenerationRequest(
+            RiverRegenerationRequestOrigin origin,
+            bool coalesced)
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.RequestCount++;
+            activeEditorRegenerationBatch.RequestOrigins[(int)origin]++;
+            if (coalesced)
+            {
+                activeEditorRegenerationBatch.CoalescedRequestCount++;
+            }
+            AppendEditorRegenerationTimeline(
+                "Request " + origin + (coalesced ? " (coalesced)" : ""));
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorRegenerationPass(
+            RiverEditorRegenerationPassKind kind,
+            double elapsedMilliseconds)
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.PassCount++;
+            activeEditorRegenerationBatch.PassKinds[(int)kind]++;
+            activeEditorRegenerationBatch.TotalPassMilliseconds +=
+                Math.Max(0.0, elapsedMilliseconds);
+            AppendEditorRegenerationTimeline(
+                "Pass " + kind + " " +
+                Math.Max(0.0, elapsedMilliseconds).ToString("F3") + " ms");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorDomainBuild(
+            GeneratedGeometryStableFingerprint fingerprint,
+            bool versionIncremented)
+        {
+            EnsureEditorRegenerationBatch();
+            RiverEditorRegenerationBatch batch =
+                activeEditorRegenerationBatch;
+            batch.DomainBuilds++;
+            batch.HasDomainFingerprint = true;
+            batch.DomainPreviousFingerprint =
+                hasEditorDomainFingerprint
+                    ? lastEditorDomainFingerprint
+                    : default(GeneratedGeometryStableFingerprint);
+            batch.DomainLatestFingerprint = fingerprint;
+            string contentState;
+            if (!hasEditorDomainFingerprint)
+            {
+                batch.DomainFirstObservations++;
+                contentState = "first observation";
+            }
+            else if (!lastEditorDomainFingerprint.Equals(fingerprint))
+            {
+                batch.DomainContentChanges++;
+                contentState = "changed";
+            }
+            else
+            {
+                batch.DomainUnchangedRebuilds++;
+                contentState = "unchanged";
+            }
+            if (versionIncremented)
+            {
+                batch.DomainVersionIncrements++;
+            }
+            hasEditorDomainFingerprint = true;
+            lastEditorDomainFingerprint = fingerprint;
+            AppendEditorRegenerationTimeline(
+                "Domain build " + contentState +
+                (versionIncremented ? " / version incremented" : "") +
+                " / " + fingerprint);
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorDomainPublication()
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.DomainPublications++;
+            AppendEditorRegenerationTimeline("Domain published");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorSurfaceBuild()
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.SurfaceBuilds++;
+            AppendEditorRegenerationTimeline("Surface built");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorCorridorBuild()
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.CorridorBuilds++;
+            AppendEditorRegenerationTimeline("Corridor built");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorCorridorColliderAssignment()
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.CorridorColliderAssignments++;
+            AppendEditorRegenerationTimeline("Corridor collider assigned");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorGroundSnapshotFingerprint(
+            GeneratedGeometryStableFingerprint fingerprint)
+        {
+            EnsureEditorRegenerationBatch();
+            RiverEditorRegenerationBatch batch =
+                activeEditorRegenerationBatch;
+            batch.GroundSnapshotBuilds++;
+            batch.HasGroundSnapshotFingerprint = true;
+            batch.GroundSnapshotPreviousFingerprint =
+                hasEditorGroundSnapshotFingerprint
+                    ? lastEditorGroundSnapshotFingerprint
+                    : default(GeneratedGeometryStableFingerprint);
+            batch.GroundSnapshotLatestFingerprint = fingerprint;
+            string contentState;
+            if (!hasEditorGroundSnapshotFingerprint)
+            {
+                batch.GroundSnapshotFirstObservations++;
+                contentState = "first observation";
+            }
+            else if (!lastEditorGroundSnapshotFingerprint.Equals(fingerprint))
+            {
+                batch.GroundSnapshotContentChanges++;
+                contentState = "changed";
+            }
+            else
+            {
+                batch.GroundSnapshotUnchangedBuilds++;
+                contentState = "unchanged";
+            }
+            hasEditorGroundSnapshotFingerprint = true;
+            lastEditorGroundSnapshotFingerprint = fingerprint;
+            AppendEditorRegenerationTimeline(
+                "Ground snapshot " + contentState +
+                " / " + fingerprint);
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorGroundNotification(
+            bool delivered,
+            bool deferred)
+        {
+            EnsureEditorRegenerationBatch();
+            if (delivered)
+            {
+                activeEditorRegenerationBatch.GroundNotifications++;
+                if (deferred)
+                {
+                    activeEditorRegenerationBatch
+                        .GroundDeferredNotifications++;
+                }
+            }
+            else
+            {
+                activeEditorRegenerationBatch.GroundNotificationMisses++;
+            }
+            AppendEditorRegenerationTimeline(
+                delivered
+                    ? deferred
+                        ? "Ground notified / startup transaction deferred"
+                        : "Ground notified / committed before return"
+                    : "Ground notification missed");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorFoamNotification()
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.FoamNotifications++;
+            AppendEditorRegenerationTimeline("Foam notified");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorReflectionRequest()
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.ReflectionRequests++;
+            AppendEditorRegenerationTimeline("Reflection requested");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void AppendEditorRegenerationTimeline(string entry)
+        {
+            const int MaximumTimelineEvents = 48;
+            EnsureEditorRegenerationBatch();
+            if (activeEditorRegenerationBatch.Timeline.Count <
+                MaximumTimelineEvents)
+            {
+                activeEditorRegenerationBatch.Timeline.Add(
+                    EditorApplication.timeSinceStartup.ToString("F6") +
+                    "s " + entry);
+            }
+            else
+            {
+                activeEditorRegenerationBatch.DroppedTimelineEvents++;
+            }
+        }
+
+        private void EnsureEditorRegenerationBatch()
+        {
+            if (activeEditorRegenerationBatch != null)
+            {
+                return;
+            }
+
+            activeEditorRegenerationBatch =
+                new RiverEditorRegenerationBatch
+                {
+                    Id = nextEditorRegenerationBatchId++,
+                    StartedAt = EditorApplication.timeSinceStartup,
+                    StartFrame = Time.frameCount
+                };
+        }
+
+        private void MarkEditorRegenerationActivity()
+        {
+            editorRegenerationActivityRevision++;
+            ScheduleEditorRegenerationBatchCompletion();
+        }
+
+        private void ScheduleEditorRegenerationBatchCompletion()
+        {
+            if (editorRegenerationCompletionScheduled)
+            {
+                return;
+            }
+
+            editorRegenerationCompletionScheduled = true;
+            scheduledEditorRegenerationActivityRevision =
+                editorRegenerationActivityRevision;
+            EditorApplication.delayCall +=
+                TryCompleteEditorRegenerationBatch;
+        }
+
+        private void TryCompleteEditorRegenerationBatch()
+        {
+            editorRegenerationCompletionScheduled = false;
+            if (activeEditorRegenerationBatch == null)
+            {
+                return;
+            }
+
+            if ((pendingRegeneration && isActiveAndEnabled) ||
+                scheduledEditorRegenerationActivityRevision !=
+                editorRegenerationActivityRevision)
+            {
+                ScheduleEditorRegenerationBatchCompletion();
+                return;
+            }
+
+            RiverEditorRegenerationBatch completed =
+                activeEditorRegenerationBatch;
+            activeEditorRegenerationBatch = null;
+            completed.EndFrame = Time.frameCount;
+            lastEditorRegenerationAccountingReport =
+                BuildEditorRegenerationAccountingReport(completed);
+
+            if (logNextEditorRegenerationBatch)
+            {
+                logNextEditorRegenerationBatch = false;
+                Debug.Log(
+                    lastEditorRegenerationAccountingReport,
+                    this);
+            }
+        }
+
+        private static string BuildEditorRegenerationAccountingReport(
+            RiverEditorRegenerationBatch batch)
+        {
+            double wallMilliseconds =
+                Math.Max(
+                    0.0,
+                    (EditorApplication.timeSinceStartup - batch.StartedAt) *
+                    1000.0);
+            StringBuilder builder = new StringBuilder(1024);
+            builder.Append("StylizedRiver regeneration accounting\n");
+            builder.Append("Batch ").Append(batch.Id)
+                .Append(" | frames ").Append(batch.StartFrame)
+                .Append('–').Append(batch.EndFrame)
+                .Append(" | wall ").Append(wallMilliseconds.ToString("F3"))
+                .Append(" ms | measured passes ")
+                .Append(batch.TotalPassMilliseconds.ToString("F3"))
+                .Append(" ms\n");
+            builder.Append("Requests ").Append(batch.RequestCount)
+                .Append(" | coalesced ").Append(batch.CoalescedRequestCount)
+                .Append(" | passes ").Append(batch.PassCount).Append('\n');
+            builder.Append("Origins: ");
+            AppendEditorOriginCounts(builder, batch.RequestOrigins);
+            builder.Append("\nPasses: Full×")
+                .Append(batch.PassKinds[(int)RiverEditorRegenerationPassKind.Full])
+                .Append(" SurfaceOnly×")
+                .Append(batch.PassKinds[(int)RiverEditorRegenerationPassKind.SurfaceOnly])
+                .Append(" CorridorOnly×")
+                .Append(batch.PassKinds[(int)RiverEditorRegenerationPassKind.CorridorOnly])
+                .Append('\n');
+            builder.Append("Outputs: Domain×").Append(batch.DomainBuilds)
+                .Append(" Surface×").Append(batch.SurfaceBuilds)
+                .Append(" Corridor×").Append(batch.CorridorBuilds)
+                .Append(" ColliderAssign×")
+                .Append(batch.CorridorColliderAssignments).Append('\n');
+            builder.Append("Domain: first observations ")
+                .Append(batch.DomainFirstObservations)
+                .Append(" | content changes ")
+                .Append(batch.DomainContentChanges)
+                .Append(" | unchanged rebuilds ")
+                .Append(batch.DomainUnchangedRebuilds)
+                .Append(" | version increments ")
+                .Append(batch.DomainVersionIncrements)
+                .Append(" | publications ")
+                .Append(batch.DomainPublications);
+            AppendEditorFingerprintPair(
+                builder,
+                batch.HasDomainFingerprint,
+                batch.DomainPreviousFingerprint,
+                batch.DomainLatestFingerprint);
+            builder.Append("\nGround snapshots: builds ")
+                .Append(batch.GroundSnapshotBuilds)
+                .Append(" | first observations ")
+                .Append(batch.GroundSnapshotFirstObservations)
+                .Append(" | content changes ")
+                .Append(batch.GroundSnapshotContentChanges)
+                .Append(" | unchanged builds ")
+                .Append(batch.GroundSnapshotUnchangedBuilds);
+            AppendEditorFingerprintPair(
+                builder,
+                batch.HasGroundSnapshotFingerprint,
+                batch.GroundSnapshotPreviousFingerprint,
+                batch.GroundSnapshotLatestFingerprint);
+            builder.Append("\nNotifications: Ground ")
+                .Append(batch.GroundNotifications)
+                .Append(" (deferred ")
+                .Append(batch.GroundDeferredNotifications)
+                .Append(", misses ")
+                .Append(batch.GroundNotificationMisses)
+                .Append(") | Foam ").Append(batch.FoamNotifications)
+                .Append(" | Reflection ").Append(batch.ReflectionRequests);
+            AppendEditorRegenerationTimelineReport(builder, batch);
+            return builder.ToString();
+        }
+
+        private static void AppendEditorRegenerationTimelineReport(
+            StringBuilder builder,
+            RiverEditorRegenerationBatch batch)
+        {
+            builder.Append("\nTimeline:");
+            for (int index = 0; index < batch.Timeline.Count; index++)
+            {
+                builder.Append("\n  ").Append(index + 1).Append(". ")
+                    .Append(batch.Timeline[index]);
+            }
+            if (batch.DroppedTimelineEvents > 0)
+            {
+                builder.Append("\n  … ")
+                    .Append(batch.DroppedTimelineEvents)
+                    .Append(" additional event(s) omitted");
+            }
+        }
+
+        private static void AppendEditorOriginCounts(
+            StringBuilder builder,
+            int[] counts)
+        {
+            bool wroteAny = false;
+            for (int index = 0;
+                 index < (int)RiverRegenerationRequestOrigin.Count;
+                 index++)
+            {
+                int count = counts[index];
+                if (count <= 0)
+                {
+                    continue;
+                }
+
+                if (wroteAny)
+                {
+                    builder.Append(", ");
+                }
+
+                builder.Append((RiverRegenerationRequestOrigin)index)
+                    .Append('×').Append(count);
+                wroteAny = true;
+            }
+
+            if (!wroteAny)
+            {
+                builder.Append("none");
+            }
+        }
+
+        private static void AppendEditorFingerprintPair(
+            StringBuilder builder,
+            bool hasFingerprint,
+            GeneratedGeometryStableFingerprint previous,
+            GeneratedGeometryStableFingerprint latest)
+        {
+            if (!hasFingerprint)
+            {
+                builder.Append(" | fingerprints unavailable");
+                return;
+            }
+
+            builder.Append(" | fingerprints ")
+                .Append(previous.Equals(default) ? "none" : previous.ToString())
+                .Append(" → ").Append(latest);
+        }
+
+        private static double ResolveEditorElapsedMilliseconds(long startedAt)
+        {
+            long elapsed =
+                System.Diagnostics.Stopwatch.GetTimestamp() - startedAt;
+            return elapsed * 1000.0 /
+                System.Diagnostics.Stopwatch.Frequency;
+        }
+
+        private static GeneratedGeometryStableFingerprint
+            CalculateEditorDomainFingerprint(RiverDomainSnapshot snapshot)
+        {
+            GeneratedGeometryStableHashBuilder builder =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.River.EditorDomain");
+            builder.AddBoolean(snapshot != null && snapshot.IsValid);
+            if (snapshot == null)
+            {
+                return builder.Finish();
+            }
+
+            builder.AddInt32(snapshot.SampleCount);
+            builder.AddSingle(snapshot.LocalLength);
+            builder.AddSingle(snapshot.RequestedSampleSpacing);
+            builder.AddSingle(snapshot.ConnectedDistanceOffset);
+            builder.AddBoolean(snapshot.ReverseFlow);
+            for (int index = 0; index < snapshot.SampleCount; index++)
+            {
+                StylizedRiverSplineSample sample = snapshot.Samples[index];
+                builder.AddVector3(sample.Centre);
+                builder.AddVector3(sample.SurfacePoint);
+                builder.AddVector3(sample.Tangent);
+                builder.AddVector3(sample.Side);
+                builder.AddVector3(sample.Up);
+                builder.AddSingle(sample.Distance);
+                builder.AddSingle(sample.OrientedDistance);
+                builder.AddSingle(sample.GlobalDistance);
+                builder.AddSingle(sample.LeftHalfWidth);
+                builder.AddSingle(sample.RightHalfWidth);
+                builder.AddSingle(sample.LeftSurfaceHalfWidth);
+                builder.AddSingle(sample.RightSurfaceHalfWidth);
+                builder.AddSingle(sample.NormalizedDistance);
+                builder.AddSingle(sample.NormalizedTime);
+            }
+            return builder.Finish();
+        }
+
+        private static GeneratedGeometryStableFingerprint
+            CalculateEditorGroundSnapshotFingerprint(
+                Vector3[] points,
+                Vector3[] sides,
+                float[] leftVisibleHalfWidths,
+                float[] rightVisibleHalfWidths,
+                float[] leftSurfaceHalfWidths,
+                float[] rightSurfaceHalfWidths,
+                float snapshotBankBlend,
+                float snapshotDepth,
+                float snapshotBedFlatness,
+                StylizedRiverBankProfile snapshotBankProfile,
+                float snapshotTerrainConformity,
+                float snapshotGroundGridSpacing,
+                float snapshotWetClearance,
+                float snapshotBankCover,
+                float snapshotReservedDownwardDisplacement)
+        {
+            GeneratedGeometryStableHashBuilder builder =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.River.EditorGroundSnapshot");
+            AddEditorFingerprintValues(ref builder, points);
+            AddEditorFingerprintValues(ref builder, sides);
+            AddEditorFingerprintValues(ref builder, leftVisibleHalfWidths);
+            AddEditorFingerprintValues(ref builder, rightVisibleHalfWidths);
+            AddEditorFingerprintValues(ref builder, leftSurfaceHalfWidths);
+            AddEditorFingerprintValues(ref builder, rightSurfaceHalfWidths);
+            builder.AddSingle(snapshotBankBlend);
+            builder.AddSingle(snapshotDepth);
+            builder.AddSingle(snapshotBedFlatness);
+            builder.AddInt32((int)snapshotBankProfile);
+            builder.AddSingle(snapshotTerrainConformity);
+            builder.AddSingle(snapshotGroundGridSpacing);
+            builder.AddSingle(snapshotWetClearance);
+            builder.AddSingle(snapshotBankCover);
+            builder.AddSingle(snapshotReservedDownwardDisplacement);
+            return builder.Finish();
+        }
+
+        private static void AddEditorFingerprintValues(
+            ref GeneratedGeometryStableHashBuilder builder,
+            Vector3[] values)
+        {
+            builder.AddInt32(values != null ? values.Length : -1);
+            if (values == null)
+            {
+                return;
+            }
+            for (int index = 0; index < values.Length; index++)
+            {
+                builder.AddVector3(values[index]);
+            }
+        }
+
+        private static void AddEditorFingerprintValues(
+            ref GeneratedGeometryStableHashBuilder builder,
+            float[] values)
+        {
+            builder.AddInt32(values != null ? values.Length : -1);
+            if (values == null)
+            {
+                return;
+            }
+            for (int index = 0; index < values.Length; index++)
+            {
+                builder.AddSingle(values[index]);
+            }
+        }
+#endif
 
         private void RemoveLegacyGeneratedObjects()
         {

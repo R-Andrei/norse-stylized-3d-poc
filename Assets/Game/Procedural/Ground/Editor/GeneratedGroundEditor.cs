@@ -92,11 +92,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool showGroundSurface = true;
         private bool showResolvedFeatureSummary;
         private bool showGroundDebug;
+        private bool showRegenerationAccounting;
         private bool showPaintedAccentStrokes = true;
         private bool showPaintedAccentBasics = true;
-        private bool showPaintedAccentBroadDistribution;
-        private bool showPaintedAccentRegionalComposition;
+        private bool showPaintedAccentDistribution;
         private bool showPaintedAccentHorizontalCompanions = true;
+        private bool showPaintedAccentAdvancedCompanionLayoutMix;
         private bool showPaintedAccentFamilyMix;
         private bool showPaintedAccentGeometry;
         private bool showPaintedAccentProfile;
@@ -370,6 +371,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             DrawGroundSurfaceAuthoringSection();
             DrawGroundDebugSection();
+            DrawRegenerationAccountingSection();
             DrawPaintedAccentStrokeControls();
             DrawGenerationSection();
             DrawPatchSection();
@@ -669,6 +671,144 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             EditorGUI.indentLevel--;
         }
 
+        private void DrawRegenerationAccountingSection()
+        {
+            if (!DrawSectionFoldout(
+                    ref showRegenerationAccounting,
+                    "Editor Regeneration Accounting"))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            if (targets.Length != 1 || target is not GeneratedGround ground)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select one GeneratedGround to inspect or copy its latest accounting batch.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            EditorGUILayout.HelpBox(
+                ground.LastEditorRegenerationAccountingReport,
+                MessageType.None);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Copy Latest Batch"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    ground.LastEditorRegenerationAccountingReport;
+            }
+            if (GUILayout.Button("Clear"))
+            {
+                ground.ClearEditorRegenerationAccounting();
+                Repaint();
+            }
+            if (GUILayout.Button("Log Next Batch Once"))
+            {
+                ground.LogNextEditorRegenerationBatchOnce();
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Last Regeneration Stage Timing",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                ground.LastRegenerationTimingDiagnostics,
+                MessageType.None);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Copy Stage Timing"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildRegenerationTimingClipboardReport(ground);
+            }
+            if (GUILayout.Button("Copy Accounting + Timing"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildCombinedGroundDiagnosticsClipboardReport(ground);
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (GUILayout.Button("Copy All Ground Reports"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildAllGroundDiagnosticsClipboardReport(ground);
+            }
+
+            EditorGUILayout.LabelField(
+                "The accounting record is Editor-only and observational. The timing report retains the latest regeneration stage breakdown recorded by GeneratedGround.",
+                EditorStyles.wordWrappedMiniLabel);
+            EditorGUI.indentLevel--;
+        }
+
+        private static string BuildRegenerationTimingClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                "GeneratedGround Full Generation Report\n" +
+                ground.LastRegenerationTimingDiagnostics;
+        }
+
+        private static string BuildCombinedGroundDiagnosticsClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                "GeneratedGround regeneration accounting\n" +
+                ground.LastEditorRegenerationAccountingReport +
+                "\n\n" +
+                BuildRegenerationTimingClipboardReport(ground);
+        }
+
+        private static string BuildPaintedAccentPlacementClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                "GeneratedGround Painted Accent Placement Report\n" +
+                ground.GetLastPaintedAccentPlacementStatistics();
+        }
+
+        private static string BuildPaintedAccentCoverageClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                "GeneratedGround Painted Accent Coverage Report\n" +
+                ground.GetLastPaintedAccentCoverageStatistics();
+        }
+
+        private static string BuildPaintedAccentProjectedGlyphClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                "GeneratedGround Painted Accent Projected Baseline Report\n" +
+                ground.GetLastPaintedAccentProjectedGlyphStatistics();
+        }
+
+        private static string BuildPaintedAccentGenerationDiagnosticsClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                BuildRegenerationTimingClipboardReport(ground) +
+                "\n\n" +
+                BuildPaintedAccentPlacementClipboardReport(ground) +
+                "\n\n" +
+                BuildPaintedAccentCoverageClipboardReport(ground) +
+                "\n\n" +
+                BuildPaintedAccentProjectedGlyphClipboardReport(ground);
+        }
+
+        private static string BuildAllGroundDiagnosticsClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                "GeneratedGround regeneration accounting\n" +
+                ground.LastEditorRegenerationAccountingReport +
+                "\n\n" +
+                BuildPaintedAccentGenerationDiagnosticsClipboardReport(ground);
+        }
+
         private void DrawPaintedAccentStrokeControls()
         {
             if (targets.Length != 1)
@@ -707,14 +847,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentDistributionPatchScale");
             SerializedProperty distributionPatchiness =
                 feature.FindPropertyRelative("paintedAccentDistributionPatchiness");
-            SerializedProperty distributionSparseFloor =
-                feature.FindPropertyRelative("paintedAccentDistributionSparseFloor");
-            SerializedProperty compositionRegionScale =
-                feature.FindPropertyRelative("paintedAccentCompositionRegionScale");
-            SerializedProperty compositionDensityContrast =
-                feature.FindPropertyRelative("paintedAccentCompositionDensityContrast");
             SerializedProperty horizontalCompanionStrength =
                 feature.FindPropertyRelative("paintedAccentHorizontalCompanionStrength");
+            SerializedProperty companionTripletShare =
+                feature.FindPropertyRelative("paintedAccentCompanionTripletShare");
+            SerializedProperty companionAccentBias =
+                feature.FindPropertyRelative("paintedAccentCompanionAccentBias");
             SerializedProperty companionTightness =
                 feature.FindPropertyRelative("paintedAccentCompanionTightness");
             SerializedProperty companionTripletVerticality =
@@ -723,6 +861,26 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentCompanionTripletVerticalityInitialized");
             SerializedProperty horizontalCompanionsInitialized =
                 feature.FindPropertyRelative("paintedAccentHorizontalCompanionsInitialized");
+            SerializedProperty companionQuotaControlsInitialized =
+                feature.FindPropertyRelative("paintedAccentCompanionQuotaControlsInitialized");
+            SerializedProperty pairSteppedWeight =
+                feature.FindPropertyRelative("paintedAccentPairSteppedWeight");
+            SerializedProperty pairShoulderWeight =
+                feature.FindPropertyRelative("paintedAccentPairShoulderWeight");
+            SerializedProperty pairOffsetWeight =
+                feature.FindPropertyRelative("paintedAccentPairOffsetWeight");
+            SerializedProperty pairShallowWeight =
+                feature.FindPropertyRelative("paintedAccentPairShallowWeight");
+            SerializedProperty tripletSteppedRunWeight =
+                feature.FindPropertyRelative("paintedAccentTripletSteppedRunWeight");
+            SerializedProperty tripletCrownRunWeight =
+                feature.FindPropertyRelative("paintedAccentTripletCrownRunWeight");
+            SerializedProperty tripletBrokenTerraceWeight =
+                feature.FindPropertyRelative("paintedAccentTripletBrokenTerraceWeight");
+            SerializedProperty tripletShallowRunWeight =
+                feature.FindPropertyRelative("paintedAccentTripletShallowRunWeight");
+            SerializedProperty companionLayoutWeightsInitialized =
+                feature.FindPropertyRelative("paintedAccentCompanionLayoutWeightsInitialized");
             SerializedProperty completeMoundWeight =
                 feature.FindPropertyRelative("paintedAccentCompleteMoundWeight");
             SerializedProperty asymmetricMoundWeight =
@@ -760,14 +918,23 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 strokeDensity == null ||
                 distributionPatchScale == null ||
                 distributionPatchiness == null ||
-                distributionSparseFloor == null ||
-                compositionRegionScale == null ||
-                compositionDensityContrast == null ||
                 horizontalCompanionStrength == null ||
+                companionTripletShare == null ||
+                companionAccentBias == null ||
                 companionTightness == null ||
                 companionTripletVerticality == null ||
                 companionTripletVerticalityInitialized == null ||
                 horizontalCompanionsInitialized == null ||
+                companionQuotaControlsInitialized == null ||
+                pairSteppedWeight == null ||
+                pairShoulderWeight == null ||
+                pairOffsetWeight == null ||
+                pairShallowWeight == null ||
+                tripletSteppedRunWeight == null ||
+                tripletCrownRunWeight == null ||
+                tripletBrokenTerraceWeight == null ||
+                tripletShallowRunWeight == null ||
+                companionLayoutWeightsInitialized == null ||
                 completeMoundWeight == null ||
                 asymmetricMoundWeight == null ||
                 singleShoulderWeight == null ||
@@ -790,13 +957,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             bool styleChanged = false;
 
-            if (compositionRegionScale.floatValue < 1f)
-            {
-                compositionRegionScale.floatValue = 4f;
-                compositionDensityContrast.floatValue = 0.70f;
-                styleChanged = true;
-            }
-
             if (!horizontalCompanionsInitialized.boolValue)
             {
                 horizontalCompanionStrength.floatValue = 0f;
@@ -809,6 +969,28 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             {
                 companionTripletVerticality.floatValue = 1f;
                 companionTripletVerticalityInitialized.boolValue = true;
+                styleChanged = true;
+            }
+
+            if (!companionQuotaControlsInitialized.boolValue)
+            {
+                companionTripletShare.floatValue = 0.45f;
+                companionAccentBias.floatValue = 0.65f;
+                companionQuotaControlsInitialized.boolValue = true;
+                styleChanged = true;
+            }
+
+            if (!companionLayoutWeightsInitialized.boolValue)
+            {
+                pairSteppedWeight.floatValue = 0.45f;
+                pairShoulderWeight.floatValue = 0.30f;
+                pairOffsetWeight.floatValue = 0.20f;
+                pairShallowWeight.floatValue = 0.05f;
+                tripletSteppedRunWeight.floatValue = 0.40f;
+                tripletCrownRunWeight.floatValue = 0.30f;
+                tripletBrokenTerraceWeight.floatValue = 0.25f;
+                tripletShallowRunWeight.floatValue = 0.05f;
+                companionLayoutWeightsInitialized.boolValue = true;
                 styleChanged = true;
             }
 
@@ -866,93 +1048,119 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 }
 
                 if (DrawSubsectionFoldout(
-                        ref showPaintedAccentBroadDistribution,
-                        "Broad Distribution"))
+                        ref showPaintedAccentDistribution,
+                        "Distribution"))
                 {
                     EditorGUI.indentLevel++;
+                    EditorGUILayout.HelpBox(
+                        "Scale controls the size of sparse/dense structure. Contrast controls how strongly the field separates into populated and quiet areas. Cluster Region Bias only decides where the fixed companion quota is concentrated.",
+                        MessageType.None);
                     EditorGUI.BeginChangeCheck();
                     EditorGUILayout.Slider(
                         distributionPatchScale,
                         2f,
                         24f,
                         new GUIContent(
-                            "Distribution Patch Scale",
-                            "World-space size in metres of soft continuous density patches. Larger values create broader sparse and dense regions without hard island boundaries."));
+                            "Distribution Scale",
+                            "Lower values create smaller, more frequent variation. Higher values create broader local patches and larger coherent regions."));
                     EditorGUILayout.Slider(
                         distributionPatchiness,
                         0f,
                         1f,
                         new GUIContent(
-                            "Distribution Patchiness",
-                            "Strength of weighted patch placement. Zero approaches broad random coverage; one strongly prefers dense noise regions while retaining a non-zero chance elsewhere."));
-                    EditorGUILayout.Slider(
-                        distributionSparseFloor,
-                        0.02f,
-                        0.40f,
-                        new GUIContent(
-                            "Distribution Sparse Floor",
-                            "Minimum patch preference retained in cold regions before semantic weighting."));
-                    styleChanged |= EditorGUI.EndChangeCheck();
-                    EditorGUI.indentLevel--;
-                }
-
-                if (DrawSubsectionFoldout(
-                        ref showPaintedAccentRegionalComposition,
-                        "Regional Composition"))
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUI.BeginChangeCheck();
-                    EditorGUILayout.Slider(
-                        compositionRegionScale,
-                        1f,
-                        16f,
-                        new GUIContent(
-                            "Regional Zone Scale",
-                            "World-space size in metres of jittered zones that share density mode and broad direction. This is independent from Distribution Patch Scale."));
-                    EditorGUILayout.Slider(
-                        compositionDensityContrast,
-                        0f,
-                        1f,
-                        new GUIContent(
-                            "Regional Density Contrast",
-                            "Redistributes a fixed average regional survival rate into denser accent zones without raising Stroke Density."));
+                            "Distribution Contrast",
+                            "Zero approaches an even field. One creates strong sparse-versus-dense separation while retaining a protected non-zero sparse-region floor."));
+                    using (new EditorGUI.DisabledScope(
+                               !horizontalCompanionStrength.hasMultipleDifferentValues &&
+                               horizontalCompanionStrength.floatValue <= 0f))
+                    {
+                        EditorGUILayout.Slider(
+                            companionAccentBias,
+                            0f,
+                            1f,
+                            new GUIContent(
+                                "Cluster Region Bias",
+                                "Zero distributes clusters like the overall field. One concentrates the same fixed cluster quota into denser accent regions."));
+                    }
                     styleChanged |= EditorGUI.EndChangeCheck();
                     EditorGUI.indentLevel--;
                 }
 
                 if (DrawSubsectionFoldout(
                         ref showPaintedAccentHorizontalCompanions,
-                        "Horizontal Companions"))
+                        "Companion Composition"))
                 {
                     EditorGUI.indentLevel++;
+                    EditorGUILayout.HelpBox(
+                        "Participation, pair/triplet split, and layout weights resolve to deterministic whole-mark quotas after ordinary projected validation. Shape controls cannot silently reduce those quotas.",
+                        MessageType.None);
                     EditorGUI.BeginChangeCheck();
                     EditorGUILayout.Slider(
                         horizontalCompanionStrength,
                         0f,
                         1f,
                         new GUIContent(
-                            "Horizontal Companion Strength",
-                            "Bounded share of surviving candidates arranged as independent two- or three-mark clusters. Zero preserves fully independent placement; one enables the strongest bounded participant budget."));
+                            "Companion Participation",
+                            "Authoritative target share of final valid projected marks assigned to complete pairs or triplets."));
                     using (new EditorGUI.DisabledScope(
                                !horizontalCompanionStrength.hasMultipleDifferentValues &&
                                horizontalCompanionStrength.floatValue <= 0f))
                     {
+                        EditorGUILayout.Slider(
+                            companionTripletShare,
+                            0f,
+                            1f,
+                            new GUIContent(
+                                "Triplet Share",
+                                "Of clustered participants, the authoritative target share assigned to triplets. The remainder is assigned to pairs."));
                         EditorGUILayout.Slider(
                             companionTightness,
                             0f,
                             1f,
                             new GUIContent(
                                 "Companion Tightness",
-                                "Endpoint spacing inside two- or three-mark clusters. Zero leaves broader gaps; one targets touching marks or an approximately one-to-two-pixel rendered break."));
+                                "Junction spacing only. One stops terminal endpoints at the visible edge of the contacted mark without overlap."));
                         EditorGUILayout.Slider(
                             companionTripletVerticality,
                             0f,
                             1f,
                             new GUIContent(
-                                "Triplet Verticality",
-                                "How strongly three-mark clusters depart from a straight run. One gives structured triplets a steep vertical member and rejects layouts that remain visually linear; flat triplets remain a rare exception."));
+                                "Cluster Verticality",
+                                "Translation-driven stepping for pairs and triplets. This does not change cluster counts or Angle Jitter."));
                     }
                     styleChanged |= EditorGUI.EndChangeCheck();
+                    if (!serializedObject.isEditingMultipleObjects &&
+                        target is GeneratedGround generatedGround)
+                    {
+                        EditorGUILayout.HelpBox(
+                            generatedGround.GetLastPaintedAccentCompanionQuotaSummary(),
+                            MessageType.None);
+                    }
+                    EditorGUI.indentLevel--;
+                }
+
+                if (DrawSubsectionFoldout(
+                        ref showPaintedAccentAdvancedCompanionLayoutMix,
+                        "Advanced Companion Layout Mix"))
+                {
+                    EditorGUI.indentLevel++;
+                    using (new EditorGUI.DisabledScope(
+                               !horizontalCompanionStrength.hasMultipleDifferentValues &&
+                               horizontalCompanionStrength.floatValue <= 0f))
+                    {
+                        EditorGUI.BeginChangeCheck();
+                        EditorGUILayout.LabelField("Pair Layout Weights", EditorStyles.miniBoldLabel);
+                        EditorGUILayout.Slider(pairSteppedWeight, 0f, 1f, new GUIContent("Stepped", "Exact normalized quota weight for stepped pairs."));
+                        EditorGUILayout.Slider(pairShoulderWeight, 0f, 1f, new GUIContent("Shoulder", "Exact normalized quota weight for shoulder/interior-contact pairs."));
+                        EditorGUILayout.Slider(pairOffsetWeight, 0f, 1f, new GUIContent("Offset", "Exact normalized quota weight for offset pairs."));
+                        EditorGUILayout.Slider(pairShallowWeight, 0f, 1f, new GUIContent("Shallow Offset", "Exact normalized quota weight for quieter visibly separated pairs."));
+                        EditorGUILayout.LabelField("Triplet Layout Weights", EditorStyles.miniBoldLabel);
+                        EditorGUILayout.Slider(tripletSteppedRunWeight, 0f, 1f, new GUIContent("Stepped Run", "Exact normalized quota weight for rising/falling stepped runs."));
+                        EditorGUILayout.Slider(tripletCrownRunWeight, 0f, 1f, new GUIContent("Crown Run", "Exact normalized quota weight for centre-raised/lowered triplets."));
+                        EditorGUILayout.Slider(tripletBrokenTerraceWeight, 0f, 1f, new GUIContent("Broken Terrace", "Exact normalized quota weight for alternating terrace triplets."));
+                        EditorGUILayout.Slider(tripletShallowRunWeight, 0f, 1f, new GUIContent("Shallow Run", "Exact normalized quota weight for quieter non-collinear triplets."));
+                        styleChanged |= EditorGUI.EndChangeCheck();
+                    }
                     EditorGUI.indentLevel--;
                 }
 
@@ -1245,6 +1453,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 EditorGUILayout.HelpBox(
                     ground.LastRegenerationTimingDiagnostics,
                     MessageType.None);
+                if (GUILayout.Button("Copy Regeneration Timing"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        BuildRegenerationTimingClipboardReport(ground);
+                }
 
                 EditorGUILayout.LabelField(
                     "Last Generated",
@@ -1252,6 +1465,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 EditorGUILayout.HelpBox(
                     ground.GetLastPaintedAccentPlacementStatistics(),
                     MessageType.None);
+                if (GUILayout.Button("Copy Last Generated"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        BuildPaintedAccentPlacementClipboardReport(ground);
+                }
 
                 EditorGUILayout.LabelField(
                     "Projected Coverage Bake",
@@ -1259,6 +1477,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 EditorGUILayout.HelpBox(
                     ground.GetLastPaintedAccentCoverageStatistics(),
                     MessageType.None);
+                if (GUILayout.Button("Copy Projected Coverage Bake"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        BuildPaintedAccentCoverageClipboardReport(ground);
+                }
 
                 if (showPaintedAccentProjectedGlyphDebug.boolValue)
                 {
@@ -1268,6 +1491,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     EditorGUILayout.HelpBox(
                         ground.GetLastPaintedAccentProjectedGlyphStatistics(),
                         MessageType.None);
+                    if (GUILayout.Button("Copy Accepted Projected Baseline"))
+                    {
+                        EditorGUIUtility.systemCopyBuffer =
+                            BuildPaintedAccentProjectedGlyphClipboardReport(ground);
+                    }
+                }
+
+                if (GUILayout.Button("Copy All Generation Diagnostics"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        BuildPaintedAccentGenerationDiagnosticsClipboardReport(ground);
                 }
 
                 EditorGUI.indentLevel--;
@@ -2258,13 +2492,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 Color modeColor =
                     ResolvePaintedAccentCompositionRegionColor(
                         proposal.RegionMode);
-                modeColor.a =
-                    proposal.SurvivedRegionalThinning
-                        ? 0.92f
-                        : 0.24f;
+                modeColor.a = 0.92f;
                 Handles.color = modeColor;
-                float lineWidth =
-                    proposal.SurvivedRegionalThinning ? 2.5f : 1.5f;
+                const float lineWidth = 2.5f;
                 Handles.DrawAAPolyLine(
                     lineWidth,
                     worldPosition - right,

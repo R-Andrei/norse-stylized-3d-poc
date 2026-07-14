@@ -1,10 +1,20 @@
+# Current River Foam rendering state
+
+`4.11C.5.17D.0` retires Final-Edge Fray completely. Gameplay-camera evidence showed that fine teeth disappear into rasterization while enlarged teeth duplicate Chipping or read as broad silhouette erosion. The active production order is now coherent Foam → analytical Chipping → structural Strands → composition. All Fray-only shader logic, controls, bindings, migrations, and debug views are removed; dead `breakupField` and runtime `_FoamBreakupScale` plumbing are removed as well. Historical serialized aliases remain only where required to preserve existing Chip migration data.
+
+The next rendering task is `4.11C.5.17D.1 — Chipping Readability Audit`. Remaining-Life morphology integration is deferred until the surviving Chip/Strand vocabulary is camera-readable and accepted.
+
+## `4.11C.5.17B.2D2B-B.2L` — Decoupled Shape Cadence and Transition
+
+Implemented, Unity validation pending. B.2L remains the deferred Chipping timing validation patch; Final-Edge Fray was later retired by D.0. It retains B.2K multi-axis contour geometry but separates target cadence from actual geometric transition duration. Shape Change Cadence selects new deterministic golden-angle targets; Shape Transition Time controls the quintic interpolation time. No size, lifecycle, movement, permission, texture, compute, Strand, or Fray ownership changes.
+
 # River Rendering Roadmap
 
 ## Current Foam completion order — July 2026
 
 Performance stabilization ends at validated P4 accounting. Offscreen freeze, empty-field sleeping, and further cadence/readback optimization are deferred until the River is complete.
 
-B.2 was rejected because each candidate remained a rigid three-circle cluster. B.2A established one connected contour but its local motion and radius pulse were visually ineffective. B.2B added useful multi-spacing coordinate advection and geometric turnover, but high Evolution Amount also sheared local contour space into ribbon-like streaks. B.2C preserves the motion field while reconstructing local chip distance in the unwarped River metric, and adds one Chip plus one Fray eligibility composite against exact Final Foam.
+B.2 was rejected because each candidate remained a rigid three-circle cluster. B.2A established one connected contour but its local motion and radius pulse were visually ineffective. B.2B-B.2E proved that nonlinear coordinate warping and one coupled Evolution Amount/Rate could not simultaneously provide stable shape, slow lifecycle, dormant dwell, and independent motion. B.2D production eligibility and B.2E candidate-independent permission diagnostics remain. B.2F supplies the independent four-stage lifecycle and rigid motion/variation controls. B.2G is Unity-validated and accepted: bounded projected-size LOD preserves distant Chip readability without changing candidate identity or preventing lifecycle death. B.2H is implemented pending validation and expands only rigid lateral centre travel, with an exact adaptive rectangular source-cell search. B.2I was rejected after Unity validation because its local proxy did not contain meaningful inward distance and serially gated the existing controls. B.2J removes that third gate and keeps Edge Coverage and candidate-level Interior Access as parallel permissions; Unity validation accepted that model. B.2K supplies the accepted independent multi-axis sine-harmonic geometry. B.2L is implemented pending validation and separates target cadence from actual contour-transition duration. Final-Edge Fray was later retired by D.0.
 
 The active morphology sequence is:
 
@@ -18,12 +28,22 @@ The active morphology sequence is:
 2D2B-B.2A replace each cluster with one connected contour; evolution visually rejected as tiny and rotation-dominant;
 2D2B-B.2B replace local oscillation with chaotic coordinate advection and geometric turnover;
 2D2B-B.2C preserve local Chip shape under advection and compare Chip/Fray eligibility against Final Foam;
-2D2B-B.2D correct Chip eligibility from composite evidence;
-2D2B-C    apply simple Fray after Strands using the validated permitted edge area;
-5.17C     integrate Remaining Life only after fixed-strength roles are accepted.
+2D2B-B.2D separate Chip Edge Coverage from deterministic Interior Access, clip to pre-Chip visible support, and convert transported Material Pattern to binary antialiased admission — implemented, Unity validation pending;
+2D2B-B.2E restore candidate-independent permission diagnostics and attempt bounded turnover/warp safety — superseded for evolution by B.2F;
+2D2B-B.2F replace coupled evolution with explicit Formation/Stable/Dissolve/Dormant timing, rigid lateral/rotation motion, independent size/shape pairs, and adaptive complete candidate search — implemented, Unity validation pending;
+2D2B-B.2G add bounded singular-value projected-size LOD and replace whole-candidate distance fade with subpixel-only lifecycle suppression — Unity-validated and accepted;
+2D2B-B.2H extend rigid lateral centre travel from `0.25` to `2.5` spacing and replace uniform search expansion with exact adaptive `3×3` through `5×9` rectangles — implemented, Unity validation pending;
+2D2B-B.2I replace transported Material Pattern ranking admission with a local visible-support/material-depth proxy — rejected after Unity validation;
+2D2B-B.2J remove the failed third admission gate and keep Edge Coverage plus candidate-level Interior Access as parallel permissions — Unity-validated and accepted;
+2D2B-B.2K replace the weak mirror-symmetric A-to-B contour morph with independent multi-axis sine-harmonic geometry while preserving all size and motion ownership — geometry accepted;
+2D2B-B.2L separate Shape Change Cadence from Shape Transition Time using constant-distance deterministic targets and quintic interpolation — implemented, Unity validation pending;
+2D2B-C/C.1/C.1A/C.1B  historical Fray experiments — rejected and retired by D.0;
+5.17D.0   remove all Fray-only production, authoring, binding, migration, and diagnostic paths;
+5.17D.1   audit Chipping readability from the production camera;
+5.17C     integrate Remaining Life only after the surviving Chip/Strand roles are accepted.
 ```
 
-No new Chipping texture or compute pass is permitted. Strands remain in Layer E. B gates analytical candidates with transported Layer C Material Pattern, reconstructs the cut from the soft body, and hands the chipped mask to the accepted Strand logic. B.1 keeps position jitter, size variation, and silhouette distortion mathematically independent. B.2B scrolls and spatially warps the single-contour field by multiple spacings and gives each candidate independent geometric turnover. B.2C prevents that lookup warp from owning local contour aspect ratio and exposes the exact rendered-mask/eligibility relationship without another resource. A second hidden legacy Chip pass remains rejected. Fray remains separate until C.
+No new Chipping texture or compute pass is permitted. Strands remain in Layer E. B gates analytical candidates against the visible Chip domain, reconstructs the cut from the soft body, and hands the chipped mask to the accepted Strand logic. B.1 keeps position jitter, size variation, and silhouette distortion mathematically independent. B.2D stops claiming that saturated Presence amplitude is interior distance: Edge Coverage remains edge-only and Interior Access grants full-body permission per candidate. B.2I proved that another local admission scalar could not recover missing distance information. B.2J removes the redundant gate. B.2E keeps the Eligibility Composite independent of current candidates. B.2F removes the rejected coordinate warp entirely and owns independent lifecycle/motion/variation. B.2G keeps those River-space identities but applies a bounded screen-readability floor to undersized candidates using a metric-correct screen-to-River Jacobian; it never shrinks close candidates or overrides lifecycle zero. B.2H retains the same rigid lateral equation but gives it tenfold amount authority and an exact rectangular source-cell search, so translated candidates remain complete. B.2J removes the failed admission scalar, its shader property/binding, and its per-fragment square-root/derivative/threshold work. B.2K keeps the same permission and candidate pipeline but replaces the contour evaluator: static cosine geometry and temporal sine geometry are independent, squared-radius blending preserves temporal radial area, and a bounded `1.52x` lobe reach extends only the adaptive lateral search ceiling to `5x11`. B.2L keeps that geometry and uses Shape Change Cadence only for target scheduling while Shape Transition Time owns actual interpolation duration. A second hidden legacy Chip pass remains rejected. Fray is retired; Chipping readability is the next active morphology problem.
 
 ## Purpose
 
@@ -405,7 +425,7 @@ The modern execution order is:
 14. Transport Presence capacity-loss attribution — Unity-validated and accepted in `5.16E.3`.
 15. Capacity audit closure and deferred sub-1% PoC limitation — accepted in `5.16E.3C`; original `0.10%` target retained, temporary review threshold `1.00%`.
 16. Layer E final-rendering contract lock — accepted in documentation-only `5.17P`.
-17. Layer E finishing — `5.17A.1` is accepted; `5.17B` and `5.17B.1` are rejected; `5.17B.2C` provides exact-state authoring. D1A proved exact lineification extraction; D1B/D1C are rejected. `5.17B.2D1D` is Unity-validated and accepted for controlled Strands. `5.17B.2D2` is visually rejected because coherent visibility was not true edge depth. `5.17B.2D2A` is implemented with Unity validation pending and reconstructs Chip/Fray from transient presence-space material edge depth while preserving accepted Strands.
+17. Layer E finishing — `5.17A.1` composition and `5.17B.2D1D` structural Strands are accepted. C.1/C.1A/C.1B Fray experiments are rejected, and `5.17D.0` removes Fray completely. `5.17D.1` audits camera-readable Chipping before further morphology implementation.
 18. Decide whether `_FoamShapeMask` production integration is still required after Layer E comparison.
 19. Reopen capacity correction only if the review threshold is exceeded or visible loss appears.
 20. Formal performance tiers, active-chunk scheduling, and profiling gates.
@@ -417,7 +437,7 @@ Final Foam reads committed packed Layer C material without residual backtracing.
 
 The inspiration comparison is refreshed before final rendering work. The production river is not expected to copy the reference one-to-one. Its accepted macro result already contains the required family resemblance: broad predominantly horizontal bands, lateral travel, split/merge behavior, obstacle-driven convergence, and stronger shore accumulation. Slightly fatter ribbons and greater bank accumulation are acceptable consequences of the current field resolution and source grammar. Layer C and the existing motion system remain the macro authority.
 
-The remaining target is local rendered character: foam should read as pale, substantially opaque, chipped, frayed, and energetic while preserving the accepted macro ribbons.
+The remaining target is local rendered character: foam should read as pale, substantially opaque, chipped, structurally stranded, and energetic while preserving the accepted macro ribbons. Fray is retired rather than part of this target.
 
 The approved Layer E order is:
 
@@ -468,7 +488,7 @@ float hardenedMask = saturate(max(hardVisible, fringe));
 
 Most visible body pixels therefore entered the breakup helper near `1.0`. The old equations altered mainly the narrow antialiased transition, while `5.17A.1` Interior Opacity Floor concealed partial erosion that did not reach zero. Breakup Scale also weakened the result at broader settings because the broad/diagonal composite had a compressed centre-weighted distribution. No further hardened-mask threshold recalibration is allowed.
 
-### `5.17B.2 — Pre-Hardening Binary Edge Cuts`
+### Historical — `5.17B.2 — Pre-Hardening Binary Edge Cuts`
 
 Status: Unity-validated for Chip and Fray. Chip, Fray, and Breakup Scale are provisionally accepted as useful fixed-strength authoring controls; no separate Scale correction blocks current work.
 

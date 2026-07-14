@@ -48,6 +48,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             private readonly List<PolygonFaceFeature> features =
                 new List<PolygonFaceFeature>();
             private readonly List<float> featureStrengths = new List<float>();
+            private readonly List<Vector3> authoredSurfaceNormals =
+                new List<Vector3>();
+            private readonly List<int> authoredSurfaceGroups =
+                new List<int>();
 
             public void AddTriangle(
                 Vector3 a,
@@ -55,6 +59,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 c,
                 PolygonFaceFeature feature,
                 float featureStrength)
+            {
+                AddTriangle(
+                    a,
+                    b,
+                    c,
+                    feature,
+                    featureStrength,
+                    Vector3.zero,
+                    -1);
+            }
+
+            public void AddTriangle(
+                Vector3 a,
+                Vector3 b,
+                Vector3 c,
+                PolygonFaceFeature feature,
+                float featureStrength,
+                Vector3 authoredSurfaceNormal)
+            {
+                AddTriangle(
+                    a,
+                    b,
+                    c,
+                    feature,
+                    featureStrength,
+                    authoredSurfaceNormal,
+                    -1);
+            }
+
+            public void AddTriangle(
+                Vector3 a,
+                Vector3 b,
+                Vector3 c,
+                PolygonFaceFeature feature,
+                float featureStrength,
+                Vector3 authoredSurfaceNormal,
+                int authoredSurfaceGroup)
             {
                 Positions.Add(a);
                 Positions.Add(b);
@@ -72,6 +113,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 featureStrengths.Add(featureStrength);
                 featureStrengths.Add(featureStrength);
                 featureStrengths.Add(featureStrength);
+
+                bool normalValid =
+                    !float.IsNaN(authoredSurfaceNormal.x) &&
+                    !float.IsNaN(authoredSurfaceNormal.y) &&
+                    !float.IsNaN(authoredSurfaceNormal.z) &&
+                    !float.IsInfinity(authoredSurfaceNormal.x) &&
+                    !float.IsInfinity(authoredSurfaceNormal.y) &&
+                    !float.IsInfinity(authoredSurfaceNormal.z) &&
+                    authoredSurfaceNormal.sqrMagnitude >
+                        MinimumEdgeLengthSqr;
+                Vector3 storedNormal = normalValid
+                    ? authoredSurfaceNormal.normalized
+                    : Vector3.zero;
+                authoredSurfaceNormals.Add(storedNormal);
+                authoredSurfaceNormals.Add(storedNormal);
+                authoredSurfaceNormals.Add(storedNormal);
+
+                authoredSurfaceGroups.Add(authoredSurfaceGroup);
+                authoredSurfaceGroups.Add(authoredSurfaceGroup);
+                authoredSurfaceGroups.Add(authoredSurfaceGroup);
             }
 
             public PolygonFaceFeature ResolveFeature(int vertexIndex)
@@ -86,6 +147,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return vertexIndex >= 0 && vertexIndex < featureStrengths.Count
                     ? featureStrengths[vertexIndex]
                     : 0f;
+            }
+
+            public bool TryResolveAuthoredSurfaceGroup(
+                int vertexIndex,
+                out int surfaceGroup)
+            {
+                surfaceGroup = -1;
+                if (vertexIndex < 0 ||
+                    vertexIndex >= authoredSurfaceGroups.Count)
+                {
+                    return false;
+                }
+
+                surfaceGroup = authoredSurfaceGroups[vertexIndex];
+                return surfaceGroup >= 0;
+            }
+
+            public bool TryResolveAuthoredSurfaceNormal(
+                int vertexIndex,
+                out Vector3 normal)
+            {
+                normal = Vector3.zero;
+                if (vertexIndex < 0 ||
+                    vertexIndex >= authoredSurfaceNormals.Count)
+                {
+                    return false;
+                }
+
+                normal = authoredSurfaceNormals[vertexIndex];
+                return normal.sqrMagnitude > MinimumEdgeLengthSqr;
             }
         }
 

@@ -59,42 +59,46 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentStrokeDensity = 34f;
 
-        [Tooltip("Painted Accent Lines only. World-space scale in metres of the continuous deterministic density patches used to prefer some regions and leave others sparse. Larger values create broader patches without hard island boundaries.")]
+        [Tooltip("Painted Accent Lines only. High-level world-space size of sparse and dense distribution structure. Lower values create smaller, more frequent variation; higher values create broader local patches and larger coherent regions. This single control drives both underlying distribution scales.")]
         [Range(2f, 24f)]
         [SerializeField]
         private float paintedAccentDistributionPatchScale = 9f;
 
-        [Tooltip("Painted Accent Lines only. Strength of continuous weighted patch distribution. Zero approaches broad random coverage; one strongly prefers high-noise regions while retaining a non-zero chance elsewhere.")]
+        [Tooltip("Painted Accent Lines only. High-level strength of sparse-versus-dense separation. Zero approaches an even field; one strongly concentrates marks into accent areas while retaining a protected non-zero sparse-region floor. This single control drives patch preference, regional redistribution, and the sparse floor.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float paintedAccentDistributionPatchiness = 0.70f;
 
-        [Tooltip("Painted Accent Lines only. Minimum patch-weight floor retained in sparse regions before semantic weighting. Lower values allow colder regions to become much quieter while preserving a non-zero proposal chance instead of creating hard exclusion islands.")]
-        [Range(0.02f, 0.40f)]
-        [SerializeField]
+        [SerializeField, HideInInspector]
         private float paintedAccentDistributionSparseFloor = 0.18f;
 
-        [Tooltip("Painted Accent Lines only. World-space size in metres of the jittered regional composition zones that share density mode and broad direction. This is independent from Distribution Patch Scale, which controls the softer continuous density field.")]
-        [Range(1f, 16f)]
-        [SerializeField]
+        [SerializeField, HideInInspector]
         private float paintedAccentCompositionRegionScale = 4f;
 
-        [Tooltip("Painted Accent Lines only. Redistributes a fixed average regional survival rate from quiet and supporting zones into accent zones. Zero gives equal regional survival; one creates the strongest quiet/dense contrast without increasing the requested total population.")]
-        [Range(0f, 1f)]
-        [SerializeField]
+        [SerializeField, HideInInspector]
         private float paintedAccentCompositionDensityContrast = 0.70f;
 
-        [Tooltip("Painted Accent Lines only. Redistributes a bounded fraction of the existing post-thinning stroke population into independent two- or three-mark companion clusters. Zero preserves fully independent placement; one enables the strongest bounded participant budget. No connectors, shared topology, or additional population are created.")]
+        [Tooltip("Painted Accent Lines only. Authoritative target share of final valid projected marks assigned to complete two- or three-member companion clusters. Zero keeps every mark independent; one assigns every mathematically and geometrically feasible mark to a cluster. The resolved whole-mark quota is reported after generation.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float paintedAccentHorizontalCompanionStrength;
+
+        [Tooltip("Painted Accent Lines only. Of all marks assigned to companion clusters, the authoritative target share assigned to three-member clusters. The remainder is assigned to pairs. Whole-cluster rounding is resolved deterministically and reported after generation.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentCompanionTripletShare = 0.45f;
+
+        [Tooltip("Painted Accent Lines only. Controls where the fixed companion quota is concentrated. Zero distributes cluster anchors like the overall field; one strongly favours the denser accent regions. This changes cluster location only, never the global pair/triplet quota.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentCompanionAccentBias = 0.65f;
 
         [Tooltip("Painted Accent Lines only. Controls endpoint spacing inside companion clusters. Zero leaves broader gaps; one targets touching marks or an approximately one-to-two-pixel rendered break. Members remain independent and validate separately.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float paintedAccentCompanionTightness = 0.65f;
 
-        [Tooltip("Painted Accent Lines only. Controls the prevalence and translation-driven vertical stepping of structured companion layouts. Higher values favour clearly stepped triplets and a bounded minority of structured pairs, while rotation remains limited to ordinary Angle Jitter plus a small companion allowance. Flat pairs remain possible at every value. Zero keeps the legacy pair grammar; one is deliberately overtuned for strong stepped and junction-like clusters.")]
+        [Tooltip("Painted Accent Lines only. Controls translation-driven stepping inside both pair and triplet clusters. Zero favours shallow offsets; one creates pronounced terraces and vertical centre differences. This does not change companion participation, pair/triplet quotas, or the bounded Angle Jitter contract.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float paintedAccentCompanionTripletVerticality = 1f;
@@ -104,6 +108,52 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         [SerializeField, HideInInspector]
         private bool paintedAccentCompanionTripletVerticalityInitialized;
+
+        [SerializeField, HideInInspector]
+        private bool paintedAccentCompanionQuotaControlsInitialized;
+
+        [Tooltip("Painted Accent Lines only. Relative authoritative weight for Stepped pair layouts. Pair layout weights are normalized and converted to exact whole-cluster counts.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentPairSteppedWeight = 0.45f;
+
+        [Tooltip("Painted Accent Lines only. Relative authoritative weight for Shoulder pair layouts.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentPairShoulderWeight = 0.30f;
+
+        [Tooltip("Painted Accent Lines only. Relative authoritative weight for Offset pair layouts.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentPairOffsetWeight = 0.20f;
+
+        [Tooltip("Painted Accent Lines only. Relative authoritative weight for the quieter Shallow Offset pair layout. This layout preserves a visible break or pair-local offset and never becomes a seamless collinear continuation.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentPairShallowWeight = 0.05f;
+
+        [Tooltip("Painted Accent Lines only. Relative authoritative weight for Stepped Run triplets.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentTripletSteppedRunWeight = 0.40f;
+
+        [Tooltip("Painted Accent Lines only. Relative authoritative weight for Crown Run triplets.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentTripletCrownRunWeight = 0.30f;
+
+        [Tooltip("Painted Accent Lines only. Relative authoritative weight for Broken Terrace triplets.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentTripletBrokenTerraceWeight = 0.25f;
+
+        [Tooltip("Painted Accent Lines only. Relative authoritative weight for quieter Shallow Run triplets.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentTripletShallowRunWeight = 0.05f;
+
+        [SerializeField, HideInInspector]
+        private bool paintedAccentCompanionLayoutWeightsInitialized;
 
         [Tooltip("Painted Accent Lines only. Relative selection weight for the complete two-sided mound glyph family. Family weights are normalized internally and do not alter authored stroke length or width.")]
         [Range(0f, 1f)]
@@ -229,29 +279,57 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float PaintedAccentStrokeDensity =>
             Mathf.Clamp(paintedAccentStrokeDensity, 0f, 2000f);
 
-        public float PaintedAccentDistributionPatchScale =>
+        public float PaintedAccentDistributionScale =>
             Mathf.Clamp(paintedAccentDistributionPatchScale, 2f, 24f);
 
-        public float PaintedAccentDistributionPatchiness =>
+        public float PaintedAccentDistributionContrast =>
             Mathf.Clamp01(paintedAccentDistributionPatchiness);
 
-        public float PaintedAccentDistributionSparseFloor =>
-            Mathf.Clamp(paintedAccentDistributionSparseFloor, 0.02f, 0.40f);
+        public float PaintedAccentDistributionPatchScale =>
+            PaintedAccentDistributionScale;
 
-        public float PaintedAccentCompositionRegionScale =>
-            paintedAccentCompositionRegionScale <= 0.001f
-                ? 4f
-                : Mathf.Clamp(paintedAccentCompositionRegionScale, 1f, 16f);
+        public float PaintedAccentDistributionPatchiness =>
+            PaintedAccentDistributionContrast;
+
+        public float PaintedAccentDistributionSparseFloor =>
+            Mathf.Lerp(0.40f, 0.10f, PaintedAccentDistributionContrast);
+
+        public float PaintedAccentCompositionRegionScale
+        {
+            get
+            {
+                float normalizedScale =
+                    Mathf.InverseLerp(
+                        2f,
+                        24f,
+                        PaintedAccentDistributionScale);
+                return Mathf.Lerp(1f, 13.5f, normalizedScale);
+            }
+        }
 
         public float PaintedAccentCompositionDensityContrast =>
-            paintedAccentCompositionRegionScale <= 0.001f
-                ? 0.70f
-                : Mathf.Clamp01(paintedAccentCompositionDensityContrast);
+            PaintedAccentDistributionContrast;
 
-        public float PaintedAccentHorizontalCompanionStrength =>
+        public float PaintedAccentCompanionParticipation =>
             paintedAccentHorizontalCompanionsInitialized
                 ? Mathf.Clamp01(paintedAccentHorizontalCompanionStrength)
                 : 0f;
+
+        public float PaintedAccentHorizontalCompanionStrength =>
+            PaintedAccentCompanionParticipation;
+
+        public float PaintedAccentCompanionTripletShare =>
+            paintedAccentCompanionQuotaControlsInitialized
+                ? Mathf.Clamp01(paintedAccentCompanionTripletShare)
+                : 0.45f;
+
+        public float PaintedAccentClusterRegionBias =>
+            paintedAccentCompanionQuotaControlsInitialized
+                ? Mathf.Clamp01(paintedAccentCompanionAccentBias)
+                : 0.65f;
+
+        public float PaintedAccentCompanionAccentBias =>
+            PaintedAccentClusterRegionBias;
 
         public float PaintedAccentCompanionTightness =>
             paintedAccentHorizontalCompanionsInitialized
@@ -262,6 +340,57 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentCompanionTripletVerticalityInitialized
                 ? Mathf.Clamp01(paintedAccentCompanionTripletVerticality)
                 : 1f;
+
+        public float PaintedAccentClusterVerticality =>
+            PaintedAccentCompanionTripletVerticality;
+
+        public Vector4 PaintedAccentCompanionPairLayoutWeights
+        {
+            get
+            {
+                if (!paintedAccentCompanionLayoutWeightsInitialized)
+                {
+                    return new Vector4(0.45f, 0.30f, 0.20f, 0.05f);
+                }
+
+                Vector4 weights =
+                    new Vector4(
+                        Mathf.Clamp01(paintedAccentPairSteppedWeight),
+                        Mathf.Clamp01(paintedAccentPairShoulderWeight),
+                        Mathf.Clamp01(paintedAccentPairOffsetWeight),
+                        Mathf.Clamp01(paintedAccentPairShallowWeight));
+                if (weights.x + weights.y + weights.z + weights.w <= 0.0001f)
+                {
+                    weights.x = 1f;
+                }
+
+                return weights;
+            }
+        }
+
+        public Vector4 PaintedAccentCompanionTripletLayoutWeights
+        {
+            get
+            {
+                if (!paintedAccentCompanionLayoutWeightsInitialized)
+                {
+                    return new Vector4(0.40f, 0.30f, 0.25f, 0.05f);
+                }
+
+                Vector4 weights =
+                    new Vector4(
+                        Mathf.Clamp01(paintedAccentTripletSteppedRunWeight),
+                        Mathf.Clamp01(paintedAccentTripletCrownRunWeight),
+                        Mathf.Clamp01(paintedAccentTripletBrokenTerraceWeight),
+                        Mathf.Clamp01(paintedAccentTripletShallowRunWeight));
+                if (weights.x + weights.y + weights.z + weights.w <= 0.0001f)
+                {
+                    weights.x = 1f;
+                }
+
+                return weights;
+            }
+        }
 
         public float PaintedAccentCompleteMoundWeight =>
             Mathf.Clamp01(paintedAccentCompleteMoundWeight);

@@ -310,20 +310,22 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Production Chipping",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
-                "These controls now drive the production Chip cut before the accepted Strand result. Candidate selection is gated by transported Material Pattern; use Chip Material Gate and Production Chip Mask to inspect the exact handoff.",
+                "Production Chipping uses two parallel permissions: Chip Edge Coverage controls the weak Presence-transition fringe, while Chip Interior Access independently admits complete activated candidates to established visible Foam. Use Chip Edge Coverage, Chip Interior Access, Chip Eligibility Composite, and Production Chip Mask to inspect the handoffs.",
                 MessageType.Info);
             EditorGUILayout.PropertyField(
                 Find("foamChipActivation"),
                 new GUIContent(
                     "Chip Activation",
-                    "Fraction of analytical candidates retained for production Chipping. Zero disables Chipping; one retains every available candidate before edge and material gating."));
+                    "Fraction of analytical candidates retained for production Chipping. Zero disables Chipping; one retains every available candidate before the independent Edge Coverage and Interior Access permissions."));
             EditorGUILayout.PropertyField(
                 Find("foamChipCandidateSpacing"),
                 new GUIContent(
                     "Candidate Spacing (m)",
                     "Average world-space spacing between possible Chip centres. Absolute mean radius is derived as Spacing × Candidate Radius Ratio; spacing does not control placement jitter or silhouette shape."));
+            SerializedProperty chipDistributionIrregularity = Find(
+                "foamChipDistributionIrregularity");
             EditorGUILayout.PropertyField(
-                Find("foamChipDistributionIrregularity"),
+                chipDistributionIrregularity,
                 new GUIContent(
                     "Distribution Irregularity",
                     "How far candidate centres deviate from the regular lattice. Zero is evenly spaced; one uses maximum deterministic jitter without changing candidate size or shape."));
@@ -335,7 +337,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 chipRadiusRatio,
                 new GUIContent(
                     "Candidate Radius Ratio",
-                    "Mean candidate radius as a fraction of Candidate Spacing. Absolute radius is Spacing × Ratio; the bounded ratio preserves the fixed low-cost 3×3 candidate search."));
+                    "Mean candidate radius as a fraction of Candidate Spacing. Absolute radius is Spacing × Ratio. Candidate search expands independently downstream and laterally only as far as radius, jitter, pulse, view scale, and rigid lateral travel require."));
             EditorGUILayout.PropertyField(
                 chipSizeIrregularity,
                 new GUIContent(
@@ -382,33 +384,340 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Shape Irregularity",
                     "Individual silhouette distortion at a fixed outer radius. Zero produces a circle; one warps a single connected contour into a strongly asymmetric blob."));
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "View Readability LOD",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "Candidate identity and animation stay in River-space metres. This bounded rendering LOD enlarges only undersized distant Chips, never shrinks close Chips, and is applied before pulse/lifecycle so formation and death still reach exact zero.",
+                MessageType.Info);
+            SerializedProperty chipStableScreenRadiusPixels = Find(
+                "foamChipStableScreenRadiusPixels");
+            SerializedProperty chipMaximumViewScale = Find(
+                "foamChipMaximumViewScale");
+            EditorGUILayout.PropertyField(
+                chipStableScreenRadiusPixels,
+                new GUIContent(
+                    "Minimum Stable Radius (px)",
+                    "Target minimum screen radius for each fully formed Chip. Zero keeps pure world-space sizing. The transition is smooth and bounded by Maximum View Scale."));
+            EditorGUILayout.PropertyField(
+                chipMaximumViewScale,
+                new GUIContent(
+                    "Maximum View Scale",
+                    "Largest permitted readability enlargement. One disables enlargement; 1.75 permits at most 75% extra radius before the existing spacing-relative cap."));
+
             EditorGUILayout.PropertyField(
                 Find("foamChipSelectionDepth"),
                 new GUIContent(
-                    "Chip Selection Depth",
-                    "Maximum normalized material-edge depth where production Chip candidates may remove Foam. Lower values confine cuts to a narrow perimeter; higher values extend farther inward and may include an entire thin ribbon."));
+                    "Chip Edge Coverage",
+                    "Controls only the Presence-transition edge territory. Low values permit very thin weak-material strips; high values permit all non-saturated edge material. It does not provide geometric distance into established Foam."));
+            EditorGUILayout.PropertyField(
+                Find("foamChipInteriorAccess"),
+                new GUIContent(
+                    "Chip Interior Access",
+                    "Fraction of activated candidate cells granted complete visible-body permission. Zero keeps all candidates edge-only; one lets every activated candidate cut established Foam. Intermediate values admit whole deterministic candidates, not pixel noise."));
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
-                "Lightweight Evolution",
+                "Lifecycle — Always Active",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
-                "Render-only evolution advects the analytical candidate field through a large animated coordinate warp, then grows, shrinks, morphs, and turns candidates over independently. The warp moves candidate centres, while local contour distance is reconstructed in the unwarped River metric to prevent ribbon stretching. It is a visual approximation, not exact material ownership, and adds no texture or compute pass.",
+                "Every activated candidate owns a deterministic four-stage cycle: monotonic Formation, fully formed Stable time, monotonic Dissolve, then exact zero coverage for Dormant Time. Motion and living-variation controls cannot disable death or shorten the authored dormant wait.",
+                MessageType.Info);
+            SerializedProperty chipFormationTime = Find(
+                "foamChipFormationTime");
+            SerializedProperty chipStableTime = Find(
+                "foamChipStableTime");
+            SerializedProperty chipDissolveTime = Find(
+                "foamChipDissolveTime");
+            SerializedProperty chipDormantTime = Find(
+                "foamChipDormantTime");
+            EditorGUILayout.PropertyField(
+                chipFormationTime,
+                new GUIContent(
+                    "Formation Time (s)",
+                    "Seconds for one candidate to grow monotonically from zero radius to its authored living radius."));
+            EditorGUILayout.PropertyField(
+                chipStableTime,
+                new GUIContent(
+                    "Stable Time (s)",
+                    "Seconds the candidate remains fully formed before dissolution. Size pulse and shape change operate only inside this stage and ease at its ends."));
+            EditorGUILayout.PropertyField(
+                chipDissolveTime,
+                new GUIContent(
+                    "Dissolve Time (s)",
+                    "Seconds for one candidate to shrink monotonically from its living radius to exact zero."));
+            EditorGUILayout.PropertyField(
+                chipDormantTime,
+                new GUIContent(
+                    "Dormant Time (s)",
+                    "Seconds the same deterministic candidate remains completely absent before it begins forming again."));
+
+            bool mixedLifecycleTimes =
+                chipFormationTime.hasMultipleDifferentValues ||
+                chipStableTime.hasMultipleDifferentValues ||
+                chipDissolveTime.hasMultipleDifferentValues ||
+                chipDormantTime.hasMultipleDifferentValues;
+            if (mixedLifecycleTimes)
+            {
+                DrawReadOnlyRow(
+                    new GUIContent("Total Candidate Cycle"),
+                    "Mixed");
+            }
+            else
+            {
+                float totalCycle =
+                    chipFormationTime.floatValue +
+                    chipStableTime.floatValue +
+                    chipDissolveTime.floatValue +
+                    chipDormantTime.floatValue;
+                DrawReadOnlyRow(
+                    new GUIContent(
+                        "Total Candidate Cycle",
+                        "Formation + Stable + Dissolve + Dormant."),
+                    $"{totalCycle:0.##} s");
+            }
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Rigid Motion",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "Downstream and lateral movement are rigid translations; rotation is an orthonormal angular transform. None of these paths deform the candidate coordinate field, so movement cannot smear or stretch an individual Chip.",
                 MessageType.Info);
             EditorGUILayout.PropertyField(
                 Find("foamChipFieldSpeed"),
                 new GUIContent(
-                    "Chip Field Speed (m/s)",
-                    "Downstream translation speed of the complete candidate field. Zero keeps candidate centres fixed in River space. Tune this visually against persistent Foam transport."));
+                    "Downstream Speed (m/s)",
+                    "Rigid downstream translation speed of the complete candidate field. Zero keeps the field fixed in River space."));
+            SerializedProperty chipLateralMotionAmount = Find(
+                "foamChipLateralMotionAmount");
             EditorGUILayout.PropertyField(
-                Find("foamChipEvolutionRate"),
+                chipLateralMotionAmount,
                 new GUIContent(
-                    "Chip Evolution Rate",
-                    "General evolution cycles per second for the animated coordinate warp, geometric lifecycle, and contour morphing. Zero freezes those phases without stopping Chip Field Speed."));
+                    "Lateral Motion Amount (spacing)",
+                    "Maximum plus/minus rigid lateral travel as a fraction of Candidate Spacing. One means one full spacing in either direction; 2.5 means two and a half spacings. The candidate search expands laterally to preserve complete contours."));
+            SerializedProperty chipLateralMotionSpeed = Find(
+                "foamChipLateralMotionSpeed");
             EditorGUILayout.PropertyField(
-                Find("foamChipEvolutionAmount"),
+                chipLateralMotionSpeed,
                 new GUIContent(
-                    "Chip Evolution Amount",
-                    "Combined authority of multi-spacing downstream/lateral advection, visible geometric growth and shrinkage, contour morphing, and smooth asynchronous turnover. Zero disables those effects."));
+                    "Lateral Motion Speed (cycles/s)",
+                    "Independent lateral oscillation frequency. Zero returns candidates to their static lateral centres."));
+
+            bool mixedLateralMotion =
+                chipSpacing.hasMultipleDifferentValues ||
+                chipLateralMotionAmount.hasMultipleDifferentValues ||
+                chipLateralMotionSpeed.hasMultipleDifferentValues;
+            if (mixedLateralMotion)
+            {
+                DrawReadOnlyRow(
+                    new GUIContent("Resolved Lateral Excursion"),
+                    "Mixed");
+                DrawReadOnlyRow(
+                    new GUIContent("Peak Lateral Speed"),
+                    "Mixed");
+            }
+            else
+            {
+                float spacingMetres = Mathf.Max(
+                    0.10f,
+                    chipSpacing.floatValue);
+                float lateralAmountSpacings = Mathf.Clamp(
+                    chipLateralMotionAmount.floatValue,
+                    0f,
+                    2.5f);
+                float lateralSpeedCycles = Mathf.Clamp(
+                    chipLateralMotionSpeed.floatValue,
+                    0f,
+                    1f);
+                float excursionMetres =
+                    spacingMetres * lateralAmountSpacings;
+
+                // RiverWaterFoamResolveChipSignedWave is a smoothstep-shaped
+                // triangle wave. Its maximum slope is exactly 6 per cycle, so
+                // peak physical centre speed is 6 × frequency × excursion.
+                float peakSpeedMetresPerSecond =
+                    6f * lateralSpeedCycles * excursionMetres;
+                DrawReadOnlyRow(
+                    new GUIContent(
+                        "Resolved Lateral Excursion",
+                        "Maximum rigid centre displacement in metres and its full peak-to-peak travel."),
+                    $"±{excursionMetres:0.###} m " +
+                    $"({excursionMetres * 2f:0.###} m peak-to-peak)");
+                DrawReadOnlyRow(
+                    new GUIContent(
+                        "Peak Lateral Speed",
+                        "Exact peak centre speed for the shader's smooth periodic lateral wave."),
+                    $"{peakSpeedMetresPerSecond:0.###} m/s");
+            }
+            EditorGUILayout.PropertyField(
+                Find("foamChipRotationAmountDegrees"),
+                new GUIContent(
+                    "Rotation Amount (deg)",
+                    "Maximum plus/minus angular excursion from each candidate's static orientation. Circular candidates do not visibly rotate."));
+            EditorGUILayout.PropertyField(
+                Find("foamChipRotationSpeed"),
+                new GUIContent(
+                    "Rotation Speed (cycles/s)",
+                    "Independent angular oscillation frequency. Zero restores the static orientation."));
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Living Variation",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "Size pulse and shape change operate only while a candidate is established. Size Pulse owns radius variation. Shape Change independently redistributes silhouette geometry through a candidate-specific multi-axis harmonic trajectory and eases back to the static contour before Dissolve. Lifecycle still reaches zero and waits through Dormant Time even when every variation amount is zero.",
+                MessageType.Info);
+            SerializedProperty chipSizePulseAmount = Find(
+                "foamChipSizePulseAmount");
+            EditorGUILayout.PropertyField(
+                chipSizePulseAmount,
+                new GUIContent(
+                    "Size Pulse Amount",
+                    "Fractional living-radius excursion. 0.20 means 80%-120% of the authored living radius; it never controls birth, death, or dormancy."));
+            EditorGUILayout.PropertyField(
+                Find("foamChipSizePulseSpeed"),
+                new GUIContent(
+                    "Size Pulse Speed (cycles/s)",
+                    "Independent established-stage pulse frequency. Zero keeps the living radius at its authored value."));
+            SerializedProperty chipShapeChangeAmount = Find(
+                "foamChipShapeChangeAmount");
+            EditorGUILayout.PropertyField(
+                chipShapeChangeAmount,
+                new GUIContent(
+                    "Shape Change Amount",
+                    "Authority of multi-axis temporal silhouette morphing. Zero preserves the static contour; one blends toward the full candidate-specific sine-harmonic trajectory. Squared-radius blending preserves temporal radial area exactly, so this does not become a Size Pulse. Shape Change remains visible when Shape Irregularity is zero; redistributed lobes can reach up to 1.52x the area-equivalent Candidate Radius and are covered by the adaptive search."));
+            SerializedProperty chipShapeChangeCadence = Find(
+                "foamChipShapeChangeSpeed");
+            SerializedProperty chipShapeTransitionTime = Find(
+                "foamChipShapeTransitionTime");
+            EditorGUILayout.PropertyField(
+                chipShapeChangeCadence,
+                new GUIContent(
+                    "Shape Change Cadence (changes/s)",
+                    "How often a candidate selects its next deterministic contour target. This controls target cadence only; it does not control how quickly the geometry moves between targets. Zero preserves the current static contour."));
+            EditorGUILayout.PropertyField(
+                chipShapeTransitionTime,
+                new GUIContent(
+                    "Shape Transition Time (s)",
+                    "Seconds spent morphing between consecutive contour targets. Larger values slow the actual geometric change. When this is longer than the cadence interval, the shader uses the complete interval and remains in continuous motion without an abrupt switch."));
+
+            if (chipShapeChangeCadence.hasMultipleDifferentValues ||
+                chipShapeTransitionTime.hasMultipleDifferentValues)
+            {
+                DrawReadOnlyRow(
+                    new GUIContent("Resolved Shape Timing"),
+                    "Mixed");
+            }
+            else
+            {
+                float cadence = Mathf.Max(
+                    0f,
+                    chipShapeChangeCadence.floatValue);
+                float authoredTransition = Mathf.Max(
+                    0.10f,
+                    chipShapeTransitionTime.floatValue);
+                if (cadence <= 0.0001f)
+                {
+                    DrawReadOnlyRow(
+                        new GUIContent("Resolved Shape Timing"),
+                        "Static");
+                }
+                else
+                {
+                    float interval = 1f / cadence;
+                    float effectiveTransition = Mathf.Min(
+                        authoredTransition,
+                        interval);
+                    float hold = Mathf.Max(
+                        0f,
+                        interval - effectiveTransition);
+                    DrawReadOnlyRow(
+                        new GUIContent("Resolved Shape Timing"),
+                        $"{effectiveTransition:0.###} s transition / {hold:0.###} s hold");
+                }
+            }
+
+            bool mixedSearchInputs =
+                chipRadiusRatio.hasMultipleDifferentValues ||
+                chipDistributionIrregularity.hasMultipleDifferentValues ||
+                chipSizeIrregularity.hasMultipleDifferentValues ||
+                chipSizePulseAmount.hasMultipleDifferentValues ||
+                chipShapeChangeAmount.hasMultipleDifferentValues ||
+                chipLateralMotionAmount.hasMultipleDifferentValues ||
+                chipStableScreenRadiusPixels.hasMultipleDifferentValues ||
+                chipMaximumViewScale.hasMultipleDifferentValues;
+            if (mixedSearchInputs)
+            {
+                DrawReadOnlyRow(
+                    new GUIContent("Candidate Search"),
+                    "Mixed");
+            }
+            else
+            {
+                float authoredRadiusRatio = Mathf.Max(
+                    0f,
+                    chipRadiusRatio.floatValue);
+                float viewScaleCeiling =
+                    chipStableScreenRadiusPixels.floatValue > 0.0001f
+                        ? Mathf.Clamp(
+                            chipMaximumViewScale.floatValue,
+                            1f,
+                            2.5f)
+                        : 1f;
+                float stabilizedRadiusRatio = Mathf.Min(
+                    0.65f,
+                    authoredRadiusRatio * viewScaleCeiling);
+                float maximumShapeReachScale = Mathf.Sqrt(
+                    Mathf.Lerp(
+                        1f,
+                        1.52f * 1.52f,
+                        Mathf.Clamp01(chipShapeChangeAmount.floatValue)));
+                float maximumRadiusReachInSpacings =
+                    stabilizedRadiusRatio *
+                    Mathf.Lerp(
+                        1f,
+                        1.42f,
+                        Mathf.Clamp01(chipSizeIrregularity.floatValue)) *
+                    (1f + Mathf.Clamp(
+                        chipSizePulseAmount.floatValue,
+                        0f,
+                        0.45f)) *
+                    maximumShapeReachScale;
+                float maximumLateralReachInSpacings =
+                    maximumRadiusReachInSpacings +
+                    Mathf.Clamp(
+                        chipLateralMotionAmount.floatValue,
+                        0f,
+                        2.5f);
+                float cellCentreReach = 0.5f +
+                    0.39f * Mathf.Clamp01(
+                        chipDistributionIrregularity.floatValue);
+                int downstreamOffset = Mathf.Clamp(
+                    Mathf.FloorToInt(
+                        maximumRadiusReachInSpacings +
+                        cellCentreReach +
+                        0.0001f),
+                    1,
+                    2);
+                int lateralOffset = Mathf.Clamp(
+                    Mathf.FloorToInt(
+                        maximumLateralReachInSpacings +
+                        cellCentreReach +
+                        0.0001f),
+                    1,
+                    5);
+                int downstreamCells = downstreamOffset * 2 + 1;
+                int lateralCells = lateralOffset * 2 + 1;
+                DrawReadOnlyRow(
+                    new GUIContent(
+                        "Candidate Search",
+                        "Smallest rectangular source-cell search that encloses maximum area-equivalent candidate radius, multi-axis shape-lobe reach, deterministic centre jitter, bounded view scale, size pulse, and rigid lateral excursion. Maximum is 5×11."),
+                    $"{downstreamCells}×{lateralCells} adaptive " +
+                    $"(R {maximumRadiusReachInSpacings:0.###}, " +
+                    $"Y {maximumLateralReachInSpacings:0.###} spacing)");
+            }
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
@@ -454,41 +763,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
-                "Fray Selection Prototype",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox(
-                "These controls drive Fray diagnostics only. Final Foam still uses the hidden legacy Fray implementation until the separately approved final-edge Fray patch.",
-                MessageType.Info);
-            EditorGUILayout.PropertyField(
-                Find("foamFraySelectionDepth"),
-                new GUIContent(
-                    "Fray Selection Depth",
-                    "Maximum normalized material-edge depth where Fray may occur. Lower values confine the permitted band to a narrow perimeter; higher values extend it farther into Foam and may include an entire thin ribbon."));
-            EditorGUILayout.PropertyField(
-                Find("foamFrayWavelength"),
-                new GUIContent(
-                    "Wavelength (m)",
-                    "World-space wavelength of the fine Fray selection pattern."));
-            EditorGUILayout.PropertyField(
-                Find("foamFrayDepth"),
-                new GUIContent(
-                    "Depth",
-                    "Reserved normalized threshold displacement. In this diagnostic patch it scales only the pattern preview and does not change Final Foam."));
-
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField(
                 "Foam Strands",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.PropertyField(
                 Find("foamStrandStrength"),
                 new GUIContent(
                     "Strand Strength",
-                    "Controls the extracted Chip-plus-Fray lineification family. Zero gives the coherent Foam body; shaping and projected-detail filtering are owned by the controls below."));
+                    "Controls structural anisotropic lineification. Zero gives the coherent Foam body; higher values create elongated cuts and remnants."));
             EditorGUILayout.PropertyField(
                 Find("foamStrandScale"),
                 new GUIContent(
                     "Strand Scale",
-                    "Controls the independent Strand-only size hierarchy. Zero retains finer subdivisions; one keeps broader, simpler structures. Production Chip and the separate Fray prototype do not alter it."));
+                    "Controls the structural Strand size hierarchy. Zero retains medium subdivisions; one keeps broader, simpler structures."));
             EditorGUILayout.PropertyField(
                 Find("foamStrandDensity"),
                 new GUIContent(
@@ -500,7 +786,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Strand Reach",
                     "Controls how deeply selected Strand regions penetrate weak-to-medium Foam. Zero stays shallow near weak edges; one permits deeper channels without changing candidate density."));
             EditorGUILayout.HelpBox(
-                "D1D replaces the misleading geometric controls with truthful Scale, Density, and Reach controls. Strand patterns are transported with their owning soft shape, and unresolved fine/medium detail falls back hierarchically before broad lineification returns to coherent Foam.",
+                "Strands own structural anisotropic lineification. Scale, Density, and Reach shape elongated cuts and remnants.",
                 MessageType.None);
 
         }

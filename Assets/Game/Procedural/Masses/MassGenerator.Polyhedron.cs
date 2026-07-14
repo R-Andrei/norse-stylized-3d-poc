@@ -71,7 +71,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool canonicalizeSharedIntersections = false,
             PolygonFaceProvenanceKind capProvenanceKind =
                 PolygonFaceProvenanceKind.None,
-            int capProvenanceIndex = -1)
+            int capProvenanceIndex = -1,
+            bool enforceExactPlaneIntersections = false,
+            bool useDistanceWelding = false,
+            PlaneCutNumericalRepairTelemetry numericalRepairs = null)
         {
             float effectiveInsideEpsilon = Mathf.Clamp(
                 insideEpsilon,
@@ -86,17 +89,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             for (int i = 0; i < faces.Count; i++)
             {
+                PolygonFace sourceFace = faces[i];
+                float ownerPlaneDistance =
+                    CalculateAuthoredFacePlaneDistance(sourceFace);
                 List<Vector3> clipped = ClipPolygon(
-                    faces[i].Vertices,
+                    sourceFace.Vertices,
+                    sourceFace.Normal,
+                    ownerPlaneDistance,
+                    sourceFace.ProvenanceKind,
+                    sourceFace.ProvenanceIndex,
                     plane,
+                    capProvenanceKind,
+                    capProvenanceIndex,
                     capPoints,
                     clampIntersectionsToSegment,
                     effectiveInsideEpsilon,
-                    intersectionCache);
+                    intersectionCache,
+                    enforceExactPlaneIntersections,
+                    numericalRepairs,
+                    out bool clipSucceeded);
+
+                if (!clipSucceeded)
+                {
+                    return;
+                }
 
                 clipped = SanitizePolygon(
                     clipped,
-                    faces[i].Normal);
+                    sourceFace.Normal);
 
                 if (clipped.Count >= 3 &&
                     CalculatePolygonArea(clipped) > TinyFaceAreaEpsilon)
@@ -104,11 +124,62 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     clippedFaces.Add(
                         new PolygonFace(
                             clipped,
-                            faces[i].Normal,
-                            faces[i].Feature,
-                            faces[i].FeatureStrength,
-                            faces[i].ProvenanceKind,
-                            faces[i].ProvenanceIndex));
+                            sourceFace.Normal,
+                            sourceFace.Feature,
+                            sourceFace.FeatureStrength,
+                            sourceFace.ProvenanceKind,
+                            sourceFace.ProvenanceIndex));
+                }
+            }
+
+            if (enforceExactPlaneIntersections)
+            {
+                float strictResidualTolerance =
+                    PointMergeDistance * 0.25f;
+                for (int pointIndex = 0;
+                     pointIndex < capPoints.Count;
+                     pointIndex++)
+                {
+                    float residual = Mathf.Abs(
+                        plane.SignedDistance(capPoints[pointIndex]));
+                    if (numericalRepairs != null)
+                    {
+                        numericalRepairs.CapVertexValidationCount++;
+                        numericalRepairs.MaximumCapResidualBeforeProjection =
+                            Mathf.Max(
+                                numericalRepairs
+                                    .MaximumCapResidualBeforeProjection,
+                                residual);
+                        numericalRepairs.MaximumCapResidualAfterProjection =
+                            Mathf.Max(
+                                numericalRepairs
+                                    .MaximumCapResidualAfterProjection,
+                                residual);
+                    }
+
+                    if (residual > strictResidualTolerance)
+                    {
+                        if (numericalRepairs != null)
+                        {
+                            numericalRepairs.CapResidualRejectCount++;
+                            RecordExactClipFailure(
+                                numericalRepairs,
+                                PolygonFaceProvenanceKind.None,
+                                -1,
+                                capProvenanceKind,
+                                capProvenanceIndex,
+                                0f,
+                                0f,
+                                "cap",
+                                "cap",
+                                0f,
+                                residual,
+                                0f,
+                                residual,
+                                "cap-point-residual");
+                        }
+                        return;
+                    }
                 }
             }
 
@@ -127,7 +198,46 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     capFace.Vertices,
                     capFace.Normal);
 
-                if (sanitizedCap.Count >= 3 &&
+                bool capResidualValid = true;
+                if (enforceExactPlaneIntersections)
+                {
+                    float maximumResidual = 0f;
+                    for (int vertexIndex = 0;
+                         vertexIndex < sanitizedCap.Count;
+                         vertexIndex++)
+                    {
+                        maximumResidual = Mathf.Max(
+                            maximumResidual,
+                            Mathf.Abs(plane.SignedDistance(
+                                sanitizedCap[vertexIndex])));
+                    }
+                    float strictResidualTolerance =
+                        PointMergeDistance * 0.25f;
+                    capResidualValid =
+                        maximumResidual <= strictResidualTolerance;
+                    if (!capResidualValid && numericalRepairs != null)
+                    {
+                        numericalRepairs.CapResidualRejectCount++;
+                        RecordExactClipFailure(
+                            numericalRepairs,
+                            PolygonFaceProvenanceKind.None,
+                            -1,
+                            capProvenanceKind,
+                            capProvenanceIndex,
+                            0f,
+                            0f,
+                            "cap",
+                            "cap",
+                            0f,
+                            maximumResidual,
+                            0f,
+                            maximumResidual,
+                            "sanitized-cap-residual");
+                    }
+                }
+
+                if (capResidualValid &&
+                    sanitizedCap.Count >= 3 &&
                     CalculatePolygonArea(sanitizedCap) > TinyFaceAreaEpsilon)
                 {
                     clippedFaces.Add(
@@ -141,7 +251,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
-            WeldSharedVertices(clippedFaces);
+            if (enforceExactPlaneIntersections &&
+                numericalRepairs != null &&
+                numericalRepairs.ExactConstructionFailureCount > 0)
+            {
+                return;
+            }
+
+            if (useDistanceWelding)
+            {
+                WeldSharedVerticesByDistance(
+                    clippedFaces,
+                    PointMergeDistance,
+                    numericalRepairs);
+            }
+            else
+            {
+                WeldSharedVertices(clippedFaces);
+            }
             SanitizeAllFaces(clippedFaces);
 
             if (clippedFaces.Count >= 4)
@@ -149,6 +276,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 faces.Clear();
                 faces.AddRange(clippedFaces);
             }
+        }
+
+        private enum PlaneClipPointClassification
+        {
+            Inside,
+            OnPlane,
+            Outside
+        }
+
+        private static float CalculateAuthoredFacePlaneDistance(
+            PolygonFace face)
+        {
+            if (face == null || face.Vertices.Count == 0)
+            {
+                return 0f;
+            }
+
+            float distance = 0f;
+            for (int vertexIndex = 0;
+                 vertexIndex < face.Vertices.Count;
+                 vertexIndex++)
+            {
+                distance += Vector3.Dot(
+                    face.Normal,
+                    face.Vertices[vertexIndex]);
+            }
+            return distance / face.Vertices.Count;
         }
 
         private static List<Vector3> ClipPolygon(
@@ -159,15 +313,78 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float insideEpsilon,
             Dictionary<EdgeKey, Vector3> intersectionCache)
         {
-            List<Vector3> result = new List<Vector3>();
+            return ClipPolygonLegacy(
+                vertices,
+                plane,
+                capPoints,
+                clampIntersectionsToSegment,
+                insideEpsilon,
+                intersectionCache);
+        }
 
+        private static List<Vector3> ClipPolygon(
+            List<Vector3> vertices,
+            Vector3 ownerPlaneNormal,
+            float ownerPlaneDistance,
+            PolygonFaceProvenanceKind ownerProvenanceKind,
+            int ownerProvenanceIndex,
+            CutPlane plane,
+            PolygonFaceProvenanceKind cutProvenanceKind,
+            int cutProvenanceIndex,
+            List<Vector3> capPoints,
+            bool clampIntersectionsToSegment,
+            float insideEpsilon,
+            Dictionary<EdgeKey, Vector3> intersectionCache,
+            bool enforceExactPlaneIntersections,
+            PlaneCutNumericalRepairTelemetry numericalRepairs,
+            out bool succeeded)
+        {
+            if (!enforceExactPlaneIntersections)
+            {
+                succeeded = true;
+                return ClipPolygonLegacy(
+                    vertices,
+                    plane,
+                    capPoints,
+                    clampIntersectionsToSegment,
+                    insideEpsilon,
+                    intersectionCache);
+            }
+
+            return ClipPolygonExact(
+                vertices,
+                ownerPlaneNormal,
+                ownerPlaneDistance,
+                ownerProvenanceKind,
+                ownerProvenanceIndex,
+                plane,
+                cutProvenanceKind,
+                cutProvenanceIndex,
+                capPoints,
+                clampIntersectionsToSegment,
+                intersectionCache,
+                numericalRepairs,
+                out succeeded);
+        }
+
+        private static List<Vector3> ClipPolygonLegacy(
+            List<Vector3> vertices,
+            CutPlane plane,
+            List<Vector3> capPoints,
+            bool clampIntersectionsToSegment,
+            float insideEpsilon,
+            Dictionary<EdgeKey, Vector3> intersectionCache)
+        {
+            List<Vector3> result = new List<Vector3>();
             Vector3 previous = vertices[vertices.Count - 1];
             float previousDistance = plane.SignedDistance(previous);
             bool previousInside = previousDistance <= insideEpsilon;
 
-            for (int i = 0; i < vertices.Count; i++)
+            for (int vertexIndex = 0;
+                 vertexIndex < vertices.Count;
+                 vertexIndex++)
             {
-                Vector3 current = vertices[i];
+                Vector3 current = vertices[vertexIndex];
                 float currentDistance = plane.SignedDistance(current);
                 bool currentInside = currentDistance <= insideEpsilon;
 
@@ -177,7 +394,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 else if (previousInside && !currentInside)
                 {
-                    Vector3 intersection = ResolveClipIntersection(
+                    Vector3 intersection = ResolveLegacyClipIntersection(
                         previous,
                         current,
                         previousDistance,
@@ -185,13 +402,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         clampIntersectionsToSegment,
                         insideEpsilon,
                         intersectionCache);
-
                     AddPointIfDifferent(result, intersection);
                     capPoints.Add(intersection);
                 }
                 else if (!previousInside && currentInside)
                 {
-                    Vector3 intersection = ResolveClipIntersection(
+                    Vector3 intersection = ResolveLegacyClipIntersection(
                         previous,
                         current,
                         previousDistance,
@@ -199,7 +415,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         clampIntersectionsToSegment,
                         insideEpsilon,
                         intersectionCache);
-
                     AddPointIfDifferent(result, intersection);
                     AddPointIfDifferent(result, current);
                     capPoints.Add(intersection);
@@ -214,7 +429,332 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return result;
         }
 
-        private static Vector3 ResolveClipIntersection(
+        private static List<Vector3> ClipPolygonExact(
+            List<Vector3> vertices,
+            Vector3 ownerPlaneNormal,
+            float ownerPlaneDistance,
+            PolygonFaceProvenanceKind ownerProvenanceKind,
+            int ownerProvenanceIndex,
+            CutPlane plane,
+            PolygonFaceProvenanceKind cutProvenanceKind,
+            int cutProvenanceIndex,
+            List<Vector3> capPoints,
+            bool clampIntersectionsToSegment,
+            Dictionary<EdgeKey, Vector3> intersectionCache,
+            PlaneCutNumericalRepairTelemetry numericalRepairs,
+            out bool succeeded)
+        {
+            List<Vector3> result = new List<Vector3>();
+            float strictTolerance = PointMergeDistance * 0.25f;
+            Vector3 previous = vertices[vertices.Count - 1];
+            float previousDistance = plane.SignedDistance(previous);
+            PlaneClipPointClassification previousClassification =
+                ClassifyPlaneClipPoint(
+                    previousDistance,
+                    strictTolerance,
+                    numericalRepairs,
+                    false);
+
+            succeeded = true;
+            for (int vertexIndex = 0;
+                 vertexIndex < vertices.Count;
+                 vertexIndex++)
+            {
+                Vector3 current = vertices[vertexIndex];
+                float currentDistance = plane.SignedDistance(current);
+                PlaneClipPointClassification currentClassification =
+                    ClassifyPlaneClipPoint(
+                        currentDistance,
+                        strictTolerance,
+                        numericalRepairs,
+                        true);
+                bool previousRetained =
+                    previousClassification !=
+                    PlaneClipPointClassification.Outside;
+                bool currentRetained =
+                    currentClassification !=
+                    PlaneClipPointClassification.Outside;
+
+                if (previousRetained && currentRetained)
+                {
+                    Vector3 retainedCurrent = current;
+                    if (currentClassification ==
+                        PlaneClipPointClassification.OnPlane &&
+                        !TrySnapOnPlanePoint(
+                            current,
+                            currentDistance,
+                            ownerPlaneNormal,
+                            ownerPlaneDistance,
+                            ownerProvenanceKind,
+                            ownerProvenanceIndex,
+                            plane,
+                            cutProvenanceKind,
+                            cutProvenanceIndex,
+                            strictTolerance,
+                            numericalRepairs,
+                            out retainedCurrent))
+                    {
+                        succeeded = false;
+                        return result;
+                    }
+                    AddPointIfDifferent(result, retainedCurrent);
+                    if (currentClassification ==
+                        PlaneClipPointClassification.OnPlane)
+                    {
+                        capPoints.Add(retainedCurrent);
+                    }
+                }
+                else if (previousRetained && !currentRetained)
+                {
+                    if (previousClassification ==
+                        PlaneClipPointClassification.OnPlane)
+                    {
+                        if (!TrySnapOnPlanePoint(
+                            previous,
+                            previousDistance,
+                            ownerPlaneNormal,
+                            ownerPlaneDistance,
+                            ownerProvenanceKind,
+                            ownerProvenanceIndex,
+                            plane,
+                            cutProvenanceKind,
+                            cutProvenanceIndex,
+                            strictTolerance,
+                            numericalRepairs,
+                            out Vector3 snappedPrevious))
+                        {
+                            succeeded = false;
+                            return result;
+                        }
+                        AddPointIfDifferent(result, snappedPrevious);
+                        capPoints.Add(snappedPrevious);
+                    }
+                    else if (!TryResolveExactClipIntersection(
+                        previous,
+                        current,
+                        previousDistance,
+                        currentDistance,
+                        previousClassification,
+                        currentClassification,
+                        ownerPlaneNormal,
+                        ownerPlaneDistance,
+                        ownerProvenanceKind,
+                        ownerProvenanceIndex,
+                        plane,
+                        cutProvenanceKind,
+                        cutProvenanceIndex,
+                        clampIntersectionsToSegment,
+                        strictTolerance,
+                        intersectionCache,
+                        numericalRepairs,
+                        out Vector3 intersection))
+                    {
+                        succeeded = false;
+                        return result;
+                    }
+                    else
+                    {
+                        AddPointIfDifferent(result, intersection);
+                        capPoints.Add(intersection);
+                    }
+                }
+                else if (!previousRetained && currentRetained)
+                {
+                    if (currentClassification ==
+                        PlaneClipPointClassification.OnPlane)
+                    {
+                        if (!TrySnapOnPlanePoint(
+                            current,
+                            currentDistance,
+                            ownerPlaneNormal,
+                            ownerPlaneDistance,
+                            ownerProvenanceKind,
+                            ownerProvenanceIndex,
+                            plane,
+                            cutProvenanceKind,
+                            cutProvenanceIndex,
+                            strictTolerance,
+                            numericalRepairs,
+                            out Vector3 snappedCurrent))
+                        {
+                            succeeded = false;
+                            return result;
+                        }
+                        AddPointIfDifferent(result, snappedCurrent);
+                        capPoints.Add(snappedCurrent);
+                    }
+                    else if (!TryResolveExactClipIntersection(
+                        previous,
+                        current,
+                        previousDistance,
+                        currentDistance,
+                        previousClassification,
+                        currentClassification,
+                        ownerPlaneNormal,
+                        ownerPlaneDistance,
+                        ownerProvenanceKind,
+                        ownerProvenanceIndex,
+                        plane,
+                        cutProvenanceKind,
+                        cutProvenanceIndex,
+                        clampIntersectionsToSegment,
+                        strictTolerance,
+                        intersectionCache,
+                        numericalRepairs,
+                        out Vector3 intersection))
+                    {
+                        succeeded = false;
+                        return result;
+                    }
+                    else
+                    {
+                        AddPointIfDifferent(result, intersection);
+                        AddPointIfDifferent(result, current);
+                        capPoints.Add(intersection);
+                    }
+                }
+
+                previous = current;
+                previousDistance = currentDistance;
+                previousClassification = currentClassification;
+            }
+
+            RemoveClosingDuplicate(result);
+            return result;
+        }
+
+        private static PlaneClipPointClassification ClassifyPlaneClipPoint(
+            float signedDistance,
+            float tolerance,
+            PlaneCutNumericalRepairTelemetry numericalRepairs,
+            bool record)
+        {
+            PlaneClipPointClassification classification;
+            if (signedDistance < -tolerance)
+            {
+                classification = PlaneClipPointClassification.Inside;
+            }
+            else if (signedDistance > tolerance)
+            {
+                classification = PlaneClipPointClassification.Outside;
+            }
+            else
+            {
+                classification = PlaneClipPointClassification.OnPlane;
+            }
+
+            if (record && numericalRepairs != null)
+            {
+                switch (classification)
+                {
+                    case PlaneClipPointClassification.Inside:
+                        numericalRepairs.StrictInsideClassificationCount++;
+                        break;
+                    case PlaneClipPointClassification.OnPlane:
+                        numericalRepairs.StrictOnPlaneClassificationCount++;
+                        break;
+                    case PlaneClipPointClassification.Outside:
+                        numericalRepairs.StrictOutsideClassificationCount++;
+                        break;
+                }
+            }
+
+            return classification;
+        }
+
+        private static bool TrySnapOnPlanePoint(
+            Vector3 point,
+            float signedDistance,
+            Vector3 ownerPlaneNormal,
+            float ownerPlaneDistance,
+            PolygonFaceProvenanceKind ownerProvenanceKind,
+            int ownerProvenanceIndex,
+            CutPlane plane,
+            PolygonFaceProvenanceKind cutProvenanceKind,
+            int cutProvenanceIndex,
+            float strictTolerance,
+            PlaneCutNumericalRepairTelemetry numericalRepairs,
+            out Vector3 snapped)
+        {
+            float cutResidualBefore = Mathf.Abs(plane.SignedDistance(point));
+            float ownerResidualBefore = Mathf.Abs(
+                Vector3.Dot(ownerPlaneNormal, point) - ownerPlaneDistance);
+            snapped = ProjectPointOntoCutPlane(point, plane);
+            float movement = (snapped - point).magnitude;
+            float cutResidualAfter = Mathf.Abs(plane.SignedDistance(snapped));
+            float ownerResidualAfter = Mathf.Abs(
+                Vector3.Dot(ownerPlaneNormal, snapped) -
+                ownerPlaneDistance);
+
+            bool valid = IsFinite(snapped) &&
+                cutResidualAfter <= strictTolerance &&
+                ownerResidualAfter <= strictTolerance;
+            if (!valid && TryConstrainPointToOwnerAndCutPlanes(
+                point,
+                ownerPlaneNormal,
+                ownerPlaneDistance,
+                plane,
+                out Vector3 corrected))
+            {
+                snapped = corrected;
+                movement = (snapped - point).magnitude;
+                cutResidualAfter = Mathf.Abs(
+                    plane.SignedDistance(snapped));
+                ownerResidualAfter = Mathf.Abs(
+                    Vector3.Dot(ownerPlaneNormal, snapped) -
+                    ownerPlaneDistance);
+                valid = IsFinite(snapped) &&
+                    cutResidualAfter <= strictTolerance &&
+                    ownerResidualAfter <= strictTolerance;
+                if (numericalRepairs != null)
+                {
+                    numericalRepairs.IntersectionProjectionCount++;
+                    numericalRepairs.MaximumIntersectionProjectionDistance =
+                        Mathf.Max(
+                            numericalRepairs
+                                .MaximumIntersectionProjectionDistance,
+                            movement);
+                }
+            }
+
+            if (numericalRepairs != null)
+            {
+                numericalRepairs.OnPlaneSnapCount++;
+                numericalRepairs.MaximumOnPlaneSnapDistance = Mathf.Max(
+                    numericalRepairs.MaximumOnPlaneSnapDistance,
+                    movement);
+                RecordIntersectionResidualExtrema(
+                    numericalRepairs,
+                    cutResidualBefore,
+                    cutResidualAfter,
+                    ownerResidualBefore,
+                    ownerResidualAfter);
+            }
+
+            if (valid)
+            {
+                return true;
+            }
+
+            RecordExactClipFailure(
+                numericalRepairs,
+                ownerProvenanceKind,
+                ownerProvenanceIndex,
+                cutProvenanceKind,
+                cutProvenanceIndex,
+                signedDistance,
+                signedDistance,
+                PlaneClipPointClassification.OnPlane.ToString(),
+                PlaneClipPointClassification.OnPlane.ToString(),
+                cutResidualBefore,
+                cutResidualAfter,
+                ownerResidualBefore,
+                ownerResidualAfter,
+                "on-plane-snap-residual-exceeds-strict-tolerance");
+            return false;
+        }
+
+        private static Vector3 ResolveLegacyClipIntersection(
             Vector3 start,
             Vector3 end,
             float startDistance,
@@ -223,37 +763,37 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float denominatorEpsilon,
             Dictionary<EdgeKey, Vector3> intersectionCache)
         {
-            if (intersectionCache == null)
+            if (intersectionCache != null)
             {
-                return IntersectEdge(
+                EdgeKey edgeKey = new EdgeKey(start, end);
+                if (intersectionCache.TryGetValue(
+                    edgeKey,
+                    out Vector3 cached))
+                {
+                    return cached;
+                }
+
+                Vector3 cachedIntersection = IntersectEdgeLegacy(
                     start,
                     end,
                     startDistance,
                     endDistance,
                     clampToSegment,
                     denominatorEpsilon);
+                intersectionCache.Add(edgeKey, cachedIntersection);
+                return cachedIntersection;
             }
 
-            EdgeKey edgeKey = new EdgeKey(start, end);
-            if (intersectionCache.TryGetValue(
-                    edgeKey,
-                    out Vector3 cached))
-            {
-                return cached;
-            }
-
-            Vector3 intersection = IntersectEdge(
+            return IntersectEdgeLegacy(
                 start,
                 end,
                 startDistance,
                 endDistance,
                 clampToSegment,
                 denominatorEpsilon);
-            intersectionCache.Add(edgeKey, intersection);
-            return intersection;
         }
 
-        private static Vector3 IntersectEdge(
+        private static Vector3 IntersectEdgeLegacy(
             Vector3 start,
             Vector3 end,
             float startDistance,
@@ -262,7 +802,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float denominatorEpsilon)
         {
             float denominator = startDistance - endDistance;
-
             if (Mathf.Abs(denominator) <= denominatorEpsilon)
             {
                 return start;
@@ -274,6 +813,399 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 t = Mathf.Clamp01(t);
             }
             return Vector3.LerpUnclamped(start, end, t);
+        }
+
+        private static bool TryResolveExactClipIntersection(
+            Vector3 start,
+            Vector3 end,
+            float startDistance,
+            float endDistance,
+            PlaneClipPointClassification startClassification,
+            PlaneClipPointClassification endClassification,
+            Vector3 ownerPlaneNormal,
+            float ownerPlaneDistance,
+            PolygonFaceProvenanceKind ownerProvenanceKind,
+            int ownerProvenanceIndex,
+            CutPlane plane,
+            PolygonFaceProvenanceKind cutProvenanceKind,
+            int cutProvenanceIndex,
+            bool clampToSegment,
+            float strictTolerance,
+            Dictionary<EdgeKey, Vector3> intersectionCache,
+            PlaneCutNumericalRepairTelemetry numericalRepairs,
+            out Vector3 intersection)
+        {
+            if (numericalRepairs != null)
+            {
+                numericalRepairs.IntersectionRequestCount++;
+            }
+
+            bool strictCrossing =
+                startClassification == PlaneClipPointClassification.Inside &&
+                endClassification == PlaneClipPointClassification.Outside ||
+                startClassification == PlaneClipPointClassification.Outside &&
+                endClassification == PlaneClipPointClassification.Inside;
+            if (!strictCrossing)
+            {
+                if (numericalRepairs != null)
+                {
+                    numericalRepairs.SameSideFallbackAttemptCount++;
+                    RecordExactClipFailure(
+                        numericalRepairs,
+                        ownerProvenanceKind,
+                        ownerProvenanceIndex,
+                        cutProvenanceKind,
+                        cutProvenanceIndex,
+                        startDistance,
+                        endDistance,
+                        startClassification.ToString(),
+                        endClassification.ToString(),
+                        0f,
+                        0f,
+                        0f,
+                        0f,
+                        "same-side-intersection-request");
+                }
+                intersection = Vector3.zero;
+                return false;
+            }
+
+            EdgeKey edgeKey = new EdgeKey(start, end);
+            if (intersectionCache != null &&
+                intersectionCache.TryGetValue(
+                    edgeKey,
+                    out Vector3 cached))
+            {
+                if (numericalRepairs != null)
+                {
+                    numericalRepairs.CachedIntersectionReuseCount++;
+                }
+                bool cachedValid = TryValidateExactIntersection(
+                    cached,
+                    ownerPlaneNormal,
+                    ownerPlaneDistance,
+                    plane,
+                    strictTolerance,
+                    out float cachedCutResidual,
+                    out float cachedOwnerResidual,
+                    out _,
+                    out _);
+                if (numericalRepairs != null)
+                {
+                    RecordIntersectionResidualExtrema(
+                        numericalRepairs,
+                        cachedCutResidual,
+                        cachedCutResidual,
+                        cachedOwnerResidual,
+                        cachedOwnerResidual);
+                }
+                if (cachedValid)
+                {
+                    intersection = cached;
+                    return true;
+                }
+
+                RecordExactClipFailure(
+                    numericalRepairs,
+                    ownerProvenanceKind,
+                    ownerProvenanceIndex,
+                    cutProvenanceKind,
+                    cutProvenanceIndex,
+                    startDistance,
+                    endDistance,
+                    startClassification.ToString(),
+                    endClassification.ToString(),
+                    Mathf.Abs(plane.SignedDistance(cached)),
+                    Mathf.Abs(plane.SignedDistance(cached)),
+                    Mathf.Abs(Vector3.Dot(ownerPlaneNormal, cached) -
+                        ownerPlaneDistance),
+                    Mathf.Abs(Vector3.Dot(ownerPlaneNormal, cached) -
+                        ownerPlaneDistance),
+                    "cached-intersection-violates-owner-or-cut-plane");
+                intersection = Vector3.zero;
+                return false;
+            }
+
+            float denominator = startDistance - endDistance;
+            if (float.IsNaN(denominator) ||
+                float.IsInfinity(denominator) ||
+                Mathf.Abs(denominator) <= MinimumEdgeLengthSqr)
+            {
+                RecordExactClipFailure(
+                    numericalRepairs,
+                    ownerProvenanceKind,
+                    ownerProvenanceIndex,
+                    cutProvenanceKind,
+                    cutProvenanceIndex,
+                    startDistance,
+                    endDistance,
+                    startClassification.ToString(),
+                    endClassification.ToString(),
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    "invalid-crossing-denominator");
+                intersection = Vector3.zero;
+                return false;
+            }
+
+            float t = startDistance / denominator;
+            if (float.IsNaN(t) || float.IsInfinity(t))
+            {
+                RecordExactClipFailure(
+                    numericalRepairs,
+                    ownerProvenanceKind,
+                    ownerProvenanceIndex,
+                    cutProvenanceKind,
+                    cutProvenanceIndex,
+                    startDistance,
+                    endDistance,
+                    startClassification.ToString(),
+                    endClassification.ToString(),
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    "non-finite-crossing-parameter");
+                intersection = Vector3.zero;
+                return false;
+            }
+            if (clampToSegment)
+            {
+                t = Mathf.Clamp01(t);
+            }
+
+            Vector3 rawIntersection = Vector3.LerpUnclamped(
+                start,
+                end,
+                t);
+            float cutResidualBefore;
+            float ownerResidualBefore;
+            float cutResidualAfter;
+            float ownerResidualAfter;
+            Vector3 resolved = rawIntersection;
+            bool valid = TryValidateExactIntersection(
+                resolved,
+                ownerPlaneNormal,
+                ownerPlaneDistance,
+                plane,
+                strictTolerance,
+                out cutResidualBefore,
+                out ownerResidualBefore,
+                out cutResidualAfter,
+                out ownerResidualAfter);
+
+            if (!valid && TryConstrainPointToOwnerAndCutPlanes(
+                rawIntersection,
+                ownerPlaneNormal,
+                ownerPlaneDistance,
+                plane,
+                out Vector3 corrected))
+            {
+                float movement = (corrected - rawIntersection).magnitude;
+                if (numericalRepairs != null)
+                {
+                    numericalRepairs.IntersectionProjectionCount++;
+                    numericalRepairs.MaximumIntersectionProjectionDistance =
+                        Mathf.Max(
+                            numericalRepairs
+                                .MaximumIntersectionProjectionDistance,
+                            movement);
+                }
+                resolved = corrected;
+                valid = TryValidateExactIntersection(
+                    resolved,
+                    ownerPlaneNormal,
+                    ownerPlaneDistance,
+                    plane,
+                    strictTolerance,
+                    out _,
+                    out _,
+                    out cutResidualAfter,
+                    out ownerResidualAfter);
+            }
+
+            if (numericalRepairs != null)
+            {
+                RecordIntersectionResidualExtrema(
+                    numericalRepairs,
+                    cutResidualBefore,
+                    cutResidualAfter,
+                    ownerResidualBefore,
+                    ownerResidualAfter);
+            }
+
+            if (!valid)
+            {
+                RecordExactClipFailure(
+                    numericalRepairs,
+                    ownerProvenanceKind,
+                    ownerProvenanceIndex,
+                    cutProvenanceKind,
+                    cutProvenanceIndex,
+                    startDistance,
+                    endDistance,
+                    startClassification.ToString(),
+                    endClassification.ToString(),
+                    cutResidualBefore,
+                    cutResidualAfter,
+                    ownerResidualBefore,
+                    ownerResidualAfter,
+                    "intersection-residual-exceeds-strict-tolerance");
+                intersection = Vector3.zero;
+                return false;
+            }
+
+            if (numericalRepairs != null)
+            {
+                numericalRepairs.StrictCrossingIntersectionCount++;
+            }
+            if (intersectionCache != null)
+            {
+                intersectionCache.Add(edgeKey, resolved);
+            }
+            intersection = resolved;
+            return true;
+        }
+
+        private static bool TryValidateExactIntersection(
+            Vector3 point,
+            Vector3 ownerPlaneNormal,
+            float ownerPlaneDistance,
+            CutPlane plane,
+            float strictTolerance,
+            out float cutResidualBefore,
+            out float ownerResidualBefore,
+            out float cutResidualAfter,
+            out float ownerResidualAfter)
+        {
+            cutResidualBefore = Mathf.Abs(plane.SignedDistance(point));
+            ownerResidualBefore = Mathf.Abs(
+                Vector3.Dot(ownerPlaneNormal, point) - ownerPlaneDistance);
+            cutResidualAfter = cutResidualBefore;
+            ownerResidualAfter = ownerResidualBefore;
+            return IsFinite(point) &&
+                cutResidualAfter <= strictTolerance &&
+                ownerResidualAfter <= strictTolerance;
+        }
+
+        private static bool TryConstrainPointToOwnerAndCutPlanes(
+            Vector3 point,
+            Vector3 ownerPlaneNormal,
+            float ownerPlaneDistance,
+            CutPlane cutPlane,
+            out Vector3 corrected)
+        {
+            float dot = Vector3.Dot(ownerPlaneNormal, cutPlane.Normal);
+            float determinant = 1f - dot * dot;
+            if (determinant <= 0.000001f)
+            {
+                corrected = point;
+                return false;
+            }
+
+            float ownerError = ownerPlaneDistance -
+                Vector3.Dot(ownerPlaneNormal, point);
+            float cutError = cutPlane.Distance -
+                Vector3.Dot(cutPlane.Normal, point);
+            float ownerScale = (ownerError - dot * cutError) /
+                determinant;
+            float cutScale = (cutError - dot * ownerError) /
+                determinant;
+            corrected = point +
+                ownerPlaneNormal * ownerScale +
+                cutPlane.Normal * cutScale;
+            return IsFinite(corrected);
+        }
+
+        private static void RecordIntersectionResidualExtrema(
+            PlaneCutNumericalRepairTelemetry numericalRepairs,
+            float cutResidualBefore,
+            float cutResidualAfter,
+            float ownerResidualBefore,
+            float ownerResidualAfter)
+        {
+            numericalRepairs.MaximumCutPlaneResidualBeforeCorrection =
+                Mathf.Max(
+                    numericalRepairs
+                        .MaximumCutPlaneResidualBeforeCorrection,
+                    cutResidualBefore);
+            numericalRepairs.MaximumCutPlaneResidualAfterCorrection =
+                Mathf.Max(
+                    numericalRepairs
+                        .MaximumCutPlaneResidualAfterCorrection,
+                    cutResidualAfter);
+            numericalRepairs.MaximumOwnerPlaneResidualBeforeCorrection =
+                Mathf.Max(
+                    numericalRepairs
+                        .MaximumOwnerPlaneResidualBeforeCorrection,
+                    ownerResidualBefore);
+            numericalRepairs.MaximumOwnerPlaneResidualAfterCorrection =
+                Mathf.Max(
+                    numericalRepairs
+                        .MaximumOwnerPlaneResidualAfterCorrection,
+                    ownerResidualAfter);
+        }
+
+        private static void RecordExactClipFailure(
+            PlaneCutNumericalRepairTelemetry numericalRepairs,
+            PolygonFaceProvenanceKind ownerProvenanceKind,
+            int ownerProvenanceIndex,
+            PolygonFaceProvenanceKind cutProvenanceKind,
+            int cutProvenanceIndex,
+            float startDistance,
+            float endDistance,
+            string startClassification,
+            string endClassification,
+            float cutResidualBefore,
+            float cutResidualAfter,
+            float ownerResidualBefore,
+            float ownerResidualAfter,
+            string reason)
+        {
+            if (numericalRepairs == null)
+            {
+                return;
+            }
+
+            numericalRepairs.ExactConstructionFailureCount++;
+            if (numericalRepairs.FirstExactFailureRecorded != 0)
+            {
+                return;
+            }
+
+            numericalRepairs.FirstExactFailureRecorded = 1;
+            numericalRepairs.FirstExactFailureOwnerProvenanceKind =
+                ownerProvenanceKind;
+            numericalRepairs.FirstExactFailureOwnerProvenanceIndex =
+                ownerProvenanceIndex;
+            numericalRepairs.FirstExactFailureCutProvenanceKind =
+                cutProvenanceKind;
+            numericalRepairs.FirstExactFailureCutProvenanceIndex =
+                cutProvenanceIndex;
+            numericalRepairs.FirstExactFailureStartDistance = startDistance;
+            numericalRepairs.FirstExactFailureEndDistance = endDistance;
+            numericalRepairs.FirstExactFailureStartClassification =
+                startClassification;
+            numericalRepairs.FirstExactFailureEndClassification =
+                endClassification;
+            numericalRepairs.FirstExactFailureCutResidualBefore =
+                cutResidualBefore;
+            numericalRepairs.FirstExactFailureCutResidualAfter =
+                cutResidualAfter;
+            numericalRepairs.FirstExactFailureOwnerResidualBefore =
+                ownerResidualBefore;
+            numericalRepairs.FirstExactFailureOwnerResidualAfter =
+                ownerResidualAfter;
+            numericalRepairs.FirstExactFailureReason = reason;
+        }
+
+        private static Vector3 ProjectPointOntoCutPlane(
+            Vector3 point,
+            CutPlane plane)
+        {
+            return point - plane.Normal * plane.SignedDistance(point);
         }
 
         private static PolygonFace CreateOrientedFace(

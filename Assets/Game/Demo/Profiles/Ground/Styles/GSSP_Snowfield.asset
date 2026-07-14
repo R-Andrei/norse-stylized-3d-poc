@@ -74,10 +74,22 @@ MonoBehaviour:
       paintedAccentCompositionRegionScale: 4
       paintedAccentCompositionDensityContrast: 0.7
       paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
       paintedAccentCompanionTightness: 0.65
       paintedAccentCompanionTripletVerticality: 1
       paintedAccentHorizontalCompanionsInitialized: 0
       paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
       paintedAccentCompleteMoundWeight: 0.2
       paintedAccentAsymmetricMoundWeight: 0.3
       paintedAccentSingleShoulderWeight: 0.3
@@ -104,17 +116,29 @@ MonoBehaviour:
       direction: {x: 0.82, y: 0.36}
       seedOffset: 301
       paintedAccentStrokeWidth: 0.017
-      paintedAccentStrokeDensity: 800
-      paintedAccentDistributionPatchScale: 18.17
-      paintedAccentDistributionPatchiness: 1
-      paintedAccentDistributionSparseFloor: 0.181
-      paintedAccentCompositionRegionScale: 7.14
-      paintedAccentCompositionDensityContrast: 0.7
+      paintedAccentStrokeDensity: 500
+      paintedAccentDistributionPatchScale: 10
+      paintedAccentDistributionPatchiness: 0.95
+      paintedAccentDistributionSparseFloor: 0.1983
+      paintedAccentCompositionRegionScale: 10.31
+      paintedAccentCompositionDensityContrast: 0.723
       paintedAccentHorizontalCompanionStrength: 1
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.99
       paintedAccentCompanionTightness: 1
       paintedAccentCompanionTripletVerticality: 1
       paintedAccentHorizontalCompanionsInitialized: 1
       paintedAccentCompanionTripletVerticalityInitialized: 1
+      paintedAccentCompanionQuotaControlsInitialized: 1
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 1
       paintedAccentCompleteMoundWeight: 0.5
       paintedAccentAsymmetricMoundWeight: 0.2
       paintedAccentSingleShoulderWeight: 0.5
@@ -190,10 +214,22 @@ MonoBehaviour:
       paintedAccentCompositionRegionScale: 4
       paintedAccentCompositionDensityContrast: 0.7
       paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
       paintedAccentCompanionTightness: 0.65
       paintedAccentCompanionTripletVerticality: 1
       paintedAccentHorizontalCompanionsInitialized: 0
       paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
       paintedAccentCompleteMoundWeight: 0.2
       paintedAccentAsymmetricMoundWeight: 0.3
       paintedAccentSingleShoulderWeight: 0.3
@@ -227,10 +263,22 @@ MonoBehaviour:
       paintedAccentCompositionRegionScale: 4
       paintedAccentCompositionDensityContrast: 0.7
       paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
       paintedAccentCompanionTightness: 0.65
       paintedAccentCompanionTripletVerticality: 1
       paintedAccentHorizontalCompanionsInitialized: 0
       paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
       paintedAccentCompleteMoundWeight: 0.2
       paintedAccentAsymmetricMoundWeight: 0.3
       paintedAccentSingleShoulderWeight: 0.3
@@ -306,10 +354,22 @@ MonoBehaviour:
       paintedAccentCompositionRegionScale: 4
       paintedAccentCompositionDensityContrast: 0.7
       paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
       paintedAccentCompanionTightness: 0.65
       paintedAccentCompanionTripletVerticality: 1
       paintedAccentHorizontalCompanionsInitialized: 0
       paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
       paintedAccentCompleteMoundWeight: 0.2
       paintedAccentAsymmetricMoundWeight: 0.3
       paintedAccentSingleShoulderWeight: 0.3
@@ -385,10 +445,22 @@ MonoBehaviour:
       paintedAccentCompositionRegionScale: 4
       paintedAccentCompositionDensityContrast: 0.7
       paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
       paintedAccentCompanionTightness: 0.65
       paintedAccentCompanionTripletVerticality: 1
       paintedAccentHorizontalCompanionsInitialized: 0
       paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
       paintedAccentCompleteMoundWeight: 0.2
       paintedAccentAsymmetricMoundWeight: 0.3
       paintedAccentSingleShoulderWeight: 0.3
@@ -422,10 +494,22 @@ MonoBehaviour:
       paintedAccentCompositionRegionScale: 4
       paintedAccentCompositionDensityContrast: 0.7
       paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
       paintedAccentCompanionTightness: 0.65
       paintedAccentCompanionTripletVerticality: 1
       paintedAccentHorizontalCompanionsInitialized: 0
       paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
       paintedAccentCompleteMoundWeight: 0.2
       paintedAccentAsymmetricMoundWeight: 0.3
       paintedAccentSingleShoulderWeight: 0.3

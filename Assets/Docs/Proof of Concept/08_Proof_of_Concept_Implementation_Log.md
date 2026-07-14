@@ -1,3 +1,126 @@
+# 2026-07-14 — River Foam `4.11C.5.17D.0` Final-Edge Fray Retirement
+
+Gameplay-camera validation rejected Fray as an independent production category. Fine teeth were unreadable at the intended isometric distance; enlarging them duplicated Chipping, and high-authority versions read as broad silhouette erosion. The feature is retired rather than tuned again.
+
+Removed:
+
+- final-boundary Fray result/helper, cluster/tooth fields, transition-band and removal-ratio reconstruction;
+- Fray shader properties, runtime IDs/bindings, serialized authoring fields, Inspector controls, and debug views;
+- retired debug IDs `22`, `23`, and `27` from active routing;
+- dead transient `breakupField` propagation and runtime `_FoamBreakupScale` shader path.
+
+Retained only for surviving Chip migration: hidden `legacyFoamBreakupScale` and the historical tuning-version serialized-name alias. Neither has a Fray runtime effect. No scene, prefab, material, or other serialized Unity asset is modified; stale serialized Fray values may remain inert until the owner chooses to clean them manually. The active Layer E order is coherent Foam → Chipping → Strands → composition. Adaptive rolled Chip loops, Ground/River regeneration work, Layer C state, and Strand mathematics are preserved. Local source validation completed; Unity shader import and visual equivalence to the former Fray-off baseline remain required.
+
+Status: implemented; Unity validation pending.
+
+# 2026-07-14 — River Foam `4.11C.5.17B.2D2B-C.1B` Fray Master Authority and Camera-Readable Teeth
+
+Unity evidence rejected C.1A as the final Fray implementation despite its monotonic Amount mapping. With Fray controls at zero, `RiverWaterFoamResolveStrandFrayKeep` still produced tooth-like cuts under Strand Strength; with Amount raised, the final Fray profile remained between `0.55` and `1.0`, causing broad smooth edge recession rather than intermittent missing pieces. The minimum `0.03 m` Feature Size was also below useful visibility at the production isometric camera.
+
+C.1B removes the independent Strand fine cutter, restricts Strands to structural broad-to-medium lineification, removes the fine-noise term from the always-active coherent morphology, and gives final Fray one exact master-off contract. The controls are now `Fray Amount`, `Tooth Size (m)`, and `Tooth Depth`; either Amount or Depth at zero returns the exact post-Chip/post-Strand mask. Separate cluster and tooth value-noise fields create camera-readable intermittent teeth with real zero gaps. Tooth Size uses `0.12–1.20 m` with a `0.28 m` default. No texture, buffer, compute dispatch, persistent state, candidate-loop change, Ground change, or regeneration change is added. Unity validation pending.
+
+# 2026-07-14 — River Foam C.1A Independent Fray Coverage Admission
+
+Unity evidence accepted C.1's post-Strand Fray result but showed that Coverage and Wavelength did not visibly change the frayed area as expected. Source audit proved that Wavelength correctly owns feature scale rather than area, while the Coverage threshold could never admit the complete perimeter and its unbounded derivative width blurred authority into partial Depth changes. C.1A retains one value-noise evaluation and all C.1 topology, replaces Coverage selection with `1 - coverage`, caps threshold antialiasing at `0.04`, adds an explicit complete-admission endpoint, and retains bounded local serration variation. The Inspector now labels Wavelength as `Fray Feature Size (m)`. Adaptive rolled Chip loops and Ground/River regeneration work are unchanged. Unity validation pending.
+
+Status: implemented; Unity shader compile, control-authority, visual-regression, and performance validation required.
+
+# 2026-07-14 — River Foam C.1 Final-Boundary Fray
+
+Implemented post-Strand Fray using the exact `postChipMask * strandKeep` baseline and a bounded hybrid boundary-support field. Replaced diagnostic-only Fray authoring with production Coverage/Wavelength/Depth controls and rewired Fray diagnostics to the production result. Unity validation pending.
+
+## 2026-07-14 — River Foam `4.11C.5.17B.2D2B-B.2L` Decoupled Shape Cadence and Transition
+
+Status: implemented; Unity compile/import and visual validation required.
+
+Runtime validation of B.2K showed that its geometry changed meaningfully, but the single cycles-per-second control still combined two timing responsibilities. B.2L relabels the retained serialized Shape Change Speed value as Shape Change Cadence and adds Shape Transition Time. Cadence selects the next target; Transition Time controls the actual contour interpolation duration.
+
+Implementation:
+
+- retained B.2K static cosine and temporal sine-harmonic geometry;
+- replaced the continuously normalized pulse trajectory with deterministic target states separated by a constant golden-angle step in the existing two-axis morph plane;
+- used quintic interpolation from previous target to current target;
+- held the target for the remainder of the cadence interval;
+- staggered intervals using the existing candidate-specific phase offset;
+- added `foamChipShapeTransitionTime`, range `0.10–30 s`, default `4 s`;
+- incremented Chip/Fray tuning version `8 -> 9` and initialized existing Rivers to the deliberate four-second transition;
+- added a read-only Inspector timing result showing effective transition and hold duration;
+- added no texture, sample, buffer, dispatch, candidate cell, size change, lifecycle change, movement change, permission change, Strand change, or Fray change.
+
+At the default cadence `0.04 changes/s`, the target interval is `25 s`; the default `4 s` transition produces `4 s` of geometric morphing and `21 s` of target hold. Setting Transition Time to `25 s` or greater produces continuous slow motion throughout the interval.
+
+## 2026-07-14 — River Foam `4.11C.5.17B.2D2B-B.2K` Multi-Axis Contour Geometry
+
+B.2J permission behavior is Unity-validated and accepted. Source audit then proved that Shape Change geometry remained weak because every candidate used only three cosine harmonics, stayed mirror-symmetric, interpolated along one A-to-B coefficient line, multiplied temporal change by Shape Irregularity, and clamped the result back toward the static contour.
+
+B.2K changes only the analytical silhouette and the search bound required to contain it. The accepted static cosine contour remains exact at Shape Change Amount `0`. Candidate-specific sine-harmonic temporal geometry moves through an orthonormal two-axis plane. A constant positive coefficient budget and squared-radius blending preserve temporal radial area exactly, preventing the geometry field from becoming another Size Pulse. Shape Change remains functional at Shape Irregularity `0`; Candidate Radius remains the area-equivalent authored scale. The proven `1.52x` maximum lobe reach extends the adaptive lateral search ceiling from `5×9` to `5×11`. Lifecycle, movement equations, rotation, size controls, view LOD, B.2J permission, Strands, Fray, and production order are unchanged. Unity validation is pending.
+
+## 2026-07-14 — River Foam `4.11C.5.17B.2D2B-B.2J` Simplified Orthogonal Chip Permission
+
+Unity validation rejected B.2I. `Chip Inward Admission` was multiplied after both edge and interior candidate selection, making it a global serial veto rather than an independent control. Its `sqrt(visibleSupport × materialEdgeDepth)` proxy saturated across established Foam, and the authority remap reserved visible core changes for roughly the final few percent of the slider.
+
+B.2J is Unity-validated and accepted. It removes the third admission control, serialized field, shader property, runtime binding, and local depth helper. Edge Coverage and Interior Access now remain parallel: production selection is `preChipVisibleSupport × max(edgeSelection, interiorSelection)`. The candidate-independent Eligibility Composite uses `max(visibleSupport × edgeEligibility, visibleSupport × InteriorAccess)`. Debug slot 24 is retained as `Chip Interior Access`, showing expected established-body authority rather than a stale gate. Candidate construction, lifecycle, rigid motion, view LOD, B.2H search, Strands, Fray, and production order are unchanged.
+
+## 2026-07-14 — River Foam `4.11C.5.17B.2D2B-B.2I` Inward Chip Body Admission
+
+**Rejected by subsequent Unity validation; superseded by B.2J.**
+
+Unity comparison at admission values `1.0`, `0.69`, and `0.35` showed disconnected eligible regions rather than edge-originating inward growth. Source audit proved the behavior: `RiverWaterFoamResolveChipMaterialSignal` generated a ranking scalar from two sine harmonics of transported `materialPattern`, and the admission control merely changed that scalar's threshold. The field therefore could not encode Foam-boundary depth.
+
+B.2I removes that Chipping-only ranking helper and uses an arithmetic proxy already available in the fragment path: `D = sqrt(saturate(visibleSupport × materialEdgeDepth))`. The control is renamed in the Inspector to `Chip Inward Admission`; internal serialized/property names remain stable. Intermediate authority uses `limit = 1 - (1 - authority)^2` and derivative-antialiased inverse thresholding, with exact branches at zero and one. The expected behavior is edge-adjacent permission first, progressive inward thickening, saturated cores last, and complete opening at one.
+
+This is explicitly not a geometric distance field. It adds no texture, sample, compute work, loop, buffer, persistent state, migration, or candidate-search expansion; it removes two sine evaluations from the admission path. Candidate shape, lifecycle, movement, B.2H lateral search, Edge Coverage, Interior Access, Strands, Fray, and production order are unchanged. Unity validation remains required.
+
+## 2026-07-14 — River Foam `4.11C.5.17B.2D2B-B.2H` Extended Rigid Lateral Travel
+
+Unity validation accepted the B.2G view-readability controls and the independent B.2F Chipping toolset, but showed that the maximum lateral centre excursion remained too weak. The existing maximum was only `0.25 × Candidate Spacing`, approximately one nominal candidate radius at default settings.
+
+B.2H raises Lateral Motion Amount to `0–2.5 spacing` without changing the rigid-motion equation, candidate identity, speed wave, lifecycle, or contour construction. At default `1.15 m` spacing, maximum travel becomes `±2.875 m` or `5.75 m` peak-to-peak. The Inspector reports this resolved distance and the exact peak centre speed `6 × cyclesPerSecond × excursion`, matching the derivative of the shader's smooth periodic wave.
+
+Simply raising the slider would make the prior `3×3`/`5×5` lattice search incomplete. B.2H derives downstream and lateral source-cell offsets independently from maximum radius, deterministic centre jitter, and rigid lateral excursion. The unrolled maximum is `5×9`, while uniform branches select the smallest required rectangle from `3×3` through `5×9` at current settings. The complete authored maximum is proven by `floor(1.338 + 2.5 + 0.89) = 4` lateral cells and `floor(1.338 + 0.89) = 2` downstream cells.
+
+No new serialized control, migration, texture, sample, buffer, kernel, dispatch, candidate identity, eligibility, lifecycle, Strand, Fray, Layer C/D, or production-order change is added.
+
+## 2026-07-13 — River Foam `4.11C.5.17B.2D2B-B.2G` Bounded Projected-Size Chip LOD
+
+Runtime evidence from two cameras showed the same B.2F Chip field becoming unreadable or disappearing at distance. Source audit proved that stable radius was purely River-space and that the complete candidate was additionally attenuated from `0.75–2.0 px` projected radius. Later Foam hardening could erase those partial cuts entirely.
+
+B.2G adds `Minimum Stable Radius (px)` and `Maximum View Scale`. The fragment shader derives the largest singular value of the screen-to-River Jacobian from `ddx/ddy` of the River coordinates, giving conservative metres per pixel under distance, field of view, resolution, and foreshortening. A smooth one-sided scale raises only undersized candidates toward the pixel target, clamps scale to the authored maximum, and caps stabilized nominal radius at `0.65 × Candidate Spacing`.
+
+Stabilization is applied before per-candidate size variation, pulse, and lifecycle. Relative size variation remains intact; Formation and Dissolve still reach exact zero and Dormant Time stays empty. The previous whole-candidate resolution gate is replaced by a `0.25–0.75 px` subpixel-only fade. Candidate search uses the stabilized radius and remains within the accepted adaptive `3×3`/`5×5` and `1.34 × spacing` bounds.
+
+Serialized tuning version 8 assigns defaults `2 px` and `1.75×`. No candidate identity, activation, eligibility, lifecycle timing, motion, rotation, pulse, shape, density, texture, sample, buffer, compute dispatch, Strand, Fray, or production-order change is added.
+
+## 2026-07-13 — River Foam `4.11C.5.17B.2D2B-B.2F` Independent Chip Lifecycle and Rigid Evolution
+
+Unity evidence after B.2E showed that the coupled evolution model remained structurally wrong. Death still depended on Evolution Amount, there was no deliberate dormant interval, one rate drove lifecycle/pulse/morph/displacement, and the capped coordinate warp plus inverse metric correction could still produce elongated or smeared chips.
+
+B.2F retires the visible Evolution Amount/Rate controls and retains those serialized fields only for tuning-version-7 migration. Every candidate selected by Chip Activation now follows an independent deterministic four-stage cycle with explicit Formation, Stable, Dissolve, and Dormant times. A quintic smoother gives zero-slope monotonic formation and dissolution; dormant coverage is exactly zero. Candidate phases are hashed per lattice cell, so the same identity returns asynchronously after its authored dormant wait.
+
+Motion and living variation are divorced. Downstream speed is uniform rigid translation. Lateral motion and rotation each have independent amount/speed pairs and use rigid centre/axis transforms. Size Pulse Amount is a direct fractional radius excursion with its own cycles-per-second speed. B.2F originally morphed Shape Change between two deterministic cosine-only contour sets and clamped temporal directional-radius ratios to `0.75×–1.25×`; B.2K later rejected and superseded that weak mirror-symmetric geometry while retaining the independent controls.
+
+The nonlinear value-noise coordinate warp, derivative-basis inversion, and correction path are removed. Candidate evaluation uses `delta = point - translatedCentre`, whose spatial Jacobian is the identity; rotation is orthonormal. Motion can therefore no longer shear, fold, or stretch an individual candidate. The search remains `3×3` for compact settings and expands uniformly to `5×5` only when maximum pulse plus lateral reach exceeds the compact support. The full authored maximum is bounded to `1.34 × Candidate Spacing`.
+
+Migration assigns deliberate slow lifecycle defaults `2.5 / 5 / 2.5 / 4 seconds`; old Evolution Amount maps only to the exact old `±8%` pulse authority and bounded shape authority. Lateral and rotation amounts start at zero because the rejected nonlinear warp has no truthful rigid-motion equivalent.
+
+No texture, sample, channel, buffer, kernel, dispatch, persistent write, Layer C/D change, Chip eligibility change, Strand change, Fray change, or production-order change is added.
+
+## 2026-07-13 — River Foam `4.11C.5.17B.2D2B-B.2E` Eligibility Domain, Complete Turnover, and Warp Safety
+
+B.2D Unity evidence exposed three isolated remaining defects. The Chip Eligibility Composite consumed `chipFinalSelection`, so Activation, current candidate contours, lifecycle, and current Evolution position replaced the intended permission-domain view; Material Admission was not represented independently. Candidate lifecycle kept a `0.13×` radius floor and blended toward its envelope by Evolution Amount, preventing true birth/death at usable values. Spatial coordinate warp continued to scale through the full amount range, while near-fold basis reconstruction could amplify local deltas up to `6×`.
+
+B.2E is implemented pending Unity validation. The composite now consumes candidate-independent potential permission: pre-Chip visible support × binary Material Admission × max(edge eligibility, Interior Access). Full Evolution Amount drives radius and visibility to exact zero at birth/release and back to the authored maximum during maturity; unresolved subpixel lifecycle contours are suppressed by the existing fragment footprint. Spatial warp authority is capped at `0.20`; values above it continue increasing lifecycle, pulse, and contour morphing. Metric correction now uses a determinant stability weight, falls back near collapsed/reversed bases, and limits corrected local-vector magnitude to `0.67×–1.50×`.
+
+No texture, sample, channel, buffer, kernel, dispatch, persistent write, serialized control, migration, candidate-loop expansion, Strand change, Fray change, or production-order change is added.
+
+## 2026-07-13 — River Foam `4.11C.5.17B.2D2B-B.2D` Visible Chip Domain and Binary Admission
+
+Source audit proved that production `Chip Selection Depth` was not distance: it thresholded Presence-derived `baseMask`, which saturates to `1` throughout established Foam while the serialized maximum remained `0.95`. Established bodies were therefore mathematically excluded. The path also multiplied `materialBody` twice and used a smooth transported Material Pattern gate as cut strength, allowing later hardening to erase many partial selections.
+
+B.2D is implemented pending Unity validation. The existing field is relabelled `Chip Edge Coverage` and remains edge-only. New `Chip Interior Access` deterministically admits whole activated candidate cells to established pre-Chip visible Foam. New `Chip Material Admission` thresholds the transported ranking signal through a narrow derivative-antialiased boundary; admitted candidates can reach full cut strength. `materialBody` is applied once, selection is clipped to the shared pre-Chip base-coverage function, and the Chip composite compares pre-material selection against pre-Chip rendered support. Serialized tuning version 6 initializes existing Rivers to Interior Access `0` and Material Admission `0.5`.
+
+Cost remains zero-resource: no new texture, sample, channel, buffer, kernel, dispatch, persistent write, or candidate-loop expansion. Strands and temporary legacy Fray are unchanged.
+
 ## 2026-07-13 — River Foam `4.11C.5.17B.2D2B-B.2C` Eligibility Composite Diagnostics and Shape-Preserving Advection
 
 Unity evidence from B.2B showed that high Evolution Amount stretched connected Chip contours into long ribbons. The animated coordinate field was being used both for candidate lookup and for local contour distance, so spatial compression/shear deformed the chip itself. B.2C keeps the broad/fine animated lookup field but converts candidate-local deltas back into the unwarped River metric through bounded derivative-basis inversion before evaluating the single connected contour. This preserves large movement and clustering while preventing the field from owning chip aspect ratio.
@@ -44,7 +167,7 @@ The patch adds no texture, compute dispatch, time input, random reseeding, Layer
 
 ## 2026-07-13 — River Foam `4.11C.5.17B.2D2B-B` Production Chip Handoff
 
-The accepted A.1 irregular candidates now drive Final Foam. Production selection multiplies activated candidates, independent Chip Selection Depth, and a smooth gate derived from transported Layer C Material Pattern. The selected area removes the coherent soft body before the accepted Strand mask is applied. The exact hardened removal is exposed as `Production Chip Mask`; `Chip Material Gate` isolates the transported eligibility field.
+Historical B contract, superseded by B.2D for domain and admission mathematics. The accepted A.1 irregular candidates drive Final Foam. At B time, production selection multiplied activated candidates, independent Chip Selection Depth, and a smooth gate derived from transported Layer C Material Pattern. The selected area removes the coherent soft body before the accepted Strand mask is applied. The exact hardened removal is exposed as `Production Chip Mask`; `Chip Material Gate` isolates the transported eligibility field.
 
 Legacy `Chip Strength` remains serialized only for migration but is no longer bound to the shader, preventing duplicate Chipping. Legacy Fray remains temporary and unchanged pending `2D2B-C`. The patch adds no texture, compute dispatch, Layer C/D write, persistent field, topology work, or Strand redesign.
 

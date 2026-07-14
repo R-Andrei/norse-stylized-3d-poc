@@ -15,10 +15,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EdgeWearEvaluationMode edgeWearEvaluationMode,
             int boundedEdgeOrdinal,
             out PlaneCutBevelPreviewStatus previewStatus,
-            out BoundedEdgePreviewStatus boundedPreviewStatus)
+            out BoundedEdgePreviewStatus boundedPreviewStatus,
+            out UnifiedEdgeWearPreviewStatus unifiedPreviewStatus)
         {
             previewStatus = default;
             boundedPreviewStatus = default;
+            unifiedPreviewStatus = default;
             System.Random shapeRandom =
                 CreateRandom(recipe.ShapeSeed, 0x27101987);
 
@@ -114,12 +116,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     edgeWearEvaluationMode,
                     boundedEdgeOrdinal,
                     out previewStatus,
-                    out boundedPreviewStatus);
+                    out boundedPreviewStatus,
+                    out unifiedPreviewStatus);
             }
             if ((edgeWearEvaluationMode ==
                     EdgeWearEvaluationMode.PlaneCutPreview ||
                  edgeWearEvaluationMode ==
-                    EdgeWearEvaluationMode.BoundedSingleEdgePreview) &&
+                    EdgeWearEvaluationMode.BoundedSingleEdgePreview ||
+                 edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.UnifiedBoundedPreview) &&
                 planeCutPreviewSoup != null)
             {
                 return planeCutPreviewSoup;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using ProgrammaticStylized3D.Geometry;
 
@@ -50,6 +51,213 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        private sealed class PlaneCutConflictWidthReductionRecord
+        {
+            public int PassIndex;
+            public int VictimEdgeIndex = -1;
+            public int ForeignEdgeIndex = -1;
+            public int VertexIndex = -1;
+            public readonly List<int> ClusterEdgeIndices =
+                new List<int>();
+            public string TriggerCategory = string.Empty;
+            public int BandValid;
+            public int TopologyValid;
+            public int OpenEdgeCount;
+            public int NonManifoldEdgeCount;
+            public int TJunctionCount;
+            public int InvalidFaceCount;
+            public int NonPlanarFaceCount;
+            public int TopologyRollbackApplied;
+            public float PreviousMinimumScale;
+            public float RequestedScale;
+            public float AppliedMinimumScale;
+            public float ClusterFloorScale;
+            public float VictimCoverageRatio;
+            public float ForeignAxialParameter;
+            public float ForeignSharedSpanRatio;
+            public string ClusterReasonEvidence = string.Empty;
+            public string PreviousScaleEvidence = string.Empty;
+            public string RollbackScaleEvidence = string.Empty;
+            public string AppliedScaleEvidence = string.Empty;
+            public string Result = string.Empty;
+        }
+
+        private sealed class PlaneCutTJunctionFailureRecord
+        {
+            public int RecordIndex;
+            public string Stage = string.Empty;
+            public Vector3 JunctionVertex;
+            public int VertexOwnerFaceCount;
+            public string VertexOwnerFaces = string.Empty;
+            public int HostFaceIndex = -1;
+            public PolygonFaceProvenanceKind HostProvenanceKind;
+            public int HostProvenanceIndex = -1;
+            public int HostSegmentIndex = -1;
+            public Vector3 HostStart;
+            public Vector3 HostEnd;
+            public Vector3 ClosestPoint;
+            public float HostLength;
+            public float SegmentParameter;
+            public float Distance;
+            public float Tolerance;
+            public int MatchingHostSegmentCount;
+            public string ProvenanceBevelEdges = string.Empty;
+            public string CandidatePlaneMatches = string.Empty;
+            public string AssociatedEdgeScales = string.Empty;
+            public int LastConflictPass = -1;
+            public string LastConflictCluster = string.Empty;
+            public readonly List<int> LinkedEdgeIndices =
+                new List<int>();
+            public string Cause = string.Empty;
+        }
+
+        private sealed class PlaneCutLocalityDeferralRecord
+        {
+            public int SourceEdgeIndex = -1;
+            public int VertexA = -1;
+            public int VertexB = -1;
+            public int FaceA = -1;
+            public int FaceB = -1;
+            public Vector3 SourceA;
+            public Vector3 SourceB;
+            public Vector3 BevelNormal;
+            public float SolvedWidth;
+            public float SolvedPlaneDistance;
+            public float LocalizedPlaneDistance;
+            public float LocalizationDelta;
+            public float LocalGuardMargin;
+            public int LimitingUnrelatedVertex = -1;
+            public Vector3 LimitingUnrelatedPosition;
+            public float LimitingUnrelatedProjection;
+            public float SolvedSourceRemovalA;
+            public float SolvedSourceRemovalB;
+            public float LocalizedSourceRemovalA;
+            public float LocalizedSourceRemovalB;
+            public float MinimumRequiredRemoval;
+            public string Cause = string.Empty;
+        }
+
+        private sealed class PlaneCutSolverTransactionState
+        {
+            public string Name = string.Empty;
+            public int PassIndex = -1;
+            public int BandClean;
+            public int GeometryClean;
+            public readonly List<PlaneCutBevelCandidate> Candidates =
+                new List<PlaneCutBevelCandidate>();
+            public List<PolygonFace> Faces = new List<PolygonFace>();
+            public Dictionary<int, float> ScaleByEdge =
+                new Dictionary<int, float>();
+            public PlaneCutStageSnapshot Stage;
+        }
+
+        private sealed class PlaneCutRetryFailureDossier
+        {
+            public int PassIndex = -1;
+            public string Stage = string.Empty;
+            public int AttemptedBuiltCount;
+            public int OpenEdgeCount;
+            public int NonManifoldEdgeCount;
+            public int TJunctionCount;
+            public int InvalidFaceCount;
+            public int NonPlanarFaceCount;
+            public string CandidateEdgeEvidence = string.Empty;
+            public string ScaleEvidence = string.Empty;
+            public string NonManifoldEvidence = string.Empty;
+            public string InvalidFaceEvidence = string.Empty;
+            public string GeneralizedClusterEvidence = string.Empty;
+            public string GeneralizedClusterReasonEvidence = string.Empty;
+            public string Cause = string.Empty;
+            public readonly List<PlaneCutOpenEdgeFailureRecord>
+                OpenEdgeFailures =
+                    new List<PlaneCutOpenEdgeFailureRecord>();
+            public readonly List<PlaneCutFaceQualityFailureRecord>
+                NonPlanarFaceFailures =
+                    new List<PlaneCutFaceQualityFailureRecord>();
+            public readonly List<PlaneCutTJunctionFailureRecord>
+                TJunctionFailures =
+                    new List<PlaneCutTJunctionFailureRecord>();
+            public readonly List<int> LinkedEdgeIndices = new List<int>();
+        }
+
+        private sealed class PlaneCutTopologyScaleTrialRecord
+        {
+            public int TrialIndex;
+            public int BasePassIndex = -1;
+            public float Factor;
+            public string SearchMode = string.Empty;
+            public string ProtectedEdgeEvidence = string.Empty;
+            public int BandVictimEdgeIndex = -1;
+            public int BandForeignEdgeIndex = -1;
+            public float BandForeignAxialParameter;
+            public float BandForeignSharedSpanRatio;
+            public readonly List<int> ClusterEdgeIndices = new List<int>();
+            public string BaseScaleEvidence = string.Empty;
+            public string RequestedScaleEvidence = string.Empty;
+            public string EffectiveScaleEvidence = string.Empty;
+            public string FloorHitEvidence = string.Empty;
+            public string CollateralChangedEvidence = string.Empty;
+            public int AttemptedBuiltCount;
+            public int BandEvaluated;
+            public int TopologyEvaluated;
+            public int FaceQualityEvaluated;
+            public int BandValid = -1;
+            public int TopologyValid = -1;
+            public int FaceQualityValid = -1;
+            public int SurfaceValid = -1;
+            public int MeshValid = -1;
+            public int FullyValid = -1;
+            public int OpenEdgeCount;
+            public int NonManifoldEdgeCount;
+            public int TJunctionCount;
+            public int InvalidFaceCount;
+            public int NonPlanarFaceCount;
+            public float MaximumPlaneDeviation;
+            public float MaximumNormalSpreadDegrees;
+            public string FailureStage = string.Empty;
+            public string FailureCause = string.Empty;
+            public string Result = string.Empty;
+            public readonly List<PlaneCutOpenEdgeFailureRecord>
+                OpenEdgeFailures =
+                    new List<PlaneCutOpenEdgeFailureRecord>();
+            public readonly List<PlaneCutFaceQualityFailureRecord>
+                NonPlanarFaceFailures =
+                    new List<PlaneCutFaceQualityFailureRecord>();
+            public readonly List<PlaneCutTJunctionFailureRecord>
+                TJunctionFailures =
+                    new List<PlaneCutTJunctionFailureRecord>();
+        }
+
+        private readonly struct PlaneCutDiagnosticSegment
+        {
+            public readonly int FaceIndex;
+            public readonly PolygonFaceProvenanceKind ProvenanceKind;
+            public readonly int ProvenanceIndex;
+            public readonly int SegmentIndex;
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly VertexKey StartKey;
+            public readonly VertexKey EndKey;
+
+            public PlaneCutDiagnosticSegment(
+                int faceIndex,
+                PolygonFaceProvenanceKind provenanceKind,
+                int provenanceIndex,
+                int segmentIndex,
+                Vector3 start,
+                Vector3 end)
+            {
+                FaceIndex = faceIndex;
+                ProvenanceKind = provenanceKind;
+                ProvenanceIndex = provenanceIndex;
+                SegmentIndex = segmentIndex;
+                Start = start;
+                End = end;
+                StartKey = new VertexKey(start);
+                EndKey = new VertexKey(end);
+            }
+        }
+
         private readonly struct PlaneCutBoundarySplit
         {
             public readonly float Parameter;
@@ -85,11 +293,302 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        private readonly struct PlaneCutStageSnapshot
+        {
+            public readonly string Stage;
+            public readonly int FaceCount;
+            public readonly int VertexCount;
+            public readonly int UniqueVertexCount;
+            public readonly int BevelFaceCount;
+            public readonly int JunctionFaceCount;
+            public readonly int OpenEdgeCount;
+            public readonly int NonManifoldEdgeCount;
+            public readonly int TJunctionCount;
+            public readonly int InvalidFaceCount;
+            public readonly int NonPlanarFaceCount;
+            public readonly float MaximumPlaneDeviation;
+            public readonly float MaximumNormalSpreadDegrees;
+
+            public PlaneCutStageSnapshot(
+                string stage,
+                int faceCount,
+                int vertexCount,
+                int uniqueVertexCount,
+                int bevelFaceCount,
+                int junctionFaceCount,
+                int openEdgeCount,
+                int nonManifoldEdgeCount,
+                int tJunctionCount,
+                int invalidFaceCount,
+                int nonPlanarFaceCount,
+                float maximumPlaneDeviation,
+                float maximumNormalSpreadDegrees)
+            {
+                Stage = stage;
+                FaceCount = faceCount;
+                VertexCount = vertexCount;
+                UniqueVertexCount = uniqueVertexCount;
+                BevelFaceCount = bevelFaceCount;
+                JunctionFaceCount = junctionFaceCount;
+                OpenEdgeCount = openEdgeCount;
+                NonManifoldEdgeCount = nonManifoldEdgeCount;
+                TJunctionCount = tJunctionCount;
+                InvalidFaceCount = invalidFaceCount;
+                NonPlanarFaceCount = nonPlanarFaceCount;
+                MaximumPlaneDeviation = maximumPlaneDeviation;
+                MaximumNormalSpreadDegrees =
+                    maximumNormalSpreadDegrees;
+            }
+        }
+
+        private readonly struct PlaneCutFaceQualityFailureRecord
+        {
+            public readonly int FaceIndex;
+            public readonly PolygonFaceProvenanceKind ProvenanceKind;
+            public readonly int ProvenanceIndex;
+            public readonly int VertexCount;
+            public readonly Vector3 AuthoredNormal;
+            public readonly Vector3 MeasuredNormal;
+            public readonly float PlaneDistance;
+            public readonly float MaximumPlaneDeviation;
+            public readonly float PlanarityTolerance;
+            public readonly int OffendingVertexIndex;
+            public readonly Vector3 OffendingVertexPosition;
+            public readonly float OffendingSignedResidual;
+            public readonly float MaximumNormalSpreadDegrees;
+            public readonly float NormalSpreadToleranceDegrees;
+            public readonly int OffendingSegmentIndex;
+            public readonly Vector3 OffendingTriangleNormal;
+            public readonly float Area;
+            public readonly float MinimumEdgeLength;
+            public readonly string FirstFailureStage;
+            public readonly int BoundaryConformityTouched;
+            public readonly int SeamRepairTouched;
+            public readonly float SeamRepairMaximumMovement;
+            public readonly string VertexResidualEvidence;
+            public readonly string Cause;
+
+            public PlaneCutFaceQualityFailureRecord(
+                int faceIndex,
+                PolygonFaceProvenanceKind provenanceKind,
+                int provenanceIndex,
+                int vertexCount,
+                Vector3 authoredNormal,
+                Vector3 measuredNormal,
+                float planeDistance,
+                float maximumPlaneDeviation,
+                float planarityTolerance,
+                int offendingVertexIndex,
+                Vector3 offendingVertexPosition,
+                float offendingSignedResidual,
+                float maximumNormalSpreadDegrees,
+                float normalSpreadToleranceDegrees,
+                int offendingSegmentIndex,
+                Vector3 offendingTriangleNormal,
+                float area,
+                float minimumEdgeLength,
+                string firstFailureStage,
+                int boundaryConformityTouched,
+                int seamRepairTouched,
+                float seamRepairMaximumMovement,
+                string vertexResidualEvidence,
+                string cause)
+            {
+                FaceIndex = faceIndex;
+                ProvenanceKind = provenanceKind;
+                ProvenanceIndex = provenanceIndex;
+                VertexCount = vertexCount;
+                AuthoredNormal = authoredNormal;
+                MeasuredNormal = measuredNormal;
+                PlaneDistance = planeDistance;
+                MaximumPlaneDeviation = maximumPlaneDeviation;
+                PlanarityTolerance = planarityTolerance;
+                OffendingVertexIndex = offendingVertexIndex;
+                OffendingVertexPosition = offendingVertexPosition;
+                OffendingSignedResidual = offendingSignedResidual;
+                MaximumNormalSpreadDegrees =
+                    maximumNormalSpreadDegrees;
+                NormalSpreadToleranceDegrees =
+                    normalSpreadToleranceDegrees;
+                OffendingSegmentIndex = offendingSegmentIndex;
+                OffendingTriangleNormal = offendingTriangleNormal;
+                Area = area;
+                MinimumEdgeLength = minimumEdgeLength;
+                FirstFailureStage = firstFailureStage;
+                BoundaryConformityTouched =
+                    boundaryConformityTouched;
+                SeamRepairTouched = seamRepairTouched;
+                SeamRepairMaximumMovement =
+                    seamRepairMaximumMovement;
+                VertexResidualEvidence = vertexResidualEvidence;
+                Cause = cause;
+            }
+        }
+
+        private readonly struct PlaneCutOpenEdgeFailureRecord
+        {
+            public readonly int RecordIndex;
+            public readonly int FaceIndex;
+            public readonly PolygonFaceProvenanceKind FaceProvenanceKind;
+            public readonly int FaceProvenanceIndex;
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly float Length;
+            public readonly int AssociatedSourceVertex;
+            public readonly Vector3 AssociatedSourcePosition;
+            public readonly float SourceVertexDistance;
+            public readonly string IncidentBuiltEdges;
+            public readonly int JunctionExpected;
+            public readonly int JunctionFaceCount;
+            public readonly string ExpectedNeighbour;
+            public readonly int NearestFaceIndex;
+            public readonly PolygonFaceProvenanceKind
+                NearestFaceProvenanceKind;
+            public readonly int NearestFaceProvenanceIndex;
+            public readonly Vector3 NearestSegmentStart;
+            public readonly Vector3 NearestSegmentEnd;
+            public readonly float NearestReversedEndpointDistance;
+            public readonly string FirstFailureStage;
+            public readonly string Cause;
+
+            public PlaneCutOpenEdgeFailureRecord(
+                int recordIndex,
+                int faceIndex,
+                PolygonFaceProvenanceKind faceProvenanceKind,
+                int faceProvenanceIndex,
+                Vector3 start,
+                Vector3 end,
+                float length,
+                int associatedSourceVertex,
+                Vector3 associatedSourcePosition,
+                float sourceVertexDistance,
+                string incidentBuiltEdges,
+                int junctionExpected,
+                int junctionFaceCount,
+                string expectedNeighbour,
+                int nearestFaceIndex,
+                PolygonFaceProvenanceKind nearestFaceProvenanceKind,
+                int nearestFaceProvenanceIndex,
+                Vector3 nearestSegmentStart,
+                Vector3 nearestSegmentEnd,
+                float nearestReversedEndpointDistance,
+                string firstFailureStage,
+                string cause)
+            {
+                RecordIndex = recordIndex;
+                FaceIndex = faceIndex;
+                FaceProvenanceKind = faceProvenanceKind;
+                FaceProvenanceIndex = faceProvenanceIndex;
+                Start = start;
+                End = end;
+                Length = length;
+                AssociatedSourceVertex = associatedSourceVertex;
+                AssociatedSourcePosition = associatedSourcePosition;
+                SourceVertexDistance = sourceVertexDistance;
+                IncidentBuiltEdges = incidentBuiltEdges;
+                JunctionExpected = junctionExpected;
+                JunctionFaceCount = junctionFaceCount;
+                ExpectedNeighbour = expectedNeighbour;
+                NearestFaceIndex = nearestFaceIndex;
+                NearestFaceProvenanceKind =
+                    nearestFaceProvenanceKind;
+                NearestFaceProvenanceIndex =
+                    nearestFaceProvenanceIndex;
+                NearestSegmentStart = nearestSegmentStart;
+                NearestSegmentEnd = nearestSegmentEnd;
+                NearestReversedEndpointDistance =
+                    nearestReversedEndpointDistance;
+                FirstFailureStage = firstFailureStage;
+                Cause = cause;
+            }
+        }
+
+        private readonly struct PlaneCutJunctionCoverageRecord
+        {
+            public readonly int VertexIndex;
+            public readonly Vector3 SourcePosition;
+            public readonly string IncidentBuiltEdges;
+            public readonly int IncidentBuiltEdgeCount;
+            public readonly int JunctionExpected;
+            public readonly int JunctionFaceCount;
+            public readonly int AssignedOpenEdgeCount;
+            public readonly string FailureReason;
+
+            public PlaneCutJunctionCoverageRecord(
+                int vertexIndex,
+                Vector3 sourcePosition,
+                string incidentBuiltEdges,
+                int incidentBuiltEdgeCount,
+                int junctionExpected,
+                int junctionFaceCount,
+                int assignedOpenEdgeCount,
+                string failureReason)
+            {
+                VertexIndex = vertexIndex;
+                SourcePosition = sourcePosition;
+                IncidentBuiltEdges = incidentBuiltEdges;
+                IncidentBuiltEdgeCount = incidentBuiltEdgeCount;
+                JunctionExpected = junctionExpected;
+                JunctionFaceCount = junctionFaceCount;
+                AssignedOpenEdgeCount = assignedOpenEdgeCount;
+                FailureReason = failureReason;
+            }
+        }
+
+        private sealed class PlaneCutNumericalRepairTelemetry
+        {
+            public int IntersectionRequestCount;
+            public int StrictCrossingIntersectionCount;
+            public int ProjectedFallbackIntersectionCount;
+            public int CachedIntersectionReuseCount;
+            public int IntersectionProjectionCount;
+            public float MaximumIntersectionProjectionDistance;
+            public int StrictInsideClassificationCount;
+            public int StrictOnPlaneClassificationCount;
+            public int StrictOutsideClassificationCount;
+            public int OnPlaneSnapCount;
+            public float MaximumOnPlaneSnapDistance;
+            public int SameSideFallbackAttemptCount;
+            public int ExactConstructionFailureCount;
+            public float MaximumCutPlaneResidualBeforeCorrection;
+            public float MaximumCutPlaneResidualAfterCorrection;
+            public float MaximumOwnerPlaneResidualBeforeCorrection;
+            public float MaximumOwnerPlaneResidualAfterCorrection;
+            public int CapVertexProjectionCount;
+            public int CapVertexValidationCount;
+            public float MaximumCapResidualBeforeProjection;
+            public float MaximumCapResidualAfterProjection;
+            public int CapResidualRejectCount;
+            public int DistanceWeldComparisonCount;
+            public int DistanceWeldMatchCount;
+            public int DistanceWeldMovedCount;
+            public float MaximumDistanceWeldMovement;
+            public int FirstExactFailureRecorded;
+            public PolygonFaceProvenanceKind
+                FirstExactFailureOwnerProvenanceKind;
+            public int FirstExactFailureOwnerProvenanceIndex;
+            public PolygonFaceProvenanceKind
+                FirstExactFailureCutProvenanceKind;
+            public int FirstExactFailureCutProvenanceIndex;
+            public float FirstExactFailureStartDistance;
+            public float FirstExactFailureEndDistance;
+            public string FirstExactFailureStartClassification;
+            public string FirstExactFailureEndClassification;
+            public float FirstExactFailureCutResidualBefore;
+            public float FirstExactFailureCutResidualAfter;
+            public float FirstExactFailureOwnerResidualBefore;
+            public float FirstExactFailureOwnerResidualAfter;
+            public string FirstExactFailureReason;
+        }
+
         private struct PlaneCutBevelAuditResult
         {
             public int SelectedEdgeCount;
             public int ActiveEdgeCount;
             public int PlanesBuilt;
+            public int AttemptedPlanesBuilt;
+            public int CertifiedPlanesBuilt;
+            public int TrialRejectedPlanes;
             public int PlanesLocalized;
             public int PlanesDeferred;
             public int PlanesRejected;
@@ -153,6 +652,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int EdgeConflictEdgesDeferredCount;
             public int EdgeConflictResolvedCount;
             public int EdgeConflictBudgetExhausted;
+            public int EdgeConflictWidthReductionCount;
+            public int EdgeConflictClusterCount;
+            public int EdgeConflictUnresolvedCount;
+            public int EdgeConflictTopologyRejectedPassCount;
+            public int EdgeConflictTopologyExpandedClusterCount;
+            public int EdgeConflictTopologyRollbackCount;
+            public float EdgeConflictMinimumWidthScale;
+            public List<PlaneCutConflictWidthReductionRecord>
+                EdgeConflictWidthReductions;
             public int EdgeConflictVictimEdgeIndex;
             public int EdgeConflictForeignEdgeIndex;
             public int EdgeConflictVertexIndex;
@@ -171,7 +679,80 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int LocalJunctionMinimumLoopVertexCount;
             public int LocalJunctionMaximumLoopVertexCount;
             public float LocalJunctionMaximumExtentRatio;
+            public int BevelRegionFaceCount;
+            public int BevelRegionBoundaryVertexCount;
+            public int BevelRegionTriangleCount;
+            public int BevelRegionAuthoredNormalTriangleCount;
+            public int BevelRegionAuthoredSurfaceGroupTriangleCount;
+            public int BevelRegionInternalFanVertexCount;
+            public float BevelRegionMaximumPlaneResidual;
+            public float BevelRegionMaximumNormalDeviationDegrees;
+            public int BevelRegionRenderValid;
+            public int MaterializedEdgeCoverageValid;
+            public string ActiveEdgeEvidence;
+            public string AttemptedEdgeEvidence;
+            public string BuiltEdgeEvidence;
+            public string TrialRejectedEdgeEvidence;
+            public string DeferredEdgeEvidence;
+            public PlaneCutSolverTransactionState LatestAttemptedState;
+            public PlaneCutSolverTransactionState LatestBandCleanState;
+            public PlaneCutSolverTransactionState LatestTopologyCleanState;
+            public PlaneCutSolverTransactionState LatestCertifiedState;
+            public List<PlaneCutRetryFailureDossier> RetryFailureDossiers;
+            public List<PlaneCutTopologyScaleTrialRecord>
+                TopologyScaleTrials;
+            public int TopologyScaleSearchBasePass;
+            public string TopologyScaleSearchMode;
+            public string TopologyScaleSearchTriggerEvidence;
+            public string TopologyScaleSearchTopologyLinkedEvidence;
+            public string TopologyScaleSearchClusterEvidence;
+            public string TopologyScaleSearchProtectedEvidence;
+            public string ActiveSearchFailureStage;
+            public string ActiveSearchFailureCause;
+            public string ActiveSearchFailureEvidence;
+            public List<int> DebugFocusEdgeIndices;
+            public int TopologyScaleSearchTrialCount;
+            public int TopologyScaleSearchBandFailureCount;
+            public int TopologyScaleSearchTopologyFailureCount;
+            public int TopologyScaleSearchFaceQualityFailureCount;
+            public int TopologyScaleSearchCollateralFailureCount;
+            public float TopologyScaleSearchCommittedFactor;
+            public float TopologyScaleSearchHighestValidFactor;
+            public string TopologyScaleSearchCollateralChangedEvidence;
+            public int TopologyScaleSearchFailedStateScalesReused;
+            public int TopologyScaleSearchUnresolved;
+            public PlaneCutStageSnapshot StagePlaneConstruction;
+            public PlaneCutStageSnapshot StageSanitized;
+            public PlaneCutStageSnapshot StageWelded;
+            public PlaneCutStageSnapshot StageConformed;
+            public PlaneCutStageSnapshot StageSeamRepaired;
+            public PlaneCutStageSnapshot StageFinalCertification;
+            public string FirstOpenEdgeStage;
+            public string FirstTJunctionStage;
+            public string FirstNonPlanarStage;
+            public float FaceQualityPlanarityTolerance;
+            public float FaceQualityNormalSpreadToleranceDegrees;
+            public List<PlaneCutFaceQualityFailureRecord>
+                FaceQualityFailures;
+            public List<PlaneCutOpenEdgeFailureRecord> OpenEdgeFailures;
+            public List<PlaneCutTJunctionFailureRecord> TJunctionFailures;
+            public List<PlaneCutLocalityDeferralRecord>
+                LocalityDeferrals;
+            public List<PlaneCutJunctionCoverageRecord> JunctionCoverage;
+            public Dictionary<string, string>
+                FaceFirstNonPlanarStageByIdentity;
+            public HashSet<string> BoundaryConformityTouchedFaces;
+            public HashSet<string> SeamRepairTouchedFaces;
+            public Dictionary<string, float>
+                SeamRepairMaximumMovementByIdentity;
+            public PlaneCutNumericalRepairTelemetry NumericalRepairs;
+            public EdgeWearCoverageAudit CoverageAudit;
+            public int JunctionCoverageTouchedVertexCount;
+            public int JunctionCoverageExpectedCount;
+            public int JunctionCoverageBuiltCount;
+            public int JunctionCoverageMissingCount;
             public int GeometryValid;
+            public string LocalJunctionDiagnostic;
             public string Diagnostic;
         }
 
@@ -181,6 +762,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ChamferCornerSolution solution,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
+            EdgeWearCoverageAudit coverageAudit,
             out TriangleSoup previewSoup)
         {
             previewSoup = null;
@@ -188,10 +770,51 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 new PlaneCutBevelAuditResult
                 {
                     SelectedEdgeCount = context.SelectedSourceEdges.Count,
+                    CoverageAudit = coverageAudit,
                     EdgeConflictVictimEdgeIndex = -1,
                     EdgeConflictForeignEdgeIndex = -1,
                     EdgeConflictVertexIndex = -1,
-                    EdgeConflictDeferredEdgeIndex = -1
+                    EdgeConflictDeferredEdgeIndex = -1,
+                    EdgeConflictMinimumWidthScale = 1f,
+                    EdgeConflictWidthReductions =
+                        new List<PlaneCutConflictWidthReductionRecord>(),
+                    FaceQualityFailures =
+                        new List<PlaneCutFaceQualityFailureRecord>(),
+                    OpenEdgeFailures =
+                        new List<PlaneCutOpenEdgeFailureRecord>(),
+                    TJunctionFailures =
+                        new List<PlaneCutTJunctionFailureRecord>(),
+                    LocalityDeferrals =
+                        new List<PlaneCutLocalityDeferralRecord>(),
+                    RetryFailureDossiers =
+                        new List<PlaneCutRetryFailureDossier>(),
+                    TopologyScaleTrials =
+                        new List<PlaneCutTopologyScaleTrialRecord>(),
+                    TopologyScaleSearchBasePass = -1,
+                    TopologyScaleSearchCommittedFactor = -1f,
+                    TopologyScaleSearchHighestValidFactor = -1f,
+                    TopologyScaleSearchMode = "none",
+                    TopologyScaleSearchTriggerEvidence = "none",
+                    TopologyScaleSearchTopologyLinkedEvidence = "none",
+                    TopologyScaleSearchClusterEvidence = "none",
+                    TopologyScaleSearchProtectedEvidence = "none",
+                    ActiveSearchFailureStage = "none",
+                    ActiveSearchFailureCause = "none",
+                    ActiveSearchFailureEvidence = "none",
+                    DebugFocusEdgeIndices = new List<int>(),
+                    TopologyScaleSearchCollateralChangedEvidence = "none",
+                    JunctionCoverage =
+                        new List<PlaneCutJunctionCoverageRecord>(),
+                    FaceFirstNonPlanarStageByIdentity =
+                        new Dictionary<string, string>(),
+                    BoundaryConformityTouchedFaces =
+                        new HashSet<string>(),
+                    SeamRepairTouchedFaces =
+                        new HashSet<string>(),
+                    SeamRepairMaximumMovementByIdentity =
+                        new Dictionary<string, float>(),
+                    NumericalRepairs =
+                        new PlaneCutNumericalRepairTelemetry()
                 };
 
             List<EdgeWearSelectedGraphEdge> orderedSelected =
@@ -201,6 +824,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             List<PlaneCutBevelCandidate> planeCandidates =
                 new List<PlaneCutBevelCandidate>(orderedSelected.Count);
+            List<int> activeEdgeIndices =
+                new List<int>(orderedSelected.Count);
             int localityDeferredCount = 0;
             for (int selectedIndex = 0;
                  selectedIndex < orderedSelected.Count;
@@ -208,15 +833,42 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 EdgeWearSelectedGraphEdge selected =
                     orderedSelected[selectedIndex];
+                TryGetEdgeWearCoverageRecord(
+                    coverageAudit,
+                    selected.GraphEdgeIndex,
+                    out EdgeWearEdgeLifecycleRecord lifecycle);
                 if (!solution.WidthByEdge.TryGetValue(
                         selected.GraphEdgeIndex,
                         out float width) ||
                     width <= PointMergeDistance)
                 {
+                    if (lifecycle != null)
+                    {
+                        bool hasInactiveWidth =
+                            solution.WidthByEdge.TryGetValue(
+                                selected.GraphEdgeIndex,
+                                out float inactiveWidth);
+                        lifecycle.SolvedWidth = hasInactiveWidth
+                            ? inactiveWidth
+                            : 0f;
+                        lifecycle.WidthInactive = true;
+                        lifecycle.Active = false;
+                        lifecycle.FinalReason = hasInactiveWidth
+                            ? "width-inactive"
+                            : "width-missing";
+                    }
                     continue;
                 }
 
                 result.ActiveEdgeCount++;
+                activeEdgeIndices.Add(selected.GraphEdgeIndex);
+                if (lifecycle != null)
+                {
+                    lifecycle.SolvedWidth = width;
+                    lifecycle.WidthInactive = false;
+                    lifecycle.Active = true;
+                    lifecycle.FinalReason = "active";
+                }
 
                 if (!TryBuildPlaneCutBevelCandidate(
                         context,
@@ -225,15 +877,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         minimumStableEdgeLength,
                         out PlaneCutBevelCandidate candidate,
                         out bool localityDeferred,
+                        out PlaneCutLocalityDeferralRecord localityEvidence,
                         out string blocker))
                 {
                     if (localityDeferred)
                     {
                         localityDeferredCount++;
+                        if (localityEvidence != null)
+                        {
+                            result.LocalityDeferrals.Add(localityEvidence);
+                        }
+                        if (lifecycle != null)
+                        {
+                            lifecycle.Deferred = true;
+                            lifecycle.FinalReason = string.IsNullOrEmpty(blocker)
+                                ? "plane-locality-deferred"
+                                : "plane-locality-deferred:" + blocker;
+                        }
                     }
                     else
                     {
                         result.PlanesRejected++;
+                        if (lifecycle != null)
+                        {
+                            lifecycle.Rejected = true;
+                            lifecycle.FinalReason = string.IsNullOrEmpty(blocker)
+                                ? "plane-rejected"
+                                : "plane-rejected:" + blocker;
+                        }
                         SetPlaneCutBevelDiagnostic(
                             ref result.Diagnostic,
                             blocker);
@@ -243,6 +914,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 planeCandidates.Add(candidate);
             }
+
+            RecalculateEdgeWearCoverageAudit(coverageAudit);
 
             if (result.ActiveEdgeCount == 0)
             {
@@ -276,11 +949,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     localityDeferredCount,
+                    coverageAudit != null &&
+                        coverageAudit.MaximumCoverageMode,
                     ref result,
                     out List<PlaneCutBevelCandidate> retainedCandidates,
                     out List<PolygonFace> edgeOnlyFaces,
                     out string edgeOnlyBlocker))
             {
+                FinalizeEdgeWearCoverageAfterFailedPlaneShell(
+                    coverageAudit,
+                    retainedCandidates,
+                    string.IsNullOrEmpty(edgeOnlyBlocker)
+                        ? "edge-only-shell-build-failed"
+                        : edgeOnlyBlocker);
+                result.ActiveEdgeEvidence =
+                    FormatPlaneCutEdgeIndexEvidence(activeEdgeIndices);
+                result.AttemptedEdgeEvidence =
+                    FormatPlaneCutCandidateEdgeEvidence(
+                        retainedCandidates);
+                result.BuiltEdgeEvidence = "none";
+                result.TrialRejectedEdgeEvidence =
+                    result.AttemptedEdgeEvidence;
+                result.DeferredEdgeEvidence =
+                    FormatPlaneCutDeferredEdgeEvidence(
+                        activeEdgeIndices,
+                        retainedCandidates);
+                result.MaterializedEdgeCoverageValid = 0;
                 SetPlaneCutBevelDiagnostic(
                     ref result.Diagnostic,
                     string.IsNullOrEmpty(edgeOnlyBlocker)
@@ -290,6 +984,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             planeCandidates = retainedCandidates;
+            result.PlanesBuilt = planeCandidates.Count;
+            result.AttemptedPlanesBuilt = planeCandidates.Count;
+            result.CertifiedPlanesBuilt = 0;
+            result.TrialRejectedPlanes = planeCandidates.Count;
+            result.ActiveEdgeEvidence =
+                FormatPlaneCutEdgeIndexEvidence(activeEdgeIndices);
+            result.AttemptedEdgeEvidence =
+                FormatPlaneCutCandidateEdgeEvidence(planeCandidates);
+            result.BuiltEdgeEvidence = "none";
+            result.TrialRejectedEdgeEvidence =
+                result.AttemptedEdgeEvidence;
+            result.DeferredEdgeEvidence =
+                FormatPlaneCutDeferredEdgeEvidence(
+                    activeEdgeIndices,
+                    planeCandidates);
+            result.MaterializedEdgeCoverageValid = 0;
 
             for (int candidateIndex = 0;
                  candidateIndex < planeCandidates.Count;
@@ -334,12 +1044,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 minimumStableEdgeLength,
                 ref result,
                 out string localJunctionBlocker);
-            if (!string.IsNullOrEmpty(localJunctionBlocker))
-            {
-                SetPlaneCutBevelDiagnostic(
-                    ref result.Diagnostic,
-                    localJunctionBlocker);
-            }
+            result.LocalJunctionDiagnostic = localJunctionBlocker;
             if (result.FaceQualityNonPlanarCount > 0)
             {
                 SetPlaneCutBevelDiagnostic(
@@ -356,6 +1061,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             result.InvalidFaceCount += CountInvalidPlaneCutFaces(
                 edgeOnlyFaces,
                 minimumStableFaceArea);
+            CapturePlaneCutStageSnapshot(
+                edgeOnlyFaces,
+                "FinalCertification",
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                planeCandidates,
+                ref result,
+                out result.StageFinalCertification);
+            AuditPlaneCutOpenEdgeFailures(
+                edgeOnlyFaces,
+                context,
+                planeCandidates,
+                minimumStableEdgeLength,
+                ref result);
+            AuditPlaneCutJunctionCoverage(
+                edgeOnlyFaces,
+                context,
+                planeCandidates,
+                ref result);
 
             double resultVolume =
                 CalculatePlaneCutPolyhedronVolume(edgeOnlyFaces);
@@ -413,6 +1137,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 result.PlanesBuilt > 0 &&
                 result.PlanesBuilt + result.PlanesDeferred ==
                     result.ActiveEdgeCount &&
+                result.BandRetainedEdgeCount == result.PlanesBuilt &&
+                result.BandSingleFaceCount == result.PlanesBuilt &&
                 result.CapsMissing == 0 &&
                 result.OpenEdgeCount == 0 &&
                 result.NonManifoldEdgeCount == 0 &&
@@ -429,9 +1155,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 boundsValid &&
                 edgeOnlyFaces.Count >= 4;
 
-            TriangleSoup auditedSoup = polygonGeometryValid
-                ? TriangulatePlaneCutPreviewFaces(edgeOnlyFaces)
-                : null;
+            TriangleSoup auditedSoup = null;
+            bool surfaceTriangulationValid = false;
+            if (polygonGeometryValid)
+            {
+                BoundedSingleEdgeAuditResult surfaceAudit =
+                    new BoundedSingleEdgeAuditResult
+                    {
+                        TriangulationFailureFace = -1,
+                        TriangulationFailureProvenanceIndex = -1,
+                        BevelRegionFailureFace = -1,
+                        BevelRegionFailureProvenanceIndex = -1
+                    };
+                surfaceTriangulationValid =
+                    TryTriangulateBoundedPreviewFaces(
+                        edgeOnlyFaces,
+                        minimumStableFaceArea,
+                        ref surfaceAudit,
+                        out auditedSoup,
+                        out string surfaceBlocker);
+                result.BevelRegionFaceCount =
+                    surfaceAudit.BevelRegionFaceCount;
+                result.BevelRegionBoundaryVertexCount =
+                    surfaceAudit.BevelRegionBoundaryVertexCount;
+                result.BevelRegionTriangleCount =
+                    surfaceAudit.BevelRegionTriangleCount;
+                result.BevelRegionAuthoredNormalTriangleCount =
+                    surfaceAudit.BevelRegionAuthoredNormalTriangleCount;
+                result.BevelRegionAuthoredSurfaceGroupTriangleCount =
+                    surfaceAudit.BevelRegionAuthoredSurfaceGroupTriangleCount;
+                result.BevelRegionInternalFanVertexCount =
+                    surfaceAudit.BevelRegionInternalFanVertexCount;
+                result.BevelRegionMaximumPlaneResidual =
+                    surfaceAudit.BevelRegionMaximumPlaneResidual;
+                result.BevelRegionMaximumNormalDeviationDegrees =
+                    surfaceAudit.BevelRegionMaximumNormalDeviationDegrees;
+                result.BevelRegionRenderValid =
+                    surfaceAudit.BevelRegionRenderValid;
+                if (!surfaceTriangulationValid)
+                {
+                    SetPlaneCutBevelDiagnostic(
+                        ref result.Diagnostic,
+                        string.IsNullOrEmpty(surfaceBlocker)
+                            ? "the all-edge bevel shell failed the one-surface render contract"
+                            : surfaceBlocker);
+                }
+            }
             if (auditedSoup != null)
             {
                 AuditPlaneCutPreviewTriangleSoup(
@@ -442,16 +1211,3429 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             bool geometryValid = polygonGeometryValid &&
+                surfaceTriangulationValid &&
+                result.BevelRegionFaceCount == result.PlanesBuilt &&
+                result.BevelRegionRenderValid == 1 &&
                 result.PreviewGeometryValid == 1;
             result.GeometryValid = geometryValid ? 1 : 0;
             if (geometryValid)
+            {
+                FinalizeEdgeWearCoverageAfterPlaneShell(
+                    coverageAudit,
+                    planeCandidates);
+                result.CertifiedPlanesBuilt = planeCandidates.Count;
+                result.TrialRejectedPlanes = 0;
+                result.BuiltEdgeEvidence =
+                    result.AttemptedEdgeEvidence;
+                result.TrialRejectedEdgeEvidence = "none";
+                if (result.LatestCertifiedState != null)
+                {
+                    result.LatestCertifiedState.Name =
+                        "fully-certified";
+                    result.LatestCertifiedState.Stage =
+                        result.StageFinalCertification;
+                }
+            }
+            else
+            {
+                FinalizeEdgeWearCoverageAfterFailedPlaneShell(
+                    coverageAudit,
+                    planeCandidates,
+                    "final-certification-failed");
+                result.CertifiedPlanesBuilt = 0;
+                result.TrialRejectedPlanes =
+                    result.AttemptedPlanesBuilt;
+                result.PlanesBuilt = 0;
+                result.BuiltEdgeEvidence = "none";
+                result.TrialRejectedEdgeEvidence =
+                    result.AttemptedEdgeEvidence;
+                result.LatestCertifiedState = null;
+            }
+            result.MaterializedEdgeCoverageValid =
+                geometryValid &&
+                IsEdgeWearCoverageMaterialized(coverageAudit, result)
+                    ? 1
+                    : 0;
+            bool exhaustiveCoverageRequired = coverageAudit != null &&
+                coverageAudit.MaximumCoverageMode;
+            bool previewContractValid = geometryValid &&
+                (!exhaustiveCoverageRequired ||
+                 result.MaterializedEdgeCoverageValid == 1);
+            if (previewContractValid)
             {
                 previewSoup = auditedSoup;
             }
             return result;
         }
 
+        private static void FinalizeEdgeWearCoverageAfterPlaneShell(
+            EdgeWearCoverageAudit audit,
+            List<PlaneCutBevelCandidate> retainedCandidates)
+        {
+            if (audit == null)
+            {
+                return;
+            }
+
+            Dictionary<int, PlaneCutBevelCandidate> builtByEdge =
+                new Dictionary<int, PlaneCutBevelCandidate>();
+            if (retainedCandidates != null)
+            {
+                for (int candidateIndex = 0;
+                     candidateIndex < retainedCandidates.Count;
+                     candidateIndex++)
+                {
+                    PlaneCutBevelCandidate candidate =
+                        retainedCandidates[candidateIndex];
+                    builtByEdge[candidate.SourceEdgeIndex] = candidate;
+                }
+            }
+
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                if (!record.Selected)
+                {
+                    continue;
+                }
+
+                if (builtByEdge.TryGetValue(
+                        record.SourceEdgeIndex,
+                        out PlaneCutBevelCandidate builtCandidate))
+                {
+                    record.AttemptedBuilt = true;
+                    record.Built = true;
+                    record.TrialRejected = false;
+                    record.Deferred = false;
+                    record.Rejected = false;
+                    record.MaterializedWidth = builtCandidate.Width;
+                    record.MaterializedWidthScale = record.SolvedWidth >
+                            PointMergeDistance
+                        ? Mathf.Clamp01(
+                            builtCandidate.Width / record.SolvedWidth)
+                        : 1f;
+                    record.WidthReduced =
+                        record.MaterializedWidthScale < 0.9999f;
+                    record.FinalReason = record.WidthReduced
+                        ? "built-width-reduced"
+                        : "built";
+                }
+                else if (record.Active &&
+                    !record.Deferred &&
+                    !record.Rejected)
+                {
+                    record.AttemptedBuilt = false;
+                    record.TrialRejected = false;
+                    record.MaterializedWidth = 0f;
+                    record.MaterializedWidthScale = 0f;
+                    record.WidthReduced = false;
+                    record.Deferred = true;
+                    record.FinalReason = "shell-conflict-deferred";
+                }
+            }
+
+            RecalculateEdgeWearCoverageAudit(audit);
+        }
+
+        private static void FinalizeEdgeWearCoverageAfterFailedPlaneShell(
+            EdgeWearCoverageAudit audit,
+            List<PlaneCutBevelCandidate> attemptedCandidates,
+            string reason)
+        {
+            if (audit == null)
+            {
+                return;
+            }
+
+            Dictionary<int, PlaneCutBevelCandidate> attemptedByEdge =
+                new Dictionary<int, PlaneCutBevelCandidate>();
+            if (attemptedCandidates != null)
+            {
+                for (int candidateIndex = 0;
+                     candidateIndex < attemptedCandidates.Count;
+                     candidateIndex++)
+                {
+                    PlaneCutBevelCandidate candidate =
+                        attemptedCandidates[candidateIndex];
+                    attemptedByEdge[candidate.SourceEdgeIndex] =
+                        candidate;
+                }
+            }
+
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                if (!record.Selected)
+                {
+                    continue;
+                }
+
+                if (attemptedByEdge.TryGetValue(
+                        record.SourceEdgeIndex,
+                        out PlaneCutBevelCandidate attempted))
+                {
+                    record.AttemptedBuilt = true;
+                    record.Built = false;
+                    record.TrialRejected = true;
+                    record.Deferred = false;
+                    record.Rejected = false;
+                    record.MaterializedWidth = attempted.Width;
+                    record.MaterializedWidthScale = record.SolvedWidth >
+                            PointMergeDistance
+                        ? Mathf.Clamp01(
+                            attempted.Width / record.SolvedWidth)
+                        : 1f;
+                    record.WidthReduced =
+                        record.MaterializedWidthScale < 0.9999f;
+                    record.FinalReason =
+                        "solver-trial-rejected:" +
+                        (string.IsNullOrEmpty(reason)
+                            ? "unknown"
+                            : reason);
+                }
+                else if (record.Active && !record.Deferred &&
+                    !record.Rejected)
+                {
+                    record.AttemptedBuilt = false;
+                    record.Built = false;
+                    record.TrialRejected = false;
+                    record.MaterializedWidth = 0f;
+                    record.MaterializedWidthScale = 0f;
+                    record.WidthReduced = false;
+                    record.Deferred = true;
+                    record.FinalReason =
+                        "pre-shell-locality-or-construction-deferred";
+                }
+            }
+
+            RecalculateEdgeWearCoverageAudit(audit);
+        }
+
+        private static bool IsEdgeWearCoverageMaterialized(
+            EdgeWearCoverageAudit audit,
+            PlaneCutBevelAuditResult result)
+        {
+            if (audit == null)
+            {
+                return result.PlanesBuilt == result.ActiveEdgeCount;
+            }
+
+            RecalculateEdgeWearCoverageAudit(audit);
+            if (!audit.MaximumCoverageMode)
+            {
+                return audit.ActiveCount == audit.BuiltCount &&
+                    audit.DeferredCount == 0 &&
+                    audit.RejectedCount == 0;
+            }
+
+            return audit.StructuralEligibleCount == audit.SelectedCount &&
+                audit.SelectedCount == audit.BuiltCount &&
+                audit.WidthInactiveCount == 0 &&
+                audit.DeferredCount == 0 &&
+                audit.RejectedCount == 0 &&
+                audit.UnmappedCount == 0;
+        }
+
+        private static string FormatPlaneCutEdgeIndexEvidence(
+            List<int> edgeIndices)
+        {
+            if (edgeIndices == null || edgeIndices.Count == 0)
+            {
+                return "none";
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int index = 0; index < edgeIndices.Count; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(edgeIndices[index]);
+            }
+            return builder.ToString();
+        }
+
+        private static string FormatPlaneCutCandidateEdgeEvidence(
+            List<PlaneCutBevelCandidate> candidates)
+        {
+            if (candidates == null || candidates.Count == 0)
+            {
+                return "none";
+            }
+
+            List<int> indices = new List<int>(candidates.Count);
+            for (int index = 0; index < candidates.Count; index++)
+            {
+                indices.Add(candidates[index].SourceEdgeIndex);
+            }
+            return FormatPlaneCutEdgeIndexEvidence(indices);
+        }
+
+        private static string FormatPlaneCutCandidateDifferenceEvidence(
+            List<PlaneCutBevelCandidate> attemptedCandidates,
+            List<PlaneCutBevelCandidate> certifiedCandidates)
+        {
+            if (attemptedCandidates == null ||
+                attemptedCandidates.Count == 0)
+            {
+                return "none";
+            }
+
+            HashSet<int> certified = new HashSet<int>();
+            if (certifiedCandidates != null)
+            {
+                for (int index = 0;
+                     index < certifiedCandidates.Count;
+                     index++)
+                {
+                    certified.Add(
+                        certifiedCandidates[index].SourceEdgeIndex);
+                }
+            }
+
+            List<int> rejectedTrialEdges = new List<int>();
+            for (int index = 0;
+                 index < attemptedCandidates.Count;
+                 index++)
+            {
+                int edgeIndex =
+                    attemptedCandidates[index].SourceEdgeIndex;
+                if (!certified.Contains(edgeIndex))
+                {
+                    rejectedTrialEdges.Add(edgeIndex);
+                }
+            }
+            rejectedTrialEdges.Sort();
+            return FormatPlaneCutEdgeIndexEvidence(rejectedTrialEdges);
+        }
+
+        private static string FormatPlaneCutDeferredEdgeEvidence(
+            List<int> activeEdgeIndices,
+            List<PlaneCutBevelCandidate> retainedCandidates)
+        {
+            if (activeEdgeIndices == null || activeEdgeIndices.Count == 0)
+            {
+                return "none";
+            }
+
+            HashSet<int> retained = new HashSet<int>();
+            if (retainedCandidates != null)
+            {
+                for (int index = 0;
+                     index < retainedCandidates.Count;
+                     index++)
+                {
+                    retained.Add(
+                        retainedCandidates[index].SourceEdgeIndex);
+                }
+            }
+
+            List<int> deferred = new List<int>();
+            for (int index = 0; index < activeEdgeIndices.Count; index++)
+            {
+                int edgeIndex = activeEdgeIndices[index];
+                if (!retained.Contains(edgeIndex))
+                {
+                    deferred.Add(edgeIndex);
+                }
+            }
+            return FormatPlaneCutEdgeIndexEvidence(deferred);
+        }
+
         private static bool TryBuildCleanPlaneCutEdgeOnlyShell(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            List<PlaneCutBevelCandidate> allCandidates,
+            List<PlaneCutVertexJunctionCandidate> noJunctions,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            int localityDeferredCount,
+            bool maximumCoverageMode,
+            ref PlaneCutBevelAuditResult result,
+            out List<PlaneCutBevelCandidate> retainedCandidates,
+            out List<PolygonFace> preparedFaces,
+            out string blocker)
+        {
+            if (maximumCoverageMode)
+            {
+                return TryBuildCleanPlaneCutEdgeOnlyShellWithWidthReduction(
+                    sourceFaces,
+                    context,
+                    allCandidates,
+                    noJunctions,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    localityDeferredCount,
+                    ref result,
+                    out retainedCandidates,
+                    out preparedFaces,
+                    out blocker);
+            }
+
+            return TryBuildCleanPlaneCutEdgeOnlyShellWithDeferral(
+                sourceFaces,
+                context,
+                allCandidates,
+                noJunctions,
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                localityDeferredCount,
+                ref result,
+                out retainedCandidates,
+                out preparedFaces,
+                out blocker);
+        }
+
+        private static bool
+            TryBuildCleanPlaneCutEdgeOnlyShellWithWidthReduction(
+                List<PolygonFace> sourceFaces,
+                ChamferTopologyContext context,
+                List<PlaneCutBevelCandidate> allCandidates,
+                List<PlaneCutVertexJunctionCandidate> noJunctions,
+                float minimumStableEdgeLength,
+                float minimumStableFaceArea,
+                int localityDeferredCount,
+                ref PlaneCutBevelAuditResult result,
+                out List<PlaneCutBevelCandidate> retainedCandidates,
+                out List<PolygonFace> preparedFaces,
+                out string blocker)
+        {
+            const int maximumConflictPasses = 32;
+            const float reductionFactor = 0.75f;
+            Dictionary<int, float> scaleByEdge =
+                new Dictionary<int, float>();
+            Dictionary<int, float> minimumScaleByEdge =
+                new Dictionary<int, float>();
+            for (int candidateIndex = 0;
+                 candidateIndex < allCandidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate =
+                    allCandidates[candidateIndex];
+                scaleByEdge[candidate.SourceEdgeIndex] = 1f;
+                minimumScaleByEdge[candidate.SourceEdgeIndex] =
+                    ResolvePlaneCutCandidateMinimumScale(
+                        candidate,
+                        minimumStableEdgeLength);
+            }
+
+            Dictionary<int, float> lastTopologyCleanScaleByEdge = null;
+            PlaneCutSolverTransactionState latestAttemptedState = null;
+            PlaneCutSolverTransactionState latestBandCleanState = null;
+            PlaneCutSolverTransactionState latestTopologyCleanState = null;
+            PlaneCutSolverTransactionState latestCertifiedState = null;
+            PlaneCutRetryFailureDossier latestRetryFailure = null;
+            retainedCandidates = new List<PlaneCutBevelCandidate>();
+            preparedFaces = null;
+            blocker = string.Empty;
+            PlaneCutBevelAuditResult lastBandAudit =
+                CreatePlaneCutBandAuditScratch();
+
+            for (int passIndex = 0;
+                 passIndex < maximumConflictPasses;
+                 passIndex++)
+            {
+                retainedCandidates = BuildScaledPlaneCutCandidates(
+                    allCandidates,
+                    context,
+                    scaleByEdge,
+                    minimumStableEdgeLength);
+                ResetPlaneCutStageTelemetry(ref result);
+                PlaneCutNumericalRepairTelemetry numericalRepairs =
+                    new PlaneCutNumericalRepairTelemetry();
+                result.NumericalRepairs = numericalRepairs;
+                result.EdgeConflictPassCount = passIndex + 1;
+                if (!TryBuildPlaneCutSystemFaces(
+                        sourceFaces,
+                        retainedCandidates,
+                        noJunctions,
+                        out List<PolygonFace> rawFaces,
+                        out int edgeCapsBuilt,
+                        out string buildBlocker,
+                        numericalRepairs))
+                {
+                    blocker = string.IsNullOrEmpty(buildBlocker)
+                        ? "the deterministic width-reduced edge shell could not be built"
+                        : buildBlocker;
+                    result.EdgeConflictUnresolvedCount++;
+                    result.AttemptedPlanesBuilt =
+                        retainedCandidates.Count;
+                    result.CertifiedPlanesBuilt = 0;
+                    result.TrialRejectedPlanes =
+                        retainedCandidates.Count;
+                    result.PlanesBuilt = 0;
+                    result.AttemptedEdgeEvidence =
+                        FormatPlaneCutCandidateEdgeEvidence(
+                            retainedCandidates);
+                    result.BuiltEdgeEvidence = "none";
+                    result.TrialRejectedEdgeEvidence =
+                        result.AttemptedEdgeEvidence;
+                    result.PlanesDeferred = localityDeferredCount;
+                    return false;
+                }
+
+                CapturePlaneCutStageSnapshot(
+                    rawFaces,
+                    "AfterPlaneConstruction",
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    retainedCandidates,
+                    ref result,
+                    out result.StagePlaneConstruction);
+
+                if (!TryPreparePlaneCutPreviewFaces(
+                        rawFaces,
+                        retainedCandidates,
+                        minimumStableEdgeLength,
+                        minimumStableFaceArea,
+                        ref result,
+                        out List<PolygonFace> auditedFaces,
+                        out int conformalSplitCount,
+                        out int seamPairCount,
+                        out int seamTouchedFaceCount,
+                        out string preparationBlocker,
+                        numericalRepairs))
+                {
+                    blocker = string.IsNullOrEmpty(preparationBlocker)
+                        ? "the width-reduced edge shell failed preview preparation"
+                        : preparationBlocker;
+                    result.EdgeConflictUnresolvedCount++;
+                    latestAttemptedState =
+                        CapturePlaneCutSolverTransactionState(
+                            "attempted-preparation-failed",
+                            passIndex + 1,
+                            retainedCandidates,
+                            rawFaces,
+                            scaleByEdge,
+                            false,
+                            false,
+                            result.StagePlaneConstruction);
+                    result.LatestAttemptedState =
+                        latestAttemptedState;
+                    result.AttemptedPlanesBuilt =
+                        retainedCandidates.Count;
+                    result.CertifiedPlanesBuilt = 0;
+                    result.TrialRejectedPlanes =
+                        retainedCandidates.Count;
+                    result.PlanesBuilt = 0;
+                    result.AttemptedEdgeEvidence =
+                        FormatPlaneCutCandidateEdgeEvidence(
+                            retainedCandidates);
+                    result.BuiltEdgeEvidence = "none";
+                    result.TrialRejectedEdgeEvidence =
+                        result.AttemptedEdgeEvidence;
+                    result.PlanesDeferred = localityDeferredCount;
+                    return false;
+                }
+
+                PlaneCutBevelAuditResult bandAudit =
+                    CreatePlaneCutBandAuditScratch();
+                AuditPlaneCutBandIntegrity(
+                    auditedFaces,
+                    context,
+                    retainedCandidates,
+                    noJunctions,
+                    minimumStableEdgeLength,
+                    ref bandAudit,
+                    out int offendingVertex,
+                    out string bandBlocker);
+                lastBandAudit = bandAudit;
+                CapturePlaneCutEdgeConflict(
+                    ref result,
+                    bandAudit,
+                    offendingVertex);
+
+                bool bandClean = IsPlaneCutBandAuditClean(bandAudit);
+                bool retryGeometryClean =
+                    IsPlaneCutRetryGeometryClean(
+                        result.StageSeamRepaired);
+                latestAttemptedState =
+                    CapturePlaneCutSolverTransactionState(
+                        "attempted",
+                        passIndex + 1,
+                        retainedCandidates,
+                        auditedFaces,
+                        scaleByEdge,
+                        bandClean,
+                        retryGeometryClean,
+                        result.StageSeamRepaired);
+                result.LatestAttemptedState = latestAttemptedState;
+                if (bandClean)
+                {
+                    latestBandCleanState =
+                        CapturePlaneCutSolverTransactionState(
+                            "band-clean",
+                            passIndex + 1,
+                            retainedCandidates,
+                            auditedFaces,
+                            scaleByEdge,
+                            bandClean,
+                            retryGeometryClean,
+                            result.StageSeamRepaired);
+                    result.LatestBandCleanState =
+                        latestBandCleanState;
+                }
+                if (retryGeometryClean)
+                {
+                    lastTopologyCleanScaleByEdge =
+                        ClonePlaneCutScaleMap(scaleByEdge);
+                    latestTopologyCleanState =
+                        CapturePlaneCutSolverTransactionState(
+                            "topology-clean",
+                            passIndex + 1,
+                            retainedCandidates,
+                            auditedFaces,
+                            scaleByEdge,
+                            bandClean,
+                            retryGeometryClean,
+                            result.StageSeamRepaired);
+                    result.LatestTopologyCleanState =
+                        latestTopologyCleanState;
+                }
+
+                if (!retryGeometryClean)
+                {
+                    string retryFailureStage =
+                        ResolvePlaneCutFirstRetryFailureStage(result);
+                    List<PolygonFace> retryFailureFaces =
+                        retryFailureStage == "AfterPlaneConstruction"
+                            ? rawFaces
+                            : auditedFaces;
+                    latestRetryFailure =
+                        CapturePlaneCutRetryFailureDossier(
+                            passIndex + 1,
+                            retryFailureStage,
+                            retryFailureFaces,
+                            context,
+                            retainedCandidates,
+                            noJunctions,
+                            minimumStableEdgeLength,
+                            minimumStableFaceArea,
+                            scaleByEdge,
+                            ref result);
+                    result.RetryFailureDossiers.Add(
+                        latestRetryFailure);
+                }
+
+                if (bandClean && retryGeometryClean)
+                {
+                    latestCertifiedState =
+                        CapturePlaneCutSolverTransactionState(
+                            "solver-clean",
+                            passIndex + 1,
+                            retainedCandidates,
+                            auditedFaces,
+                            scaleByEdge,
+                            bandClean,
+                            retryGeometryClean,
+                            result.StageSeamRepaired);
+                    result.LatestCertifiedState =
+                        latestCertifiedState;
+                    preparedFaces = auditedFaces;
+                    result.AttemptedPlanesBuilt =
+                        retainedCandidates.Count;
+                    result.CertifiedPlanesBuilt = 0;
+                    result.TrialRejectedPlanes =
+                        retainedCandidates.Count;
+                    result.PlanesBuilt =
+                        retainedCandidates.Count;
+                    result.AttemptedEdgeEvidence =
+                        FormatPlaneCutCandidateEdgeEvidence(
+                            retainedCandidates);
+                    result.BuiltEdgeEvidence = "none";
+                    result.TrialRejectedEdgeEvidence =
+                        result.AttemptedEdgeEvidence;
+                    result.PlanesDeferred = localityDeferredCount;
+                    result.PlanesLocalized =
+                        CountLocalizedPlaneCutCandidates(
+                            retainedCandidates);
+                    result.CapsBuilt = edgeCapsBuilt;
+                    result.ConformalSplitCount = conformalSplitCount;
+                    result.SeamPairCount = seamPairCount;
+                    result.FaceQualitySeamTouchedFaceCount =
+                        seamTouchedFaceCount;
+                    result.EdgeConflictResolvedCount =
+                        result.EdgeConflictWidthReductionCount > 0
+                            ? 1
+                            : 0;
+                    result.EdgeConflictMinimumWidthScale =
+                        ResolveMinimumPlaneCutScale(scaleByEdge);
+                    CopyPlaneCutBandAudit(bandAudit, ref result);
+                    return true;
+                }
+
+                bool topologyTriggered = !retryGeometryClean;
+                if (topologyTriggered)
+                {
+                    result.EdgeConflictTopologyRejectedPassCount++;
+                }
+
+                if (passIndex + 1 >= maximumConflictPasses)
+                {
+                    result.EdgeConflictBudgetExhausted = 1;
+                    result.EdgeConflictUnresolvedCount++;
+                    blocker = topologyTriggered
+                        ? "topology-aware conflict reduction exhausted its bounded pass budget"
+                        : string.IsNullOrEmpty(bandBlocker)
+                            ? "conflict-cluster width reduction exhausted its bounded pass budget"
+                            : bandBlocker;
+                    break;
+                }
+
+                List<int> clusterEdgeIndices;
+                string clusterReasonEvidence;
+                PlaneCutRetryFailureDossier topologyFailure = null;
+                PlaneCutTJunctionFailureRecord tJunctionFailure = null;
+                if (topologyTriggered)
+                {
+                    topologyFailure = latestRetryFailure;
+                    if (topologyFailure != null &&
+                        topologyFailure.TJunctionCount > 0 &&
+                        latestTopologyCleanState != null)
+                    {
+                        if (!TryBuildMinimalPlaneCutTopologyCluster(
+                                retainedCandidates,
+                                topologyFailure.TJunctionFailures,
+                                out clusterEdgeIndices,
+                                out clusterReasonEvidence,
+                                out tJunctionFailure))
+                        {
+                            result.EdgeConflictBudgetExhausted = 1;
+                            result.EdgeConflictUnresolvedCount++;
+                            blocker =
+                                "the T-junction could not be mapped to its exact linked bevel set";
+                            break;
+                        }
+
+                        topologyFailure.GeneralizedClusterEvidence =
+                            FormatPlaneCutEdgeIndexEvidence(
+                                clusterEdgeIndices);
+                        topologyFailure.GeneralizedClusterReasonEvidence =
+                            clusterReasonEvidence;
+                        if (!TryResolvePlaneCutForeignBandRetreatTarget(
+                                retainedCandidates,
+                                result.EdgeConflictWidthReductions,
+                                clusterEdgeIndices,
+                                out int retreatVictimEdgeIndex,
+                                out int retreatForeignEdgeIndex,
+                                out int retreatSourcePassIndex,
+                                out string retreatTriggerEvidence))
+                        {
+                            result.EdgeConflictBudgetExhausted = 1;
+                            result.EdgeConflictUnresolvedCount++;
+                            blocker =
+                                "the T-junction could not be traced to a directly evidenced foreign band plane";
+                            break;
+                        }
+
+                        List<int> retreatEdgeIndices = new List<int>
+                        {
+                            retreatForeignEdgeIndex
+                        };
+                        List<int> protectedEdgeIndices =
+                            BuildPlaneCutProtectedEdgeSet(
+                                clusterEdgeIndices,
+                                retreatEdgeIndices);
+                        result.TopologyScaleSearchBasePass =
+                            latestTopologyCleanState.PassIndex;
+                        result.TopologyScaleSearchMode =
+                            "direct-foreign-band-plane-retreat";
+                        result.TopologyScaleSearchTriggerEvidence =
+                            retreatTriggerEvidence;
+                        result.TopologyScaleSearchTopologyLinkedEvidence =
+                            topologyFailure.GeneralizedClusterEvidence;
+                        result.TopologyScaleSearchClusterEvidence =
+                            FormatPlaneCutEdgeIndexEvidence(
+                                retreatEdgeIndices);
+                        result.TopologyScaleSearchProtectedEvidence =
+                            FormatPlaneCutEdgeIndexEvidence(
+                                protectedEdgeIndices);
+                        SetPlaneCutDebugFocusEdges(
+                            ref result,
+                            clusterEdgeIndices,
+                            retreatEdgeIndices);
+                        result.EdgeConflictTopologyRollbackCount++;
+
+                        bool searchSucceeded =
+                            TrySearchPlaneCutRetreatScales(
+                                sourceFaces,
+                                context,
+                                allCandidates,
+                                noJunctions,
+                                minimumStableEdgeLength,
+                                minimumStableFaceArea,
+                                minimumScaleByEdge,
+                                latestTopologyCleanState,
+                                retreatEdgeIndices,
+                                retreatVictimEdgeIndex,
+                                retreatForeignEdgeIndex,
+                                retreatSourcePassIndex,
+                                "direct-foreign-band-plane-retreat",
+                                "foreign-band-retreat-trial-",
+                                "direct-foreign-band-plane-retreat",
+                                "direct-foreign-band-plane-relative-factor",
+                                result.TopologyScaleSearchProtectedEvidence,
+                                "no tested foreign-plane retreat factor produced a band-clean, topology-clean, face-quality-clean, one-surface, mesh-valid shell",
+                                ref result,
+                                out Dictionary<int, float>
+                                    searchedScaleByEdge,
+                                out List<PlaneCutBevelCandidate>
+                                    searchedCandidates,
+                                out List<PolygonFace> searchedFaces,
+                                out string searchBlocker);
+
+                        if (!searchSucceeded &&
+                            TryResolvePlaneCutOpposingBandRetreatTarget(
+                                result.TopologyScaleTrials,
+                                retainedCandidates,
+                                retreatVictimEdgeIndex,
+                                retreatForeignEdgeIndex,
+                                out int opposingForeignEdgeIndex,
+                                out string dualTriggerEvidence))
+                        {
+                            retreatEdgeIndices = new List<int>
+                            {
+                                retreatForeignEdgeIndex,
+                                opposingForeignEdgeIndex
+                            };
+                            retreatEdgeIndices.Sort();
+                            protectedEdgeIndices =
+                                BuildPlaneCutProtectedEdgeSet(
+                                    clusterEdgeIndices,
+                                    retreatEdgeIndices);
+                            result.TopologyScaleSearchMode =
+                                "dual-endpoint-foreign-plane-retreat";
+                            result.TopologyScaleSearchTriggerEvidence =
+                                dualTriggerEvidence;
+                            result.TopologyScaleSearchClusterEvidence =
+                                FormatPlaneCutEdgeIndexEvidence(
+                                    retreatEdgeIndices);
+                            result.TopologyScaleSearchProtectedEvidence =
+                                FormatPlaneCutEdgeIndexEvidence(
+                                    protectedEdgeIndices);
+                            SetPlaneCutDebugFocusEdges(
+                                ref result,
+                                clusterEdgeIndices,
+                                retreatEdgeIndices);
+
+                            searchSucceeded =
+                                TrySearchPlaneCutRetreatScales(
+                                    sourceFaces,
+                                    context,
+                                    allCandidates,
+                                    noJunctions,
+                                    minimumStableEdgeLength,
+                                    minimumStableFaceArea,
+                                    minimumScaleByEdge,
+                                    latestTopologyCleanState,
+                                    retreatEdgeIndices,
+                                    retreatVictimEdgeIndex,
+                                    opposingForeignEdgeIndex,
+                                    retreatSourcePassIndex,
+                                    "dual-endpoint-foreign-plane-retreat",
+                                    "dual-endpoint-retreat-trial-",
+                                    "dual-endpoint-foreign-plane-retreat",
+                                    "dual-endpoint-relative-factor",
+                                    result.TopologyScaleSearchProtectedEvidence,
+                                    "no tested dual-endpoint retreat factor produced a band-clean, topology-clean, face-quality-clean, one-surface, mesh-valid shell",
+                                    ref result,
+                                    out searchedScaleByEdge,
+                                    out searchedCandidates,
+                                    out searchedFaces,
+                                    out searchBlocker);
+                        }
+
+                        latestAttemptedState =
+                            result.LatestAttemptedState;
+                        latestBandCleanState =
+                            result.LatestBandCleanState;
+                        latestTopologyCleanState =
+                            result.LatestTopologyCleanState;
+                        latestCertifiedState =
+                            result.LatestCertifiedState;
+                        if (result.RetryFailureDossiers.Count > 0)
+                        {
+                            latestRetryFailure =
+                                result.RetryFailureDossiers[
+                                    result.RetryFailureDossiers.Count - 1];
+                        }
+
+                        if (searchSucceeded)
+                        {
+                            scaleByEdge = searchedScaleByEdge;
+                            retainedCandidates = searchedCandidates;
+                            preparedFaces = searchedFaces;
+                            result.AttemptedPlanesBuilt =
+                                retainedCandidates.Count;
+                            result.CertifiedPlanesBuilt = 0;
+                            result.TrialRejectedPlanes =
+                                retainedCandidates.Count;
+                            result.PlanesBuilt =
+                                retainedCandidates.Count;
+                            result.AttemptedEdgeEvidence =
+                                FormatPlaneCutCandidateEdgeEvidence(
+                                    retainedCandidates);
+                            result.BuiltEdgeEvidence = "none";
+                            result.TrialRejectedEdgeEvidence =
+                                result.AttemptedEdgeEvidence;
+                            result.PlanesDeferred = localityDeferredCount;
+                            result.PlanesLocalized =
+                                CountLocalizedPlaneCutCandidates(
+                                    retainedCandidates);
+                            result.EdgeConflictResolvedCount = 1;
+                            result.EdgeConflictMinimumWidthScale =
+                                ResolveMinimumPlaneCutScale(scaleByEdge);
+                            return true;
+                        }
+
+                        result.EdgeConflictBudgetExhausted = 1;
+                        result.EdgeConflictUnresolvedCount++;
+                        blocker = string.IsNullOrEmpty(searchBlocker)
+                            ? "the bounded endpoint retreat searches found no fully valid factor"
+                            : searchBlocker;
+                        break;
+                    }
+
+                    bool mapped =
+                        TryBuildPlaneCutGeneralizedFailureCluster(
+                            retainedCandidates,
+                            topologyFailure,
+                            result.EdgeConflictWidthReductions,
+                            out clusterEdgeIndices,
+                            out clusterReasonEvidence);
+                    if (!mapped)
+                    {
+                        result.EdgeConflictBudgetExhausted = 1;
+                        result.EdgeConflictUnresolvedCount++;
+                        blocker =
+                            "the retry defect could not be mapped to a complete local bevel interaction cluster";
+                        break;
+                    }
+                    topologyFailure.GeneralizedClusterEvidence =
+                        FormatPlaneCutEdgeIndexEvidence(
+                            clusterEdgeIndices);
+                    topologyFailure.GeneralizedClusterReasonEvidence =
+                        clusterReasonEvidence;
+
+                    PlaneCutConflictWidthReductionRecord captured =
+                        new PlaneCutConflictWidthReductionRecord
+                        {
+                            PassIndex = passIndex + 1,
+                            VictimEdgeIndex =
+                                topologyFailure.LinkedEdgeIndices.Count > 0
+                                    ? topologyFailure.LinkedEdgeIndices[0]
+                                    : -1,
+                            ForeignEdgeIndex =
+                                topologyFailure.LinkedEdgeIndices.Count > 1
+                                    ? topologyFailure.LinkedEdgeIndices[1]
+                                    : -1,
+                            VertexIndex = -1,
+                            TriggerCategory = "topology-diagnostic",
+                            BandValid = bandClean ? 1 : 0,
+                            TopologyValid = 0,
+                            OpenEdgeCount = topologyFailure.OpenEdgeCount,
+                            NonManifoldEdgeCount =
+                                topologyFailure.NonManifoldEdgeCount,
+                            TJunctionCount = topologyFailure.TJunctionCount,
+                            InvalidFaceCount =
+                                topologyFailure.InvalidFaceCount,
+                            NonPlanarFaceCount =
+                                topologyFailure.NonPlanarFaceCount,
+                            ClusterReasonEvidence =
+                                clusterReasonEvidence,
+                            PreviousScaleEvidence =
+                                FormatPlaneCutScaleEvidence(
+                                    scaleByEdge,
+                                    clusterEdgeIndices),
+                            Result =
+                                "generalized-failure-dossier-captured-no-geometry-retry"
+                        };
+                    captured.ClusterEdgeIndices.AddRange(
+                        clusterEdgeIndices);
+                    result.EdgeConflictWidthReductions.Add(captured);
+                    result.EdgeConflictClusterCount =
+                        result.EdgeConflictWidthReductions.Count;
+                    result.EdgeConflictBudgetExhausted = 1;
+                    result.EdgeConflictUnresolvedCount++;
+                    blocker =
+                        "the generalized retry failure was captured; width-reduction geometry remains unchanged";
+                    break;
+                }
+                else if (!TryBuildPlaneCutConflictCluster(
+                        retainedCandidates,
+                        bandAudit,
+                        context,
+                        out clusterEdgeIndices))
+                {
+                    result.EdgeConflictBudgetExhausted = 1;
+                    result.EdgeConflictUnresolvedCount++;
+                    blocker = string.IsNullOrEmpty(bandBlocker)
+                        ? "the bevel-band conflict could not be mapped to a local edge cluster"
+                        : bandBlocker;
+                    break;
+                }
+                else
+                {
+                    clusterReasonEvidence =
+                        "band-conflict-and-incident-source-vertex-star";
+                }
+
+                int victimEdgeIndex = tJunctionFailure != null &&
+                        tJunctionFailure.LinkedEdgeIndices.Count > 0
+                    ? tJunctionFailure.LinkedEdgeIndices[0]
+                    : topologyFailure != null &&
+                        topologyFailure.LinkedEdgeIndices.Count > 0
+                        ? topologyFailure.LinkedEdgeIndices[0]
+                        : bandAudit.EdgeConflictVictimEdgeIndex;
+                int foreignEdgeIndex = tJunctionFailure != null &&
+                        tJunctionFailure.LinkedEdgeIndices.Count > 1
+                    ? tJunctionFailure.LinkedEdgeIndices[1]
+                    : topologyFailure != null &&
+                        topologyFailure.LinkedEdgeIndices.Count > 1
+                        ? topologyFailure.LinkedEdgeIndices[1]
+                        : bandAudit.EdgeConflictForeignEdgeIndex;
+                PlaneCutConflictWidthReductionRecord reduction =
+                    new PlaneCutConflictWidthReductionRecord
+                    {
+                        PassIndex = passIndex + 1,
+                        VictimEdgeIndex = victimEdgeIndex,
+                        ForeignEdgeIndex = foreignEdgeIndex,
+                        VertexIndex = topologyTriggered
+                            ? -1
+                            : bandAudit.EdgeConflictVertexIndex >= 0
+                                ? bandAudit.EdgeConflictVertexIndex
+                                : offendingVertex,
+                        TriggerCategory = topologyTriggered
+                            ? "topology"
+                            : "band-integrity",
+                        BandValid = bandClean ? 1 : 0,
+                        TopologyValid = retryGeometryClean ? 1 : 0,
+                        OpenEdgeCount =
+                            result.StageSeamRepaired.OpenEdgeCount,
+                        NonManifoldEdgeCount =
+                            result.StageSeamRepaired
+                                .NonManifoldEdgeCount,
+                        TJunctionCount =
+                            result.StageSeamRepaired.TJunctionCount,
+                        InvalidFaceCount =
+                            result.StageSeamRepaired.InvalidFaceCount,
+                        NonPlanarFaceCount =
+                            result.StageSeamRepaired
+                                .NonPlanarFaceCount,
+                        VictimCoverageRatio =
+                            bandAudit.EdgeConflictVictimCoverageRatio,
+                        ForeignAxialParameter =
+                            bandAudit.EdgeConflictForeignAxialParameter,
+                        ForeignSharedSpanRatio =
+                            bandAudit.EdgeConflictForeignSharedSpanRatio,
+                        ClusterReasonEvidence =
+                            clusterReasonEvidence
+                    };
+                reduction.ClusterEdgeIndices.AddRange(clusterEdgeIndices);
+                reduction.PreviousMinimumScale =
+                    ResolveMinimumPlaneCutScale(
+                        scaleByEdge,
+                        clusterEdgeIndices);
+                reduction.PreviousScaleEvidence =
+                    FormatPlaneCutScaleEvidence(
+                        scaleByEdge,
+                        clusterEdgeIndices);
+                reduction.RequestedScale =
+                    reduction.PreviousMinimumScale * reductionFactor;
+                reduction.ClusterFloorScale =
+                    ResolveMaximumPlaneCutScale(
+                        minimumScaleByEdge,
+                        clusterEdgeIndices);
+
+                if (topologyTriggered &&
+                    lastTopologyCleanScaleByEdge != null)
+                {
+                    scaleByEdge = ClonePlaneCutScaleMap(
+                        lastTopologyCleanScaleByEdge);
+                    reduction.TopologyRollbackApplied = 1;
+                    reduction.RollbackScaleEvidence =
+                        FormatPlaneCutScaleEvidence(
+                            scaleByEdge,
+                            clusterEdgeIndices);
+                    result.EdgeConflictTopologyRollbackCount++;
+                }
+
+                bool reduced = false;
+                float appliedMinimumScale = 1f;
+                for (int clusterIndex = 0;
+                     clusterIndex < clusterEdgeIndices.Count;
+                     clusterIndex++)
+                {
+                    int edgeIndex = clusterEdgeIndices[clusterIndex];
+                    float currentScale = scaleByEdge[edgeIndex];
+                    float minimumScale = minimumScaleByEdge[edgeIndex];
+                    float nextScale = Mathf.Max(
+                        minimumScale,
+                        Mathf.Min(
+                            currentScale,
+                            reduction.RequestedScale));
+                    if (nextScale < currentScale - 0.000001f)
+                    {
+                        scaleByEdge[edgeIndex] = nextScale;
+                        reduced = true;
+                    }
+                    appliedMinimumScale = Mathf.Min(
+                        appliedMinimumScale,
+                        scaleByEdge[edgeIndex]);
+                }
+                reduction.AppliedMinimumScale = appliedMinimumScale;
+                reduction.AppliedScaleEvidence =
+                    FormatPlaneCutScaleEvidence(
+                        scaleByEdge,
+                        clusterEdgeIndices);
+
+                if (!reduced)
+                {
+                    reduction.Result = topologyTriggered
+                        ? "topology-unresolved-geometric-floor"
+                        : "unresolved-geometric-floor";
+                    result.EdgeConflictWidthReductions.Add(reduction);
+                    result.EdgeConflictClusterCount =
+                        result.EdgeConflictWidthReductions.Count;
+                    result.EdgeConflictBudgetExhausted = 1;
+                    result.EdgeConflictUnresolvedCount++;
+                    blocker = topologyTriggered
+                        ? "the topology conflict cluster reached its geometric minimum width"
+                        : string.IsNullOrEmpty(bandBlocker)
+                            ? "the conflicting bevel cluster reached its geometric minimum width"
+                            : bandBlocker +
+                                "; conflict cluster reached its geometric minimum width";
+                    break;
+                }
+
+                reduction.Result = topologyTriggered
+                    ? "topology-rejected-expanded-reduced-and-retry"
+                    : "band-reduced-and-retry";
+                result.EdgeConflictWidthReductions.Add(reduction);
+                result.EdgeConflictClusterCount =
+                    result.EdgeConflictWidthReductions.Count;
+                result.EdgeConflictWidthReductionCount++;
+                result.EdgeConflictMinimumWidthScale = Mathf.Min(
+                    result.EdgeConflictMinimumWidthScale,
+                    appliedMinimumScale);
+            }
+
+            CopyPlaneCutBandAudit(lastBandAudit, ref result);
+            result.LatestAttemptedState = latestAttemptedState;
+            result.LatestBandCleanState = latestBandCleanState;
+            result.LatestTopologyCleanState = latestTopologyCleanState;
+            result.LatestCertifiedState = latestCertifiedState;
+            result.AttemptedPlanesBuilt = latestAttemptedState == null
+                ? retainedCandidates.Count
+                : latestAttemptedState.Candidates.Count;
+            result.CertifiedPlanesBuilt = latestCertifiedState == null
+                ? 0
+                : latestCertifiedState.Candidates.Count;
+            result.TrialRejectedPlanes = Mathf.Max(
+                0,
+                result.AttemptedPlanesBuilt -
+                    result.CertifiedPlanesBuilt);
+            result.PlanesBuilt = result.CertifiedPlanesBuilt;
+            result.AttemptedEdgeEvidence = latestAttemptedState == null
+                ? FormatPlaneCutCandidateEdgeEvidence(
+                    retainedCandidates)
+                : FormatPlaneCutCandidateEdgeEvidence(
+                    latestAttemptedState.Candidates);
+            result.BuiltEdgeEvidence = latestCertifiedState == null
+                ? "none"
+                : FormatPlaneCutCandidateEdgeEvidence(
+                    latestCertifiedState.Candidates);
+            result.TrialRejectedEdgeEvidence =
+                FormatPlaneCutCandidateDifferenceEvidence(
+                    latestAttemptedState == null
+                        ? retainedCandidates
+                        : latestAttemptedState.Candidates,
+                    latestCertifiedState == null
+                        ? null
+                        : latestCertifiedState.Candidates);
+            result.PlanesDeferred = localityDeferredCount;
+            result.PlanesLocalized = CountLocalizedPlaneCutCandidates(
+                retainedCandidates);
+            if (latestRetryFailure != null)
+            {
+                ApplyPlaneCutRetryFailureToResult(
+                    latestRetryFailure,
+                    minimumStableEdgeLength,
+                    ref result);
+            }
+            return false;
+        }
+
+        private static bool IsPlaneCutRetryGeometryClean(
+            PlaneCutStageSnapshot snapshot)
+        {
+            return snapshot.OpenEdgeCount == 0 &&
+                snapshot.NonManifoldEdgeCount == 0 &&
+                snapshot.TJunctionCount == 0 &&
+                snapshot.InvalidFaceCount == 0 &&
+                snapshot.NonPlanarFaceCount == 0;
+        }
+
+        private static Dictionary<int, float> ClonePlaneCutScaleMap(
+            Dictionary<int, float> source)
+        {
+            return source == null
+                ? new Dictionary<int, float>()
+                : new Dictionary<int, float>(source);
+        }
+
+        private static string ResolvePlaneCutFirstRetryFailureStage(
+            PlaneCutBevelAuditResult result)
+        {
+            string earliest = string.Empty;
+            int earliestRank = int.MaxValue;
+            ConsiderPlaneCutFailureStage(
+                result.FirstOpenEdgeStage,
+                ref earliest,
+                ref earliestRank);
+            ConsiderPlaneCutFailureStage(
+                result.FirstTJunctionStage,
+                ref earliest,
+                ref earliestRank);
+            ConsiderPlaneCutFailureStage(
+                result.FirstNonPlanarStage,
+                ref earliest,
+                ref earliestRank);
+            return string.IsNullOrEmpty(earliest)
+                ? "AfterSeamRepair"
+                : earliest;
+        }
+
+        private static void ConsiderPlaneCutFailureStage(
+            string stage,
+            ref string earliest,
+            ref int earliestRank)
+        {
+            if (string.IsNullOrEmpty(stage))
+            {
+                return;
+            }
+            int rank = ResolvePlaneCutStageRank(stage);
+            if (rank >= earliestRank)
+            {
+                return;
+            }
+            earliest = stage;
+            earliestRank = rank;
+        }
+
+        private static int ResolvePlaneCutStageRank(string stage)
+        {
+            return stage switch
+            {
+                "AfterPlaneConstruction" => 0,
+                "AfterSanitation" => 1,
+                "AfterWeld" => 2,
+                "AfterBoundaryConformity" => 3,
+                "AfterSeamRepair" => 4,
+                "FinalCertification" => 5,
+                _ => 6
+            };
+        }
+
+        private static PlaneCutSolverTransactionState
+            CapturePlaneCutSolverTransactionState(
+                string name,
+                int passIndex,
+                List<PlaneCutBevelCandidate> candidates,
+                List<PolygonFace> faces,
+                Dictionary<int, float> scaleByEdge,
+                bool bandClean,
+                bool geometryClean,
+                PlaneCutStageSnapshot stage)
+        {
+            PlaneCutSolverTransactionState state =
+                new PlaneCutSolverTransactionState
+                {
+                    Name = name,
+                    PassIndex = passIndex,
+                    BandClean = bandClean ? 1 : 0,
+                    GeometryClean = geometryClean ? 1 : 0,
+                    Faces = faces == null
+                        ? new List<PolygonFace>()
+                        : ClonePolygonFacesForPlaneCutAudit(faces),
+                    ScaleByEdge = ClonePlaneCutScaleMap(scaleByEdge),
+                    Stage = stage
+                };
+            if (candidates != null)
+            {
+                state.Candidates.AddRange(candidates);
+            }
+            return state;
+        }
+
+        private static PlaneCutRetryFailureDossier
+            CapturePlaneCutRetryFailureDossier(
+                int passIndex,
+                string stage,
+                List<PolygonFace> faces,
+                ChamferTopologyContext context,
+                List<PlaneCutBevelCandidate> candidates,
+                List<PlaneCutVertexJunctionCandidate> junctions,
+                float minimumStableEdgeLength,
+                float minimumStableFaceArea,
+                Dictionary<int, float> scaleByEdge,
+                ref PlaneCutBevelAuditResult result)
+        {
+            PlaneCutRetryFailureDossier dossier =
+                new PlaneCutRetryFailureDossier
+                {
+                    PassIndex = passIndex,
+                    Stage = stage,
+                    AttemptedBuiltCount = candidates == null
+                        ? 0
+                        : candidates.Count,
+                    CandidateEdgeEvidence =
+                        FormatPlaneCutCandidateEdgeEvidence(candidates),
+                    ScaleEvidence = FormatPlaneCutScaleEvidence(
+                        scaleByEdge,
+                        CollectPlaneCutCandidateEdgeIndices(candidates))
+                };
+
+            PlaneCutBevelAuditResult scratch =
+                new PlaneCutBevelAuditResult
+                {
+                    CoverageAudit = result.CoverageAudit,
+                    EdgeConflictWidthReductions =
+                        result.EdgeConflictWidthReductions,
+                    FaceQualityFailures =
+                        new List<PlaneCutFaceQualityFailureRecord>(),
+                    OpenEdgeFailures =
+                        new List<PlaneCutOpenEdgeFailureRecord>(),
+                    TJunctionFailures =
+                        new List<PlaneCutTJunctionFailureRecord>(),
+                    FaceFirstNonPlanarStageByIdentity =
+                        new Dictionary<string, string>(),
+                    BoundaryConformityTouchedFaces =
+                        new HashSet<string>(),
+                    SeamRepairTouchedFaces =
+                        new HashSet<string>(),
+                    SeamRepairMaximumMovementByIdentity =
+                        new Dictionary<string, float>(),
+                    TopologyScaleSearchBasePass = -1,
+                    TopologyScaleSearchCommittedFactor = -1f,
+                    TopologyScaleSearchHighestValidFactor = -1f,
+                    TopologyScaleSearchMode = "none",
+                    TopologyScaleSearchTriggerEvidence = "none",
+                    TopologyScaleSearchTopologyLinkedEvidence = "none",
+                    FirstOpenEdgeStage = stage,
+                    FirstTJunctionStage = stage,
+                    FirstNonPlanarStage = stage
+                };
+
+            EdgeWearTopologyStats topology = faces == null
+                ? default
+                : AuditEdgeWearTopology(
+                    faces,
+                    minimumStableEdgeLength);
+            dossier.OpenEdgeCount = topology.OpenEdgeCount;
+            dossier.NonManifoldEdgeCount = topology.NonManifoldEdgeCount;
+            dossier.TJunctionCount = topology.TJunctionCount;
+            dossier.InvalidFaceCount = faces == null
+                ? 0
+                : CountInvalidPlaneCutFaces(
+                    faces,
+                    minimumStableFaceArea);
+
+            if (faces != null)
+            {
+                for (int faceIndex = 0;
+                     faceIndex < faces.Count;
+                     faceIndex++)
+                {
+                    PolygonFace face = faces[faceIndex];
+                    if (face == null ||
+                        face.Feature !=
+                            PolygonFaceFeature.ConvexEdgeWear)
+                    {
+                        continue;
+                    }
+                    string identity = BuildPlaneCutFaceIdentity(
+                        face,
+                        faceIndex);
+                    if (!scratch.FaceFirstNonPlanarStageByIdentity
+                            .ContainsKey(identity))
+                    {
+                        scratch.FaceFirstNonPlanarStageByIdentity.Add(
+                            identity,
+                            stage);
+                    }
+                }
+                AuditPlaneCutFaceQuality(
+                    faces,
+                    junctions ??
+                        new List<PlaneCutVertexJunctionCandidate>(),
+                    minimumStableEdgeLength,
+                    ref scratch);
+                dossier.NonPlanarFaceCount =
+                    scratch.FaceQualityNonPlanarCount;
+                dossier.NonPlanarFaceFailures.AddRange(
+                    scratch.FaceQualityFailures);
+
+                AuditPlaneCutOpenEdgeFailures(
+                    faces,
+                    context,
+                    candidates,
+                    minimumStableEdgeLength,
+                    ref scratch);
+                dossier.OpenEdgeFailures.AddRange(
+                    scratch.OpenEdgeFailures);
+
+                if (topology.TJunctionCount > 0)
+                {
+                    CapturePlaneCutTJunctionFailures(
+                        faces,
+                        stage,
+                        minimumStableEdgeLength,
+                        candidates,
+                        ref scratch);
+                    dossier.TJunctionFailures.AddRange(
+                        scratch.TJunctionFailures);
+                }
+
+                dossier.NonManifoldEvidence =
+                    BuildPlaneCutNonManifoldFailureEvidence(
+                        faces,
+                        dossier.LinkedEdgeIndices);
+                dossier.InvalidFaceEvidence =
+                    BuildPlaneCutInvalidFaceFailureEvidence(
+                        faces,
+                        minimumStableFaceArea,
+                        dossier.LinkedEdgeIndices);
+            }
+
+            CollectPlaneCutRetryLinkedEdges(
+                dossier,
+                candidates,
+                minimumStableEdgeLength);
+            dossier.Cause = ResolvePlaneCutRetryFailureCause(dossier);
+            return dossier;
+        }
+
+        private static List<int> CollectPlaneCutCandidateEdgeIndices(
+            List<PlaneCutBevelCandidate> candidates)
+        {
+            List<int> indices = new List<int>();
+            if (candidates == null)
+            {
+                return indices;
+            }
+            for (int index = 0; index < candidates.Count; index++)
+            {
+                indices.Add(candidates[index].SourceEdgeIndex);
+            }
+            indices.Sort();
+            return indices;
+        }
+
+        private static void CollectPlaneCutRetryLinkedEdges(
+            PlaneCutRetryFailureDossier dossier,
+            List<PlaneCutBevelCandidate> candidates,
+            float minimumStableEdgeLength)
+        {
+            SortedSet<int> linked = new SortedSet<int>(
+                dossier.LinkedEdgeIndices);
+            for (int index = 0;
+                 index < dossier.TJunctionFailures.Count;
+                 index++)
+            {
+                linked.UnionWith(
+                    dossier.TJunctionFailures[index].LinkedEdgeIndices);
+            }
+            for (int index = 0;
+                 index < dossier.OpenEdgeFailures.Count;
+                 index++)
+            {
+                PlaneCutOpenEdgeFailureRecord failure =
+                    dossier.OpenEdgeFailures[index];
+                AddPlaneCutFailureProvenanceEdge(
+                    failure.FaceProvenanceKind,
+                    failure.FaceProvenanceIndex,
+                    linked);
+                AddPlaneCutFailureProvenanceEdge(
+                    failure.NearestFaceProvenanceKind,
+                    failure.NearestFaceProvenanceIndex,
+                    linked);
+                AddPlaneCutCandidatePlaneMatches(
+                    candidates,
+                    failure.Start,
+                    minimumStableEdgeLength,
+                    linked);
+                AddPlaneCutCandidatePlaneMatches(
+                    candidates,
+                    failure.End,
+                    minimumStableEdgeLength,
+                    linked);
+            }
+            for (int index = 0;
+                 index < dossier.NonPlanarFaceFailures.Count;
+                 index++)
+            {
+                PlaneCutFaceQualityFailureRecord failure =
+                    dossier.NonPlanarFaceFailures[index];
+                AddPlaneCutFailureProvenanceEdge(
+                    failure.ProvenanceKind,
+                    failure.ProvenanceIndex,
+                    linked);
+                AddPlaneCutCandidatePlaneMatches(
+                    candidates,
+                    failure.OffendingVertexPosition,
+                    minimumStableEdgeLength,
+                    linked);
+            }
+            dossier.LinkedEdgeIndices.Clear();
+            dossier.LinkedEdgeIndices.AddRange(linked);
+        }
+
+        private static void AddPlaneCutFailureProvenanceEdge(
+            PolygonFaceProvenanceKind provenanceKind,
+            int provenanceIndex,
+            SortedSet<int> linked)
+        {
+            if (provenanceKind ==
+                    PolygonFaceProvenanceKind.EdgeBevelPlane &&
+                provenanceIndex >= 0)
+            {
+                linked.Add(provenanceIndex);
+            }
+        }
+
+        private static void AddPlaneCutCandidatePlaneMatches(
+            List<PlaneCutBevelCandidate> candidates,
+            Vector3 position,
+            float minimumStableEdgeLength,
+            SortedSet<int> linked)
+        {
+            if (candidates == null || !IsFinite(position))
+            {
+                return;
+            }
+            float baseTolerance = Mathf.Max(
+                PointMergeDistance * 8f,
+                minimumStableEdgeLength * 0.002f);
+            for (int index = 0; index < candidates.Count; index++)
+            {
+                PlaneCutBevelCandidate candidate = candidates[index];
+                float tolerance = Mathf.Max(
+                    baseTolerance,
+                    candidate.PlaneTolerance);
+                if (Mathf.Abs(
+                        candidate.Plane.SignedDistance(position)) <=
+                    tolerance)
+                {
+                    linked.Add(candidate.SourceEdgeIndex);
+                }
+            }
+        }
+
+        private static string ResolvePlaneCutRetryFailureCause(
+            PlaneCutRetryFailureDossier dossier)
+        {
+            List<string> causes = new List<string>();
+            if (dossier.OpenEdgeCount > 0)
+            {
+                causes.Add("open-edges:" + dossier.OpenEdgeCount);
+            }
+            if (dossier.NonManifoldEdgeCount > 0)
+            {
+                causes.Add(
+                    "non-manifold-edges:" +
+                    dossier.NonManifoldEdgeCount);
+            }
+            if (dossier.TJunctionCount > 0)
+            {
+                causes.Add("t-junctions:" + dossier.TJunctionCount);
+            }
+            if (dossier.InvalidFaceCount > 0)
+            {
+                causes.Add("invalid-faces:" + dossier.InvalidFaceCount);
+            }
+            if (dossier.NonPlanarFaceCount > 0)
+            {
+                causes.Add(
+                    "non-planar-faces:" +
+                    dossier.NonPlanarFaceCount);
+            }
+            return causes.Count == 0
+                ? "none"
+                : string.Join("+", causes);
+        }
+
+        private static string BuildPlaneCutNonManifoldFailureEvidence(
+            List<PolygonFace> faces,
+            List<int> linkedEdgeIndices)
+        {
+            if (faces == null)
+            {
+                return "none";
+            }
+            Dictionary<EdgeKey, List<int>> incidentByEdge =
+                new Dictionary<EdgeKey, List<int>>();
+            Dictionary<EdgeKey, Vector3> startByEdge =
+                new Dictionary<EdgeKey, Vector3>();
+            Dictionary<EdgeKey, Vector3> endByEdge =
+                new Dictionary<EdgeKey, Vector3>();
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                if (face == null || face.Vertices == null ||
+                    face.Vertices.Count < 2)
+                {
+                    continue;
+                }
+                for (int vertexIndex = 0;
+                     vertexIndex < face.Vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 start = face.Vertices[vertexIndex];
+                    Vector3 end = face.Vertices[
+                        (vertexIndex + 1) % face.Vertices.Count];
+                    EdgeKey key = new EdgeKey(start, end);
+                    if (!incidentByEdge.TryGetValue(
+                            key,
+                            out List<int> incidents))
+                    {
+                        incidents = new List<int>();
+                        incidentByEdge.Add(key, incidents);
+                        startByEdge.Add(key, start);
+                        endByEdge.Add(key, end);
+                    }
+                    incidents.Add(faceIndex);
+                }
+            }
+
+            StringBuilder builder = new StringBuilder();
+            SortedSet<int> linked = new SortedSet<int>(linkedEdgeIndices);
+            List<EdgeKey> orderedKeys =
+                new List<EdgeKey>(incidentByEdge.Keys);
+            orderedKeys.Sort((left, right) =>
+                string.CompareOrdinal(
+                    FormatPlaneCutVector(startByEdge[left]) + "->" +
+                        FormatPlaneCutVector(endByEdge[left]),
+                    FormatPlaneCutVector(startByEdge[right]) + "->" +
+                        FormatPlaneCutVector(endByEdge[right])));
+            for (int keyIndex = 0;
+                 keyIndex < orderedKeys.Count;
+                 keyIndex++)
+            {
+                EdgeKey key = orderedKeys[keyIndex];
+                List<int> incidents = incidentByEdge[key];
+                if (incidents.Count <= 2)
+                {
+                    continue;
+                }
+                incidents.Sort();
+                if (builder.Length > 0)
+                {
+                    builder.Append('|');
+                }
+                builder.Append("edge=");
+                builder.Append(FormatPlaneCutVector(startByEdge[key]));
+                builder.Append("->");
+                builder.Append(FormatPlaneCutVector(endByEdge[key]));
+                builder.Append(",faces={");
+                for (int index = 0; index < incidents.Count; index++)
+                {
+                    int faceIndex = incidents[index];
+                    if (index > 0)
+                    {
+                        builder.Append('/');
+                    }
+                    PolygonFace face = faces[faceIndex];
+                    builder.Append(BuildPlaneCutFaceIdentity(
+                        face,
+                        faceIndex));
+                    builder.Append('#');
+                    builder.Append(faceIndex);
+                    AddPlaneCutFailureProvenanceEdge(
+                        face.ProvenanceKind,
+                        face.ProvenanceIndex,
+                        linked);
+                }
+                builder.Append('}');
+            }
+            linkedEdgeIndices.Clear();
+            linkedEdgeIndices.AddRange(linked);
+            return builder.Length == 0 ? "none" : builder.ToString();
+        }
+
+        private static string BuildPlaneCutInvalidFaceFailureEvidence(
+            List<PolygonFace> faces,
+            float minimumStableFaceArea,
+            List<int> linkedEdgeIndices)
+        {
+            if (faces == null)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            SortedSet<int> linked = new SortedSet<int>(linkedEdgeIndices);
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                string reason = ResolvePlaneCutInvalidFaceReason(
+                    face,
+                    minimumStableFaceArea);
+                if (string.IsNullOrEmpty(reason))
+                {
+                    continue;
+                }
+                if (builder.Length > 0)
+                {
+                    builder.Append('|');
+                }
+                builder.Append("face=");
+                builder.Append(BuildPlaneCutFaceIdentity(face, faceIndex));
+                builder.Append('#');
+                builder.Append(faceIndex);
+                builder.Append(",reason=");
+                builder.Append(reason);
+                if (face != null)
+                {
+                    AddPlaneCutFailureProvenanceEdge(
+                        face.ProvenanceKind,
+                        face.ProvenanceIndex,
+                        linked);
+                }
+            }
+            linkedEdgeIndices.Clear();
+            linkedEdgeIndices.AddRange(linked);
+            return builder.Length == 0 ? "none" : builder.ToString();
+        }
+
+        private static string ResolvePlaneCutInvalidFaceReason(
+            PolygonFace face,
+            float minimumStableFaceArea)
+        {
+            if (face == null)
+            {
+                return "null-face";
+            }
+            if (face.Vertices == null || face.Vertices.Count < 3)
+            {
+                return "fewer-than-three-vertices";
+            }
+            if (!IsFinite(face.Normal) ||
+                face.Normal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return "invalid-authored-normal";
+            }
+            for (int index = 0; index < face.Vertices.Count; index++)
+            {
+                if (!IsFinite(face.Vertices[index]))
+                {
+                    return "non-finite-vertex:" + index;
+                }
+            }
+            float area = CalculatePolygonArea(face.Vertices);
+            if (area <= minimumStableFaceArea)
+            {
+                return "area:" + area.ToString("G9") +
+                    "<=" + minimumStableFaceArea.ToString("G9");
+            }
+            Vector3 measuredNormal =
+                CalculatePolygonNormal(face.Vertices);
+            if (!IsFinite(measuredNormal) ||
+                measuredNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return "invalid-measured-normal";
+            }
+            if (Vector3.Dot(measuredNormal, face.Normal) <= 0f)
+            {
+                return "winding-opposes-authored-normal";
+            }
+            return string.Empty;
+        }
+
+        private static bool TryBuildPlaneCutGeneralizedFailureCluster(
+            List<PlaneCutBevelCandidate> activeCandidates,
+            PlaneCutRetryFailureDossier failure,
+            List<PlaneCutConflictWidthReductionRecord> reductions,
+            out List<int> clusterEdgeIndices,
+            out string reasonEvidence)
+        {
+            clusterEdgeIndices = new List<int>();
+            reasonEvidence = string.Empty;
+            if (failure == null ||
+                failure.LinkedEdgeIndices.Count == 0)
+            {
+                return false;
+            }
+
+            Dictionary<int, SortedSet<string>> reasons =
+                new Dictionary<int, SortedSet<string>>();
+            HashSet<int> clusterEdges = new HashSet<int>();
+            HashSet<int> clusterVertices = new HashSet<int>();
+            for (int edgeIndex = 0;
+                 edgeIndex < failure.LinkedEdgeIndices.Count;
+                 edgeIndex++)
+            {
+                AddPlaneCutTopologyClusterEdge(
+                    activeCandidates,
+                    failure.LinkedEdgeIndices[edgeIndex],
+                    "retry-failure-" + failure.Cause,
+                    clusterEdges,
+                    clusterVertices,
+                    reasons);
+            }
+
+            PlaneCutConflictWidthReductionRecord previousConflict =
+                FindLatestPlaneCutConflictIntersectingEdges(
+                    reductions,
+                    clusterEdges);
+            if (previousConflict != null)
+            {
+                for (int edgeIndex = 0;
+                     edgeIndex <
+                         previousConflict.ClusterEdgeIndices.Count;
+                     edgeIndex++)
+                {
+                    AddPlaneCutTopologyClusterEdge(
+                        activeCandidates,
+                        previousConflict.ClusterEdgeIndices[edgeIndex],
+                        "previous-conflict-pass-" +
+                            previousConflict.PassIndex,
+                        clusterEdges,
+                        clusterVertices,
+                        reasons);
+                }
+            }
+
+            HashSet<int> interactionVertices =
+                new HashSet<int>(clusterVertices);
+            for (int candidateIndex = 0;
+                 candidateIndex < activeCandidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate =
+                    activeCandidates[candidateIndex];
+                if (!interactionVertices.Contains(candidate.VertexA) &&
+                    !interactionVertices.Contains(candidate.VertexB))
+                {
+                    continue;
+                }
+                AddPlaneCutTopologyClusterEdge(
+                    activeCandidates,
+                    candidate.SourceEdgeIndex,
+                    "incident-source-vertex-star",
+                    clusterEdges,
+                    clusterVertices,
+                    reasons);
+            }
+
+            clusterEdgeIndices.AddRange(clusterEdges);
+            clusterEdgeIndices.Sort();
+            reasonEvidence = FormatPlaneCutClusterReasonEvidence(
+                clusterEdgeIndices,
+                reasons);
+            return clusterEdgeIndices.Count > 0;
+        }
+
+        private static void ApplyPlaneCutRetryFailureToResult(
+            PlaneCutRetryFailureDossier failure,
+            float minimumStableEdgeLength,
+            ref PlaneCutBevelAuditResult result)
+        {
+            if (failure == null)
+            {
+                return;
+            }
+            result.OpenEdgeCount = failure.OpenEdgeCount;
+            result.NonManifoldEdgeCount =
+                failure.NonManifoldEdgeCount;
+            result.TJunctionCount = failure.TJunctionCount;
+            result.InvalidFaceCount = failure.InvalidFaceCount;
+            result.FaceQualityNonPlanarCount =
+                failure.NonPlanarFaceCount;
+            result.FaceQualityPlanarityTolerance =
+                ResolvePlaneCutPlanarityTolerance(
+                    minimumStableEdgeLength);
+            result.FaceQualityNormalSpreadToleranceDegrees =
+                PlaneCutMaximumNormalSpreadDegrees;
+            result.OpenEdgeFailures.Clear();
+            result.OpenEdgeFailures.AddRange(
+                failure.OpenEdgeFailures);
+            result.FaceQualityFailures.Clear();
+            result.FaceQualityFailures.AddRange(
+                failure.NonPlanarFaceFailures);
+            result.TJunctionFailures.Clear();
+            result.TJunctionFailures.AddRange(
+                failure.TJunctionFailures);
+            result.FirstOpenEdgeStage = failure.OpenEdgeCount > 0
+                ? failure.Stage
+                : string.Empty;
+            result.FirstTJunctionStage = failure.TJunctionCount > 0
+                ? failure.Stage
+                : string.Empty;
+            result.FirstNonPlanarStage =
+                failure.NonPlanarFaceCount > 0
+                    ? failure.Stage
+                    : string.Empty;
+        }
+
+        private static bool TryBuildMinimalPlaneCutTopologyCluster(
+            List<PlaneCutBevelCandidate> activeCandidates,
+            List<PlaneCutTJunctionFailureRecord> tJunctionFailures,
+            out List<int> clusterEdgeIndices,
+            out string reasonEvidence,
+            out PlaneCutTJunctionFailureRecord failure)
+        {
+            clusterEdgeIndices = new List<int>();
+            reasonEvidence = string.Empty;
+            failure = null;
+            if (activeCandidates == null ||
+                tJunctionFailures == null ||
+                tJunctionFailures.Count == 0)
+            {
+                return false;
+            }
+
+            failure = tJunctionFailures[0];
+            SortedSet<int> exactEdges = new SortedSet<int>();
+            for (int failureIndex = 0;
+                 failureIndex < tJunctionFailures.Count;
+                 failureIndex++)
+            {
+                PlaneCutTJunctionFailureRecord exactFailure =
+                    tJunctionFailures[failureIndex];
+                for (int edgeIndex = 0;
+                     edgeIndex < exactFailure.LinkedEdgeIndices.Count;
+                     edgeIndex++)
+                {
+                    int sourceEdgeIndex =
+                        exactFailure.LinkedEdgeIndices[edgeIndex];
+                    if (TryFindPlaneCutCandidateBySourceEdge(
+                            activeCandidates,
+                            sourceEdgeIndex,
+                            out PlaneCutBevelCandidate _))
+                    {
+                        exactEdges.Add(sourceEdgeIndex);
+                    }
+                }
+            }
+
+            clusterEdgeIndices.AddRange(exactEdges);
+            if (clusterEdgeIndices.Count == 0)
+            {
+                return false;
+            }
+
+            StringBuilder reasons = new StringBuilder();
+            for (int edgeIndex = 0;
+                 edgeIndex < clusterEdgeIndices.Count;
+                 edgeIndex++)
+            {
+                if (edgeIndex > 0)
+                {
+                    reasons.Append('/');
+                }
+                reasons.Append(clusterEdgeIndices[edgeIndex]);
+                reasons.Append("=exact-tjunction-link");
+            }
+            reasonEvidence = reasons.ToString();
+            return true;
+        }
+
+        private static bool TryResolvePlaneCutForeignBandRetreatTarget(
+            List<PlaneCutBevelCandidate> activeCandidates,
+            List<PlaneCutConflictWidthReductionRecord> reductions,
+            List<int> topologyLinkedEdgeIndices,
+            out int victimEdgeIndex,
+            out int foreignEdgeIndex,
+            out int sourcePassIndex,
+            out string triggerEvidence)
+        {
+            victimEdgeIndex = -1;
+            foreignEdgeIndex = -1;
+            sourcePassIndex = -1;
+            triggerEvidence = string.Empty;
+            if (activeCandidates == null ||
+                reductions == null ||
+                topologyLinkedEdgeIndices == null ||
+                topologyLinkedEdgeIndices.Count == 0)
+            {
+                return false;
+            }
+
+            HashSet<int> topologyLinkedEdges = new HashSet<int>(
+                topologyLinkedEdgeIndices);
+            for (int recordIndex = reductions.Count - 1;
+                 recordIndex >= 0;
+                 recordIndex--)
+            {
+                PlaneCutConflictWidthReductionRecord reduction =
+                    reductions[recordIndex];
+                if (!string.Equals(
+                        reduction.TriggerCategory,
+                        "band-integrity",
+                        StringComparison.Ordinal) ||
+                    !topologyLinkedEdges.Contains(
+                        reduction.VictimEdgeIndex) ||
+                    reduction.ForeignEdgeIndex < 0 ||
+                    reduction.ForeignEdgeIndex ==
+                        reduction.VictimEdgeIndex ||
+                    !TryFindPlaneCutCandidateBySourceEdge(
+                        activeCandidates,
+                        reduction.ForeignEdgeIndex,
+                        out PlaneCutBevelCandidate _))
+                {
+                    continue;
+                }
+
+                victimEdgeIndex = reduction.VictimEdgeIndex;
+                foreignEdgeIndex = reduction.ForeignEdgeIndex;
+                sourcePassIndex = reduction.PassIndex;
+                triggerEvidence =
+                    "bandPass:" + reduction.PassIndex +
+                    ",victim:" + reduction.VictimEdgeIndex +
+                    ",foreign:" + reduction.ForeignEdgeIndex +
+                    ",foreignAxial:" +
+                        reduction.ForeignAxialParameter.ToString("G9") +
+                    ",foreignSpan:" +
+                        reduction.ForeignSharedSpanRatio.ToString("G9") +
+                    ",topologyLinked:{" +
+                        FormatPlaneCutEdgeIndexEvidence(
+                            topologyLinkedEdgeIndices) + "}";
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryResolvePlaneCutOpposingBandRetreatTarget(
+            List<PlaneCutTopologyScaleTrialRecord> trials,
+            List<PlaneCutBevelCandidate> activeCandidates,
+            int victimEdgeIndex,
+            int initialForeignEdgeIndex,
+            out int opposingForeignEdgeIndex,
+            out string triggerEvidence)
+        {
+            opposingForeignEdgeIndex = -1;
+            triggerEvidence = string.Empty;
+            if (trials == null || activeCandidates == null)
+            {
+                return false;
+            }
+
+            for (int trialIndex = 0;
+                 trialIndex < trials.Count;
+                 trialIndex++)
+            {
+                PlaneCutTopologyScaleTrialRecord trial = trials[trialIndex];
+                if (!string.Equals(
+                        trial.SearchMode,
+                        "direct-foreign-band-plane-retreat",
+                        StringComparison.Ordinal) ||
+                    trial.BandEvaluated != 1 ||
+                    trial.BandValid != 0 ||
+                    trial.TopologyValid != 1 ||
+                    trial.BandVictimEdgeIndex != victimEdgeIndex ||
+                    trial.BandForeignEdgeIndex < 0 ||
+                    trial.BandForeignEdgeIndex == victimEdgeIndex ||
+                    trial.BandForeignEdgeIndex == initialForeignEdgeIndex ||
+                    !TryFindPlaneCutCandidateBySourceEdge(
+                        activeCandidates,
+                        trial.BandForeignEdgeIndex,
+                        out PlaneCutBevelCandidate _))
+                {
+                    continue;
+                }
+
+                opposingForeignEdgeIndex = trial.BandForeignEdgeIndex;
+                triggerEvidence =
+                    "directTrial:" + trial.TrialIndex +
+                    ",victim:" + victimEdgeIndex +
+                    ",foreignA:" + initialForeignEdgeIndex +
+                    ",foreignB:" + opposingForeignEdgeIndex +
+                    ",foreignBAxial:" +
+                        trial.BandForeignAxialParameter.ToString("G9") +
+                    ",foreignBSpan:" +
+                        trial.BandForeignSharedSpanRatio.ToString("G9");
+                return true;
+            }
+
+            return false;
+        }
+
+        private static List<int> BuildPlaneCutProtectedEdgeSet(
+            List<int> topologyLinkedEdgeIndices,
+            List<int> retreatEdgeIndices)
+        {
+            HashSet<int> retreatEdges = retreatEdgeIndices == null
+                ? new HashSet<int>()
+                : new HashSet<int>(retreatEdgeIndices);
+            SortedSet<int> protectedEdges = new SortedSet<int>();
+            if (topologyLinkedEdgeIndices != null)
+            {
+                for (int edgeIndex = 0;
+                     edgeIndex < topologyLinkedEdgeIndices.Count;
+                     edgeIndex++)
+                {
+                    int sourceEdgeIndex =
+                        topologyLinkedEdgeIndices[edgeIndex];
+                    if (!retreatEdges.Contains(sourceEdgeIndex))
+                    {
+                        protectedEdges.Add(sourceEdgeIndex);
+                    }
+                }
+            }
+            return new List<int>(protectedEdges);
+        }
+
+        private static void SetPlaneCutDebugFocusEdges(
+            ref PlaneCutBevelAuditResult result,
+            List<int> topologyLinkedEdgeIndices,
+            List<int> retreatEdgeIndices)
+        {
+            if (result.DebugFocusEdgeIndices == null)
+            {
+                result.DebugFocusEdgeIndices = new List<int>();
+            }
+            result.DebugFocusEdgeIndices.Clear();
+            SortedSet<int> focusEdges = new SortedSet<int>();
+            if (topologyLinkedEdgeIndices != null)
+            {
+                focusEdges.UnionWith(topologyLinkedEdgeIndices);
+            }
+            if (retreatEdgeIndices != null)
+            {
+                focusEdges.UnionWith(retreatEdgeIndices);
+            }
+            result.DebugFocusEdgeIndices.AddRange(focusEdges);
+        }
+
+        private static bool TrySearchPlaneCutRetreatScales(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            List<PlaneCutBevelCandidate> allCandidates,
+            List<PlaneCutVertexJunctionCandidate> noJunctions,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            Dictionary<int, float> minimumScaleByEdge,
+            PlaneCutSolverTransactionState topologyCleanBaseState,
+            List<int> clusterEdgeIndices,
+            int retreatVictimEdgeIndex,
+            int retreatForeignEdgeIndex,
+            int retreatSourcePassIndex,
+            string searchMode,
+            string trialStatePrefix,
+            string committedTriggerCategory,
+            string clusterReasonEvidence,
+            string protectedEdgeEvidence,
+            string failureSummary,
+            ref PlaneCutBevelAuditResult result,
+            out Dictionary<int, float> committedScaleByEdge,
+            out List<PlaneCutBevelCandidate> committedCandidates,
+            out List<PolygonFace> committedFaces,
+            out string blocker)
+        {
+            committedScaleByEdge = null;
+            committedCandidates = null;
+            committedFaces = null;
+            blocker = string.Empty;
+            if (topologyCleanBaseState == null ||
+                topologyCleanBaseState.ScaleByEdge == null ||
+                clusterEdgeIndices == null ||
+                clusterEdgeIndices.Count == 0)
+            {
+                blocker =
+                    "the bounded retreat search has no immutable topology-clean base state";
+                result.TopologyScaleSearchUnresolved = 1;
+                return false;
+            }
+
+            float[] factors = { 0.95f, 0.90f, 0.85f, 0.80f, 0.75f };
+            result.TopologyScaleSearchBasePass =
+                topologyCleanBaseState.PassIndex;
+            result.TopologyScaleSearchMode = searchMode;
+            if (string.IsNullOrEmpty(
+                    result.TopologyScaleSearchTriggerEvidence) ||
+                string.Equals(
+                    result.TopologyScaleSearchTriggerEvidence,
+                    "none",
+                    StringComparison.Ordinal))
+            {
+                result.TopologyScaleSearchTriggerEvidence =
+                    "bandPass:" + retreatSourcePassIndex +
+                    ",victim:" + retreatVictimEdgeIndex +
+                    ",foreign:" + retreatForeignEdgeIndex;
+            }
+            result.TopologyScaleSearchClusterEvidence =
+                FormatPlaneCutEdgeIndexEvidence(clusterEdgeIndices);
+            result.TopologyScaleSearchCommittedFactor = -1f;
+            result.TopologyScaleSearchHighestValidFactor = -1f;
+            result.TopologyScaleSearchCollateralChangedEvidence = "none";
+            result.TopologyScaleSearchFailedStateScalesReused = 0;
+            result.TopologyScaleSearchUnresolved = 1;
+
+            Bounds sourceBounds = CalculateFaceBounds(sourceFaces);
+            double sourceVolume =
+                CalculatePlaneCutPolyhedronVolume(sourceFaces);
+            for (int trialIndex = 0;
+                 trialIndex < factors.Length;
+                 trialIndex++)
+            {
+                float factor = factors[trialIndex];
+                bool fullyValid = TryEvaluatePlaneCutRetreatTrial(
+                    sourceFaces,
+                    sourceBounds,
+                    sourceVolume,
+                    context,
+                    allCandidates,
+                    noJunctions,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    minimumScaleByEdge,
+                    topologyCleanBaseState,
+                    clusterEdgeIndices,
+                    trialIndex + 1,
+                    factor,
+                    searchMode,
+                    protectedEdgeEvidence,
+                    out PlaneCutTopologyScaleTrialRecord trial,
+                    out Dictionary<int, float> trialScaleByEdge,
+                    out List<PlaneCutBevelCandidate> trialCandidates,
+                    out List<PolygonFace> trialFaces,
+                    out PlaneCutBevelAuditResult trialAudit,
+                    out string trialBlocker);
+                result.TopologyScaleTrials.Add(trial);
+                result.TopologyScaleSearchTrialCount++;
+                ApplyPlaneCutActiveSearchFailure(
+                    trial,
+                    ref result);
+                if (trial.BandEvaluated == 1 &&
+                    trial.BandValid == 0)
+                {
+                    result.TopologyScaleSearchBandFailureCount++;
+                }
+                if (trial.TopologyEvaluated == 1 &&
+                    trial.TopologyValid == 0)
+                {
+                    result.TopologyScaleSearchTopologyFailureCount++;
+                }
+                if (trial.FaceQualityEvaluated == 1 &&
+                    trial.FaceQualityValid == 0)
+                {
+                    result.TopologyScaleSearchFaceQualityFailureCount++;
+                }
+                if (!string.Equals(
+                        trial.CollateralChangedEvidence,
+                        "none",
+                        StringComparison.Ordinal))
+                {
+                    result.TopologyScaleSearchCollateralFailureCount++;
+                    result.TopologyScaleSearchCollateralChangedEvidence =
+                        trial.CollateralChangedEvidence;
+                }
+
+                PlaneCutSolverTransactionState attemptedState =
+                    CapturePlaneCutSolverTransactionState(
+                        trialStatePrefix + (trialIndex + 1),
+                        topologyCleanBaseState.PassIndex,
+                        trialCandidates,
+                        trialFaces,
+                        trialScaleByEdge,
+                        trial.BandValid == 1,
+                        trial.TopologyValid == 1 &&
+                            trial.FaceQualityValid == 1,
+                        trialAudit.StageFinalCertification.Stage ==
+                                "FinalCertification"
+                            ? trialAudit.StageFinalCertification
+                            : trialAudit.StageSeamRepaired);
+                result.LatestAttemptedState = attemptedState;
+
+                if (fullyValid)
+                {
+                    result.ActiveSearchFailureStage = "none";
+                    result.ActiveSearchFailureCause = "none";
+                    result.ActiveSearchFailureEvidence = "none";
+                    result.TopologyScaleSearchCommittedFactor = factor;
+                    result.TopologyScaleSearchHighestValidFactor = factor;
+                    result.TopologyScaleSearchUnresolved = 0;
+                    result.LatestBandCleanState =
+                        CapturePlaneCutSolverTransactionState(
+                            "band-clean-" + searchMode,
+                            topologyCleanBaseState.PassIndex,
+                            trialCandidates,
+                            trialFaces,
+                            trialScaleByEdge,
+                            true,
+                            true,
+                            trialAudit.StageFinalCertification);
+                    result.LatestTopologyCleanState =
+                        CapturePlaneCutSolverTransactionState(
+                            "topology-clean-" + searchMode,
+                            topologyCleanBaseState.PassIndex,
+                            trialCandidates,
+                            trialFaces,
+                            trialScaleByEdge,
+                            true,
+                            true,
+                            trialAudit.StageFinalCertification);
+                    result.LatestCertifiedState =
+                        CapturePlaneCutSolverTransactionState(
+                            "solver-clean",
+                            topologyCleanBaseState.PassIndex,
+                            trialCandidates,
+                            trialFaces,
+                            trialScaleByEdge,
+                            true,
+                            true,
+                            trialAudit.StageFinalCertification);
+                    ApplyPlaneCutTopologyTrialAuditToResult(
+                        trialAudit,
+                        ref result);
+                    PlaneCutConflictWidthReductionRecord committedReduction =
+                        new PlaneCutConflictWidthReductionRecord
+                        {
+                            PassIndex = topologyCleanBaseState.PassIndex,
+                            VictimEdgeIndex =
+                                retreatVictimEdgeIndex,
+                            ForeignEdgeIndex =
+                                retreatForeignEdgeIndex,
+                            VertexIndex = -1,
+                            TriggerCategory =
+                                committedTriggerCategory,
+                            BandValid = 1,
+                            TopologyValid = 1,
+                            PreviousMinimumScale =
+                                ResolveMinimumPlaneCutScale(
+                                    topologyCleanBaseState.ScaleByEdge,
+                                    clusterEdgeIndices),
+                            RequestedScale = factor,
+                            AppliedMinimumScale =
+                                ResolveMinimumPlaneCutScale(
+                                    trialScaleByEdge,
+                                    clusterEdgeIndices),
+                            ClusterFloorScale =
+                                ResolveMaximumPlaneCutScale(
+                                    minimumScaleByEdge,
+                                    clusterEdgeIndices),
+                            ClusterReasonEvidence =
+                                clusterReasonEvidence,
+                            PreviousScaleEvidence =
+                                trial.BaseScaleEvidence,
+                            RollbackScaleEvidence =
+                                trial.BaseScaleEvidence,
+                            AppliedScaleEvidence =
+                                trial.EffectiveScaleEvidence,
+                            Result =
+                                "committed-" + searchMode + "-factor-" +
+                                    factor.ToString("G9")
+                        };
+                    committedReduction.ClusterEdgeIndices.AddRange(
+                        clusterEdgeIndices);
+                    result.EdgeConflictWidthReductions.Add(
+                        committedReduction);
+                    result.EdgeConflictWidthReductionCount++;
+                    result.EdgeConflictClusterCount =
+                        result.EdgeConflictWidthReductions.Count;
+                    committedScaleByEdge = trialScaleByEdge;
+                    committedCandidates = trialCandidates;
+                    committedFaces = trialFaces;
+                    blocker = string.Empty;
+                    return true;
+                }
+
+                blocker = string.IsNullOrEmpty(trialBlocker)
+                    ? "the bounded retreat trial failed certification"
+                    : trialBlocker;
+            }
+
+            result.LatestTopologyCleanState = topologyCleanBaseState;
+            result.LatestCertifiedState = null;
+            result.TopologyScaleSearchUnresolved = 1;
+            blocker = failureSummary;
+            return false;
+        }
+
+        private static bool TryEvaluatePlaneCutRetreatTrial(
+            List<PolygonFace> sourceFaces,
+            Bounds sourceBounds,
+            double sourceVolume,
+            ChamferTopologyContext context,
+            List<PlaneCutBevelCandidate> allCandidates,
+            List<PlaneCutVertexJunctionCandidate> noJunctions,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            Dictionary<int, float> minimumScaleByEdge,
+            PlaneCutSolverTransactionState topologyCleanBaseState,
+            List<int> clusterEdgeIndices,
+            int trialIndex,
+            float factor,
+            string searchMode,
+            string protectedEdgeEvidence,
+            out PlaneCutTopologyScaleTrialRecord trial,
+            out Dictionary<int, float> trialScaleByEdge,
+            out List<PlaneCutBevelCandidate> trialCandidates,
+            out List<PolygonFace> trialFaces,
+            out PlaneCutBevelAuditResult trialAudit,
+            out string blocker)
+        {
+            trial = new PlaneCutTopologyScaleTrialRecord
+            {
+                TrialIndex = trialIndex,
+                BasePassIndex = topologyCleanBaseState.PassIndex,
+                Factor = factor,
+                SearchMode = searchMode,
+                ProtectedEdgeEvidence = protectedEdgeEvidence,
+                Result = "discarded"
+            };
+            trial.ClusterEdgeIndices.AddRange(clusterEdgeIndices);
+            trialScaleByEdge = ClonePlaneCutScaleMap(
+                topologyCleanBaseState.ScaleByEdge);
+            trialCandidates = new List<PlaneCutBevelCandidate>();
+            trialFaces = new List<PolygonFace>();
+            trialAudit = CreatePlaneCutTopologyTrialAuditScratch();
+            blocker = string.Empty;
+
+            Dictionary<int, float> requestedScaleByEdge =
+                ClonePlaneCutScaleMap(trialScaleByEdge);
+            SortedSet<int> floorHitEdges = new SortedSet<int>();
+            for (int clusterIndex = 0;
+                 clusterIndex < clusterEdgeIndices.Count;
+                 clusterIndex++)
+            {
+                int edgeIndex = clusterEdgeIndices[clusterIndex];
+                if (!trialScaleByEdge.TryGetValue(
+                        edgeIndex,
+                        out float baseScale) ||
+                    !minimumScaleByEdge.TryGetValue(
+                        edgeIndex,
+                        out float minimumScale))
+                {
+                    trial.FailureCause =
+                        "retreat edge is absent from the rollback scale map";
+                    blocker = trial.FailureCause;
+                    return false;
+                }
+
+                float requestedScale = baseScale * factor;
+                float effectiveScale = Mathf.Max(
+                    minimumScale,
+                    requestedScale);
+                requestedScaleByEdge[edgeIndex] = requestedScale;
+                trialScaleByEdge[edgeIndex] = effectiveScale;
+                if (effectiveScale > requestedScale + 0.000001f)
+                {
+                    floorHitEdges.Add(edgeIndex);
+                }
+            }
+
+            trial.BaseScaleEvidence = FormatPlaneCutScaleEvidence(
+                topologyCleanBaseState.ScaleByEdge,
+                clusterEdgeIndices);
+            trial.RequestedScaleEvidence = FormatPlaneCutScaleEvidence(
+                requestedScaleByEdge,
+                clusterEdgeIndices);
+            trial.EffectiveScaleEvidence = FormatPlaneCutScaleEvidence(
+                trialScaleByEdge,
+                clusterEdgeIndices);
+            trial.FloorHitEvidence =
+                FormatPlaneCutEdgeIndexEvidence(
+                    new List<int>(floorHitEdges));
+            trial.CollateralChangedEvidence =
+                FormatPlaneCutScaleDifferencesOutsideCluster(
+                    topologyCleanBaseState.ScaleByEdge,
+                    trialScaleByEdge,
+                    clusterEdgeIndices);
+            if (!string.Equals(
+                    trial.CollateralChangedEvidence,
+                    "none",
+                    StringComparison.Ordinal))
+            {
+                trial.FailureCause =
+                    "a bounded retreat trial changed an edge outside the exact retreat set";
+                blocker = trial.FailureCause;
+                return false;
+            }
+
+            trialCandidates = BuildScaledPlaneCutCandidates(
+                allCandidates,
+                context,
+                trialScaleByEdge,
+                minimumStableEdgeLength);
+            trial.AttemptedBuiltCount = trialCandidates.Count;
+            ResetPlaneCutStageTelemetry(ref trialAudit);
+            PlaneCutNumericalRepairTelemetry numericalRepairs =
+                new PlaneCutNumericalRepairTelemetry();
+            trialAudit.NumericalRepairs = numericalRepairs;
+            if (!TryBuildPlaneCutSystemFaces(
+                    sourceFaces,
+                    trialCandidates,
+                    noJunctions,
+                    out List<PolygonFace> rawFaces,
+                    out int edgeCapsBuilt,
+                    out string buildBlocker,
+                    numericalRepairs))
+            {
+                trial.FailureStage = "PlaneConstruction";
+                trial.FailureCause = string.IsNullOrEmpty(buildBlocker)
+                    ? "trial plane construction failed"
+                    : buildBlocker;
+                blocker = trial.FailureCause;
+                return false;
+            }
+
+            CapturePlaneCutStageSnapshot(
+                rawFaces,
+                "AfterPlaneConstruction",
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                trialCandidates,
+                ref trialAudit,
+                out trialAudit.StagePlaneConstruction);
+            if (!TryPreparePlaneCutPreviewFaces(
+                    rawFaces,
+                    trialCandidates,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    ref trialAudit,
+                    out trialFaces,
+                    out int conformalSplitCount,
+                    out int seamPairCount,
+                    out int seamTouchedFaceCount,
+                    out string preparationBlocker,
+                    numericalRepairs))
+            {
+                trial.FailureStage =
+                    ResolvePlaneCutFirstRetryFailureStage(trialAudit);
+                trial.FailureCause = string.IsNullOrEmpty(
+                        preparationBlocker)
+                    ? "trial preview preparation failed"
+                    : preparationBlocker;
+                blocker = trial.FailureCause;
+                CopyPlaneCutTopologyTrialFailures(
+                    trialAudit,
+                    trial);
+                return false;
+            }
+
+            trialAudit.PlanesBuilt = trialCandidates.Count;
+            trialAudit.AttemptedPlanesBuilt = trialCandidates.Count;
+            trialAudit.CapsBuilt = edgeCapsBuilt;
+            trialAudit.ConformalSplitCount = conformalSplitCount;
+            trialAudit.SeamPairCount = seamPairCount;
+            trialAudit.FaceQualitySeamTouchedFaceCount =
+                seamTouchedFaceCount;
+
+            PlaneCutBevelAuditResult bandAudit =
+                CreatePlaneCutBandAuditScratch();
+            AuditPlaneCutBandIntegrity(
+                trialFaces,
+                context,
+                trialCandidates,
+                noJunctions,
+                minimumStableEdgeLength,
+                ref bandAudit,
+                out int _,
+                out string bandBlocker);
+            CopyPlaneCutBandAudit(bandAudit, ref trialAudit);
+            trial.BandEvaluated = 1;
+            trial.BandValid = IsPlaneCutBandAuditClean(bandAudit)
+                ? 1
+                : 0;
+            trial.BandVictimEdgeIndex =
+                bandAudit.EdgeConflictVictimEdgeIndex;
+            trial.BandForeignEdgeIndex =
+                bandAudit.EdgeConflictForeignEdgeIndex;
+            trial.BandForeignAxialParameter =
+                bandAudit.EdgeConflictForeignAxialParameter;
+            trial.BandForeignSharedSpanRatio =
+                bandAudit.EdgeConflictForeignSharedSpanRatio;
+
+            for (int candidateIndex = 0;
+                 candidateIndex < trialCandidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate =
+                    trialCandidates[candidateIndex];
+                int capCount = CountMatchingPlaneCutCaps(
+                    trialFaces,
+                    candidate);
+                if (capCount == 1)
+                {
+                    continue;
+                }
+                if (capCount == 0 &&
+                    IsPlaneCutCandidateRedundant(
+                        trialFaces,
+                        candidate))
+                {
+                    trialAudit.CapsRedundant++;
+                    continue;
+                }
+                trialAudit.CapsMissing++;
+            }
+
+            AuditPlaneCutFaceQuality(
+                trialFaces,
+                noJunctions,
+                minimumStableEdgeLength,
+                ref trialAudit);
+            EdgeWearTopologyStats topology = AuditEdgeWearTopology(
+                trialFaces,
+                minimumStableEdgeLength);
+            trialAudit.OpenEdgeCount = topology.OpenEdgeCount;
+            trialAudit.NonManifoldEdgeCount =
+                topology.NonManifoldEdgeCount;
+            trialAudit.TJunctionCount = topology.TJunctionCount;
+            trialAudit.InvalidFaceCount += CountInvalidPlaneCutFaces(
+                trialFaces,
+                minimumStableFaceArea);
+            CapturePlaneCutStageSnapshot(
+                trialFaces,
+                "FinalCertification",
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                trialCandidates,
+                ref trialAudit,
+                out trialAudit.StageFinalCertification);
+            AuditPlaneCutOpenEdgeFailures(
+                trialFaces,
+                context,
+                trialCandidates,
+                minimumStableEdgeLength,
+                ref trialAudit);
+
+            trial.OpenEdgeCount = trialAudit.OpenEdgeCount;
+            trial.NonManifoldEdgeCount =
+                trialAudit.NonManifoldEdgeCount;
+            trial.TJunctionCount = trialAudit.TJunctionCount;
+            trial.InvalidFaceCount = trialAudit.InvalidFaceCount;
+            trial.NonPlanarFaceCount =
+                trialAudit.FaceQualityNonPlanarCount;
+            trial.MaximumPlaneDeviation =
+                trialAudit.FaceQualityMaxPlaneDeviation;
+            trial.MaximumNormalSpreadDegrees =
+                trialAudit.FaceQualityMaxNormalSpreadDegrees;
+            trial.TopologyEvaluated = 1;
+            trial.FaceQualityEvaluated = 1;
+            trial.TopologyValid =
+                trial.OpenEdgeCount == 0 &&
+                trial.NonManifoldEdgeCount == 0 &&
+                trial.TJunctionCount == 0 &&
+                trial.InvalidFaceCount == 0
+                    ? 1
+                    : 0;
+            trial.FaceQualityValid =
+                trial.NonPlanarFaceCount == 0 ? 1 : 0;
+
+            double resultVolume =
+                CalculatePlaneCutPolyhedronVolume(trialFaces);
+            bool volumeValid = sourceVolume > 0.000000001 &&
+                resultVolume > sourceVolume * 0.75 &&
+                resultVolume <= sourceVolume * 1.0001;
+            bool boundsValid = ArePlaneCutBoundsContained(
+                sourceBounds,
+                CalculateFaceBounds(trialFaces),
+                Mathf.Max(
+                    PlaneEpsilon * 1.25f,
+                    Mathf.Max(
+                        PointMergeDistance * 8f,
+                        minimumStableEdgeLength * 0.02f)));
+            bool polygonValid =
+                trial.BandValid == 1 &&
+                trial.TopologyValid == 1 &&
+                trial.FaceQualityValid == 1 &&
+                trialAudit.BandRetainedEdgeCount ==
+                    trialCandidates.Count &&
+                trialAudit.BandSingleFaceCount ==
+                    trialCandidates.Count &&
+                trialAudit.CapsMissing == 0 &&
+                volumeValid &&
+                boundsValid &&
+                trialFaces.Count >= 4;
+
+            bool surfaceTriangulationValid = false;
+            TriangleSoup auditedSoup = null;
+            if (polygonValid)
+            {
+                BoundedSingleEdgeAuditResult surfaceAudit =
+                    new BoundedSingleEdgeAuditResult
+                    {
+                        TriangulationFailureFace = -1,
+                        TriangulationFailureProvenanceIndex = -1,
+                        BevelRegionFailureFace = -1,
+                        BevelRegionFailureProvenanceIndex = -1
+                    };
+                surfaceTriangulationValid =
+                    TryTriangulateBoundedPreviewFaces(
+                        trialFaces,
+                        minimumStableFaceArea,
+                        ref surfaceAudit,
+                        out auditedSoup,
+                        out string surfaceBlocker);
+                trialAudit.BevelRegionFaceCount =
+                    surfaceAudit.BevelRegionFaceCount;
+                trialAudit.BevelRegionBoundaryVertexCount =
+                    surfaceAudit.BevelRegionBoundaryVertexCount;
+                trialAudit.BevelRegionTriangleCount =
+                    surfaceAudit.BevelRegionTriangleCount;
+                trialAudit.BevelRegionAuthoredNormalTriangleCount =
+                    surfaceAudit.BevelRegionAuthoredNormalTriangleCount;
+                trialAudit.BevelRegionAuthoredSurfaceGroupTriangleCount =
+                    surfaceAudit.BevelRegionAuthoredSurfaceGroupTriangleCount;
+                trialAudit.BevelRegionInternalFanVertexCount =
+                    surfaceAudit.BevelRegionInternalFanVertexCount;
+                trialAudit.BevelRegionMaximumPlaneResidual =
+                    surfaceAudit.BevelRegionMaximumPlaneResidual;
+                trialAudit.BevelRegionMaximumNormalDeviationDegrees =
+                    surfaceAudit.BevelRegionMaximumNormalDeviationDegrees;
+                trialAudit.BevelRegionRenderValid =
+                    surfaceAudit.BevelRegionRenderValid;
+                if (!surfaceTriangulationValid &&
+                    string.IsNullOrEmpty(blocker))
+                {
+                    blocker = surfaceBlocker;
+                }
+            }
+            if (auditedSoup != null)
+            {
+                AuditPlaneCutPreviewTriangleSoup(
+                    auditedSoup,
+                    trialFaces,
+                    minimumStableEdgeLength,
+                    ref trialAudit);
+            }
+
+            trial.SurfaceValid =
+                surfaceTriangulationValid &&
+                trialAudit.BevelRegionFaceCount ==
+                    trialCandidates.Count &&
+                trialAudit.BevelRegionRenderValid == 1
+                    ? 1
+                    : 0;
+            trial.MeshValid =
+                trialAudit.PreviewGeometryValid == 1 ? 1 : 0;
+            trial.FullyValid =
+                polygonValid &&
+                trial.SurfaceValid == 1 &&
+                trial.MeshValid == 1
+                    ? 1
+                    : 0;
+            CopyPlaneCutTopologyTrialFailures(trialAudit, trial);
+            if (trial.FullyValid == 1)
+            {
+                trial.Result = "committed";
+                trial.FailureStage = "none";
+                trial.FailureCause = "none";
+                return true;
+            }
+
+            trial.FailureStage = trial.BandValid == 0
+                ? "BandIntegrity"
+                : ResolvePlaneCutFirstRetryFailureStage(trialAudit);
+            if (trial.BandValid == 0)
+            {
+                trial.FailureCause = string.IsNullOrEmpty(bandBlocker)
+                    ? "band-integrity"
+                    : bandBlocker;
+            }
+            else if (trial.TopologyValid == 0)
+            {
+                trial.FailureCause = "topology";
+            }
+            else if (trial.FaceQualityValid == 0)
+            {
+                trial.FailureCause = "face-quality";
+            }
+            else if (!volumeValid)
+            {
+                trial.FailureCause = "retained-volume";
+            }
+            else if (!boundsValid)
+            {
+                trial.FailureCause = "source-bounds";
+            }
+            else if (trial.SurfaceValid == 0)
+            {
+                trial.FailureCause = "one-surface-render";
+            }
+            else
+            {
+                trial.FailureCause = "preview-mesh";
+            }
+            blocker = trial.FailureCause;
+            return false;
+        }
+
+        private static void ApplyPlaneCutActiveSearchFailure(
+            PlaneCutTopologyScaleTrialRecord trial,
+            ref PlaneCutBevelAuditResult result)
+        {
+            if (trial == null || trial.FullyValid == 1)
+            {
+                return;
+            }
+            result.ActiveSearchFailureStage =
+                string.IsNullOrEmpty(trial.FailureStage)
+                    ? "unknown"
+                    : trial.FailureStage;
+            result.ActiveSearchFailureCause =
+                string.IsNullOrEmpty(trial.FailureCause)
+                    ? "unknown"
+                    : trial.FailureCause;
+            result.ActiveSearchFailureEvidence =
+                "mode:" +
+                    (string.IsNullOrEmpty(trial.SearchMode)
+                        ? "unknown"
+                        : trial.SearchMode) +
+                ",trial:" + trial.TrialIndex +
+                ",factor:" + trial.Factor.ToString("G9") +
+                ",victim:" + trial.BandVictimEdgeIndex +
+                ",foreign:" + trial.BandForeignEdgeIndex +
+                ",foreignAxial:" +
+                    trial.BandForeignAxialParameter.ToString("G9") +
+                ",foreignSpan:" +
+                    trial.BandForeignSharedSpanRatio.ToString("G9");
+        }
+
+        private static PlaneCutBevelAuditResult
+            CreatePlaneCutTopologyTrialAuditScratch()
+        {
+            return new PlaneCutBevelAuditResult
+            {
+                EdgeConflictVictimEdgeIndex = -1,
+                EdgeConflictForeignEdgeIndex = -1,
+                EdgeConflictVertexIndex = -1,
+                EdgeConflictDeferredEdgeIndex = -1,
+                EdgeConflictMinimumWidthScale = 1f,
+                EdgeConflictWidthReductions =
+                    new List<PlaneCutConflictWidthReductionRecord>(),
+                FaceQualityFailures =
+                    new List<PlaneCutFaceQualityFailureRecord>(),
+                OpenEdgeFailures =
+                    new List<PlaneCutOpenEdgeFailureRecord>(),
+                TJunctionFailures =
+                    new List<PlaneCutTJunctionFailureRecord>(),
+                LocalityDeferrals =
+                    new List<PlaneCutLocalityDeferralRecord>(),
+                RetryFailureDossiers =
+                    new List<PlaneCutRetryFailureDossier>(),
+                TopologyScaleTrials =
+                    new List<PlaneCutTopologyScaleTrialRecord>(),
+                TopologyScaleSearchBasePass = -1,
+                TopologyScaleSearchCommittedFactor = -1f,
+                TopologyScaleSearchHighestValidFactor = -1f,
+                TopologyScaleSearchMode = "none",
+                TopologyScaleSearchTriggerEvidence = "none",
+                TopologyScaleSearchTopologyLinkedEvidence = "none",
+                TopologyScaleSearchClusterEvidence = "none",
+                TopologyScaleSearchCollateralChangedEvidence = "none",
+                JunctionCoverage =
+                    new List<PlaneCutJunctionCoverageRecord>(),
+                FaceFirstNonPlanarStageByIdentity =
+                    new Dictionary<string, string>(),
+                BoundaryConformityTouchedFaces =
+                    new HashSet<string>(),
+                SeamRepairTouchedFaces =
+                    new HashSet<string>(),
+                SeamRepairMaximumMovementByIdentity =
+                    new Dictionary<string, float>(),
+                NumericalRepairs =
+                    new PlaneCutNumericalRepairTelemetry()
+            };
+        }
+
+        private static string FormatPlaneCutScaleDifferencesOutsideCluster(
+            Dictionary<int, float> baseline,
+            Dictionary<int, float> trial,
+            List<int> clusterEdgeIndices)
+        {
+            if (baseline == null || trial == null)
+            {
+                return "missing-scale-map";
+            }
+            HashSet<int> cluster = clusterEdgeIndices == null
+                ? new HashSet<int>()
+                : new HashSet<int>(clusterEdgeIndices);
+            SortedSet<int> changed = new SortedSet<int>();
+            foreach (KeyValuePair<int, float> pair in baseline)
+            {
+                if (cluster.Contains(pair.Key))
+                {
+                    continue;
+                }
+                if (!trial.TryGetValue(pair.Key, out float trialScale) ||
+                    Mathf.Abs(trialScale - pair.Value) > 0.000001f)
+                {
+                    changed.Add(pair.Key);
+                }
+            }
+            foreach (KeyValuePair<int, float> pair in trial)
+            {
+                if (!cluster.Contains(pair.Key) &&
+                    !baseline.ContainsKey(pair.Key))
+                {
+                    changed.Add(pair.Key);
+                }
+            }
+            return FormatPlaneCutEdgeIndexEvidence(
+                new List<int>(changed));
+        }
+
+        private static void CopyPlaneCutTopologyTrialFailures(
+            PlaneCutBevelAuditResult audit,
+            PlaneCutTopologyScaleTrialRecord trial)
+        {
+            if (audit.OpenEdgeFailures != null)
+            {
+                trial.OpenEdgeFailures.AddRange(
+                    audit.OpenEdgeFailures);
+            }
+            if (audit.FaceQualityFailures != null)
+            {
+                trial.NonPlanarFaceFailures.AddRange(
+                    audit.FaceQualityFailures);
+            }
+            if (audit.TJunctionFailures != null)
+            {
+                trial.TJunctionFailures.AddRange(
+                    audit.TJunctionFailures);
+            }
+        }
+
+        private static void ApplyPlaneCutTopologyTrialAuditToResult(
+            PlaneCutBevelAuditResult trial,
+            ref PlaneCutBevelAuditResult result)
+        {
+            result.StagePlaneConstruction =
+                trial.StagePlaneConstruction;
+            result.StageSanitized = trial.StageSanitized;
+            result.StageWelded = trial.StageWelded;
+            result.StageConformed = trial.StageConformed;
+            result.StageSeamRepaired = trial.StageSeamRepaired;
+            result.StageFinalCertification =
+                trial.StageFinalCertification;
+            result.FirstOpenEdgeStage = trial.FirstOpenEdgeStage;
+            result.FirstTJunctionStage = trial.FirstTJunctionStage;
+            result.FirstNonPlanarStage = trial.FirstNonPlanarStage;
+            result.OpenEdgeCount = trial.OpenEdgeCount;
+            result.NonManifoldEdgeCount = trial.NonManifoldEdgeCount;
+            result.TJunctionCount = trial.TJunctionCount;
+            result.InvalidFaceCount = trial.InvalidFaceCount;
+            result.FaceQualityFaceCount = trial.FaceQualityFaceCount;
+            result.FaceQualityNonPlanarCount =
+                trial.FaceQualityNonPlanarCount;
+            result.FaceQualityMaxPlaneDeviation =
+                trial.FaceQualityMaxPlaneDeviation;
+            result.FaceQualityMaxNormalSpreadDegrees =
+                trial.FaceQualityMaxNormalSpreadDegrees;
+            result.FaceQualityPlanarityTolerance =
+                trial.FaceQualityPlanarityTolerance;
+            result.FaceQualityNormalSpreadToleranceDegrees =
+                trial.FaceQualityNormalSpreadToleranceDegrees;
+            result.CapsBuilt = trial.CapsBuilt;
+            result.CapsMissing = trial.CapsMissing;
+            result.CapsRedundant = trial.CapsRedundant;
+            result.ConformalSplitCount = trial.ConformalSplitCount;
+            result.SeamPairCount = trial.SeamPairCount;
+            result.FaceQualitySeamTouchedFaceCount =
+                trial.FaceQualitySeamTouchedFaceCount;
+            CopyPlaneCutBandAudit(trial, ref result);
+            result.BevelRegionFaceCount = trial.BevelRegionFaceCount;
+            result.BevelRegionBoundaryVertexCount =
+                trial.BevelRegionBoundaryVertexCount;
+            result.BevelRegionTriangleCount =
+                trial.BevelRegionTriangleCount;
+            result.BevelRegionAuthoredNormalTriangleCount =
+                trial.BevelRegionAuthoredNormalTriangleCount;
+            result.BevelRegionAuthoredSurfaceGroupTriangleCount =
+                trial.BevelRegionAuthoredSurfaceGroupTriangleCount;
+            result.BevelRegionInternalFanVertexCount =
+                trial.BevelRegionInternalFanVertexCount;
+            result.BevelRegionMaximumPlaneResidual =
+                trial.BevelRegionMaximumPlaneResidual;
+            result.BevelRegionMaximumNormalDeviationDegrees =
+                trial.BevelRegionMaximumNormalDeviationDegrees;
+            result.BevelRegionRenderValid =
+                trial.BevelRegionRenderValid;
+            result.PreviewTriangleCount = trial.PreviewTriangleCount;
+            result.PreviewDegenerateTriangleCount =
+                trial.PreviewDegenerateTriangleCount;
+            result.PreviewOpenEdgeCount = trial.PreviewOpenEdgeCount;
+            result.PreviewNonManifoldEdgeCount =
+                trial.PreviewNonManifoldEdgeCount;
+            result.PreviewWindingFailureCount =
+                trial.PreviewWindingFailureCount;
+            result.PreviewBoundsFailureCount =
+                trial.PreviewBoundsFailureCount;
+            result.PreviewVolumeFailureCount =
+                trial.PreviewVolumeFailureCount;
+            result.PreviewGeometryValid = trial.PreviewGeometryValid;
+            result.NumericalRepairs = trial.NumericalRepairs;
+            result.FaceQualityFailures.Clear();
+            result.FaceQualityFailures.AddRange(
+                trial.FaceQualityFailures);
+            result.OpenEdgeFailures.Clear();
+            result.OpenEdgeFailures.AddRange(
+                trial.OpenEdgeFailures);
+            result.TJunctionFailures.Clear();
+            result.TJunctionFailures.AddRange(
+                trial.TJunctionFailures);
+        }
+
+        private static bool TryBuildPlaneCutTopologyConflictCluster(
+            List<PlaneCutBevelCandidate> activeCandidates,
+            List<PlaneCutTJunctionFailureRecord> tJunctionFailures,
+            List<PlaneCutConflictWidthReductionRecord> reductions,
+            out List<int> clusterEdgeIndices,
+            out string reasonEvidence,
+            out PlaneCutTJunctionFailureRecord failure)
+        {
+            clusterEdgeIndices = new List<int>();
+            reasonEvidence = string.Empty;
+            failure = null;
+            if (tJunctionFailures == null ||
+                tJunctionFailures.Count == 0)
+            {
+                return false;
+            }
+
+            failure = tJunctionFailures[0];
+            Dictionary<int, SortedSet<string>> reasons =
+                new Dictionary<int, SortedSet<string>>();
+            HashSet<int> clusterEdges = new HashSet<int>();
+            HashSet<int> clusterVertices = new HashSet<int>();
+            for (int edgeIndex = 0;
+                 edgeIndex < failure.LinkedEdgeIndices.Count;
+                 edgeIndex++)
+            {
+                int sourceEdgeIndex =
+                    failure.LinkedEdgeIndices[edgeIndex];
+                AddPlaneCutTopologyClusterEdge(
+                    activeCandidates,
+                    sourceEdgeIndex,
+                    "tjunction-linked",
+                    clusterEdges,
+                    clusterVertices,
+                    reasons);
+            }
+
+            PlaneCutConflictWidthReductionRecord previousConflict =
+                FindLatestPlaneCutConflictIntersectingEdges(
+                    reductions,
+                    clusterEdges);
+            if (previousConflict != null)
+            {
+                for (int edgeIndex = 0;
+                     edgeIndex <
+                         previousConflict.ClusterEdgeIndices.Count;
+                     edgeIndex++)
+                {
+                    AddPlaneCutTopologyClusterEdge(
+                        activeCandidates,
+                        previousConflict.ClusterEdgeIndices[edgeIndex],
+                        "previous-conflict-pass-" +
+                            previousConflict.PassIndex,
+                        clusterEdges,
+                        clusterVertices,
+                        reasons);
+                }
+            }
+
+            if (clusterEdges.Count == 0)
+            {
+                return false;
+            }
+
+            HashSet<int> interactionVertices =
+                new HashSet<int>(clusterVertices);
+            for (int candidateIndex = 0;
+                 candidateIndex < activeCandidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate =
+                    activeCandidates[candidateIndex];
+                if (!interactionVertices.Contains(candidate.VertexA) &&
+                    !interactionVertices.Contains(candidate.VertexB))
+                {
+                    continue;
+                }
+                AddPlaneCutTopologyClusterEdge(
+                    activeCandidates,
+                    candidate.SourceEdgeIndex,
+                    "incident-source-vertex-star",
+                    clusterEdges,
+                    clusterVertices,
+                    reasons);
+            }
+
+            clusterEdgeIndices.AddRange(clusterEdges);
+            clusterEdgeIndices.Sort();
+            reasonEvidence = FormatPlaneCutClusterReasonEvidence(
+                clusterEdgeIndices,
+                reasons);
+            return clusterEdgeIndices.Count > 0;
+        }
+
+        private static void AddPlaneCutTopologyClusterEdge(
+            List<PlaneCutBevelCandidate> activeCandidates,
+            int sourceEdgeIndex,
+            string reason,
+            HashSet<int> clusterEdges,
+            HashSet<int> clusterVertices,
+            Dictionary<int, SortedSet<string>> reasons)
+        {
+            if (!TryFindPlaneCutCandidateBySourceEdge(
+                    activeCandidates,
+                    sourceEdgeIndex,
+                    out PlaneCutBevelCandidate candidate))
+            {
+                return;
+            }
+            clusterEdges.Add(candidate.SourceEdgeIndex);
+            clusterVertices.Add(candidate.VertexA);
+            clusterVertices.Add(candidate.VertexB);
+            if (!reasons.TryGetValue(
+                    candidate.SourceEdgeIndex,
+                    out SortedSet<string> edgeReasons))
+            {
+                edgeReasons = new SortedSet<string>();
+                reasons.Add(candidate.SourceEdgeIndex, edgeReasons);
+            }
+            edgeReasons.Add(reason);
+        }
+
+        private static PlaneCutConflictWidthReductionRecord
+            FindLatestPlaneCutConflictIntersectingEdges(
+                List<PlaneCutConflictWidthReductionRecord> reductions,
+                HashSet<int> sourceEdges)
+        {
+            if (reductions == null || sourceEdges == null ||
+                sourceEdges.Count == 0)
+            {
+                return null;
+            }
+            for (int recordIndex = reductions.Count - 1;
+                 recordIndex >= 0;
+                 recordIndex--)
+            {
+                PlaneCutConflictWidthReductionRecord reduction =
+                    reductions[recordIndex];
+                for (int edgeIndex = 0;
+                     edgeIndex < reduction.ClusterEdgeIndices.Count;
+                     edgeIndex++)
+                {
+                    if (sourceEdges.Contains(
+                            reduction.ClusterEdgeIndices[edgeIndex]))
+                    {
+                        return reduction;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private static string FormatPlaneCutClusterReasonEvidence(
+            List<int> clusterEdgeIndices,
+            Dictionary<int, SortedSet<string>> reasons)
+        {
+            if (clusterEdgeIndices == null ||
+                clusterEdgeIndices.Count == 0)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            for (int edgeIndex = 0;
+                 edgeIndex < clusterEdgeIndices.Count;
+                 edgeIndex++)
+            {
+                int sourceEdgeIndex = clusterEdgeIndices[edgeIndex];
+                if (builder.Length > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(sourceEdgeIndex);
+                builder.Append('=');
+                if (!reasons.TryGetValue(
+                        sourceEdgeIndex,
+                        out SortedSet<string> edgeReasons) ||
+                    edgeReasons.Count == 0)
+                {
+                    builder.Append("cluster");
+                    continue;
+                }
+                bool first = true;
+                foreach (string reason in edgeReasons)
+                {
+                    if (!first)
+                    {
+                        builder.Append('+');
+                    }
+                    builder.Append(reason);
+                    first = false;
+                }
+            }
+            return builder.ToString();
+        }
+
+        private static List<PlaneCutBevelCandidate>
+            BuildScaledPlaneCutCandidates(
+                List<PlaneCutBevelCandidate> originalCandidates,
+                ChamferTopologyContext context,
+                Dictionary<int, float> scaleByEdge,
+                float minimumStableEdgeLength)
+        {
+            List<PlaneCutBevelCandidate> scaled =
+                new List<PlaneCutBevelCandidate>(
+                    originalCandidates.Count);
+            for (int candidateIndex = 0;
+                 candidateIndex < originalCandidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate original =
+                    originalCandidates[candidateIndex];
+                float scale = scaleByEdge.TryGetValue(
+                        original.SourceEdgeIndex,
+                        out float storedScale)
+                    ? storedScale
+                    : 1f;
+                scaled.Add(ScalePlaneCutBevelCandidate(
+                    original,
+                    context,
+                    scale,
+                    minimumStableEdgeLength));
+            }
+            return scaled;
+        }
+
+        private static PlaneCutBevelCandidate ScalePlaneCutBevelCandidate(
+            PlaneCutBevelCandidate original,
+            ChamferTopologyContext context,
+            float requestedScale,
+            float minimumStableEdgeLength)
+        {
+            float minimumScale = ResolvePlaneCutCandidateMinimumScale(
+                original,
+                minimumStableEdgeLength);
+            float scale = Mathf.Clamp(
+                requestedScale,
+                minimumScale,
+                1f);
+            EdgeWearGraphEdge edge =
+                context.Graph.Edges[original.SourceEdgeIndex];
+            Vector3 sourceA =
+                context.Graph.Vertices[edge.VertexA].Position;
+            Vector3 sourceB =
+                context.Graph.Vertices[edge.VertexB].Position;
+            float minimumRemovalFloor = Mathf.Max(
+                PointMergeDistance * 2f,
+                minimumStableEdgeLength * 0.02f);
+            float scaledMinimumRemoval = Mathf.Max(
+                minimumRemovalFloor,
+                original.MinimumSourceRemoval * scale);
+            float minimumSourceProjection = Mathf.Min(
+                Vector3.Dot(original.Plane.Normal, sourceA),
+                Vector3.Dot(original.Plane.Normal, sourceB));
+            CutPlane scaledPlane = new CutPlane(
+                original.Plane.Normal,
+                minimumSourceProjection - scaledMinimumRemoval);
+            float actualMinimumRemoval = Mathf.Min(
+                scaledPlane.SignedDistance(sourceA),
+                scaledPlane.SignedDistance(sourceB));
+            float clipEpsilon = Mathf.Min(
+                PlaneEpsilon,
+                Mathf.Max(
+                    PointMergeDistance * 0.25f,
+                    actualMinimumRemoval * 0.25f));
+            return new PlaneCutBevelCandidate(
+                original.SourceEdgeIndex,
+                original.VertexA,
+                original.VertexB,
+                original.Width * scale,
+                scaledPlane,
+                original.Strength,
+                original.SelectionScore,
+                original.PlaneTolerance,
+                clipEpsilon,
+                actualMinimumRemoval,
+                original.WasLocalized);
+        }
+
+        private static float ResolvePlaneCutCandidateMinimumScale(
+            PlaneCutBevelCandidate candidate,
+            float minimumStableEdgeLength)
+        {
+            float minimumRemoval = Mathf.Max(
+                PointMergeDistance * 2f,
+                minimumStableEdgeLength * 0.02f);
+            float removalScale = candidate.MinimumSourceRemoval > 0f
+                ? minimumRemoval / candidate.MinimumSourceRemoval
+                : 1f;
+            float widthScale = candidate.Width > 0f
+                ? PointMergeDistance * 2f / candidate.Width
+                : 1f;
+            return Mathf.Clamp01(Mathf.Max(removalScale, widthScale));
+        }
+
+        private static bool TryBuildPlaneCutConflictCluster(
+            List<PlaneCutBevelCandidate> activeCandidates,
+            PlaneCutBevelAuditResult bandAudit,
+            ChamferTopologyContext context,
+            out List<int> clusterEdgeIndices)
+        {
+            clusterEdgeIndices = new List<int>();
+            HashSet<int> clusterEdges = new HashSet<int>();
+            HashSet<int> clusterVertices = new HashSet<int>();
+            AddPlaneCutConflictSeed(
+                activeCandidates,
+                bandAudit.EdgeConflictVictimEdgeIndex,
+                clusterEdges,
+                clusterVertices);
+            AddPlaneCutConflictSeed(
+                activeCandidates,
+                bandAudit.EdgeConflictForeignEdgeIndex,
+                clusterEdges,
+                clusterVertices);
+            if (bandAudit.EdgeConflictVertexIndex >= 0 &&
+                bandAudit.EdgeConflictVertexIndex <
+                    context.Graph.Vertices.Count)
+            {
+                clusterVertices.Add(bandAudit.EdgeConflictVertexIndex);
+            }
+
+            if (clusterEdges.Count == 0 && clusterVertices.Count == 0)
+            {
+                return false;
+            }
+
+            for (int candidateIndex = 0;
+                 candidateIndex < activeCandidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate =
+                    activeCandidates[candidateIndex];
+                if (clusterVertices.Contains(candidate.VertexA) ||
+                    clusterVertices.Contains(candidate.VertexB))
+                {
+                    clusterEdges.Add(candidate.SourceEdgeIndex);
+                }
+            }
+
+            clusterEdgeIndices.AddRange(clusterEdges);
+            clusterEdgeIndices.Sort();
+            return clusterEdgeIndices.Count > 0;
+        }
+
+        private static void AddPlaneCutConflictSeed(
+            List<PlaneCutBevelCandidate> activeCandidates,
+            int sourceEdgeIndex,
+            HashSet<int> clusterEdges,
+            HashSet<int> clusterVertices)
+        {
+            if (!TryFindPlaneCutCandidateBySourceEdge(
+                    activeCandidates,
+                    sourceEdgeIndex,
+                    out PlaneCutBevelCandidate candidate))
+            {
+                return;
+            }
+            clusterEdges.Add(candidate.SourceEdgeIndex);
+            clusterVertices.Add(candidate.VertexA);
+            clusterVertices.Add(candidate.VertexB);
+        }
+
+        private static float ResolveMinimumPlaneCutScale(
+            Dictionary<int, float> scaleByEdge)
+        {
+            if (scaleByEdge == null || scaleByEdge.Count == 0)
+            {
+                return 1f;
+            }
+            float minimum = 1f;
+            foreach (KeyValuePair<int, float> pair in scaleByEdge)
+            {
+                minimum = Mathf.Min(minimum, pair.Value);
+            }
+            return minimum;
+        }
+
+        private static float ResolveMinimumPlaneCutScale(
+            Dictionary<int, float> scaleByEdge,
+            List<int> edgeIndices)
+        {
+            float minimum = 1f;
+            for (int edgeIndex = 0;
+                 edgeIndex < edgeIndices.Count;
+                 edgeIndex++)
+            {
+                if (scaleByEdge.TryGetValue(
+                        edgeIndices[edgeIndex],
+                        out float scale))
+                {
+                    minimum = Mathf.Min(minimum, scale);
+                }
+            }
+            return minimum;
+        }
+
+        private static float ResolveMaximumPlaneCutScale(
+            Dictionary<int, float> scaleByEdge,
+            List<int> edgeIndices)
+        {
+            float maximum = 0f;
+            for (int edgeIndex = 0;
+                 edgeIndex < edgeIndices.Count;
+                 edgeIndex++)
+            {
+                if (scaleByEdge.TryGetValue(
+                        edgeIndices[edgeIndex],
+                        out float scale))
+                {
+                    maximum = Mathf.Max(maximum, scale);
+                }
+            }
+            return maximum;
+        }
+
+        private static string FormatPlaneCutScaleEvidence(
+            Dictionary<int, float> scaleByEdge,
+            List<int> edgeIndices)
+        {
+            if (scaleByEdge == null || edgeIndices == null ||
+                edgeIndices.Count == 0)
+            {
+                return "none";
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int edgeIndex = 0;
+                 edgeIndex < edgeIndices.Count;
+                 edgeIndex++)
+            {
+                int sourceEdgeIndex = edgeIndices[edgeIndex];
+                if (!scaleByEdge.TryGetValue(
+                        sourceEdgeIndex,
+                        out float scale))
+                {
+                    continue;
+                }
+                if (builder.Length > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(sourceEdgeIndex);
+                builder.Append('=');
+                builder.Append(scale.ToString("G9"));
+            }
+            return builder.Length == 0 ? "none" : builder.ToString();
+        }
+
+        private static bool TryBuildCleanPlaneCutEdgeOnlyShellWithDeferral(
             List<PolygonFace> sourceFaces,
             ChamferTopologyContext context,
             List<PlaneCutBevelCandidate> allCandidates,
@@ -477,6 +4659,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                  retainedCandidates.Count > 0;
                  passIndex++)
             {
+                ResetPlaneCutStageTelemetry(ref result);
+                PlaneCutNumericalRepairTelemetry numericalRepairs =
+                    new PlaneCutNumericalRepairTelemetry();
+                result.NumericalRepairs = numericalRepairs;
                 result.EdgeConflictPassCount = passIndex + 1;
                 if (!TryBuildPlaneCutSystemFaces(
                         sourceFaces,
@@ -484,7 +4670,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         noJunctions,
                         out List<PolygonFace> rawFaces,
                         out int edgeCapsBuilt,
-                        out string buildBlocker))
+                        out string buildBlocker,
+                        numericalRepairs))
                 {
                     blocker = string.IsNullOrEmpty(buildBlocker)
                         ? "the deterministic edge-only shell could not be built"
@@ -492,15 +4679,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     return false;
                 }
 
+                CapturePlaneCutStageSnapshot(
+                    rawFaces,
+                    "AfterPlaneConstruction",
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    retainedCandidates,
+                    ref result,
+                    out result.StagePlaneConstruction);
+
                 if (!TryPreparePlaneCutPreviewFaces(
                         rawFaces,
+                        retainedCandidates,
                         minimumStableEdgeLength,
                         minimumStableFaceArea,
+                        ref result,
                         out List<PolygonFace> auditedFaces,
                         out int conformalSplitCount,
                         out int seamPairCount,
                         out int seamTouchedFaceCount,
-                        out string preparationBlocker))
+                        out string preparationBlocker,
+                        numericalRepairs))
                 {
                     blocker = string.IsNullOrEmpty(preparationBlocker)
                         ? "the edge-only shell failed preview preparation"
@@ -606,7 +4805,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeConflictVictimEdgeIndex = -1,
                 EdgeConflictForeignEdgeIndex = -1,
                 EdgeConflictVertexIndex = -1,
-                EdgeConflictDeferredEdgeIndex = -1
+                EdgeConflictDeferredEdgeIndex = -1,
+                EdgeConflictMinimumWidthScale = 1f,
+                EdgeConflictWidthReductions =
+                    new List<PlaneCutConflictWidthReductionRecord>(),
+                TopologyScaleSearchBasePass = -1,
+                TopologyScaleSearchCommittedFactor = -1f,
+                TopologyScaleSearchHighestValidFactor = -1f
             };
         }
 
@@ -740,10 +4945,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStableEdgeLength,
             out PlaneCutBevelCandidate candidate,
             out bool localityDeferred,
+            out PlaneCutLocalityDeferralRecord localityEvidence,
             out string blocker)
         {
             candidate = default;
             localityDeferred = false;
+            localityEvidence = null;
             blocker = string.Empty;
             int edgeIndex = selected.GraphEdgeIndex;
             if (edgeIndex < 0 || edgeIndex >= context.Graph.Edges.Count)
@@ -816,6 +5023,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float localGuardMargin = Mathf.Max(
                 PointMergeDistance * 2f,
                 minimumStableEdgeLength * 0.001f);
+            int limitingUnrelatedVertex = -1;
+            Vector3 limitingUnrelatedPosition = default;
+            float limitingUnrelatedProjection = float.NegativeInfinity;
             for (int vertexIndex = 0;
                  vertexIndex < context.Graph.Vertices.Count;
                  vertexIndex++)
@@ -828,9 +5038,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 Vector3 unrelated =
                     context.Graph.Vertices[vertexIndex].Position;
-                localizedDistance = Mathf.Max(
-                    localizedDistance,
-                    Vector3.Dot(normal, unrelated) + localGuardMargin);
+                float unrelatedProjection =
+                    Vector3.Dot(normal, unrelated);
+                float guardedProjection =
+                    unrelatedProjection + localGuardMargin;
+                if (guardedProjection > localizedDistance)
+                {
+                    localizedDistance = guardedProjection;
+                    limitingUnrelatedVertex = vertexIndex;
+                    limitingUnrelatedPosition = unrelated;
+                    limitingUnrelatedProjection = unrelatedProjection;
+                }
             }
 
             bool wasLocalized = localizedDistance >
@@ -852,6 +5070,35 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 blocker = wasLocalized
                     ? "a localized bevel plane cannot retain unrelated vertices and still remove its source edge"
                     : "the solved bevel plane does not remove its source edge";
+                localityEvidence = new PlaneCutLocalityDeferralRecord
+                {
+                    SourceEdgeIndex = edgeIndex,
+                    VertexA = edge.VertexA,
+                    VertexB = edge.VertexB,
+                    FaceA = edge.FaceA,
+                    FaceB = edge.FaceB,
+                    SourceA = sourceA,
+                    SourceB = sourceB,
+                    BevelNormal = normal,
+                    SolvedWidth = solution.WidthByEdge[edgeIndex],
+                    SolvedPlaneDistance = solvedDistance,
+                    LocalizedPlaneDistance = localizedDistance,
+                    LocalizationDelta = localizedDistance - solvedDistance,
+                    LocalGuardMargin = localGuardMargin,
+                    LimitingUnrelatedVertex = limitingUnrelatedVertex,
+                    LimitingUnrelatedPosition =
+                        limitingUnrelatedPosition,
+                    LimitingUnrelatedProjection =
+                        limitingUnrelatedProjection,
+                    SolvedSourceRemovalA =
+                        Vector3.Dot(normal, sourceA) - solvedDistance,
+                    SolvedSourceRemovalB =
+                        Vector3.Dot(normal, sourceB) - solvedDistance,
+                    LocalizedSourceRemovalA = sourceRemovalA,
+                    LocalizedSourceRemovalB = sourceRemovalB,
+                    MinimumRequiredRemoval = minimumRemoval,
+                    Cause = blocker
+                };
                 return false;
             }
 
@@ -879,15 +5126,690 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return true;
         }
 
+        private const float PlaneCutMaximumNormalSpreadDegrees = 0.75f;
+
+        private static float ResolvePlaneCutPlanarityTolerance(
+            float minimumStableEdgeLength)
+        {
+            return Mathf.Max(
+                PointMergeDistance * 2f,
+                minimumStableEdgeLength * 0.00005f);
+        }
+
+        private static void ResetPlaneCutStageTelemetry(
+            ref PlaneCutBevelAuditResult result)
+        {
+            result.StagePlaneConstruction = default;
+            result.StageSanitized = default;
+            result.StageWelded = default;
+            result.StageConformed = default;
+            result.StageSeamRepaired = default;
+            result.StageFinalCertification = default;
+            result.FirstOpenEdgeStage = string.Empty;
+            result.FirstTJunctionStage = string.Empty;
+            result.FirstNonPlanarStage = string.Empty;
+            result.OpenEdgeCount = 0;
+            result.NonManifoldEdgeCount = 0;
+            result.TJunctionCount = 0;
+            result.InvalidFaceCount = 0;
+            result.FaceQualityFaceCount = 0;
+            result.FaceQualityNonPlanarCount = 0;
+            result.FaceQualityMaxPlaneDeviation = 0f;
+            result.FaceQualityMaxNormalSpreadDegrees = 0f;
+            result.FaceQualityFailures?.Clear();
+            result.OpenEdgeFailures?.Clear();
+            result.TJunctionFailures?.Clear();
+            result.FaceFirstNonPlanarStageByIdentity?.Clear();
+            result.BoundaryConformityTouchedFaces?.Clear();
+            result.SeamRepairTouchedFaces?.Clear();
+            result.SeamRepairMaximumMovementByIdentity?.Clear();
+        }
+
+        private static string BuildPlaneCutFaceIdentity(
+            PolygonFace face,
+            int faceIndex)
+        {
+            if (face == null)
+            {
+                return "NullFace:" + faceIndex;
+            }
+            if (face.ProvenanceKind != PolygonFaceProvenanceKind.None &&
+                face.ProvenanceIndex >= 0)
+            {
+                return face.ProvenanceKind + ":" +
+                    face.ProvenanceIndex;
+            }
+            return "FaceIndex:" + faceIndex;
+        }
+
+        private static void CapturePlaneCutModifiedFaceIdentities(
+            List<PolygonFace> before,
+            List<PolygonFace> after,
+            HashSet<string> touchedIdentities,
+            Dictionary<string, float> maximumMovementByIdentity)
+        {
+            if (before == null || after == null ||
+                touchedIdentities == null)
+            {
+                return;
+            }
+
+            int count = Mathf.Min(before.Count, after.Count);
+            for (int faceIndex = 0; faceIndex < count; faceIndex++)
+            {
+                PolygonFace left = before[faceIndex];
+                PolygonFace right = after[faceIndex];
+                if (left == null || right == null ||
+                    left.Vertices == null || right.Vertices == null)
+                {
+                    continue;
+                }
+
+                bool touched = left.Vertices.Count != right.Vertices.Count;
+                float maximumMovement = 0f;
+                int vertexCount = Mathf.Min(
+                    left.Vertices.Count,
+                    right.Vertices.Count);
+                for (int vertexIndex = 0;
+                     vertexIndex < vertexCount;
+                     vertexIndex++)
+                {
+                    float movement = Vector3.Distance(
+                        left.Vertices[vertexIndex],
+                        right.Vertices[vertexIndex]);
+                    maximumMovement = Mathf.Max(
+                        maximumMovement,
+                        movement);
+                    if (movement > Mathf.Sqrt(MinimumEdgeLengthSqr))
+                    {
+                        touched = true;
+                    }
+                }
+
+                if (!touched)
+                {
+                    continue;
+                }
+
+                string identity = BuildPlaneCutFaceIdentity(
+                    right,
+                    faceIndex);
+                touchedIdentities.Add(identity);
+                if (maximumMovementByIdentity != null)
+                {
+                    maximumMovementByIdentity[identity] =
+                        maximumMovement;
+                }
+            }
+        }
+
+        private static void CapturePlaneCutStageSnapshot(
+            List<PolygonFace> faces,
+            string stage,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            List<PlaneCutBevelCandidate> candidates,
+            ref PlaneCutBevelAuditResult result,
+            out PlaneCutStageSnapshot snapshot)
+        {
+            int faceCount = faces == null ? 0 : faces.Count;
+            int vertexCount = 0;
+            int bevelFaceCount = 0;
+            int junctionFaceCount = 0;
+            int nonPlanarFaceCount = 0;
+            float maximumDeviation = 0f;
+            float maximumSpread = 0f;
+            Dictionary<VertexKey, Vector3> unique =
+                new Dictionary<VertexKey, Vector3>();
+            float planarityTolerance =
+                ResolvePlaneCutPlanarityTolerance(
+                    minimumStableEdgeLength);
+
+            if (faces != null)
+            {
+                for (int faceIndex = 0;
+                     faceIndex < faces.Count;
+                     faceIndex++)
+                {
+                    PolygonFace face = faces[faceIndex];
+                    if (face == null || face.Vertices == null)
+                    {
+                        continue;
+                    }
+                    vertexCount += face.Vertices.Count;
+                    for (int vertexIndex = 0;
+                         vertexIndex < face.Vertices.Count;
+                         vertexIndex++)
+                    {
+                        Vector3 vertex = face.Vertices[vertexIndex];
+                        VertexKey key = new VertexKey(vertex);
+                        if (!unique.ContainsKey(key))
+                        {
+                            unique.Add(key, vertex);
+                        }
+                    }
+
+                    if (face.ProvenanceKind ==
+                        PolygonFaceProvenanceKind.EdgeBevelPlane)
+                    {
+                        bevelFaceCount++;
+                    }
+                    else if (face.ProvenanceKind ==
+                        PolygonFaceProvenanceKind.VertexJunctionPlane)
+                    {
+                        junctionFaceCount++;
+                    }
+
+                    if (face.Feature !=
+                            PolygonFaceFeature.ConvexEdgeWear ||
+                        face.Vertices.Count < 3)
+                    {
+                        continue;
+                    }
+
+                    MeasurePlaneCutFacePlanarityDetailed(
+                        face,
+                        out float deviation,
+                        out _,
+                        out _,
+                        out _,
+                        out float spread,
+                        out _,
+                        out _,
+                        out _,
+                        out _,
+                        out _);
+                    maximumDeviation = Mathf.Max(
+                        maximumDeviation,
+                        deviation);
+                    maximumSpread = Mathf.Max(
+                        maximumSpread,
+                        spread);
+                    if (deviation > planarityTolerance ||
+                        spread > PlaneCutMaximumNormalSpreadDegrees)
+                    {
+                        nonPlanarFaceCount++;
+                        if (result.FaceFirstNonPlanarStageByIdentity != null)
+                        {
+                            string identity = BuildPlaneCutFaceIdentity(
+                                face,
+                                faceIndex);
+                            if (!result.FaceFirstNonPlanarStageByIdentity
+                                    .ContainsKey(identity))
+                            {
+                                result.FaceFirstNonPlanarStageByIdentity.Add(
+                                    identity,
+                                    stage);
+                            }
+                        }
+                    }
+                }
+            }
+
+            EdgeWearTopologyStats topology = faces == null
+                ? default
+                : AuditEdgeWearTopology(
+                    faces,
+                    minimumStableEdgeLength);
+            int invalidFaceCount = faces == null
+                ? 0
+                : CountInvalidPlaneCutFaces(
+                    faces,
+                    minimumStableFaceArea);
+            snapshot = new PlaneCutStageSnapshot(
+                stage,
+                faceCount,
+                vertexCount,
+                unique.Count,
+                bevelFaceCount,
+                junctionFaceCount,
+                topology.OpenEdgeCount,
+                topology.NonManifoldEdgeCount,
+                topology.TJunctionCount,
+                invalidFaceCount,
+                nonPlanarFaceCount,
+                maximumDeviation,
+                maximumSpread);
+
+            if (topology.OpenEdgeCount > 0 &&
+                string.IsNullOrEmpty(result.FirstOpenEdgeStage))
+            {
+                result.FirstOpenEdgeStage = stage;
+            }
+            if (topology.TJunctionCount > 0)
+            {
+                if (string.IsNullOrEmpty(result.FirstTJunctionStage))
+                {
+                    result.FirstTJunctionStage = stage;
+                }
+                CapturePlaneCutTJunctionFailures(
+                    faces,
+                    stage,
+                    minimumStableEdgeLength,
+                    candidates,
+                    ref result);
+            }
+            if (nonPlanarFaceCount > 0 &&
+                string.IsNullOrEmpty(result.FirstNonPlanarStage))
+            {
+                result.FirstNonPlanarStage = stage;
+            }
+        }
+
+        private static void CapturePlaneCutTJunctionFailures(
+            List<PolygonFace> faces,
+            string stage,
+            float minimumStableEdgeLength,
+            List<PlaneCutBevelCandidate> candidates,
+            ref PlaneCutBevelAuditResult result)
+        {
+            if (faces == null || faces.Count == 0)
+            {
+                return;
+            }
+            if (result.TJunctionFailures == null)
+            {
+                result.TJunctionFailures =
+                    new List<PlaneCutTJunctionFailureRecord>();
+            }
+
+            Dictionary<VertexKey, Vector3> uniqueVertices =
+                new Dictionary<VertexKey, Vector3>();
+            List<VertexKey> vertexOrder = new List<VertexKey>();
+            Dictionary<VertexKey, List<string>> ownerFacesByVertex =
+                new Dictionary<VertexKey, List<string>>();
+            Dictionary<VertexKey, SortedSet<int>>
+                ownerBevelEdgesByVertex =
+                    new Dictionary<VertexKey, SortedSet<int>>();
+            List<PlaneCutDiagnosticSegment> segments =
+                new List<PlaneCutDiagnosticSegment>();
+
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                if (face == null || face.Vertices == null ||
+                    face.Vertices.Count < 2)
+                {
+                    continue;
+                }
+                for (int vertexIndex = 0;
+                     vertexIndex < face.Vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 vertex = face.Vertices[vertexIndex];
+                    VertexKey key = new VertexKey(vertex);
+                    if (!uniqueVertices.ContainsKey(key))
+                    {
+                        uniqueVertices.Add(key, vertex);
+                        vertexOrder.Add(key);
+                    }
+                    if (!ownerFacesByVertex.TryGetValue(
+                            key,
+                            out List<string> owners))
+                    {
+                        owners = new List<string>();
+                        ownerFacesByVertex.Add(key, owners);
+                    }
+                    owners.Add(
+                        BuildPlaneCutFaceIdentity(face, faceIndex) +
+                        "#" + faceIndex + "[v" + vertexIndex + "]");
+                    if (face.ProvenanceKind ==
+                            PolygonFaceProvenanceKind.EdgeBevelPlane &&
+                        face.ProvenanceIndex >= 0)
+                    {
+                        if (!ownerBevelEdgesByVertex.TryGetValue(
+                                key,
+                                out SortedSet<int> ownerEdges))
+                        {
+                            ownerEdges = new SortedSet<int>();
+                            ownerBevelEdgesByVertex.Add(key, ownerEdges);
+                        }
+                        ownerEdges.Add(face.ProvenanceIndex);
+                    }
+
+                    Vector3 end = face.Vertices[
+                        (vertexIndex + 1) % face.Vertices.Count];
+                    if (!AreSamePoint(vertex, end))
+                    {
+                        segments.Add(new PlaneCutDiagnosticSegment(
+                            faceIndex,
+                            face.ProvenanceKind,
+                            face.ProvenanceIndex,
+                            vertexIndex,
+                            vertex,
+                            end));
+                    }
+                }
+            }
+
+            float tolerance = CalculateTopologyTJunctionTolerance(
+                minimumStableEdgeLength);
+            float toleranceSqr = tolerance * tolerance;
+            for (int vertexOrderIndex = 0;
+                 vertexOrderIndex < vertexOrder.Count;
+                 vertexOrderIndex++)
+            {
+                VertexKey vertexKey = vertexOrder[vertexOrderIndex];
+                Vector3 vertex = uniqueVertices[vertexKey];
+                int bestSegmentIndex = -1;
+                float bestDistance = float.PositiveInfinity;
+                float bestParameter = 0f;
+                Vector3 bestClosest = default;
+                int matchingSegments = 0;
+
+                for (int segmentIndex = 0;
+                     segmentIndex < segments.Count;
+                     segmentIndex++)
+                {
+                    PlaneCutDiagnosticSegment segment =
+                        segments[segmentIndex];
+                    if (vertexKey.Equals(segment.StartKey) ||
+                        vertexKey.Equals(segment.EndKey))
+                    {
+                        continue;
+                    }
+                    if (!TryMeasurePlaneCutTJunction(
+                            vertex,
+                            segment.Start,
+                            segment.End,
+                            toleranceSqr,
+                            out float parameter,
+                            out Vector3 closest,
+                            out float distance))
+                    {
+                        continue;
+                    }
+                    matchingSegments++;
+                    if (distance < bestDistance - 0.000000001f ||
+                        (Mathf.Abs(distance - bestDistance) <=
+                            0.000000001f &&
+                         (bestSegmentIndex < 0 ||
+                          segment.FaceIndex <
+                              segments[bestSegmentIndex].FaceIndex ||
+                          (segment.FaceIndex ==
+                               segments[bestSegmentIndex].FaceIndex &&
+                           segment.SegmentIndex <
+                               segments[bestSegmentIndex].SegmentIndex))))
+                    {
+                        bestSegmentIndex = segmentIndex;
+                        bestDistance = distance;
+                        bestParameter = parameter;
+                        bestClosest = closest;
+                    }
+                }
+
+                if (bestSegmentIndex < 0)
+                {
+                    continue;
+                }
+
+                PlaneCutDiagnosticSegment host =
+                    segments[bestSegmentIndex];
+                SortedSet<int> provenanceEdges =
+                    ownerBevelEdgesByVertex.TryGetValue(
+                            vertexKey,
+                            out SortedSet<int> storedOwnerEdges)
+                        ? new SortedSet<int>(storedOwnerEdges)
+                        : new SortedSet<int>();
+                if (host.ProvenanceKind ==
+                        PolygonFaceProvenanceKind.EdgeBevelPlane &&
+                    host.ProvenanceIndex >= 0)
+                {
+                    provenanceEdges.Add(host.ProvenanceIndex);
+                }
+
+                SortedSet<int> candidatePlaneMatches =
+                    new SortedSet<int>();
+                if (candidates != null)
+                {
+                    for (int candidateIndex = 0;
+                         candidateIndex < candidates.Count;
+                         candidateIndex++)
+                    {
+                        PlaneCutBevelCandidate candidate =
+                            candidates[candidateIndex];
+                        float matchTolerance = Mathf.Max(
+                            tolerance,
+                            candidate.PlaneTolerance);
+                        if (Mathf.Abs(candidate.Plane.SignedDistance(vertex)) <=
+                            matchTolerance)
+                        {
+                            candidatePlaneMatches.Add(
+                                candidate.SourceEdgeIndex);
+                        }
+                    }
+                }
+
+                SortedSet<int> linkedEdges =
+                    new SortedSet<int>(provenanceEdges);
+                linkedEdges.UnionWith(candidatePlaneMatches);
+                ResolvePlaneCutLastConflictForEdges(
+                    result.EdgeConflictWidthReductions,
+                    linkedEdges,
+                    out int lastConflictPass,
+                    out string lastConflictCluster);
+
+                PlaneCutTJunctionFailureRecord failure =
+                    new PlaneCutTJunctionFailureRecord
+                    {
+                        RecordIndex = result.TJunctionFailures.Count,
+                        Stage = stage,
+                        JunctionVertex = vertex,
+                        VertexOwnerFaceCount =
+                            ownerFacesByVertex[vertexKey].Count,
+                        VertexOwnerFaces = string.Join(
+                            "/",
+                            ownerFacesByVertex[vertexKey]),
+                        HostFaceIndex = host.FaceIndex,
+                        HostProvenanceKind = host.ProvenanceKind,
+                        HostProvenanceIndex = host.ProvenanceIndex,
+                        HostSegmentIndex = host.SegmentIndex,
+                        HostStart = host.Start,
+                        HostEnd = host.End,
+                        ClosestPoint = bestClosest,
+                        HostLength = Vector3.Distance(
+                            host.Start,
+                            host.End),
+                        SegmentParameter = bestParameter,
+                        Distance = bestDistance,
+                        Tolerance = tolerance,
+                        MatchingHostSegmentCount = matchingSegments,
+                        ProvenanceBevelEdges =
+                            FormatPlaneCutSortedEdgeSet(provenanceEdges),
+                        CandidatePlaneMatches =
+                            FormatPlaneCutSortedEdgeSet(
+                                candidatePlaneMatches),
+                        AssociatedEdgeScales =
+                            FormatPlaneCutCandidateScaleEvidence(
+                                candidates,
+                                result.CoverageAudit,
+                                linkedEdges),
+                        LastConflictPass = lastConflictPass,
+                        LastConflictCluster = lastConflictCluster,
+                        Cause = "vertex-on-unsplit-host-segment"
+                    };
+                failure.LinkedEdgeIndices.AddRange(linkedEdges);
+                result.TJunctionFailures.Add(failure);
+            }
+        }
+
+        private static bool TryMeasurePlaneCutTJunction(
+            Vector3 point,
+            Vector3 start,
+            Vector3 end,
+            float toleranceSqr,
+            out float parameter,
+            out Vector3 closest,
+            out float distance)
+        {
+            parameter = 0f;
+            closest = default;
+            distance = float.PositiveInfinity;
+            Vector3 segment = end - start;
+            float segmentLengthSqr = segment.sqrMagnitude;
+            if (segmentLengthSqr <= MinimumEdgeLengthSqr ||
+                (point - start).sqrMagnitude <= toleranceSqr ||
+                (point - end).sqrMagnitude <= toleranceSqr)
+            {
+                return false;
+            }
+            parameter = Vector3.Dot(point - start, segment) /
+                segmentLengthSqr;
+            if (parameter <= 0f || parameter >= 1f)
+            {
+                return false;
+            }
+            closest = start + segment * parameter;
+            distance = Vector3.Distance(point, closest);
+            return distance * distance <= toleranceSqr;
+        }
+
+        private static void ResolvePlaneCutLastConflictForEdges(
+            List<PlaneCutConflictWidthReductionRecord> reductions,
+            SortedSet<int> sourceEdges,
+            out int lastPass,
+            out string clusterEvidence)
+        {
+            lastPass = -1;
+            clusterEvidence = "none";
+            if (reductions == null || sourceEdges == null ||
+                sourceEdges.Count == 0)
+            {
+                return;
+            }
+            for (int recordIndex = reductions.Count - 1;
+                 recordIndex >= 0;
+                 recordIndex--)
+            {
+                PlaneCutConflictWidthReductionRecord reduction =
+                    reductions[recordIndex];
+                bool intersects = false;
+                for (int edgeIndex = 0;
+                     edgeIndex < reduction.ClusterEdgeIndices.Count;
+                     edgeIndex++)
+                {
+                    if (sourceEdges.Contains(
+                            reduction.ClusterEdgeIndices[edgeIndex]))
+                    {
+                        intersects = true;
+                        break;
+                    }
+                }
+                if (!intersects)
+                {
+                    continue;
+                }
+                lastPass = reduction.PassIndex;
+                clusterEvidence = FormatPlaneCutEdgeIndexEvidence(
+                    reduction.ClusterEdgeIndices) +
+                    "@" + reduction.AppliedScaleEvidence;
+                return;
+            }
+        }
+
+        private static string FormatPlaneCutSortedEdgeSet(
+            SortedSet<int> sourceEdges)
+        {
+            if (sourceEdges == null || sourceEdges.Count == 0)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            foreach (int sourceEdge in sourceEdges)
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(sourceEdge);
+            }
+            return builder.ToString();
+        }
+
+        private static string FormatPlaneCutCandidateScaleEvidence(
+            List<PlaneCutBevelCandidate> candidates,
+            EdgeWearCoverageAudit coverageAudit,
+            SortedSet<int> sourceEdges)
+        {
+            if (candidates == null || sourceEdges == null ||
+                sourceEdges.Count == 0)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate = candidates[candidateIndex];
+                if (!sourceEdges.Contains(candidate.SourceEdgeIndex))
+                {
+                    continue;
+                }
+                float solvedWidth = candidate.Width;
+                if (TryGetEdgeWearCoverageRecord(
+                        coverageAudit,
+                        candidate.SourceEdgeIndex,
+                        out EdgeWearEdgeLifecycleRecord lifecycle) &&
+                    lifecycle.SolvedWidth > PointMergeDistance)
+                {
+                    solvedWidth = lifecycle.SolvedWidth;
+                }
+                float scale = solvedWidth > PointMergeDistance
+                    ? candidate.Width / solvedWidth
+                    : 1f;
+                if (builder.Length > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(candidate.SourceEdgeIndex);
+                builder.Append('=');
+                builder.Append(scale.ToString("G9"));
+                builder.Append('(');
+                builder.Append(candidate.Width.ToString("G9"));
+                builder.Append(')');
+            }
+            return builder.Length == 0 ? "none" : builder.ToString();
+        }
+
         private static bool TryPreparePlaneCutPreviewFaces(
             List<PolygonFace> sourceFaces,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
+            ref PlaneCutBevelAuditResult result,
             out List<PolygonFace> auditedFaces,
             out int conformalSplitCount,
             out int seamPairCount,
             out int seamTouchedFaceCount,
-            out string blocker)
+            out string blocker,
+            PlaneCutNumericalRepairTelemetry numericalRepairs = null)
+        {
+            return TryPreparePlaneCutPreviewFaces(
+                sourceFaces,
+                null,
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                ref result,
+                out auditedFaces,
+                out conformalSplitCount,
+                out seamPairCount,
+                out seamTouchedFaceCount,
+                out blocker,
+                numericalRepairs);
+        }
+
+        private static bool TryPreparePlaneCutPreviewFaces(
+            List<PolygonFace> sourceFaces,
+            List<PlaneCutBevelCandidate> candidates,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            ref PlaneCutBevelAuditResult result,
+            out List<PolygonFace> auditedFaces,
+            out int conformalSplitCount,
+            out int seamPairCount,
+            out int seamTouchedFaceCount,
+            out string blocker,
+            PlaneCutNumericalRepairTelemetry numericalRepairs = null)
         {
             auditedFaces = new List<PolygonFace>(sourceFaces.Count);
             conformalSplitCount = 0;
@@ -931,43 +5853,95 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     sourceFace.ProvenanceIndex));
             }
 
-            WeldSharedVertices(auditedFaces);
+            CapturePlaneCutStageSnapshot(
+                auditedFaces,
+                "AfterSanitation",
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                candidates,
+                ref result,
+                out result.StageSanitized);
+
+            if (numericalRepairs != null)
+            {
+                WeldSharedVerticesByDistance(
+                    auditedFaces,
+                    PointMergeDistance,
+                    numericalRepairs);
+            }
+            else
+            {
+                WeldSharedVertices(auditedFaces);
+            }
+            CapturePlaneCutStageSnapshot(
+                auditedFaces,
+                "AfterWeld",
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                candidates,
+                ref result,
+                out result.StageWelded);
+
+            List<PolygonFace> beforeConformity =
+                ClonePolygonFacesForPlaneCutAudit(auditedFaces);
             conformalSplitCount = ConformPlaneCutFaceBoundaries(
                 auditedFaces,
                 minimumStableEdgeLength);
+            CapturePlaneCutModifiedFaceIdentities(
+                beforeConformity,
+                auditedFaces,
+                result.BoundaryConformityTouchedFaces,
+                null);
+            CapturePlaneCutStageSnapshot(
+                auditedFaces,
+                "AfterBoundaryConformity",
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                candidates,
+                ref result,
+                out result.StageConformed);
+
+            List<PolygonFace> beforeSeamRepair =
+                ClonePolygonFacesForPlaneCutAudit(auditedFaces);
             seamPairCount = RepairPlaneCutNumericalSeams(
                 auditedFaces,
                 minimumStableEdgeLength,
                 out seamTouchedFaceCount);
+            CapturePlaneCutModifiedFaceIdentities(
+                beforeSeamRepair,
+                auditedFaces,
+                result.SeamRepairTouchedFaces,
+                result.SeamRepairMaximumMovementByIdentity);
+            CapturePlaneCutStageSnapshot(
+                auditedFaces,
+                "AfterSeamRepair",
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                candidates,
+                ref result,
+                out result.StageSeamRepaired);
             return auditedFaces.Count >= 4;
         }
 
         private static TriangleSoup TriangulatePlaneCutPreviewFaces(
             List<PolygonFace> faces)
         {
-            TriangleSoup soup = new TriangleSoup();
-            for (int faceIndex = 0;
-                 faceIndex < faces.Count;
-                 faceIndex++)
-            {
-                PolygonFace face = faces[faceIndex];
-                Vector3 centre = CalculateAverage(face.Vertices);
-                for (int vertexIndex = 0;
-                     vertexIndex < face.Vertices.Count;
-                     vertexIndex++)
+            BoundedSingleEdgeAuditResult surfaceAudit =
+                new BoundedSingleEdgeAuditResult
                 {
-                    AddOrientedTriangle(
-                        soup,
-                        centre,
-                        face.Vertices[vertexIndex],
-                        face.Vertices[
-                            (vertexIndex + 1) % face.Vertices.Count],
-                        face.Normal,
-                        face.Feature,
-                        face.FeatureStrength);
-                }
-            }
-            return soup;
+                    TriangulationFailureFace = -1,
+                    TriangulationFailureProvenanceIndex = -1,
+                    BevelRegionFailureFace = -1,
+                    BevelRegionFailureProvenanceIndex = -1
+                };
+            return TryTriangulateBoundedPreviewFaces(
+                    faces,
+                    TinyFaceAreaEpsilon,
+                    ref surfaceAudit,
+                    out TriangleSoup soup,
+                    out _)
+                ? soup
+                : null;
         }
 
         private static void AuditPlaneCutPreviewTriangleSoup(
@@ -1788,18 +6762,432 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return count;
         }
 
+        private static void AuditPlaneCutOpenEdgeFailures(
+            List<PolygonFace> faces,
+            ChamferTopologyContext context,
+            List<PlaneCutBevelCandidate> candidates,
+            float minimumStableEdgeLength,
+            ref PlaneCutBevelAuditResult result)
+        {
+            if (result.OpenEdgeFailures == null)
+            {
+                result.OpenEdgeFailures =
+                    new List<PlaneCutOpenEdgeFailureRecord>();
+            }
+            else
+            {
+                result.OpenEdgeFailures.Clear();
+            }
+
+            if (faces == null || context == null)
+            {
+                return;
+            }
+
+            List<PlaneCutOpenEdgeRecord> openEdges =
+                CollectPlaneCutOpenEdges(faces);
+            float nearMatchTolerance = Mathf.Max(
+                PointMergeDistance * 8f,
+                minimumStableEdgeLength * 0.002f);
+            for (int recordIndex = 0;
+                 recordIndex < openEdges.Count;
+                 recordIndex++)
+            {
+                PlaneCutOpenEdgeRecord open = openEdges[recordIndex];
+                PolygonFace owner = open.FaceIndex >= 0 &&
+                        open.FaceIndex < faces.Count
+                    ? faces[open.FaceIndex]
+                    : null;
+                FindNearestPlaneCutSourceVertex(
+                    context,
+                    open.Start,
+                    open.End,
+                    out int sourceVertex,
+                    out Vector3 sourcePosition,
+                    out float sourceDistance);
+                List<int> incidentEdges =
+                    CollectPlaneCutIncidentCandidateEdges(
+                        candidates,
+                        sourceVertex);
+                int junctionExpected = incidentEdges.Count >= 2 ? 1 : 0;
+                int junctionFaceCount = CountPlaneCutJunctionFaces(
+                    faces,
+                    sourceVertex);
+                FindNearestPlaneCutBoundarySegment(
+                    faces,
+                    open,
+                    out int nearestFaceIndex,
+                    out PolygonFaceProvenanceKind nearestKind,
+                    out int nearestProvenanceIndex,
+                    out Vector3 nearestStart,
+                    out Vector3 nearestEnd,
+                    out float nearestDistance);
+
+                string expectedNeighbour = junctionExpected == 1
+                    ? "Junction(vertex:" + sourceVertex + ")"
+                    : owner != null &&
+                        owner.ProvenanceKind ==
+                            PolygonFaceProvenanceKind.SourceFace &&
+                        incidentEdges.Count > 0
+                        ? "Bevel(edge:" + incidentEdges[0] + ")"
+                        : "BoundaryMate";
+                string cause;
+                if (junctionExpected == 1 && junctionFaceCount == 0)
+                {
+                    cause = "missing-junction";
+                }
+                else if (nearestDistance <= nearMatchTolerance * 4f)
+                {
+                    cause = "near-miss-boundary";
+                }
+                else
+                {
+                    cause = "unmatched-boundary";
+                }
+
+                result.OpenEdgeFailures.Add(
+                    new PlaneCutOpenEdgeFailureRecord(
+                        recordIndex,
+                        open.FaceIndex,
+                        owner == null
+                            ? PolygonFaceProvenanceKind.None
+                            : owner.ProvenanceKind,
+                        owner == null ? -1 : owner.ProvenanceIndex,
+                        open.Start,
+                        open.End,
+                        Vector3.Distance(open.Start, open.End),
+                        sourceVertex,
+                        sourcePosition,
+                        sourceDistance,
+                        FormatPlaneCutEdgeIndexEvidence(incidentEdges),
+                        junctionExpected,
+                        junctionFaceCount,
+                        expectedNeighbour,
+                        nearestFaceIndex,
+                        nearestKind,
+                        nearestProvenanceIndex,
+                        nearestStart,
+                        nearestEnd,
+                        nearestDistance,
+                        string.IsNullOrEmpty(result.FirstOpenEdgeStage)
+                            ? "FinalCertification"
+                            : result.FirstOpenEdgeStage,
+                        cause));
+            }
+        }
+
+        private static void AuditPlaneCutJunctionCoverage(
+            List<PolygonFace> faces,
+            ChamferTopologyContext context,
+            List<PlaneCutBevelCandidate> candidates,
+            ref PlaneCutBevelAuditResult result)
+        {
+            if (result.JunctionCoverage == null)
+            {
+                result.JunctionCoverage =
+                    new List<PlaneCutJunctionCoverageRecord>();
+            }
+            else
+            {
+                result.JunctionCoverage.Clear();
+            }
+            result.JunctionCoverageTouchedVertexCount = 0;
+            result.JunctionCoverageExpectedCount = 0;
+            result.JunctionCoverageBuiltCount = 0;
+            result.JunctionCoverageMissingCount = 0;
+            if (context == null || candidates == null)
+            {
+                return;
+            }
+
+            SortedSet<int> touchedVertices = new SortedSet<int>();
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                touchedVertices.Add(candidates[candidateIndex].VertexA);
+                touchedVertices.Add(candidates[candidateIndex].VertexB);
+            }
+
+            result.JunctionCoverageTouchedVertexCount =
+                touchedVertices.Count;
+            foreach (int vertexIndex in touchedVertices)
+            {
+                List<int> incidentEdges =
+                    CollectPlaneCutIncidentCandidateEdges(
+                        candidates,
+                        vertexIndex);
+                int expected = incidentEdges.Count >= 2 ? 1 : 0;
+                int junctionFaceCount = CountPlaneCutJunctionFaces(
+                    faces,
+                    vertexIndex);
+                int assignedOpenEdges = 0;
+                if (result.OpenEdgeFailures != null)
+                {
+                    for (int openIndex = 0;
+                         openIndex < result.OpenEdgeFailures.Count;
+                         openIndex++)
+                    {
+                        if (result.OpenEdgeFailures[openIndex]
+                                .AssociatedSourceVertex == vertexIndex)
+                        {
+                            assignedOpenEdges++;
+                        }
+                    }
+                }
+
+                if (expected == 1)
+                {
+                    result.JunctionCoverageExpectedCount++;
+                    if (junctionFaceCount > 0)
+                    {
+                        result.JunctionCoverageBuiltCount++;
+                    }
+                    else
+                    {
+                        result.JunctionCoverageMissingCount++;
+                    }
+                }
+
+                string failureReason = expected == 1 &&
+                        junctionFaceCount == 0 &&
+                        assignedOpenEdges > 0
+                    ? "junction-required-open-boundary"
+                    : expected == 1 && junctionFaceCount == 0
+                        ? "junction-required-no-cap"
+                        : junctionFaceCount > 1
+                            ? "duplicate-junction-faces"
+                            : "none";
+                Vector3 sourcePosition = vertexIndex >= 0 &&
+                        vertexIndex < context.Graph.Vertices.Count
+                    ? context.Graph.Vertices[vertexIndex].Position
+                    : Vector3.zero;
+                result.JunctionCoverage.Add(
+                    new PlaneCutJunctionCoverageRecord(
+                        vertexIndex,
+                        sourcePosition,
+                        FormatPlaneCutEdgeIndexEvidence(incidentEdges),
+                        incidentEdges.Count,
+                        expected,
+                        junctionFaceCount,
+                        assignedOpenEdges,
+                        failureReason));
+            }
+        }
+
+        private static List<int> CollectPlaneCutIncidentCandidateEdges(
+            List<PlaneCutBevelCandidate> candidates,
+            int vertexIndex)
+        {
+            List<int> edges = new List<int>();
+            if (candidates == null || vertexIndex < 0)
+            {
+                return edges;
+            }
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate =
+                    candidates[candidateIndex];
+                if (candidate.VertexA == vertexIndex ||
+                    candidate.VertexB == vertexIndex)
+                {
+                    edges.Add(candidate.SourceEdgeIndex);
+                }
+            }
+            edges.Sort();
+            return edges;
+        }
+
+        private static int CountPlaneCutJunctionFaces(
+            List<PolygonFace> faces,
+            int vertexIndex)
+        {
+            if (faces == null || vertexIndex < 0)
+            {
+                return 0;
+            }
+            int count = 0;
+            for (int faceIndex = 0;
+                 faceIndex < faces.Count;
+                 faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                if (face != null &&
+                    face.ProvenanceKind ==
+                        PolygonFaceProvenanceKind.VertexJunctionPlane &&
+                    face.ProvenanceIndex == vertexIndex)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static void FindNearestPlaneCutSourceVertex(
+            ChamferTopologyContext context,
+            Vector3 start,
+            Vector3 end,
+            out int vertexIndex,
+            out Vector3 sourcePosition,
+            out float distance)
+        {
+            vertexIndex = -1;
+            sourcePosition = Vector3.zero;
+            distance = float.PositiveInfinity;
+            if (context == null || context.Graph == null)
+            {
+                return;
+            }
+            for (int index = 0;
+                 index < context.Graph.Vertices.Count;
+                 index++)
+            {
+                Vector3 candidate =
+                    context.Graph.Vertices[index].Position;
+                float candidateDistance = Mathf.Min(
+                    Vector3.Distance(start, candidate),
+                    Vector3.Distance(end, candidate));
+                if (candidateDistance >= distance)
+                {
+                    continue;
+                }
+                vertexIndex = index;
+                sourcePosition = candidate;
+                distance = candidateDistance;
+            }
+            if (float.IsPositiveInfinity(distance))
+            {
+                distance = 0f;
+            }
+        }
+
+        private static void FindNearestPlaneCutBoundarySegment(
+            List<PolygonFace> faces,
+            PlaneCutOpenEdgeRecord open,
+            out int nearestFaceIndex,
+            out PolygonFaceProvenanceKind nearestKind,
+            out int nearestProvenanceIndex,
+            out Vector3 nearestStart,
+            out Vector3 nearestEnd,
+            out float nearestDistance)
+        {
+            nearestFaceIndex = -1;
+            nearestKind = PolygonFaceProvenanceKind.None;
+            nearestProvenanceIndex = -1;
+            nearestStart = Vector3.zero;
+            nearestEnd = Vector3.zero;
+            nearestDistance = float.PositiveInfinity;
+            if (faces == null)
+            {
+                return;
+            }
+
+            for (int faceIndex = 0;
+                 faceIndex < faces.Count;
+                 faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                if (face == null || face.Vertices == null ||
+                    face.Vertices.Count < 2)
+                {
+                    continue;
+                }
+                for (int edgeIndex = 0;
+                     edgeIndex < face.Vertices.Count;
+                     edgeIndex++)
+                {
+                    Vector3 start = face.Vertices[edgeIndex];
+                    Vector3 end = face.Vertices[
+                        (edgeIndex + 1) % face.Vertices.Count];
+                    EdgeKey key = new EdgeKey(start, end);
+                    if (faceIndex == open.FaceIndex &&
+                        key.Equals(open.EdgeKey))
+                    {
+                        continue;
+                    }
+                    float reversedDistance = Mathf.Max(
+                        Vector3.Distance(open.Start, end),
+                        Vector3.Distance(open.End, start));
+                    if (reversedDistance >= nearestDistance)
+                    {
+                        continue;
+                    }
+                    nearestDistance = reversedDistance;
+                    nearestFaceIndex = faceIndex;
+                    nearestKind = face.ProvenanceKind;
+                    nearestProvenanceIndex = face.ProvenanceIndex;
+                    nearestStart = start;
+                    nearestEnd = end;
+                }
+            }
+            if (float.IsPositiveInfinity(nearestDistance))
+            {
+                nearestDistance = 0f;
+            }
+        }
+
+        private static string BuildPlaneCutFaceVertexResidualEvidence(
+            PolygonFace face)
+        {
+            if (face == null || face.Vertices == null ||
+                face.Vertices.Count == 0)
+            {
+                return "none";
+            }
+            float planeDistance = Vector3.Dot(
+                face.Normal,
+                face.Vertices[0]);
+            StringBuilder builder = new StringBuilder();
+            for (int vertexIndex = 0;
+                 vertexIndex < face.Vertices.Count;
+                 vertexIndex++)
+            {
+                if (vertexIndex > 0)
+                {
+                    builder.Append('|');
+                }
+                Vector3 vertex = face.Vertices[vertexIndex];
+                builder.Append(vertexIndex);
+                builder.Append('@');
+                builder.Append('(');
+                builder.Append(vertex.x.ToString("G9"));
+                builder.Append('/');
+                builder.Append(vertex.y.ToString("G9"));
+                builder.Append('/');
+                builder.Append(vertex.z.ToString("G9"));
+                builder.Append(")[r=");
+                builder.Append((Vector3.Dot(face.Normal, vertex) -
+                    planeDistance).ToString("G9"));
+                builder.Append(']');
+            }
+            return builder.ToString();
+        }
+
         private static void AuditPlaneCutFaceQuality(
             List<PolygonFace> faces,
             List<PlaneCutVertexJunctionCandidate> junctions,
             float minimumStableEdgeLength,
             ref PlaneCutBevelAuditResult result)
         {
-            const float maximumTriangleNormalSpreadDegrees = 0.75f;
             const float minimumJunctionCompactness = 0.06f;
             const float maximumJunctionAspectRatio = 12f;
-            float planarityTolerance = Mathf.Max(
-                PointMergeDistance * 2f,
-                minimumStableEdgeLength * 0.00005f);
+            float planarityTolerance =
+                ResolvePlaneCutPlanarityTolerance(
+                    minimumStableEdgeLength);
+            result.FaceQualityPlanarityTolerance = planarityTolerance;
+            result.FaceQualityNormalSpreadToleranceDegrees =
+                PlaneCutMaximumNormalSpreadDegrees;
+            if (result.FaceQualityFailures == null)
+            {
+                result.FaceQualityFailures =
+                    new List<PlaneCutFaceQualityFailureRecord>();
+            }
+            else
+            {
+                result.FaceQualityFailures.Clear();
+            }
 
             for (int faceIndex = 0;
                  faceIndex < faces.Count;
@@ -1815,22 +7203,85 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 result.FaceQualityFaceCount++;
-                MeasurePlaneCutFacePlanarity(
+                MeasurePlaneCutFacePlanarityDetailed(
                     face,
                     out float maximumDeviation,
-                    out float maximumNormalSpread);
+                    out int offendingVertexIndex,
+                    out Vector3 offendingVertexPosition,
+                    out float offendingSignedResidual,
+                    out float maximumNormalSpread,
+                    out int offendingSegmentIndex,
+                    out Vector3 offendingTriangleNormal,
+                    out Vector3 measuredNormal,
+                    out float area,
+                    out float minimumEdgeLength);
                 result.FaceQualityMaxPlaneDeviation = Mathf.Max(
                     result.FaceQualityMaxPlaneDeviation,
                     maximumDeviation);
                 result.FaceQualityMaxNormalSpreadDegrees = Mathf.Max(
                     result.FaceQualityMaxNormalSpreadDegrees,
                     maximumNormalSpread);
-                if (maximumDeviation > planarityTolerance ||
+                bool deviationFailure =
+                    maximumDeviation > planarityTolerance;
+                bool spreadFailure =
                     maximumNormalSpread >
-                        maximumTriangleNormalSpreadDegrees)
+                        PlaneCutMaximumNormalSpreadDegrees;
+                if (!deviationFailure && !spreadFailure)
                 {
-                    result.FaceQualityNonPlanarCount++;
+                    continue;
                 }
+
+                result.FaceQualityNonPlanarCount++;
+                string identity = BuildPlaneCutFaceIdentity(
+                    face,
+                    faceIndex);
+                string firstFailureStage = string.Empty;
+                result.FaceFirstNonPlanarStageByIdentity?.TryGetValue(
+                    identity,
+                    out firstFailureStage);
+                bool conformityTouched =
+                    result.BoundaryConformityTouchedFaces != null &&
+                    result.BoundaryConformityTouchedFaces.Contains(identity);
+                bool seamTouched =
+                    result.SeamRepairTouchedFaces != null &&
+                    result.SeamRepairTouchedFaces.Contains(identity);
+                float seamMovement = 0f;
+                result.SeamRepairMaximumMovementByIdentity?.TryGetValue(
+                    identity,
+                    out seamMovement);
+                string cause = deviationFailure && spreadFailure
+                    ? "plane-residual+normal-spread"
+                    : deviationFailure
+                        ? "plane-residual"
+                        : "normal-spread";
+                result.FaceQualityFailures.Add(
+                    new PlaneCutFaceQualityFailureRecord(
+                        faceIndex,
+                        face.ProvenanceKind,
+                        face.ProvenanceIndex,
+                        face.Vertices.Count,
+                        face.Normal,
+                        measuredNormal,
+                        Vector3.Dot(face.Normal, face.Vertices[0]),
+                        maximumDeviation,
+                        planarityTolerance,
+                        offendingVertexIndex,
+                        offendingVertexPosition,
+                        offendingSignedResidual,
+                        maximumNormalSpread,
+                        PlaneCutMaximumNormalSpreadDegrees,
+                        offendingSegmentIndex,
+                        offendingTriangleNormal,
+                        area,
+                        minimumEdgeLength,
+                        string.IsNullOrEmpty(firstFailureStage)
+                            ? "FinalCertification"
+                            : firstFailureStage,
+                        conformityTouched ? 1 : 0,
+                        seamTouched ? 1 : 0,
+                        seamMovement,
+                        BuildPlaneCutFaceVertexResidualEvidence(face),
+                        cause));
             }
 
             result.FaceQualityMinimumJunctionCompactness =
@@ -1903,13 +7354,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             out float maximumDeviation,
             out float maximumNormalSpread)
         {
+            MeasurePlaneCutFacePlanarityDetailed(
+                face,
+                out maximumDeviation,
+                out _,
+                out _,
+                out _,
+                out maximumNormalSpread,
+                out _,
+                out _,
+                out _,
+                out _,
+                out _);
+        }
+
+        private static void MeasurePlaneCutFacePlanarityDetailed(
+            PolygonFace face,
+            out float maximumDeviation,
+            out int offendingVertexIndex,
+            out Vector3 offendingVertexPosition,
+            out float offendingSignedResidual,
+            out float maximumNormalSpread,
+            out int offendingSegmentIndex,
+            out Vector3 offendingTriangleNormal,
+            out Vector3 measuredNormal,
+            out float area,
+            out float minimumEdgeLength)
+        {
             maximumDeviation = 0f;
+            offendingVertexIndex = -1;
+            offendingVertexPosition = Vector3.zero;
+            offendingSignedResidual = 0f;
             maximumNormalSpread = 0f;
-            if (face.Vertices.Count < 3)
+            offendingSegmentIndex = -1;
+            offendingTriangleNormal = Vector3.zero;
+            measuredNormal = Vector3.zero;
+            area = 0f;
+            minimumEdgeLength = 0f;
+            if (face == null || face.Vertices == null ||
+                face.Vertices.Count < 3)
             {
                 return;
             }
 
+            measuredNormal = CalculatePolygonNormal(face.Vertices);
+            area = CalculatePolygonArea(face.Vertices);
+            minimumEdgeLength = float.PositiveInfinity;
             float planeDistance = Vector3.Dot(
                 face.Normal,
                 face.Vertices[0]);
@@ -1921,12 +7411,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 start = face.Vertices[vertexIndex];
                 Vector3 end = face.Vertices[
                     (vertexIndex + 1) % face.Vertices.Count];
-                maximumDeviation = Mathf.Max(
-                    maximumDeviation,
-                    Mathf.Abs(
-                        Vector3.Dot(face.Normal, start) -
-                        planeDistance));
+                float signedResidual =
+                    Vector3.Dot(face.Normal, start) - planeDistance;
+                float deviation = Mathf.Abs(signedResidual);
+                if (deviation > maximumDeviation)
+                {
+                    maximumDeviation = deviation;
+                    offendingVertexIndex = vertexIndex;
+                    offendingVertexPosition = start;
+                    offendingSignedResidual = signedResidual;
+                }
 
+                float edgeLength = Vector3.Distance(start, end);
+                minimumEdgeLength = Mathf.Min(
+                    minimumEdgeLength,
+                    edgeLength);
                 Vector3 triangleNormal = Vector3.Cross(
                     start - centre,
                     end - centre);
@@ -1940,11 +7439,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     triangleNormal = -triangleNormal;
                 }
-                maximumNormalSpread = Mathf.Max(
-                    maximumNormalSpread,
-                    Vector3.Angle(
-                        triangleNormal,
-                        face.Normal));
+                float spread = Vector3.Angle(
+                    triangleNormal,
+                    face.Normal);
+                if (spread > maximumNormalSpread)
+                {
+                    maximumNormalSpread = spread;
+                    offendingSegmentIndex = vertexIndex;
+                    offendingTriangleNormal = triangleNormal;
+                }
+            }
+
+            if (float.IsPositiveInfinity(minimumEdgeLength))
+            {
+                minimumEdgeLength = 0f;
             }
         }
 

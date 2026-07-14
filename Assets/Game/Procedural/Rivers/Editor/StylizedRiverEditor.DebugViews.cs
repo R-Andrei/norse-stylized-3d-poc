@@ -33,8 +33,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             LayerDAdvancedInternals,
             LayerDComparisons,
             LayerDChipSelection,
-            LayerERendering,
-            LayerEFraySelection
+            LayerERendering
         }
 
         private struct RiverDebugState
@@ -186,8 +185,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             "Layer D — Advanced Internals",
             "Layer D — Comparisons",
             "Layer D — Chip Selection",
-            "Layer E — Rendering",
-            "Layer E — Fray Selection"
+            "Layer E — Rendering"
         };
 
         private static readonly string[] FoamLayerALabels =
@@ -270,10 +268,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             "Chip Candidate Field",
             "Chip Activated Candidates",
-            "Chip Edge Eligibility",
+            "Chip Edge Coverage",
             "Chip Eligibility Composite",
             "Chip Final Selection",
-            "Chip Material Gate",
+            "Chip Interior Access",
             "Production Chip Mask"
         };
 
@@ -284,7 +282,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             (int)StylizedRiverFoamDebugView.ChipEdgeEligibility,
             (int)StylizedRiverFoamDebugView.ChipEligibilityComposite,
             (int)StylizedRiverFoamDebugView.ChipFinalSelection,
-            (int)StylizedRiverFoamDebugView.ChipMaterialGate,
+            (int)StylizedRiverFoamDebugView.ChipInteriorAuthority,
             (int)StylizedRiverFoamDebugView.ProductionChipMask
         };
 
@@ -300,19 +298,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference
         };
 
-        private static readonly string[] FoamLayerEFrayLabels =
-        {
-            "Fray Permitted Band",
-            "Fray Eligibility Composite",
-            "Fray Pattern Preview"
-        };
-
-        private static readonly int[] FoamLayerEFrayValues =
-        {
-            (int)StylizedRiverFoamDebugView.FrayPermittedBand,
-            (int)StylizedRiverFoamDebugView.FrayEligibilityComposite,
-            (int)StylizedRiverFoamDebugView.FrayPatternPreview
-        };
 
         private void DrawDebugViews()
         {
@@ -988,10 +973,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return FoamDebugCategory.LayerERendering;
             }
 
-            if (System.Array.IndexOf(FoamLayerEFrayValues, viewValue) >= 0)
-            {
-                return FoamDebugCategory.LayerEFraySelection;
-            }
 
             return FoamDebugCategory.LayerCMaterial;
         }
@@ -1015,8 +996,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     FoamLayerDChipValues[0],
                 FoamDebugCategory.LayerERendering =>
                     FoamLayerEValues[0],
-                FoamDebugCategory.LayerEFraySelection =>
-                    FoamLayerEFrayValues[0],
                 _ => FoamLayerCValues[0]
             };
         }
@@ -1063,10 +1042,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     values = FoamLayerEValues;
                     break;
 
-                case FoamDebugCategory.LayerEFraySelection:
-                    labels = FoamLayerEFrayLabels;
-                    values = FoamLayerEFrayValues;
-                    break;
 
                 default:
                     labels = FoamLayerCLabels;
@@ -1408,52 +1383,40 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamShaderDetailProbe:
                     return
-                        "Layer E production breakup mask after the committed Final Foam silhouette receives the current Chip, Fray, and derived short-cut controls. It is render-only: it does not write FoamState or _FoamShapeMask, but it is the same local morphology consumed by normal Final Foam.";
+                        "Layer E production breakup mask after the committed Final Foam silhouette receives the current Chip and Strand controls. It is render-only: it does not write FoamState or _FoamShapeMask, but it is the same local morphology consumed by normal Final Foam.";
 
                 case StylizedRiverFoamDebugView.FoamShaderDetailDifference:
                     return
-                        "Layer E production breakup difference. Black means the committed Final Foam silhouette is unchanged; magenta/red means coverage is removed by chips, fray, or short cuts. This proof never adds coverage, so the green channel remains zero.";
+                        "Layer E production breakup difference. Black means the committed Final Foam silhouette is unchanged; magenta/red means coverage is removed by Chipping or Strands. This proof never adds coverage, so the green channel remains zero.";
 
 
                 case StylizedRiverFoamDebugView.ChipCandidateField:
                     return
-                        "Chip construction diagnostic. White shows the deterministic sparse field of single connected irregular contours before activation, edge restriction, or transported-material gating. Candidate Spacing is in metres; Candidate Radius Ratio derives the effective world-space radius.";
+                        "Chip construction diagnostic. White shows the current deterministic candidate contours after lifecycle, rigid motion, size pulse, rotation, and bounded shape change, but before Chip Activation, edge restriction, Interior Access, or transported-material gating.";
 
                 case StylizedRiverFoamDebugView.ChipActivatedCandidates:
                     return
-                        "Chip construction diagnostic. Yellow shows candidates retained by Chip Activation after animated coordinate advection, geometric growth/shrinkage, contour morphing, and turnover, but before Foam-edge restriction and transported-material gating. This isolates evolution and density from the later selection stages.";
+                        "Chip construction diagnostic. Yellow shows the current candidates retained by Chip Activation after the explicit lifecycle and independent rigid-motion/living-variation controls, but before Foam-edge restriction, Interior Access, and transported-material gating.";
 
                 case StylizedRiverFoamDebugView.ChipEdgeEligibility:
                     return
-                        "Chip construction diagnostic. Cyan shows the material-edge region permitted by Chip Selection Depth. Lower values narrow the perimeter; higher values extend inward and may cover an entire thin ribbon.";
+                        "Chip construction diagnostic. Cyan shows the visible Presence-transition territory permitted by Chip Edge Coverage. It is deliberately edge-only; established-body permission is added separately by Chip Interior Access and appears in Chip Final Selection.";
 
                 case StylizedRiverFoamDebugView.ChipEligibilityComposite:
                     return
-                        "Chip comparison diagnostic. Dark gray is the exact current Final Foam mask, cyan is Chip Edge Eligibility outside that rendered mask, and bright yellow is their overlap. This exposes where the eligibility field covers too much, too little, or whole thin ribbons without adding another texture.";
+                        "Chip permission diagnostic, independent of current candidates and Chip Activation. Dark gray is pre-Chip rendered Foam coverage. Bright yellow is the Edge Coverage territory; established-body yellow intensity is the expected permission authored by fractional Chip Interior Access. Cyan indicates permission outside visible support and should normally be absent.";
 
                 case StylizedRiverFoamDebugView.ChipFinalSelection:
                     return
-                        "Chip construction diagnostic. Magenta shows Activated Candidates multiplied by Chip Edge Eligibility before the transported Material Pattern gate. It is intentionally broader than the final production removal.";
+                        "Chip construction diagnostic. Magenta shows the complete production selection before soft-shape reconstruction: edge-only candidate selection plus deterministic candidates granted Interior Access, clipped to pre-Chip visible Foam support.";
 
-                case StylizedRiverFoamDebugView.ChipMaterialGate:
+                case StylizedRiverFoamDebugView.ChipInteriorAuthority:
                     return
-                        "Production Chip diagnostic. Green shows the broad eligibility signal derived from transported Layer C Material Pattern inside meaningful material. It changes with material flow without time-based reseeding or a new texture.";
+                        "Chip permission diagnostic. Green shows candidate-independent established-body authority from Chip Interior Access, clipped to pre-Chip visible Foam support. Intensity is the expected fraction of activated candidate cells granted full-body permission; current candidate contours and Activation are intentionally excluded.";
 
                 case StylizedRiverFoamDebugView.ProductionChipMask:
                     return
-                        "Production Chip diagnostic. Magenta shows the exact hardened Final Foam coverage removed after candidate activation, edge selection, transported-material gating, and soft-shape reconstruction. It matches the production cut before legacy Fray and Strands.";
-
-                case StylizedRiverFoamDebugView.FrayPermittedBand:
-                    return
-                        "Selection-only Fray diagnostic. Cyan shows the edge-depth region permitted by Fray Selection Depth. Lower values narrow the perimeter; higher values extend inward and may cover an entire thin ribbon. The control is normalized material depth, not metres.";
-
-                case StylizedRiverFoamDebugView.FrayEligibilityComposite:
-                    return
-                        "Fray comparison diagnostic. Dark gray is the exact current Final Foam mask, cyan is the Fray Permitted Band outside that rendered mask, and bright yellow is their overlap. Use it to tune future Fray eligibility against the actual rendered silhouette rather than an isolated band.";
-
-                case StylizedRiverFoamDebugView.FrayPatternPreview:
-                    return
-                        "Selection-only Fray diagnostic. Orange shows the fine world-space pattern after Wavelength and Depth are applied inside the permitted band. It previews future threshold perturbation without modifying Final Foam.";
+                        "Production Chip diagnostic. Magenta shows the exact hardened Final Foam coverage removed after candidate activation, parallel Edge Coverage or Interior Access permission, and soft-shape reconstruction. It matches the production cut before Strands.";
 
                 case StylizedRiverFoamDebugView.FoamFilmSource:
                     return

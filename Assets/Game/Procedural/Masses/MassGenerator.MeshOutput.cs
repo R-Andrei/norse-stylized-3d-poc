@@ -288,21 +288,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 c = soup.Positions[i + 2];
 
                 Vector3 normal = Vector3.Cross(b - a, c - a);
-                Vector3 faceCentre = (a + b + c) / 3f;
-
-                if (Vector3.Dot(normal, faceCentre - centre) < 0f)
+                bool hasAuthoredSurfaceNormal =
+                    soup.TryResolveAuthoredSurfaceNormal(
+                        i,
+                        out Vector3 authoredSurfaceNormal);
+                Vector3 faceNormal;
+                if (hasAuthoredSurfaceNormal)
                 {
-                    Vector3 temporary = b;
-                    b = c;
-                    c = temporary;
-                    normal = -normal;
+                    if (Vector3.Dot(normal, authoredSurfaceNormal) < 0f)
+                    {
+                        Vector3 temporary = b;
+                        b = c;
+                        c = temporary;
+                        normal = -normal;
+                    }
+                    faceNormal = authoredSurfaceNormal;
                 }
+                else
+                {
+                    Vector3 faceCentre = (a + b + c) / 3f;
+                    if (Vector3.Dot(normal, faceCentre - centre) < 0f)
+                    {
+                        Vector3 temporary = b;
+                        b = c;
+                        c = temporary;
+                        normal = -normal;
+                    }
 
-                Vector3 faceNormal = normal.sqrMagnitude > MinimumEdgeLengthSqr
-                    ? normal.normalized
-                    : Vector3.up;
+                    faceNormal = normal.sqrMagnitude > MinimumEdgeLengthSqr
+                        ? normal.normalized
+                        : Vector3.up;
+                }
                 PolygonFaceFeature faceFeature = soup.ResolveFeature(i);
                 float faceFeatureStrength = soup.ResolveFeatureStrength(i);
+                bool hasAuthoredSurfaceGroup =
+                    soup.TryResolveAuthoredSurfaceGroup(
+                        i,
+                        out int authoredSurfaceGroup);
 
                 int indexA = AddRenderedVertex(
                     meshData,
@@ -315,6 +337,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
+                    hasAuthoredSurfaceGroup,
+                    authoredSurfaceGroup,
                     recipe,
                     faceFeature,
                     faceFeatureStrength);
@@ -330,6 +354,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
+                    hasAuthoredSurfaceGroup,
+                    authoredSurfaceGroup,
                     recipe,
                     faceFeature,
                     faceFeatureStrength);
@@ -345,6 +371,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
+                    hasAuthoredSurfaceGroup,
+                    authoredSurfaceGroup,
                     recipe,
                     faceFeature,
                     faceFeatureStrength);
@@ -366,6 +394,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float height,
             float depth,
             Vector3 faceNormal,
+            bool hasAuthoredSurfaceGroup,
+            int authoredSurfaceGroup,
             MassRecipe recipe,
             PolygonFaceFeature faceFeature,
             float faceFeatureStrength)
@@ -374,9 +404,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 (position.x - bounds.min.x) / width,
                 (position.z - bounds.min.z) / depth);
 
+            int surfaceVariationIndex = hasAuthoredSurfaceGroup
+                ? authoredSurfaceGroup
+                : vertexIndex;
             float randomValue = Hash01(
                 recipe.SurfaceSeed,
-                vertexIndex);
+                surfaceVariationIndex);
 
             float red = Mathf.Clamp01(
                 0.5f +
@@ -419,11 +452,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 edgeWear,
                 0f);
 
-            return meshData.AddVertex(
+            int renderedVertex = meshData.AddVertex(
                 position,
                 uv,
                 new Color(red, green, blue, edgeWear),
                 materialMasks);
+            meshData.Normals.Add(faceNormal);
+            return renderedVertex;
         }
 
         // Vertex colour material contract:

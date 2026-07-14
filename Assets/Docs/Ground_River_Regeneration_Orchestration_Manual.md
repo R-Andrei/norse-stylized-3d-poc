@@ -2,10 +2,10 @@
 
 ## Document status
 
-- **Status:** Proposed implementation manual; no implementation is authorized by this document alone.
+- **Status:** Active implementation manual. GR-O1 diagnostics are validated; GR-O3A Play-startup coalescing is implemented and awaiting Unity validation.
 - **Scope:** Cross-feature GeneratedGround and StylizedRiver lifecycle, invalidation, build ordering, and future ground-dependent feature integration.
 - **Audited baseline:** Live `fufu` working tree at Git HEAD `04dbc13` on 2026-07-13, including the uncommitted Ground and River changes present during the audit.
-- **Primary implementation sequence:** Candidates 1 through 4 are mandatory and serialized. Candidate 5 is an optional extensibility pass after Candidate 4 is accepted.
+- **Primary implementation sequence:** Candidate 1 is accepted. The user explicitly authorized the bounded GR-O3A Play-startup coalescing slice before Candidate 2 because captured telemetry isolated one safe high-impact lifecycle wave. Candidate 2 remains available if broader transaction decomposition is later required. Candidates 3B/4 remain measurement-gated. Candidate 5 is optional after exact invalidation is accepted.
 - **Supersession:** This document does not supersede Ground visual doctrine, River rendering architecture, or River Foam ownership. It governs only the cross-feature processing contract described here.
 
 ## Authoritative companion documents
@@ -1171,3 +1171,115 @@ Ground-dependent features consume committed truth.
 River realizes visible output against committed Ground.
 Runtime systems receive only the changes they actually own.
 ```
+
+## GR-O1 — Editor regeneration accounting and shadow fingerprints
+
+**Status:** Implemented and validated in Unity. The copied accounting reports isolated the Play-startup duplication and are the accepted evidence baseline for GR-O3A.
+
+GR-O1 is an observational prerequisite for orchestration changes. It does not suppress, defer, merge, reorder, or gate any existing Ground or River work.
+
+### Implemented evidence
+
+- GeneratedGround records one compact completed batch containing request origins, pass count, passes with no expensive stage, per-stage execution counts, measured pass time, River notifications, corridor callbacks, and a timestamped ordered request/pass timeline.
+- StylizedRiver records request origins, debounce coalescing, full/surface/corridor passes, Domain/surface/corridor outputs, collider assignments, Ground/Foam/reflection notifications, exact-content fingerprints, and a timestamped ordered request/output/pass timeline.
+- The River Domain fingerprint excludes `Domain.Version`. An identical rebuild is therefore reported as unchanged content even when the version increments and publishes again.
+- The Ground-influence fingerprint is calculated from the exact immutable snapshot arrays and scalar controls already produced by `CreateGroundSnapshot`. It is diagnostic only and never participates in invalidation.
+- Batch completion occurs after one quiet Editor delay. A pending River debounce keeps the active batch open until its pass executes.
+- Both Inspectors provide copy-to-clipboard, clear, and one-shot Console controls. The River Inspector also copies the parent Ground and River reports as one combined payload.
+- No default Console output, per-frame hashing, serialized telemetry, or retained event history was introduced.
+
+### Accepted evidence
+
+- Edit-mode compile/reload produced five Ground requests but only one expensive structural pass: `10693.097 ms`. The four trailing passes were material/snapshot-only and together cost approximately `1.5 ms`.
+- First Play entry produced three expensive Ground passes: `11866.388 ms`, `13069.546 ms`, and `10645.878 ms`, totalling `35582.229 ms`.
+- The first two expensive passes were caused by two `ModifierChanged` enable notifications. The third was caused by `StylizedRiver.OnEnable -> RiverChanged`.
+- River Domain and surface preparation before the Ground callback took only milliseconds. The River full-pass duration was dominated by the nested synchronous Ground regeneration.
+- Moving a spline knot produced a `7.132 ms` River structural pass and a `0.417 ms` Ground snapshot/material pass with no Ground geometry, mesh, collider, accent, coverage, or corridor stage.
+- Changing Foam colour produced no new structural accounting batch.
+- Conclusion: the high-value defect is not harmless request count. It is generation of two temporary intermediate Ground states before the final active contributor set is available during Play startup.
+
+### Remaining GR-O1 checks
+
+- [ ] Exercise Undo/Redo after GR-O3A and confirm accounting remains behaviorally neutral.
+- [ ] Retain the diagnostics through GR-O3A validation; do not remove them until the one-pass startup result is accepted.
+
+# GR-O3A — Play-startup Ground regeneration coalescing
+
+**Status:** Implemented; awaiting Unity validation.
+
+GR-O3A is the lowest-risk, evidence-backed slice of Candidate 3. It addresses only the measured Editor Play-entry enable wave. It does not yet replace the broader edit-mode, Undo/Redo, disable/removal, or multi-consumer transaction architecture described by full Candidate 3.
+
+## Exact behavior
+
+During the first two Play frames in the Unity Editor, these automatic requests may join one pending Ground startup batch:
+
+- `GeneratedGround.OnEnable`;
+- `GroundModifier.OnEnable -> NotifyModifierChanged`;
+- `StylizedRiver.OnEnable -> NotifyRiverChanged`.
+
+In the Unity Editor, the Play-startup batch may also be queued when no retained Ground output survives scene restoration. The project-wide lifecycle audit found no Ground/River consumer that reads Ground collision, Ground sampling, River projection, Foam, or disturbance data from `Awake`, `OnEnable`, or `Start`. `GeneratedGround.Start` therefore acts as the explicit initialization barrier: the final transaction completes before any ordinary `Update`, `FixedUpdate`, or `LateUpdate` consumer can run. When retained mesh/collider output does exist, it remains assigned during the pending window. Player builds retain the previous synchronous behavior; GR-O3A is an Editor iteration optimization.
+
+The pending batch is flushed by the earliest of:
+
+- `GeneratedGround.Start`, before ordinary `Update`/`LateUpdate` consumers;
+- one Unity Editor delay callback after the current enable wave;
+- an explicit or otherwise non-coalescible Ground request, which absorbs and flushes the pending requests synchronously.
+
+At flush, GeneratedGround refreshes the final active modifier/River membership and executes the existing unchanged Ground stage-signature pipeline once. No Ground generation algorithm, mesh quality, collider quality, Painted Accent algorithm, or signature formula is changed.
+
+When River OnEnable receives a deferred Ground result, it builds one cheap temporary corridor against the retained Ground output so the River render mesh and collider remain available. The final Ground transaction later invokes the existing `RebuildCorridorFromGround` callback, replacing that temporary corridor before normal runtime `Update`/`LateUpdate` processing. River Domain, surface, visuals, reflection, Foam notification, and public explicit regeneration semantics remain owned by StylizedRiver.
+
+## Diagnostics added
+
+GeneratedGround accounting now reports:
+
+- coalesced request count;
+- Play-startup flush count;
+- forced-immediate flush count;
+- requests queued without retained Ground output, proving when the initialization barrier was used;
+- ordered `Queued PlayStartup` and `Flush PlayStartup` timeline events.
+
+StylizedRiver accounting now reports:
+
+- Ground notifications committed before return;
+- Ground notifications deferred to the startup transaction;
+- the temporary corridor build and final Ground-callback corridor build as separate output events.
+
+## Readiness audit
+
+The current project sources contain no Ground/River gameplay consumer that reads the Ground height snapshot, Ground collider, River projection, Foam field, or disturbance field from `Awake`, `OnEnable`, or `Start`. River Foam and disturbance processing begins in `LateUpdate`; reflection and debug consumers begin in `Update`. `GeneratedGround.Start` is therefore the accepted initialization barrier. GR-O3A retains existing Ground mesh/collider output when available and builds a temporary River corridor during the pending window, but it may also queue a cold Play-scene restoration with no retained Ground output because the final Ground transaction completes before ordinary runtime processing begins.
+
+## Deliberately unchanged
+
+- Edit-mode compile/reload generation remains synchronous. It already produced only one expensive pass.
+- Explicit `GeneratedGround.Regenerate` and explicit River regeneration remain synchronous.
+- Spline debounce and normal structural edits remain unchanged.
+- Player builds remain synchronous.
+- Domain versioning, `DomainChanged`, Foam invalidation, disturbance invalidation, reflection requests, and Ground signatures are not narrowed.
+- Modifier and River callbacks remain compatibility adapters.
+
+## Acceptance gate
+
+- [ ] First Play entry reports three or more automatic requests coalesced into exactly one expensive Ground geometry/mesh/collider pass.
+- [ ] The Ground report shows one Play-startup flush; any `queued without retained output` count is followed by the committed pass before frame processing begins.
+- [ ] River reports one deferred Ground notification, an immediate temporary corridor, and one final `GroundCorridorChanged` corridor rebuild.
+- [ ] Ground and River render meshes remain visible continuously and both colliders remain assigned.
+- [ ] Foam startup remains cache-only and begins against the final Domain/corridor state.
+- [ ] Spline editing retains the accepted millisecond-scale River pass and Ground no-geometry response.
+- [ ] Foam/material-only edits produce no Ground structural pass.
+- [ ] Explicit Regenerate actions still return only after committed output exists.
+
+## Rejection conditions
+
+Reject GR-O3A if the three expensive Ground passes still occur, work merely moves after the first frame, a mesh or collider disappears during startup, Foam begins before the final corridor is available, a startup request remains pending, explicit regeneration becomes asynchronous, or ordinary spline/material behavior changes.
+
+## Methods ledger
+
+- **Accepted:** Coalesce only the measured Editor Play-startup automatic enable wave while retaining previous mesh/collider output.
+- **Accepted readiness contract:** `GeneratedGround.Start` is the initialization barrier for Editor Play startup; retained output is used when available but is not required for coalescing.
+- **Accepted compatibility behavior:** Deferred River notification builds a cheap temporary corridor, followed by the existing final Ground callback.
+- **Rejected:** Delete Modifier or River enable callbacks. This can leave contributor membership stale under another enable order.
+- **Rejected:** Suppress requests solely because signatures previously matched. Each measured intermediate pass represented a genuinely different active contributor set.
+- **Deferred:** Full Candidate 2 River stage decomposition. GR-O3A does not require it because it does not interrupt or externally schedule individual River stages.
+- **Deferred:** Full edit-mode/Undo/disable/removal Candidate 3 transaction coordinator until GR-O3A evidence demonstrates whether broader scheduling work remains valuable.
+

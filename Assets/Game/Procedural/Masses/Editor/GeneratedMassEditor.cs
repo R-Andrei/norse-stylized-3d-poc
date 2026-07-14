@@ -9,6 +9,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
     [CanEditMultipleObjects]
     public sealed class GeneratedMassEditor : UnityEditor.Editor
     {
+        private static bool edgeWearSceneOverlayEnabled;
+        private static bool edgeWearSceneOverlayFocusOnly;
+        private static GeneratedMass edgeWearSceneOverlayTarget;
+
         private const string ColdGreyStoneMaterialPath =
             "Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat";
         private const string DarkWetRiverStoneMaterialPath =
@@ -133,9 +137,60 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private bool showCreviceShelterFeature = true;
         private bool showDirtDepositFeature = true;
         private bool showEdgeWearFeature;
+        private bool showEdgeWearEdgeNumbers;
+        private bool showOnlyEdgeWearFocusNumbers;
         private bool showAdvancedFeatureDiagnostics;
         private bool showCreaseDebugFeature;
         private bool showPressureProfile;
+
+        [InitializeOnLoadMethod]
+        private static void RegisterEdgeWearSceneOverlayRenderer()
+        {
+            SceneView.duringSceneGui -= DrawGlobalEdgeWearSceneOverlay;
+            SceneView.duringSceneGui += DrawGlobalEdgeWearSceneOverlay;
+        }
+
+        private static void DrawGlobalEdgeWearSceneOverlay(
+            SceneView sceneView)
+        {
+            if (!edgeWearSceneOverlayEnabled || Application.isPlaying)
+            {
+                return;
+            }
+
+            GeneratedMass mass = edgeWearSceneOverlayTarget;
+            if (mass == null)
+            {
+                edgeWearSceneOverlayEnabled = false;
+                edgeWearSceneOverlayTarget = null;
+                return;
+            }
+
+            DrawEdgeWearEdgeNumberOverlay(
+                mass,
+                edgeWearSceneOverlayFocusOnly,
+                sceneView);
+        }
+
+        private static void SetEdgeWearSceneOverlayState(
+            GeneratedMass mass,
+            bool enabled,
+            bool focusOnly)
+        {
+            bool nextEnabled = enabled && mass != null;
+            GeneratedMass nextTarget = nextEnabled ? mass : null;
+            if (edgeWearSceneOverlayEnabled == nextEnabled &&
+                edgeWearSceneOverlayFocusOnly == focusOnly &&
+                edgeWearSceneOverlayTarget == nextTarget)
+            {
+                return;
+            }
+
+            edgeWearSceneOverlayEnabled = nextEnabled;
+            edgeWearSceneOverlayFocusOnly = focusOnly;
+            edgeWearSceneOverlayTarget = nextTarget;
+            SceneView.RepaintAll();
+        }
 
         private void OnEnable()
         {
@@ -335,7 +390,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             serializedObject.ApplyModifiedProperties();
 
-            DrawPlaneCutBevelPreview();
+            DrawEdgeWearBevelPreview();
 
             EditorGUILayout.Space(10f);
             EditorGUILayout.LabelField(
@@ -400,320 +455,204 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 MessageType.Info);
         }
 
-        private void DrawBoundedSingleEdgePreview()
+        private void DrawEdgeWearBevelPreview()
         {
             EditorGUILayout.Space(10f);
             EditorGUILayout.LabelField(
-                "EW-B1 Bounded Single-Edge Prototype",
-                EditorStyles.boldLabel);
-
-            if (targets.Length != 1)
-            {
-                EditorGUILayout.HelpBox(
-                    "Select exactly one Generated Mass to evaluate and cycle bounded source edges.",
-                    MessageType.Info);
-                return;
-            }
-
-            GeneratedMass mass = target as GeneratedMass;
-            if (mass == null)
-            {
-                return;
-            }
-
-            string message;
-            MessageType messageType;
-            if (!mass.BoundedEdgePreviewEnabled)
-            {
-                message =
-                    "Evaluates one selected source edge as one bounded bevel polygon, two locally modified owner faces, and two bounded endpoint caps. " +
-                    "No whole-rock bevel plane is used.";
-                messageType = MessageType.Info;
-            }
-            else if (mass.BoundedEdgePreviewStale)
-            {
-                message =
-                    "The bounded edge preview is out of date. Refresh explicitly; no automatic diagnostic generation occurred.";
-                messageType = MessageType.Warning;
-            }
-            else if (mass.BoundedEdgePreviewApplied)
-            {
-                message =
-                    "Bounded edge " +
-                    (mass.BoundedEdgePreviewOrdinal + 1) + " of " +
-                    mass.BoundedEdgePreviewCandidateCount +
-                    " is active. Source edge " +
-                    mass.BoundedEdgePreviewSourceEdgeIndex +
-                    "; bevel faces=" +
-                    mass.BoundedEdgePreviewBevelFaceCount +
-                    ", endpoint caps=" +
-                    mass.BoundedEdgePreviewEndpointCapCount +
-                    ", modified source faces=" +
-                    mass.BoundedEdgePreviewModifiedSourceFaceCount +
-                    ", foreign source faces modified=" +
-                    mass.BoundedEdgePreviewForeignSourceFaceModifiedCount +
-                    ", rail deviation=" +
-                    mass.BoundedEdgePreviewRailDeviation.ToString("G6") +
-                    ", extent beyond rails=" +
-                    mass.BoundedEdgePreviewMaximumExtentBeyondRails
-                        .ToString("G6") + ".";
-                messageType = MessageType.Info;
-            }
-            else
-            {
-                message =
-                    "The bounded edge preview was rejected" +
-                    (mass.BoundedEdgePreviewSourceEdgeIndex >= 0
-                        ? " for source edge " +
-                            mass.BoundedEdgePreviewSourceEdgeIndex
-                        : string.Empty) +
-                    ".";
-                if (!string.IsNullOrEmpty(
-                        mass.BoundedEdgePreviewDiagnostic))
-                {
-                    message += " " +
-                        mass.BoundedEdgePreviewDiagnostic + ".";
-                }
-                messageType = MessageType.Error;
-            }
-
-            EditorGUILayout.HelpBox(message, messageType);
-
-            bool disabled = Application.isPlaying;
-            using (new EditorGUI.DisabledScope(disabled))
-            {
-                EditorGUILayout.BeginHorizontal();
-                using (new EditorGUI.DisabledScope(
-                    !mass.BoundedEdgePreviewEnabled ||
-                    mass.BoundedEdgePreviewCandidateCount <= 1))
-                {
-                    if (GUILayout.Button("Previous Bounded Edge"))
-                    {
-                        mass.PreviousBoundedEdgePreview();
-                        serializedObject.Update();
-                        Repaint();
-                        SceneView.RepaintAll();
-                    }
-                }
-
-                string evaluateLabel = mass.BoundedEdgePreviewEnabled
-                    ? "Refresh Bounded Edge"
-                    : "Evaluate Bounded Edge";
-                if (GUILayout.Button(evaluateLabel))
-                {
-                    mass.EvaluateBoundedEdgePreview();
-                    serializedObject.Update();
-                    Repaint();
-                    SceneView.RepaintAll();
-                }
-
-                using (new EditorGUI.DisabledScope(
-                    !mass.BoundedEdgePreviewEnabled ||
-                    mass.BoundedEdgePreviewCandidateCount <= 1))
-                {
-                    if (GUILayout.Button("Next Bounded Edge"))
-                    {
-                        mass.NextBoundedEdgePreview();
-                        serializedObject.Update();
-                        Repaint();
-                        SceneView.RepaintAll();
-                    }
-                }
-                EditorGUILayout.EndHorizontal();
-
-                if (mass.BoundedEdgePreviewEnabled &&
-                    GUILayout.Button("Show Production Geometry"))
-                {
-                    mass.ShowProductionGeometry();
-                    serializedObject.Update();
-                    Repaint();
-                    SceneView.RepaintAll();
-                }
-            }
-        }
-
-        private void DrawPlaneCutBevelPreview()
-        {
-            DrawBoundedSingleEdgePreview();
-
-            EditorGUILayout.Space(10f);
-            EditorGUILayout.LabelField(
-                "Rejected Whole-Rock Plane Diagnostic",
+                "Edge-Wear Bevel Evaluation",
                 EditorStyles.boldLabel);
 
             bool anyEvaluated = false;
             int evaluatedCount = 0;
             int staleCount = 0;
             int appliedCount = 0;
+            int candidates = 0;
+            int railSolved = 0;
             int activeEdges = 0;
-            int builtEdges = 0;
             int deferredEdges = 0;
             int rejectedEdges = 0;
+            int bevelFaces = 0;
+            int triangles = 0;
             string firstDiagnostic = string.Empty;
+
             for (int targetIndex = 0;
                  targetIndex < targets.Length;
                  targetIndex++)
             {
                 GeneratedMass mass = targets[targetIndex] as GeneratedMass;
-                bool evaluated = mass != null &&
-                    mass.PlaneCutBevelPreviewEnabled;
-                anyEvaluated |= evaluated;
-                if (!evaluated || mass == null)
+                if (mass == null || !mass.UnifiedEdgeWearPreviewEnabled)
                 {
                     continue;
                 }
 
+                anyEvaluated = true;
                 evaluatedCount++;
-                if (mass.PlaneCutBevelPreviewStale)
+                if (mass.UnifiedEdgeWearPreviewStale)
                 {
                     staleCount++;
                 }
-                if (mass.PlaneCutBevelPreviewApplied)
+                if (mass.UnifiedEdgeWearPreviewApplied)
                 {
                     appliedCount++;
                 }
-                activeEdges += mass.PlaneCutBevelPreviewActiveEdges;
-                builtEdges += mass.PlaneCutBevelPreviewBuiltEdges;
-                deferredEdges += mass.PlaneCutBevelPreviewDeferredEdges;
-                rejectedEdges += mass.PlaneCutBevelPreviewRejectedEdges;
+                candidates += mass.UnifiedEdgeWearPreviewCandidateCount;
+                railSolved +=
+                    mass.UnifiedEdgeWearPreviewRailSolvedEdgeCount;
+                activeEdges += mass.UnifiedEdgeWearPreviewActiveEdgeCount;
+                deferredEdges +=
+                    mass.UnifiedEdgeWearPreviewDeferredEdgeCount;
+                rejectedEdges +=
+                    mass.UnifiedEdgeWearPreviewRejectedEdgeCount;
+                bevelFaces += mass.UnifiedEdgeWearPreviewBevelFaceCount;
+                triangles += mass.UnifiedEdgeWearPreviewTriangleCount;
                 if (string.IsNullOrEmpty(firstDiagnostic) &&
                     !string.IsNullOrEmpty(
-                        mass.PlaneCutBevelPreviewDiagnostic))
+                        mass.UnifiedEdgeWearPreviewDiagnostic))
                 {
-                    firstDiagnostic = mass.PlaneCutBevelPreviewDiagnostic;
+                    firstDiagnostic =
+                        mass.UnifiedEdgeWearPreviewDiagnostic;
                 }
             }
 
-            string previewMessage;
-            MessageType previewMessageType;
+            string message;
+            MessageType messageType;
             if (!anyEvaluated)
             {
-                previewMessage =
-                    "Retained only as rejected architecture evidence. It applies selected infinite edge planes to the whole rock. " +
-                    "Use the bounded single-edge prototype above for new geometry work.";
-                previewMessageType = MessageType.Info;
+                message =
+                    "One authoritative rebuild solves all selected edge widths together, rebuilds the complete rock through the certified all-edge bevel shell, and outputs one cumulative audit record. Every emitted bevel polygon uses the one-planar-surface render contract.";
+                messageType = MessageType.Info;
             }
             else if (staleCount > 0)
             {
-                previewMessage =
-                    "Plane-cut preview is out of date for " + staleCount +
-                    " object(s). No automatic solver run occurred. " +
-                    "Press Refresh Plane-Cut Bevel Preview to evaluate the current settings, " +
-                    "or Show Production Geometry to discard the preview state.";
-                previewMessageType = MessageType.Warning;
+                message =
+                    "The edge-wear preview is out of date for " +
+                    staleCount + " object(s). Rebuild to evaluate current settings.";
+                messageType = MessageType.Warning;
             }
             else if (appliedCount == evaluatedCount)
             {
-                previewMessage =
-                    "Editor-only plane-cut preview is active for " +
+                message =
+                    "All-edge bevel preview active for " +
                     appliedCount + " object(s): " +
-                    builtEdges + " of " + activeEdges +
-                    " active edges are shown.";
-                if (deferredEdges > 0)
+                    activeEdges + " materialized bevels from " +
+                    railSolved + " active selected edges and " +
+                    candidates + " selected candidates, " +
+                    bevelFaces + " one-surface bevel faces, " +
+                    triangles + " triangles.";
+                if (deferredEdges > 0 || rejectedEdges > 0)
                 {
-                    previewMessage += " " + deferredEdges +
-                        " edge(s) were safely deferred because no local cut could retain unrelated vertices.";
+                    message += " Deferred=" + deferredEdges +
+                        ", rejected=" + rejectedEdges + ".";
                 }
-                previewMessage +=
-                    " The transient mesh is never used in Play Mode.";
-                previewMessageType = deferredEdges > 0
-                    ? MessageType.Warning
-                    : MessageType.Info;
+                messageType =
+                    deferredEdges > 0 || rejectedEdges > 0
+                        ? MessageType.Warning
+                        : MessageType.Info;
             }
             else
             {
-                previewMessage =
-                    "Plane-cut preview was evaluated for " + evaluatedCount +
-                    " object(s), but " + (evaluatedCount - appliedCount) +
-                    " fell back to production geometry. Hard rejections: " +
-                    rejectedEdges + ".";
+                message =
+                    "All-edge bevel rebuild failed for " +
+                    (evaluatedCount - appliedCount) +
+                    " object(s). Active selected=" + railSolved +
+                    ", materialized=" + activeEdges +
+                    ", deferred=" + deferredEdges +
+                    ", rejected=" + rejectedEdges + ".";
                 if (!string.IsNullOrEmpty(firstDiagnostic))
                 {
-                    previewMessage += " " + firstDiagnostic + ".";
+                    message += " " + firstDiagnostic + ".";
                 }
-                previewMessageType = MessageType.Error;
+                messageType = MessageType.Error;
             }
 
-            EditorGUILayout.HelpBox(
-                previewMessage,
-                previewMessageType);
+            EditorGUILayout.HelpBox(message, messageType);
 
             using (new EditorGUI.DisabledScope(Application.isPlaying))
             {
-                string evaluationButtonLabel = anyEvaluated
-                    ? "Refresh Plane-Cut Bevel Preview"
-                    : "Evaluate Plane-Cut Bevel Preview";
-                if (GUILayout.Button(evaluationButtonLabel))
-                {
-                    for (int targetIndex = 0;
-                         targetIndex < targets.Length;
-                         targetIndex++)
-                    {
-                        GeneratedMass mass =
-                            targets[targetIndex] as GeneratedMass;
-                        if (anyEvaluated)
-                        {
-                            mass?.RefreshPlaneCutBevelPreview();
-                        }
-                        else
-                        {
-                            mass?.EvaluatePlaneCutBevelPreview();
-                        }
-                    }
-
-                    serializedObject.Update();
-                    Repaint();
-                    SceneView.RepaintAll();
-                }
-
-                if (anyEvaluated &&
-                    GUILayout.Button("Show Production Geometry"))
-                {
-                    for (int targetIndex = 0;
-                         targetIndex < targets.Length;
-                         targetIndex++)
-                    {
-                        GeneratedMass mass =
-                            targets[targetIndex] as GeneratedMass;
-                        mass?.ShowProductionGeometry();
-                    }
-
-                    serializedObject.Update();
-                    Repaint();
-                    SceneView.RepaintAll();
-                }
-            }
-
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.HelpBox(
-                "Legacy replacement/strip/patch reconstruction is diagnostic comparison evidence only. " +
-                "It never changes the displayed mesh and runs only from the explicit single-object action below.",
-                MessageType.None);
-
-            bool legacyAuditUnavailable =
-                Application.isPlaying || targets.Length != 1;
-            using (new EditorGUI.DisabledScope(legacyAuditUnavailable))
-            {
                 if (GUILayout.Button(
-                        "Run Legacy Edge-Wear Diagnostic Audit"))
+                        "Rebuild Edge-Wear Bevel Preview"))
                 {
-                    GeneratedMass mass = target as GeneratedMass;
-                    mass?.RunLegacyEdgeWearDiagnosticAudit();
+                    for (int targetIndex = 0;
+                         targetIndex < targets.Length;
+                         targetIndex++)
+                    {
+                        GeneratedMass mass =
+                            targets[targetIndex] as GeneratedMass;
+                        mass?.EvaluateUnifiedEdgeWearPreview();
+                    }
+
+                    serializedObject.Update();
                     Repaint();
+                    SceneView.RepaintAll();
                 }
             }
 
-            if (targets.Length != 1)
+            bool nextShowEdgeNumbers = EditorGUILayout.ToggleLeft(
+                new GUIContent(
+                    "Show Source Edge Numbers in Scene",
+                    "Draws the authoritative source-edge indices used by the edge-wear graph directly on the rock in the Scene view."),
+                showEdgeWearEdgeNumbers);
+            if (nextShowEdgeNumbers != showEdgeWearEdgeNumbers)
             {
-                EditorGUILayout.HelpBox(
-                    "Select exactly one Generated Mass to run the expensive legacy diagnostic audit.",
-                    MessageType.Warning);
+                showEdgeWearEdgeNumbers = nextShowEdgeNumbers;
+                SetEdgeWearSceneOverlayState(
+                    target as GeneratedMass,
+                    showEdgeWearEdgeNumbers,
+                    showOnlyEdgeWearFocusNumbers);
+            }
+            if (showEdgeWearEdgeNumbers)
+            {
+                bool nextFocusOnly = EditorGUILayout.ToggleLeft(
+                    new GUIContent(
+                        "Only Active Search Edges",
+                        "Shows only the edges implicated by the current transactional search and failure dossiers."),
+                    showOnlyEdgeWearFocusNumbers);
+                if (nextFocusOnly != showOnlyEdgeWearFocusNumbers)
+                {
+                    showOnlyEdgeWearFocusNumbers = nextFocusOnly;
+                    SetEdgeWearSceneOverlayState(
+                        target as GeneratedMass,
+                        showEdgeWearEdgeNumbers,
+                        showOnlyEdgeWearFocusNumbers);
+                }
+
+                GeneratedMass overlayMass = target as GeneratedMass;
+                SetEdgeWearSceneOverlayState(
+                    overlayMass,
+                    showEdgeWearEdgeNumbers,
+                    showOnlyEdgeWearFocusNumbers);
+                MassGenerator.EdgeWearDebugEdgeRecord[] overlayRecords =
+                    overlayMass != null
+                        ? overlayMass.UnifiedEdgeWearPreviewDebugEdges
+                        : null;
+                int overlayRecordCount = overlayRecords == null
+                    ? 0
+                    : overlayRecords.Length;
+                int overlayFocusCount =
+                    CountFocusedEdgeWearDebugRecords(overlayRecords);
+                EditorGUILayout.LabelField(
+                    "Edge Overlay Data",
+                    overlayFocusCount + " focused / " +
+                        overlayRecordCount + " total");
+                if (overlayRecordCount == 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        "No source-edge overlay records are available. Rebuild the edge-wear bevel preview once.",
+                        MessageType.Warning);
+                }
+                else if (showOnlyEdgeWearFocusNumbers &&
+                         overlayFocusCount == 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        "The current audit has no structured focus edges. Disable Only Active Search Edges to inspect the complete source graph.",
+                        MessageType.Warning);
+                }
             }
 
             if (Application.isPlaying)
             {
                 EditorGUILayout.HelpBox(
-                    "Plane-cut preview evaluation is disabled in Play Mode; production geometry is used.",
+                    "Explicit edge-wear evaluation is disabled in Play Mode; production geometry is used.",
                     MessageType.None);
             }
         }
@@ -2095,14 +2034,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         private void OnSceneGUI()
         {
-            if (!showPressureProfile || !Application.isPlaying)
+            GeneratedMass mass = target as GeneratedMass;
+            if (mass == null)
             {
                 return;
             }
 
-            GeneratedMass mass = target as GeneratedMass;
-            if (mass == null ||
-                Selection.activeGameObject != mass.gameObject ||
+            if (!showPressureProfile || !Application.isPlaying ||
                 !StylizedRiverDisturbanceRuntime.
                     TryGetGeneratedSourcePressureProfileDebugData(
                         mass,
@@ -2112,6 +2050,238 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
 
             DrawPressureProfileSceneOverlay(debugData);
+        }
+
+
+        private static int CountFocusedEdgeWearDebugRecords(
+            MassGenerator.EdgeWearDebugEdgeRecord[] records)
+        {
+            if (records == null)
+            {
+                return 0;
+            }
+            int count = 0;
+            for (int recordIndex = 0;
+                 recordIndex < records.Length;
+                 recordIndex++)
+            {
+                if (records[recordIndex].Focus)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static string BuildFocusedEdgeWearDebugEvidence(
+            MassGenerator.EdgeWearDebugEdgeRecord[] records)
+        {
+            if (records == null)
+            {
+                return "none";
+            }
+            string evidence = string.Empty;
+            for (int recordIndex = 0;
+                 recordIndex < records.Length;
+                 recordIndex++)
+            {
+                if (!records[recordIndex].Focus)
+                {
+                    continue;
+                }
+                if (evidence.Length > 0)
+                {
+                    evidence += "/";
+                }
+                evidence += records[recordIndex].EdgeIndex.ToString();
+            }
+            return evidence.Length == 0 ? "none" : evidence;
+        }
+
+        private static Vector2 ResolveEdgeWearLabelOffset(
+            int visibleOrdinal)
+        {
+            switch (visibleOrdinal % 8)
+            {
+                case 0:
+                    return new Vector2(-0.34f, 0.30f);
+                case 1:
+                    return new Vector2(0.34f, 0.30f);
+                case 2:
+                    return new Vector2(-0.34f, -0.30f);
+                case 3:
+                    return new Vector2(0.34f, -0.30f);
+                case 4:
+                    return new Vector2(-0.48f, 0f);
+                case 5:
+                    return new Vector2(0.48f, 0f);
+                case 6:
+                    return new Vector2(0f, 0.44f);
+                default:
+                    return new Vector2(0f, -0.44f);
+            }
+        }
+
+        private static void DrawEdgeWearEdgeOverlayStatusPanel(
+            MassGenerator.EdgeWearDebugEdgeRecord[] records,
+            bool focusOnly,
+            int visibleCount)
+        {
+            int totalCount = records == null ? 0 : records.Length;
+            int focusCount = CountFocusedEdgeWearDebugRecords(records);
+            string focusEvidence =
+                BuildFocusedEdgeWearDebugEvidence(records);
+            Handles.BeginGUI();
+            float panelHeight = focusOnly && focusCount == 0
+                ? 80f
+                : 58f;
+            Rect panel = new Rect(12f, 12f, 310f, panelHeight);
+            GUI.Box(panel, GUIContent.none, EditorStyles.helpBox);
+            GUI.Label(
+                new Rect(22f, 18f, 288f, 20f),
+                "Source edge overlay: " + visibleCount +
+                    " shown / " + totalCount + " total",
+                EditorStyles.boldLabel);
+            GUI.Label(
+                new Rect(22f, 40f, 288f, 18f),
+                "Focus edges: {" + focusEvidence + "}" +
+                    (focusOnly ? "  (focus-only)" : string.Empty),
+                EditorStyles.miniLabel);
+            if (focusOnly && focusCount == 0)
+            {
+                GUI.Label(
+                    new Rect(22f, 57f, 288f, 18f),
+                    "No structured focus records; disable the filter.",
+                    EditorStyles.miniLabel);
+            }
+            Handles.EndGUI();
+        }
+
+        private static void DrawEdgeWearEdgeNumberOverlay(
+            GeneratedMass mass,
+            bool focusOnly,
+            SceneView sceneView)
+        {
+            if (Event.current.type != EventType.Repaint)
+            {
+                return;
+            }
+            MassGenerator.EdgeWearDebugEdgeRecord[] records =
+                mass.UnifiedEdgeWearPreviewDebugEdges;
+            int focusCount = CountFocusedEdgeWearDebugRecords(records);
+            int visibleCount = records == null
+                ? 0
+                : focusOnly
+                    ? focusCount
+                    : records.Length;
+            DrawEdgeWearEdgeOverlayStatusPanel(
+                records,
+                focusOnly,
+                visibleCount);
+            if (records == null || records.Length == 0 ||
+                visibleCount == 0)
+            {
+                return;
+            }
+
+            Color previousColor = Handles.color;
+            UnityEngine.Rendering.CompareFunction previousZTest =
+                Handles.zTest;
+            Handles.zTest =
+                UnityEngine.Rendering.CompareFunction.Always;
+
+            GUIStyle normalStyle = new GUIStyle(
+                EditorStyles.helpBox)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontStyle = FontStyle.Bold,
+                padding = new RectOffset(5, 5, 2, 2)
+            };
+            normalStyle.normal.textColor = Color.white;
+            GUIStyle focusStyle = new GUIStyle(normalStyle);
+            focusStyle.normal.textColor =
+                new Color(1f, 0.72f, 0.18f, 1f);
+
+            Transform cameraTransform = sceneView != null &&
+                sceneView.camera != null
+                    ? sceneView.camera.transform
+                    : null;
+            Vector3 labelRight = cameraTransform != null
+                ? cameraTransform.right
+                : Vector3.right;
+            Vector3 labelUp = cameraTransform != null
+                ? cameraTransform.up
+                : Vector3.up;
+
+            int visibleOrdinal = 0;
+            for (int recordIndex = 0;
+                 recordIndex < records.Length;
+                 recordIndex++)
+            {
+                MassGenerator.EdgeWearDebugEdgeRecord record =
+                    records[recordIndex];
+                if (focusOnly && !record.Focus)
+                {
+                    continue;
+                }
+
+                Vector3 start = mass.transform.TransformPoint(record.Start);
+                Vector3 end = mass.transform.TransformPoint(record.End);
+                Vector3 midpoint = (start + end) * 0.5f;
+                float handleSize = HandleUtility.GetHandleSize(midpoint);
+                Color edgeColor = record.Focus
+                    ? new Color(1f, 0.58f, 0.08f, 1f)
+                    : record.Selected
+                        ? new Color(1f, 1f, 1f, 0.86f)
+                        : new Color(0.55f, 0.78f, 1f, 0.72f);
+
+                Handles.color = new Color(0f, 0f, 0f, 0.9f);
+                Handles.DrawAAPolyLine(
+                    record.Focus ? 8f : 5f,
+                    start,
+                    end);
+                Handles.color = edgeColor;
+                Handles.DrawAAPolyLine(
+                    record.Focus ? 4f : 2.5f,
+                    start,
+                    end);
+                Handles.DotHandleCap(
+                    0,
+                    start,
+                    Quaternion.identity,
+                    handleSize * (record.Focus ? 0.045f : 0.03f),
+                    EventType.Repaint);
+                Handles.DotHandleCap(
+                    0,
+                    end,
+                    Quaternion.identity,
+                    handleSize * (record.Focus ? 0.045f : 0.03f),
+                    EventType.Repaint);
+
+                Vector2 offset =
+                    ResolveEdgeWearLabelOffset(visibleOrdinal);
+                Vector3 labelPosition = midpoint +
+                    (labelRight * offset.x + labelUp * offset.y) *
+                    handleSize * 0.38f;
+                Handles.color = new Color(0f, 0f, 0f, 0.82f);
+                Handles.DrawAAPolyLine(
+                    3f,
+                    midpoint,
+                    labelPosition);
+                Handles.color = edgeColor;
+                Handles.DrawAAPolyLine(
+                    1.5f,
+                    midpoint,
+                    labelPosition);
+                Handles.Label(
+                    labelPosition,
+                    " " + record.EdgeIndex + " ",
+                    record.Focus ? focusStyle : normalStyle);
+                visibleOrdinal++;
+            }
+
+            Handles.zTest = previousZTest;
+            Handles.color = previousColor;
         }
 
         private static void DrawPressureProfileSceneOverlay(

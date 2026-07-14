@@ -35,6 +35,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         Tertiary = 3
     }
 
+    internal enum GroundPaintedAccentCompanionPairLayout
+    {
+        None = 0,
+        ShallowOffset = 1,
+        SteppedContinuation = 2,
+        ShoulderContact = 3,
+        OffsetEcho = 4
+    }
+
+    internal enum GroundPaintedAccentCompanionTripletLayout
+    {
+        None = 0,
+        SteppedRun = 1,
+        CrownRun = 2,
+        BrokenTerrace = 3,
+        ShallowRun = 4
+    }
+
     internal readonly struct GroundPaintedAccentSurfaceStrokeVariant
     {
         public GroundPaintedAccentSurfaceStrokeVariant(
@@ -96,7 +114,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 -1,
                 GroundPaintedAccentCompanionMemberRole.None,
                 0,
-                default)
+                GroundPaintedAccentCompanionPairLayout.None,
+                default,
+                0,
+                GroundPaintedAccentCompositionRegionMode.Supporting)
         {
         }
 
@@ -112,7 +133,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int companionClusterIndex,
             GroundPaintedAccentCompanionMemberRole companionMemberRole,
             int intendedCompanionClusterSize,
-            GroundPaintedAccentSurfaceStrokeVariant independentFallback)
+            GroundPaintedAccentCompanionPairLayout companionPairLayout,
+            GroundPaintedAccentSurfaceStrokeVariant independentFallback,
+            int proposalRankQuartile,
+            GroundPaintedAccentCompositionRegionMode compositionRegionMode)
         {
             LocalPoints = localPoints ?? Array.Empty<Vector3>();
             LocalNormals = localNormals ?? Array.Empty<Vector3>();
@@ -128,7 +152,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 companionClusterIndex >= 0
                     ? Mathf.Clamp(intendedCompanionClusterSize, 2, 3)
                     : 0;
+            CompanionPairLayout =
+                companionClusterIndex >= 0 &&
+                IntendedCompanionClusterSize == 2
+                    ? companionPairLayout
+                    : GroundPaintedAccentCompanionPairLayout.None;
             IndependentFallback = independentFallback;
+            ProposalRankQuartile = Mathf.Clamp(proposalRankQuartile, 0, 3);
+            CompositionRegionMode = compositionRegionMode;
         }
 
         public Vector3[] LocalPoints { get; }
@@ -142,7 +173,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public int CompanionClusterIndex { get; }
         public GroundPaintedAccentCompanionMemberRole CompanionMemberRole { get; }
         public int IntendedCompanionClusterSize { get; }
+        public GroundPaintedAccentCompanionPairLayout CompanionPairLayout { get; }
         public GroundPaintedAccentSurfaceStrokeVariant IndependentFallback { get; }
+        public int ProposalRankQuartile { get; }
+        public GroundPaintedAccentCompositionRegionMode CompositionRegionMode
+        {
+            get;
+        }
         public bool IsCompanionMember => CompanionClusterIndex >= 0;
         public bool HasIndependentFallback => IndependentFallback.IsValid;
 
@@ -150,6 +187,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int companionClusterIndex,
             GroundPaintedAccentCompanionMemberRole companionMemberRole,
             int intendedCompanionClusterSize,
+            GroundPaintedAccentCompanionPairLayout companionPairLayout,
             GroundPaintedAccentSurfaceStrokeVariant independentFallback)
         {
             return new GroundPaintedAccentSurfaceStroke(
@@ -164,7 +202,32 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 companionClusterIndex,
                 companionMemberRole,
                 intendedCompanionClusterSize,
-                independentFallback);
+                companionPairLayout,
+                independentFallback,
+                ProposalRankQuartile,
+                CompositionRegionMode);
+        }
+
+        public GroundPaintedAccentSurfaceStroke WithPlacementMetadata(
+            int proposalRankQuartile,
+            GroundPaintedAccentCompositionRegionMode compositionRegionMode)
+        {
+            return new GroundPaintedAccentSurfaceStroke(
+                LocalPoints,
+                LocalNormals,
+                Width,
+                BodyWidth,
+                Strength,
+                AuthoredLength,
+                Family,
+                Seed,
+                CompanionClusterIndex,
+                CompanionMemberRole,
+                IntendedCompanionClusterSize,
+                CompanionPairLayout,
+                IndependentFallback,
+                proposalRankQuartile,
+                compositionRegionMode);
         }
 
         public GroundPaintedAccentSurfaceStroke CreateIndependentFallback()
@@ -182,7 +245,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 IndependentFallback.Strength,
                 IndependentFallback.AuthoredLength,
                 IndependentFallback.Family,
-                IndependentFallback.Seed);
+                IndependentFallback.Seed)
+                .WithPlacementMetadata(
+                    ProposalRankQuartile,
+                    CompositionRegionMode);
         }
 
         public GroundPaintedAccentSurfaceStrokeVariant ToVariant()
@@ -205,12 +271,69 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             LocalNormals.Length == LocalPoints.Length;
     }
 
+    internal readonly struct GroundPaintedAccentProposalRankDiagnostics
+    {
+        public GroundPaintedAccentProposalRankDiagnostics(
+            Vector4 selected,
+            Vector4 accepted)
+        {
+            Selected = MaxZero(selected);
+            Accepted = MaxZero(accepted);
+        }
+
+        public Vector4 Selected { get; }
+        public Vector4 Accepted { get; }
+
+        private static Vector4 MaxZero(Vector4 value)
+        {
+            return new Vector4(
+                Mathf.Max(0f, value.x),
+                Mathf.Max(0f, value.y),
+                Mathf.Max(0f, value.z),
+                Mathf.Max(0f, value.w));
+        }
+    }
+
+    internal readonly struct GroundPaintedAccentSurfaceStrokeBuildTimings
+    {
+        public GroundPaintedAccentSurfaceStrokeBuildTimings(
+            double candidateBuildMilliseconds,
+            double regionalWeightingMilliseconds,
+            double candidateOrderingMilliseconds,
+            double compositionSetupMilliseconds,
+            double strokeSetupMilliseconds,
+            double surfaceConstructionValidationMilliseconds,
+            double diagnosticsMilliseconds)
+        {
+            CandidateBuildMilliseconds = Math.Max(0d, candidateBuildMilliseconds);
+            RegionalWeightingMilliseconds = Math.Max(0d, regionalWeightingMilliseconds);
+            CandidateOrderingMilliseconds = Math.Max(0d, candidateOrderingMilliseconds);
+            CompositionSetupMilliseconds = Math.Max(0d, compositionSetupMilliseconds);
+            StrokeSetupMilliseconds = Math.Max(0d, strokeSetupMilliseconds);
+            SurfaceConstructionValidationMilliseconds =
+                Math.Max(0d, surfaceConstructionValidationMilliseconds);
+            DiagnosticsMilliseconds = Math.Max(0d, diagnosticsMilliseconds);
+        }
+
+        public double CandidateBuildMilliseconds { get; }
+        public double RegionalWeightingMilliseconds { get; }
+        public double CandidateOrderingMilliseconds { get; }
+        public double CompositionSetupMilliseconds { get; }
+        public double StrokeSetupMilliseconds { get; }
+        public double SurfaceConstructionValidationMilliseconds { get; }
+        public double DiagnosticsMilliseconds { get; }
+
+        public static GroundPaintedAccentSurfaceStrokeBuildTimings Empty =>
+            default;
+    }
+
     internal readonly struct GroundPaintedAccentPlacementDiagnostics
     {
         public GroundPaintedAccentPlacementDiagnostics(
             int targetProposals,
             int candidatePool,
             int proposed,
+            int physicallyEvaluated,
             int accepted,
             float distributionPatchScale,
             float distributionPatchiness,
@@ -218,7 +341,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float proposalPatchWeightMin,
             float proposalPatchWeightMean,
             float proposalPatchWeightMax,
-            int rejectedRegionalThinning,
             int rejectedSampling,
             int rejectedRiver,
             int rejectedModifierExclusion,
@@ -227,9 +349,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int horizontalCompanionClusterCount,
             int horizontalCompanionPairClusterCount,
             int horizontalCompanionTripletClusterCount,
+            int horizontalCompanionPairShallowLayoutCount,
+            int horizontalCompanionPairSteppedLayoutCount,
+            int horizontalCompanionPairShoulderLayoutCount,
+            int horizontalCompanionPairOffsetLayoutCount,
             int horizontalCompanionParticipantCount,
             int horizontalCompanionAcceptedClusterCount,
             int horizontalCompanionAcceptedParticipantCount,
+            int horizontalCompanionTargetParticipantCount,
+            int horizontalCompanionFormedParticipantCount,
+            int horizontalCompanionPrimaryClusterAttempts,
+            int horizontalCompanionTargetPlanRejected,
+            int horizontalCompanionNoSecondaryCandidate,
+            int horizontalCompanionNoTertiaryCandidate,
+            int horizontalCompanionTripletToPairDowngrade,
+            int horizontalCompanionCrossRegionCandidateSelection,
+            int horizontalCompanionPairStructureRepair,
+            int horizontalCompanionTripletStructureRepair,
+            int horizontalCompanionEnvelopeCollision,
+            int horizontalCompanionOccupiedCell,
+            int horizontalCompanionPairStructureRejected,
+            int horizontalCompanionTripletStructureRejected,
+            int horizontalCompanionSourceMemberPhysicalFallback,
+            int horizontalCompanionSourceClusterIncomplete,
             int compositionRegionCount,
             int quietRegionCount,
             int supportingRegionCount,
@@ -260,11 +402,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float acceptedAngleOffsetMax,
             float acceptedCompanionAngleOffsetMin,
             float acceptedCompanionAngleOffsetMean,
-            float acceptedCompanionAngleOffsetMax)
+            float acceptedCompanionAngleOffsetMax,
+            GroundPaintedAccentProposalRankDiagnostics proposalRankDiagnostics,
+            GroundPaintedAccentSurfaceStrokeBuildTimings buildTimings)
         {
             TargetProposals = Mathf.Max(0, targetProposals);
             CandidatePool = Mathf.Max(0, candidatePool);
             Proposed = Mathf.Max(0, proposed);
+            PhysicallyEvaluated = Mathf.Max(0, physicallyEvaluated);
             Accepted = Mathf.Max(0, accepted);
             DistributionPatchScale = Mathf.Max(0f, distributionPatchScale);
             DistributionPatchiness = Mathf.Clamp01(distributionPatchiness);
@@ -272,7 +417,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             ProposalPatchWeightMin = Mathf.Clamp01(proposalPatchWeightMin);
             ProposalPatchWeightMean = Mathf.Clamp01(proposalPatchWeightMean);
             ProposalPatchWeightMax = Mathf.Clamp01(proposalPatchWeightMax);
-            RejectedRegionalThinning = Mathf.Max(0, rejectedRegionalThinning);
             RejectedSampling = Mathf.Max(0, rejectedSampling);
             RejectedRiver = Mathf.Max(0, rejectedRiver);
             RejectedModifierExclusion = Mathf.Max(0, rejectedModifierExclusion);
@@ -284,12 +428,52 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 Mathf.Max(0, horizontalCompanionPairClusterCount);
             HorizontalCompanionTripletClusterCount =
                 Mathf.Max(0, horizontalCompanionTripletClusterCount);
+            HorizontalCompanionPairShallowLayoutCount =
+                Mathf.Max(0, horizontalCompanionPairShallowLayoutCount);
+            HorizontalCompanionPairSteppedLayoutCount =
+                Mathf.Max(0, horizontalCompanionPairSteppedLayoutCount);
+            HorizontalCompanionPairShoulderLayoutCount =
+                Mathf.Max(0, horizontalCompanionPairShoulderLayoutCount);
+            HorizontalCompanionPairOffsetLayoutCount =
+                Mathf.Max(0, horizontalCompanionPairOffsetLayoutCount);
             HorizontalCompanionParticipantCount =
                 Mathf.Max(0, horizontalCompanionParticipantCount);
             HorizontalCompanionAcceptedClusterCount =
                 Mathf.Max(0, horizontalCompanionAcceptedClusterCount);
             HorizontalCompanionAcceptedParticipantCount =
                 Mathf.Max(0, horizontalCompanionAcceptedParticipantCount);
+            HorizontalCompanionTargetParticipantCount =
+                Mathf.Max(0, horizontalCompanionTargetParticipantCount);
+            HorizontalCompanionFormedParticipantCount =
+                Mathf.Max(0, horizontalCompanionFormedParticipantCount);
+            HorizontalCompanionPrimaryClusterAttempts =
+                Mathf.Max(0, horizontalCompanionPrimaryClusterAttempts);
+            HorizontalCompanionTargetPlanRejected =
+                Mathf.Max(0, horizontalCompanionTargetPlanRejected);
+            HorizontalCompanionNoSecondaryCandidate =
+                Mathf.Max(0, horizontalCompanionNoSecondaryCandidate);
+            HorizontalCompanionNoTertiaryCandidate =
+                Mathf.Max(0, horizontalCompanionNoTertiaryCandidate);
+            HorizontalCompanionTripletToPairDowngrade =
+                Mathf.Max(0, horizontalCompanionTripletToPairDowngrade);
+            HorizontalCompanionCrossRegionCandidateSelection =
+                Mathf.Max(0, horizontalCompanionCrossRegionCandidateSelection);
+            HorizontalCompanionPairStructureRepair =
+                Mathf.Max(0, horizontalCompanionPairStructureRepair);
+            HorizontalCompanionTripletStructureRepair =
+                Mathf.Max(0, horizontalCompanionTripletStructureRepair);
+            HorizontalCompanionEnvelopeCollision =
+                Mathf.Max(0, horizontalCompanionEnvelopeCollision);
+            HorizontalCompanionOccupiedCell =
+                Mathf.Max(0, horizontalCompanionOccupiedCell);
+            HorizontalCompanionPairStructureRejected =
+                Mathf.Max(0, horizontalCompanionPairStructureRejected);
+            HorizontalCompanionTripletStructureRejected =
+                Mathf.Max(0, horizontalCompanionTripletStructureRejected);
+            HorizontalCompanionSourceMemberPhysicalFallback =
+                Mathf.Max(0, horizontalCompanionSourceMemberPhysicalFallback);
+            HorizontalCompanionSourceClusterIncomplete =
+                Mathf.Max(0, horizontalCompanionSourceClusterIncomplete);
             CompositionRegionCount = Mathf.Max(0, compositionRegionCount);
             QuietRegionCount = Mathf.Max(0, quietRegionCount);
             SupportingRegionCount = Mathf.Max(0, supportingRegionCount);
@@ -324,11 +508,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 acceptedCompanionAngleOffsetMean;
             AcceptedCompanionAngleOffsetMax =
                 acceptedCompanionAngleOffsetMax;
+            ProposalRankDiagnostics = proposalRankDiagnostics;
+            BuildTimings = buildTimings;
         }
 
         public int TargetProposals { get; }
         public int CandidatePool { get; }
         public int Proposed { get; }
+        public int PhysicallyEvaluated { get; }
         public int Accepted { get; }
         public float DistributionPatchScale { get; }
         public float DistributionPatchiness { get; }
@@ -336,7 +523,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float ProposalPatchWeightMin { get; }
         public float ProposalPatchWeightMean { get; }
         public float ProposalPatchWeightMax { get; }
-        public int RejectedRegionalThinning { get; }
         public int RejectedSampling { get; }
         public int RejectedRiver { get; }
         public int RejectedModifierExclusion { get; }
@@ -345,9 +531,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public int HorizontalCompanionClusterCount { get; }
         public int HorizontalCompanionPairClusterCount { get; }
         public int HorizontalCompanionTripletClusterCount { get; }
+        public int HorizontalCompanionPairShallowLayoutCount { get; }
+        public int HorizontalCompanionPairSteppedLayoutCount { get; }
+        public int HorizontalCompanionPairShoulderLayoutCount { get; }
+        public int HorizontalCompanionPairOffsetLayoutCount { get; }
         public int HorizontalCompanionParticipantCount { get; }
         public int HorizontalCompanionAcceptedClusterCount { get; }
         public int HorizontalCompanionAcceptedParticipantCount { get; }
+        public int HorizontalCompanionTargetParticipantCount { get; }
+        public int HorizontalCompanionFormedParticipantCount { get; }
+        public int HorizontalCompanionPrimaryClusterAttempts { get; }
+        public int HorizontalCompanionTargetPlanRejected { get; }
+        public int HorizontalCompanionNoSecondaryCandidate { get; }
+        public int HorizontalCompanionNoTertiaryCandidate { get; }
+        public int HorizontalCompanionTripletToPairDowngrade { get; }
+        public int HorizontalCompanionCrossRegionCandidateSelection { get; }
+        public int HorizontalCompanionPairStructureRepair { get; }
+        public int HorizontalCompanionTripletStructureRepair { get; }
+        public int HorizontalCompanionEnvelopeCollision { get; }
+        public int HorizontalCompanionOccupiedCell { get; }
+        public int HorizontalCompanionPairStructureRejected { get; }
+        public int HorizontalCompanionTripletStructureRejected { get; }
+        public int HorizontalCompanionSourceMemberPhysicalFallback { get; }
+        public int HorizontalCompanionSourceClusterIncomplete { get; }
         public int CompositionRegionCount { get; }
         public int QuietRegionCount { get; }
         public int SupportingRegionCount { get; }
@@ -379,6 +585,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float AcceptedCompanionAngleOffsetMin { get; }
         public float AcceptedCompanionAngleOffsetMean { get; }
         public float AcceptedCompanionAngleOffsetMax { get; }
+        public GroundPaintedAccentProposalRankDiagnostics ProposalRankDiagnostics
+        {
+            get;
+        }
+        public GroundPaintedAccentSurfaceStrokeBuildTimings BuildTimings
+        {
+            get;
+        }
 
         public int RejectedPhysicalValidation =>
             RejectedSampling +
@@ -394,17 +608,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     {
         public GroundPaintedAccentCompositionProposalDebugPoint(
             Vector3 localPosition,
-            GroundPaintedAccentCompositionRegionMode regionMode,
-            bool survivedRegionalThinning)
+            GroundPaintedAccentCompositionRegionMode regionMode)
         {
             LocalPosition = localPosition;
             RegionMode = regionMode;
-            SurvivedRegionalThinning = survivedRegionalThinning;
         }
 
         public Vector3 LocalPosition { get; }
         public GroundPaintedAccentCompositionRegionMode RegionMode { get; }
-        public bool SurvivedRegionalThinning { get; }
     }
 
     public readonly struct GroundPaintedAccentCompositionRegionDebug
@@ -413,7 +624,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Vector3 localPosition,
             Vector2 localDirection,
             GroundPaintedAccentCompositionRegionMode regionMode,
-            float acceptanceMultiplier,
+            float selectionMultiplier,
             bool isOccupied)
         {
             LocalPosition = localPosition;
@@ -422,14 +633,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     ? localDirection.normalized
                     : Vector2.right;
             RegionMode = regionMode;
-            AcceptanceMultiplier = Mathf.Clamp01(acceptanceMultiplier);
+            SelectionMultiplier = Mathf.Max(0.001f, selectionMultiplier);
             IsOccupied = isOccupied;
         }
 
         public Vector3 LocalPosition { get; }
         public Vector2 LocalDirection { get; }
         public GroundPaintedAccentCompositionRegionMode RegionMode { get; }
-        public float AcceptanceMultiplier { get; }
+        public float SelectionMultiplier { get; }
         public bool IsOccupied { get; }
     }
 
@@ -596,7 +807,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
     internal static class GroundPaintedAccentSurfaceStrokeGenerator
     {
-        public const int Revision = 17;
+        public const int Revision = 23;
 
         private const float MinimumFieldSize = 0.0001f;
         private const int MinimumStrokePointCount = 13;
@@ -615,7 +826,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private const float CompositionRegionJitterFraction = 0.28f;
         private const float QuietRegionProbability = 0.30f;
         private const float SupportingRegionProbability = 0.50f;
-        private const float BaseCompositionRetention = 0.45f;
         private const float QuietConcentratedWeight = 0.15f;
         private const float SupportingConcentratedWeight = 0.65f;
         private const float AccentConcentratedWeight = 1.45f;
@@ -624,11 +834,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private const float MinimumBalancedPerMarkJitterFraction = 0.35f;
         private const float MinimumRegionScaleBias = 0.92f;
         private const float MaximumRegionScaleBias = 1.08f;
-        private const float MaximumHorizontalCompanionParticipantFraction = 0.68f;
+        private const float MaximumHorizontalCompanionParticipantFraction = 0.94f;
         private const float HorizontalCompanionStrengthExponent = 1.05f;
         private const float MaximumHorizontalCompanionTripletProbability = 0.56f;
         private const float MaximumTripletProbabilityVerticalityBoost = 0.16f;
-        private const float MaximumStructuredPairProbability = 0.64f;
+        private const float MaximumStructuredPairProbability = 0.94f;
         private const float MinimumCompanionLengthRatio = 0.78f;
         private const float MaximumCompanionLengthRatio = 1.00f;
         private const float MinimumTertiaryLengthRatio = 0.68f;
@@ -650,7 +860,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private const float AbsoluteCompanionMemberAngleDegrees = 42f;
         private const float MaximumPairShapeAngleDegrees = 10f;
         private const float MaximumTripletShapeAngleDegrees = 15f;
-        private const float MaximumPairStepWidthMultiplier = 3.25f;
+        private const float MaximumPairStepWidthMultiplier = 4.25f;
+        private const float MinimumStructuredPairCenterStepLengthFraction =
+            0.15f;
+        private const float MinimumShallowPairCenterStepLengthFraction =
+            0.055f;
+        private const float MinimumShallowPairSpanLengthFraction = 0.10f;
+        private const float MaximumShallowPairStepWidthMultiplier = 1.75f;
+        private const float ShallowPairTranslationLengthFraction = 0.07f;
+        private const float StructuredPairTranslationLengthFraction = 0.24f;
+        private const float OffsetEchoPairTranslationScale = 0.90f;
+        private const float HorizontalPairStructureRepairMargin = 1.08f;
+        private const float FirstTripletStructureRepairScale = 1.35f;
+        private const float SecondTripletStructureRepairScale = 2.00f;
         private const float MinimumTripletNonLinearityWidthMultiplier = 0f;
         private const float MaximumTripletNonLinearityWidthMultiplier = 2.50f;
         private const float MinimumTripletVerticalSpanWidthMultiplier = 0f;
@@ -676,19 +898,44 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             LocalGrade
         }
 
+        private enum HorizontalCompanionTargetFailureReason
+        {
+            None,
+            InvalidPlan,
+            PairStructure,
+            TripletStructure
+        }
+
+        private enum HorizontalCompanionReservationFailureReason
+        {
+            None,
+            EnvelopeCollision,
+            OccupiedCell
+        }
+
+        private sealed class HorizontalCompanionCompositionAudit
+        {
+            public int TargetParticipantCount;
+            public int FormedParticipantCount;
+            public int PrimaryClusterAttempts;
+            public int TargetPlanRejected;
+            public int NoSecondaryCandidate;
+            public int NoTertiaryCandidate;
+            public int TripletToPairDowngrade;
+            public int CrossRegionCandidateSelection;
+            public int PairStructureRepair;
+            public int TripletStructureRepair;
+            public int EnvelopeCollision;
+            public int OccupiedCell;
+            public int PairStructureRejected;
+            public int TripletStructureRejected;
+        }
+
         private enum HorizontalCompanionArrangement
         {
             Continuation,
             StaggeredEcho,
             OffsetShoulder
-        }
-
-        private enum HorizontalCompanionPairLayout
-        {
-            FlatContinuation,
-            SteppedContinuation,
-            ShoulderContact,
-            OffsetEcho
         }
 
         private enum HorizontalCompanionTripletLayout
@@ -760,7 +1007,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 float priority,
                 float patchWeight,
                 float semanticSupport,
-                float selectionWeight)
+                float selectionWeight,
+                CompositionRegion region)
             {
                 Column = column;
                 Row = row;
@@ -770,6 +1018,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 PatchWeight = patchWeight;
                 SemanticSupport = semanticSupport;
                 SelectionWeight = selectionWeight;
+                Region = region;
             }
 
             public int Column { get; }
@@ -780,6 +1029,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             public float PatchWeight { get; }
             public float SemanticSupport { get; }
             public float SelectionWeight { get; }
+            public CompositionRegion Region { get; }
         }
 
         private readonly struct CompositionRegion
@@ -788,14 +1038,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 long coordinateKey,
                 int seed,
                 GroundPaintedAccentCompositionRegionMode mode,
-                float acceptanceMultiplier,
+                float selectionMultiplier,
                 float angleOffsetDegrees,
                 float scaleBias)
             {
                 CoordinateKey = coordinateKey;
                 Seed = seed;
                 Mode = mode;
-                AcceptanceMultiplier = acceptanceMultiplier;
+                SelectionMultiplier = selectionMultiplier;
                 AngleOffsetDegrees = angleOffsetDegrees;
                 ScaleBias = scaleBias;
             }
@@ -803,7 +1053,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             public long CoordinateKey { get; }
             public int Seed { get; }
             public GroundPaintedAccentCompositionRegionMode Mode { get; }
-            public float AcceptanceMultiplier { get; }
+            public float SelectionMultiplier { get; }
             public float AngleOffsetDegrees { get; }
             public float ScaleBias { get; }
         }
@@ -826,6 +1076,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 CompanionMemberRole =
                     GroundPaintedAccentCompanionMemberRole.None;
                 IntendedCompanionClusterSize = 0;
+                CompanionPairLayout =
+                    GroundPaintedAccentCompanionPairLayout.None;
                 ProfileSeed = source.Seed;
                 StrengthScale = 1f;
                 IndependentCenterXZ = source.CenterXZ;
@@ -837,7 +1089,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             public CompositionRegion Region { get; }
             public Vector3 DebugLocalPosition { get; }
             public bool HasDebugLocalPosition { get; }
-            public bool SurvivedRegionalThinning { get; set; }
+            public int ProposalRankQuartile { get; set; }
             public Vector2 CenterXZ { get; set; }
             public GroundPaintedAccentCompositionRole Role { get; set; }
             public GroundPaintedAccentGlyphFamily Family { get; set; }
@@ -848,6 +1100,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 set;
             }
             public int IntendedCompanionClusterSize { get; set; }
+            public GroundPaintedAccentCompanionPairLayout CompanionPairLayout
+            {
+                get;
+                set;
+            }
             public bool HasCompanionOrientation { get; set; }
             public float CompanionAngleOffsetDegrees { get; set; }
             public int ProfileSeed { get; set; }
@@ -943,7 +1200,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         baseSurface,
                         feature,
                         settings,
-                        patchCoordinate)
+                        patchCoordinate,
+                        out _,
+                        out _)
                     : new List<StrokeCandidate>();
 
             candidates.Sort(CompareStrokeCandidates);
@@ -971,6 +1230,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         candidate.SelectionWeight));
             }
 
+            float compositionRegionScale =
+                ResolveCompositionRegionScale(settings);
             int sampleResolution = DebugDistributionSampleResolution;
             List<GroundPaintedAccentDistributionDebugSample>
                 distributionSamples =
@@ -1031,8 +1292,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             feature != null ? feature.MaskInfluence : 0f);
                     float semanticWeight =
                         Mathf.Lerp(0.45f, 1f, semanticSupport);
+                    CompositionRegion region =
+                        ResolveCompositionRegion(
+                            distributionSamplePosition,
+                            settings,
+                            compositionRegionScale);
                     float effectiveProposalWeight =
-                        Mathf.Clamp01(patchWeight * semanticWeight);
+                        Mathf.Clamp01(
+                            patchWeight *
+                            semanticWeight *
+                            region.SelectionMultiplier);
 
                     distributionSamples.Add(
                         new GroundPaintedAccentDistributionDebugSample(
@@ -1088,8 +1357,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     baseSurface,
                     feature,
                     settings,
-                    patchCoordinate);
+                    patchCoordinate,
+                    out double candidateBuildMilliseconds,
+                    out double regionalWeightingMilliseconds);
+            long candidateOrderingStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
             candidates.Sort(CompareStrokeCandidates);
+            double candidateOrderingMilliseconds =
+                ResolveElapsedMilliseconds(candidateOrderingStartedAt);
 
             int proposed =
                 Mathf.Min(settings.TargetStrokeCount, candidates.Count);
@@ -1106,8 +1381,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int quietProposalCount = 0;
             int supportingProposalCount = 0;
             int accentProposalCount = 0;
-            int rejectedRegionalThinning = 0;
+            int[] selectedByRankQuartile = new int[4];
+            int[] acceptedByRankQuartile = new int[4];
             List<int> horizontalCompanionClusterSizes = new List<int>();
+            long compositionSetupStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
 
             for (int proposalIndex = 0;
                  proposalIndex < proposed;
@@ -1120,16 +1398,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     Mathf.Max(maximumProposalPatchWeight, candidate.PatchWeight);
                 totalProposalPatchWeight += candidate.PatchWeight;
 
-                Vector2 distributionPosition =
-                    ResolveDistributionSamplePosition(
-                        candidate.CenterXZ,
-                        patchCoordinate,
-                        originSize);
-                CompositionRegion region =
-                    ResolveCompositionRegion(
-                        distributionPosition,
-                        settings,
-                        compositionRegionScale);
+                CompositionRegion region = candidate.Region;
 
                 if (!regions.TryGetValue(
                         region.CoordinateKey,
@@ -1170,57 +1439,47 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         region,
                         debugLocalPosition,
                         hasDebugLocalPosition);
+                int rankQuartile =
+                    proposed > 0
+                        ? Mathf.Min(3, proposalIndex * 4 / proposed)
+                        : 0;
+                compositionCandidate.ProposalRankQuartile = rankQuartile;
+                selectedByRankQuartile[rankQuartile]++;
                 compositionCandidates.Add(compositionCandidate);
                 regionRuntime.Members.Add(compositionCandidate);
-
-                float thinningRoll =
-                    Hash01((uint)candidate.Seed, 307u);
-                compositionCandidate.SurvivedRegionalThinning =
-                    thinningRoll <= region.AcceptanceMultiplier;
-                if (!compositionCandidate.SurvivedRegionalThinning)
-                {
-                    rejectedRegionalThinning++;
-                }
             }
 
-            List<CompositionCandidate> thinnedCandidates =
+            List<CompositionCandidate> selectedCandidates =
                 new List<CompositionCandidate>(proposed);
             foreach (KeyValuePair<long, CompositionRegionRuntime> pair in regions)
             {
                 CompositionRegionRuntime regionRuntime = pair.Value;
-                List<CompositionCandidate> regionSurvivors =
-                    new List<CompositionCandidate>();
-
-                for (int index = 0;
-                     index < regionRuntime.Members.Count;
-                     index++)
+                regionRuntime.Members.Sort(
+                    CompareCompositionCandidatesBySource);
+                for (int rank = 0; rank < regionRuntime.Members.Count; rank++)
                 {
                     CompositionCandidate candidate =
-                        regionRuntime.Members[index];
-                    if (candidate.SurvivedRegionalThinning)
-                    {
-                        regionSurvivors.Add(candidate);
-                    }
+                        regionRuntime.Members[rank];
+                    candidate.Role = ResolveCompositionRole(candidate, rank);
+                    ResolveCompositionCandidateGeometry(candidate, settings);
+                    selectedCandidates.Add(candidate);
                 }
-
-                regionSurvivors.Sort(CompareCompositionCandidatesBySource);
-                for (int rank = 0; rank < regionSurvivors.Count; rank++)
-                {
-                    CompositionCandidate candidate = regionSurvivors[rank];
-                    candidate.Role =
-                        ResolveCompositionRole(candidate, rank);
-                    ResolveCompositionCandidateGeometry(
-                        candidate,
-                        settings);
-                    thinnedCandidates.Add(candidate);
-                }
-
             }
 
-            ComposeHorizontalCompanions(
-                thinnedCandidates,
-                settings,
-                horizontalCompanionClusterSizes);
+            double compositionSetupMilliseconds =
+                ResolveElapsedMilliseconds(compositionSetupStartedAt);
+
+            // V3J.4F3: companion ownership moved to the final valid projected
+            // prototype pool. Surface generation now remains purely independent
+            // so authoring quotas are resolved against marks that have already
+            // passed ordinary surface and projected validation.
+            int horizontalCompanionPairShallowLayoutCount = 0;
+            int horizontalCompanionPairSteppedLayoutCount = 0;
+            int horizontalCompanionPairShoulderLayoutCount = 0;
+            int horizontalCompanionPairOffsetLayoutCount = 0;
+            HorizontalCompanionCompositionAudit
+                horizontalCompanionCompositionAudit =
+                    new HorizontalCompanionCompositionAudit();
             int horizontalCompanionClusterCount =
                 horizontalCompanionClusterSizes.Count;
             int horizontalCompanionPairClusterCount = 0;
@@ -1242,14 +1501,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     horizontalCompanionPairClusterCount++;
                 }
             }
-            thinnedCandidates.Sort(CompareCompositionCandidatesBySource);
+            selectedCandidates.Sort(CompareCompositionCandidatesBySource);
             List<GroundPaintedAccentSurfaceStroke> strokes =
                 new List<GroundPaintedAccentSurfaceStroke>(
-                    thinnedCandidates.Count);
+                    selectedCandidates.Count);
             List<GroundPaintedAccentCompositionMarkDebugPoint>
                 acceptedMarkDebugPoints =
                     new List<GroundPaintedAccentCompositionMarkDebugPoint>(
-                        thinnedCandidates.Count);
+                        selectedCandidates.Count);
             int rejectedSampling = 0;
             int rejectedRiver = 0;
             int rejectedModifierExclusion = 0;
@@ -1270,6 +1529,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int singleShoulderAcceptedCount = 0;
             int shallowCrestAcceptedCount = 0;
             int horizontalCompanionAcceptedParticipantCount = 0;
+            int horizontalCompanionSourceMemberPhysicalFallback = 0;
             int[] horizontalCompanionAcceptedMembers =
                 horizontalCompanionClusterCount > 0
                     ? new int[horizontalCompanionClusterCount]
@@ -1284,12 +1544,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float acceptedCompanionAngleOffsetMin = float.PositiveInfinity;
             float acceptedCompanionAngleOffsetMax = float.NegativeInfinity;
             double acceptedCompanionAngleOffsetTotal = 0d;
+            long strokeSetupTicks = 0L;
+            long surfaceConstructionValidationTicks = 0L;
 
             for (int index = 0;
-                 index < thinnedCandidates.Count;
+                 index < selectedCandidates.Count;
                  index++)
             {
-                CompositionCandidate candidate = thinnedCandidates[index];
+                CompositionCandidate candidate = selectedCandidates[index];
+                long strokeSetupStartedAt =
+                    System.Diagnostics.Stopwatch.GetTimestamp();
                 IncrementFamilyCount(
                     candidate.Family,
                     ref completeMoundSelectedCount,
@@ -1316,6 +1580,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         candidate.Source.SemanticSupport) *
                     Mathf.Lerp(0.80f, 1.0f, Hash01(strokeHash, 71u)) *
                     candidate.StrengthScale;
+                strokeSetupTicks +=
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    strokeSetupStartedAt;
 
                 GroundPaintedAccentSurfaceStroke independentFallback =
                     default;
@@ -1330,6 +1597,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         out independentFallback);
                 }
 
+                long surfaceValidationStartedAt =
+                    System.Diagnostics.Stopwatch.GetTimestamp();
                 bool composedStrokeCreated =
                     TryCreateSurfaceStroke(
                         candidate.CenterXZ,
@@ -1348,8 +1617,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         modifiers,
                         out GroundPaintedAccentSurfaceStroke stroke,
                         out StrokeRejectionReason rejectionReason);
+                surfaceConstructionValidationTicks +=
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    surfaceValidationStartedAt;
                 if (!composedStrokeCreated && independentFallback.IsValid)
                 {
+                    horizontalCompanionSourceMemberPhysicalFallback++;
                     stroke = independentFallback;
                     rejectionReason = StrokeRejectionReason.None;
                 }
@@ -1379,6 +1652,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     continue;
                 }
 
+                stroke = stroke.WithPlacementMetadata(
+                    candidate.ProposalRankQuartile,
+                    candidate.Region.Mode);
+
                 if (composedStrokeCreated &&
                     candidate.CompanionClusterIndex >= 0)
                 {
@@ -1386,10 +1663,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         candidate.CompanionClusterIndex,
                         candidate.CompanionMemberRole,
                         candidate.IntendedCompanionClusterSize,
+                        candidate.CompanionPairLayout,
                         independentFallback.ToVariant());
                 }
 
                 strokes.Add(stroke);
+                acceptedByRankQuartile[
+                    Mathf.Clamp(candidate.ProposalRankQuartile, 0, 3)]++;
                 if (stroke.IsCompanionMember &&
                     stroke.CompanionClusterIndex <
                         horizontalCompanionAcceptedMembers.Length)
@@ -1489,6 +1769,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 }
             }
 
+            long diagnosticsStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
             int quietRegionCount = 0;
             int supportingRegionCount = 0;
             int accentRegionCount = 0;
@@ -1530,7 +1812,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             settings,
                             regionRuntime.Region.AngleOffsetDegrees),
                         regionRuntime.Region.Mode,
-                        regionRuntime.Region.AcceptanceMultiplier,
+                        regionRuntime.Region.SelectionMultiplier,
                         true));
             }
 
@@ -1551,8 +1833,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 proposalDebugPoints.Add(
                     new GroundPaintedAccentCompositionProposalDebugPoint(
                         candidate.DebugLocalPosition,
-                        candidate.Region.Mode,
-                        candidate.SurvivedRegionalThinning));
+                        candidate.Region.Mode));
             }
 
             compositionDebugSnapshot =
@@ -1562,6 +1843,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     acceptedMarkDebugPoints.ToArray());
 
             int horizontalCompanionAcceptedClusterCount = 0;
+            int horizontalCompanionSourceClusterIncomplete = 0;
             for (int clusterIndex = 0;
                  clusterIndex < horizontalCompanionAcceptedMembers.Length;
                  clusterIndex++)
@@ -1570,6 +1852,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     horizontalCompanionClusterSizes[clusterIndex])
                 {
                     horizontalCompanionAcceptedClusterCount++;
+                }
+                else
+                {
+                    horizontalCompanionSourceClusterIncomplete++;
                 }
             }
 
@@ -1600,6 +1886,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     settings.TargetStrokeCount,
                     candidates.Count,
                     proposed,
+                    selectedCandidates.Count,
                     acceptedCount,
                     settings.DistributionPatchScale,
                     settings.DistributionPatchiness,
@@ -1607,7 +1894,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     proposalPatchWeightMin,
                     proposalPatchWeightMean,
                     proposed > 0 ? maximumProposalPatchWeight : 0f,
-                    rejectedRegionalThinning,
                     rejectedSampling,
                     rejectedRiver,
                     rejectedModifierExclusion,
@@ -1616,9 +1902,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     horizontalCompanionClusterCount,
                     horizontalCompanionPairClusterCount,
                     horizontalCompanionTripletClusterCount,
+                    horizontalCompanionPairShallowLayoutCount,
+                    horizontalCompanionPairSteppedLayoutCount,
+                    horizontalCompanionPairShoulderLayoutCount,
+                    horizontalCompanionPairOffsetLayoutCount,
                     horizontalCompanionParticipantCount,
                     horizontalCompanionAcceptedClusterCount,
                     horizontalCompanionAcceptedParticipantCount,
+                    horizontalCompanionCompositionAudit.TargetParticipantCount,
+                    horizontalCompanionCompositionAudit.FormedParticipantCount,
+                    horizontalCompanionCompositionAudit.PrimaryClusterAttempts,
+                    horizontalCompanionCompositionAudit.TargetPlanRejected,
+                    horizontalCompanionCompositionAudit.NoSecondaryCandidate,
+                    horizontalCompanionCompositionAudit.NoTertiaryCandidate,
+                    horizontalCompanionCompositionAudit.TripletToPairDowngrade,
+                    horizontalCompanionCompositionAudit.CrossRegionCandidateSelection,
+                    horizontalCompanionCompositionAudit.PairStructureRepair,
+                    horizontalCompanionCompositionAudit.TripletStructureRepair,
+                    horizontalCompanionCompositionAudit.EnvelopeCollision,
+                    horizontalCompanionCompositionAudit.OccupiedCell,
+                    horizontalCompanionCompositionAudit.PairStructureRejected,
+                    horizontalCompanionCompositionAudit.TripletStructureRejected,
+                    horizontalCompanionSourceMemberPhysicalFallback,
+                    horizontalCompanionSourceClusterIncomplete,
                     regions.Count,
                     quietRegionCount,
                     supportingRegionCount,
@@ -1653,7 +1959,28 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     acceptedCompanionAngleOffsetMean,
                     acceptedCompanionAngleOffsetCount > 0
                         ? acceptedCompanionAngleOffsetMax
-                        : 0f);
+                        : 0f,
+                    new GroundPaintedAccentProposalRankDiagnostics(
+                        new Vector4(
+                            selectedByRankQuartile[0],
+                            selectedByRankQuartile[1],
+                            selectedByRankQuartile[2],
+                            selectedByRankQuartile[3]),
+                        new Vector4(
+                            acceptedByRankQuartile[0],
+                            acceptedByRankQuartile[1],
+                            acceptedByRankQuartile[2],
+                            acceptedByRankQuartile[3])),
+                    new GroundPaintedAccentSurfaceStrokeBuildTimings(
+                        candidateBuildMilliseconds,
+                        regionalWeightingMilliseconds,
+                        candidateOrderingMilliseconds,
+                        compositionSetupMilliseconds,
+                        strokeSetupTicks * 1000d /
+                            System.Diagnostics.Stopwatch.Frequency,
+                        surfaceConstructionValidationTicks * 1000d /
+                            System.Diagnostics.Stopwatch.Frequency,
+                        ResolveElapsedMilliseconds(diagnosticsStartedAt)));
 
             return strokes.ToArray();
         }
@@ -1725,8 +2052,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 mode = GroundPaintedAccentCompositionRegionMode.Accent;
             }
 
-            float acceptanceMultiplier =
-                ResolveRegionalAcceptanceMultiplier(
+            float selectionMultiplier =
+                ResolveRegionalSelectionMultiplier(
                     mode,
                     settings.CompositionDensityContrast);
             float regionalAngleMaximum =
@@ -1751,12 +2078,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 coordinateKey,
                 regionSeed,
                 mode,
-                acceptanceMultiplier,
+                selectionMultiplier,
                 angleOffsetDegrees,
                 scaleBias);
         }
 
-        private static float ResolveRegionalAcceptanceMultiplier(
+        private static float ResolveRegionalSelectionMultiplier(
             GroundPaintedAccentCompositionRegionMode mode,
             float densityContrast)
         {
@@ -1792,10 +2119,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     break;
             }
 
-            return Mathf.Clamp01(
-                BaseCompositionRetention *
+            return
                 selectedWeight /
-                Mathf.Max(0.0001f, expectedWeight));
+                Mathf.Max(0.0001f, expectedWeight);
         }
 
         private static GroundPaintedAccentCompositionRole
@@ -1895,8 +2221,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private static void ComposeHorizontalCompanions(
             List<CompositionCandidate> candidates,
             FieldSettings settings,
-            List<int> clusterSizes)
+            List<int> clusterSizes,
+            out int pairShallowLayoutCount,
+            out int pairSteppedLayoutCount,
+            out int pairShoulderLayoutCount,
+            out int pairOffsetLayoutCount,
+            out HorizontalCompanionCompositionAudit audit)
         {
+            pairShallowLayoutCount = 0;
+            pairSteppedLayoutCount = 0;
+            pairShoulderLayoutCount = 0;
+            pairOffsetLayoutCount = 0;
+            audit = new HorizontalCompanionCompositionAudit();
             if (candidates == null ||
                 clusterSizes == null ||
                 candidates.Count < 2 ||
@@ -1933,6 +2269,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     targetParticipantCount,
                     0,
                     maximumParticipantCount);
+            audit.TargetParticipantCount = targetParticipantCount;
             if (targetParticipantCount < 2)
             {
                 return;
@@ -1967,6 +2304,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         remainingParticipantBudget,
                         settings);
                 int clusterIndex = clusterSizes.Count;
+                audit.PrimaryClusterAttempts++;
                 if (!TryComposeHorizontalCompanionCluster(
                         available,
                         primary,
@@ -1975,9 +2313,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         occupiedCells,
                         settings,
                         clusterIndex,
+                        audit,
                         out HorizontalCompanionEnvelope envelope,
                         out long cellKey,
-                        out int composedClusterSize))
+                        out int composedClusterSize,
+                        out GroundPaintedAccentCompanionPairLayout composedPairLayout))
                 {
                     continue;
                 }
@@ -1985,8 +2325,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 occupiedEnvelopes.Add(envelope);
                 occupiedCells.Add(cellKey);
                 clusterSizes.Add(composedClusterSize);
+                if (composedClusterSize == 2)
+                {
+                    switch (composedPairLayout)
+                    {
+                        case GroundPaintedAccentCompanionPairLayout.SteppedContinuation:
+                            pairSteppedLayoutCount++;
+                            break;
+                        case GroundPaintedAccentCompanionPairLayout.ShoulderContact:
+                            pairShoulderLayoutCount++;
+                            break;
+                        case GroundPaintedAccentCompanionPairLayout.OffsetEcho:
+                            pairOffsetLayoutCount++;
+                            break;
+                        case GroundPaintedAccentCompanionPairLayout.ShallowOffset:
+                        default:
+                            pairShallowLayoutCount++;
+                            break;
+                    }
+                }
                 formedParticipantCount += composedClusterSize;
             }
+
+            audit.FormedParticipantCount = formedParticipantCount;
         }
 
         private static int CompareCompanionCandidatesByPriority(
@@ -2052,39 +2413,57 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             HashSet<long> occupiedCells,
             FieldSettings settings,
             int clusterIndex,
+            HorizontalCompanionCompositionAudit audit,
             out HorizontalCompanionEnvelope envelope,
             out long cellKey,
-            out int composedClusterSize)
+            out int composedClusterSize,
+            out GroundPaintedAccentCompanionPairLayout composedPairLayout)
         {
             envelope = default;
             cellKey = 0L;
             composedClusterSize = 0;
+            composedPairLayout =
+                GroundPaintedAccentCompanionPairLayout.ShallowOffset;
             if (primary == null || primary.CompanionClusterIndex >= 0)
             {
                 return false;
             }
 
+            bool downgradeRecorded = false;
             if (!TryResolveHorizontalCompanionTargets(
                     primary,
                     requestedClusterSize,
                     settings,
+                    audit,
                     out float primaryAngleOffsetDegrees,
                     out HorizontalCompanionTarget secondaryTarget,
-                    out HorizontalCompanionTarget tertiaryTarget))
+                    out HorizontalCompanionTarget tertiaryTarget,
+                    out HorizontalCompanionTargetFailureReason targetFailure))
             {
-                if (requestedClusterSize < 3 ||
-                    !TryResolveHorizontalCompanionTargets(
-                        primary,
-                        2,
-                        settings,
-                        out primaryAngleOffsetDegrees,
-                        out secondaryTarget,
-                        out tertiaryTarget))
+                RecordHorizontalCompanionTargetFailure(audit, targetFailure);
+                if (requestedClusterSize < 3)
                 {
                     return false;
                 }
 
+                audit.TripletToPairDowngrade++;
+                downgradeRecorded = true;
                 requestedClusterSize = 2;
+                if (!TryResolveHorizontalCompanionTargets(
+                        primary,
+                        requestedClusterSize,
+                        settings,
+                        audit,
+                        out primaryAngleOffsetDegrees,
+                        out secondaryTarget,
+                        out tertiaryTarget,
+                        out targetFailure))
+                {
+                    RecordHorizontalCompanionTargetFailure(
+                        audit,
+                        targetFailure);
+                    return false;
+                }
             }
 
             CompositionCandidate secondary =
@@ -2093,49 +2472,120 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     primary,
                     null,
                     secondaryTarget,
-                    settings);
+                    settings,
+                    out bool secondaryUsedCrossRegion);
+            if (secondaryUsedCrossRegion)
+            {
+                audit.CrossRegionCandidateSelection++;
+            }
             if (secondary == null)
             {
-                return false;
+                audit.NoSecondaryCandidate++;
+                if (requestedClusterSize < 3)
+                {
+                    return false;
+                }
             }
 
-            CompositionCandidate tertiary = null;
             if (requestedClusterSize >= 3)
             {
-                tertiary =
+                CompositionCandidate tertiary = null;
+                if (secondary != null)
+                {
+                    tertiary =
+                        FindTargetedAvailableCompanion(
+                            available,
+                            primary,
+                            secondary,
+                            tertiaryTarget,
+                            settings,
+                            out bool tertiaryUsedCrossRegion);
+                    if (tertiaryUsedCrossRegion)
+                    {
+                        audit.CrossRegionCandidateSelection++;
+                    }
+                    if (tertiary == null)
+                    {
+                        audit.NoTertiaryCandidate++;
+                    }
+                }
+
+                if (secondary != null && tertiary != null)
+                {
+                    if (TryReserveHorizontalCompanionCluster(
+                            primary,
+                            primaryAngleOffsetDegrees,
+                            secondary,
+                            secondaryTarget,
+                            tertiary,
+                            tertiaryTarget,
+                            occupiedEnvelopes,
+                            occupiedCells,
+                            settings,
+                            out envelope,
+                            out cellKey,
+                            out HorizontalCompanionReservationFailureReason
+                                reservationFailure))
+                    {
+                        ApplyHorizontalCompanionCluster(
+                            primary,
+                            primaryAngleOffsetDegrees,
+                            secondary,
+                            secondaryTarget,
+                            tertiary,
+                            tertiaryTarget,
+                            GroundPaintedAccentCompanionPairLayout.None,
+                            settings,
+                            clusterIndex);
+                        composedClusterSize = 3;
+                        return true;
+                    }
+
+                    RecordHorizontalCompanionReservationFailure(
+                        audit,
+                        reservationFailure);
+                }
+
+                if (!downgradeRecorded)
+                {
+                    audit.TripletToPairDowngrade++;
+                    downgradeRecorded = true;
+                }
+
+                requestedClusterSize = 2;
+                if (!TryResolveHorizontalCompanionTargets(
+                        primary,
+                        requestedClusterSize,
+                        settings,
+                        audit,
+                        out primaryAngleOffsetDegrees,
+                        out secondaryTarget,
+                        out tertiaryTarget,
+                        out targetFailure))
+                {
+                    RecordHorizontalCompanionTargetFailure(
+                        audit,
+                        targetFailure);
+                    return false;
+                }
+
+                secondary =
                     FindTargetedAvailableCompanion(
                         available,
                         primary,
-                        secondary,
-                        tertiaryTarget,
-                        settings);
-            }
-
-            if (tertiary != null &&
-                TryReserveHorizontalCompanionCluster(
-                    primary,
-                    primaryAngleOffsetDegrees,
-                    secondary,
-                    secondaryTarget,
-                    tertiary,
-                    tertiaryTarget,
-                    occupiedEnvelopes,
-                    occupiedCells,
-                    settings,
-                    out envelope,
-                    out cellKey))
-            {
-                ApplyHorizontalCompanionCluster(
-                    primary,
-                    primaryAngleOffsetDegrees,
-                    secondary,
-                    secondaryTarget,
-                    tertiary,
-                    tertiaryTarget,
-                    settings,
-                    clusterIndex);
-                composedClusterSize = 3;
-                return true;
+                        null,
+                        secondaryTarget,
+                        settings,
+                        out bool downgradedSecondaryUsedCrossRegion);
+                if (downgradedSecondaryUsedCrossRegion)
+                {
+                    audit.CrossRegionCandidateSelection++;
+                }
+                if (secondary == null)
+                {
+                    audit.NoSecondaryCandidate++;
+                    return false;
+                }
             }
 
             if (!TryReserveHorizontalCompanionCluster(
@@ -2149,11 +2599,25 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     occupiedCells,
                     settings,
                     out envelope,
-                    out cellKey))
+                    out cellKey,
+                    out HorizontalCompanionReservationFailureReason
+                        pairReservationFailure))
             {
+                RecordHorizontalCompanionReservationFailure(
+                    audit,
+                    pairReservationFailure);
                 return false;
             }
 
+            uint pairLayoutHash =
+                (uint)Hash(
+                    primary.Source.Seed,
+                    primary.Region.Seed,
+                    449);
+            composedPairLayout =
+                ResolveHorizontalCompanionPairLayout(
+                    pairLayoutHash,
+                    Smooth01(settings.CompanionTripletVerticality));
             ApplyHorizontalCompanionCluster(
                 primary,
                 primaryAngleOffsetDegrees,
@@ -2161,6 +2625,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 secondaryTarget,
                 null,
                 default,
+                composedPairLayout,
                 settings,
                 clusterIndex);
             composedClusterSize = 2;
@@ -2171,15 +2636,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             CompositionCandidate primary,
             int requestedClusterSize,
             FieldSettings settings,
+            HorizontalCompanionCompositionAudit audit,
             out float primaryAngleOffsetDegrees,
             out HorizontalCompanionTarget secondaryTarget,
-            out HorizontalCompanionTarget tertiaryTarget)
+            out HorizontalCompanionTarget tertiaryTarget,
+            out HorizontalCompanionTargetFailureReason failureReason)
         {
             primaryAngleOffsetDegrees = 0f;
             secondaryTarget = default;
             tertiaryTarget = default;
+            failureReason = HorizontalCompanionTargetFailureReason.None;
             if (primary == null)
             {
+                failureReason =
+                    HorizontalCompanionTargetFailureReason.InvalidPlan;
                 return false;
             }
 
@@ -2192,12 +2662,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 Smooth01(settings.CompanionTripletVerticality);
             HorizontalCompanionArrangement arrangement =
                 ResolveHorizontalCompanionArrangement(clusterHash);
-            HorizontalCompanionPairLayout pairLayout =
+            GroundPaintedAccentCompanionPairLayout pairLayout =
                 requestedClusterSize == 2
                     ? ResolveHorizontalCompanionPairLayout(
                         clusterHash,
                         verticality)
-                    : HorizontalCompanionPairLayout.FlatContinuation;
+                    : GroundPaintedAccentCompanionPairLayout.ShallowOffset;
             HorizontalCompanionTripletLayout tripletLayout =
                 requestedClusterSize >= 3
                     ? ResolveHorizontalCompanionTripletLayout(
@@ -2254,7 +2724,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             bool structuredPair =
                 requestedClusterSize == 2 &&
                 pairLayout !=
-                    HorizontalCompanionPairLayout.FlatContinuation;
+                    GroundPaintedAccentCompanionPairLayout.ShallowOffset;
 
             if (structuredPair)
             {
@@ -2290,21 +2760,31 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         settings) +
                     ResolveStructuredPairTranslation(
                         pairLayout,
+                        primaryAngleOffsetDegrees,
+                        secondaryAngleOffsetDegrees,
                         Mathf.Min(primary.Length, secondaryLength),
                         verticality,
                         clusterHash,
                         settings);
-                if (!HasRequiredHorizontalPairStructure(
+                if (!TryRepairHorizontalPairStructure(
                         primary.CenterXZ,
                         primary.Length,
                         primaryAngleOffsetDegrees,
-                        structuredPairCenter,
                         secondaryLength,
                         secondaryAngleOffsetDegrees,
                         pairLayout,
-                        settings))
+                        clusterHash,
+                        settings,
+                        ref structuredPairCenter,
+                        out bool pairStructureRepaired))
                 {
+                    failureReason =
+                        HorizontalCompanionTargetFailureReason.PairStructure;
                     return false;
+                }
+                if (pairStructureRepaired && audit != null)
+                {
+                    audit.PairStructureRepair++;
                 }
 
                 secondaryTarget =
@@ -2346,6 +2826,39 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         secondaryGap,
                         secondaryVerticalOffset,
                         settings);
+                if (requestedClusterSize == 2 &&
+                    pairLayout ==
+                        GroundPaintedAccentCompanionPairLayout.ShallowOffset)
+                {
+                    secondaryCenter +=
+                        ResolveShallowPairTranslation(
+                            primaryAngleOffsetDegrees,
+                            secondaryAngleOffsetDegrees,
+                            Mathf.Min(primary.Length, secondaryLength),
+                            verticality,
+                            clusterHash,
+                            settings);
+                    if (!TryRepairHorizontalPairStructure(
+                            primary.CenterXZ,
+                            primary.Length,
+                            primaryAngleOffsetDegrees,
+                            secondaryLength,
+                            secondaryAngleOffsetDegrees,
+                            pairLayout,
+                            clusterHash,
+                            settings,
+                            ref secondaryCenter,
+                            out bool pairStructureRepaired))
+                    {
+                        failureReason =
+                            HorizontalCompanionTargetFailureReason.PairStructure;
+                        return false;
+                    }
+                    if (pairStructureRepaired && audit != null)
+                    {
+                        audit.PairStructureRepair++;
+                    }
+                }
                 secondaryTarget =
                     new HorizontalCompanionTarget(
                         arrangement,
@@ -2453,31 +2966,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 settings,
                 out Vector2 secondaryTranslation,
                 out Vector2 tertiaryTranslation);
-            Vector2 structuredSecondaryCenter =
-                ResolveCompanionContactCenter(
-                    primary.CenterXZ,
-                    primary.Length,
-                    primaryAngleOffsetDegrees,
-                    secondaryAnchorFraction,
-                    secondaryLength,
-                    secondaryAngleOffsetDegrees,
-                    secondaryTargetFraction,
-                    horizontalSign,
-                    structuredSecondaryGap,
-                    settings) +
-                secondaryTranslation;
-            secondaryTarget =
-                new HorizontalCompanionTarget(
-                    arrangement,
-                    structuredSecondaryCenter,
-                    secondaryLength,
-                    secondaryStrengthScale,
-                    secondaryAngleOffsetDegrees);
 
-            Vector2 tertiaryAnchorCenter =
-                tertiaryAnchorsToPrimary
-                    ? primary.CenterXZ
-                    : structuredSecondaryCenter;
             float tertiaryAnchorLength =
                 tertiaryAnchorsToPrimary
                     ? primary.Length
@@ -2497,36 +2986,88 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     clusterHash,
                     419u,
                     settings);
-            Vector2 structuredTertiaryCenter =
-                ResolveCompanionContactCenter(
-                    tertiaryAnchorCenter,
-                    tertiaryAnchorLength,
-                    tertiaryAnchorAngle,
-                    tertiaryAnchorFraction,
-                    tertiaryLength,
-                    tertiaryAngleOffsetDegrees,
-                    tertiaryTargetFraction,
-                    tertiaryDirectionSign,
-                    structuredTertiaryGap,
-                    settings) +
-                tertiaryTranslation;
 
-            if (!HasRequiredHorizontalTripletStructure(
-                    primary.CenterXZ,
-                    primary.Length,
-                    primaryAngleOffsetDegrees,
-                    structuredSecondaryCenter,
-                    secondaryLength,
-                    secondaryAngleOffsetDegrees,
-                    structuredTertiaryCenter,
-                    tertiaryLength,
-                    tertiaryAngleOffsetDegrees,
-                    tripletLayout,
-                    settings))
+            Vector2 structuredSecondaryCenter = default;
+            Vector2 structuredTertiaryCenter = default;
+            bool tripletStructureAccepted = false;
+            int acceptedRepairPass = -1;
+            for (int repairPass = 0; repairPass < 3; repairPass++)
             {
-                return false;
+                float repairScale =
+                    repairPass == 0
+                        ? 1f
+                        : repairPass == 1
+                            ? FirstTripletStructureRepairScale
+                            : SecondTripletStructureRepairScale;
+                structuredSecondaryCenter =
+                    ResolveCompanionContactCenter(
+                        primary.CenterXZ,
+                        primary.Length,
+                        primaryAngleOffsetDegrees,
+                        secondaryAnchorFraction,
+                        secondaryLength,
+                        secondaryAngleOffsetDegrees,
+                        secondaryTargetFraction,
+                        horizontalSign,
+                        structuredSecondaryGap,
+                        settings) +
+                    secondaryTranslation * repairScale;
+                Vector2 tertiaryAnchorCenter =
+                    tertiaryAnchorsToPrimary
+                        ? primary.CenterXZ
+                        : structuredSecondaryCenter;
+                structuredTertiaryCenter =
+                    ResolveCompanionContactCenter(
+                        tertiaryAnchorCenter,
+                        tertiaryAnchorLength,
+                        tertiaryAnchorAngle,
+                        tertiaryAnchorFraction,
+                        tertiaryLength,
+                        tertiaryAngleOffsetDegrees,
+                        tertiaryTargetFraction,
+                        tertiaryDirectionSign,
+                        structuredTertiaryGap,
+                        settings) +
+                    tertiaryTranslation * repairScale;
+                if (!HasRequiredHorizontalTripletStructure(
+                        primary.CenterXZ,
+                        primary.Length,
+                        primaryAngleOffsetDegrees,
+                        structuredSecondaryCenter,
+                        secondaryLength,
+                        secondaryAngleOffsetDegrees,
+                        structuredTertiaryCenter,
+                        tertiaryLength,
+                        tertiaryAngleOffsetDegrees,
+                        tripletLayout,
+                        settings))
+                {
+                    continue;
+                }
+
+                tripletStructureAccepted = true;
+                acceptedRepairPass = repairPass;
+                break;
             }
 
+            if (!tripletStructureAccepted)
+            {
+                failureReason =
+                    HorizontalCompanionTargetFailureReason.TripletStructure;
+                return false;
+            }
+            if (acceptedRepairPass > 0 && audit != null)
+            {
+                audit.TripletStructureRepair++;
+            }
+
+            secondaryTarget =
+                new HorizontalCompanionTarget(
+                    arrangement,
+                    structuredSecondaryCenter,
+                    secondaryLength,
+                    secondaryStrengthScale,
+                    secondaryAngleOffsetDegrees);
             tertiaryTarget =
                 new HorizontalCompanionTarget(
                     arrangement,
@@ -2538,7 +3079,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         }
 
         private static void ResolveStructuredPairContactPlan(
-            HorizontalCompanionPairLayout pairLayout,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
             float horizontalSign,
             float verticality,
             uint clusterHash,
@@ -2548,17 +3089,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float directionSign = horizontalSign < 0f ? -1f : 1f;
             switch (pairLayout)
             {
-                case HorizontalCompanionPairLayout.ShoulderContact:
+                case GroundPaintedAccentCompanionPairLayout.ShoulderContact:
                     anchorContactFraction =
                         Mathf.Lerp(0.34f, 0.04f, verticality) *
                         directionSign;
                     break;
-                case HorizontalCompanionPairLayout.OffsetEcho:
+                case GroundPaintedAccentCompanionPairLayout.OffsetEcho:
                     anchorContactFraction =
                         Mathf.Lerp(0.48f, 0.26f, verticality) *
                         directionSign;
                     break;
-                case HorizontalCompanionPairLayout.SteppedContinuation:
+                case GroundPaintedAccentCompanionPairLayout.SteppedContinuation:
                 default:
                     anchorContactFraction =
                         Mathf.Lerp(0.44f, 0.16f, verticality) *
@@ -2582,6 +3123,108 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     Mathf.Lerp(0.015f, 0.05f, verticality));
         }
 
+        private static bool TryRepairHorizontalPairStructure(
+            Vector2 primaryCenter,
+            float primaryLength,
+            float primaryAngleOffsetDegrees,
+            float secondaryLength,
+            float secondaryAngleOffsetDegrees,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
+            uint clusterHash,
+            FieldSettings settings,
+            ref Vector2 secondaryCenter,
+            out bool repaired)
+        {
+            repaired = false;
+            if (HasRequiredHorizontalPairStructure(
+                    primaryCenter,
+                    primaryLength,
+                    primaryAngleOffsetDegrees,
+                    secondaryCenter,
+                    secondaryLength,
+                    secondaryAngleOffsetDegrees,
+                    pairLayout,
+                    settings))
+            {
+                return true;
+            }
+
+            Vector2 pairNormal =
+                ResolveCompanionPairSharedNormal(
+                    primaryAngleOffsetDegrees,
+                    secondaryAngleOffsetDegrees,
+                    settings);
+            ResolveHorizontalPairStructureMinimums(
+                Mathf.Min(primaryLength, secondaryLength),
+                pairLayout,
+                settings,
+                out float minimumCenterStep,
+                out float minimumPairNormalSpan);
+            float currentSignedStep =
+                Vector2.Dot(secondaryCenter - primaryCenter, pairNormal);
+            float repairSign =
+                Mathf.Abs(currentSignedStep) > 0.0001f
+                    ? Mathf.Sign(currentSignedStep)
+                    : (Hash01(clusterHash, 659u) < 0.5f ? -1f : 1f);
+            float requiredStep =
+                Mathf.Max(minimumCenterStep, minimumPairNormalSpan) *
+                HorizontalPairStructureRepairMargin;
+            secondaryCenter +=
+                pairNormal *
+                (repairSign * requiredStep - currentSignedStep);
+            repaired = true;
+            return HasRequiredHorizontalPairStructure(
+                primaryCenter,
+                primaryLength,
+                primaryAngleOffsetDegrees,
+                secondaryCenter,
+                secondaryLength,
+                secondaryAngleOffsetDegrees,
+                pairLayout,
+                settings);
+        }
+
+        private static void ResolveHorizontalPairStructureMinimums(
+            float minimumLength,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
+            FieldSettings settings,
+            out float minimumCenterStep,
+            out float minimumPairNormalSpan)
+        {
+            float verticality =
+                Smooth01(settings.CompanionTripletVerticality);
+            bool shallowOffset =
+                pairLayout ==
+                GroundPaintedAccentCompanionPairLayout.ShallowOffset;
+            minimumCenterStep =
+                shallowOffset
+                    ? Mathf.Max(
+                        settings.StrokeWidthWorld *
+                        MaximumShallowPairStepWidthMultiplier *
+                        verticality,
+                        minimumLength *
+                        MinimumShallowPairCenterStepLengthFraction *
+                        verticality)
+                    : Mathf.Max(
+                        settings.StrokeWidthWorld *
+                        Mathf.Lerp(
+                            0f,
+                            MaximumPairStepWidthMultiplier,
+                            verticality),
+                        minimumLength *
+                        MinimumStructuredPairCenterStepLengthFraction *
+                        verticality);
+            minimumPairNormalSpan =
+                shallowOffset
+                    ? minimumLength *
+                      MinimumShallowPairSpanLengthFraction *
+                      verticality
+                    : Mathf.Max(
+                        settings.StrokeWidthWorld *
+                        Mathf.Lerp(0f, 4.5f, verticality),
+                        minimumLength * 0.22f * verticality);
+        }
+
         private static bool HasRequiredHorizontalPairStructure(
             Vector2 primaryCenter,
             float primaryLength,
@@ -2589,14 +3232,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Vector2 secondaryCenter,
             float secondaryLength,
             float secondaryAngleOffsetDegrees,
-            HorizontalCompanionPairLayout pairLayout,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
             FieldSettings settings)
         {
-            if (pairLayout == HorizontalCompanionPairLayout.FlatContinuation)
-            {
-                return true;
-            }
-
             float verticality =
                 Smooth01(settings.CompanionTripletVerticality);
             if (verticality <= 0.0001f)
@@ -2604,10 +3242,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 return true;
             }
 
-            Vector2 horizontalAxis =
-                ResolveSafeAxis(settings.VisualHorizontalAxis);
-            Vector2 verticalAxis =
-                new Vector2(-horizontalAxis.y, horizontalAxis.x);
+            Vector2 pairNormal =
+                ResolveCompanionPairSharedNormal(
+                    primaryAngleOffsetDegrees,
+                    secondaryAngleOffsetDegrees,
+                    settings);
             ResolveCompanionSegmentEndpoints(
                 primaryCenter,
                 primaryLength,
@@ -2623,47 +3262,44 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 out Vector2 secondaryStart,
                 out Vector2 secondaryEnd);
 
-            float verticalMin = float.PositiveInfinity;
-            float verticalMax = float.NegativeInfinity;
+            float pairNormalMin = float.PositiveInfinity;
+            float pairNormalMax = float.NegativeInfinity;
             AccumulateProjectedAxisExtent(
                 primaryStart,
-                verticalAxis,
-                ref verticalMin,
-                ref verticalMax);
+                pairNormal,
+                ref pairNormalMin,
+                ref pairNormalMax);
             AccumulateProjectedAxisExtent(
                 primaryEnd,
-                verticalAxis,
-                ref verticalMin,
-                ref verticalMax);
+                pairNormal,
+                ref pairNormalMin,
+                ref pairNormalMax);
             AccumulateProjectedAxisExtent(
                 secondaryStart,
-                verticalAxis,
-                ref verticalMin,
-                ref verticalMax);
+                pairNormal,
+                ref pairNormalMin,
+                ref pairNormalMax);
             AccumulateProjectedAxisExtent(
                 secondaryEnd,
-                verticalAxis,
-                ref verticalMin,
-                ref verticalMax);
+                pairNormal,
+                ref pairNormalMin,
+                ref pairNormalMax);
 
             float minimumLength = Mathf.Min(primaryLength, secondaryLength);
-            float minimumCenterStep =
-                Mathf.Max(
-                    settings.StrokeWidthWorld *
-                    Mathf.Lerp(0f, MaximumPairStepWidthMultiplier, verticality),
-                    minimumLength * 0.11f * verticality);
-            float minimumVerticalSpan =
-                Mathf.Max(
-                    settings.StrokeWidthWorld *
-                    Mathf.Lerp(0f, 4.5f, verticality),
-                    minimumLength * 0.22f * verticality);
-            float centerStep =
+            ResolveHorizontalPairStructureMinimums(
+                minimumLength,
+                pairLayout,
+                settings,
+                out float minimumCenterStep,
+                out float minimumPairNormalSpan);
+            float pairLocalCenterStep =
                 Mathf.Abs(
                     Vector2.Dot(
                         secondaryCenter - primaryCenter,
-                        verticalAxis));
-            return centerStep >= minimumCenterStep &&
-                   verticalMax - verticalMin >= minimumVerticalSpan;
+                        pairNormal));
+            return pairLocalCenterStep >= minimumCenterStep &&
+                   pairNormalMax - pairNormalMin >=
+                   minimumPairNormalSpan;
         }
 
         private static bool HasRequiredHorizontalTripletStructure(
@@ -2957,26 +3593,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         }
 
         private static Vector2 ResolveStructuredPairTranslation(
-            HorizontalCompanionPairLayout pairLayout,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
+            float primaryAngleOffsetDegrees,
+            float secondaryAngleOffsetDegrees,
             float minimumLength,
             float verticality,
             uint clusterHash,
             FieldSettings settings)
         {
-            Vector2 horizontalAxis =
-                ResolveSafeAxis(settings.VisualHorizontalAxis);
-            Vector2 verticalAxis =
-                new Vector2(-horizontalAxis.y, horizontalAxis.x);
+            Vector2 pairNormal =
+                ResolveCompanionPairSharedNormal(
+                    primaryAngleOffsetDegrees,
+                    secondaryAngleOffsetDegrees,
+                    settings);
             float layoutScale;
             switch (pairLayout)
             {
-                case HorizontalCompanionPairLayout.ShoulderContact:
+                case GroundPaintedAccentCompanionPairLayout.ShoulderContact:
                     layoutScale = 1.12f;
                     break;
-                case HorizontalCompanionPairLayout.OffsetEcho:
-                    layoutScale = 0.82f;
+                case GroundPaintedAccentCompanionPairLayout.OffsetEcho:
+                    layoutScale = OffsetEchoPairTranslationScale;
                     break;
-                case HorizontalCompanionPairLayout.SteppedContinuation:
+                case GroundPaintedAccentCompanionPairLayout.SteppedContinuation:
                 default:
                     layoutScale = 1f;
                     break;
@@ -2988,14 +3627,66 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 verticality;
             float lengthStep =
                 Mathf.Max(0f, minimumLength) *
-                0.18f *
+                StructuredPairTranslationLengthFraction *
                 verticality;
             float magnitude =
                 Mathf.Max(widthStep, lengthStep) *
                 layoutScale *
                 Mathf.Lerp(0.84f, 1.16f, Hash01(clusterHash, 607u));
             float sign = Hash01(clusterHash, 613u) < 0.5f ? -1f : 1f;
-            return verticalAxis * (magnitude * sign);
+            return pairNormal * (magnitude * sign);
+        }
+
+        private static Vector2 ResolveShallowPairTranslation(
+            float primaryAngleOffsetDegrees,
+            float secondaryAngleOffsetDegrees,
+            float minimumLength,
+            float verticality,
+            uint clusterHash,
+            FieldSettings settings)
+        {
+            Vector2 pairNormal =
+                ResolveCompanionPairSharedNormal(
+                    primaryAngleOffsetDegrees,
+                    secondaryAngleOffsetDegrees,
+                    settings);
+            float widthStep =
+                settings.StrokeWidthWorld *
+                MaximumShallowPairStepWidthMultiplier *
+                verticality;
+            float lengthStep =
+                Mathf.Max(0f, minimumLength) *
+                ShallowPairTranslationLengthFraction *
+                verticality;
+            float magnitude =
+                Mathf.Max(widthStep, lengthStep) *
+                Mathf.Lerp(0.88f, 1.12f, Hash01(clusterHash, 617u));
+            float sign = Hash01(clusterHash, 619u) < 0.5f ? -1f : 1f;
+            return pairNormal * (magnitude * sign);
+        }
+
+        private static Vector2 ResolveCompanionPairSharedNormal(
+            float primaryAngleOffsetDegrees,
+            float secondaryAngleOffsetDegrees,
+            FieldSettings settings)
+        {
+            Vector2 visualHorizontalAxis =
+                ResolveSafeAxis(settings.VisualHorizontalAxis);
+            Vector2 primaryAxis =
+                ResolveStrokeAxis(settings, primaryAngleOffsetDegrees);
+            Vector2 secondaryAxis =
+                ResolveStrokeAxis(settings, secondaryAngleOffsetDegrees);
+            if (Vector2.Dot(primaryAxis, visualHorizontalAxis) < 0f)
+            {
+                primaryAxis = -primaryAxis;
+            }
+            if (Vector2.Dot(secondaryAxis, visualHorizontalAxis) < 0f)
+            {
+                secondaryAxis = -secondaryAxis;
+            }
+
+            Vector2 sharedAxis = ResolveSafeAxis(primaryAxis + secondaryAxis);
+            return new Vector2(-sharedAxis.y, sharedAxis.x);
         }
 
         private static void ResolveStructuredTripletTranslations(
@@ -3266,8 +3957,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             CompositionCandidate primary,
             CompositionCandidate excludedCandidate,
             HorizontalCompanionTarget target,
-            FieldSettings settings)
+            FieldSettings settings,
+            out bool usedCrossRegion)
         {
+            usedCrossRegion = false;
             float maximumRelocation =
                 Mathf.Max(
                     settings.StrokeLengthMax *
@@ -3275,44 +3968,61 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     Vector2.Distance(primary.CenterXZ, target.CenterXZ) * 1.10f);
             float maximumRelocationSquared =
                 maximumRelocation * maximumRelocation;
-            CompositionCandidate selected = null;
-            float closestDistanceSquared = float.PositiveInfinity;
 
-            for (int index = 0; index < available.Count; index++)
+            for (int searchPass = 0; searchPass < 2; searchPass++)
             {
-                CompositionCandidate candidate = available[index];
-                if (object.ReferenceEquals(candidate, primary) ||
-                    object.ReferenceEquals(candidate, excludedCandidate) ||
-                    candidate.CompanionClusterIndex >= 0 ||
-                    candidate.Region.CoordinateKey !=
-                        primary.Region.CoordinateKey)
+                bool sameRegionOnly = searchPass == 0;
+                CompositionCandidate selected = null;
+                float closestDistanceSquared = float.PositiveInfinity;
+                for (int index = 0; index < available.Count; index++)
                 {
-                    continue;
+                    CompositionCandidate candidate = available[index];
+                    if (object.ReferenceEquals(candidate, primary) ||
+                        object.ReferenceEquals(candidate, excludedCandidate) ||
+                        candidate.CompanionClusterIndex >= 0)
+                    {
+                        continue;
+                    }
+
+                    bool sameRegion =
+                        candidate.Region.CoordinateKey ==
+                        primary.Region.CoordinateKey;
+                    if ((sameRegionOnly && !sameRegion) ||
+                        (!sameRegionOnly && sameRegion))
+                    {
+                        continue;
+                    }
+
+                    float relocationDistanceSquared =
+                        (candidate.CenterXZ - target.CenterXZ).sqrMagnitude;
+                    if (relocationDistanceSquared > maximumRelocationSquared)
+                    {
+                        continue;
+                    }
+
+                    if (relocationDistanceSquared <
+                            closestDistanceSquared - 0.000001f ||
+                        (Mathf.Abs(
+                             relocationDistanceSquared -
+                             closestDistanceSquared) <= 0.000001f &&
+                         selected != null &&
+                         CompareCompositionCandidatesBySource(
+                             candidate,
+                             selected) < 0))
+                    {
+                        selected = candidate;
+                        closestDistanceSquared = relocationDistanceSquared;
+                    }
                 }
 
-                float relocationDistanceSquared =
-                    (candidate.CenterXZ - target.CenterXZ).sqrMagnitude;
-                if (relocationDistanceSquared > maximumRelocationSquared)
+                if (selected != null)
                 {
-                    continue;
-                }
-
-                if (relocationDistanceSquared <
-                        closestDistanceSquared - 0.000001f ||
-                    (Mathf.Abs(
-                         relocationDistanceSquared -
-                         closestDistanceSquared) <= 0.000001f &&
-                     selected != null &&
-                     CompareCompositionCandidatesBySource(
-                         candidate,
-                         selected) < 0))
-                {
-                    selected = candidate;
-                    closestDistanceSquared = relocationDistanceSquared;
+                    usedCrossRegion = !sameRegionOnly;
+                    return selected;
                 }
             }
 
-            return selected;
+            return null;
         }
 
         private static bool TryReserveHorizontalCompanionCluster(
@@ -3326,8 +4036,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             HashSet<long> occupiedCells,
             FieldSettings settings,
             out HorizontalCompanionEnvelope envelope,
-            out long cellKey)
+            out long cellKey,
+            out HorizontalCompanionReservationFailureReason failureReason)
         {
+            failureReason = HorizontalCompanionReservationFailureReason.None;
             envelope =
                 BuildHorizontalCompanionEnvelope(
                     primary,
@@ -3344,6 +4056,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 if (envelope.Intersects(occupiedEnvelopes[index]))
                 {
                     cellKey = 0L;
+                    failureReason =
+                        HorizontalCompanionReservationFailureReason
+                            .EnvelopeCollision;
                     return false;
                 }
             }
@@ -3369,13 +4084,63 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     horizontalAxis,
                     verticalAxis,
                     cellSize);
-            return !occupiedCells.Contains(cellKey);
+            if (occupiedCells.Contains(cellKey))
+            {
+                failureReason =
+                    HorizontalCompanionReservationFailureReason.OccupiedCell;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void RecordHorizontalCompanionTargetFailure(
+            HorizontalCompanionCompositionAudit audit,
+            HorizontalCompanionTargetFailureReason failureReason)
+        {
+            if (audit == null ||
+                failureReason == HorizontalCompanionTargetFailureReason.None)
+            {
+                return;
+            }
+
+            audit.TargetPlanRejected++;
+            switch (failureReason)
+            {
+                case HorizontalCompanionTargetFailureReason.PairStructure:
+                    audit.PairStructureRejected++;
+                    break;
+                case HorizontalCompanionTargetFailureReason.TripletStructure:
+                    audit.TripletStructureRejected++;
+                    break;
+            }
+        }
+
+        private static void RecordHorizontalCompanionReservationFailure(
+            HorizontalCompanionCompositionAudit audit,
+            HorizontalCompanionReservationFailureReason failureReason)
+        {
+            if (audit == null)
+            {
+                return;
+            }
+
+            switch (failureReason)
+            {
+                case HorizontalCompanionReservationFailureReason
+                    .EnvelopeCollision:
+                    audit.EnvelopeCollision++;
+                    break;
+                case HorizontalCompanionReservationFailureReason.OccupiedCell:
+                    audit.OccupiedCell++;
+                    break;
+            }
         }
 
         private static void ResolveHorizontalCompanionAngles(
             CompositionCandidate primary,
             HorizontalCompanionArrangement arrangement,
-            HorizontalCompanionPairLayout pairLayout,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
             HorizontalCompanionTripletLayout tripletLayout,
             int requestedClusterSize,
             uint clusterHash,
@@ -3396,7 +4161,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 out _);
             if (requestedClusterSize == 2 &&
                 pairLayout !=
-                    HorizontalCompanionPairLayout.FlatContinuation)
+                    GroundPaintedAccentCompanionPairLayout.ShallowOffset)
             {
                 ResolveStructuredHorizontalCompanionPairAngles(
                     primary,
@@ -3503,7 +4268,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private static void ResolveStructuredHorizontalCompanionPairAngles(
             CompositionCandidate primary,
-            HorizontalCompanionPairLayout pairLayout,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
             uint clusterHash,
             float authoredAngleJitter,
             float authoredPrimaryAngleOffsetDegrees,
@@ -3546,13 +4311,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float layoutScale;
             switch (pairLayout)
             {
-                case HorizontalCompanionPairLayout.ShoulderContact:
+                case GroundPaintedAccentCompanionPairLayout.ShoulderContact:
                     layoutScale = 1f;
                     break;
-                case HorizontalCompanionPairLayout.OffsetEcho:
+                case GroundPaintedAccentCompanionPairLayout.OffsetEcho:
                     layoutScale = 0.62f;
                     break;
-                case HorizontalCompanionPairLayout.SteppedContinuation:
+                case GroundPaintedAccentCompanionPairLayout.SteppedContinuation:
                 default:
                     layoutScale = 0.78f;
                     break;
@@ -3892,6 +4657,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             HorizontalCompanionTarget secondaryTarget,
             CompositionCandidate tertiary,
             HorizontalCompanionTarget tertiaryTarget,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
             FieldSettings settings,
             int clusterIndex)
         {
@@ -3929,7 +4695,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 secondaryProfileSeed,
                 clusterIndex,
                 GroundPaintedAccentCompanionMemberRole.Secondary,
-                intendedClusterSize);
+                intendedClusterSize,
+                pairLayout);
 
             if (tertiary != null)
             {
@@ -3956,13 +4723,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     tertiaryProfileSeed,
                     clusterIndex,
                     GroundPaintedAccentCompanionMemberRole.Tertiary,
-                    intendedClusterSize);
+                    intendedClusterSize,
+                    GroundPaintedAccentCompanionPairLayout.None);
             }
 
             primary.CompanionClusterIndex = clusterIndex;
             primary.CompanionMemberRole =
                 GroundPaintedAccentCompanionMemberRole.Primary;
             primary.IntendedCompanionClusterSize = intendedClusterSize;
+            primary.CompanionPairLayout =
+                intendedClusterSize == 2
+                    ? pairLayout
+                    : GroundPaintedAccentCompanionPairLayout.None;
             primary.HasCompanionOrientation = true;
             primary.CompanionAngleOffsetDegrees =
                 primaryAngleOffsetDegrees;
@@ -3975,7 +4747,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int profileSeed,
             int clusterIndex,
             GroundPaintedAccentCompanionMemberRole companionMemberRole,
-            int intendedClusterSize)
+            int intendedClusterSize,
+            GroundPaintedAccentCompanionPairLayout pairLayout)
         {
             candidate.CenterXZ = target.CenterXZ;
             candidate.Length = target.Length;
@@ -3985,6 +4758,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             candidate.CompanionClusterIndex = clusterIndex;
             candidate.CompanionMemberRole = companionMemberRole;
             candidate.IntendedCompanionClusterSize = intendedClusterSize;
+            candidate.CompanionPairLayout =
+                intendedClusterSize == 2
+                    ? pairLayout
+                    : GroundPaintedAccentCompanionPairLayout.None;
             candidate.HasCompanionOrientation = true;
             candidate.CompanionAngleOffsetDegrees =
                 target.AngleOffsetDegrees;
@@ -4021,7 +4798,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return HorizontalCompanionTripletLayout.BrokenTerrace;
         }
 
-        private static HorizontalCompanionPairLayout
+        private static GroundPaintedAccentCompanionPairLayout
             ResolveHorizontalCompanionPairLayout(
                 uint clusterHash,
                 float verticality)
@@ -4033,22 +4810,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             if (roll >= structuredProbability ||
                 structuredProbability <= 0.0001f)
             {
-                return HorizontalCompanionPairLayout.FlatContinuation;
+                return GroundPaintedAccentCompanionPairLayout.ShallowOffset;
             }
 
             float structuredRoll =
                 roll / Mathf.Max(0.0001f, structuredProbability);
             if (structuredRoll < 0.46f)
             {
-                return HorizontalCompanionPairLayout.SteppedContinuation;
+                return GroundPaintedAccentCompanionPairLayout.SteppedContinuation;
             }
 
             if (structuredRoll < 0.79f)
             {
-                return HorizontalCompanionPairLayout.ShoulderContact;
+                return GroundPaintedAccentCompanionPairLayout.ShoulderContact;
             }
 
-            return HorizontalCompanionPairLayout.OffsetEcho;
+            return GroundPaintedAccentCompanionPairLayout.OffsetEcho;
         }
 
         private static HorizontalCompanionArrangement
@@ -4453,8 +5230,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundHeightFieldSnapshot baseSurface,
             GroundSurfaceFeatureRecipe feature,
             FieldSettings settings,
-            Vector2Int patchCoordinate)
+            Vector2Int patchCoordinate,
+            out double candidateBuildMilliseconds,
+            out double regionalWeightingMilliseconds)
         {
+            long candidateBuildStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            long regionalWeightingTicks = 0L;
+            float compositionRegionScale =
+                ResolveCompositionRegionScale(settings);
             int desiredCandidateCount =
                 Mathf.Max(
                     settings.TargetStrokeCount,
@@ -4509,8 +5293,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             settings.Seed);
                     float semanticWeight =
                         Mathf.Lerp(0.45f, 1f, semanticSupport);
+                    long regionalWeightingStartedAt =
+                        System.Diagnostics.Stopwatch.GetTimestamp();
+                    CompositionRegion region =
+                        ResolveCompositionRegion(
+                            distributionSamplePosition,
+                            settings,
+                            compositionRegionScale);
+                    float regionalSelectionMultiplier =
+                        region.SelectionMultiplier;
+                    regionalWeightingTicks +=
+                        System.Diagnostics.Stopwatch.GetTimestamp() -
+                        regionalWeightingStartedAt;
                     float selectionWeight =
-                        Mathf.Max(0.001f, patchWeight * semanticWeight);
+                        Mathf.Max(
+                            0.001f,
+                            patchWeight *
+                            semanticWeight *
+                            regionalSelectionMultiplier);
                     float selectionRoll =
                         Mathf.Max(0.000001f, Hash01((uint)cellHash, 43u));
                     float priority =
@@ -4525,10 +5325,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             priority,
                             patchWeight,
                             semanticSupport,
-                            selectionWeight));
+                            selectionWeight,
+                            region));
                 }
             }
 
+            regionalWeightingMilliseconds =
+                regionalWeightingTicks * 1000d /
+                System.Diagnostics.Stopwatch.Frequency;
+            candidateBuildMilliseconds =
+                ResolveElapsedMilliseconds(candidateBuildStartedAt);
             return candidates;
         }
 
@@ -5098,6 +5904,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return (value & 0x00FFFFFFu) / 16777215f;
         }
 
+        private static double ResolveElapsedMilliseconds(long startedAt)
+        {
+            long elapsedTicks =
+                System.Diagnostics.Stopwatch.GetTimestamp() - startedAt;
+            return elapsedTicks * 1000d /
+                   System.Diagnostics.Stopwatch.Frequency;
+        }
+
         private readonly struct FieldSettings
         {
             private FieldSettings(
@@ -5240,20 +6054,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         : 0.65f;
                 float distributionPatchScale =
                     feature != null
-                        ? feature.PaintedAccentDistributionPatchScale
+                        ? feature.PaintedAccentDistributionScale
                         : 9f;
                 float distributionPatchiness =
                     feature != null
-                        ? feature.PaintedAccentDistributionPatchiness
+                        ? feature.PaintedAccentDistributionContrast
                         : 0.70f;
                 float distributionSparseFloor =
                     feature != null
                         ? feature.PaintedAccentDistributionSparseFloor
-                        : 0.18f;
+                        : 0.19f;
                 float compositionRegionScale =
                     feature != null
                         ? feature.PaintedAccentCompositionRegionScale
-                        : 4f;
+                        : 5f;
                 float compositionDensityContrast =
                     feature != null
                         ? feature.PaintedAccentCompositionDensityContrast

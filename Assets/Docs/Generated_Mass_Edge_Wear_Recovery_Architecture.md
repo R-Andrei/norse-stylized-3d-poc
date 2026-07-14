@@ -39,7 +39,7 @@ BoundedSingleEdgePreview
 
 `LegacyDiagnosticAudit` is editor-only, explicit, single-object, clone-only evidence. It does not apply generated mesh data to the component, recook the collider, refresh the stable world fingerprint, or notify the geometry registry.
 
-`BoundedSingleEdgePreview` is editor-only and evaluates one selected source edge through a direct local solve: the selected support line receives the requested width while each endpoint-adjacent support line remains at zero offset. It does not use the shared multi-edge corner solution or an infinite edge plane, geometrically modifies only the two owner faces, and adds exact graph-owned collinear boundary subdivisions to endpoint-adjacent non-owner faces for watertight local caps. It has its own transient mesh identity so lifecycle reuse cannot treat it as production.
+`BoundedSingleEdgePreview` is editor-only and evaluates one selected source edge through a direct local solve: the selected support line receives the requested width while each endpoint-adjacent support line remains at zero offset. It does not use the shared multi-edge corner solution or an infinite edge plane. It clips the two owner faces and the two endpoint-adjacent support faces, removes both original edge endpoints from the support boundaries, and emits one bounded bevel polygon with no separate endpoint caps. It has its own transient mesh identity so lifecycle reuse cannot treat it as production.
 
 This separation is mandatory. `OnEnable`, `OnValidate`, script reload, and Play Mode transitions may reconstruct a transient production mesh, but they may not run any diagnostic mode implicitly.
 
@@ -55,11 +55,11 @@ Both approaches are rejected as final geometry:
 
 The current bounded prototype solves the selected edge independently:
 
-> For one selected source edge, offset only that edge on each owner face, keep each endpoint-adjacent edge at zero offset, intersect those support lines to obtain four rail points that lie on exact original adjacent boundaries, clip only the two convex owner faces against their local rail lines, emit exactly one bevel polygon between the rails, and close each endpoint with one local bounded cap.
+> For one selected source edge, offset only that edge on each owner face, keep each endpoint-adjacent edge at zero offset, intersect those support lines to obtain four rail points that lie on exact original adjacent boundaries, clip the two convex owner faces, replace each endpoint-support source vertex with its two ordered rail points, and emit exactly one bevel polygon between the rails.
 
-Unity rejected reuse of the normal multi-edge corner solution for isolated closure: neighbouring bevel offsets move the shared corner into the owner-face interior, so it no longer belongs to the original adjacent boundary required by the prototype endpoint cap. The selected edge therefore uses a bounded deterministic width-backoff solve with all neighbouring offsets fixed at zero. Owner faces must not be reconstructed by manually splicing rail points into the source loop; each owner is intersected with a local in-plane half-plane so convexity is preserved by construction.
+Unity rejected reuse of the normal multi-edge corner solution for isolated closure: neighbouring bevel offsets move the shared corner into the owner-face interior, so it no longer belongs to the original endpoint-adjacent boundaries required by the isolated prototype. The selected edge therefore uses a bounded deterministic width-backoff solve with all neighbouring offsets fixed at zero. Owner faces must not be reconstructed by manually splicing rail points into the source loop; each owner is intersected with a local in-plane half-plane so convexity is preserved by construction. Endpoint-support faces are different: each removes exactly one source corner and replaces it with the two canonical rails already lying on its incident boundaries.
 
-No unrelated source face may change its planar surface. Topology-only collinear boundary subdivision is permitted where a rail endpoint lies on that face so the local endpoint cap shares the exact same segment. No infinite bevel or junction plane participates in the bounded preview.
+No unrelated source face may change its planar surface. The only intended source-face changes are the two owner clips and the two endpoint-support corner clips. No infinite bevel or junction plane participates in the bounded preview.
 
 ## Authoritative inputs
 
@@ -87,17 +87,19 @@ source convex polygon faces
     -> solve the selected edge directly with only its support line offset
     -> deterministically back off width until all four rail points lie inside their exact adjacent source-edge segments
     -> bind each rail point to its graph-owned endpoint-adjacent source face and segment
-    -> split those four exact non-owner boundaries at the rail points
+    -> pair the two rails at each endpoint to one exact graph-owned support face
+    -> replace endpoint-support source vertex A with its ordered rail pair
+    -> replace endpoint-support source vertex B with its ordered rail pair
     -> clip owner face A against rail A in its own plane
     -> clip owner face B against rail B in its own plane
     -> emit one bounded bevel polygon between the rails
-    -> emit one bounded endpoint-cap triangle at each source endpoint
+    -> emit no endpoint-cap polygons
     -> preserve every unrelated source face surface unchanged
     -> one final polygon sanitation/conformity/seam pass
-    -> orient only the generated bevel and endpoint caps outward from the original solid centre
+    -> orient the generated bevel outward from the original solid centre
     -> certify zero remaining generated-face winding failures
     -> certify provenance counts and rail fidelity
-    -> certify polygon topology, bounds, and retained volume with separate evidence
+    -> certify polygon topology, source-solid containment, result-global convexity, face intersections, bounds, and retained volume with separate evidence
     -> classify convexity on temporary duplicate/collinear-reduced loops
     -> triangulate every segment of the unchanged audited boundaries
     -> certify exact triangle topology, winding, bounds, and volume
@@ -220,7 +222,7 @@ Each solved rail point carries explicit ownership:
 - adjacent graph edge;
 - opposite target graph/source face containing that adjacent boundary.
 
-Boundary subdivision uses this topology directly. It may not search unrelated source segments by geometric proximity.
+Endpoint-support clipping uses this topology directly. It may not search unrelated source segments by geometric proximity.
 
 The prototype must produce:
 
@@ -228,16 +230,17 @@ The prototype must produce:
 - owner face A clipped locally by `a0 -> b0`;
 - owner face B clipped locally by `a1 -> b1`;
 - exactly one bounded bevel polygon `a0 -> b0 -> b1 -> a1`;
-- exactly one endpoint cap at source vertex A;
-- exactly one endpoint cap at source vertex B;
-- one collinear boundary subdivision for each of `a0`, `b0`, `a1`, and `b1` on its graph-owned endpoint-adjacent non-owner source face;
+- endpoint-support face A with its source vertex replaced by the ordered pair `a0/a1`;
+- endpoint-support face B with its source vertex replaced by the ordered pair `b0/b1`;
+- zero endpoint-cap polygons;
+- exactly four intended source-face modifications: two owners and two endpoint supports;
 - zero geometric surface changes to unrelated source faces.
 
-The non-owner subdivisions are topological only: normalizing away collinear vertices must recover the original source polygon exactly. They are necessary because each local endpoint cap edge must be shared by the adjacent source face rather than ending as a T-junction.
+The support clips remove the triangular source corners rather than covering them with duplicate coplanar triangles. Each new support-face rail edge is shared directly with the bevel, so no cap or T-junction is required.
 
-EW-B1.3 canonicalizes every accepted rail to the exact graph-owned target boundary segment before any geometry is built. The canonical point must remain within tolerance of the analytical owner and target face planes, and the same position is authoritative for all downstream bounded geometry. Convexity certification may remove intentional collinear subdivision points from a temporary check loop only; the audited shell retains them for watertight topology.
+EW-B1.3 canonicalizes every accepted rail to the exact graph-owned target boundary segment before any geometry is built. The canonical point must remain within tolerance of the analytical owner and target face planes, and the same position is authoritative for all downstream bounded geometry. Convexity certification may simplify duplicate or collinear points only on temporary classification loops; emitted support and owner boundaries retain every real rail segment required for watertight topology.
 
-The endpoint caps are an intentionally local prototype closure. They validate that bounded geometry can remain watertight without an infinite plane. They are not the final multi-bevel vertex-cap representation.
+The earlier endpoint-cap closure is rejected. It duplicated the corner area retained by the support face and produced positive volume plus the visible inward triangular crease. Higher-valence endpoint reconstruction remains deferred to the later multi-edge vertex-cap stage.
 
 Preparation must retain face/provenance evidence across input validation, welding, boundary conformity, seam repair, and final validation. A failure must identify its stage, exact face index, provenance kind/index, and polygon failure category rather than reporting a generic owner-convexity message.
 
@@ -249,7 +252,7 @@ targetBoundaries = 4
 ownerClips = 2
 boundarySubdivisions = 4
 bevelFaces = 1
-endpointCaps = 2
+endpointCaps = 0
 modifiedSourceFaces = 2
 foreignSourceFacesModified = 0
 railDeviation <= tolerance
@@ -428,3 +431,449 @@ EW-B1.5 proved one complete bounded shell on source edge `11`: `19` faces triang
 Numerical preparation is part of the audited geometry state. A prepared bounded shell must therefore be compared against a source baseline that has passed through the same deterministic polygon copy, weld, boundary conformity, seam repair, and final validation stages. The raw source remains the strict bounds authority and remains fully reported, but retained-volume validity uses the prepared source volume. The accepted interval remains unchanged at `0.75 < result/preparedSource <= 1.0001`.
 
 Generated Mass geometry diagnostics follow a cumulative evidence rule. When an unresolved blocker needs more evidence, new structured fields are added without deleting earlier still-relevant fields. Result preparation and source preparation independently report cardinality, topology, numerical repair, volume drift, and exact failure provenance. Bounds and volume report raw, prepared, and result states plus margins. This remains one structured record per physical evaluation; exhaustive telemetry must not become per-face or repeated lifecycle Console spam.
+
+## EW-B1.5R2 diagnostic certification
+
+EW-B1.5R1 proved the positive retained-volume delta is construction-level rather than numerical preparation drift. EW-B1.5R2 therefore does not alter bevel geometry. It certifies the missing facts: local edge convexity, source-shell convexity, result containment against every original source plane, bevel-plane sidedness, and signed volume contribution by provenance. Topology-valid shells are triangulated even when retained-volume certification fails so polygon and triangle volume can be compared independently, but rejected geometry is never published as a preview.
+
+The AABB containment record remains useful but is explicitly coarse. Source-solid containment is the per-source-plane half-space test. Candidate classification is diagnostic-only until the representative edges prove whether concave or orientation-invalid edges are entering the bounded path.
+
+
+## EW-B1.6 endpoint closure correction
+
+The prior bounded prototype's endpoint-cap architecture is superseded. In the old shell, each endpoint-adjacent source face retained the original source vertex and merely received two collinear rail subdivisions, while a separate triangle covered the same corner region. That produced coplanar face duplication, positive signed-volume contribution, and the visible inward triangular/multi-surface crease even though edge incidence appeared manifold.
+
+The corrected single-edge shell is:
+
+1. clip both selected-edge owner faces to their solved longitudinal rails;
+2. at endpoint A, replace the original support-face vertex with the ordered pair `a0, a1`;
+3. at endpoint B, replace the original support-face vertex with the ordered pair `b1, b0` according to that support face's own boundary order;
+4. emit one bevel quad `a0 → b0 → b1 → a1`;
+5. emit no endpoint-cap polygons.
+
+Each bevel endpoint edge is therefore shared directly by the bevel and one clipped support face. The prototype accepts this closure only when both endpoint rails identify the same exact graph-owned support face and its two incident source edges. Higher-valence or ambiguous endpoint layouts are rejected and deferred to bounded multi-edge vertex reconstruction.
+
+EW-B1.6 also adds two shell-level gates absent from the earlier audit: every result vertex must lie inside every outward result-face plane, and no two face interiors may overlap or intersect improperly. The earlier undirected edge-incidence audit remains necessary but is no longer treated as sufficient proof of a valid solid.
+The bounded prototype now also requires `resultVolume <= preparedSourceVolume`; the former `1.0001` allowance is removed because a full-edge bevel is a subtractive operation. Endpoint telemetry retains the exact source and rail positions, support-plane normals, graph-edge parameters, and residuals so any future closure failure can be diagnosed from one evaluation record.
+
+
+## EW-B1.6R1 prepared-baseline certification
+
+EW-B1.6 proved that endpoint-support clipping produces a closed, convex, contained, subtractive shell, but its first validation run never reached triangulation because two audits compared unlike states. Source-face change certification compared a numerically prepared result against the raw source shell, and face-intersection certification treated every result-only detector pair as newly introduced without auditing the prepared source.
+
+EW-B1.6R1 leaves the bounded geometry unchanged. The authoritative source-face modification comparison is prepared source versus prepared result; the prior raw comparison remains cumulative telemetry. Face intersections are audited identically on both prepared shells and keyed by stable face provenance. The audit records complete source, result, unchanged, changed, new, and resolved pair sets, including coplanarity, shared vertices, shared boundary edges, source-graph adjacency, and boundary-contact evidence. Preview adoption rejects only a newly introduced or materially changed pair with no actual shared boundary contact. Absolute detector pairs that already exist in the prepared source remain diagnostic evidence rather than being misattributed to the bevel.
+
+This correction is deliberately not a geometry patch. It exists to let the already-subtractive one-bevel/no-cap construction reach triangulation when the source-to-result delta is clean, so visual inspection can finally determine whether the original inward multi-surface crease has been removed.
+
+## EW-B1.6R2 provenance-preserving source-baseline certification
+
+EW-B1.6R1 established equivalent prepared comparison domains but exposed that the untouched source baseline entered preparation without `SourceFace:i` provenance. The prepared-source face-change audit therefore skipped every baseline face, and intersection delta keys could not match the same physical source pair between source and result.
+
+EW-B1.6R2 clones the untouched source polygons with explicit source-face provenance before calling the shared bounded preparation pipeline. The attributed raw clone drives the historical raw face-change comparison; the original raw shell remains the authority for geometric bounds, volume, containment, and source-solid tests. Prepared source and prepared result now carry the same stable identities through source-change and intersection-delta certification.
+
+A cumulative provenance audit independently certifies the attributed raw source, prepared source, and result. Each state must contain exactly one valid `SourceFace:i` identity for every original source face, with no missing, duplicate, out-of-range, or null records. Generated bounded faces are permitted only as separately attributed non-source records. Provenance failure is an explicit blocker and may never degrade into a misleading zero-modification result.
+
+This patch changes no bounded bevel geometry. It exists to allow the subtractive one-quad/no-cap construction to reach triangulation only after its comparison identities are complete and unique.
+
+## EW-B2 unified all-edge preview architecture
+
+The primary editor workflow is one `Rebuild Edge-Wear Bevel Preview` action. It runs retained corner and plane-cut diagnostics for evidence, evaluates all eligible bounded edge rails, and publishes only a certified unified bounded result. The superseded plane-cut mesh is diagnostic-only and may not become the displayed preview.
+
+The unified prototype must not merge complete single-edge replacement rocks. It constructs one shared result from untouched source vertices and active rail points so each affected source face and vertex junction is represented once. The first EW-B2 implementation tests a point-cloud convex-hull reconstruction. This is an experiment until it emits certified faces; the isolated single-edge architecture remains the proven geometry baseline.
+
+## EW-B2.1 diagnostic storage and failure localization
+
+Unified hull evaluation carries an explicit stage:
+
+```text
+CandidateEvaluation
+PointCloud
+PlaneExtraction
+FacetOrdering
+FacetSanitation
+FacetClassification
+Preparation
+TopologyCertification
+Triangulation
+Complete
+```
+
+Every failure records both `stage` and `failureStage` before returning. Active rail-solved plans are counted before hull reconstruction. Plane extraction records triple classification and plane creation/merge/prune counts even on failure. Facet construction records the exact failed plane, support points, ordered and sanitized boundary sizes, area, convexity result, and reason.
+
+The Unity Console receives one bounded, high-value summary with the blocker first. Exhaustive point, rail, face, plane-diagnostic, provenance, and intersection evidence is rewritten on every evaluation to:
+
+```text
+Library/GeneratedMassEdgeWearTelemetry.txt
+```
+
+The file is editor-only diagnostic output and is not a serialized asset or production dependency. Console truncation must never again hide the decisive blocker. The combined geometry algorithm is intentionally unchanged in EW-B2.1; the next geometry decision is made only after the exact hull stage is observed.
+
+
+## EW-B2.2 normalization-safe combined-hull plane extraction
+
+The combined point-cloud hull must never rely on `Vector3.Normalize()` to decide whether a seed triangle is geometrically usable. `TryBuildBoundedConvexHullPlanes` now measures the raw cross-product magnitude, rejects clearly degenerate and near-degenerate seeds separately, and divides explicitly only after passing a scale-aware threshold with a `PointMergeDistance` hard floor.
+
+Each retained `BoundedHullPlane` carries its seed triple, seed cross magnitude, and merged seed-magnitude range. Candidate insertion requires a finite unit normal, finite distance, and at least three supporting points. Before facet ordering, a final invariant pass certifies every plane's normal length, distance, support indices, support residuals, and non-degenerate planar rank. Any survivor that violates those invariants fails at `PlaneExtraction`; malformed data must not leak into `FacetOrdering`.
+
+The Console retains only aggregate threshold and failure evidence. Complete per-plane seeds, normals, distances, and support-point sets are written to `Library/GeneratedMassEdgeWearTelemetry.txt`. Rail solving, point-cloud membership, facet geometry, and bevel selection are unchanged in EW-B2.2.
+
+## EW-B1.7 one-surface bevel render contract
+
+The non-negotiable local output is one planar bevel polygon. Polygon provenance alone is not sufficient certification. The previous bounded implementation created one `BoundedEdgeBevel` quad but triangulated every polygon through a centre fan. A four-vertex bevel consequently became four render triangles around an inserted centre vertex. Generated Mass mesh output then recalculated each triangle normal independently, supplied no explicit mesh normals, and seeded material variation from each duplicated triangle-soup vertex index. The internal fan therefore introduced both lighting and colour/mask discontinuities, producing the visible four-surface inward crease even though telemetry reported `bevelFaces:1`.
+
+A bounded bevel region now has this render contract:
+
+1. one `BoundedEdgeBevel` polygon owns the complete outlined region;
+2. its full boundary lies on one authoritative `PolygonFace.Normal` plane;
+3. triangulation emits exactly `n - 2` direct triangles and no centre fan vertex;
+4. every emitted triangle carries the same authoritative surface normal;
+5. every emitted triangle carries the same authored surface-group key, so duplicated vertices cannot create material seams inside the polygon;
+6. `MeshData.Normals` is complete, so Unity does not replace the authored bevel normal through recalculation;
+7. region telemetry certifies polygon count, boundary size, triangle count, authored-normal coverage, authored surface-group coverage, fan-vertex count, plane residual, geometric-normal deviation, and exact failure provenance.
+
+For the current quad this means two triangles sharing one normal. The diagonal is only a GPU implementation edge and must have no lighting or geometric fold. The separate point-cloud all-edge experiment remains rejected as a complete reconstruction because it suppressed fourteen of fifteen solved edges; EW-B1.7 changes only the local surface representation.
+
+## EW-B3 authoritative all-edge one-surface rebuild
+
+The authoritative editor rebuild no longer invokes the experimental point-cloud convex-hull path. `MassGenerator.EdgeWear.Orchestration.cs` obtains one shared corner-aware width solution, calls `AuditPlaneCutBevelKernel`, and publishes that complete edge-only shell directly when certification succeeds. `MassGenerator.EdgeWear.BoundedAllEdges.cs` is retained only as historical rejected implementation evidence and is not executed by the normal preview workflow.
+
+This is a deliberate reclassification of the edge-only plane shell. Earlier visual inspection interpreted the long narrow region as several bevel faces. EW-B1.7 proved that one four-vertex bevel polygon had been centre-fan triangulated into four independently shaded render triangles. The plane-band audit already reported one retained face per built edge and zero split/interrupted/foreign-cut/collapsed bands. With direct one-surface triangulation, authored normals, and authored surface groups, the edge-only shell is now the simplest complete simultaneous convex reconstruction.
+
+`TryTriangulateBoundedPreviewFaces` is the shared final surface contract for both:
+
+```text
+PolygonFaceProvenanceKind.BoundedEdgeBevel
+PolygonFaceProvenanceKind.EdgeBevelPlane
+```
+
+Every such polygon:
+
+- remains one analytical polygon;
+- is triangulated without an inserted centre vertex;
+- uses a stable existing boundary vertex as direct-fan anchor;
+- searches all boundary anchors when necessary to avoid degenerate direct triangles;
+- writes one authoritative polygon normal across all emitted triangles;
+- writes one stable surface-group identity across all emitted triangles;
+- must pass one-plane residual and rendered-normal certification.
+
+The all-edge shell additionally requires:
+
+```text
+BandRetainedEdgeCount == PlanesBuilt
+BandSingleFaceCount == PlanesBuilt
+BevelRegionFaceCount == PlanesBuilt
+BevelRegionRenderValid == 1
+```
+
+Conflict handling remains explicit. The edge-only builder may defer an attributed incompatible edge through its bounded conflict pass, but it may not silently suppress a plane merely because a point-cloud hull discarded its rail points. The compact audit lists active, built, and deferred source-edge indices. `MaterializedEdgeCoverageValid` is separate from geometric validity and is true only when `PlanesBuilt == ActiveEdgeCount`.
+
+The single editor action remains `Rebuild Edge-Wear Bevel Preview`. It writes one concise `GeneratedMass all-edge bevel rebuild audit` record and rewrites `Library/GeneratedMassEdgeWearTelemetry.txt` with the complete authoritative audit. No old plane-cut preview button, bounded-edge cycling button, or point-cloud hull button is exposed.
+
+## EW-B3.1 staged all-edge certification telemetry
+
+The authoritative edge-plane shell retains its geometry unchanged. `MassGenerator.EdgeWear.PlaneCutKernel.cs` now captures six deterministic polygon-stage snapshots:
+
+```text
+AfterPlaneConstruction
+AfterSanitation
+AfterWeld
+AfterBoundaryConformity
+AfterSeamRepair
+FinalCertification
+```
+
+Each snapshot carries topology and face-quality invariants. The first stage with an open edge and the first stage with a non-planar edge-wear face are retained independently. Generated-face identity is stable through `PolygonFaceProvenanceKind` and provenance index; an edge-plane bevel is therefore diagnosed as `EdgeBevelPlane:<sourceEdge>`, and a junction cap as `VertexJunctionPlane:<sourceVertex>`.
+
+Final face-quality failure records contain the complete failed polygon boundary with a signed residual for every vertex, the exact residual/spread thresholds, offending vertex and boundary segment, authored/measured normals, area, minimum edge length, and preparation-touch evidence. Final open-edge records resolve their owner, nearest source vertex, incident built bevels, expected boundary or junction neighbour, nearest reversed segment, and mismatch distance. Vertex-junction coverage is reported for every source vertex touched by the retained bevel set.
+
+`MassGenerator.EdgeWear.Diagnostics.Logging.cs` emits one bounded Console record. It places `primaryFailure` first, followed by the stage timeline and capped examples. The full failure set is written to `Library/GeneratedMassEdgeWearTelemetry.txt` in named sections. This telemetry is diagnostic-only and must not be used to weaken planarity, topology, one-surface, or complete-coverage gates.
+
+## EW-B3.2 plane-exact clipping and radius welding
+
+EW-B3.1 localized two independent numerical faults at `AfterPlaneConstruction`. `EdgeBevelPlane:17` inherited one vertex with an authored-plane residual of `6.68764114E-05`, which is inside the clipping classification tolerance but outside the strict face-planarity tolerance. Separately, two reversed source-face boundary pairs remained open despite endpoint mismatch of only `5.96046448E-08`, because rounded `VertexKey` identity is not equivalent to the declared Euclidean `PointMergeDistance` contract.
+
+The authoritative edge-plane shell therefore uses an explicit numerical construction contract:
+
+1. A genuine signed-distance crossing is solved on the source edge and the result is projected onto the analytical cut plane.
+2. A tolerance-only inside/outside transition with no strict crossing selects the nearer endpoint and projects it onto the cut plane; an off-plane tolerated endpoint is never inserted directly into a bevel cap.
+3. The same projected point is stored in the shared-intersection cache and cap-point set.
+4. All cap points are projected again before deduplication. A sanitized cap is emitted only when its maximum residual is no greater than `PointMergeDistance * 0.25`.
+5. Shared shell vertices are canonicalized by actual Euclidean distance under `PointMergeDistance`, with deterministic first-point ownership and no averaging.
+
+This behavior is opt-in through `PlaneCutNumericalRepairTelemetry` and is enabled by the authoritative all-edge shell. Legacy clipping callers retain their previous behavior until separately audited. The stage timeline and failure dossiers remain authoritative. Numerical telemetry records both the repair work and its maximum movement so a successful result cannot hide an excessive snap.
+## EW-B3.3 strict sequential clipping contract
+
+EW-B3.2 proved that radius welding is correct and closed both numerical source-face seams, but its tolerance-only projected fallback is rejected. The reference run contained one fallback with `maxProjection:6.70406152E-05`; the resulting `EdgeBevelPlane:16` polygon had a matching `minEdge:6.70406152E-05`, residual `6.60419464E-05`, and `88.973671°` normal spread. The fallback emitted a projected endpoint and retained the original endpoint because the broad removal epsilon classified it as inside, producing a tiny off-plane hook in an existing bevel face.
+
+The authoritative exact shell now separates removal tolerance from final geometric classification:
+
+1. `PointMergeDistance * 0.25` defines strict `Inside`, `OnPlane`, and `Outside` states.
+2. Only a genuine `Inside ↔ Outside` edge emits an analytical segment-plane intersection.
+3. `Outside ↔ Outside` emits nothing. Same-side endpoint projection is forbidden.
+4. `OnPlane` endpoints may be snapped only within the strict tolerance.
+5. A sequential intersection must satisfy both the current cut plane and the owner face’s authored plane. Raw segment interpolation is retained when it already satisfies both; otherwise a closest two-plane correction is attempted.
+6. Cached intersections are revalidated against both planes before reuse.
+7. Collected cap points are validated, not globally reprojected. A failed residual aborts the cut transaction.
+8. Any strict classification, denominator, cache, plane-residual, or cap invariant failure aborts the current cut before the polyhedron is replaced.
+9. Deterministic true-distance welding from EW-B3.2 remains authoritative.
+
+`PlaneCutNumericalRepairTelemetry` remains one cumulative record per physical evaluation. It now distinguishes classifications, on-plane snaps, genuine crossings, prohibited fallback attempts, two-plane corrections, owner/cut residuals, cap validation, exact construction failures, and the first stable owner/cut provenance failure. The six-stage EW-B3.1 timeline and complete failed-face/topology dossiers remain unchanged.
+
+## Maximum Coverage contract — EW-B4.1
+
+The accepted EW-B3.3 edge-plane shell can construct many simultaneous one-surface bevels with closed topology and exact planarity. Coverage selection is now separated into two layers:
+
+1. **Structural eligibility** determines whether an edge can legitimately be beveled. The edge must have exactly two owner faces, finite usable normals, a segment longer than `max(PointMergeDistance * 4, maximumDimension * 0.00001)`, a valid outward orientation, a convex bounded-edge classification, and a non-coplanar owner-face relationship.
+2. **Artistic preference** ranks structural edges by the established relative-length, face-angle, vertical/base suppression, random, upward-facing, and edge-character terms.
+
+For Coverage below its maximum, the historic artistic filters and score ordering remain authoritative. At maximum Coverage, artistic filters no longer remove structurally eligible edges; every structurally eligible edge enters the selected set. This applies to the complete rock and is independent of the current camera.
+
+`materializedCoverage` has a stronger meaning in maximum mode. It is true only when:
+
+```text
+structurallyEligible == selected
+selected == built
+widthInactive == 0
+deferred == 0
+rejected == 0
+unmapped == 0
+```
+
+EW-B4.1 intentionally does not change the corner-width solver or locality deferral. A structurally selected edge may therefore still report `width-inactive`, `plane-locality-deferred`, `shell-conflict-deferred`, or `plane-rejected`. EW-B4.2 must resolve those exact measured categories through coordinated width reduction or a narrowly proven locality correction.
+
+### Edge lifecycle telemetry
+
+One `EdgeWearEdgeLifecycleRecord` is retained per source edge for the physical evaluation. Each record carries stable graph-edge identity, endpoints, owner-face evidence, length, dihedral, vertical position, structural classification, artistic status, candidate reason, selection, solved width, active state, plane result, and final reason. The Console reports compact aggregate counts and exact failure-category ID sets. The overwritten telemetry file includes one lifecycle line per source edge.
+
+The former explicit-junction coverage summary is retained only as a labelled legacy heuristic. The authoritative edge-plane shell is judged by closed topology, manifold incidence, T-junction absence, face quality, one-surface rendering, bounds, and volume—not by whether obsolete explicit junction-cap faces were emitted.
+
+
+## EW-B4.2 maximum-Coverage conflict contract
+
+Maximum Coverage is now a complete-materialization mode. The edge-plane shell must retain every structurally selected candidate throughout conflict solving. The lower-Coverage artistic path may retain the historical deterministic candidate-deferral policy, but maximum Coverage may not.
+
+When `AuditPlaneCutBandIntegrity` identifies a victim edge, foreign edge, or offending source vertex, the maximum-Coverage solver constructs one local cluster from those seed edges and all selected edges incident to their endpoints. It then moves every reducible cluster plane toward its source edge by a shared bounded scale step and rebuilds the complete shell.
+
+Plane reduction preserves:
+
+- the existing bevel-plane normal;
+- source-edge provenance;
+- positive source-edge removal;
+- the strict owner-plane/cut-plane intersection contract;
+- true-distance welding;
+- one-surface render certification.
+
+The minimum scale for each edge is derived only from the existing `PointMergeDistance` and `minimumStableEdgeLength` source-removal/width floors. Reaching that floor is an explicit unresolved conflict, not permission to delete the edge.
+
+Maximum-Coverage completion requires equality across structural eligibility, selection, active positive-width edges, and built bevel faces. Geometry validity and coverage validity are reported separately. A partial but manifold shell is not a successful maximum-Coverage result. The audit may retain its geometry-valid evidence, but the preview triangle soup is withheld unless exhaustive coverage validity also passes.
+
+The legacy local-junction-star extraction remains non-authoritative for the edge-plane shell. Its textual blocker is retained only in detailed telemetry and does not override a closed, manifold, planar shell.
+
+## Stable incomplete rollback baseline
+
+EW-B4.1 is the current immutable stable rollback point. It produces a closed, manifold, planar, one-surface-render-valid mesh with `36` of `40` structurally eligible bevels. Edges `{0/8/19/37}` are deferred, so the baseline is intentionally incomplete, but it is suitable for restoring known-good geometry while later exhaustive-coverage experiments remain invalid. Experimental patches must not overwrite or redefine this baseline.
+
+## EW-B4.2R1 exact topology and locality evidence contract
+
+EW-B4.2 conflict-cluster reduction reached `39` materialized bevels but introduced one T-junction at `AfterPlaneConstruction`; edge `0` remains deferred earlier by the plane-locality gate. The next step is diagnostic-only.
+
+The T-junction dossier reproduces the same numerical predicate used by `AuditEdgeWearTopology`. For each unique junction vertex it identifies the unsplit host segment, exact host and vertex-owner provenance, segment parameter, closest-point residual, topology tolerance, associated bevel provenance, nearby candidate planes, current candidate widths/scales, and the latest conflict-reduction cluster that modified an associated edge. Records are captured at every stage where the defect remains, while `FirstTJunctionStage` identifies introduction.
+
+Plane-locality deferral is a separate construction phase and has its own dossier. The record preserves the solved bevel plane, the unrelated-vertex guard that moves it, the limiting unrelated vertex, and the resulting source-edge removal failure. This distinguishes an intrinsically invalid solved plane from a plane made non-materializable by global unrelated-vertex preservation.
+
+EW-B4.2R1 changes no geometry. It does not loosen topology tolerance, split host segments, raise the width floor, change conflict clusters, or modify locality. The subsequent correction must be chosen from the exact owner/host/conflict and source-removal evidence.
+## EW-B4.2R2 topology-aware conflict retry contract
+
+The maximum-Coverage width solver is transactional at the complete-shell level. A retry is accepted only when the prepared shell passes both the bevel-band audit and the same topology/face-quality invariants used by final certification.
+
+A topology-breaking retry is not allowed to become the new reduction baseline. The solver retains the latest topology-clean scale map, rolls the full map back to that state, expands the interaction cluster, and then applies a coherent replacement reduction before rebuilding from immutable original candidates.
+
+For T-junction-driven expansion, the cluster contains:
+
+1. bevel provenance owning the junction vertex or host segment;
+2. candidate bevel planes passing through the junction neighbourhood;
+3. the latest earlier conflict cluster that modified any implicated bevel;
+4. one bounded incident source-vertex star around those seed edges.
+
+The topology audit is authoritative. Band-clean but topologically invalid geometry is rejected. Tolerances are not loosened to conceal near-coincident unsplit segments.
+
+Edge `0` remains a separate cooperative-locality problem. EW-B4.2R2 intentionally preserves its explicit locality deferral and targets a valid 39-of-40 experimental shell. EW-B4.1-STABLE remains the immutable rollback baseline.
+
+## EW-B4.2R2 failed replacement-trial finding
+
+EW-B4.2R2 correctly refused the original T-junction retry, restored the latest topology-clean scale map, and applied one expanded-cluster replacement. That replacement did not preserve geometry validity: at `AfterPlaneConstruction` it contained three open edges and one bevel face with `0.886028051` degrees of normal spread against the `0.75` degree contract. No T-junction remained.
+
+The R2 mapper was specialized to `PlaneCutTJunctionFailureRecord`. It therefore had no structured input for an open-edge/non-planar retry and aborted. The failure also exposed an audit-state flaw: a 39-plane attempted shell was later represented as zero built and 39 structurally rejected edges. These are transaction semantics failures, not candidate-selection results.
+
+## EW-B4.2R3 transactional retry evidence contract
+
+A solver pass has four independent states:
+
+1. **attempted** — the complete candidate set and scale map were used to construct a trial shell;
+2. **band-clean** — the attempted shell passed bevel-band integrity, regardless of topology;
+3. **topology-clean** — the attempted shell passed open/non-manifold/T-junction/invalid/non-planar certification, regardless of band integrity;
+4. **fully certified** — the same immutable trial passed both band and geometry contracts.
+
+Each retained state owns cloned candidates, cloned faces, the complete scale map, pass identity, and the relevant stage snapshot. A later failed retry cannot mutate or relabel an earlier clean state.
+
+Retry failures are captured at their earliest material stage. The generalized dossier hierarchy includes open edges, non-manifold edges, T-junctions, invalid faces, and non-planar bevel faces. Every record retains stable face/bevel provenance and contributes structured source-edge IDs to a generalized interaction cluster. Nearby candidate planes, the latest intersecting conflict pass, and one bounded incident source-vertex star are attribution evidence, not automatic permission for another geometry reduction.
+
+EW-B4.2R3 deliberately preserves geometry behaviour. The established T-junction-driven R2 retry remains unchanged. A generalized non-T-junction failure is recorded and mapped, then the solver stops. The next width correction is selected only after Unity identifies the exact failed bevel, all open-edge owners, and the prior scale transition that produced them.
+
+Lifecycle reporting distinguishes:
+
+- `attemptedBuilt`: a bevel plane existed in the latest attempted shell;
+- `certifiedBuilt`: that bevel belongs to the latest fully certified shell;
+- `trialRejected`: attempted geometry failed solver certification;
+- `localityDeferred`: the edge never entered the shell because its plane was infeasible;
+- `rejected`: the source edge or plane failed a true structural/construction requirement.
+
+EW-B4.1-STABLE remains immutable. EW-B4.2R3 is diagnostic and transactional infrastructure for the experimental 39-of-40 path; it is not a new stable geometry baseline.
+
+## EW-B4.2R4 minimal topology retry contract
+
+A topology-triggered width retry is no longer an extension of the ordinary band-conflict cluster solver. The exact T-junction record defines a separate bounded transaction.
+
+The immutable rollback input is the complete latest topology-clean scale map. Saved rollback faces are evidence and fallback output only; they are never incrementally clipped into a new trial. Every factor trial starts from the original source polyhedron and original feasible candidate planes.
+
+For each exact linked edge:
+
+```text
+requestedScale(edge) = topologyCleanScale(edge) * factor
+effectiveScale(edge) = max(requestedScale(edge), existingNumericalFloor(edge))
+```
+
+No common absolute target is propagated from the failed state. Edges outside the exact cluster must remain byte-for-value equivalent within the existing float comparison tolerance. Any outside-cluster change is a solver defect and rejects the complete trial.
+
+The initial bounded factor sequence is:
+
+```text
+0.95
+0.90
+0.85
+0.80
+```
+
+Each factor independently rebuilds and certifies:
+
+- bevel-band completeness and single-face ownership;
+- cap survival or proven redundancy;
+- zero open, non-manifold, T-junction, and invalid-face defects;
+- zero face-quality failures under the existing residual and `0.75` degree spread limits;
+- retained volume and source-bounds containment;
+- one authored planar surface per bevel with no centre fan;
+- triangulation and preview triangle-soup validity.
+
+The first fully valid factor in descending order is the highest tested valid factor and may be committed. If none succeeds, the solver restores the prior topology-clean state, reports local infeasibility, withholds the preview, and does not automatically import the previous conflict cluster or an incident source-vertex star.
+
+Each trial records its rollback, requested, and effective scales, any floor hits, every scale changed outside the cluster, attempted built count, stage-evaluation status, band/topology/face-quality/render/mesh validity, and every captured exact face/open-edge/T-junction failure dossier. The audit explicitly records `failedStateScalesReused=0`; an unresolved search names the restored topology-clean fallback state.
+
+The lifecycle has two distinct success gates:
+
+1. `solver-clean`: band and complete per-trial geometry/render/mesh certification passed inside the bounded search;
+2. `fully-certified`: the authoritative outer final certification has repeated and accepted the complete shell.
+
+`certifiedBuilt` is populated only at the second gate. Any later final failure demotes every attempted plane to `trialRejected`, clears the certified state, and leaves structural `rejected` reserved for genuine candidate/construction rejection.
+
+Edge `0` remains an independent cooperative-locality problem. EW-B4.2R4 targets only the feasible 39-plane shell and cannot supersede `EW-B4.1-STABLE` until Unity produces a closed, planar, render-valid, mesh-valid 39-of-40 result.
+
+## EW-B4.2R5 direct foreign band-plane retreat contract
+
+R4 proved that a topology failure dossier and the width degree of freedom required to clear the preceding band conflict are not necessarily the same set of edges. The exact T-junction remains attributed to `{7/8/20}`, but the complete factor log showed that every R4 trial failed because unchanged `EdgeBevelPlane:9` continued to split victim edge `8` near axial parameter `0.9642-0.9643`.
+
+R5 therefore derives two independent structured sets:
+
+```text
+topologyLinked = exact T-junction LinkedEdgeIndices
+retreatEdges   = directly evidenced foreign edge from the latest prior
+                 band-integrity record whose victim is topology-linked
+```
+
+For the reference shell:
+
+```text
+topologyLinked={7/8/20}
+victim=8
+foreign=9
+retreatEdges={9}
+```
+
+No source-edge ID is hardcoded. The solver walks prior structured conflict records from newest to oldest, accepts only a `band-integrity` record whose victim belongs to the topology-linked set, and requires its foreign edge to remain an active bevel candidate.
+
+Every trial clones the complete latest topology-clean scale map and applies one factor only to the retreat set:
+
+```text
+trialScale(9) = pass7Scale(9) * factor
+all other scales = exact pass-7 values
+```
+
+The bounded sequence is:
+
+```text
+0.95
+0.90
+0.85
+0.80
+0.75
+```
+
+The final sample reproduces the known foreign-plane scale `0.133483887` that previously advanced beyond band integrity, while leaving `7/8/20` at the topology-clean pass-7 scale `0.177978516`.
+
+The complete R4 transaction and certification rules remain active. Every trial rebuilds from immutable source faces and original candidates, rejects any outside-retreat scale change, and must pass band, cap, topology, face-quality, volume, bounds, one-surface, triangulation, and preview-mesh certification together. Failure restores pass `7` and does not trigger automatic pair search or cluster expansion.
+
+Telemetry remains cumulative rather than compressed. The full file section is renamed `[Direct Foreign Band-Plane Retreat Search]` and retains one complete record per factor. It additionally records:
+
+- `searchMode=direct-foreign-band-plane-retreat`;
+- the direct prior band record (`bandPass`, victim, foreign, axial parameter, shared span);
+- the unchanged topology-linked dossier;
+- the exact retreat set;
+- rollback/requested/effective scales and floor hits;
+- collateral changes;
+- every certification result and exact failure record.
+
+The Console retains only the compact equivalent. The file log is the authoritative evidence source for subsequent solver decisions.
+
+
+
+## EW-B4.2R6 dual-endpoint retreat contract
+
+The R5 trial sequence proves that victim edge `8` is interrupted by two different foreign bevel planes at opposite axial ends. As edge `9` retreats, its violation moves toward axial `1` and eventually disappears; the remaining active blocker becomes edge plane `7` near axial `0.03006`. Both blocker transitions occurred while topology and face quality remained clean.
+
+R6 retains two evidence layers:
+
+```text
+topologyLinked = {7/8/20}
+retreatEdges   = two directly observed foreign planes for victim 8
+protectedEdges = topologyLinked - retreatEdges
+```
+
+For the reference shell these resolve dynamically to:
+
+```text
+retreatEdges={7/9}
+protectedEdges={8/20}
+```
+
+No source-edge number is embedded in the solver. The first retreat edge is obtained from the latest structured pre-T-junction band record. The opposing edge is obtained from a topology-clean direct-retreat trial whose structured band audit reports the same victim and a different active foreign plane.
+
+Each dual trial clones the complete immutable topology-clean scale map and applies a shared factor only to the two endpoint planes. Protected edges remain byte-for-byte equivalent in scale to pass `7`. Every trial is rebuilt from original source faces and candidates; no failed faces, intersections, or scales become input to a later trial.
+
+The bounded factor sequence remains:
+
+```text
+0.95
+0.90
+0.85
+0.80
+0.75
+```
+
+The final factor reproduces the known endpoint scale `0.133483887` for both planes while leaving `8/20` at `0.177978516`. This isolates the band-helpful portion of the old broad pass without repeating its topology-linked reductions.
+
+Telemetry remains cumulative. Direct search trials and dual search trials are written to separate sections but retain one shared trial schema. Each trial now records search mode, protected edges, structured band victim/foreign IDs, axial position, span, scale transitions, collateral changes, and every certification result. `primaryFailure` remains historical solver provenance; `activeSearchFailure` identifies the current terminal trial blocker.
+
+### Editor source-edge index overlay
+
+The edge overlay is diagnostic-only and is fed by the same `EdgeWearTopologyGraph` that assigns telemetry source-edge IDs. The generator captures every graph edge's endpoints before preview construction, applies the exact generated-mass dimension, lean, grounding, and recenter transforms using the rendered soup as the reference state, and stores the transformed records only in non-serialized editor preview state.
+
+The custom editor draws the authoritative indices at edge midpoints. The complete graph can be shown, or the view can be restricted to the current search focus set. Focus membership is generated from structured topology-linked and retreat sets, not from hardcoded IDs. No GameObject, component, layer, tag, material, mesh channel, production setting, or runtime branch is added.

@@ -1931,6 +1931,74 @@ private struct EdgeWearGraphBuildStats
             public int InvalidEdgeCount;
         }
 
+        private sealed class EdgeWearCoverageAudit
+        {
+            public readonly bool MaximumCoverageMode;
+            public readonly List<EdgeWearEdgeLifecycleRecord> Records =
+                new List<EdgeWearEdgeLifecycleRecord>();
+            public readonly Dictionary<EdgeKey, EdgeWearEdgeLifecycleRecord>
+                RecordByKey =
+                    new Dictionary<EdgeKey, EdgeWearEdgeLifecycleRecord>();
+            public readonly Dictionary<int, EdgeWearEdgeLifecycleRecord>
+                RecordByGraphEdge =
+                    new Dictionary<int, EdgeWearEdgeLifecycleRecord>();
+            public int SourceEdgeCount;
+            public int StructuralEligibleCount;
+            public int ArtisticEligibleCount;
+            public int ArtisticFilteredCount;
+            public int CandidateCount;
+            public int SelectedCount;
+            public int WidthInactiveCount;
+            public int WidthReducedCount;
+            public int ActiveCount;
+            public int AttemptedBuiltCount;
+            public int BuiltCount;
+            public int TrialRejectedCount;
+            public int DeferredCount;
+            public int RejectedCount;
+            public int UnmappedCount;
+
+            public EdgeWearCoverageAudit(bool maximumCoverageMode)
+            {
+                MaximumCoverageMode = maximumCoverageMode;
+            }
+        }
+
+        private sealed class EdgeWearEdgeLifecycleRecord
+        {
+            public EdgeKey Key;
+            public int SourceEdgeIndex = -1;
+            public int CandidateIndex = -1;
+            public Vector3 Start;
+            public Vector3 End;
+            public int FaceA = -1;
+            public int FaceB = -1;
+            public int FaceCount;
+            public float Length;
+            public float DihedralDegrees;
+            public float Vertical01;
+            public float Score;
+            public float SolvedWidth;
+            public float MaterializedWidth;
+            public float MaterializedWidthScale = 1f;
+            public bool WidthReduced;
+            public BoundedEdgeClassification Classification =
+                BoundedEdgeClassification.None;
+            public bool StructuralEligible;
+            public bool ArtisticEligible;
+            public bool Candidate;
+            public bool Selected;
+            public bool WidthInactive;
+            public bool Active;
+            public bool AttemptedBuilt;
+            public bool Built;
+            public bool TrialRejected;
+            public bool Deferred;
+            public bool Rejected;
+            public string CandidateReason = string.Empty;
+            public string FinalReason = string.Empty;
+        }
+
 private readonly struct EdgeWearBevelCandidate
         {
             public readonly int CandidateIndex;

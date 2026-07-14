@@ -1527,7 +1527,7 @@ Transform:
   m_GameObject: {fileID: 106799628}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.13485095, z: 0, w: 0.9908659}
-  m_LocalPosition: {x: -13.52, y: -0.25, z: 3.05}
+  m_LocalPosition: {x: -13.52, y: -0.182, z: 3.05}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2432,7 +2432,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609313, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: 3.97, y: 22.275, z: -33.33}
+  m_LocalPosition: {x: 5.28, y: 22.380001, z: -32.68}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3146,37 +3146,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 441717164}
   m_Mesh: {fileID: 0}
---- !u!1 &589866829
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 589866830}
-  m_Layer: 0
-  m_Name: __PS3D_RiverCorridor_Invalid
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &589866830
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 589866829}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1626776151}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &593135559
 GameObject:
   m_ObjectHideFlags: 0
@@ -3288,12 +3257,12 @@ MonoBehaviour:
   snowfieldVariant: 2
   surfaceStyleMigrationVersion: 1
   regenerateOnValidate: 1
-  debugView: 0
+  debugView: 28
   showPaintedAccentDistributionOverlay: 1
   showPaintedAccentWeightedProposals: 1
   showPaintedAccentLastAcceptedPositions: 1
-  showPaintedAccentCompositionDebug: 0
-  showPaintedAccentProjectedGlyphDebug: 0
+  showPaintedAccentCompositionDebug: 1
+  showPaintedAccentProjectedGlyphDebug: 1
   paintedAccentGlyphFamilyPreview: 0
   paintedAccentPlacementOverlayWeight: 0
   modifiers:
@@ -6321,7 +6290,7 @@ Transform:
   m_GameObject: {fileID: 1205211012}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.68263626, z: 0, w: 0.7307583}
-  m_LocalPosition: {x: -0.32, y: -0.176, z: -2.24}
+  m_LocalPosition: {x: -0.32, y: -0.084, z: -2.24}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7477,7 +7446,7 @@ Transform:
   m_GameObject: {fileID: 1302693749}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.13485095, z: 0, w: 0.9908659}
-  m_LocalPosition: {x: -11.693, y: -0.25, z: 3.492}
+  m_LocalPosition: {x: -11.693, y: -0.176, z: 3.492}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8519,7 +8488,7 @@ Transform:
   m_GameObject: {fileID: 1374330458}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.98, y: -0.255, z: -2.06}
+  m_LocalPosition: {x: 0.98, y: -0.215, z: -2.06}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9072,7 +9041,7 @@ Transform:
   m_GameObject: {fileID: 1533091818}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609314, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: 3.97, y: 22.275, z: -33.33}
+  m_LocalPosition: {x: 5.28, y: 22.380001, z: -32.68}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9522,8 +9491,8 @@ MonoBehaviour:
   overallRockTintStrength: 0
   lightingTintInfluence: 0.8
   edgeWearAmount: 0.238
-  edgeWearWidth: 0.868
-  edgeWearCoverage: 0.954
+  edgeWearWidth: 0.198
+  edgeWearCoverage: 2
   edgeWearSoftness: 0.258
   edgeWearResponseStrength: 1
   edgeWearBrightnessLift: 1
@@ -9608,8 +9577,8 @@ MonoBehaviour:
     Request: 0
     Resolution: 0
     EdgeWearAmount: 0.238
-    EdgeWearWidth: 0.868
-    EdgeWearCoverage: 0.954
+    EdgeWearWidth: 0.198
+    EdgeWearCoverage: 2
     EdgeWearSoftness: 0.258
     CreaseAmount: 1
     CreaseWidth: 1
@@ -9719,7 +9688,7 @@ Transform:
   m_GameObject: {fileID: 1595308776}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.242, y: -0.115, z: -6.928}
+  m_LocalPosition: {x: -9.242, y: -0.078, z: -6.928}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9753,7 +9722,7 @@ Transform:
   m_GameObject: {fileID: 1611485499}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 3.97, y: 1.025, z: -13.33}
+  m_LocalPosition: {x: 5.28, y: 1.13, z: -12.68}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -10157,7 +10126,6 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 589866830}
   - {fileID: 370939560}
   m_Father: {fileID: 593135560}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -10724,25 +10692,41 @@ MonoBehaviour:
   foamFrayStrength: 0
   foamBreakupScale: 0
   foamChipActivation: 0.6
-  foamChipCandidateSpacing: 0.15
+  foamChipCandidateSpacing: 0.12
   foamChipDistributionIrregularity: 1
   foamChipRadius: 0.22
-  foamChipRadiusRatio: 0.18
-  foamChipSizeIrregularity: 0.91
+  foamChipRadiusRatio: 0.16
+  foamChipSizeIrregularity: 0.45
   foamChipShapeIrregularity: 0.85
+  foamChipStableScreenRadiusPixels: 2.65
+  foamChipMaximumViewScale: 2
   foamChipSelectionDepth: 0.6
-  foamChipFieldSpeed: 0.11
+  foamChipInteriorAccess: 0.3
+  foamChipFieldSpeed: 0.12
+  foamChipFormationTime: 1.1
+  foamChipStableTime: 1
+  foamChipDissolveTime: 1.1
+  foamChipDormantTime: 4
+  foamChipLateralMotionAmount: 1.1
+  foamChipLateralMotionSpeed: 0.15
+  foamChipRotationAmountDegrees: 175
+  foamChipRotationSpeed: 0.03
+  foamChipSizePulseAmount: 0.2
+  foamChipSizePulseSpeed: 0.2
+  foamChipShapeChangeAmount: 1
+  foamChipShapeChangeSpeed: 0.13
+  foamChipShapeTransitionTime: 4
   foamChipEvolutionRate: 0.18
-  foamChipEvolutionAmount: 0.11
+  foamChipEvolutionAmount: 0.2
   foamFraySelectionDepth: 0.68
   foamFrayWavelength: 0.06
   foamFrayDepth: 0
-  foamChipFraySelectionTuningVersion: 5
+  foamChipFraySelectionTuningVersion: 9
   foamStrandStrength: 0.86
   foamStrandScale: 0.56
   foamStrandDensity: 0.5
   foamStrandReach: 0.46
-  foamDebugView: 18
+  foamDebugView: 26
   foamSpawnDistanceNormalized: 0.634
   foamSpawnAcrossNormalized: -0.27
   foamSpawnScale: 0.538
@@ -11737,7 +11721,7 @@ Transform:
   m_GameObject: {fileID: 1871029506}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.54902285, z: 0, w: 0.8358074}
-  m_LocalPosition: {x: 0.18, y: -0.105, z: -2.848}
+  m_LocalPosition: {x: 0.18, y: -0.111, z: -2.848}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

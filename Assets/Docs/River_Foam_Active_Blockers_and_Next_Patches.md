@@ -1,3 +1,54 @@
+# Accepted source patch — `4.11C.5.17D.0` Final-Edge Fray Retirement
+
+Fray is retired after gameplay-camera validation showed no useful independent visual category. The patch removes every Fray-only production helper, procedural field, property, binding, serialized authoring control, Inspector entry, and debug view. It also removes the dead transient `breakupField` / runtime `_FoamBreakupScale` path that no surviving mechanic consumed. No scene, prefab, material, or other serialized Unity asset is modified; stale serialized Fray values are harmless and any manual cleanup remains owner-controlled.
+
+The active Layer E order is now:
+
+```text
+coherent Foam → analytical Chipping → structural Strands → composition
+```
+
+Compatibility retained only for surviving Chip data:
+
+```text
+legacyFoamBreakupScale
+  hidden FormerlySerializedAs source used by historical Chip migration only;
+
+foamChipFraySelectionTuningVersion alias
+  historical serialized name retained only to preserve Chip migration state.
+```
+
+Neither compatibility alias has a Fray runtime path. Unity import and visual validation remain required.
+
+# Next active patch — `4.11C.5.17D.1` Chipping Readability Audit
+
+Audit Chipping from the production isometric camera before changing its equations. Capture one compact diagnostic record covering projected candidate size, visible removal, edge/interior authority, sub-readable candidates, and later Strand occlusion. Use the evidence to decide whether the next implementation needs stronger medium/large bias, a higher projected-size floor, revised edge admission, or simpler authoring controls.
+
+Remaining-Life morphology integration stays blocked until Chipping and Strands are accepted as the complete readable Layer E vocabulary.
+
+# Deferred validation — `4.11C.5.17B.2D2B-B.2L` Decoupled Shape Cadence and Transition
+
+B.2K geometry is implemented and visually meaningful, but Unity evidence showed that the existing Shape Change Speed control behaved primarily as target cadence: contour configurations could switch too quickly even when the desired geometric extent was correct. B.2L remains the deferred Chipping timing validation patch; Fray was later retired by D.0.
+
+B.2L retains B.2K geometry and exposes:
+
+```text
+Shape Change Cadence (changes/s)
+Shape Transition Time (seconds)
+Resolved Shape Timing = effective transition / hold
+```
+
+Cadence selects the next deterministic target. Transition Time independently controls actual interpolation duration. Targets are separated by a constant golden-angle step in the existing two-axis coefficient plane, so every transition has equal geometric travel. Quintic interpolation gives zero velocity at both endpoints; candidate phase offsets prevent synchronized field-wide switching.
+
+Validation gates:
+
+1. Amount changes geometric extent only;
+2. Cadence changes how often new targets are selected;
+3. Transition Time changes how slowly the actual contour crosses between targets;
+4. increasing Transition Time does not change Candidate Radius, Size Pulse, lifecycle, movement, or rotation;
+5. transitions are continuous at cadence boundaries and show no popping;
+6. confirm D.0 retirement does not alter Chip geometry, timing, lifecycle, movement, or search reach.
+
 # River Foam Active Blockers and Next Patches
 
 ## Purpose
@@ -25,27 +76,17 @@ Unity validation confirmed one final generated-topology GPU publication, one nor
 
 Unity validation measured populated visible, populated offscreen, and empty-field work. Offscreen work currently remains essentially identical to visible work, and empty fields still perform meaningful topology/readback work. Those optimization opportunities are deliberately deferred until the River is feature-complete. P4 remains available as the final-state profiling baseline.
 
-# Immediate priority — validate `4.11C.5.17B.2D2B-B.2C` eligibility composites and shape-preserving advection
+# Accepted — `4.11C.5.17B.2D2B-B.2F/B.2G` lifecycle, rigid evolution, and view readability
 
-B.2B established useful controllable Chip motion at moderate settings, but high Evolution Amount exposed a structural fault: the animated coordinate warp also deformed local contour distance, stretching fat chips into long ribbons. B.2C keeps the accepted motion field while reconstructing each local candidate delta in the unwarped River metric before contour evaluation.
+Unity validation accepted the independent four-stage candidate lifecycle, rigid motion/variation controls, and bounded projected-size readability. Formation/Dissolve still reach zero, Dormant Time remains empty, motion no longer uses a deforming coordinate warp, and the close/far camera comparison now retains readable Chips with the available view-LOD controls.
 
-B.2C adds only two diagnostics:
+# Accepted — `4.11C.5.17B.2D2B-B.2J` Simplified Orthogonal Chip Permission
 
-1. `Chip Eligibility Composite`;
-2. `Fray Eligibility Composite`.
+Unity validation accepted the two-path permission model. `Chip Edge Coverage` remains functional at Interior Access `0`; `Chip Interior Access` independently adds established-body candidate authority; and removing the failed third admission gate restored predictable production and diagnostics.
 
-Both use dark gray for exact current Final Foam, cyan for eligibility outside the rendered mask, and bright yellow for overlap. The existing eligibility formulas remain unchanged in this patch.
+# Accepted foundation — `4.11C.5.17B.2D2B-B.2K` Multi-Axis Contour Geometry
 
-Acceptance requires:
-
-1. high Evolution Amount no longer stretches connected chips into long lines;
-2. movement, growth/shrink, turnover, and transient clustering remain visible;
-3. Chip Eligibility Composite clearly exposes over-broad or missing Chip coverage against Final Foam;
-4. Fray Eligibility Composite provides the same evidence for the future Fray patch;
-5. no new texture, compute pass, persistent state, control, or candidate-loop expansion appears;
-6. Final Foam, Production Chip Mask, Strands, and temporary legacy Fray remain otherwise unchanged.
-
-The next patch after validation must correct eligibility from composite evidence. It must not guess at a new edge formula before these views are inspected.
+Unity evidence confirmed that B.2K provides the required meaningful geometric silhouette change. Its remaining defect was timing ownership: the former cycles-per-second control also determined how abruptly the contour crossed between configurations. B.2L addresses timing only and leaves the accepted B.2K geometry, size separation, and `5×11` search bound intact.
 
 # Current working state after architecture lock
 
@@ -76,7 +117,7 @@ Layer D may read Layer C, but must never write Layer C.
 Layer E must never feed back into compute/simulation.
 ```
 
-## Active state through `4.11C.5.17B.2D2A — Presence-Space Chip and Fray Reconstruction`
+## Historical accepted state through `4.11C.5.17B.2D2A — Presence-Space Chip and Fray Reconstruction`
 
 The zero-memory presentation audit passed decisively:
 
@@ -346,7 +387,7 @@ Resource contract: no new texture sample, noise/hash evaluation, texture, buffer
 
 D1C is visually rejected. Spacing, Width, and Curvature changed only a secondary anisotropic band while the decisive extracted Chip/Fray candidate patterns remained fixed. Unity therefore found all three controls effectively inert, and one-pixel noise remained. The audit also proved that projected frequency omitted transported Material Pattern phase and that visible warped/lead/trail Strand shapes could be paired with the stored candidate pattern.
 
-### `5.17B.2D1D — Strand Control Model Reset and Coherent Pattern Transport`
+### Historical — `5.17B.2D1D — Strand Control Model Reset and Coherent Pattern Transport`
 
 D1D is Unity-validated and accepted. Its Strand Strength, Scale, Density, and Reach controls now produce viable controlled lineification without excessive visual artefacting.
 
@@ -372,11 +413,11 @@ Immediate acceptance tests:
 5. Fine detail simplifies to broad structures, then coherent Foam, before one-pixel noise.
 6. Rock/wake regions show fewer crossed pattern/shape mismatches.
 
-### `5.17B.2D2 — visually rejected`
+### Historical — `5.17B.2D2 — visually rejected`
 
 D2 changed thresholds and pattern hierarchy but still treated `coherentSoftVisibility` as edge depth. Unity showed nearly the same elongated contour excavation as the former implementation. The scalar contains internal morphology valleys and cannot identify true perimeter distance. D2 is closed; no constant-only follow-up is allowed.
 
-### `5.17B.2D2A — Presence-Space Chip and Fray Reconstruction`
+### Historical — `5.17B.2D2A — Presence-Space Chip and Fray Reconstruction`
 
 D2A is implemented with Unity validation pending. Accepted D1D Strands are frozen. Chip and Fray now consume a transient base-material edge depth rather than coherent visibility valleys. Chip contributes a medium broad-pattern depth requirement; Fray adds a shallow fine perturbation to the same requirement. The modified soft body is re-hardened, then mapped back onto the accepted coupled production mask through a removal-only ratio.
 
@@ -397,7 +438,7 @@ Do not sample support/negative topology directly for breakup unless later Unity 
 
 ### Later polish
 
-`5.17C` is planned Remaining-Life progression for the accepted deterioration vocabulary: chips, fray, extracted strands, detached flecks, broken streak remnants, and sparse old-foam remnants should advance as Layer C Remaining Life falls. Supported and Negative Topology must initially influence that progression only through their existing Layer C aging rates; direct topology, support, negative-pressure, or river-location breakup multipliers remain deferred unless Remaining Life demonstrably proves insufficient. `5.17D` is planned fine-fragment and final-energy work rather than an optional bucket to omit: tiny detached flecks, small fragments, thin streak remnants, micro-bubbles, and selective bright glints are part of the intended final Foam pass. Their underlying Foam availability and deterioration follow the lifecycle-derived mask; optical glints may additionally respond to lighting.
+Remaining-Life morphology progression is deferred until the surviving Chip and Strand vocabulary is accepted from the production camera. Fray is not part of that future vocabulary. Any later detached flecks, streak remnants, micro-bubbles, or optical glints require a separate evidence-driven proposal and must not recreate Fray under another name.
 
 ### Performance contract
 
@@ -412,13 +453,10 @@ Reuse the existing shader-detail probe and available samples where practical. Pr
 
 ### Immediate next steps
 
-1. Validate Chip alone at Strength `0`, `0.5`, and `1`; maximum must show medium coherent bites rather than lines.
-2. Validate Fray alone at Strength `0`, `0.5`, and `1`; maximum must remain shallow and contour-local.
-3. Validate Chip plus Fray and confirm Fray roughens the post-Chip boundary.
-4. Compare Breakup Scale `0`, `0.5`, and `1` independently for Chip and Fray.
-5. Confirm accepted D1D Strand-only captures are unchanged.
-6. Inspect gameplay distance and obstacle regions for one-pixel Fray noise or pattern/shape mismatch.
-7. Begin Remaining-Life orchestration only after Chip, Fray, and Strands are visually distinct and accepted.
+1. Complete D.0 Unity import and Fray-off visual-equivalence validation.
+2. Run D.1 Chipping Readability Audit from the production camera.
+3. Measure projected candidate size, visible removal, edge/interior authority, sub-readable candidates, and Strand occlusion in one compact record.
+4. Design the Chipping rework from that evidence; do not resume Fray or Remaining-Life morphology work first.
 
 ## Active and trusted foundations
 

@@ -371,6 +371,83 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        private static void WeldSharedVerticesByDistance(
+            List<PolygonFace> faces,
+            float maximumDistance,
+            PlaneCutNumericalRepairTelemetry numericalRepairs)
+        {
+            if (faces == null || faces.Count == 0 ||
+                maximumDistance <= 0f)
+            {
+                return;
+            }
+
+            float maximumDistanceSqr =
+                maximumDistance * maximumDistance;
+            List<Vector3> canonical = new List<Vector3>();
+
+            for (int faceIndex = 0;
+                 faceIndex < faces.Count;
+                 faceIndex++)
+            {
+                List<Vector3> vertices = faces[faceIndex].Vertices;
+                for (int vertexIndex = 0;
+                     vertexIndex < vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 candidate = vertices[vertexIndex];
+                    int bestCanonicalIndex = -1;
+                    float bestDistanceSqr = maximumDistanceSqr;
+
+                    for (int canonicalIndex = 0;
+                         canonicalIndex < canonical.Count;
+                         canonicalIndex++)
+                    {
+                        if (numericalRepairs != null)
+                        {
+                            numericalRepairs
+                                .DistanceWeldComparisonCount++;
+                        }
+                        float distanceSqr =
+                            (candidate - canonical[canonicalIndex])
+                                .sqrMagnitude;
+                        if (distanceSqr > maximumDistanceSqr ||
+                            (bestCanonicalIndex >= 0 &&
+                             distanceSqr >= bestDistanceSqr))
+                        {
+                            continue;
+                        }
+                        bestCanonicalIndex = canonicalIndex;
+                        bestDistanceSqr = distanceSqr;
+                    }
+
+                    if (bestCanonicalIndex < 0)
+                    {
+                        canonical.Add(candidate);
+                        continue;
+                    }
+
+                    Vector3 snapped = canonical[bestCanonicalIndex];
+                    float movement = Mathf.Sqrt(
+                        Mathf.Max(0f, bestDistanceSqr));
+                    vertices[vertexIndex] = snapped;
+                    if (numericalRepairs != null)
+                    {
+                        numericalRepairs.DistanceWeldMatchCount++;
+                        if (movement > 0f)
+                        {
+                            numericalRepairs.DistanceWeldMovedCount++;
+                            numericalRepairs.MaximumDistanceWeldMovement =
+                                Mathf.Max(
+                                    numericalRepairs
+                                        .MaximumDistanceWeldMovement,
+                                    movement);
+                        }
+                    }
+                }
+            }
+        }
+
         private static void SanitizeAllFaces(
             List<PolygonFace> faces)
         {

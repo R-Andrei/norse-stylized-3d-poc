@@ -1325,10 +1325,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             metrics.PolygonAudits++;
             List<PolygonFace> trialClone =
                 ClonePolygonFacesForPlaneCutAudit(trialFaces);
+            PlaneCutBevelAuditResult qualityAudit =
+                new PlaneCutBevelAuditResult();
             if (!TryPreparePlaneCutPreviewFaces(
                     trialClone,
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
+                    ref qualityAudit,
                     out List<PolygonFace> prepared,
                     out _,
                     out _,
@@ -1342,8 +1345,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EdgeWearTopologyStats topology = AuditEdgeWearTopology(
                 prepared,
                 minimumStableEdgeLength);
-            PlaneCutBevelAuditResult qualityAudit =
-                new PlaneCutBevelAuditResult();
             AuditPlaneCutFaceQuality(
                 prepared,
                 junctions,
@@ -1402,7 +1403,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<PlaneCutVertexJunctionCandidate> junctions,
             out List<PolygonFace> faces,
             out int edgeCapsBuilt,
-            out string blocker)
+            out string blocker,
+            PlaneCutNumericalRepairTelemetry numericalRepairs = null)
         {
             faces = ClonePolygonFacesForPlaneCutAudit(
                 sourceFaces,
@@ -1421,6 +1423,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
 
+                int exactFailureCountBefore = numericalRepairs == null
+                    ? 0
+                    : numericalRepairs.ExactConstructionFailureCount;
                 ClipPolyhedron(
                     faces,
                     candidate.Plane,
@@ -1430,7 +1435,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     candidate.ClipEpsilon,
                     true,
                     PolygonFaceProvenanceKind.EdgeBevelPlane,
-                    candidate.SourceEdgeIndex);
+                    candidate.SourceEdgeIndex,
+                    numericalRepairs != null,
+                    numericalRepairs != null,
+                    numericalRepairs);
+                if (numericalRepairs != null &&
+                    numericalRepairs.ExactConstructionFailureCount >
+                        exactFailureCountBefore)
+                {
+                    blocker =
+                        "strict plane-classification or intersection invariant failed";
+                    return false;
+                }
                 int after = CountMatchingPlaneCutCaps(faces, candidate);
                 if (before == 0 && after == 1)
                 {
@@ -1449,6 +1465,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 PlaneCutVertexJunctionCandidate junction =
                     junctions[junctionIndex];
+                int exactFailureCountBefore = numericalRepairs == null
+                    ? 0
+                    : numericalRepairs.ExactConstructionFailureCount;
                 ClipPolyhedron(
                     faces,
                     junction.Plane,
@@ -1458,7 +1477,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     junction.ClipEpsilon,
                     true,
                     PolygonFaceProvenanceKind.VertexJunctionPlane,
-                    junction.VertexIndex);
+                    junction.VertexIndex,
+                    numericalRepairs != null,
+                    numericalRepairs != null,
+                    numericalRepairs);
+                if (numericalRepairs != null &&
+                    numericalRepairs.ExactConstructionFailureCount >
+                        exactFailureCountBefore)
+                {
+                    blocker =
+                        "strict vertex-junction clipping invariant failed";
+                    return false;
+                }
                 if (!TryFindSinglePlaneCutCap(
                         faces,
                         junction.Plane,

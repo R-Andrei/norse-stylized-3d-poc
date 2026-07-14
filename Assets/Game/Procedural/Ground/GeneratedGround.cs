@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Serialization;
 using Unity.Profiling;
@@ -257,6 +258,44 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Material = 1 << 7,
             RiverCorridor = 1 << 8
         }
+
+        private enum GroundRegenerationRequestOrigin
+        {
+            OnEnable,
+            OnValidate,
+            ExplicitRegenerate,
+            NewShape,
+            ModifierChanged,
+            RiverChanged,
+            SurfaceStyleChanged,
+            MaterialRefresh,
+            Count
+        }
+
+#if UNITY_EDITOR
+        private sealed class GroundEditorRegenerationBatch
+        {
+            public int Id;
+            public double StartedAt;
+            public int StartFrame;
+            public int EndFrame;
+            public int RequestCount;
+            public readonly int[] RequestOrigins =
+                new int[(int)GroundRegenerationRequestOrigin.Count];
+            public int CoalescedRequestCount;
+            public int PlayStartupFlushCount;
+            public int ForcedImmediateFlushCount;
+            public int QueuedWithoutRetainedOutputCount;
+            public int PassCount;
+            public int NoExpensiveStagePassCount;
+            public readonly int[] StageCounts = new int[9];
+            public int RiverNotificationsReceived;
+            public int RiverCorridorCallbacks;
+            public double TotalPassMilliseconds;
+            public readonly List<string> Timeline = new List<string>(24);
+            public int DroppedTimelineEvents;
+        }
+#endif
         public const string SnowfieldCleanVariantId = "snowfield.clean";
         public const string SnowfieldPatchyVariantId = "snowfield.patchy";
         public const string SnowfieldDirtyThawingVariantId =
@@ -359,6 +398,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private bool groundGeometryInitialized;
         private int groundGeometryRevision;
         private int runtimeRiverNotificationRevision;
+        private bool playStartupRegenerationPending;
+        private int playStartupPendingRequestCount;
+#if UNITY_EDITOR
+        private bool playStartupFlushScheduled;
+#endif
         private int currentSnapshotSignature;
         private int currentPaintedAccentDomainSignature;
         private GroundRegenerationStage lastExecutedRegenerationStages;
@@ -410,6 +454,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private double lastMaterialMilliseconds;
         private double lastRiverCorridorMilliseconds;
         private double lastTotalRegenerationMilliseconds;
+
+#if UNITY_EDITOR
+        private GroundEditorRegenerationBatch activeEditorRegenerationBatch;
+        private string lastEditorRegenerationAccountingReport =
+            "No Ground regeneration-accounting batch has completed yet.";
+        private int nextEditorRegenerationBatchId = 1;
+        private int editorRegenerationActivityRevision;
+        private int scheduledEditorRegenerationActivityRevision;
+        private bool editorRegenerationCompletionScheduled;
+        private bool logNextEditorRegenerationBatch;
+#endif
 
         private static readonly ProfilerMarker RegenerateProfilerMarker =
             new ProfilerMarker("GeneratedGround.Regenerate.Total");
@@ -594,6 +649,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             string.IsNullOrWhiteSpace(lastRegenerationTimingDiagnostics)
                 ? "Ground regeneration has not been measured yet."
                 : lastRegenerationTimingDiagnostics;
+
+#if UNITY_EDITOR
+        public string LastEditorRegenerationAccountingReport =>
+            lastEditorRegenerationAccountingReport;
+
+        public void ClearEditorRegenerationAccounting()
+        {
+            activeEditorRegenerationBatch = null;
+            lastEditorRegenerationAccountingReport =
+                "No Ground regeneration-accounting batch has completed yet.";
+            editorRegenerationActivityRevision++;
+        }
+
+        public void LogNextEditorRegenerationBatchOnce()
+        {
+            logNextEditorRegenerationBatch = true;
+        }
+#endif
         public string ResolvedSurfaceFeatureSummary =>
             ResolveSurfaceVariant() != null
                 ? ResolveSurfaceVariant().BuildFeatureSummary()
@@ -629,7 +702,28 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             CacheComponents();
             NormalizeSurfaceStyleSelection();
             RefreshModifiers();
-            Regenerate();
+            RequestRegeneration(
+                GroundRegenerationRequestOrigin.OnEnable,
+                true);
+        }
+
+        private void Start()
+        {
+            FlushPendingPlayStartupRegeneration();
+        }
+
+        private void OnDisable()
+        {
+            playStartupRegenerationPending = false;
+            playStartupPendingRequestCount = 0;
+#if UNITY_EDITOR
+            if (playStartupFlushScheduled)
+            {
+                EditorApplication.delayCall -=
+                    TryFlushPendingPlayStartupRegeneration;
+                playStartupFlushScheduled = false;
+            }
+#endif
         }
 
         private void OnValidate()
@@ -648,7 +742,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             if (lastValidatedGenerationSignature != generationSignature)
             {
                 RefreshModifiers();
-                Regenerate();
+                RequestRegeneration(
+                    GroundRegenerationRequestOrigin.OnValidate,
+                    false);
                 return;
             }
 
@@ -657,6 +753,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         [ContextMenu("Regenerate Ground")]
         public void Regenerate()
+        {
+            RequestRegeneration(
+                GroundRegenerationRequestOrigin.ExplicitRegenerate,
+                false);
+        }
+
+        private bool RequestRegeneration(
+            GroundRegenerationRequestOrigin origin,
+            bool allowPlayStartupCoalescing)
+        {
+#if UNITY_EDITOR
+            BeginEditorRegenerationRequest(origin);
+#endif
+            if (allowPlayStartupCoalescing &&
+                TryQueuePlayStartupRegeneration(origin))
+            {
+                return false;
+            }
+
+            if (playStartupRegenerationPending)
+            {
+                int coalescedRequestCount =
+                    ConsumePendingPlayStartupRegeneration();
+                RefreshModifiers();
+#if UNITY_EDITOR
+                RecordEditorPlayStartupFlush(
+                    coalescedRequestCount,
+                    "forced immediate by " + origin,
+                    true);
+#endif
+            }
+
+            ExecuteRegenerationPass();
+            return true;
+        }
+
+        private void ExecuteRegenerationPass()
         {
             ResetRegenerationTiming();
             long totalStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -674,6 +807,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         ResolveElapsedMilliseconds(totalStartedAt);
                     lastExecutedRegenerationStages = executedStages;
                     UpdateRegenerationTimingDiagnostics();
+#if UNITY_EDITOR
+                    RecordEditorRegenerationPass(
+                        executedStages,
+                        lastTotalRegenerationMilliseconds);
+#endif
                     return;
                 }
 
@@ -836,6 +974,113 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ResolveElapsedMilliseconds(totalStartedAt);
             lastExecutedRegenerationStages = executedStages;
             UpdateRegenerationTimingDiagnostics();
+#if UNITY_EDITOR
+            RecordEditorRegenerationPass(
+                executedStages,
+                lastTotalRegenerationMilliseconds);
+#endif
+        }
+
+        private bool TryQueuePlayStartupRegeneration(
+            GroundRegenerationRequestOrigin origin)
+        {
+            if (!IsPlayStartupCoalescingWindow())
+            {
+                return false;
+            }
+
+            CacheComponents();
+            bool retainedOutputAvailable =
+                HasRetainedGroundMeshAndColliderOutput();
+            playStartupRegenerationPending = true;
+            playStartupPendingRequestCount++;
+#if UNITY_EDITOR
+            RecordEditorCoalescedPlayStartupRequest(
+                origin,
+                retainedOutputAvailable);
+            SchedulePlayStartupRegenerationFlush();
+#endif
+            return true;
+        }
+
+        private static bool IsPlayStartupCoalescingWindow()
+        {
+#if UNITY_EDITOR
+            return Application.isPlaying && Time.frameCount <= 1;
+#else
+            return false;
+#endif
+        }
+
+        private bool HasRetainedGroundMeshAndColliderOutput()
+        {
+            return generatedMesh != null &&
+                   meshFilter != null &&
+                   meshFilter.sharedMesh == generatedMesh &&
+                   meshCollider != null &&
+                   meshCollider.sharedMesh == generatedMesh;
+        }
+
+#if UNITY_EDITOR
+        private void SchedulePlayStartupRegenerationFlush()
+        {
+            if (playStartupFlushScheduled)
+            {
+                return;
+            }
+
+            playStartupFlushScheduled = true;
+            EditorApplication.delayCall +=
+                TryFlushPendingPlayStartupRegeneration;
+        }
+
+        private void TryFlushPendingPlayStartupRegeneration()
+        {
+            playStartupFlushScheduled = false;
+            if (this == null || !isActiveAndEnabled)
+            {
+                playStartupRegenerationPending = false;
+                playStartupPendingRequestCount = 0;
+                return;
+            }
+
+            FlushPendingPlayStartupRegeneration();
+        }
+#endif
+
+        private int ConsumePendingPlayStartupRegeneration()
+        {
+            int coalescedRequestCount = playStartupPendingRequestCount;
+            playStartupRegenerationPending = false;
+            playStartupPendingRequestCount = 0;
+#if UNITY_EDITOR
+            if (playStartupFlushScheduled)
+            {
+                EditorApplication.delayCall -=
+                    TryFlushPendingPlayStartupRegeneration;
+                playStartupFlushScheduled = false;
+            }
+#endif
+            return coalescedRequestCount;
+        }
+
+        private void FlushPendingPlayStartupRegeneration()
+        {
+            if (!playStartupRegenerationPending)
+            {
+                return;
+            }
+
+            int coalescedRequestCount =
+                ConsumePendingPlayStartupRegeneration();
+            RefreshModifiers();
+#if UNITY_EDITOR
+            RecordEditorPlayStartupFlush(
+                coalescedRequestCount,
+                "startup flush",
+                false);
+#endif
+            ExecuteRegenerationPass();
         }
 
         [ContextMenu("New Ground Shape")]
@@ -844,7 +1089,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             recipe.SetShapeSeed(
                 GenerateDifferentSeed(recipe.ShapeSeed));
 
-            Regenerate();
+            RequestRegeneration(
+                GroundRegenerationRequestOrigin.NewShape,
+                false);
         }
 
         [ContextMenu("Find Ground Modifiers")]
@@ -869,23 +1116,36 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             RefreshModifiers();
-            Regenerate();
+            RequestRegeneration(
+                GroundRegenerationRequestOrigin.ModifierChanged,
+                true);
         }
 
         public void NotifyRiverChanged(StylizedRiver river)
+        {
+            NotifyRiverChanged(river, false);
+        }
+
+        public bool NotifyRiverChanged(
+            StylizedRiver river,
+            bool allowPlayStartupCoalescing)
         {
             if (river == null ||
                 (river.transform != transform &&
                  !river.transform.IsChildOf(transform)))
             {
-                return;
+                return false;
             }
 
             RefreshModifiers();
-#if !UNITY_EDITOR
+#if UNITY_EDITOR
+            RecordEditorRiverNotificationReceived();
+#else
             runtimeRiverNotificationRevision++;
 #endif
-            Regenerate();
+            return RequestRegeneration(
+                GroundRegenerationRequestOrigin.RiverChanged,
+                allowPlayStartupCoalescing);
         }
 
         public void ApplySnowfieldVariant(GroundSnowfieldVariant variant)
@@ -947,7 +1207,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 CalculateGenerationSignature())
             {
                 RefreshModifiers();
-                Regenerate();
+                RequestRegeneration(
+                    GroundRegenerationRequestOrigin.SurfaceStyleChanged,
+                    false);
                 return;
             }
 
@@ -1097,63 +1359,163 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundSurfaceFeatureRecipe feature =
                 ResolveShaderFeature(
                     GroundSurfaceFeatureKind.PaintedAccentLines);
-            float densityContrast =
+            float distributionScale =
                 feature != null
-                    ? feature.PaintedAccentCompositionDensityContrast
+                    ? feature.PaintedAccentDistributionScale
+                    : 0f;
+            float distributionContrast =
+                feature != null
+                    ? feature.PaintedAccentDistributionContrast
                     : 0f;
             float pathWiggle =
                 feature != null
                     ? feature.PaintedAccentStrokePathWiggle
                     : 0f;
-            float horizontalCompanionStrength =
+            float companionParticipation =
                 feature != null
-                    ? feature.PaintedAccentHorizontalCompanionStrength
+                    ? feature.PaintedAccentCompanionParticipation
                     : 0f;
+            float companionTripletShare =
+                feature != null
+                    ? feature.PaintedAccentCompanionTripletShare
+                    : 0.45f;
+            float clusterRegionBias =
+                feature != null
+                    ? feature.PaintedAccentClusterRegionBias
+                    : 0.65f;
             float companionTightness =
                 feature != null
                     ? feature.PaintedAccentCompanionTightness
                     : 0f;
-            float companionTripletVerticality =
+            float clusterVerticality =
                 feature != null
-                    ? feature.PaintedAccentCompanionTripletVerticality
+                    ? feature.PaintedAccentClusterVerticality
                     : 1f;
             Vector4 familyWeights =
                 feature != null
                     ? feature.PaintedAccentGlyphFamilyWeights
                     : Vector4.zero;
+            GroundPaintedAccentProposalRankDiagnostics rankDiagnostics =
+                diagnostics.ProposalRankDiagnostics;
+            float surfaceAcceptance =
+                ResolvePercentage(
+                    diagnostics.Accepted,
+                    diagnostics.PhysicallyEvaluated);
+            Vector4 rankAcceptance =
+                new Vector4(
+                    ResolvePercentage(
+                        rankDiagnostics.Accepted.x,
+                        rankDiagnostics.Selected.x),
+                    ResolvePercentage(
+                        rankDiagnostics.Accepted.y,
+                        rankDiagnostics.Selected.y),
+                    ResolvePercentage(
+                        rankDiagnostics.Accepted.z,
+                        rankDiagnostics.Selected.z),
+                    ResolvePercentage(
+                        rankDiagnostics.Accepted.w,
+                        rankDiagnostics.Selected.w));
+            Vector3 regionAcceptance =
+                new Vector3(
+                    ResolvePercentage(
+                        diagnostics.QuietAcceptedCount,
+                        diagnostics.QuietProposalCount),
+                    ResolvePercentage(
+                        diagnostics.SupportingAcceptedCount,
+                        diagnostics.SupportingProposalCount),
+                    ResolvePercentage(
+                        diagnostics.AccentAcceptedCount,
+                        diagnostics.AccentProposalCount));
+            bool hasProjectedFunnel =
+                paintedAccentProjectedGlyphDebugSnapshot.IsValid;
+            GroundPaintedAccentProjectedGlyphDiagnostics projectedDiagnostics =
+                hasProjectedFunnel
+                    ? paintedAccentProjectedGlyphDebugSnapshot.Diagnostics
+                    : default;
+            GroundPaintedAccentProjectedFunnelDiagnostics projectedBreakdown =
+                projectedDiagnostics.FunnelDiagnostics;
+            Vector4 rankProjectedAcceptance =
+                new Vector4(
+                    ResolvePercentage(
+                        projectedBreakdown.ProposalRankProjectedValid.x,
+                        rankDiagnostics.Accepted.x),
+                    ResolvePercentage(
+                        projectedBreakdown.ProposalRankProjectedValid.y,
+                        rankDiagnostics.Accepted.y),
+                    ResolvePercentage(
+                        projectedBreakdown.ProposalRankProjectedValid.z,
+                        rankDiagnostics.Accepted.z),
+                    ResolvePercentage(
+                        projectedBreakdown.ProposalRankProjectedValid.w,
+                        rankDiagnostics.Accepted.w));
+            Vector3 regionProjectedAcceptance =
+                new Vector3(
+                    ResolvePercentage(
+                        projectedBreakdown.QuietProjectedValid,
+                        diagnostics.QuietAcceptedCount),
+                    ResolvePercentage(
+                        projectedBreakdown.SupportingProjectedValid,
+                        diagnostics.SupportingAcceptedCount),
+                    ResolvePercentage(
+                        projectedBreakdown.AccentProjectedValid,
+                        diagnostics.AccentAcceptedCount));
+            string projectedFunnel =
+                hasProjectedFunnel
+                    ? BuildPaintedAccentProjectedFunnelSummary(
+                        projectedDiagnostics)
+                    : "Projected valid / final projected: unavailable\n";
 
             return
-                $"Target proposals / candidate pool: " +
-                $"{diagnostics.TargetProposals} / {diagnostics.CandidatePool}\n" +
-                $"Proposed / final accepted: " +
-                $"{diagnostics.Proposed} / {diagnostics.Accepted}\n" +
-                $"Rejected regional thinning: " +
-                $"{diagnostics.RejectedRegionalThinning}\n" +
-                $"Rejected physical validation: " +
-                $"{diagnostics.RejectedPhysicalValidation}\n\n" +
+                $"Candidate pool / selected / physically evaluated: " +
+                $"{diagnostics.CandidatePool} / {diagnostics.Proposed} / " +
+                $"{diagnostics.PhysicallyEvaluated}\n" +
+                $"Surface accepted / rejected / acceptance: " +
+                $"{diagnostics.Accepted} / " +
+                $"{diagnostics.RejectedPhysicalValidation} / " +
+                $"{surfaceAcceptance:F1}%\n" +
+                projectedFunnel +
+                $"Proposal rank Q1-Q4 selected: " +
+                $"{rankDiagnostics.Selected.x:F0} / " +
+                $"{rankDiagnostics.Selected.y:F0} / " +
+                $"{rankDiagnostics.Selected.z:F0} / " +
+                $"{rankDiagnostics.Selected.w:F0}\n" +
+                $"Proposal rank Q1-Q4 surface accepted: " +
+                $"{rankDiagnostics.Accepted.x:F0} / " +
+                $"{rankDiagnostics.Accepted.y:F0} / " +
+                $"{rankDiagnostics.Accepted.z:F0} / " +
+                $"{rankDiagnostics.Accepted.w:F0}\n" +
+                $"Proposal rank Q1-Q4 surface acceptance: " +
+                $"{rankAcceptance.x:F1}% / " +
+                $"{rankAcceptance.y:F1}% / " +
+                $"{rankAcceptance.z:F1}% / " +
+                $"{rankAcceptance.w:F1}%\n" +
+                $"Proposal rank Q1-Q4 projected valid: " +
+                $"{projectedBreakdown.ProposalRankProjectedValid.x:F0} / " +
+                $"{projectedBreakdown.ProposalRankProjectedValid.y:F0} / " +
+                $"{projectedBreakdown.ProposalRankProjectedValid.z:F0} / " +
+                $"{projectedBreakdown.ProposalRankProjectedValid.w:F0}\n" +
+                $"Proposal rank Q1-Q4 projected acceptance: " +
+                $"{rankProjectedAcceptance.x:F1}% / " +
+                $"{rankProjectedAcceptance.y:F1}% / " +
+                $"{rankProjectedAcceptance.z:F1}% / " +
+                $"{rankProjectedAcceptance.w:F1}%\n\n" +
                 $"Proposal-bearing regions: " +
                 $"{diagnostics.CompositionRegionCount}\n" +
                 $"Quiet / supporting / accent regions: " +
                 $"{diagnostics.QuietRegionCount} / " +
                 $"{diagnostics.SupportingRegionCount} / " +
                 $"{diagnostics.AccentRegionCount}\n" +
-                $"Region scale: {diagnostics.CompositionRegionScale:F3} m\n" +
-                $"Regional density contrast: {densityContrast:F2}\n" +
+                $"Distribution scale / contrast: " +
+                $"{distributionScale:F2} m / {distributionContrast:F2}\n" +
                 $"Stroke path wiggle: {pathWiggle:F2}\n" +
-                $"Horizontal companion strength / tightness / triplet verticality: " +
-                $"{horizontalCompanionStrength:F2} / " +
-                $"{companionTightness:F2} / " +
-                $"{companionTripletVerticality:F2}\n" +
-                $"Companion clusters composed (pairs / triplets): " +
-                $"{diagnostics.HorizontalCompanionClusterCount} (" +
-                $"{diagnostics.HorizontalCompanionPairClusterCount} / " +
-                $"{diagnostics.HorizontalCompanionTripletClusterCount})\n" +
-                $"Companion participants composed / accepted: " +
-                $"{diagnostics.HorizontalCompanionParticipantCount} / " +
-                $"{diagnostics.HorizontalCompanionAcceptedParticipantCount}\n" +
-                $"Companion full clusters accepted: " +
-                $"{diagnostics.HorizontalCompanionAcceptedClusterCount}\n" +
-                $"Proposals quiet / supporting / accent: " +
+                $"Companion participation / triplet share / cluster region bias: " +
+                $"{companionParticipation:F2} / " +
+                $"{companionTripletShare:F2} / " +
+                $"{clusterRegionBias:F2}\n" +
+                $"Companion tightness / cluster verticality: " +
+                $"{companionTightness:F2} / {clusterVerticality:F2}\n" +
+                $"Companion allocation stage: final valid projected prototypes\n" +
+                $"Selected quiet / supporting / accent: " +
                 $"{diagnostics.QuietProposalCount} / " +
                 $"{diagnostics.SupportingProposalCount} / " +
                 $"{diagnostics.AccentProposalCount}\n" +
@@ -1161,6 +1523,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"{diagnostics.QuietAcceptedCount} / " +
                 $"{diagnostics.SupportingAcceptedCount} / " +
                 $"{diagnostics.AccentAcceptedCount}\n" +
+                $"Region surface acceptance quiet / supporting / accent: " +
+                $"{regionAcceptance.x:F1}% / " +
+                $"{regionAcceptance.y:F1}% / " +
+                $"{regionAcceptance.z:F1}%\n" +
+                $"Projected-valid quiet / supporting / accent: " +
+                $"{projectedBreakdown.QuietProjectedValid} / " +
+                $"{projectedBreakdown.SupportingProjectedValid} / " +
+                $"{projectedBreakdown.AccentProjectedValid}\n" +
+                $"Region projected acceptance quiet / supporting / accent: " +
+                $"{regionProjectedAcceptance.x:F1}% / " +
+                $"{regionProjectedAcceptance.y:F1}% / " +
+                $"{regionProjectedAcceptance.z:F1}%\n" +
                 $"Accepted dominant / standard / support: " +
                 $"{diagnostics.DominantAcceptedCount} / " +
                 $"{diagnostics.StandardAcceptedCount} / " +
@@ -1186,10 +1560,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"{diagnostics.AcceptedAngleOffsetMin:F1} / " +
                 $"{diagnostics.AcceptedAngleOffsetMean:F1} / " +
                 $"{diagnostics.AcceptedAngleOffsetMax:F1} deg\n" +
-                $"Accepted companion angle min/mean/max: " +
-                $"{diagnostics.AcceptedCompanionAngleOffsetMin:F1} / " +
-                $"{diagnostics.AcceptedCompanionAngleOffsetMean:F1} / " +
-                $"{diagnostics.AcceptedCompanionAngleOffsetMax:F1} deg\n\n" +
                 $"Rejected sampling / river / modifier: " +
                 $"{diagnostics.RejectedSampling} / " +
                 $"{diagnostics.RejectedRiver} / " +
@@ -1197,6 +1567,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"Rejected broad slope / local grade: " +
                 $"{diagnostics.RejectedBroadSlope} / " +
                 $"{diagnostics.RejectedLocalGrade}";
+        }
+
+        private static string BuildPaintedAccentProjectedFunnelSummary(
+            GroundPaintedAccentProjectedGlyphDiagnostics diagnostics)
+        {
+            int projectedValid =
+                diagnostics.QuotaDiagnostics.ValidProjectedMarks;
+            float projectedAcceptance =
+                ResolvePercentage(
+                    projectedValid,
+                    diagnostics.AcceptedBaseDescriptors);
+            return
+                $"Projected valid / final projected: " +
+                $"{projectedValid} / {diagnostics.ProjectedGlyphsAccepted}\n" +
+                $"Projected acceptance from surface: " +
+                $"{projectedAcceptance:F1}%\n";
+        }
+
+        private static float ResolvePercentage(float numerator, float denominator)
+        {
+            return denominator > 0.0001f
+                ? numerator * 100f / denominator
+                : 0f;
         }
 
         public int CalculatePaintedAccentProjectedGlyphDebugSignature()
@@ -1228,6 +1621,35 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return snapshot.IsValid;
         }
 
+        public string GetLastPaintedAccentCompanionQuotaSummary()
+        {
+            if (!paintedAccentProjectedGlyphDebugSnapshot.IsValid)
+            {
+                return "Last resolved composition: generate Painted Accents once to resolve the final whole-mark quotas.";
+            }
+
+            GroundPaintedAccentProjectedGlyphDiagnostics diagnostics =
+                paintedAccentProjectedGlyphDebugSnapshot.Diagnostics;
+            GroundPaintedAccentCompanionQuotaDiagnostics quota =
+                diagnostics.QuotaDiagnostics;
+            int independentMarks =
+                Mathf.Max(
+                    0,
+                    diagnostics.ProjectedGlyphsAccepted -
+                    diagnostics.FinalCompanionParticipantCount);
+
+            return
+                $"Last resolved composition: " +
+                $"{quota.AchievedPairClusters} pairs / " +
+                $"{quota.AchievedTripletClusters} triplets / " +
+                $"{independentMarks} independent; " +
+                $"{diagnostics.FinalCompanionParticipantCount} of " +
+                $"{diagnostics.ProjectedGlyphsAccepted} marks clustered " +
+                $"({diagnostics.FinalCompanionParticipantFraction * 100f:F1}%). " +
+                $"Shortfall pairs / triplets: " +
+                $"{quota.PairShortfall} / {quota.TripletShortfall}.";
+        }
+
         public string GetLastPaintedAccentProjectedGlyphStatistics()
         {
             CacheComponents();
@@ -1245,6 +1667,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             GroundPaintedAccentProjectedGlyphDiagnostics diagnostics =
                 paintedAccentProjectedGlyphDebugSnapshot.Diagnostics;
+            GroundPaintedAccentCompanionQuotaDiagnostics quota =
+                diagnostics.QuotaDiagnostics;
+            GroundPaintedAccentClusterBuildAuditDiagnostics clusterAudit =
+                diagnostics.ClusterBuildAuditDiagnostics;
+            GroundPaintedAccentInternalOverlapAuditDiagnostics overlapAudit =
+                diagnostics.InternalOverlapAuditDiagnostics;
+            GroundPaintedAccentNearParallelAuditDiagnostics nearParallelAudit =
+                diagnostics.NearParallelAuditDiagnostics;
 
             return
                 $"Base descriptors: {diagnostics.AcceptedBaseDescriptors}\n" +
@@ -1257,13 +1687,123 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"Rejected local grade: {diagnostics.ProjectedGlyphsRejectedLocalGrade}\n" +
                 $"Rejected family shape: {diagnostics.ProjectedGlyphsRejectedFamilyShape}\n" +
                 $"Rejected sharp projected turn: {diagnostics.ProjectedGlyphsRejectedSharpTurn}\n\n" +
+                $"Authoritative participation / triplet share: " +
+                $"{quota.RequestedParticipationFraction * 100f:F1}% / " +
+                $"{quota.RequestedTripletShare * 100f:F1}%\n" +
+                $"Resolved participants / valid projected marks: " +
+                $"{quota.RequestedParticipants} / {quota.ValidProjectedMarks}\n" +
+                $"Requested pair / triplet clusters: " +
+                $"{quota.RequestedPairClusters} / {quota.RequestedTripletClusters}\n" +
+                $"Achieved pair / triplet clusters: " +
+                $"{quota.AchievedPairClusters} / {quota.AchievedTripletClusters}\n" +
+                $"Explicit pair / triplet shortfall: " +
+                $"{quota.PairShortfall} / {quota.TripletShortfall}\n" +
+                $"Bounded cluster build attempts: {quota.BuildAttempts}\n" +
+                $"External index queries / grid cells / unique candidates: " +
+                $"{clusterAudit.ExternalSpatialQueries} / " +
+                $"{clusterAudit.ExternalGridCellsVisited} / " +
+                $"{clusterAudit.ExternalUniqueCandidatesReturned}\n" +
+                $"External full-list comparisons avoided / actual external relationships tested: " +
+                $"{clusterAudit.ExternalFullListComparisonsAvoided} / " +
+                $"{clusterAudit.ExternalGlyphCandidatesExamined}\n" +
+                $"External bounds tests / passes / detailed / conflicts: " +
+                $"{clusterAudit.ExternalBoundsTests} / " +
+                $"{clusterAudit.ExternalBoundsOverlapPasses} / " +
+                $"{clusterAudit.ExternalDetailedOverlapTests} / " +
+                $"{clusterAudit.ExternalConflictRejections}\n" +
+                $"Reconciliation clusters examined / new independent relationships tested: " +
+                $"{clusterAudit.ReconciliationClustersExamined} / " +
+                $"{clusterAudit.ReconciliationNewIndependentRelationshipsTested}\n" +
+                $"Reconciliation previously validated / legacy full-list relationships skipped: " +
+                $"{clusterAudit.ReconciliationPreviouslyValidatedRelationshipsSkipped} / " +
+                $"{clusterAudit.ReconciliationLegacyFullListComparisonsAvoided}\n" +
+                $"Reconciliation bounds tests / passes / detailed: " +
+                $"{clusterAudit.ReconciliationBoundsTests} / " +
+                $"{clusterAudit.ReconciliationBoundsOverlapPasses} / " +
+                $"{clusterAudit.ReconciliationDetailedOverlapTests}\n" +
+                $"Pair layouts requested stepped / shoulder / offset / shallow: " +
+                $"{quota.RequestedPairLayouts.x:F0} / {quota.RequestedPairLayouts.y:F0} / " +
+                $"{quota.RequestedPairLayouts.z:F0} / {quota.RequestedPairLayouts.w:F0}\n" +
+                $"Pair layouts achieved stepped / shoulder / offset / shallow: " +
+                $"{quota.AchievedPairLayouts.x:F0} / {quota.AchievedPairLayouts.y:F0} / " +
+                $"{quota.AchievedPairLayouts.z:F0} / {quota.AchievedPairLayouts.w:F0}\n" +
+                $"Triplet layouts requested stepped / crown / broken / shallow: " +
+                $"{quota.RequestedTripletLayouts.x:F0} / {quota.RequestedTripletLayouts.y:F0} / " +
+                $"{quota.RequestedTripletLayouts.z:F0} / {quota.RequestedTripletLayouts.w:F0}\n" +
+                $"Triplet layouts achieved stepped / crown / broken / shallow: " +
+                $"{quota.AchievedTripletLayouts.x:F0} / {quota.AchievedTripletLayouts.y:F0} / " +
+                $"{quota.AchievedTripletLayouts.z:F0} / {quota.AchievedTripletLayouts.w:F0}\n" +
                 $"Projected companion clusters requested / accepted / fallback: " +
                 $"{diagnostics.CompanionClustersRequested} / " +
                 $"{diagnostics.CompanionClustersAccepted} / " +
                 $"{diagnostics.CompanionClustersFallback}\n" +
-                $"Projected complete pairs / triplets: " +
-                $"{diagnostics.CompanionPairsAccepted} / " +
-                $"{diagnostics.CompanionTripletsAccepted}\n" +
+                $"Final clustered participants / accepted glyphs / percent: " +
+                $"{diagnostics.FinalCompanionParticipantCount} / " +
+                $"{diagnostics.ProjectedGlyphsAccepted} / " +
+                $"{diagnostics.FinalCompanionParticipantFraction * 100f:F1}%\n" +
+                $"Clusters removed during final independent reconciliation: " +
+                $"{diagnostics.CompanionClustersRemovedDuringReconciliation}\n" +
+                $"Committed pair-local step min/mean/max: " +
+                $"{diagnostics.CompanionPairVerticalStepMin:F3} / " +
+                $"{diagnostics.CompanionPairVerticalStepMean:F3} / " +
+                $"{diagnostics.CompanionPairVerticalStepMax:F3} m\n" +
+                $"Committed pair-local step fraction min/mean/max: " +
+                $"{diagnostics.CompanionPairVerticalStepFractionMin:F3} / " +
+                $"{diagnostics.CompanionPairVerticalStepFractionMean:F3} / " +
+                $"{diagnostics.CompanionPairVerticalStepFractionMax:F3}\n" +
+                $"Pair contact candidates rejected by step retention: " +
+                $"{diagnostics.CompanionPairStepRetentionRejectedCandidates}\n" +
+                $"Pair near-collinear endpoint candidates rejected: " +
+                $"{diagnostics.CompanionPairNearCollinearRejectedCandidates}\n" +
+                $"Pre-geometry candidates rejected by step / score: " +
+                $"{diagnostics.CompanionPreGeometryStepRetentionRejectedCandidates} / " +
+                $"{diagnostics.CompanionPreGeometryNonCompetitiveScoreRejectedCandidates}\n" +
+                $"Candidates sent to geometric validation: " +
+                $"{diagnostics.CompanionCandidatesSentToGeometryValidation}\n" +
+                $"Near-parallel body-blend candidates rejected: " +
+                $"{diagnostics.CompanionNearParallelBodyRejectedCandidates}\n" +
+                $"Near-parallel method calls / metadata preparations / segments prepared: " +
+                $"{nearParallelAudit.MethodCalls} / " +
+                $"{nearParallelAudit.RightSegmentMetadataPreparations} / " +
+                $"{nearParallelAudit.RightSegmentsPrepared}\n" +
+                $"Near-parallel segment pairs considered / axis-gap rejected / alignment rejected: " +
+                $"{nearParallelAudit.SegmentPairsConsidered} / " +
+                $"{nearParallelAudit.SegmentPairsRejectedByAxisGap} / " +
+                $"{nearParallelAudit.SegmentPairsRejectedByAlignment}\n" +
+                $"Near-parallel exact distance tests / distance passes / interval evaluations / blends: " +
+                $"{nearParallelAudit.SegmentPairsSentToExactDistance} / " +
+                $"{nearParallelAudit.ExactDistancePasses} / " +
+                $"{nearParallelAudit.ExactIntervalOverlapEvaluations} / " +
+                $"{nearParallelAudit.BlendsDetected}\n" +
+                $"Triplet occupied attachment-slot candidates rejected: " +
+                $"{diagnostics.CompanionOccupiedAttachmentSlotRejectedCandidates}\n" +
+                $"Triplet shared contact-locus candidates rejected: " +
+                $"{diagnostics.CompanionSharedContactLocusRejectedCandidates}\n" +
+                $"Crowded triplet junction candidates rejected: " +
+                $"{diagnostics.CompanionCrowdedTripletJunctionRejectedCandidates}\n" +
+                $"Triplet free-end pseudo-contact candidates rejected: " +
+                $"{diagnostics.CompanionTripletFreeEndPseudoContactRejectedCandidates}\n" +
+                $"Severely compressed triplet candidates rejected: " +
+                $"{diagnostics.CompanionSeverelyCompressedTripletRejectedCandidates}\n" +
+                $"Wrong-side terminal candidates rejected: " +
+                $"{diagnostics.CompanionWrongSideTerminalRejectedCandidates}\n" +
+                $"Swept-width internal-overlap candidates rejected: " +
+                $"{diagnostics.CompanionSweptWidthInternalOverlapRejectedCandidates}\n" +
+                $"Internal-overlap method calls / final silhouette calls: " +
+                $"{overlapAudit.MethodCalls} / {overlapAudit.FinalSilhouetteCalls}\n" +
+                $"Internal segment pairs considered / broad-phase rejected / exact narrow-phase: " +
+                $"{overlapAudit.SegmentPairsConsidered} / " +
+                $"{overlapAudit.SegmentPairsRejectedByBroadPhase} / " +
+                $"{overlapAudit.SegmentPairsSentToExactNarrowPhase}\n" +
+                $"Exact intersections / swept-clearance rejections: " +
+                $"{overlapAudit.ExactSegmentIntersectionsFound} / " +
+                $"{overlapAudit.ExactSweptClearanceRejections}\n" +
+                $"Pair fallback incomplete / prototype / contact / surface / external: " +
+                $"{diagnostics.CompanionPairRejectedIncomplete} / " +
+                $"{diagnostics.CompanionPairRejectedPrototype} / " +
+                $"{diagnostics.CompanionPairRejectedContact} / " +
+                $"{diagnostics.CompanionPairRejectedSurface} / " +
+                $"{diagnostics.CompanionPairRejectedExternalConflict}\n" +
                 $"Companion fallback incomplete / prototype / contact / surface / external: " +
                 $"{diagnostics.CompanionRejectedIncomplete} / " +
                 $"{diagnostics.CompanionRejectedPrototype} / " +
@@ -1433,6 +1973,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         public void RefreshSurfaceMaterialProperties()
         {
+#if UNITY_EDITOR
+            BeginEditorRegenerationRequest(
+                GroundRegenerationRequestOrigin.MaterialRefresh);
+#endif
             ResetRegenerationTiming();
             long totalStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
             GroundRegenerationStage executedStages =
@@ -1478,6 +2022,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ResolveElapsedMilliseconds(totalStartedAt);
             lastExecutedRegenerationStages = executedStages;
             UpdateRegenerationTimingDiagnostics();
+#if UNITY_EDITOR
+            RecordEditorRegenerationPass(
+                executedStages,
+                lastTotalRegenerationMilliseconds);
+#endif
         }
 
         public bool TrySampleBaseSurface(
@@ -1740,6 +2289,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     continue;
                 }
 
+#if UNITY_EDITOR
+                RecordEditorRiverCorridorCallback();
+#endif
                 river.RebuildCorridorFromGround();
             }
         }
@@ -1764,6 +2316,302 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 river.RefreshCorridorMaterialProperties();
             }
         }
+
+#if UNITY_EDITOR
+        private void BeginEditorRegenerationRequest(
+            GroundRegenerationRequestOrigin origin)
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.RequestCount++;
+            activeEditorRegenerationBatch.RequestOrigins[(int)origin]++;
+            AppendEditorRegenerationTimeline("Request " + origin);
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorCoalescedPlayStartupRequest(
+            GroundRegenerationRequestOrigin origin,
+            bool retainedOutputAvailable)
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.CoalescedRequestCount++;
+            if (!retainedOutputAvailable)
+            {
+                activeEditorRegenerationBatch
+                    .QueuedWithoutRetainedOutputCount++;
+            }
+            AppendEditorRegenerationTimeline(
+                "Queued PlayStartup " + origin +
+                (retainedOutputAvailable
+                    ? " / retained mesh+collider"
+                    : " / initialization barrier required"));
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorPlayStartupFlush(
+            int coalescedRequestCount,
+            string trigger,
+            bool forcedImmediate)
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.PlayStartupFlushCount++;
+            if (forcedImmediate)
+            {
+                activeEditorRegenerationBatch.ForcedImmediateFlushCount++;
+            }
+            AppendEditorRegenerationTimeline(
+                "Flush PlayStartup " +
+                Mathf.Max(0, coalescedRequestCount) +
+                " coalesced request(s) / " + trigger);
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorRegenerationPass(
+            GroundRegenerationStage stages,
+            double elapsedMilliseconds)
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.PassCount++;
+            activeEditorRegenerationBatch.TotalPassMilliseconds +=
+                Math.Max(0.0, elapsedMilliseconds);
+
+            GroundRegenerationStage expensiveStages =
+                GroundRegenerationStage.Geometry |
+                GroundRegenerationStage.Mesh |
+                GroundRegenerationStage.Collider |
+                GroundRegenerationStage.SurfaceStrokes |
+                GroundRegenerationStage.ProjectedGlyphs |
+                GroundRegenerationStage.Coverage |
+                GroundRegenerationStage.RiverCorridor;
+            if ((stages & expensiveStages) == 0)
+            {
+                activeEditorRegenerationBatch.NoExpensiveStagePassCount++;
+            }
+
+            RecordEditorStageCount(stages, GroundRegenerationStage.Snapshots, 0);
+            RecordEditorStageCount(stages, GroundRegenerationStage.Geometry, 1);
+            RecordEditorStageCount(stages, GroundRegenerationStage.Mesh, 2);
+            RecordEditorStageCount(stages, GroundRegenerationStage.Collider, 3);
+            RecordEditorStageCount(stages, GroundRegenerationStage.SurfaceStrokes, 4);
+            RecordEditorStageCount(stages, GroundRegenerationStage.ProjectedGlyphs, 5);
+            RecordEditorStageCount(stages, GroundRegenerationStage.Coverage, 6);
+            RecordEditorStageCount(stages, GroundRegenerationStage.Material, 7);
+            RecordEditorStageCount(stages, GroundRegenerationStage.RiverCorridor, 8);
+            AppendEditorRegenerationTimeline(
+                "Pass " + stages + " " +
+                Math.Max(0.0, elapsedMilliseconds).ToString("F3") + " ms");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorStageCount(
+            GroundRegenerationStage stages,
+            GroundRegenerationStage stage,
+            int index)
+        {
+            if ((stages & stage) != 0)
+            {
+                activeEditorRegenerationBatch.StageCounts[index]++;
+            }
+        }
+
+        private void RecordEditorRiverNotificationReceived()
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.RiverNotificationsReceived++;
+            AppendEditorRegenerationTimeline("River notification received");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void RecordEditorRiverCorridorCallback()
+        {
+            EnsureEditorRegenerationBatch();
+            activeEditorRegenerationBatch.RiverCorridorCallbacks++;
+            AppendEditorRegenerationTimeline("River corridor callback");
+            MarkEditorRegenerationActivity();
+        }
+
+        private void AppendEditorRegenerationTimeline(string entry)
+        {
+            const int MaximumTimelineEvents = 32;
+            EnsureEditorRegenerationBatch();
+            if (activeEditorRegenerationBatch.Timeline.Count <
+                MaximumTimelineEvents)
+            {
+                activeEditorRegenerationBatch.Timeline.Add(
+                    EditorApplication.timeSinceStartup.ToString("F6") +
+                    "s " + entry);
+            }
+            else
+            {
+                activeEditorRegenerationBatch.DroppedTimelineEvents++;
+            }
+        }
+
+        private void EnsureEditorRegenerationBatch()
+        {
+            if (activeEditorRegenerationBatch != null)
+            {
+                return;
+            }
+
+            activeEditorRegenerationBatch =
+                new GroundEditorRegenerationBatch
+                {
+                    Id = nextEditorRegenerationBatchId++,
+                    StartedAt = EditorApplication.timeSinceStartup,
+                    StartFrame = Time.frameCount
+                };
+        }
+
+        private void MarkEditorRegenerationActivity()
+        {
+            editorRegenerationActivityRevision++;
+            ScheduleEditorRegenerationBatchCompletion();
+        }
+
+        private void ScheduleEditorRegenerationBatchCompletion()
+        {
+            if (editorRegenerationCompletionScheduled)
+            {
+                return;
+            }
+
+            editorRegenerationCompletionScheduled = true;
+            scheduledEditorRegenerationActivityRevision =
+                editorRegenerationActivityRevision;
+            EditorApplication.delayCall +=
+                TryCompleteEditorRegenerationBatch;
+        }
+
+        private void TryCompleteEditorRegenerationBatch()
+        {
+            editorRegenerationCompletionScheduled = false;
+            if (activeEditorRegenerationBatch == null)
+            {
+                return;
+            }
+
+            if (scheduledEditorRegenerationActivityRevision !=
+                editorRegenerationActivityRevision)
+            {
+                ScheduleEditorRegenerationBatchCompletion();
+                return;
+            }
+
+            GroundEditorRegenerationBatch completed =
+                activeEditorRegenerationBatch;
+            activeEditorRegenerationBatch = null;
+            completed.EndFrame = Time.frameCount;
+            lastEditorRegenerationAccountingReport =
+                BuildEditorRegenerationAccountingReport(completed);
+
+            if (logNextEditorRegenerationBatch)
+            {
+                logNextEditorRegenerationBatch = false;
+                Debug.Log(
+                    lastEditorRegenerationAccountingReport,
+                    this);
+            }
+        }
+
+        private static string BuildEditorRegenerationAccountingReport(
+            GroundEditorRegenerationBatch batch)
+        {
+            double wallMilliseconds =
+                Math.Max(
+                    0.0,
+                    (EditorApplication.timeSinceStartup - batch.StartedAt) *
+                    1000.0);
+            StringBuilder builder = new StringBuilder(768);
+            builder.Append("GeneratedGround regeneration accounting\n");
+            builder.Append("Batch ").Append(batch.Id)
+                .Append(" | frames ").Append(batch.StartFrame)
+                .Append('–').Append(batch.EndFrame)
+                .Append(" | wall ").Append(wallMilliseconds.ToString("F3"))
+                .Append(" ms | measured passes ")
+                .Append(batch.TotalPassMilliseconds.ToString("F3"))
+                .Append(" ms\n");
+            builder.Append("Requests ").Append(batch.RequestCount)
+                .Append(" | coalesced ")
+                .Append(batch.CoalescedRequestCount)
+                .Append(" | passes ").Append(batch.PassCount)
+                .Append(" | no-expensive-stage passes ")
+                .Append(batch.NoExpensiveStagePassCount).Append('\n');
+            builder.Append("Play startup: flushes ")
+                .Append(batch.PlayStartupFlushCount)
+                .Append(" | forced-immediate flushes ")
+                .Append(batch.ForcedImmediateFlushCount)
+                .Append(" | queued without retained output ")
+                .Append(batch.QueuedWithoutRetainedOutputCount)
+                .Append('\n');
+            builder.Append("Origins: ");
+            AppendEditorOriginCounts(builder, batch.RequestOrigins);
+            builder.Append("\nStages: Snapshots×").Append(batch.StageCounts[0])
+                .Append(" Geometry×").Append(batch.StageCounts[1])
+                .Append(" Mesh×").Append(batch.StageCounts[2])
+                .Append(" Collider×").Append(batch.StageCounts[3])
+                .Append(" SurfaceStrokes×").Append(batch.StageCounts[4])
+                .Append(" ProjectedGlyphs×").Append(batch.StageCounts[5])
+                .Append(" Coverage×").Append(batch.StageCounts[6])
+                .Append(" Material×").Append(batch.StageCounts[7])
+                .Append(" RiverCorridor×").Append(batch.StageCounts[8])
+                .Append('\n');
+            builder.Append("River notifications received ")
+                .Append(batch.RiverNotificationsReceived)
+                .Append(" | corridor callbacks ")
+                .Append(batch.RiverCorridorCallbacks);
+            AppendEditorRegenerationTimelineReport(builder, batch);
+            return builder.ToString();
+        }
+
+        private static void AppendEditorRegenerationTimelineReport(
+            StringBuilder builder,
+            GroundEditorRegenerationBatch batch)
+        {
+            builder.Append("\nTimeline:");
+            for (int index = 0; index < batch.Timeline.Count; index++)
+            {
+                builder.Append("\n  ").Append(index + 1).Append(". ")
+                    .Append(batch.Timeline[index]);
+            }
+            if (batch.DroppedTimelineEvents > 0)
+            {
+                builder.Append("\n  … ")
+                    .Append(batch.DroppedTimelineEvents)
+                    .Append(" additional event(s) omitted");
+            }
+        }
+
+        private static void AppendEditorOriginCounts(
+            StringBuilder builder,
+            int[] counts)
+        {
+            bool wroteAny = false;
+            for (int index = 0;
+                 index < (int)GroundRegenerationRequestOrigin.Count;
+                 index++)
+            {
+                int count = counts[index];
+                if (count <= 0)
+                {
+                    continue;
+                }
+
+                if (wroteAny)
+                {
+                    builder.Append(", ");
+                }
+
+                builder.Append((GroundRegenerationRequestOrigin)index)
+                    .Append('×').Append(count);
+                wroteAny = true;
+            }
+
+            if (!wroteAny)
+            {
+                builder.Append("none");
+            }
+        }
+#endif
 
         private void NormalizeSurfaceStyleSelection()
         {
@@ -2639,6 +3487,32 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     feature != null ? feature.PaintedAccentFoldIrregularity : 0f);
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentFoldEndTaper : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentCompanionParticipation : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentCompanionTripletShare : 0.45f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentClusterRegionBias : 0.65f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentCompanionTightness : 0.65f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentClusterVerticality : 1f);
+                Vector4 pairLayoutWeights =
+                    feature != null
+                        ? feature.PaintedAccentCompanionPairLayoutWeights
+                        : new Vector4(0.45f, 0.30f, 0.20f, 0.05f);
+                hash = hash * 31 + Quantize(pairLayoutWeights.x);
+                hash = hash * 31 + Quantize(pairLayoutWeights.y);
+                hash = hash * 31 + Quantize(pairLayoutWeights.z);
+                hash = hash * 31 + Quantize(pairLayoutWeights.w);
+                Vector4 tripletLayoutWeights =
+                    feature != null
+                        ? feature.PaintedAccentCompanionTripletLayoutWeights
+                        : new Vector4(0.40f, 0.30f, 0.25f, 0.05f);
+                hash = hash * 31 + Quantize(tripletLayoutWeights.x);
+                hash = hash * 31 + Quantize(tripletLayoutWeights.y);
+                hash = hash * 31 + Quantize(tripletLayoutWeights.z);
+                hash = hash * 31 + Quantize(tripletLayoutWeights.w);
                 Vector2 localNorth = ResolvePaintedAccentProjectedNorthLocalXZ();
                 hash = hash * 31 + Quantize(localNorth.x);
                 hash = hash * 31 + Quantize(localNorth.y);
@@ -2702,35 +3576,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentStrokeDensity : 0f);
                 hash = hash * 31 + Quantize(
-                    feature != null ? feature.PaintedAccentDistributionPatchScale : 0f);
+                    feature != null ? feature.PaintedAccentDistributionScale : 0f);
                 hash = hash * 31 + Quantize(
-                    feature != null ? feature.PaintedAccentDistributionPatchiness : 0f);
-                hash = hash * 31 + Quantize(
-                    feature != null ? feature.PaintedAccentDistributionSparseFloor : 0f);
-                hash = hash * 31 + Quantize(
-                    feature != null ? feature.PaintedAccentCompositionRegionScale : 0f);
-                hash = hash * 31 + Quantize(
-                    feature != null ? feature.PaintedAccentCompositionDensityContrast : 0f);
-                float horizontalCompanionStrength =
-                    feature != null
-                        ? feature.PaintedAccentHorizontalCompanionStrength
-                        : 0f;
-                hash = hash * 31 + Quantize(horizontalCompanionStrength);
-                if (horizontalCompanionStrength > 0.0001f)
-                {
-                    hash = hash * 31 + Quantize(
-                        feature != null
-                            ? feature.PaintedAccentCompanionTightness
-                            : 0f);
-                    hash = hash * 31 + Quantize(
-                        feature != null
-                            ? feature.PaintedAccentCompanionTripletVerticality
-                            : 1f);
-                    Vector2 visualHorizontal =
-                        ResolvePaintedAccentVisualHorizontalLocalXZ();
-                    hash = hash * 31 + Quantize(visualHorizontal.x);
-                    hash = hash * 31 + Quantize(visualHorizontal.y);
-                }
+                    feature != null ? feature.PaintedAccentDistributionContrast : 0f);
                 Vector4 familyWeights =
                     feature != null
                         ? feature.PaintedAccentGlyphFamilyWeights
@@ -2841,12 +3689,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"Mesh apply: {lastMeshApplyMilliseconds:F2} ms\n" +
                 $"Collider cook: {lastColliderMilliseconds:F2} ms\n" +
                 $"Painted Accent strokes: {lastSurfaceStrokeMilliseconds:F2} ms\n" +
+                $"  candidate build + weighting: {paintedAccentPlacementDiagnostics.BuildTimings.CandidateBuildMilliseconds:F2} ms\n" +
+                $"    regional weighting subset: {paintedAccentPlacementDiagnostics.BuildTimings.RegionalWeightingMilliseconds:F2} ms\n" +
+                $"  candidate ordering: {paintedAccentPlacementDiagnostics.BuildTimings.CandidateOrderingMilliseconds:F2} ms\n" +
+                $"  composition setup: {paintedAccentPlacementDiagnostics.BuildTimings.CompositionSetupMilliseconds:F2} ms\n" +
+                $"  stroke setup: {paintedAccentPlacementDiagnostics.BuildTimings.StrokeSetupMilliseconds:F2} ms\n" +
+                $"  surface construction + validation: {paintedAccentPlacementDiagnostics.BuildTimings.SurfaceConstructionValidationMilliseconds:F2} ms\n" +
+                $"  placement diagnostics: {paintedAccentPlacementDiagnostics.BuildTimings.DiagnosticsMilliseconds:F2} ms\n" +
                 $"Painted Accent projection: {lastProjectedGlyphMilliseconds:F2} ms\n" +
                 $"  profile build: {paintedAccentProjectedGlyphBuildTimings.ProfileBuildMilliseconds:F2} ms\n" +
                 $"  family validation: {paintedAccentProjectedGlyphBuildTimings.FamilyValidationMilliseconds:F2} ms\n" +
                 $"  point construction: {paintedAccentProjectedGlyphBuildTimings.PointConstructionMilliseconds:F2} ms\n" +
                 $"  topology + turn: {paintedAccentProjectedGlyphBuildTimings.TopologyValidationMilliseconds:F2} ms\n" +
                 $"  projected cluster composition: {paintedAccentProjectedGlyphBuildTimings.ClusterCompositionMilliseconds:F2} ms\n" +
+                $"    cluster allocation wall time: {paintedAccentProjectedGlyphBuildTimings.ClusterAuditTotalMilliseconds:F2} ms\n" +
+                $"      contact solving total: {paintedAccentProjectedGlyphBuildTimings.ClusterContactSolvingMilliseconds:F2} ms\n" +
+                $"        contact placement + other: {paintedAccentProjectedGlyphBuildTimings.ClusterContactPlacementMilliseconds:F2} ms\n" +
+                $"        near-parallel validation: {paintedAccentProjectedGlyphBuildTimings.ClusterNearParallelValidationMilliseconds:F2} ms\n" +
+                $"        candidate internal-overlap validation: {paintedAccentProjectedGlyphBuildTimings.ClusterCandidateInternalOverlapValidationMilliseconds:F2} ms\n" +
+                $"      final silhouette overlap validation: {paintedAccentProjectedGlyphBuildTimings.ClusterFinalSilhouetteOverlapValidationMilliseconds:F2} ms\n" +
+                $"      internal silhouette + quality total: {paintedAccentProjectedGlyphBuildTimings.ClusterInternalValidationMilliseconds:F2} ms\n" +
+                $"      projected surface/domain in cluster attempts: {paintedAccentProjectedGlyphBuildTimings.ClusterSurfaceValidationMilliseconds:F2} ms\n" +
+                $"      external accepted-glyph conflicts: {paintedAccentProjectedGlyphBuildTimings.ClusterExternalConflictMilliseconds:F2} ms\n" +
+                $"      final reconciliation: {paintedAccentProjectedGlyphBuildTimings.ClusterReconciliationMilliseconds:F2} ms\n" +
                 $"  surface/domain validation: {paintedAccentProjectedGlyphBuildTimings.SurfaceValidationMilliseconds:F2} ms\n" +
                 $"    footprint preparation: {paintedAccentProjectedGlyphBuildTimings.FootprintPreparationMilliseconds:F2} ms\n" +
                 $"    ground sampling: {paintedAccentProjectedGlyphBuildTimings.GroundSamplingMilliseconds:F2} ms\n" +

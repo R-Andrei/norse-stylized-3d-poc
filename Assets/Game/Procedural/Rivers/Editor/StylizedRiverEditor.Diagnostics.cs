@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Splines;
+using ProgrammaticStylized3D.Geometry.Ground;
 
 namespace ProgrammaticStylized3D.Rivers.Editor
 {
@@ -17,6 +18,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "instead of changing the Inspector layout.",
                 EditorStyles.wordWrappedMiniLabel);
 
+            DrawRegenerationAccountingDiagnostics();
             DrawNestedSection(
                 InspectorSection.DiagnosticsDomainGeometry,
                 "Domain & Geometry",
@@ -29,6 +31,62 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 InspectorSection.DiagnosticsFoam,
                 "Foam",
                 DrawFoamDiagnostics);
+        }
+
+        private void DrawRegenerationAccountingDiagnostics()
+        {
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Editor Regeneration Accounting",
+                EditorStyles.boldLabel);
+
+            if (targets.Length != 1 || target is not StylizedRiver river)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select one river to inspect or copy its latest accounting batch.",
+                    MessageType.Info);
+                return;
+            }
+
+            EditorGUILayout.HelpBox(
+                river.LastEditorRegenerationAccountingReport,
+                MessageType.None);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Copy River Batch"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    river.LastEditorRegenerationAccountingReport;
+            }
+            if (GUILayout.Button("Copy Ground + River"))
+            {
+                GeneratedGround ground =
+                    river.GetComponentInParent<GeneratedGround>();
+                string groundReport =
+                    ground != null
+                        ? ground.LastEditorRegenerationAccountingReport
+                        : "No parent GeneratedGround found.";
+                EditorGUIUtility.systemCopyBuffer =
+                    groundReport + "\n\n" +
+                    river.LastEditorRegenerationAccountingReport;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Clear"))
+            {
+                river.ClearEditorRegenerationAccounting();
+                Repaint();
+            }
+            if (GUILayout.Button("Log Next Batch Once"))
+            {
+                river.LogNextEditorRegenerationBatchOnce();
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.LabelField(
+                "Fingerprints exclude the River Domain version so an identical rebuild remains visible as unchanged content plus a version increment.",
+                EditorStyles.wordWrappedMiniLabel);
         }
 
         private void DrawDomainAndGeometryDiagnostics()

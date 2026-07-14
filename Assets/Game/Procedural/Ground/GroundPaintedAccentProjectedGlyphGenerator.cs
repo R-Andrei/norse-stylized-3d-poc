@@ -252,6 +252,311 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public GroundPaintedAccentProjectedGlyphRejectionReason Reason { get; }
     }
 
+    public readonly struct GroundPaintedAccentCompanionQuotaDiagnostics
+    {
+        public GroundPaintedAccentCompanionQuotaDiagnostics(
+            int validProjectedMarks,
+            float requestedParticipationFraction,
+            float requestedTripletShare,
+            int requestedParticipants,
+            int requestedPairClusters,
+            int requestedTripletClusters,
+            int achievedPairClusters,
+            int achievedTripletClusters,
+            int pairShortfall,
+            int tripletShortfall,
+            int buildAttempts,
+            Vector4 requestedPairLayouts,
+            Vector4 achievedPairLayouts,
+            Vector4 requestedTripletLayouts,
+            Vector4 achievedTripletLayouts)
+        {
+            ValidProjectedMarks = Mathf.Max(0, validProjectedMarks);
+            RequestedParticipationFraction =
+                Mathf.Clamp01(requestedParticipationFraction);
+            RequestedTripletShare = Mathf.Clamp01(requestedTripletShare);
+            RequestedParticipants = Mathf.Max(0, requestedParticipants);
+            RequestedPairClusters = Mathf.Max(0, requestedPairClusters);
+            RequestedTripletClusters = Mathf.Max(0, requestedTripletClusters);
+            AchievedPairClusters = Mathf.Max(0, achievedPairClusters);
+            AchievedTripletClusters = Mathf.Max(0, achievedTripletClusters);
+            PairShortfall = Mathf.Max(0, pairShortfall);
+            TripletShortfall = Mathf.Max(0, tripletShortfall);
+            BuildAttempts = Mathf.Max(0, buildAttempts);
+            RequestedPairLayouts = ClampCountVector(requestedPairLayouts);
+            AchievedPairLayouts = ClampCountVector(achievedPairLayouts);
+            RequestedTripletLayouts = ClampCountVector(requestedTripletLayouts);
+            AchievedTripletLayouts = ClampCountVector(achievedTripletLayouts);
+        }
+
+        public int ValidProjectedMarks { get; }
+        public float RequestedParticipationFraction { get; }
+        public float RequestedTripletShare { get; }
+        public int RequestedParticipants { get; }
+        public int RequestedPairClusters { get; }
+        public int RequestedTripletClusters { get; }
+        public int AchievedPairClusters { get; }
+        public int AchievedTripletClusters { get; }
+        public int PairShortfall { get; }
+        public int TripletShortfall { get; }
+        public int BuildAttempts { get; }
+        public Vector4 RequestedPairLayouts { get; }
+        public Vector4 AchievedPairLayouts { get; }
+        public Vector4 RequestedTripletLayouts { get; }
+        public Vector4 AchievedTripletLayouts { get; }
+
+        private static Vector4 ClampCountVector(Vector4 value)
+        {
+            value.x = Mathf.Max(0f, value.x);
+            value.y = Mathf.Max(0f, value.y);
+            value.z = Mathf.Max(0f, value.z);
+            value.w = Mathf.Max(0f, value.w);
+            return value;
+        }
+    }
+
+
+    public readonly struct GroundPaintedAccentClusterBuildAuditDiagnostics
+    {
+        public GroundPaintedAccentClusterBuildAuditDiagnostics(
+            int requestedClusters,
+            int builtClusters,
+            int failedClusters,
+            int totalBuildAttempts,
+            int successfulAttemptsMin,
+            float successfulAttemptsMean,
+            int successfulAttemptsMax,
+            int succeededOnAttemptOne,
+            int succeededOnAttemptsTwoToFour,
+            int succeededOnAttemptsFiveToEight,
+            int succeededOnAttemptsNineToSixteen,
+            int succeededOnAttemptsSeventeenToThirtyTwo,
+            int succeededOnAttemptsThirtyThreeToSeventyTwo,
+            int failedClustersExhaustingAttemptBudget,
+            long externalGlyphCandidatesExamined,
+            long externalBoundsTests,
+            long externalBoundsOverlapPasses,
+            long externalDetailedOverlapTests,
+            int externalConflictRejections,
+            long externalSpatialQueries,
+            long externalGridCellsVisited,
+            long externalUniqueCandidatesReturned,
+            long externalFullListComparisonsAvoided,
+            long reconciliationClustersExamined,
+            long reconciliationPreviouslyValidatedRelationshipsSkipped,
+            long reconciliationNewIndependentRelationshipsTested,
+            long reconciliationLegacyFullListComparisonsAvoided,
+            long reconciliationBoundsTests,
+            long reconciliationBoundsOverlapPasses,
+            long reconciliationDetailedOverlapTests)
+        {
+            RequestedClusters = Mathf.Max(0, requestedClusters);
+            BuiltClusters = Mathf.Max(0, builtClusters);
+            FailedClusters = Mathf.Max(0, failedClusters);
+            TotalBuildAttempts = Mathf.Max(0, totalBuildAttempts);
+            SuccessfulAttemptsMin = Mathf.Max(0, successfulAttemptsMin);
+            SuccessfulAttemptsMean = Mathf.Max(0f, successfulAttemptsMean);
+            SuccessfulAttemptsMax = Mathf.Max(0, successfulAttemptsMax);
+            SucceededOnAttemptOne = Mathf.Max(0, succeededOnAttemptOne);
+            SucceededOnAttemptsTwoToFour =
+                Mathf.Max(0, succeededOnAttemptsTwoToFour);
+            SucceededOnAttemptsFiveToEight =
+                Mathf.Max(0, succeededOnAttemptsFiveToEight);
+            SucceededOnAttemptsNineToSixteen =
+                Mathf.Max(0, succeededOnAttemptsNineToSixteen);
+            SucceededOnAttemptsSeventeenToThirtyTwo =
+                Mathf.Max(0, succeededOnAttemptsSeventeenToThirtyTwo);
+            SucceededOnAttemptsThirtyThreeToSeventyTwo =
+                Mathf.Max(0, succeededOnAttemptsThirtyThreeToSeventyTwo);
+            FailedClustersExhaustingAttemptBudget =
+                Mathf.Max(0, failedClustersExhaustingAttemptBudget);
+            ExternalGlyphCandidatesExamined =
+                Math.Max(0L, externalGlyphCandidatesExamined);
+            ExternalBoundsTests = Math.Max(0L, externalBoundsTests);
+            ExternalBoundsOverlapPasses =
+                Math.Max(0L, externalBoundsOverlapPasses);
+            ExternalDetailedOverlapTests =
+                Math.Max(0L, externalDetailedOverlapTests);
+            ExternalConflictRejections =
+                Mathf.Max(0, externalConflictRejections);
+            ExternalSpatialQueries = Math.Max(0L, externalSpatialQueries);
+            ExternalGridCellsVisited =
+                Math.Max(0L, externalGridCellsVisited);
+            ExternalUniqueCandidatesReturned =
+                Math.Max(0L, externalUniqueCandidatesReturned);
+            ExternalFullListComparisonsAvoided =
+                Math.Max(0L, externalFullListComparisonsAvoided);
+            ReconciliationClustersExamined =
+                Math.Max(0L, reconciliationClustersExamined);
+            ReconciliationPreviouslyValidatedRelationshipsSkipped =
+                Math.Max(
+                    0L,
+                    reconciliationPreviouslyValidatedRelationshipsSkipped);
+            ReconciliationNewIndependentRelationshipsTested =
+                Math.Max(
+                    0L,
+                    reconciliationNewIndependentRelationshipsTested);
+            ReconciliationLegacyFullListComparisonsAvoided =
+                Math.Max(
+                    0L,
+                    reconciliationLegacyFullListComparisonsAvoided);
+            ReconciliationBoundsTests =
+                Math.Max(0L, reconciliationBoundsTests);
+            ReconciliationBoundsOverlapPasses =
+                Math.Max(0L, reconciliationBoundsOverlapPasses);
+            ReconciliationDetailedOverlapTests =
+                Math.Max(0L, reconciliationDetailedOverlapTests);
+        }
+
+        public int RequestedClusters { get; }
+        public int BuiltClusters { get; }
+        public int FailedClusters { get; }
+        public int TotalBuildAttempts { get; }
+        public int SuccessfulAttemptsMin { get; }
+        public float SuccessfulAttemptsMean { get; }
+        public int SuccessfulAttemptsMax { get; }
+        public int SucceededOnAttemptOne { get; }
+        public int SucceededOnAttemptsTwoToFour { get; }
+        public int SucceededOnAttemptsFiveToEight { get; }
+        public int SucceededOnAttemptsNineToSixteen { get; }
+        public int SucceededOnAttemptsSeventeenToThirtyTwo { get; }
+        public int SucceededOnAttemptsThirtyThreeToSeventyTwo { get; }
+        public int FailedClustersExhaustingAttemptBudget { get; }
+        public long ExternalGlyphCandidatesExamined { get; }
+        public long ExternalBoundsTests { get; }
+        public long ExternalBoundsOverlapPasses { get; }
+        public long ExternalDetailedOverlapTests { get; }
+        public int ExternalConflictRejections { get; }
+        public long ExternalSpatialQueries { get; }
+        public long ExternalGridCellsVisited { get; }
+        public long ExternalUniqueCandidatesReturned { get; }
+        public long ExternalFullListComparisonsAvoided { get; }
+        public long ReconciliationClustersExamined { get; }
+        public long ReconciliationPreviouslyValidatedRelationshipsSkipped
+        {
+            get;
+        }
+        public long ReconciliationNewIndependentRelationshipsTested { get; }
+        public long ReconciliationLegacyFullListComparisonsAvoided { get; }
+        public long ReconciliationBoundsTests { get; }
+        public long ReconciliationBoundsOverlapPasses { get; }
+        public long ReconciliationDetailedOverlapTests { get; }
+
+        public static GroundPaintedAccentClusterBuildAuditDiagnostics Empty =>
+            default;
+    }
+
+    public readonly struct GroundPaintedAccentInternalOverlapAuditDiagnostics
+    {
+        public GroundPaintedAccentInternalOverlapAuditDiagnostics(
+            long methodCalls,
+            long finalSilhouetteCalls,
+            long segmentPairsConsidered,
+            long segmentPairsRejectedByBroadPhase,
+            long segmentPairsSentToExactNarrowPhase,
+            long exactSegmentIntersectionsFound,
+            long exactSweptClearanceRejections)
+        {
+            MethodCalls = Math.Max(0L, methodCalls);
+            FinalSilhouetteCalls = Math.Max(0L, finalSilhouetteCalls);
+            SegmentPairsConsidered = Math.Max(0L, segmentPairsConsidered);
+            SegmentPairsRejectedByBroadPhase =
+                Math.Max(0L, segmentPairsRejectedByBroadPhase);
+            SegmentPairsSentToExactNarrowPhase =
+                Math.Max(0L, segmentPairsSentToExactNarrowPhase);
+            ExactSegmentIntersectionsFound =
+                Math.Max(0L, exactSegmentIntersectionsFound);
+            ExactSweptClearanceRejections =
+                Math.Max(0L, exactSweptClearanceRejections);
+        }
+
+        public long MethodCalls { get; }
+        public long FinalSilhouetteCalls { get; }
+        public long SegmentPairsConsidered { get; }
+        public long SegmentPairsRejectedByBroadPhase { get; }
+        public long SegmentPairsSentToExactNarrowPhase { get; }
+        public long ExactSegmentIntersectionsFound { get; }
+        public long ExactSweptClearanceRejections { get; }
+
+        public static GroundPaintedAccentInternalOverlapAuditDiagnostics Empty =>
+            default;
+    }
+
+    public readonly struct GroundPaintedAccentNearParallelAuditDiagnostics
+    {
+        public GroundPaintedAccentNearParallelAuditDiagnostics(
+            long methodCalls,
+            long rightSegmentMetadataPreparations,
+            long rightSegmentsPrepared,
+            long segmentPairsConsidered,
+            long segmentPairsRejectedByAxisGap,
+            long segmentPairsRejectedByAlignment,
+            long segmentPairsSentToExactDistance,
+            long exactDistancePasses,
+            long exactIntervalOverlapEvaluations,
+            long blendsDetected)
+        {
+            MethodCalls = Math.Max(0L, methodCalls);
+            RightSegmentMetadataPreparations =
+                Math.Max(0L, rightSegmentMetadataPreparations);
+            RightSegmentsPrepared = Math.Max(0L, rightSegmentsPrepared);
+            SegmentPairsConsidered = Math.Max(0L, segmentPairsConsidered);
+            SegmentPairsRejectedByAxisGap =
+                Math.Max(0L, segmentPairsRejectedByAxisGap);
+            SegmentPairsRejectedByAlignment =
+                Math.Max(0L, segmentPairsRejectedByAlignment);
+            SegmentPairsSentToExactDistance =
+                Math.Max(0L, segmentPairsSentToExactDistance);
+            ExactDistancePasses = Math.Max(0L, exactDistancePasses);
+            ExactIntervalOverlapEvaluations =
+                Math.Max(0L, exactIntervalOverlapEvaluations);
+            BlendsDetected = Math.Max(0L, blendsDetected);
+        }
+
+        public long MethodCalls { get; }
+        public long RightSegmentMetadataPreparations { get; }
+        public long RightSegmentsPrepared { get; }
+        public long SegmentPairsConsidered { get; }
+        public long SegmentPairsRejectedByAxisGap { get; }
+        public long SegmentPairsRejectedByAlignment { get; }
+        public long SegmentPairsSentToExactDistance { get; }
+        public long ExactDistancePasses { get; }
+        public long ExactIntervalOverlapEvaluations { get; }
+        public long BlendsDetected { get; }
+
+        public static GroundPaintedAccentNearParallelAuditDiagnostics Empty =>
+            default;
+    }
+
+    public readonly struct GroundPaintedAccentProjectedFunnelDiagnostics
+    {
+        public GroundPaintedAccentProjectedFunnelDiagnostics(
+            Vector4 proposalRankProjectedValid,
+            int quietProjectedValid,
+            int supportingProjectedValid,
+            int accentProjectedValid)
+        {
+            ProposalRankProjectedValid = MaxZero(proposalRankProjectedValid);
+            QuietProjectedValid = Mathf.Max(0, quietProjectedValid);
+            SupportingProjectedValid = Mathf.Max(0, supportingProjectedValid);
+            AccentProjectedValid = Mathf.Max(0, accentProjectedValid);
+        }
+
+        public Vector4 ProposalRankProjectedValid { get; }
+        public int QuietProjectedValid { get; }
+        public int SupportingProjectedValid { get; }
+        public int AccentProjectedValid { get; }
+
+        private static Vector4 MaxZero(Vector4 value)
+        {
+            value.x = Mathf.Max(0f, value.x);
+            value.y = Mathf.Max(0f, value.y);
+            value.z = Mathf.Max(0f, value.z);
+            value.w = Mathf.Max(0f, value.w);
+            return value;
+        }
+    }
+
     public readonly struct GroundPaintedAccentProjectedGlyphDiagnostics
     {
         public GroundPaintedAccentProjectedGlyphDiagnostics(
@@ -269,6 +574,37 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int companionClustersFallback,
             int companionPairsAccepted,
             int companionTripletsAccepted,
+            GroundPaintedAccentCompanionQuotaDiagnostics quotaDiagnostics,
+            GroundPaintedAccentClusterBuildAuditDiagnostics clusterBuildAuditDiagnostics,
+            GroundPaintedAccentInternalOverlapAuditDiagnostics internalOverlapAuditDiagnostics,
+            GroundPaintedAccentNearParallelAuditDiagnostics nearParallelAuditDiagnostics,
+            int finalCompanionParticipantCount,
+            float finalCompanionParticipantFraction,
+            int companionClustersRemovedDuringReconciliation,
+            int companionPairStepRetentionRejectedCandidates,
+            int companionPairNearCollinearRejectedCandidates,
+            int companionPreGeometryStepRetentionRejectedCandidates,
+            int companionPreGeometryNonCompetitiveScoreRejectedCandidates,
+            int companionCandidatesSentToGeometryValidation,
+            int companionNearParallelBodyRejectedCandidates,
+            int companionOccupiedAttachmentSlotRejectedCandidates,
+            int companionSharedContactLocusRejectedCandidates,
+            int companionCrowdedTripletJunctionRejectedCandidates,
+            int companionTripletFreeEndPseudoContactRejectedCandidates,
+            int companionSeverelyCompressedTripletRejectedCandidates,
+            int companionWrongSideTerminalRejectedCandidates,
+            int companionSweptWidthInternalOverlapRejectedCandidates,
+            int companionPairRejectedIncomplete,
+            int companionPairRejectedPrototype,
+            int companionPairRejectedContact,
+            int companionPairRejectedSurface,
+            int companionPairRejectedExternalConflict,
+            float companionPairVerticalStepMin,
+            float companionPairVerticalStepMean,
+            float companionPairVerticalStepMax,
+            float companionPairVerticalStepFractionMin,
+            float companionPairVerticalStepFractionMean,
+            float companionPairVerticalStepFractionMax,
             int companionRejectedIncomplete,
             int companionRejectedPrototype,
             int companionRejectedContact,
@@ -298,7 +634,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float projectedTurnDegreesMean,
             float projectedTurnDegreesMax,
             float maximumNorthDisplacementError,
-            float maximumCrossAxisDrift)
+            float maximumCrossAxisDrift,
+            GroundPaintedAccentProjectedFunnelDiagnostics funnelDiagnostics)
         {
             AcceptedBaseDescriptors = Mathf.Max(0, acceptedBaseDescriptors);
             ProjectedGlyphsAccepted = Mathf.Max(0, projectedGlyphsAccepted);
@@ -325,6 +662,78 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             CompanionPairsAccepted = Mathf.Max(0, companionPairsAccepted);
             CompanionTripletsAccepted =
                 Mathf.Max(0, companionTripletsAccepted);
+            QuotaDiagnostics = quotaDiagnostics;
+            ClusterBuildAuditDiagnostics = clusterBuildAuditDiagnostics;
+            InternalOverlapAuditDiagnostics = internalOverlapAuditDiagnostics;
+            NearParallelAuditDiagnostics = nearParallelAuditDiagnostics;
+            FinalCompanionParticipantCount =
+                Mathf.Max(0, finalCompanionParticipantCount);
+            FinalCompanionParticipantFraction =
+                Mathf.Clamp01(finalCompanionParticipantFraction);
+            CompanionClustersRemovedDuringReconciliation =
+                Mathf.Max(0, companionClustersRemovedDuringReconciliation);
+            CompanionPairStepRetentionRejectedCandidates =
+                Mathf.Max(0, companionPairStepRetentionRejectedCandidates);
+            CompanionPairNearCollinearRejectedCandidates =
+                Mathf.Max(0, companionPairNearCollinearRejectedCandidates);
+            CompanionPreGeometryStepRetentionRejectedCandidates =
+                Mathf.Max(
+                    0,
+                    companionPreGeometryStepRetentionRejectedCandidates);
+            CompanionPreGeometryNonCompetitiveScoreRejectedCandidates =
+                Mathf.Max(
+                    0,
+                    companionPreGeometryNonCompetitiveScoreRejectedCandidates);
+            CompanionCandidatesSentToGeometryValidation =
+                Mathf.Max(0, companionCandidatesSentToGeometryValidation);
+            CompanionNearParallelBodyRejectedCandidates =
+                Mathf.Max(0, companionNearParallelBodyRejectedCandidates);
+            CompanionOccupiedAttachmentSlotRejectedCandidates =
+                Mathf.Max(
+                    0,
+                    companionOccupiedAttachmentSlotRejectedCandidates);
+            CompanionSharedContactLocusRejectedCandidates =
+                Mathf.Max(0, companionSharedContactLocusRejectedCandidates);
+            CompanionCrowdedTripletJunctionRejectedCandidates =
+                Mathf.Max(
+                    0,
+                    companionCrowdedTripletJunctionRejectedCandidates);
+            CompanionTripletFreeEndPseudoContactRejectedCandidates =
+                Mathf.Max(
+                    0,
+                    companionTripletFreeEndPseudoContactRejectedCandidates);
+            CompanionSeverelyCompressedTripletRejectedCandidates =
+                Mathf.Max(
+                    0,
+                    companionSeverelyCompressedTripletRejectedCandidates);
+            CompanionWrongSideTerminalRejectedCandidates =
+                Mathf.Max(0, companionWrongSideTerminalRejectedCandidates);
+            CompanionSweptWidthInternalOverlapRejectedCandidates =
+                Mathf.Max(
+                    0,
+                    companionSweptWidthInternalOverlapRejectedCandidates);
+            CompanionPairRejectedIncomplete =
+                Mathf.Max(0, companionPairRejectedIncomplete);
+            CompanionPairRejectedPrototype =
+                Mathf.Max(0, companionPairRejectedPrototype);
+            CompanionPairRejectedContact =
+                Mathf.Max(0, companionPairRejectedContact);
+            CompanionPairRejectedSurface =
+                Mathf.Max(0, companionPairRejectedSurface);
+            CompanionPairRejectedExternalConflict =
+                Mathf.Max(0, companionPairRejectedExternalConflict);
+            CompanionPairVerticalStepMin =
+                Mathf.Max(0f, companionPairVerticalStepMin);
+            CompanionPairVerticalStepMean =
+                Mathf.Max(0f, companionPairVerticalStepMean);
+            CompanionPairVerticalStepMax =
+                Mathf.Max(0f, companionPairVerticalStepMax);
+            CompanionPairVerticalStepFractionMin =
+                Mathf.Max(0f, companionPairVerticalStepFractionMin);
+            CompanionPairVerticalStepFractionMean =
+                Mathf.Max(0f, companionPairVerticalStepFractionMean);
+            CompanionPairVerticalStepFractionMax =
+                Mathf.Max(0f, companionPairVerticalStepFractionMax);
             CompanionRejectedIncomplete =
                 Mathf.Max(0, companionRejectedIncomplete);
             CompanionRejectedPrototype =
@@ -364,6 +773,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             MaximumNorthDisplacementError =
                 Mathf.Max(0f, maximumNorthDisplacementError);
             MaximumCrossAxisDrift = Mathf.Max(0f, maximumCrossAxisDrift);
+            FunnelDiagnostics = funnelDiagnostics;
         }
 
         public int AcceptedBaseDescriptors { get; }
@@ -380,6 +790,67 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public int CompanionClustersFallback { get; }
         public int CompanionPairsAccepted { get; }
         public int CompanionTripletsAccepted { get; }
+        public GroundPaintedAccentCompanionQuotaDiagnostics QuotaDiagnostics
+        {
+            get;
+        }
+        public GroundPaintedAccentClusterBuildAuditDiagnostics
+            ClusterBuildAuditDiagnostics
+        {
+            get;
+        }
+        public GroundPaintedAccentInternalOverlapAuditDiagnostics
+            InternalOverlapAuditDiagnostics
+        {
+            get;
+        }
+        public GroundPaintedAccentNearParallelAuditDiagnostics
+            NearParallelAuditDiagnostics
+        {
+            get;
+        }
+        public int FinalCompanionParticipantCount { get; }
+        public float FinalCompanionParticipantFraction { get; }
+        public int CompanionClustersRemovedDuringReconciliation { get; }
+        public int CompanionPairStepRetentionRejectedCandidates { get; }
+        public int CompanionPairNearCollinearRejectedCandidates { get; }
+        public int CompanionPreGeometryStepRetentionRejectedCandidates
+        {
+            get;
+        }
+        public int CompanionPreGeometryNonCompetitiveScoreRejectedCandidates
+        {
+            get;
+        }
+        public int CompanionCandidatesSentToGeometryValidation { get; }
+        public int CompanionNearParallelBodyRejectedCandidates { get; }
+        public int CompanionOccupiedAttachmentSlotRejectedCandidates { get; }
+        public int CompanionSharedContactLocusRejectedCandidates { get; }
+        public int CompanionCrowdedTripletJunctionRejectedCandidates { get; }
+        public int CompanionTripletFreeEndPseudoContactRejectedCandidates
+        {
+            get;
+        }
+        public int CompanionSeverelyCompressedTripletRejectedCandidates
+        {
+            get;
+        }
+        public int CompanionWrongSideTerminalRejectedCandidates { get; }
+        public int CompanionSweptWidthInternalOverlapRejectedCandidates
+        {
+            get;
+        }
+        public int CompanionPairRejectedIncomplete { get; }
+        public int CompanionPairRejectedPrototype { get; }
+        public int CompanionPairRejectedContact { get; }
+        public int CompanionPairRejectedSurface { get; }
+        public int CompanionPairRejectedExternalConflict { get; }
+        public float CompanionPairVerticalStepMin { get; }
+        public float CompanionPairVerticalStepMean { get; }
+        public float CompanionPairVerticalStepMax { get; }
+        public float CompanionPairVerticalStepFractionMin { get; }
+        public float CompanionPairVerticalStepFractionMean { get; }
+        public float CompanionPairVerticalStepFractionMax { get; }
         public int CompanionRejectedIncomplete { get; }
         public int CompanionRejectedPrototype { get; }
         public int CompanionRejectedContact { get; }
@@ -410,6 +881,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float ProjectedTurnDegreesMax { get; }
         public float MaximumNorthDisplacementError { get; }
         public float MaximumCrossAxisDrift { get; }
+        public GroundPaintedAccentProjectedFunnelDiagnostics FunnelDiagnostics
+        {
+            get;
+        }
 
         public int ProjectedGlyphsRejectedTotal =>
             ProjectedGlyphsRejectedSampling +
@@ -432,6 +907,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             double pointConstructionMilliseconds,
             double topologyValidationMilliseconds,
             double clusterCompositionMilliseconds,
+            double clusterAuditTotalMilliseconds,
+            double clusterQuotaPreparationMilliseconds,
+            double clusterParticipantSelectionMilliseconds,
+            double clusterDonorSelectionMilliseconds,
+            double clusterPrototypePreparationMilliseconds,
+            double clusterContactSolvingMilliseconds,
+            double clusterNearParallelValidationMilliseconds,
+            double clusterCandidateInternalOverlapValidationMilliseconds,
+            double clusterFinalSilhouetteOverlapValidationMilliseconds,
+            double clusterInternalValidationMilliseconds,
+            double clusterSurfaceValidationMilliseconds,
+            double clusterExternalConflictMilliseconds,
+            double clusterCommitMilliseconds,
+            double clusterReconciliationMilliseconds,
             double surfaceValidationMilliseconds,
             double footprintPreparationMilliseconds,
             double groundSamplingMilliseconds,
@@ -447,6 +936,42 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             PointConstructionMilliseconds = Math.Max(0d, pointConstructionMilliseconds);
             TopologyValidationMilliseconds = Math.Max(0d, topologyValidationMilliseconds);
             ClusterCompositionMilliseconds = Math.Max(0d, clusterCompositionMilliseconds);
+            ClusterAuditTotalMilliseconds = Math.Max(0d, clusterAuditTotalMilliseconds);
+            ClusterQuotaPreparationMilliseconds =
+                Math.Max(0d, clusterQuotaPreparationMilliseconds);
+            ClusterParticipantSelectionMilliseconds =
+                Math.Max(0d, clusterParticipantSelectionMilliseconds);
+            ClusterDonorSelectionMilliseconds =
+                Math.Max(0d, clusterDonorSelectionMilliseconds);
+            ClusterPrototypePreparationMilliseconds =
+                Math.Max(0d, clusterPrototypePreparationMilliseconds);
+            ClusterContactSolvingMilliseconds =
+                Math.Max(0d, clusterContactSolvingMilliseconds);
+            ClusterNearParallelValidationMilliseconds =
+                Math.Max(0d, clusterNearParallelValidationMilliseconds);
+            ClusterCandidateInternalOverlapValidationMilliseconds =
+                Math.Max(
+                    0d,
+                    clusterCandidateInternalOverlapValidationMilliseconds);
+            ClusterFinalSilhouetteOverlapValidationMilliseconds =
+                Math.Max(
+                    0d,
+                    clusterFinalSilhouetteOverlapValidationMilliseconds);
+            ClusterContactPlacementMilliseconds =
+                Math.Max(
+                    0d,
+                    ClusterContactSolvingMilliseconds -
+                    ClusterNearParallelValidationMilliseconds -
+                    ClusterCandidateInternalOverlapValidationMilliseconds);
+            ClusterInternalValidationMilliseconds =
+                Math.Max(0d, clusterInternalValidationMilliseconds);
+            ClusterSurfaceValidationMilliseconds =
+                Math.Max(0d, clusterSurfaceValidationMilliseconds);
+            ClusterExternalConflictMilliseconds =
+                Math.Max(0d, clusterExternalConflictMilliseconds);
+            ClusterCommitMilliseconds = Math.Max(0d, clusterCommitMilliseconds);
+            ClusterReconciliationMilliseconds =
+                Math.Max(0d, clusterReconciliationMilliseconds);
             SurfaceValidationMilliseconds = Math.Max(0d, surfaceValidationMilliseconds);
             FootprintPreparationMilliseconds = Math.Max(0d, footprintPreparationMilliseconds);
             GroundSamplingMilliseconds = Math.Max(0d, groundSamplingMilliseconds);
@@ -463,6 +988,27 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public double PointConstructionMilliseconds { get; }
         public double TopologyValidationMilliseconds { get; }
         public double ClusterCompositionMilliseconds { get; }
+        public double ClusterAuditTotalMilliseconds { get; }
+        public double ClusterQuotaPreparationMilliseconds { get; }
+        public double ClusterParticipantSelectionMilliseconds { get; }
+        public double ClusterDonorSelectionMilliseconds { get; }
+        public double ClusterPrototypePreparationMilliseconds { get; }
+        public double ClusterContactSolvingMilliseconds { get; }
+        public double ClusterContactPlacementMilliseconds { get; }
+        public double ClusterNearParallelValidationMilliseconds { get; }
+        public double ClusterCandidateInternalOverlapValidationMilliseconds
+        {
+            get;
+        }
+        public double ClusterFinalSilhouetteOverlapValidationMilliseconds
+        {
+            get;
+        }
+        public double ClusterInternalValidationMilliseconds { get; }
+        public double ClusterSurfaceValidationMilliseconds { get; }
+        public double ClusterExternalConflictMilliseconds { get; }
+        public double ClusterCommitMilliseconds { get; }
+        public double ClusterReconciliationMilliseconds { get; }
         public double SurfaceValidationMilliseconds { get; }
         public double FootprintPreparationMilliseconds { get; }
         public double GroundSamplingMilliseconds { get; }
@@ -474,9 +1020,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public double DiagnosticsMilliseconds { get; }
 
         public static GroundPaintedAccentProjectedGlyphBuildTimings Empty =>
-            new GroundPaintedAccentProjectedGlyphBuildTimings(
-                0d, 0d, 0d, 0d, 0d, 0d, 0d,
-                0d, 0d, 0d, 0d, 0d, 0d, 0d);
+            default;
     }
 
     internal sealed class GroundPaintedAccentProjectedGlyphTimingAccumulator
@@ -486,6 +1030,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public long PointConstructionTicks;
         public long TopologyValidationTicks;
         public long ClusterCompositionTicks;
+        public long ClusterAuditTotalTicks;
+        public long ClusterQuotaPreparationTicks;
+        public long ClusterParticipantSelectionTicks;
+        public long ClusterDonorSelectionTicks;
+        public long ClusterPrototypePreparationTicks;
+        public long ClusterContactSolvingTicks;
+        public long ClusterNearParallelValidationTicks;
+        public long ClusterCandidateInternalOverlapValidationTicks;
+        public long ClusterFinalSilhouetteOverlapValidationTicks;
+        public long ClusterInternalValidationTicks;
+        public long ClusterSurfaceValidationTicks;
+        public long ClusterExternalConflictTicks;
+        public long ClusterCommitTicks;
+        public long ClusterReconciliationTicks;
         public long SurfaceValidationTicks;
         public long FootprintPreparationTicks;
         public long GroundSamplingTicks;
@@ -506,6 +1064,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 PointConstructionTicks * tickToMilliseconds,
                 TopologyValidationTicks * tickToMilliseconds,
                 ClusterCompositionTicks * tickToMilliseconds,
+                ClusterAuditTotalTicks * tickToMilliseconds,
+                ClusterQuotaPreparationTicks * tickToMilliseconds,
+                ClusterParticipantSelectionTicks * tickToMilliseconds,
+                ClusterDonorSelectionTicks * tickToMilliseconds,
+                ClusterPrototypePreparationTicks * tickToMilliseconds,
+                ClusterContactSolvingTicks * tickToMilliseconds,
+                ClusterNearParallelValidationTicks * tickToMilliseconds,
+                ClusterCandidateInternalOverlapValidationTicks *
+                    tickToMilliseconds,
+                ClusterFinalSilhouetteOverlapValidationTicks *
+                    tickToMilliseconds,
+                ClusterInternalValidationTicks * tickToMilliseconds,
+                ClusterSurfaceValidationTicks * tickToMilliseconds,
+                ClusterExternalConflictTicks * tickToMilliseconds,
+                ClusterCommitTicks * tickToMilliseconds,
+                ClusterReconciliationTicks * tickToMilliseconds,
                 SurfaceValidationTicks * tickToMilliseconds,
                 FootprintPreparationTicks * tickToMilliseconds,
                 GroundSamplingTicks * tickToMilliseconds,
@@ -515,6 +1089,236 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 TransverseGradeTicks * tickToMilliseconds,
                 LongitudinalGradeTicks * tickToMilliseconds,
                 DiagnosticsTicks * tickToMilliseconds);
+        }
+    }
+
+    internal sealed class GroundPaintedAccentClusterBuildAuditAccumulator
+    {
+        private int successfulClusterCount;
+        private int successfulAttemptMinimum = int.MaxValue;
+        private int successfulAttemptMaximum;
+        private long successfulAttemptTotal;
+        private int succeededOnAttemptOne;
+        private int succeededOnAttemptsTwoToFour;
+        private int succeededOnAttemptsFiveToEight;
+        private int succeededOnAttemptsNineToSixteen;
+        private int succeededOnAttemptsSeventeenToThirtyTwo;
+        private int succeededOnAttemptsThirtyThreeToSeventyTwo;
+        private int failedClustersExhaustingAttemptBudget;
+
+        public long ExternalGlyphCandidatesExamined;
+        public long ExternalBoundsTests;
+        public long ExternalBoundsOverlapPasses;
+        public long ExternalDetailedOverlapTests;
+        public int ExternalConflictRejections;
+        public long ExternalSpatialQueries;
+        public long ExternalGridCellsVisited;
+        public long ExternalUniqueCandidatesReturned;
+        public long ExternalFullListComparisonsAvoided;
+        public long ReconciliationClustersExamined;
+        public long ReconciliationPreviouslyValidatedRelationshipsSkipped;
+        public long ReconciliationNewIndependentRelationshipsTested;
+        public long ReconciliationLegacyFullListComparisonsAvoided;
+        public long ReconciliationBoundsTests;
+        public long ReconciliationBoundsOverlapPasses;
+        public long ReconciliationDetailedOverlapTests;
+
+        public void RecordBuildResult(
+            bool built,
+            int attempts,
+            bool exhaustedAttemptBudget)
+        {
+            int safeAttempts = Mathf.Max(0, attempts);
+            if (!built)
+            {
+                if (exhaustedAttemptBudget)
+                {
+                    failedClustersExhaustingAttemptBudget++;
+                }
+                return;
+            }
+
+            successfulClusterCount++;
+            successfulAttemptMinimum =
+                Mathf.Min(successfulAttemptMinimum, safeAttempts);
+            successfulAttemptMaximum =
+                Mathf.Max(successfulAttemptMaximum, safeAttempts);
+            successfulAttemptTotal += safeAttempts;
+            if (safeAttempts <= 1)
+            {
+                succeededOnAttemptOne++;
+            }
+            else if (safeAttempts <= 4)
+            {
+                succeededOnAttemptsTwoToFour++;
+            }
+            else if (safeAttempts <= 8)
+            {
+                succeededOnAttemptsFiveToEight++;
+            }
+            else if (safeAttempts <= 16)
+            {
+                succeededOnAttemptsNineToSixteen++;
+            }
+            else if (safeAttempts <= 32)
+            {
+                succeededOnAttemptsSeventeenToThirtyTwo++;
+            }
+            else
+            {
+                succeededOnAttemptsThirtyThreeToSeventyTwo++;
+            }
+        }
+
+        public GroundPaintedAccentClusterBuildAuditDiagnostics Resolve(
+            int requestedClusters,
+            int totalBuildAttempts)
+        {
+            int resolvedSuccessfulMinimum =
+                successfulClusterCount > 0
+                    ? successfulAttemptMinimum
+                    : 0;
+            float successfulAttemptMean =
+                successfulClusterCount > 0
+                    ? successfulAttemptTotal / (float)successfulClusterCount
+                    : 0f;
+            return new GroundPaintedAccentClusterBuildAuditDiagnostics(
+                requestedClusters,
+                successfulClusterCount,
+                Mathf.Max(0, requestedClusters - successfulClusterCount),
+                totalBuildAttempts,
+                resolvedSuccessfulMinimum,
+                successfulAttemptMean,
+                successfulAttemptMaximum,
+                succeededOnAttemptOne,
+                succeededOnAttemptsTwoToFour,
+                succeededOnAttemptsFiveToEight,
+                succeededOnAttemptsNineToSixteen,
+                succeededOnAttemptsSeventeenToThirtyTwo,
+                succeededOnAttemptsThirtyThreeToSeventyTwo,
+                failedClustersExhaustingAttemptBudget,
+                ExternalGlyphCandidatesExamined,
+                ExternalBoundsTests,
+                ExternalBoundsOverlapPasses,
+                ExternalDetailedOverlapTests,
+                ExternalConflictRejections,
+                ExternalSpatialQueries,
+                ExternalGridCellsVisited,
+                ExternalUniqueCandidatesReturned,
+                ExternalFullListComparisonsAvoided,
+                ReconciliationClustersExamined,
+                ReconciliationPreviouslyValidatedRelationshipsSkipped,
+                ReconciliationNewIndependentRelationshipsTested,
+                ReconciliationLegacyFullListComparisonsAvoided,
+                ReconciliationBoundsTests,
+                ReconciliationBoundsOverlapPasses,
+                ReconciliationDetailedOverlapTests);
+        }
+    }
+
+    internal sealed class GroundPaintedAccentInternalOverlapAuditAccumulator
+    {
+        public long MethodCalls;
+        public long FinalSilhouetteCalls;
+        public long SegmentPairsConsidered;
+        public long SegmentPairsRejectedByBroadPhase;
+        public long SegmentPairsSentToExactNarrowPhase;
+        public long ExactSegmentIntersectionsFound;
+        public long ExactSweptClearanceRejections;
+
+        public void Accumulate(
+            bool finalSilhouetteCall,
+            long segmentPairsConsidered,
+            long segmentPairsRejectedByBroadPhase,
+            long segmentPairsSentToExactNarrowPhase,
+            long exactSegmentIntersectionsFound,
+            long exactSweptClearanceRejections)
+        {
+            MethodCalls++;
+            if (finalSilhouetteCall)
+            {
+                FinalSilhouetteCalls++;
+            }
+
+            SegmentPairsConsidered +=
+                Math.Max(0L, segmentPairsConsidered);
+            SegmentPairsRejectedByBroadPhase +=
+                Math.Max(0L, segmentPairsRejectedByBroadPhase);
+            SegmentPairsSentToExactNarrowPhase +=
+                Math.Max(0L, segmentPairsSentToExactNarrowPhase);
+            ExactSegmentIntersectionsFound +=
+                Math.Max(0L, exactSegmentIntersectionsFound);
+            ExactSweptClearanceRejections +=
+                Math.Max(0L, exactSweptClearanceRejections);
+        }
+
+        public GroundPaintedAccentInternalOverlapAuditDiagnostics Resolve()
+        {
+            return new GroundPaintedAccentInternalOverlapAuditDiagnostics(
+                MethodCalls,
+                FinalSilhouetteCalls,
+                SegmentPairsConsidered,
+                SegmentPairsRejectedByBroadPhase,
+                SegmentPairsSentToExactNarrowPhase,
+                ExactSegmentIntersectionsFound,
+                ExactSweptClearanceRejections);
+        }
+    }
+
+    internal sealed class GroundPaintedAccentNearParallelAuditAccumulator
+    {
+        public long MethodCalls;
+        public long RightSegmentMetadataPreparations;
+        public long RightSegmentsPrepared;
+        public long SegmentPairsConsidered;
+        public long SegmentPairsRejectedByAxisGap;
+        public long SegmentPairsRejectedByAlignment;
+        public long SegmentPairsSentToExactDistance;
+        public long ExactDistancePasses;
+        public long ExactIntervalOverlapEvaluations;
+        public long BlendsDetected;
+
+        public void Accumulate(
+            long rightSegmentMetadataPreparations,
+            long rightSegmentsPrepared,
+            long segmentPairsConsidered,
+            long segmentPairsRejectedByAxisGap,
+            long segmentPairsRejectedByAlignment,
+            long segmentPairsSentToExactDistance,
+            long exactDistancePasses,
+            long exactIntervalOverlapEvaluations,
+            long blendsDetected)
+        {
+            MethodCalls++;
+            RightSegmentMetadataPreparations +=
+                Math.Max(0L, rightSegmentMetadataPreparations);
+            RightSegmentsPrepared += Math.Max(0L, rightSegmentsPrepared);
+            SegmentPairsConsidered += Math.Max(0L, segmentPairsConsidered);
+            SegmentPairsRejectedByAxisGap +=
+                Math.Max(0L, segmentPairsRejectedByAxisGap);
+            SegmentPairsRejectedByAlignment +=
+                Math.Max(0L, segmentPairsRejectedByAlignment);
+            SegmentPairsSentToExactDistance +=
+                Math.Max(0L, segmentPairsSentToExactDistance);
+            ExactDistancePasses += Math.Max(0L, exactDistancePasses);
+            ExactIntervalOverlapEvaluations +=
+                Math.Max(0L, exactIntervalOverlapEvaluations);
+            BlendsDetected += Math.Max(0L, blendsDetected);
+        }
+
+        public GroundPaintedAccentNearParallelAuditDiagnostics Resolve()
+        {
+            return new GroundPaintedAccentNearParallelAuditDiagnostics(
+                MethodCalls,
+                RightSegmentMetadataPreparations,
+                RightSegmentsPrepared,
+                SegmentPairsConsidered,
+                SegmentPairsRejectedByAxisGap,
+                SegmentPairsRejectedByAlignment,
+                SegmentPairsSentToExactDistance,
+                ExactDistancePasses,
+                ExactIntervalOverlapEvaluations,
+                BlendsDetected);
         }
     }
 
@@ -560,6 +1364,71 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         }
     }
 
+    internal readonly struct GroundPaintedAccentNearParallelSegmentMetadata
+    {
+        public GroundPaintedAccentNearParallelSegmentMetadata(
+            Vector2 start,
+            Vector2 end,
+            float startHalfWidth,
+            float endHalfWidth)
+        {
+            Start = start;
+            End = end;
+            Vector2 delta = end - start;
+            Length = delta.magnitude;
+            IsValid = Length > 0.000001f;
+            Direction = IsValid ? delta / Length : Vector2.zero;
+            AverageHalfWidth =
+                (startHalfWidth + endHalfWidth) * 0.5f;
+            MinimumX = Mathf.Min(start.x, end.x);
+            MaximumX = Mathf.Max(start.x, end.x);
+            MinimumY = Mathf.Min(start.y, end.y);
+            MaximumY = Mathf.Max(start.y, end.y);
+        }
+
+        public Vector2 Start { get; }
+        public Vector2 End { get; }
+        public Vector2 Direction { get; }
+        public float Length { get; }
+        public float AverageHalfWidth { get; }
+        public float MinimumX { get; }
+        public float MaximumX { get; }
+        public float MinimumY { get; }
+        public float MaximumY { get; }
+        public bool IsValid { get; }
+    }
+
+    internal readonly struct GroundPaintedAccentInternalOverlapSegmentMetadata
+    {
+        public GroundPaintedAccentInternalOverlapSegmentMetadata(
+            Vector2 start,
+            Vector2 end,
+            float startHalfWidth,
+            float endHalfWidth)
+        {
+            Start = start;
+            End = end;
+            StartHalfWidth = startHalfWidth;
+            EndHalfWidth = endHalfWidth;
+            MaximumHalfWidth =
+                Mathf.Max(0f, Mathf.Max(startHalfWidth, endHalfWidth));
+            MinimumX = Mathf.Min(start.x, end.x);
+            MaximumX = Mathf.Max(start.x, end.x);
+            MinimumY = Mathf.Min(start.y, end.y);
+            MaximumY = Mathf.Max(start.y, end.y);
+        }
+
+        public Vector2 Start { get; }
+        public Vector2 End { get; }
+        public float StartHalfWidth { get; }
+        public float EndHalfWidth { get; }
+        public float MaximumHalfWidth { get; }
+        public float MinimumX { get; }
+        public float MaximumX { get; }
+        public float MinimumY { get; }
+        public float MaximumY { get; }
+    }
+
     internal sealed class GroundPaintedAccentProjectedGlyphScratch
     {
         public Vector2[] ProjectedPoints = Array.Empty<Vector2>();
@@ -569,6 +1438,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public Vector3[] SurfacePoints = Array.Empty<Vector3>();
         public int[] RiverIndices = Array.Empty<int>();
         public int[] ModifierIndices = Array.Empty<int>();
+        public GroundPaintedAccentNearParallelSegmentMetadata[]
+            NearParallelRightSegments =
+                Array.Empty<GroundPaintedAccentNearParallelSegmentMetadata>();
+        public GroundPaintedAccentInternalOverlapSegmentMetadata[]
+            InternalOverlapLeftSegments =
+                Array.Empty<GroundPaintedAccentInternalOverlapSegmentMetadata>();
+        public GroundPaintedAccentInternalOverlapSegmentMetadata[]
+            InternalOverlapRightSegments =
+                Array.Empty<GroundPaintedAccentInternalOverlapSegmentMetadata>();
 
         public void EnsurePointCapacity(int required)
         {
@@ -583,6 +1461,41 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             LeftPoints = new Vector2[capacity];
             RightPoints = new Vector2[capacity];
             SurfacePoints = new Vector3[capacity];
+        }
+
+        public void EnsureNearParallelSegmentCapacity(int required)
+        {
+            if (NearParallelRightSegments.Length >= required)
+            {
+                return;
+            }
+
+            int capacity = Mathf.NextPowerOfTwo(Mathf.Max(2, required));
+            NearParallelRightSegments =
+                new GroundPaintedAccentNearParallelSegmentMetadata[capacity];
+        }
+
+        public void EnsureInternalOverlapSegmentCapacity(
+            int requiredLeft,
+            int requiredRight)
+        {
+            if (InternalOverlapLeftSegments.Length < requiredLeft)
+            {
+                int capacity =
+                    Mathf.NextPowerOfTwo(Mathf.Max(2, requiredLeft));
+                InternalOverlapLeftSegments =
+                    new GroundPaintedAccentInternalOverlapSegmentMetadata[
+                        capacity];
+            }
+
+            if (InternalOverlapRightSegments.Length < requiredRight)
+            {
+                int capacity =
+                    Mathf.NextPowerOfTwo(Mathf.Max(2, requiredRight));
+                InternalOverlapRightSegments =
+                    new GroundPaintedAccentInternalOverlapSegmentMetadata[
+                        capacity];
+            }
         }
 
         public void EnsureRiverCapacity(int required)
@@ -635,7 +1548,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
     internal static class GroundPaintedAccentProjectedGlyphGenerator
     {
-        public const int Revision = 7;
+        public const int Revision = 19;
 
         private const int ShapeMetricCount = 10;
         private const int CrestPositionMetricIndex = 0;
@@ -663,12 +1576,56 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private const float MaximumProjectedClusterRelocationLengthMultiplier =
             2.25f;
         private const float ProjectedContactNeighborhoodFraction = 0.08f;
-        private const float ProjectedUnintendedOverlapWidthFraction = 0.48f;
+        private const float MinimumProjectedInteriorContactNormalComponent = 0.22f;
+        private const float ProjectedLooseContactExtraWidthMultiplier = 0.60f;
+        private const float ProjectedInternalSweptClearanceFraction = 0.98f;
+        private const float ProjectedContactSweptClearanceFraction = 0.94f;
         private const float ProjectedExternalConflictWidthFraction = 0.42f;
+        private const float ProjectedExternalConflictGridCellSize = 0.50f;
         private const float MinimumProjectedExternalClearance = 0.003f;
+        private const float ProjectedSweptClearanceTolerance = 0.0005f;
+        private const float MinimumProjectedContactSideProjection = 0.0001f;
         private const float MinimumProjectedStructuredStep = 0.020f;
-        private const float MinimumProjectedStepRetentionFraction = 0.42f;
+        private const float MinimumProjectedPairStepRetentionFraction = 0.65f;
+        private const float MinimumProjectedTripletStepRetentionFraction = 0.42f;
+        private const float MaximumNearCollinearPairJunctionDegrees = 16f;
+        private const float MaximumNearCollinearPairStepLengthFraction = 0.12f;
+        private const float MinimumShallowPairContactGap = 0.010f;
+        private const float MaximumNearParallelBodyAngleDegrees = 22f;
+        private const float NearParallelBodyClearanceFraction = 0.88f;
+        private const float MinimumNearParallelBlendLengthFraction = 0.14f;
+        private const float MinimumNearParallelBlendWorldLength = 0.025f;
+        private const float MinimumTripletAttachmentIndexSeparationFraction =
+            0.14f;
+        private const float MinimumTripletContactSeparationLengthFraction =
+            0.10f;
+        private const float MinimumTripletContactSeparationWidthMultiplier =
+            2.25f;
+        private const float MaximumSeverelyCompressedTripletCentroidSpanFraction =
+            0.42f;
+        private const float MinimumCrowdedTripletJunctionLengthFraction =
+            0.055f;
+        private const float MinimumCrowdedTripletJunctionWidthMultiplier =
+            1.35f;
+        private const float MinimumTripletPseudoContactLengthFraction =
+            0.055f;
+        private const float MinimumTripletPseudoContactWidthMultiplier =
+            1.35f;
+        private const float MinimumTripletPseudoContactBodyLengthFraction =
+            0.035f;
+        private const float MinimumTripletPseudoContactBodyWidthMultiplier =
+            1.10f;
+        private const float MinimumTripletPseudoContactApproachDot = 0.35f;
         private const float ProjectedStepErrorScoreWeight = 8f;
+        private const int MaximumAuthoritativeClusterBuildAttempts = 72;
+        private const float AuthoritativeDensityRadiusLengthMultiplier = 3.25f;
+        private const float MinimumAuthoritativeDensityRadius = 1.50f;
+        private const float PairSteppedStepLengthFraction = 0.24f;
+        private const float PairShoulderStepLengthFraction = 0.21f;
+        private const float PairOffsetStepLengthFraction = 0.18f;
+        private const float PairShallowStepLengthFraction = 0.075f;
+        private const float TripletStepLengthFraction = 0.22f;
+        private const float AuthoritativeAlongSpacingLengthFraction = 0.58f;
 
         private sealed class ProjectedGlyphPrototype
         {
@@ -704,8 +1661,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             public ProjectedGlyphPrototype Clone()
             {
+                return CloneWithStroke(Stroke);
+            }
+
+            public ProjectedGlyphPrototype CloneWithStroke(
+                GroundPaintedAccentSurfaceStroke stroke)
+            {
                 return new ProjectedGlyphPrototype(
-                    Stroke,
+                    stroke,
                     (Vector2[])ProjectedPoints.Clone(),
                     (float[])HalfWidths.Clone(),
                     Profile,
@@ -714,6 +1677,272 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     MaximumNorthDisplacementError,
                     MaximumCrossAxisDrift);
             }
+        }
+
+        private sealed class AuthoritativeProjectedMark
+        {
+            public AuthoritativeProjectedMark(
+                int sourceIndex,
+                GroundPaintedAccentSurfaceStroke stroke,
+                ProjectedGlyphPrototype prototype,
+                GroundPaintedAccentProjectedGlyph independentGlyph)
+            {
+                SourceIndex = sourceIndex;
+                Stroke = stroke;
+                Prototype = prototype;
+                IndependentGlyph = independentGlyph;
+                Centroid = ResolveProjectedCentroid(prototype.ProjectedPoints);
+            }
+
+            public int SourceIndex { get; }
+            public GroundPaintedAccentSurfaceStroke Stroke { get; }
+            public ProjectedGlyphPrototype Prototype { get; }
+            public GroundPaintedAccentProjectedGlyph IndependentGlyph { get; }
+            public Vector2 Centroid { get; }
+            public float DensityScore { get; set; }
+            public float SelectionScore { get; set; }
+        }
+
+        private readonly struct AuthoritativeCompanionQuota
+        {
+            public AuthoritativeCompanionQuota(
+                int participantCount,
+                int pairClusterCount,
+                int tripletClusterCount)
+            {
+                ParticipantCount = Mathf.Max(0, participantCount);
+                PairClusterCount = Mathf.Max(0, pairClusterCount);
+                TripletClusterCount = Mathf.Max(0, tripletClusterCount);
+            }
+
+            public int ParticipantCount { get; }
+            public int PairClusterCount { get; }
+            public int TripletClusterCount { get; }
+        }
+
+        private readonly struct AuthoritativeClusterSpec
+        {
+            public AuthoritativeClusterSpec(
+                int size,
+                GroundPaintedAccentCompanionPairLayout pairLayout,
+                GroundPaintedAccentCompanionTripletLayout tripletLayout,
+                int ordinal)
+            {
+                Size = Mathf.Clamp(size, 2, 3);
+                PairLayout = pairLayout;
+                TripletLayout = tripletLayout;
+                Ordinal = Mathf.Max(0, ordinal);
+            }
+
+            public int Size { get; }
+            public GroundPaintedAccentCompanionPairLayout PairLayout { get; }
+            public GroundPaintedAccentCompanionTripletLayout TripletLayout { get; }
+            public int Ordinal { get; }
+        }
+
+        private sealed class AuthoritativeClusterRecord
+        {
+            public int ClusterIndex;
+            public AuthoritativeClusterSpec Spec;
+            public int[] MarkIndices;
+            public GroundPaintedAccentProjectedGlyph[] ClusterGlyphs;
+            public int ReconciliationIndependentCountChecked;
+        }
+
+        private sealed class ProjectedGlyphSpatialIndex
+        {
+            private readonly Dictionary<long, List<int>> cells =
+                new Dictionary<long, List<int>>();
+            private readonly List<int> queryResults = new List<int>();
+            private int[] queryVisitStamps = Array.Empty<int>();
+            private int queryStamp;
+            private int indexedGlyphCount;
+
+            public void Add(
+                int glyphIndex,
+                GroundPaintedAccentProjectedGlyph glyph)
+            {
+                ResolveProjectedBounds(
+                    glyph.LocalProjectedPoints,
+                    glyph.HalfWidths,
+                    ProjectedExternalConflictWidthFraction,
+                    out Vector2 minimum,
+                    out Vector2 maximum);
+                Add(glyphIndex, minimum, maximum);
+            }
+
+            public IReadOnlyList<int> Query(
+                IReadOnlyList<Vector2> points,
+                IReadOnlyList<float> halfWidths,
+                GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit)
+            {
+                queryResults.Clear();
+                if (indexedGlyphCount <= 0)
+                {
+                    if (clusterAudit != null)
+                    {
+                        clusterAudit.ExternalSpatialQueries++;
+                    }
+                    return queryResults;
+                }
+
+                ResolveProjectedBounds(
+                    points,
+                    halfWidths,
+                    ProjectedExternalConflictWidthFraction,
+                    out Vector2 minimum,
+                    out Vector2 maximum);
+                int minimumCellX = ResolveCellCoordinate(minimum.x);
+                int maximumCellX = ResolveCellCoordinate(maximum.x);
+                int minimumCellY = ResolveCellCoordinate(minimum.y);
+                int maximumCellY = ResolveCellCoordinate(maximum.y);
+                EnsureQueryStampCapacity(indexedGlyphCount);
+                AdvanceQueryStamp();
+
+                long visitedCells = 0L;
+                for (int cellX = minimumCellX;
+                     cellX <= maximumCellX;
+                     cellX++)
+                {
+                    for (int cellY = minimumCellY;
+                         cellY <= maximumCellY;
+                         cellY++)
+                    {
+                        visitedCells++;
+                        if (!cells.TryGetValue(
+                                ResolveCellKey(cellX, cellY),
+                                out List<int> glyphIndices))
+                        {
+                            continue;
+                        }
+
+                        for (int index = 0;
+                             index < glyphIndices.Count;
+                             index++)
+                        {
+                            int glyphIndex = glyphIndices[index];
+                            if (glyphIndex < 0 ||
+                                glyphIndex >= indexedGlyphCount ||
+                                queryVisitStamps[glyphIndex] == queryStamp)
+                            {
+                                continue;
+                            }
+
+                            queryVisitStamps[glyphIndex] = queryStamp;
+                            queryResults.Add(glyphIndex);
+                        }
+                    }
+                }
+
+                queryResults.Sort();
+                if (clusterAudit != null)
+                {
+                    clusterAudit.ExternalSpatialQueries++;
+                    clusterAudit.ExternalGridCellsVisited += visitedCells;
+                    clusterAudit.ExternalUniqueCandidatesReturned +=
+                        queryResults.Count;
+                    clusterAudit.ExternalFullListComparisonsAvoided +=
+                        Mathf.Max(0, indexedGlyphCount - queryResults.Count);
+                }
+                return queryResults;
+            }
+
+            private void Add(
+                int glyphIndex,
+                Vector2 minimum,
+                Vector2 maximum)
+            {
+                if (glyphIndex < 0)
+                {
+                    return;
+                }
+
+                int minimumCellX = ResolveCellCoordinate(minimum.x);
+                int maximumCellX = ResolveCellCoordinate(maximum.x);
+                int minimumCellY = ResolveCellCoordinate(minimum.y);
+                int maximumCellY = ResolveCellCoordinate(maximum.y);
+                for (int cellX = minimumCellX;
+                     cellX <= maximumCellX;
+                     cellX++)
+                {
+                    for (int cellY = minimumCellY;
+                         cellY <= maximumCellY;
+                         cellY++)
+                    {
+                        long key = ResolveCellKey(cellX, cellY);
+                        if (!cells.TryGetValue(key, out List<int> indices))
+                        {
+                            indices = new List<int>();
+                            cells.Add(key, indices);
+                        }
+                        indices.Add(glyphIndex);
+                    }
+                }
+
+                indexedGlyphCount = Mathf.Max(indexedGlyphCount, glyphIndex + 1);
+                EnsureQueryStampCapacity(indexedGlyphCount);
+            }
+
+            private void EnsureQueryStampCapacity(int required)
+            {
+                if (queryVisitStamps.Length >= required)
+                {
+                    return;
+                }
+
+                int capacity = Mathf.NextPowerOfTwo(Mathf.Max(2, required));
+                Array.Resize(ref queryVisitStamps, capacity);
+            }
+
+            private void AdvanceQueryStamp()
+            {
+                if (queryStamp == int.MaxValue)
+                {
+                    Array.Clear(queryVisitStamps, 0, queryVisitStamps.Length);
+                    queryStamp = 1;
+                    return;
+                }
+
+                queryStamp++;
+                if (queryStamp <= 0)
+                {
+                    queryStamp = 1;
+                }
+            }
+
+            private static int ResolveCellCoordinate(float value)
+            {
+                return Mathf.FloorToInt(
+                    value / ProjectedExternalConflictGridCellSize);
+            }
+
+            private static long ResolveCellKey(int cellX, int cellY)
+            {
+                return ((long)cellX << 32) ^ (uint)cellY;
+            }
+        }
+
+        private readonly struct ProjectedTripletFreeTerminal
+        {
+            public ProjectedTripletFreeTerminal(
+                int memberIndex,
+                Vector2 position,
+                Vector2 outward,
+                float halfWidth,
+                float authoredLength)
+            {
+                MemberIndex = memberIndex;
+                Position = position;
+                Outward = outward;
+                HalfWidth = Mathf.Max(0f, halfWidth);
+                AuthoredLength = Mathf.Max(0f, authoredLength);
+            }
+
+            public int MemberIndex { get; }
+            public Vector2 Position { get; }
+            public Vector2 Outward { get; }
+            public float HalfWidth { get; }
+            public float AuthoredLength { get; }
         }
 
         private readonly struct ProjectedClusterContact
@@ -734,6 +1963,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             public int AnchorPointIndex { get; }
             public int MovingMemberIndex { get; }
             public int MovingPointIndex { get; }
+        }
+
+        private struct ProjectedClusterQualityRejections
+        {
+            public int PairStepRetention;
+            public int PairNearCollinear;
+            public int PreGeometryStepRetention;
+            public int PreGeometryNonCompetitiveScore;
+            public int CandidatesSentToGeometry;
+            public int NearParallelBodyBlend;
+            public int OccupiedAttachmentSlot;
+            public int SharedContactLocus;
+            public int CrowdedTripletJunction;
+            public int TripletFreeEndPseudoContact;
+            public int SeverelyCompressedTriplet;
+            public int WrongSideTerminal;
+            public int SweptWidthInternalOverlap;
+
+            public void Accumulate(ProjectedClusterQualityRejections other)
+            {
+                PairStepRetention += other.PairStepRetention;
+                PairNearCollinear += other.PairNearCollinear;
+                PreGeometryStepRetention += other.PreGeometryStepRetention;
+                PreGeometryNonCompetitiveScore +=
+                    other.PreGeometryNonCompetitiveScore;
+                CandidatesSentToGeometry += other.CandidatesSentToGeometry;
+                NearParallelBodyBlend += other.NearParallelBodyBlend;
+                OccupiedAttachmentSlot += other.OccupiedAttachmentSlot;
+                SharedContactLocus += other.SharedContactLocus;
+                CrowdedTripletJunction += other.CrowdedTripletJunction;
+                TripletFreeEndPseudoContact +=
+                    other.TripletFreeEndPseudoContact;
+                SeverelyCompressedTriplet += other.SeverelyCompressedTriplet;
+                WrongSideTerminal += other.WrongSideTerminal;
+                SweptWidthInternalOverlap +=
+                    other.SweptWidthInternalOverlap;
+            }
         }
 
         private enum ProjectedCompanionFallbackReason
@@ -775,9 +2041,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 new List<GroundPaintedAccentProjectedGlyph>(baseStrokes.Count);
             List<GroundPaintedAccentProjectedGlyphRejectionDebugPoint> rejections =
                 new List<GroundPaintedAccentProjectedGlyphRejectionDebugPoint>();
-            Dictionary<int, List<GroundPaintedAccentSurfaceStroke>> clusters =
-                new Dictionary<int, List<GroundPaintedAccentSurfaceStroke>>();
-            HashSet<int> acceptedClusterKeys = new HashSet<int>();
             GroundPaintedAccentProjectedGlyphScratch scratch =
                 new GroundPaintedAccentProjectedGlyphScratch();
 
@@ -793,145 +2056,59 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int companionClustersFallback = 0;
             int companionPairsAccepted = 0;
             int companionTripletsAccepted = 0;
+            int companionClustersRemovedDuringReconciliation = 0;
+            int companionPairStepRetentionRejectedCandidates = 0;
+            int companionPairNearCollinearRejectedCandidates = 0;
+            int companionPreGeometryStepRetentionRejectedCandidates = 0;
+            int companionPreGeometryNonCompetitiveScoreRejectedCandidates = 0;
+            int companionCandidatesSentToGeometryValidation = 0;
+            int companionNearParallelBodyRejectedCandidates = 0;
+            int companionOccupiedAttachmentSlotRejectedCandidates = 0;
+            int companionSharedContactLocusRejectedCandidates = 0;
+            int companionCrowdedTripletJunctionRejectedCandidates = 0;
+            int companionTripletFreeEndPseudoContactRejectedCandidates = 0;
+            int companionSeverelyCompressedTripletRejectedCandidates = 0;
+            int companionWrongSideTerminalRejectedCandidates = 0;
+            int companionSweptWidthInternalOverlapRejectedCandidates = 0;
+            int companionPairRejectedIncomplete = 0;
+            int companionPairRejectedPrototype = 0;
+            int companionPairRejectedContact = 0;
+            int companionPairRejectedSurface = 0;
+            int companionPairRejectedExternalConflict = 0;
             int companionRejectedIncomplete = 0;
             int companionRejectedPrototype = 0;
             int companionRejectedContact = 0;
             int companionRejectedSurface = 0;
             int companionRejectedExternalConflict = 0;
 
+            int[] projectedValidByRankQuartile = new int[4];
+            int quietProjectedValid = 0;
+            int supportingProjectedValid = 0;
+            int accentProjectedValid = 0;
+            List<AuthoritativeProjectedMark> eligibleMarks =
+                new List<AuthoritativeProjectedMark>(baseStrokes.Count);
             for (int strokeIndex = 0;
                  strokeIndex < baseStrokes.Count;
                  strokeIndex++)
             {
                 GroundPaintedAccentSurfaceStroke stroke = baseStrokes[strokeIndex];
-                if (stroke.IsCompanionMember)
+                if (stroke.IsCompanionMember && stroke.HasIndependentFallback)
                 {
-                    if (!clusters.TryGetValue(
-                            stroke.CompanionClusterIndex,
-                            out List<GroundPaintedAccentSurfaceStroke> members))
-                    {
-                        members =
-                            new List<GroundPaintedAccentSurfaceStroke>(
-                                stroke.IntendedCompanionClusterSize);
-                        clusters.Add(stroke.CompanionClusterIndex, members);
-                    }
-
-                    members.Add(stroke);
-                    continue;
+                    stroke = stroke.CreateIndependentFallback();
                 }
 
-                ProcessProjectedStroke(
-                    stroke,
-                    baseSurface,
-                    feature,
-                    rivers,
-                    modifiers,
-                    localNorth,
-                    scratch,
-                    timing,
-                    glyphs,
-                    rejections,
-                    ref rejectedSampling,
-                    ref rejectedRiver,
-                    ref rejectedModifier,
-                    ref rejectedBroadSlope,
-                    ref rejectedLocalGrade,
-                    ref rejectedFamilyShape,
-                    ref rejectedSharpTurn);
-            }
-
-            List<int> clusterKeys = new List<int>(clusters.Keys);
-            clusterKeys.Sort();
-            for (int clusterKeyIndex = 0;
-                 clusterKeyIndex < clusterKeys.Count;
-                 clusterKeyIndex++)
-            {
-                int clusterKey = clusterKeys[clusterKeyIndex];
-                List<GroundPaintedAccentSurfaceStroke> members =
-                    clusters[clusterKey];
-                members.Sort(CompareCompanionSurfaceStrokeMembers);
-                companionClustersRequested++;
-
-                if (TryBuildAtomicProjectedCluster(
-                        members,
-                        baseSurface,
+                if (!TryBuildProjectedGlyphPrototype(
+                        stroke,
                         feature,
-                        rivers,
-                        modifiers,
                         localNorth,
-                        scratch,
                         timing,
-                        glyphs,
-                        out List<GroundPaintedAccentProjectedGlyph> clusterGlyphs,
-                        out ProjectedCompanionFallbackReason fallbackReason))
+                        out ProjectedGlyphPrototype prototype,
+                        out GroundPaintedAccentProjectedGlyphRejectionReason
+                            prototypeReason))
                 {
-                    companionClustersAccepted++;
-                    acceptedClusterKeys.Add(clusterKey);
-                    if (clusterGlyphs.Count >= 3)
-                    {
-                        companionTripletsAccepted++;
-                    }
-                    else
-                    {
-                        companionPairsAccepted++;
-                    }
-
-                    glyphs.AddRange(clusterGlyphs);
-                    continue;
-                }
-
-                companionClustersFallback++;
-                switch (fallbackReason)
-                {
-                    case ProjectedCompanionFallbackReason.Incomplete:
-                        companionRejectedIncomplete++;
-                        break;
-                    case ProjectedCompanionFallbackReason.Prototype:
-                        companionRejectedPrototype++;
-                        break;
-                    case ProjectedCompanionFallbackReason.Contact:
-                        companionRejectedContact++;
-                        break;
-                    case ProjectedCompanionFallbackReason.Surface:
-                        companionRejectedSurface++;
-                        break;
-                    case ProjectedCompanionFallbackReason.ExternalConflict:
-                        companionRejectedExternalConflict++;
-                        break;
-                }
-
-                for (int memberIndex = 0;
-                     memberIndex < members.Count;
-                     memberIndex++)
-                {
-                    GroundPaintedAccentSurfaceStroke fallbackStroke =
-                        members[memberIndex].CreateIndependentFallback();
-                    if (!fallbackStroke.IsValid)
-                    {
-                        RecordProjectionRejection(
-                            members[memberIndex],
-                            GroundPaintedAccentProjectedGlyphRejectionReason.Sampling,
-                            rejections,
-                            ref rejectedSampling,
-                            ref rejectedRiver,
-                            ref rejectedModifier,
-                            ref rejectedBroadSlope,
-                            ref rejectedLocalGrade,
-                            ref rejectedFamilyShape,
-                            ref rejectedSharpTurn);
-                        continue;
-                    }
-
-                    ProcessProjectedStroke(
-                        fallbackStroke,
-                        baseSurface,
-                        feature,
-                        rivers,
-                        modifiers,
-                        localNorth,
-                        scratch,
-                        timing,
-                        glyphs,
+                    RecordProjectionRejection(
+                        stroke,
+                        prototypeReason,
                         rejections,
                         ref rejectedSampling,
                         ref rejectedRiver,
@@ -940,36 +2117,418 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         ref rejectedLocalGrade,
                         ref rejectedFamilyShape,
                         ref rejectedSharpTurn);
+                    continue;
+                }
+
+                if (!TryFinalizeProjectedGlyph(
+                        prototype,
+                        baseSurface,
+                        rivers,
+                        modifiers,
+                        scratch,
+                        timing,
+                        out GroundPaintedAccentProjectedGlyph independentGlyph,
+                        out GroundPaintedAccentProjectedGlyphRejectionReason
+                            finalizeReason))
+                {
+                    RecordProjectionRejection(
+                        stroke,
+                        finalizeReason,
+                        rejections,
+                        ref rejectedSampling,
+                        ref rejectedRiver,
+                        ref rejectedModifier,
+                        ref rejectedBroadSlope,
+                        ref rejectedLocalGrade,
+                        ref rejectedFamilyShape,
+                        ref rejectedSharpTurn);
+                    continue;
+                }
+
+                projectedValidByRankQuartile[
+                    Mathf.Clamp(stroke.ProposalRankQuartile, 0, 3)]++;
+                switch (stroke.CompositionRegionMode)
+                {
+                    case GroundPaintedAccentCompositionRegionMode.Quiet:
+                        quietProjectedValid++;
+                        break;
+                    case GroundPaintedAccentCompositionRegionMode.Accent:
+                        accentProjectedValid++;
+                        break;
+                    case GroundPaintedAccentCompositionRegionMode.Supporting:
+                    default:
+                        supportingProjectedValid++;
+                        break;
+                }
+
+                eligibleMarks.Add(
+                    new AuthoritativeProjectedMark(
+                        strokeIndex,
+                        stroke,
+                        prototype,
+                        independentGlyph));
+            }
+
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit =
+                new GroundPaintedAccentClusterBuildAuditAccumulator();
+            GroundPaintedAccentInternalOverlapAuditAccumulator
+                internalOverlapAudit =
+                    new GroundPaintedAccentInternalOverlapAuditAccumulator();
+            GroundPaintedAccentNearParallelAuditAccumulator
+                nearParallelAudit =
+                    new GroundPaintedAccentNearParallelAuditAccumulator();
+            long clusterAuditStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            long quotaPreparationStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            float companionParticipation =
+                Mathf.Clamp01(feature.PaintedAccentCompanionParticipation);
+            float companionTripletShare =
+                Mathf.Clamp01(feature.PaintedAccentCompanionTripletShare);
+            AuthoritativeCompanionQuota authoritativeQuota =
+                ResolveAuthoritativeCompanionQuota(
+                    eligibleMarks.Count,
+                    companionParticipation,
+                    companionTripletShare);
+            companionClustersRequested =
+                authoritativeQuota.PairClusterCount +
+                authoritativeQuota.TripletClusterCount;
+            int companionParticipantsRequested =
+                authoritativeQuota.ParticipantCount;
+            int companionPairClustersRequested =
+                authoritativeQuota.PairClusterCount;
+            int companionTripletClustersRequested =
+                authoritativeQuota.TripletClusterCount;
+
+            int[] requestedPairLayouts =
+                ResolveAuthoritativeLayoutCounts(
+                    companionPairClustersRequested,
+                    feature.PaintedAccentCompanionPairLayoutWeights);
+            int[] requestedTripletLayouts =
+                ResolveAuthoritativeLayoutCounts(
+                    companionTripletClustersRequested,
+                    feature.PaintedAccentCompanionTripletLayoutWeights);
+            int[] acceptedPairLayouts = new int[4];
+            int[] acceptedTripletLayouts = new int[4];
+            List<AuthoritativeClusterSpec> clusterSpecs =
+                BuildAuthoritativeClusterSpecs(
+                    requestedPairLayouts,
+                    requestedTripletLayouts,
+                    feature.SeedOffset);
+            timing.ClusterQuotaPreparationTicks +=
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                quotaPreparationStartedAt;
+
+            long participantSelectionStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            if (companionParticipantsRequested > 0)
+            {
+                ResolveAuthoritativeMarkSelectionScores(
+                    eligibleMarks,
+                    feature.PaintedAccentClusterRegionBias);
+                eligibleMarks.Sort(CompareAuthoritativeProjectedMarks);
+            }
+
+            int resolvedParticipantCount =
+                Mathf.Min(
+                    companionParticipantsRequested,
+                    eligibleMarks.Count);
+            List<int> participantMarkIndices =
+                new List<int>(resolvedParticipantCount);
+            List<int> independentMarkIndices =
+                new List<int>(eligibleMarks.Count - resolvedParticipantCount);
+            for (int markIndex = 0;
+                 markIndex < eligibleMarks.Count;
+                 markIndex++)
+            {
+                if (markIndex < resolvedParticipantCount)
+                {
+                    participantMarkIndices.Add(markIndex);
+                }
+                else
+                {
+                    independentMarkIndices.Add(markIndex);
                 }
             }
 
-            ReconcileAcceptedProjectedClustersAgainstFinalIndependents(
-                clusters,
-                acceptedClusterKeys,
-                baseSurface,
-                feature,
-                rivers,
-                modifiers,
-                localNorth,
-                scratch,
-                timing,
+            for (int independentIndex = 0;
+                 independentIndex < independentMarkIndices.Count;
+                 independentIndex++)
+            {
+                glyphs.Add(
+                    eligibleMarks[independentMarkIndices[independentIndex]]
+                        .IndependentGlyph);
+            }
+
+            ProjectedGlyphSpatialIndex acceptedGlyphSpatialIndex =
+                new ProjectedGlyphSpatialIndex();
+            for (int glyphIndex = 0;
+                 glyphIndex < glyphs.Count;
+                 glyphIndex++)
+            {
+                acceptedGlyphSpatialIndex.Add(glyphIndex, glyphs[glyphIndex]);
+            }
+
+            timing.ClusterParticipantSelectionTicks +=
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                participantSelectionStartedAt;
+
+            List<AuthoritativeClusterRecord> acceptedClusterRecords =
+                new List<AuthoritativeClusterRecord>(clusterSpecs.Count);
+            List<int> availableParticipantIndices =
+                new List<int>(participantMarkIndices);
+            int authoritativeClusterBuildAttempts = 0;
+            int authoritativePairShortfall = 0;
+            int authoritativeTripletShortfall = 0;
+
+            for (int specIndex = 0;
+                 specIndex < clusterSpecs.Count;
+                 specIndex++)
+            {
+                AuthoritativeClusterSpec spec = clusterSpecs[specIndex];
+                int clusterIndex = acceptedClusterRecords.Count;
+                bool clusterBuilt =
+                    TryBuildAuthoritativeProjectedCluster(
+                        spec,
+                        clusterIndex,
+                        eligibleMarks,
+                        availableParticipantIndices,
+                        baseSurface,
+                        feature,
+                        rivers,
+                        modifiers,
+                        localNorth,
+                        scratch,
+                        timing,
+                        clusterAudit,
+                        nearParallelAudit,
+                        internalOverlapAudit,
+                        glyphs,
+                        acceptedGlyphSpatialIndex,
+                        out int[] selectedMarkIndices,
+                        out List<GroundPaintedAccentProjectedGlyph>
+                            clusterGlyphs,
+                        out ProjectedCompanionFallbackReason fallbackReason,
+                        out int buildAttempts,
+                        out bool exhaustedAttemptBudget,
+                        out ProjectedClusterQualityRejections
+                            qualityRejections);
+                authoritativeClusterBuildAttempts += buildAttempts;
+                clusterAudit.RecordBuildResult(
+                    clusterBuilt,
+                    buildAttempts,
+                    exhaustedAttemptBudget);
+                long clusterCommitStartedAt =
+                    System.Diagnostics.Stopwatch.GetTimestamp();
+                companionPairStepRetentionRejectedCandidates +=
+                    qualityRejections.PairStepRetention;
+                companionPairNearCollinearRejectedCandidates +=
+                    qualityRejections.PairNearCollinear;
+                companionPreGeometryStepRetentionRejectedCandidates +=
+                    qualityRejections.PreGeometryStepRetention;
+                companionPreGeometryNonCompetitiveScoreRejectedCandidates +=
+                    qualityRejections.PreGeometryNonCompetitiveScore;
+                companionCandidatesSentToGeometryValidation +=
+                    qualityRejections.CandidatesSentToGeometry;
+                companionNearParallelBodyRejectedCandidates +=
+                    qualityRejections.NearParallelBodyBlend;
+                companionOccupiedAttachmentSlotRejectedCandidates +=
+                    qualityRejections.OccupiedAttachmentSlot;
+                companionSharedContactLocusRejectedCandidates +=
+                    qualityRejections.SharedContactLocus;
+                companionCrowdedTripletJunctionRejectedCandidates +=
+                    qualityRejections.CrowdedTripletJunction;
+                companionTripletFreeEndPseudoContactRejectedCandidates +=
+                    qualityRejections.TripletFreeEndPseudoContact;
+                companionSeverelyCompressedTripletRejectedCandidates +=
+                    qualityRejections.SeverelyCompressedTriplet;
+                companionWrongSideTerminalRejectedCandidates +=
+                    qualityRejections.WrongSideTerminal;
+                companionSweptWidthInternalOverlapRejectedCandidates +=
+                    qualityRejections.SweptWidthInternalOverlap;
+
+                if (clusterBuilt)
+                {
+                    companionClustersAccepted++;
+                    if (spec.Size >= 3)
+                    {
+                        companionTripletsAccepted++;
+                        acceptedTripletLayouts[
+                            ResolveAuthoritativeTripletLayoutIndex(
+                                spec.TripletLayout)]++;
+                    }
+                    else
+                    {
+                        companionPairsAccepted++;
+                        acceptedPairLayouts[
+                            ResolveAuthoritativePairLayoutIndex(
+                                spec.PairLayout)]++;
+                    }
+
+                    for (int selectedIndex = 0;
+                         selectedIndex < selectedMarkIndices.Length;
+                         selectedIndex++)
+                    {
+                        availableParticipantIndices.Remove(
+                            selectedMarkIndices[selectedIndex]);
+                    }
+                    GroundPaintedAccentProjectedGlyph[]
+                        committedClusterGlyphs = clusterGlyphs.ToArray();
+                    for (int clusterGlyphIndex = 0;
+                         clusterGlyphIndex < committedClusterGlyphs.Length;
+                         clusterGlyphIndex++)
+                    {
+                        int glyphIndex = glyphs.Count;
+                        GroundPaintedAccentProjectedGlyph committedGlyph =
+                            committedClusterGlyphs[clusterGlyphIndex];
+                        glyphs.Add(committedGlyph);
+                        acceptedGlyphSpatialIndex.Add(
+                            glyphIndex,
+                            committedGlyph);
+                    }
+                    acceptedClusterRecords.Add(
+                        new AuthoritativeClusterRecord
+                        {
+                            ClusterIndex = clusterIndex,
+                            Spec = spec,
+                            MarkIndices = selectedMarkIndices,
+                            ClusterGlyphs = committedClusterGlyphs,
+                            ReconciliationIndependentCountChecked = 0
+                        });
+                    timing.ClusterCommitTicks +=
+                        System.Diagnostics.Stopwatch.GetTimestamp() -
+                        clusterCommitStartedAt;
+                    continue;
+                }
+
+                companionClustersFallback++;
+                if (spec.Size >= 3)
+                {
+                    authoritativeTripletShortfall++;
+                }
+                else
+                {
+                    authoritativePairShortfall++;
+                }
+
+                bool pairFallback = spec.Size == 2;
+                switch (fallbackReason)
+                {
+                    case ProjectedCompanionFallbackReason.Incomplete:
+                        companionRejectedIncomplete++;
+                        if (pairFallback)
+                        {
+                            companionPairRejectedIncomplete++;
+                        }
+                        break;
+                    case ProjectedCompanionFallbackReason.Prototype:
+                        companionRejectedPrototype++;
+                        if (pairFallback)
+                        {
+                            companionPairRejectedPrototype++;
+                        }
+                        break;
+                    case ProjectedCompanionFallbackReason.Surface:
+                        companionRejectedSurface++;
+                        if (pairFallback)
+                        {
+                            companionPairRejectedSurface++;
+                        }
+                        break;
+                    case ProjectedCompanionFallbackReason.ExternalConflict:
+                        companionRejectedExternalConflict++;
+                        if (pairFallback)
+                        {
+                            companionPairRejectedExternalConflict++;
+                        }
+                        break;
+                    case ProjectedCompanionFallbackReason.Contact:
+                    default:
+                        companionRejectedContact++;
+                        if (pairFallback)
+                        {
+                            companionPairRejectedContact++;
+                        }
+                        break;
+                }
+                timing.ClusterCommitTicks +=
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    clusterCommitStartedAt;
+            }
+
+            long remainingIndependentCommitStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            // Initial independents and cluster-to-cluster relationships were
+            // already checked during authoritative construction. Only glyphs
+            // committed after allocation can introduce reconciliation work.
+            List<GroundPaintedAccentProjectedGlyph>
+                reconciliationIndependentGlyphs =
+                    new List<GroundPaintedAccentProjectedGlyph>(
+                        availableParticipantIndices.Count);
+            for (int availableIndex = 0;
+                 availableIndex < availableParticipantIndices.Count;
+                 availableIndex++)
+            {
+                GroundPaintedAccentProjectedGlyph independentGlyph =
+                    eligibleMarks[availableParticipantIndices[availableIndex]]
+                        .IndependentGlyph;
+                glyphs.Add(independentGlyph);
+                reconciliationIndependentGlyphs.Add(independentGlyph);
+            }
+
+            timing.ClusterCommitTicks +=
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                remainingIndependentCommitStartedAt;
+
+            long reconciliationStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            ReconcileAuthoritativeClustersAgainstFinalIndependents(
+                eligibleMarks,
+                acceptedClusterRecords,
                 glyphs,
-                rejections,
-                ref rejectedSampling,
-                ref rejectedRiver,
-                ref rejectedModifier,
-                ref rejectedBroadSlope,
-                ref rejectedLocalGrade,
-                ref rejectedFamilyShape,
-                ref rejectedSharpTurn,
+                reconciliationIndependentGlyphs,
+                acceptedPairLayouts,
+                acceptedTripletLayouts,
                 ref companionClustersAccepted,
                 ref companionClustersFallback,
                 ref companionPairsAccepted,
                 ref companionTripletsAccepted,
-                ref companionRejectedExternalConflict);
+                ref authoritativePairShortfall,
+                ref authoritativeTripletShortfall,
+                ref companionRejectedExternalConflict,
+                ref companionPairRejectedExternalConflict,
+                ref companionClustersRemovedDuringReconciliation,
+                clusterAudit);
+            timing.ClusterReconciliationTicks +=
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                reconciliationStartedAt;
+            timing.ClusterAuditTotalTicks +=
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                clusterAuditStartedAt;
+
+            int finalCompanionParticipantCount = 0;
+            for (int glyphIndex = 0; glyphIndex < glyphs.Count; glyphIndex++)
+            {
+                if (glyphs[glyphIndex].IsCompanionMember)
+                {
+                    finalCompanionParticipantCount++;
+                }
+            }
+            float finalCompanionParticipantFraction =
+                glyphs.Count > 0
+                    ? finalCompanionParticipantCount / (float)glyphs.Count
+                    : 0f;
 
             long diagnosticsStartedAt =
                 System.Diagnostics.Stopwatch.GetTimestamp();
+            ResolveAcceptedProjectedPairStepStatistics(
+                glyphs,
+                out float companionPairVerticalStepMin,
+                out float companionPairVerticalStepMean,
+                out float companionPairVerticalStepMax,
+                out float companionPairVerticalStepFractionMin,
+                out float companionPairVerticalStepFractionMean,
+                out float companionPairVerticalStepFractionMax);
             int[] familyAttempted = new int[4];
             int[] familyAccepted = new int[4];
             int[] familyRejected = new int[4];
@@ -1111,6 +2670,70 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     companionClustersFallback,
                     companionPairsAccepted,
                     companionTripletsAccepted,
+                    new GroundPaintedAccentCompanionQuotaDiagnostics(
+                        eligibleMarks.Count,
+                        companionParticipation,
+                        companionTripletShare,
+                        companionParticipantsRequested,
+                        companionPairClustersRequested,
+                        companionTripletClustersRequested,
+                        companionPairsAccepted,
+                        companionTripletsAccepted,
+                        authoritativePairShortfall,
+                        authoritativeTripletShortfall,
+                        authoritativeClusterBuildAttempts,
+                        new Vector4(
+                            requestedPairLayouts[0],
+                            requestedPairLayouts[1],
+                            requestedPairLayouts[2],
+                            requestedPairLayouts[3]),
+                        new Vector4(
+                            acceptedPairLayouts[0],
+                            acceptedPairLayouts[1],
+                            acceptedPairLayouts[2],
+                            acceptedPairLayouts[3]),
+                        new Vector4(
+                            requestedTripletLayouts[0],
+                            requestedTripletLayouts[1],
+                            requestedTripletLayouts[2],
+                            requestedTripletLayouts[3]),
+                        new Vector4(
+                            acceptedTripletLayouts[0],
+                            acceptedTripletLayouts[1],
+                            acceptedTripletLayouts[2],
+                            acceptedTripletLayouts[3])),
+                    clusterAudit.Resolve(
+                        companionClustersRequested,
+                        authoritativeClusterBuildAttempts),
+                    internalOverlapAudit.Resolve(),
+                    nearParallelAudit.Resolve(),
+                    finalCompanionParticipantCount,
+                    finalCompanionParticipantFraction,
+                    companionClustersRemovedDuringReconciliation,
+                    companionPairStepRetentionRejectedCandidates,
+                    companionPairNearCollinearRejectedCandidates,
+                    companionPreGeometryStepRetentionRejectedCandidates,
+                    companionPreGeometryNonCompetitiveScoreRejectedCandidates,
+                    companionCandidatesSentToGeometryValidation,
+                    companionNearParallelBodyRejectedCandidates,
+                    companionOccupiedAttachmentSlotRejectedCandidates,
+                    companionSharedContactLocusRejectedCandidates,
+                    companionCrowdedTripletJunctionRejectedCandidates,
+                    companionTripletFreeEndPseudoContactRejectedCandidates,
+                    companionSeverelyCompressedTripletRejectedCandidates,
+                    companionWrongSideTerminalRejectedCandidates,
+                    companionSweptWidthInternalOverlapRejectedCandidates,
+                    companionPairRejectedIncomplete,
+                    companionPairRejectedPrototype,
+                    companionPairRejectedContact,
+                    companionPairRejectedSurface,
+                    companionPairRejectedExternalConflict,
+                    companionPairVerticalStepMin,
+                    companionPairVerticalStepMean,
+                    companionPairVerticalStepMax,
+                    companionPairVerticalStepFractionMin,
+                    companionPairVerticalStepFractionMean,
+                    companionPairVerticalStepFractionMax,
                     companionRejectedIncomplete,
                     companionRejectedPrototype,
                     companionRejectedContact,
@@ -1196,7 +2819,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     (float)(projectedTurnTotal / divisor),
                     acceptedCount > 0 ? projectedTurnMaximum : 0f,
                     maximumNorthError,
-                    maximumCrossDrift);
+                    maximumCrossDrift,
+                    new GroundPaintedAccentProjectedFunnelDiagnostics(
+                        new Vector4(
+                            projectedValidByRankQuartile[0],
+                            projectedValidByRankQuartile[1],
+                            projectedValidByRankQuartile[2],
+                            projectedValidByRankQuartile[3]),
+                        quietProjectedValid,
+                        supportingProjectedValid,
+                        accentProjectedValid));
 
             GroundPaintedAccentProjectedGlyphDebugSnapshot snapshot =
                 new GroundPaintedAccentProjectedGlyphDebugSnapshot(
@@ -1208,6 +2840,1052 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 diagnosticsStartedAt;
             timings = timing.Resolve();
             return snapshot;
+        }
+
+        private static AuthoritativeCompanionQuota
+            ResolveAuthoritativeCompanionQuota(
+                int totalMarkCount,
+                float participation,
+                float tripletShare)
+        {
+            int total = Mathf.Max(0, totalMarkCount);
+            if (total < 2 || participation <= 0.0001f)
+            {
+                return new AuthoritativeCompanionQuota(0, 0, 0);
+            }
+
+            float targetParticipants = total * Mathf.Clamp01(participation);
+            float requestedTripletShare = Mathf.Clamp01(tripletShare);
+            int bestParticipants = 0;
+            int bestPairs = 0;
+            int bestTriplets = 0;
+            float bestScore = Mathf.Abs(targetParticipants) * 10000f;
+
+            for (int triplets = 0; triplets <= total / 3; triplets++)
+            {
+                int maximumPairs = (total - triplets * 3) / 2;
+                for (int pairs = 0; pairs <= maximumPairs; pairs++)
+                {
+                    int participants = pairs * 2 + triplets * 3;
+                    if (participants <= 0)
+                    {
+                        continue;
+                    }
+
+                    float participationError =
+                        Mathf.Abs(participants - targetParticipants);
+                    float resolvedTripletShare =
+                        triplets * 3f / participants;
+                    float tripletShareError =
+                        Mathf.Abs(
+                            resolvedTripletShare - requestedTripletShare);
+                    float score =
+                        participationError * 10000f +
+                        tripletShareError * 100f +
+                        Mathf.Abs(triplets - pairs) * 0.0001f;
+                    if (score < bestScore - 0.0001f)
+                    {
+                        bestScore = score;
+                        bestParticipants = participants;
+                        bestPairs = pairs;
+                        bestTriplets = triplets;
+                    }
+                }
+            }
+
+            return new AuthoritativeCompanionQuota(
+                bestParticipants,
+                bestPairs,
+                bestTriplets);
+        }
+
+        private static int[] ResolveAuthoritativeLayoutCounts(
+            int totalCount,
+            Vector4 authoredWeights)
+        {
+            int[] counts = new int[4];
+            int total = Mathf.Max(0, totalCount);
+            if (total <= 0)
+            {
+                return counts;
+            }
+
+            float[] weights =
+            {
+                Mathf.Max(0f, authoredWeights.x),
+                Mathf.Max(0f, authoredWeights.y),
+                Mathf.Max(0f, authoredWeights.z),
+                Mathf.Max(0f, authoredWeights.w)
+            };
+            float weightTotal =
+                weights[0] + weights[1] + weights[2] + weights[3];
+            if (weightTotal <= 0.0001f)
+            {
+                weights[0] = 1f;
+                weightTotal = 1f;
+            }
+
+            float[] remainders = new float[4];
+            int assigned = 0;
+            for (int index = 0; index < 4; index++)
+            {
+                float exact = total * weights[index] / weightTotal;
+                counts[index] = Mathf.FloorToInt(exact);
+                remainders[index] = exact - counts[index];
+                assigned += counts[index];
+            }
+
+            while (assigned < total)
+            {
+                int bestIndex = 0;
+                for (int index = 1; index < 4; index++)
+                {
+                    if (remainders[index] > remainders[bestIndex] + 0.000001f)
+                    {
+                        bestIndex = index;
+                    }
+                }
+
+                counts[bestIndex]++;
+                remainders[bestIndex] = -1f;
+                assigned++;
+            }
+
+            return counts;
+        }
+
+        private static List<AuthoritativeClusterSpec>
+            BuildAuthoritativeClusterSpecs(
+                IReadOnlyList<int> pairLayoutCounts,
+                IReadOnlyList<int> tripletLayoutCounts,
+                int seedOffset)
+        {
+            List<AuthoritativeClusterSpec> specs =
+                new List<AuthoritativeClusterSpec>();
+            int ordinal = 0;
+            GroundPaintedAccentCompanionTripletLayout[] tripletLayouts =
+            {
+                GroundPaintedAccentCompanionTripletLayout.SteppedRun,
+                GroundPaintedAccentCompanionTripletLayout.CrownRun,
+                GroundPaintedAccentCompanionTripletLayout.BrokenTerrace,
+                GroundPaintedAccentCompanionTripletLayout.ShallowRun
+            };
+            GroundPaintedAccentCompanionPairLayout[] pairLayouts =
+            {
+                GroundPaintedAccentCompanionPairLayout.SteppedContinuation,
+                GroundPaintedAccentCompanionPairLayout.ShoulderContact,
+                GroundPaintedAccentCompanionPairLayout.OffsetEcho,
+                GroundPaintedAccentCompanionPairLayout.ShallowOffset
+            };
+
+            for (int layoutIndex = 0; layoutIndex < 4; layoutIndex++)
+            {
+                int count =
+                    tripletLayoutCounts != null &&
+                    layoutIndex < tripletLayoutCounts.Count
+                        ? Mathf.Max(0, tripletLayoutCounts[layoutIndex])
+                        : 0;
+                for (int index = 0; index < count; index++)
+                {
+                    specs.Add(
+                        new AuthoritativeClusterSpec(
+                            3,
+                            GroundPaintedAccentCompanionPairLayout.None,
+                            tripletLayouts[layoutIndex],
+                            ordinal++));
+                }
+            }
+
+            for (int layoutIndex = 0; layoutIndex < 4; layoutIndex++)
+            {
+                int count =
+                    pairLayoutCounts != null &&
+                    layoutIndex < pairLayoutCounts.Count
+                        ? Mathf.Max(0, pairLayoutCounts[layoutIndex])
+                        : 0;
+                for (int index = 0; index < count; index++)
+                {
+                    specs.Add(
+                        new AuthoritativeClusterSpec(
+                            2,
+                            pairLayouts[layoutIndex],
+                            GroundPaintedAccentCompanionTripletLayout.None,
+                            ordinal++));
+                }
+            }
+
+            specs.Sort(
+                (left, right) =>
+                {
+                    uint leftHash =
+                        HashAuthoritative(
+                            (uint)(left.Ordinal + 1),
+                            (uint)(seedOffset + 0x4F31));
+                    uint rightHash =
+                        HashAuthoritative(
+                            (uint)(right.Ordinal + 1),
+                            (uint)(seedOffset + 0x4F31));
+                    int sizeComparison = right.Size.CompareTo(left.Size);
+                    if (sizeComparison != 0)
+                    {
+                        return sizeComparison;
+                    }
+
+                    return leftHash.CompareTo(rightHash);
+                });
+            return specs;
+        }
+
+        private static void ResolveAuthoritativeMarkSelectionScores(
+            List<AuthoritativeProjectedMark> marks,
+            float accentBias)
+        {
+            if (marks == null || marks.Count == 0)
+            {
+                return;
+            }
+
+            float maximumLength = 0f;
+            for (int index = 0; index < marks.Count; index++)
+            {
+                maximumLength =
+                    Mathf.Max(maximumLength, marks[index].Stroke.AuthoredLength);
+            }
+            float densityRadius =
+                Mathf.Max(
+                    MinimumAuthoritativeDensityRadius,
+                    maximumLength * AuthoritativeDensityRadiusLengthMultiplier);
+            float densityRadiusSquared = densityRadius * densityRadius;
+            float densityMinimum = float.PositiveInfinity;
+            float densityMaximum = float.NegativeInfinity;
+
+            for (int leftIndex = 0; leftIndex < marks.Count; leftIndex++)
+            {
+                float density = 0f;
+                Vector2 left = marks[leftIndex].Centroid;
+                for (int rightIndex = 0; rightIndex < marks.Count; rightIndex++)
+                {
+                    if (rightIndex == leftIndex)
+                    {
+                        continue;
+                    }
+
+                    float distanceSquared =
+                        (marks[rightIndex].Centroid - left).sqrMagnitude;
+                    if (distanceSquared > densityRadiusSquared)
+                    {
+                        continue;
+                    }
+
+                    density +=
+                        1f - Mathf.Sqrt(distanceSquared) / densityRadius;
+                }
+
+                marks[leftIndex].DensityScore = density;
+                densityMinimum = Mathf.Min(densityMinimum, density);
+                densityMaximum = Mathf.Max(densityMaximum, density);
+            }
+
+            float densityRange = Mathf.Max(0.0001f, densityMaximum - densityMinimum);
+            float bias = Mathf.Clamp01(accentBias);
+            for (int index = 0; index < marks.Count; index++)
+            {
+                float normalizedDensity =
+                    (marks[index].DensityScore - densityMinimum) / densityRange;
+                float deterministicOrder =
+                    HashAuthoritative01(
+                        (uint)marks[index].Stroke.Seed,
+                        0xB5297A4Du);
+                marks[index].SelectionScore =
+                    Mathf.Lerp(deterministicOrder, normalizedDensity, bias);
+            }
+        }
+
+        private static int CompareAuthoritativeProjectedMarks(
+            AuthoritativeProjectedMark left,
+            AuthoritativeProjectedMark right)
+        {
+            int scoreComparison =
+                right.SelectionScore.CompareTo(left.SelectionScore);
+            if (scoreComparison != 0)
+            {
+                return scoreComparison;
+            }
+
+            int seedComparison = left.Stroke.Seed.CompareTo(right.Stroke.Seed);
+            if (seedComparison != 0)
+            {
+                return seedComparison;
+            }
+
+            return left.SourceIndex.CompareTo(right.SourceIndex);
+        }
+
+        private static bool TryBuildAuthoritativeProjectedCluster(
+            AuthoritativeClusterSpec spec,
+            int clusterIndex,
+            IReadOnlyList<AuthoritativeProjectedMark> marks,
+            IReadOnlyList<int> availableMarkIndices,
+            GroundHeightFieldSnapshot baseSurface,
+            GroundSurfaceFeatureRecipe feature,
+            IReadOnlyList<GroundPaintedAccentRiverExclusionSnapshot> rivers,
+            IReadOnlyList<GroundModifierSnapshot> modifiers,
+            Vector2 localNorth,
+            GroundPaintedAccentProjectedGlyphScratch scratch,
+            GroundPaintedAccentProjectedGlyphTimingAccumulator timing,
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit,
+            GroundPaintedAccentNearParallelAuditAccumulator
+                nearParallelAudit,
+            GroundPaintedAccentInternalOverlapAuditAccumulator
+                internalOverlapAudit,
+            IReadOnlyList<GroundPaintedAccentProjectedGlyph> acceptedGlyphs,
+            ProjectedGlyphSpatialIndex acceptedGlyphSpatialIndex,
+            out int[] selectedMarkIndices,
+            out List<GroundPaintedAccentProjectedGlyph> clusterGlyphs,
+            out ProjectedCompanionFallbackReason fallbackReason,
+            out int buildAttempts,
+            out bool exhaustedAttemptBudget,
+            out ProjectedClusterQualityRejections qualityRejections)
+        {
+            selectedMarkIndices = Array.Empty<int>();
+            clusterGlyphs = new List<GroundPaintedAccentProjectedGlyph>(spec.Size);
+            fallbackReason = ProjectedCompanionFallbackReason.Incomplete;
+            buildAttempts = 0;
+            exhaustedAttemptBudget = false;
+            qualityRejections = default;
+            if (marks == null ||
+                availableMarkIndices == null ||
+                availableMarkIndices.Count < spec.Size)
+            {
+                return false;
+            }
+
+            int availableCount = availableMarkIndices.Count;
+            uint specHash =
+                HashAuthoritative(
+                    (uint)(spec.Ordinal + 1),
+                    (uint)(feature.SeedOffset + 0x792D));
+            int start = (int)(specHash % (uint)availableCount);
+            ProjectedCompanionFallbackReason lastReason =
+                ProjectedCompanionFallbackReason.Contact;
+
+            int maximumAttempts =
+                Mathf.Min(
+                    MaximumAuthoritativeClusterBuildAttempts,
+                    Mathf.Max(12, availableCount * 2));
+            for (int attempt = 0; attempt < maximumAttempts; attempt++)
+            {
+                long donorSelectionStartedAt =
+                    System.Diagnostics.Stopwatch.GetTimestamp();
+                buildAttempts++;
+                int primaryPosition =
+                    (start + attempt * 17) % availableCount;
+                int secondaryPosition =
+                    (start + 1 + attempt * 29) % availableCount;
+                if (secondaryPosition == primaryPosition)
+                {
+                    secondaryPosition = (secondaryPosition + 1) % availableCount;
+                }
+
+                int tertiaryPosition = -1;
+                if (spec.Size >= 3)
+                {
+                    tertiaryPosition =
+                        (start + 2 + attempt * 43) % availableCount;
+                    int guard = 0;
+                    while ((tertiaryPosition == primaryPosition ||
+                            tertiaryPosition == secondaryPosition) &&
+                           guard < availableCount)
+                    {
+                        tertiaryPosition =
+                            (tertiaryPosition + 1) % availableCount;
+                        guard++;
+                    }
+                    if (tertiaryPosition == primaryPosition ||
+                        tertiaryPosition == secondaryPosition)
+                    {
+                        timing.ClusterDonorSelectionTicks +=
+                            System.Diagnostics.Stopwatch.GetTimestamp() -
+                            donorSelectionStartedAt;
+                        continue;
+                    }
+                }
+
+                int[] candidateIndices =
+                    spec.Size >= 3
+                        ? new[]
+                        {
+                            availableMarkIndices[primaryPosition],
+                            availableMarkIndices[secondaryPosition],
+                            availableMarkIndices[tertiaryPosition]
+                        }
+                        : new[]
+                        {
+                            availableMarkIndices[primaryPosition],
+                            availableMarkIndices[secondaryPosition]
+                        };
+                timing.ClusterDonorSelectionTicks +=
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    donorSelectionStartedAt;
+                if (!TryBuildAuthoritativeProjectedClusterCandidate(
+                        spec,
+                        clusterIndex,
+                        marks,
+                        candidateIndices,
+                        baseSurface,
+                        feature,
+                        rivers,
+                        modifiers,
+                        localNorth,
+                        scratch,
+                        timing,
+                        clusterAudit,
+                        nearParallelAudit,
+                        internalOverlapAudit,
+                        acceptedGlyphs,
+                        acceptedGlyphSpatialIndex,
+                        out List<GroundPaintedAccentProjectedGlyph>
+                            candidateGlyphs,
+                        out lastReason,
+                        out ProjectedClusterQualityRejections
+                            candidateQualityRejections))
+                {
+                    qualityRejections.Accumulate(
+                        candidateQualityRejections);
+                    continue;
+                }
+
+                qualityRejections.Accumulate(candidateQualityRejections);
+                selectedMarkIndices = candidateIndices;
+                clusterGlyphs = candidateGlyphs;
+                fallbackReason = ProjectedCompanionFallbackReason.None;
+                return true;
+            }
+
+            exhaustedAttemptBudget =
+                maximumAttempts > 0 && buildAttempts >= maximumAttempts;
+            fallbackReason = lastReason;
+            return false;
+        }
+
+        private static bool TryBuildAuthoritativeProjectedClusterCandidate(
+            AuthoritativeClusterSpec spec,
+            int clusterIndex,
+            IReadOnlyList<AuthoritativeProjectedMark> marks,
+            IReadOnlyList<int> selectedMarkIndices,
+            GroundHeightFieldSnapshot baseSurface,
+            GroundSurfaceFeatureRecipe feature,
+            IReadOnlyList<GroundPaintedAccentRiverExclusionSnapshot> rivers,
+            IReadOnlyList<GroundModifierSnapshot> modifiers,
+            Vector2 localNorth,
+            GroundPaintedAccentProjectedGlyphScratch scratch,
+            GroundPaintedAccentProjectedGlyphTimingAccumulator timing,
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit,
+            GroundPaintedAccentNearParallelAuditAccumulator
+                nearParallelAudit,
+            GroundPaintedAccentInternalOverlapAuditAccumulator
+                internalOverlapAudit,
+            IReadOnlyList<GroundPaintedAccentProjectedGlyph> acceptedGlyphs,
+            ProjectedGlyphSpatialIndex acceptedGlyphSpatialIndex,
+            out List<GroundPaintedAccentProjectedGlyph> clusterGlyphs,
+            out ProjectedCompanionFallbackReason fallbackReason,
+            out ProjectedClusterQualityRejections qualityRejections)
+        {
+            clusterGlyphs =
+                new List<GroundPaintedAccentProjectedGlyph>(spec.Size);
+            fallbackReason = ProjectedCompanionFallbackReason.None;
+            qualityRejections = default;
+            if (selectedMarkIndices == null ||
+                selectedMarkIndices.Count != spec.Size)
+            {
+                fallbackReason = ProjectedCompanionFallbackReason.Incomplete;
+                return false;
+            }
+
+            long prototypePreparationStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            List<ProjectedGlyphPrototype> prototypes =
+                new List<ProjectedGlyphPrototype>(spec.Size);
+            for (int memberIndex = 0;
+                 memberIndex < selectedMarkIndices.Count;
+                 memberIndex++)
+            {
+                int markIndex = selectedMarkIndices[memberIndex];
+                if (markIndex < 0 || markIndex >= marks.Count)
+                {
+                    timing.ClusterPrototypePreparationTicks +=
+                        System.Diagnostics.Stopwatch.GetTimestamp() -
+                        prototypePreparationStartedAt;
+                    fallbackReason =
+                        ProjectedCompanionFallbackReason.Incomplete;
+                    return false;
+                }
+
+                AuthoritativeProjectedMark mark = marks[markIndex];
+                GroundPaintedAccentCompanionMemberRole role =
+                    memberIndex == 0
+                        ? GroundPaintedAccentCompanionMemberRole.Primary
+                        : memberIndex == 1
+                            ? GroundPaintedAccentCompanionMemberRole.Secondary
+                            : GroundPaintedAccentCompanionMemberRole.Tertiary;
+                GroundPaintedAccentSurfaceStroke clusteredStroke =
+                    mark.Stroke.WithCompanionMetadata(
+                        clusterIndex,
+                        role,
+                        spec.Size,
+                        spec.Size == 2
+                            ? spec.PairLayout
+                            : GroundPaintedAccentCompanionPairLayout.None,
+                        mark.Stroke.ToVariant());
+                prototypes.Add(
+                    mark.Prototype.CloneWithStroke(clusteredStroke));
+            }
+
+            PrepareAuthoritativeClusterPrototypePositions(
+                prototypes,
+                spec,
+                feature,
+                localNorth);
+            timing.ClusterPrototypePreparationTicks +=
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                prototypePreparationStartedAt;
+
+            long contactSolvingStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            if (!TryComposeProjectedCluster(
+                    prototypes,
+                    feature,
+                    localNorth,
+                    scratch,
+                    timing,
+                    nearParallelAudit,
+                    internalOverlapAudit,
+                    out List<ProjectedClusterContact> contacts,
+                    ref qualityRejections))
+            {
+                long contactSolvingTicks =
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    contactSolvingStartedAt;
+                timing.ClusterContactSolvingTicks += contactSolvingTicks;
+                timing.ClusterCompositionTicks += contactSolvingTicks;
+                fallbackReason = ProjectedCompanionFallbackReason.Contact;
+                return false;
+            }
+            long resolvedContactSolvingTicks =
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                contactSolvingStartedAt;
+            timing.ClusterContactSolvingTicks += resolvedContactSolvingTicks;
+            timing.ClusterCompositionTicks += resolvedContactSolvingTicks;
+
+            long internalValidationStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            long finalSilhouetteOverlapStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            bool validFinalSilhouette =
+                HasValidProjectedClusterSilhouette(
+                    prototypes,
+                    contacts,
+                    out bool finalSweptWidthOverlap,
+                    internalOverlapAudit,
+                    scratch);
+            timing.ClusterFinalSilhouetteOverlapValidationTicks +=
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                finalSilhouetteOverlapStartedAt;
+            if (!validFinalSilhouette)
+            {
+                if (finalSweptWidthOverlap)
+                {
+                    qualityRejections.SweptWidthInternalOverlap++;
+                }
+                long internalValidationTicks =
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    internalValidationStartedAt;
+                timing.ClusterInternalValidationTicks +=
+                    internalValidationTicks;
+                timing.ClusterCompositionTicks += internalValidationTicks;
+                fallbackReason = ProjectedCompanionFallbackReason.Contact;
+                return false;
+            }
+
+            if (prototypes.Count == 3 &&
+                HasCrowdedProjectedTripletJunctions(prototypes, contacts))
+            {
+                qualityRejections.CrowdedTripletJunction++;
+                long internalValidationTicks =
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    internalValidationStartedAt;
+                timing.ClusterInternalValidationTicks +=
+                    internalValidationTicks;
+                timing.ClusterCompositionTicks += internalValidationTicks;
+                fallbackReason = ProjectedCompanionFallbackReason.Contact;
+                return false;
+            }
+
+            if (prototypes.Count == 3 &&
+                HasProjectedTripletFreeEndPseudoContact(prototypes, contacts))
+            {
+                qualityRejections.TripletFreeEndPseudoContact++;
+                long internalValidationTicks =
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    internalValidationStartedAt;
+                timing.ClusterInternalValidationTicks +=
+                    internalValidationTicks;
+                timing.ClusterCompositionTicks += internalValidationTicks;
+                fallbackReason = ProjectedCompanionFallbackReason.Contact;
+                return false;
+            }
+
+            if (prototypes.Count == 3 &&
+                HasSeverelyCompressedProjectedTriplet(prototypes))
+            {
+                qualityRejections.SeverelyCompressedTriplet++;
+                long internalValidationTicks =
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    internalValidationStartedAt;
+                timing.ClusterInternalValidationTicks +=
+                    internalValidationTicks;
+                timing.ClusterCompositionTicks += internalValidationTicks;
+                fallbackReason = ProjectedCompanionFallbackReason.Contact;
+                return false;
+            }
+
+            long internalValidationTicksResolved =
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                internalValidationStartedAt;
+            timing.ClusterInternalValidationTicks +=
+                internalValidationTicksResolved;
+            timing.ClusterCompositionTicks += internalValidationTicksResolved;
+
+            long externalConflictStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            if (HasProjectedClusterExternalConflict(
+                    prototypes,
+                    acceptedGlyphs,
+                    acceptedGlyphSpatialIndex,
+                    clusterAudit))
+            {
+                long externalConflictTicks =
+                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                    externalConflictStartedAt;
+                timing.ClusterExternalConflictTicks += externalConflictTicks;
+                timing.ClusterCompositionTicks += externalConflictTicks;
+                fallbackReason =
+                    ProjectedCompanionFallbackReason.ExternalConflict;
+                return false;
+            }
+            long externalConflictTicksResolved =
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                externalConflictStartedAt;
+            timing.ClusterExternalConflictTicks +=
+                externalConflictTicksResolved;
+            timing.ClusterCompositionTicks += externalConflictTicksResolved;
+
+            long clusterSurfaceValidationStartedAt =
+                System.Diagnostics.Stopwatch.GetTimestamp();
+            for (int memberIndex = 0;
+                 memberIndex < prototypes.Count;
+                 memberIndex++)
+            {
+                if (!TryFinalizeProjectedGlyph(
+                        prototypes[memberIndex],
+                        baseSurface,
+                        rivers,
+                        modifiers,
+                        scratch,
+                        timing,
+                        out GroundPaintedAccentProjectedGlyph glyph,
+                        out _))
+                {
+                    timing.ClusterSurfaceValidationTicks +=
+                        System.Diagnostics.Stopwatch.GetTimestamp() -
+                        clusterSurfaceValidationStartedAt;
+                    clusterGlyphs.Clear();
+                    fallbackReason = ProjectedCompanionFallbackReason.Surface;
+                    return false;
+                }
+
+                clusterGlyphs.Add(glyph);
+            }
+
+            timing.ClusterSurfaceValidationTicks +=
+                System.Diagnostics.Stopwatch.GetTimestamp() -
+                clusterSurfaceValidationStartedAt;
+            return clusterGlyphs.Count == spec.Size;
+        }
+
+        private static void PrepareAuthoritativeClusterPrototypePositions(
+            List<ProjectedGlyphPrototype> prototypes,
+            AuthoritativeClusterSpec spec,
+            GroundSurfaceFeatureRecipe feature,
+            Vector2 localNorth)
+        {
+            if (prototypes == null || prototypes.Count < 2)
+            {
+                return;
+            }
+
+            Vector2 primaryCentroid =
+                ResolveProjectedCentroid(prototypes[0].ProjectedPoints);
+            Vector2 primaryAxis =
+                ResolveProjectedPrototypeAxis(prototypes[0]);
+            uint clusterHash =
+                HashAuthoritative(
+                    (uint)prototypes[0].Stroke.Seed,
+                    (uint)(spec.Ordinal + 0x6D2B));
+            float alongSign =
+                (clusterHash & 1u) == 0u ? 1f : -1f;
+            float verticalSign =
+                (clusterHash & 2u) == 0u ? 1f : -1f;
+            Vector2 alongAxis = primaryAxis * alongSign;
+            Vector2 resolvedNorth =
+                localNorth.sqrMagnitude > 0.000001f
+                    ? localNorth.normalized
+                    : Vector2.up;
+            Vector2 pairNormal =
+                new Vector2(-primaryAxis.y, primaryAxis.x);
+            if (Vector2.Dot(pairNormal, resolvedNorth) < 0f)
+            {
+                pairNormal = -pairNormal;
+            }
+            pairNormal *= verticalSign;
+            resolvedNorth *= verticalSign;
+
+            float minimumLength = float.PositiveInfinity;
+            float averageLength = 0f;
+            for (int index = 0; index < prototypes.Count; index++)
+            {
+                float length = prototypes[index].Stroke.AuthoredLength;
+                minimumLength = Mathf.Min(minimumLength, length);
+                averageLength += length;
+            }
+            minimumLength =
+                float.IsInfinity(minimumLength) ? 0.5f : minimumLength;
+            averageLength /= prototypes.Count;
+            float verticality =
+                SmoothAuthoritative01(feature.PaintedAccentClusterVerticality);
+            float alongSpacing =
+                averageLength * AuthoritativeAlongSpacingLengthFraction;
+
+            if (spec.Size == 2)
+            {
+                float stepFraction;
+                switch (spec.PairLayout)
+                {
+                    case GroundPaintedAccentCompanionPairLayout.ShoulderContact:
+                        stepFraction = PairShoulderStepLengthFraction;
+                        break;
+                    case GroundPaintedAccentCompanionPairLayout.OffsetEcho:
+                        stepFraction = PairOffsetStepLengthFraction;
+                        break;
+                    case GroundPaintedAccentCompanionPairLayout.ShallowOffset:
+                        stepFraction = PairShallowStepLengthFraction;
+                        break;
+                    case GroundPaintedAccentCompanionPairLayout.SteppedContinuation:
+                    default:
+                        stepFraction = PairSteppedStepLengthFraction;
+                        break;
+                }
+
+                float stepScale =
+                    spec.PairLayout ==
+                        GroundPaintedAccentCompanionPairLayout.ShallowOffset
+                        ? Mathf.Lerp(0.55f, 1f, verticality)
+                        : Mathf.Lerp(0.45f, 1f, verticality);
+                Vector2 targetCentroid =
+                    primaryCentroid +
+                    alongAxis * alongSpacing +
+                    pairNormal * (minimumLength * stepFraction * stepScale);
+                TranslatePrototypeToCentroid(prototypes[1], targetCentroid);
+                return;
+            }
+
+            float tripletStep =
+                minimumLength *
+                TripletStepLengthFraction *
+                Mathf.Lerp(0.40f, 1f, verticality);
+            Vector2 secondaryOffset;
+            Vector2 tertiaryOffset;
+            switch (spec.TripletLayout)
+            {
+                case GroundPaintedAccentCompanionTripletLayout.CrownRun:
+                    secondaryOffset =
+                        alongAxis * alongSpacing +
+                        resolvedNorth * (tripletStep * 1.35f);
+                    tertiaryOffset =
+                        alongAxis * (alongSpacing * 2f) +
+                        resolvedNorth * (tripletStep * 0.10f);
+                    break;
+                case GroundPaintedAccentCompanionTripletLayout.BrokenTerrace:
+                    secondaryOffset =
+                        alongAxis * alongSpacing +
+                        resolvedNorth * (tripletStep * 1.10f);
+                    tertiaryOffset =
+                        alongAxis * (alongSpacing * 2f) -
+                        resolvedNorth * (tripletStep * 0.45f);
+                    break;
+                case GroundPaintedAccentCompanionTripletLayout.ShallowRun:
+                    secondaryOffset =
+                        alongAxis * alongSpacing +
+                        resolvedNorth * (tripletStep * 0.45f);
+                    tertiaryOffset =
+                        alongAxis * (alongSpacing * 2f) +
+                        resolvedNorth * (tripletStep * 0.15f);
+                    break;
+                case GroundPaintedAccentCompanionTripletLayout.SteppedRun:
+                default:
+                    secondaryOffset =
+                        alongAxis * alongSpacing +
+                        resolvedNorth * tripletStep;
+                    tertiaryOffset =
+                        alongAxis * (alongSpacing * 2f) +
+                        resolvedNorth * (tripletStep * 2f);
+                    break;
+            }
+
+            TranslatePrototypeToCentroid(
+                prototypes[1],
+                primaryCentroid + secondaryOffset);
+            TranslatePrototypeToCentroid(
+                prototypes[2],
+                primaryCentroid + tertiaryOffset);
+        }
+
+        private static Vector2 ResolveProjectedPrototypeAxis(
+            ProjectedGlyphPrototype prototype)
+        {
+            if (prototype == null ||
+                prototype.ProjectedPoints == null ||
+                prototype.ProjectedPoints.Length < 2)
+            {
+                return Vector2.right;
+            }
+
+            Vector2 axis =
+                prototype.ProjectedPoints[
+                    prototype.ProjectedPoints.Length - 1] -
+                prototype.ProjectedPoints[0];
+            return axis.sqrMagnitude > 0.000001f
+                ? axis.normalized
+                : Vector2.right;
+        }
+
+        private static void TranslatePrototypeToCentroid(
+            ProjectedGlyphPrototype prototype,
+            Vector2 targetCentroid)
+        {
+            if (prototype == null || prototype.ProjectedPoints == null)
+            {
+                return;
+            }
+
+            Vector2 translation =
+                targetCentroid -
+                ResolveProjectedCentroid(prototype.ProjectedPoints);
+            TranslateProjectedPoints(prototype.ProjectedPoints, translation);
+        }
+
+        private static void ReconcileAuthoritativeClustersAgainstFinalIndependents(
+            IReadOnlyList<AuthoritativeProjectedMark> marks,
+            List<AuthoritativeClusterRecord> records,
+            List<GroundPaintedAccentProjectedGlyph> glyphs,
+            List<GroundPaintedAccentProjectedGlyph>
+                reconciliationIndependentGlyphs,
+            int[] acceptedPairLayouts,
+            int[] acceptedTripletLayouts,
+            ref int companionClustersAccepted,
+            ref int companionClustersFallback,
+            ref int companionPairsAccepted,
+            ref int companionTripletsAccepted,
+            ref int pairShortfall,
+            ref int tripletShortfall,
+            ref int companionRejectedExternalConflict,
+            ref int companionPairRejectedExternalConflict,
+            ref int clustersRemovedDuringReconciliation,
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit)
+        {
+            if (records == null ||
+                records.Count == 0 ||
+                reconciliationIndependentGlyphs == null ||
+                reconciliationIndependentGlyphs.Count == 0)
+            {
+                return;
+            }
+
+            // Each record remembers the late-independent prefix already
+            // validated. A removal appends new fallback independents and the
+            // next pass checks only those newly introduced relationships.
+            int maximumPasses = records.Count;
+            for (int passIndex = 0;
+                 passIndex < maximumPasses && records.Count > 0;
+                 passIndex++)
+            {
+                bool changed = false;
+                for (int recordIndex = records.Count - 1;
+                     recordIndex >= 0;
+                     recordIndex--)
+                {
+                    AuthoritativeClusterRecord record = records[recordIndex];
+                    GroundPaintedAccentProjectedGlyph[] clusterGlyphs =
+                        record.ClusterGlyphs ??
+                        Array.Empty<GroundPaintedAccentProjectedGlyph>();
+                    int independentCount =
+                        reconciliationIndependentGlyphs.Count;
+                    int checkedIndependentCount =
+                        Mathf.Clamp(
+                            record.ReconciliationIndependentCountChecked,
+                            0,
+                            independentCount);
+                    if (clusterAudit != null)
+                    {
+                        clusterAudit.ReconciliationClustersExamined++;
+                        long memberCount = clusterGlyphs.Length;
+                        long newRelationships =
+                            memberCount *
+                            (independentCount - checkedIndependentCount);
+                        long legacyRelationships =
+                            memberCount *
+                            Mathf.Max(0, glyphs.Count - clusterGlyphs.Length);
+                        clusterAudit
+                            .ReconciliationPreviouslyValidatedRelationshipsSkipped +=
+                                memberCount * checkedIndependentCount;
+                        clusterAudit
+                            .ReconciliationLegacyFullListComparisonsAvoided +=
+                                Math.Max(
+                                    0L,
+                                    legacyRelationships - newRelationships);
+                    }
+
+                    if (!HasFinalProjectedClusterExternalConflict(
+                            clusterGlyphs,
+                            reconciliationIndependentGlyphs,
+                            checkedIndependentCount,
+                            clusterAudit))
+                    {
+                        record.ReconciliationIndependentCountChecked =
+                            independentCount;
+                        continue;
+                    }
+
+                    for (int glyphIndex = glyphs.Count - 1;
+                         glyphIndex >= 0;
+                         glyphIndex--)
+                    {
+                        if (glyphs[glyphIndex].CompanionClusterIndex ==
+                            record.ClusterIndex)
+                        {
+                            glyphs.RemoveAt(glyphIndex);
+                        }
+                    }
+
+                    for (int memberIndex = 0;
+                         memberIndex < record.MarkIndices.Length;
+                         memberIndex++)
+                    {
+                        GroundPaintedAccentProjectedGlyph independentGlyph =
+                            marks[record.MarkIndices[memberIndex]]
+                                .IndependentGlyph;
+                        glyphs.Add(independentGlyph);
+                        reconciliationIndependentGlyphs.Add(independentGlyph);
+                    }
+
+                    companionClustersAccepted =
+                        Mathf.Max(0, companionClustersAccepted - 1);
+                    companionClustersFallback++;
+                    companionRejectedExternalConflict++;
+                    clustersRemovedDuringReconciliation++;
+                    if (record.Spec.Size >= 3)
+                    {
+                        companionTripletsAccepted =
+                            Mathf.Max(0, companionTripletsAccepted - 1);
+                        tripletShortfall++;
+                        int layoutIndex =
+                            ResolveAuthoritativeTripletLayoutIndex(
+                                record.Spec.TripletLayout);
+                        acceptedTripletLayouts[layoutIndex] =
+                            Mathf.Max(
+                                0,
+                                acceptedTripletLayouts[layoutIndex] - 1);
+                    }
+                    else
+                    {
+                        companionPairsAccepted =
+                            Mathf.Max(0, companionPairsAccepted - 1);
+                        companionPairRejectedExternalConflict++;
+                        pairShortfall++;
+                        int layoutIndex =
+                            ResolveAuthoritativePairLayoutIndex(
+                                record.Spec.PairLayout);
+                        acceptedPairLayouts[layoutIndex] =
+                            Mathf.Max(0, acceptedPairLayouts[layoutIndex] - 1);
+                    }
+
+                    records.RemoveAt(recordIndex);
+                    changed = true;
+                    break;
+                }
+
+                if (!changed)
+                {
+                    break;
+                }
+            }
+        }
+
+        private static int ResolveAuthoritativePairLayoutIndex(
+            GroundPaintedAccentCompanionPairLayout layout)
+        {
+            switch (layout)
+            {
+                case GroundPaintedAccentCompanionPairLayout.ShoulderContact:
+                    return 1;
+                case GroundPaintedAccentCompanionPairLayout.OffsetEcho:
+                    return 2;
+                case GroundPaintedAccentCompanionPairLayout.ShallowOffset:
+                    return 3;
+                case GroundPaintedAccentCompanionPairLayout.SteppedContinuation:
+                default:
+                    return 0;
+            }
+        }
+
+        private static int ResolveAuthoritativeTripletLayoutIndex(
+            GroundPaintedAccentCompanionTripletLayout layout)
+        {
+            switch (layout)
+            {
+                case GroundPaintedAccentCompanionTripletLayout.CrownRun:
+                    return 1;
+                case GroundPaintedAccentCompanionTripletLayout.BrokenTerrace:
+                    return 2;
+                case GroundPaintedAccentCompanionTripletLayout.ShallowRun:
+                    return 3;
+                case GroundPaintedAccentCompanionTripletLayout.SteppedRun:
+                default:
+                    return 0;
+            }
+        }
+
+        private static uint HashAuthoritative(uint value, uint salt)
+        {
+            uint hash = value ^ (salt * 0x9E3779B9u);
+            hash ^= hash >> 16;
+            hash *= 0x7FEB352Du;
+            hash ^= hash >> 15;
+            hash *= 0x846CA68Bu;
+            hash ^= hash >> 16;
+            return hash;
+        }
+
+        private static float HashAuthoritative01(uint value, uint salt)
+        {
+            return (HashAuthoritative(value, salt) & 0x00FFFFFFu) /
+                   16777215f;
+        }
+
+        private static float SmoothAuthoritative01(float value)
+        {
+            value = Mathf.Clamp01(value);
+            return value * value * (3f - 2f * value);
         }
 
         private static void ProcessProjectedStroke(
@@ -1349,7 +4027,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ref int companionClustersFallback,
                 ref int companionPairsAccepted,
                 ref int companionTripletsAccepted,
-                ref int companionRejectedExternalConflict)
+                ref int companionRejectedExternalConflict,
+                ref int companionPairRejectedExternalConflict,
+                ref int companionClustersRemovedDuringReconciliation)
         {
             if (acceptedClusterKeys == null ||
                 acceptedClusterKeys.Count == 0)
@@ -1412,6 +4092,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     companionClustersAccepted =
                         Mathf.Max(0, companionClustersAccepted - 1);
                     companionClustersFallback++;
+                    companionClustersRemovedDuringReconciliation++;
                     companionRejectedExternalConflict++;
                     if (intendedSize >= 3)
                     {
@@ -1422,6 +4103,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     {
                         companionPairsAccepted =
                             Mathf.Max(0, companionPairsAccepted - 1);
+                        companionPairRejectedExternalConflict++;
                     }
 
                     for (int memberIndex = 0;
@@ -1480,8 +4162,59 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         }
 
         private static bool HasFinalProjectedClusterExternalConflict(
+            IReadOnlyList<GroundPaintedAccentProjectedGlyph> clusterGlyphs,
+            IReadOnlyList<GroundPaintedAccentProjectedGlyph>
+                independentGlyphs,
+            int independentStartIndex,
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit)
+        {
+            if (clusterGlyphs == null ||
+                independentGlyphs == null ||
+                clusterGlyphs.Count == 0)
+            {
+                return false;
+            }
+
+            int startIndex =
+                Mathf.Clamp(
+                    independentStartIndex,
+                    0,
+                    independentGlyphs.Count);
+            for (int memberIndex = 0;
+                 memberIndex < clusterGlyphs.Count;
+                 memberIndex++)
+            {
+                GroundPaintedAccentProjectedGlyph member =
+                    clusterGlyphs[memberIndex];
+                for (int independentIndex = startIndex;
+                     independentIndex < independentGlyphs.Count;
+                     independentIndex++)
+                {
+                    GroundPaintedAccentProjectedGlyph independent =
+                        independentGlyphs[independentIndex];
+                    if (HasInstrumentedProjectedReconciliationOverlap(
+                            member.LocalProjectedPoints,
+                            member.HalfWidths,
+                            independent.LocalProjectedPoints,
+                            independent.HalfWidths,
+                            clusterAudit))
+                    {
+                        if (clusterAudit != null)
+                        {
+                            clusterAudit.ExternalConflictRejections++;
+                        }
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasFinalProjectedClusterExternalConflict(
             int clusterKey,
-            IReadOnlyList<GroundPaintedAccentProjectedGlyph> glyphs)
+            IReadOnlyList<GroundPaintedAccentProjectedGlyph> glyphs,
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit = null)
         {
             for (int memberIndex = 0;
                  memberIndex < glyphs.Count;
@@ -1509,15 +4242,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         continue;
                     }
 
-                    if (HasUnintendedProjectedOverlap(
+                    if (HasInstrumentedProjectedExternalOverlap(
                             member.LocalProjectedPoints,
                             member.HalfWidths,
                             other.LocalProjectedPoints,
                             other.HalfWidths,
-                            -1,
-                            -1,
-                            ProjectedExternalConflictWidthFraction))
+                            clusterAudit))
                     {
+                        if (clusterAudit != null)
+                        {
+                            clusterAudit.ExternalConflictRejections++;
+                        }
                         return true;
                     }
                 }
@@ -1537,10 +4272,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundPaintedAccentProjectedGlyphTimingAccumulator timing,
             IReadOnlyList<GroundPaintedAccentProjectedGlyph> acceptedGlyphs,
             out List<GroundPaintedAccentProjectedGlyph> clusterGlyphs,
-            out ProjectedCompanionFallbackReason fallbackReason)
+            out ProjectedCompanionFallbackReason fallbackReason,
+            out int pairStepRetentionRejectedCandidates,
+            out int pairNearCollinearRejectedCandidates)
         {
             clusterGlyphs = new List<GroundPaintedAccentProjectedGlyph>(3);
             fallbackReason = ProjectedCompanionFallbackReason.None;
+            pairStepRetentionRejectedCandidates = 0;
+            pairNearCollinearRejectedCandidates = 0;
             if (members == null || members.Count < 2)
             {
                 fallbackReason = ProjectedCompanionFallbackReason.Incomplete;
@@ -1552,7 +4291,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 intendedSize > 3 ||
                 members.Count != intendedSize ||
                 members[0].CompanionMemberRole !=
-                    GroundPaintedAccentCompanionMemberRole.Primary)
+                    GroundPaintedAccentCompanionMemberRole.Primary ||
+                (intendedSize == 2 &&
+                 members[0].CompanionPairLayout ==
+                     GroundPaintedAccentCompanionPairLayout.None))
             {
                 fallbackReason = ProjectedCompanionFallbackReason.Incomplete;
                 return false;
@@ -1565,7 +4307,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                  memberIndex++)
             {
                 GroundPaintedAccentSurfaceStroke member = members[memberIndex];
-                if (member.IntendedCompanionClusterSize != intendedSize)
+                if (member.IntendedCompanionClusterSize != intendedSize ||
+                    (intendedSize == 2 &&
+                     member.CompanionPairLayout !=
+                         members[0].CompanionPairLayout))
                 {
                     fallbackReason =
                         ProjectedCompanionFallbackReason.Incomplete;
@@ -1610,18 +4355,33 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             long compositionStartedAt =
                 System.Diagnostics.Stopwatch.GetTimestamp();
+            ProjectedClusterQualityRejections qualityRejections = default;
             if (!TryComposeProjectedCluster(
                     prototypes,
                     feature,
                     localNorth,
-                    out List<ProjectedClusterContact> contacts))
+                    scratch,
+                    timing,
+                    null,
+                    null,
+                    out List<ProjectedClusterContact> contacts,
+                    ref qualityRejections))
             {
+                pairStepRetentionRejectedCandidates =
+                    qualityRejections.PairStepRetention;
+                pairNearCollinearRejectedCandidates =
+                    qualityRejections.PairNearCollinear;
                 timing.ClusterCompositionTicks +=
                     System.Diagnostics.Stopwatch.GetTimestamp() -
                     compositionStartedAt;
                 fallbackReason = ProjectedCompanionFallbackReason.Contact;
                 return false;
             }
+
+            pairStepRetentionRejectedCandidates =
+                qualityRejections.PairStepRetention;
+            pairNearCollinearRejectedCandidates =
+                qualityRejections.PairNearCollinear;
 
             if (HasProjectedClusterExternalConflict(
                     prototypes,
@@ -1676,7 +4436,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             List<ProjectedGlyphPrototype> members,
             GroundSurfaceFeatureRecipe feature,
             Vector2 localNorth,
-            out List<ProjectedClusterContact> contacts)
+            GroundPaintedAccentProjectedGlyphScratch scratch,
+            GroundPaintedAccentProjectedGlyphTimingAccumulator timing,
+            GroundPaintedAccentNearParallelAuditAccumulator
+                nearParallelAudit,
+            GroundPaintedAccentInternalOverlapAuditAccumulator
+                internalOverlapAudit,
+            out List<ProjectedClusterContact> contacts,
+            ref ProjectedClusterQualityRejections qualityRejections)
         {
             contacts = new List<ProjectedClusterContact>(2);
             if (members == null || members.Count < 2 || members.Count > 3)
@@ -1692,6 +4459,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 localNorth.sqrMagnitude > 0.000001f
                     ? localNorth.normalized
                     : Vector2.up;
+            GroundPaintedAccentCompanionPairLayout pairLayout =
+                members.Count == 2
+                    ? members[0].Stroke.CompanionPairLayout
+                    : GroundPaintedAccentCompanionPairLayout.None;
             Vector2[] originalCentroids =
                 new Vector2[members.Count];
             for (int memberIndex = 0;
@@ -1709,7 +4480,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     resolvedLocalNorth,
                     1,
                     new[] { 0 },
+                    contacts,
                     tightness,
+                    members.Count == 2
+                        ? MinimumProjectedPairStepRetentionFraction
+                        : MinimumProjectedTripletStepRetentionFraction,
+                    pairLayout,
+                    members.Count == 2,
+                    scratch,
+                    timing,
+                    nearParallelAudit,
+                    internalOverlapAudit,
+                    ref qualityRejections,
                     out ProjectedClusterContact secondaryContact))
             {
                 return false;
@@ -1724,7 +4506,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         resolvedLocalNorth,
                         2,
                         new[] { 0, 1 },
+                        contacts,
                         tightness,
+                        MinimumProjectedTripletStepRetentionFraction,
+                        GroundPaintedAccentCompanionPairLayout.None,
+                        false,
+                        scratch,
+                        timing,
+                        nearParallelAudit,
+                        internalOverlapAudit,
+                        ref qualityRejections,
                         out ProjectedClusterContact tertiaryContact))
                 {
                     return false;
@@ -1741,7 +4532,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Vector2 localNorth,
             int movingMemberIndex,
             IReadOnlyList<int> anchorMemberIndices,
+            IReadOnlyList<ProjectedClusterContact> existingContacts,
             float tightness,
+            float minimumStepRetentionFraction,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
+            bool countPairStepRetentionRejections,
+            GroundPaintedAccentProjectedGlyphScratch scratch,
+            GroundPaintedAccentProjectedGlyphTimingAccumulator timing,
+            GroundPaintedAccentNearParallelAuditAccumulator
+                nearParallelAudit,
+            GroundPaintedAccentInternalOverlapAuditAccumulator
+                internalOverlapAudit,
+            ref ProjectedClusterQualityRejections qualityRejections,
             out ProjectedClusterContact contact)
         {
             contact = default;
@@ -1778,13 +4580,25 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                 ProjectedGlyphPrototype anchor = members[anchorMemberIndex];
                 List<int> anchorContactIndices =
-                    BuildProjectedAnchorContactIndices(anchor);
+                    BuildProjectedAnchorContactIndices(
+                        anchor,
+                        pairLayout);
                 for (int anchorContactIndex = 0;
                      anchorContactIndex < anchorContactIndices.Count;
                      anchorContactIndex++)
                 {
                     int anchorPointIndex =
                         anchorContactIndices[anchorContactIndex];
+                    if (IsProjectedTripletAttachmentSlotOccupied(
+                            members,
+                            existingContacts,
+                            anchorMemberIndex,
+                            anchorPointIndex))
+                    {
+                        qualityRejections.OccupiedAttachmentSlot++;
+                        continue;
+                    }
+
                     for (int movingContactIndex = 0;
                          movingContactIndex < movingContactIndices.Length;
                          movingContactIndex++)
@@ -1805,17 +4619,36 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             anchor.HalfWidths[anchorPointIndex];
                         float movingHalfWidth =
                             candidateHalfWidths[movingPointIndex];
-                        float looseGap =
-                            Mathf.Max(
-                                0.018f,
-                                (anchorHalfWidth + movingHalfWidth) * 1.60f);
-                        float tightOverlap =
-                            -Mathf.Min(anchorHalfWidth, movingHalfWidth) * 0.12f;
-                        float contactGap =
-                            Mathf.Lerp(looseGap, tightOverlap, tightness);
+                        if (!TryResolveProjectedEndpointCentreSeparation(
+                                anchor.ProjectedPoints,
+                                anchorPointIndex,
+                                outward,
+                                anchorHalfWidth,
+                                movingHalfWidth,
+                                tightness,
+                                pairLayout,
+                                out float endpointCentreSeparation))
+                        {
+                            continue;
+                        }
+                        Vector2 anchorContactPoint =
+                            anchor.ProjectedPoints[anchorPointIndex];
                         Vector2 targetContact =
-                            anchor.ProjectedPoints[anchorPointIndex] +
-                            outward * contactGap;
+                            anchorContactPoint -
+                            outward * endpointCentreSeparation;
+                        if (IsProjectedTripletContactLocusTooClose(
+                                members,
+                                existingContacts,
+                                anchor.ProjectedPoints[anchorPointIndex],
+                                Mathf.Min(
+                                    anchor.Stroke.AuthoredLength,
+                                    moving.Stroke.AuthoredLength),
+                                anchorHalfWidth + movingHalfWidth))
+                        {
+                            qualityRejections.SharedContactLocus++;
+                            continue;
+                        }
+
                         Vector2 translation =
                             targetContact - candidatePoints[movingPointIndex];
                         float maximumRelocation =
@@ -1831,15 +4664,151 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         }
 
                         TranslateProjectedPoints(candidatePoints, translation);
-                        if (HasUnintendedProjectedOverlap(
+                        if (!HasValidProjectedEndpointContactSide(
+                                anchorContactPoint,
+                                candidatePoints,
+                                movingPointIndex,
+                                outward))
+                        {
+                            qualityRejections.WrongSideTerminal++;
+                            continue;
+                        }
+
+                        Vector2 movingCentroid =
+                            ResolveProjectedCentroid(candidatePoints);
+                        Vector2 originalCentroid =
+                            originalCentroids[movingMemberIndex];
+                        Vector2 anchorCentroid =
+                            ResolveProjectedCentroid(anchor.ProjectedPoints);
+                        bool isPair =
+                            pairLayout !=
+                            GroundPaintedAccentCompanionPairLayout.None;
+                        Vector2 stepAxis =
+                            isPair
+                                ? ResolveProjectedPairSharedNormal(
+                                    anchor.ProjectedPoints,
+                                    moving.ProjectedPoints)
+                                : localNorth;
+                        float desiredStep =
+                            Vector2.Dot(
+                                originalCentroid -
+                                originalCentroids[anchorMemberIndex],
+                                stepAxis);
+                        float candidateStep =
+                            Vector2.Dot(
+                                movingCentroid - anchorCentroid,
+                                stepAxis);
+                        float desiredStepMagnitude =
+                            Mathf.Abs(desiredStep);
+                        if (desiredStepMagnitude >=
+                            MinimumProjectedStructuredStep)
+                        {
+                            float minimumRetainedStep =
+                                Mathf.Max(
+                                    MinimumProjectedStructuredStep,
+                                    desiredStepMagnitude *
+                                    Mathf.Clamp01(
+                                        minimumStepRetentionFraction));
+                            if (Mathf.Sign(candidateStep) !=
+                                    Mathf.Sign(desiredStep) ||
+                                Mathf.Abs(candidateStep) <
+                                    minimumRetainedStep)
+                            {
+                                qualityRejections.PreGeometryStepRetention++;
+                                if (countPairStepRetentionRejections)
+                                {
+                                    qualityRejections.PairStepRetention++;
+                                }
+                                continue;
+                            }
+                        }
+
+                        if (isPair &&
+                            endpointCentreSeparation <= 0f &&
+                            IsProjectedEndpointContact(
+                                anchor,
+                                anchorPointIndex) &&
+                            IsNearCollinearProjectedPairContact(
+                                anchor.ProjectedPoints,
+                                anchorPointIndex,
+                                candidatePoints,
+                                movingPointIndex,
+                                Mathf.Abs(candidateStep),
+                                Mathf.Min(
+                                    anchor.Stroke.AuthoredLength,
+                                    moving.Stroke.AuthoredLength)))
+                        {
+                            qualityRejections.PairNearCollinear++;
+                            continue;
+                        }
+
+                        float stepError = candidateStep - desiredStep;
+                        float score =
+                            translation.sqrMagnitude +
+                            (movingCentroid - originalCentroid).sqrMagnitude * 0.15f +
+                            stepError * stepError *
+                            ProjectedStepErrorScoreWeight +
+                            endpointCentreSeparation * 0.02f;
+                        if (score >= bestScore)
+                        {
+                            qualityRejections
+                                .PreGeometryNonCompetitiveScore++;
+                            continue;
+                        }
+
+                        qualityRejections.CandidatesSentToGeometry++;
+                        long nearParallelStartedAt =
+                            System.Diagnostics.Stopwatch.GetTimestamp();
+                        bool hasAnchorNearParallelBlend =
+                            HasNearParallelProjectedBodyBlend(
+                                anchor.ProjectedPoints,
+                                anchor.HalfWidths,
+                                candidatePoints,
+                                candidateHalfWidths,
+                                Mathf.Min(
+                                    anchor.Stroke.AuthoredLength,
+                                    moving.Stroke.AuthoredLength),
+                                scratch,
+                                nearParallelAudit);
+                        if (timing != null)
+                        {
+                            timing.ClusterNearParallelValidationTicks +=
+                                System.Diagnostics.Stopwatch.GetTimestamp() -
+                                nearParallelStartedAt;
+                        }
+                        if (hasAnchorNearParallelBlend)
+                        {
+                            qualityRejections.NearParallelBodyBlend++;
+                            continue;
+                        }
+
+                        long internalOverlapStartedAt =
+                            System.Diagnostics.Stopwatch.GetTimestamp();
+                        bool hasAnchorInternalOverlap =
+                            HasUnintendedProjectedInternalOverlap(
                                 anchor.ProjectedPoints,
                                 anchor.HalfWidths,
                                 candidatePoints,
                                 candidateHalfWidths,
                                 anchorPointIndex,
                                 movingPointIndex,
-                                ProjectedUnintendedOverlapWidthFraction))
+                                out bool anchorSweptWidthOverlap,
+                                internalOverlapAudit,
+                                false,
+                                scratch);
+                        if (timing != null)
                         {
+                            timing
+                                .ClusterCandidateInternalOverlapValidationTicks +=
+                                System.Diagnostics.Stopwatch.GetTimestamp() -
+                                internalOverlapStartedAt;
+                        }
+                        if (hasAnchorInternalOverlap)
+                        {
+                            if (anchorSweptWidthOverlap)
+                            {
+                                qualityRejections.SweptWidthInternalOverlap++;
+                            }
                             continue;
                         }
 
@@ -1855,68 +4824,66 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                             ProjectedGlyphPrototype other =
                                 members[otherMemberIndex];
-                            if (HasUnintendedProjectedOverlap(
+                            nearParallelStartedAt =
+                                System.Diagnostics.Stopwatch.GetTimestamp();
+                            bool hasOtherNearParallelBlend =
+                                HasNearParallelProjectedBodyBlend(
+                                    other.ProjectedPoints,
+                                    other.HalfWidths,
+                                    candidatePoints,
+                                    candidateHalfWidths,
+                                    Mathf.Min(
+                                        other.Stroke.AuthoredLength,
+                                        moving.Stroke.AuthoredLength),
+                                    scratch,
+                                    nearParallelAudit);
+                            if (timing != null)
+                            {
+                                timing.ClusterNearParallelValidationTicks +=
+                                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                                    nearParallelStartedAt;
+                            }
+                            if (hasOtherNearParallelBlend)
+                            {
+                                qualityRejections.NearParallelBodyBlend++;
+                                conflictsWithOtherMember = true;
+                                break;
+                            }
+
+                            internalOverlapStartedAt =
+                                System.Diagnostics.Stopwatch.GetTimestamp();
+                            bool hasOtherInternalOverlap =
+                                HasUnintendedProjectedInternalOverlap(
                                     other.ProjectedPoints,
                                     other.HalfWidths,
                                     candidatePoints,
                                     candidateHalfWidths,
                                     -1,
                                     -1,
-                                    ProjectedUnintendedOverlapWidthFraction))
+                                    out bool otherSweptWidthOverlap,
+                                    internalOverlapAudit,
+                                    false,
+                                    scratch);
+                            if (timing != null)
                             {
+                                timing
+                                    .ClusterCandidateInternalOverlapValidationTicks +=
+                                    System.Diagnostics.Stopwatch.GetTimestamp() -
+                                    internalOverlapStartedAt;
+                            }
+                            if (hasOtherInternalOverlap)
+                            {
+                                if (otherSweptWidthOverlap)
+                                {
+                                    qualityRejections
+                                        .SweptWidthInternalOverlap++;
+                                }
                                 conflictsWithOtherMember = true;
                                 break;
                             }
                         }
 
                         if (conflictsWithOtherMember)
-                        {
-                            continue;
-                        }
-
-                        Vector2 movingCentroid =
-                            ResolveProjectedCentroid(candidatePoints);
-                        Vector2 originalCentroid =
-                            originalCentroids[movingMemberIndex];
-                        Vector2 anchorCentroid =
-                            ResolveProjectedCentroid(anchor.ProjectedPoints);
-                        float desiredVerticalStep =
-                            Vector2.Dot(
-                                originalCentroid -
-                                originalCentroids[anchorMemberIndex],
-                                localNorth);
-                        float candidateVerticalStep =
-                            Vector2.Dot(
-                                movingCentroid - anchorCentroid,
-                                localNorth);
-                        float desiredStepMagnitude =
-                            Mathf.Abs(desiredVerticalStep);
-                        if (desiredStepMagnitude >=
-                            MinimumProjectedStructuredStep)
-                        {
-                            float minimumRetainedStep =
-                                Mathf.Max(
-                                    MinimumProjectedStructuredStep,
-                                    desiredStepMagnitude *
-                                    MinimumProjectedStepRetentionFraction);
-                            if (Mathf.Sign(candidateVerticalStep) !=
-                                    Mathf.Sign(desiredVerticalStep) ||
-                                Mathf.Abs(candidateVerticalStep) <
-                                    minimumRetainedStep)
-                            {
-                                continue;
-                            }
-                        }
-
-                        float verticalStepError =
-                            candidateVerticalStep - desiredVerticalStep;
-                        float score =
-                            translation.sqrMagnitude +
-                            (movingCentroid - originalCentroid).sqrMagnitude * 0.15f +
-                            verticalStepError * verticalStepError *
-                            ProjectedStepErrorScoreWeight +
-                            Mathf.Abs(contactGap) * 0.02f;
-                        if (score >= bestScore)
                         {
                             continue;
                         }
@@ -2024,25 +4991,44 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         }
 
         private static List<int> BuildProjectedAnchorContactIndices(
-            ProjectedGlyphPrototype prototype)
+            ProjectedGlyphPrototype prototype,
+            GroundPaintedAccentCompanionPairLayout pairLayout)
         {
             int pointCount = prototype.ProjectedPoints.Length;
             int start = ResolveSafeProjectedContactIndex(prototype, true);
+            int quarter = Mathf.RoundToInt((pointCount - 1) * 0.25f);
+            int middle = Mathf.RoundToInt((pointCount - 1) * 0.50f);
+            int threeQuarter = Mathf.RoundToInt((pointCount - 1) * 0.75f);
             int end = ResolveSafeProjectedContactIndex(prototype, false);
-            int[] candidates =
+            int[] candidates;
+            switch (pairLayout)
             {
-                start,
-                Mathf.RoundToInt((pointCount - 1) * 0.25f),
-                Mathf.RoundToInt((pointCount - 1) * 0.50f),
-                Mathf.RoundToInt((pointCount - 1) * 0.75f),
-                end
-            };
+                case GroundPaintedAccentCompanionPairLayout.SteppedContinuation:
+                    candidates = new[] { quarter, threeQuarter, middle };
+                    break;
+                case GroundPaintedAccentCompanionPairLayout.ShoulderContact:
+                    candidates = new[] { middle, quarter, threeQuarter };
+                    break;
+                case GroundPaintedAccentCompanionPairLayout.OffsetEcho:
+                    candidates = new[] { quarter, threeQuarter, middle };
+                    break;
+                case GroundPaintedAccentCompanionPairLayout.ShallowOffset:
+                    candidates = new[] { start, quarter, threeQuarter, end };
+                    break;
+                case GroundPaintedAccentCompanionPairLayout.None:
+                default:
+                    candidates =
+                        new[] { start, quarter, middle, threeQuarter, end };
+                    break;
+            }
+
             List<int> indices = new List<int>(candidates.Length);
             for (int candidateIndex = 0;
                  candidateIndex < candidates.Length;
                  candidateIndex++)
             {
-                int index = Mathf.Clamp(candidates[candidateIndex], 0, pointCount - 1);
+                int index =
+                    Mathf.Clamp(candidates[candidateIndex], 0, pointCount - 1);
                 if (!indices.Contains(index))
                 {
                     indices.Add(index);
@@ -2050,6 +5036,172 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             return indices;
+        }
+
+        private static bool TryResolveProjectedEndpointCentreSeparation(
+            IReadOnlyList<Vector2> anchorPoints,
+            int anchorContactIndex,
+            Vector2 movingOutward,
+            float anchorHalfWidth,
+            float movingHalfWidth,
+            float tightness,
+            GroundPaintedAccentCompanionPairLayout pairLayout,
+            out float endpointCentreSeparation)
+        {
+            endpointCentreSeparation = 0f;
+            float totalHalfWidth =
+                Mathf.Max(0f, anchorHalfWidth) +
+                Mathf.Max(0f, movingHalfWidth);
+            float looseExtra =
+                Mathf.Max(
+                    0.018f,
+                    totalHalfWidth *
+                    ProjectedLooseContactExtraWidthMultiplier);
+
+            bool anchorEndpoint =
+                anchorContactIndex <= 0 ||
+                anchorContactIndex >= anchorPoints.Count - 1;
+            float anchorBoundaryDistance;
+            if (anchorEndpoint)
+            {
+                anchorBoundaryDistance = Mathf.Max(0f, anchorHalfWidth);
+            }
+            else
+            {
+                Vector2 anchorTangent =
+                    ResolveProjectedContactTangent(
+                        anchorPoints,
+                        anchorContactIndex);
+                Vector2 anchorNormal =
+                    new Vector2(-anchorTangent.y, anchorTangent.x);
+                float normalComponent =
+                    Mathf.Abs(Vector2.Dot(movingOutward, anchorNormal));
+                if (normalComponent <
+                    MinimumProjectedInteriorContactNormalComponent)
+                {
+                    return false;
+                }
+
+                anchorBoundaryDistance =
+                    Mathf.Max(0f, anchorHalfWidth) /
+                    normalComponent;
+            }
+
+            float exactEdgeStop =
+                anchorBoundaryDistance +
+                Mathf.Max(0f, movingHalfWidth);
+            if (pairLayout ==
+                GroundPaintedAccentCompanionPairLayout.ShallowOffset)
+            {
+                float shallowVisibleGap =
+                    Mathf.Max(
+                        MinimumShallowPairContactGap,
+                        totalHalfWidth * 0.10f);
+                endpointCentreSeparation =
+                    exactEdgeStop +
+                    Mathf.Lerp(
+                        looseExtra,
+                        shallowVisibleGap,
+                        tightness);
+                return true;
+            }
+
+            endpointCentreSeparation =
+                exactEdgeStop +
+                Mathf.Lerp(looseExtra, 0f, tightness);
+            return true;
+        }
+
+        private static bool IsProjectedEndpointContact(
+            ProjectedGlyphPrototype prototype,
+            int contactIndex)
+        {
+            int start = ResolveSafeProjectedContactIndex(prototype, true);
+            int end = ResolveSafeProjectedContactIndex(prototype, false);
+            return contactIndex == start || contactIndex == end;
+        }
+
+        private static bool IsNearCollinearProjectedPairContact(
+            IReadOnlyList<Vector2> anchorPoints,
+            int anchorContactIndex,
+            IReadOnlyList<Vector2> movingPoints,
+            int movingContactIndex,
+            float pairLocalStep,
+            float minimumAuthoredLength)
+        {
+            float maximumStep =
+                Mathf.Max(0f, minimumAuthoredLength) *
+                MaximumNearCollinearPairStepLengthFraction;
+            if (pairLocalStep > maximumStep)
+            {
+                return false;
+            }
+
+            Vector2 anchorTangent =
+                ResolveProjectedContactTangent(
+                    anchorPoints,
+                    anchorContactIndex);
+            Vector2 movingTangent =
+                ResolveProjectedContactTangent(
+                    movingPoints,
+                    movingContactIndex);
+            float alignment =
+                Mathf.Clamp01(
+                    Mathf.Abs(Vector2.Dot(anchorTangent, movingTangent)));
+            float junctionAngle = Mathf.Acos(alignment) * Mathf.Rad2Deg;
+            return junctionAngle <=
+                   MaximumNearCollinearPairJunctionDegrees;
+        }
+
+        private static Vector2 ResolveProjectedContactTangent(
+            IReadOnlyList<Vector2> points,
+            int contactIndex)
+        {
+            if (points == null || points.Count < 2)
+            {
+                return Vector2.right;
+            }
+
+            int previousIndex = Mathf.Max(0, contactIndex - 1);
+            int nextIndex = Mathf.Min(points.Count - 1, contactIndex + 1);
+            Vector2 tangent = points[nextIndex] - points[previousIndex];
+            return tangent.sqrMagnitude > 0.000001f
+                ? tangent.normalized
+                : Vector2.right;
+        }
+
+        private static Vector2 ResolveProjectedPairSharedNormal(
+            IReadOnlyList<Vector2> primaryPoints,
+            IReadOnlyList<Vector2> secondaryPoints)
+        {
+            Vector2 primaryAxis = ResolveProjectedPathAxis(primaryPoints);
+            Vector2 secondaryAxis = ResolveProjectedPathAxis(secondaryPoints);
+            if (Vector2.Dot(primaryAxis, secondaryAxis) < 0f)
+            {
+                secondaryAxis = -secondaryAxis;
+            }
+
+            Vector2 sharedAxis = primaryAxis + secondaryAxis;
+            if (sharedAxis.sqrMagnitude <= 0.000001f)
+            {
+                sharedAxis = primaryAxis;
+            }
+            sharedAxis.Normalize();
+            return new Vector2(-sharedAxis.y, sharedAxis.x);
+        }
+
+        private static Vector2 ResolveProjectedPathAxis(
+            IReadOnlyList<Vector2> points)
+        {
+            if (points == null || points.Count < 2)
+            {
+                return Vector2.right;
+            }
+
+            Vector2 axis = points[points.Count - 1] - points[0];
+            return axis.sqrMagnitude > 0.000001f
+                ? axis.normalized
+                : Vector2.right;
         }
 
         private static Vector2 ResolveProjectedEndpointOutwardDirection(
@@ -2065,6 +5217,42 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return outward.sqrMagnitude > 0.000001f
                 ? outward.normalized
                 : Vector2.right;
+        }
+
+        private static bool HasValidProjectedEndpointContactSide(
+            Vector2 anchorContactPoint,
+            IReadOnlyList<Vector2> movingPoints,
+            int movingContactIndex,
+            Vector2 movingOutward)
+        {
+            if (movingPoints == null ||
+                movingPoints.Count < 2 ||
+                movingContactIndex < 0 ||
+                movingContactIndex >= movingPoints.Count ||
+                movingOutward.sqrMagnitude <= 0.000001f)
+            {
+                return false;
+            }
+
+            int inwardIndex =
+                movingContactIndex <= movingPoints.Count / 2
+                    ? Mathf.Min(
+                        movingPoints.Count - 1,
+                        movingContactIndex + 1)
+                    : Mathf.Max(0, movingContactIndex - 1);
+            if (inwardIndex == movingContactIndex)
+            {
+                return false;
+            }
+
+            Vector2 outward = movingOutward.normalized;
+            Vector2 endpoint = movingPoints[movingContactIndex];
+            float anchorProjection =
+                Vector2.Dot(anchorContactPoint - endpoint, outward);
+            float bodyProjection =
+                Vector2.Dot(movingPoints[inwardIndex] - endpoint, outward);
+            return anchorProjection >= MinimumProjectedContactSideProjection &&
+                   bodyProjection <= -MinimumProjectedContactSideProjection;
         }
 
         private static void TranslateProjectedPoints(
@@ -2093,10 +5281,1092 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return points.Count > 0 ? total / points.Count : Vector2.zero;
         }
 
+        private static void ResolveAcceptedProjectedPairStepStatistics(
+            IReadOnlyList<GroundPaintedAccentProjectedGlyph> glyphs,
+            out float stepMinimum,
+            out float stepMean,
+            out float stepMaximum,
+            out float stepFractionMinimum,
+            out float stepFractionMean,
+            out float stepFractionMaximum)
+        {
+            stepMinimum = 0f;
+            stepMean = 0f;
+            stepMaximum = 0f;
+            stepFractionMinimum = 0f;
+            stepFractionMean = 0f;
+            stepFractionMaximum = 0f;
+            if (glyphs == null || glyphs.Count < 2)
+            {
+                return;
+            }
+
+            Dictionary<int, GroundPaintedAccentProjectedGlyph> primaries =
+                new Dictionary<int, GroundPaintedAccentProjectedGlyph>();
+            Dictionary<int, GroundPaintedAccentProjectedGlyph> secondaries =
+                new Dictionary<int, GroundPaintedAccentProjectedGlyph>();
+            for (int glyphIndex = 0;
+                 glyphIndex < glyphs.Count;
+                 glyphIndex++)
+            {
+                GroundPaintedAccentProjectedGlyph glyph = glyphs[glyphIndex];
+                if (glyph.CompanionClusterIndex < 0 ||
+                    glyph.IntendedCompanionClusterSize != 2)
+                {
+                    continue;
+                }
+
+                if (glyph.CompanionMemberRole ==
+                    GroundPaintedAccentCompanionMemberRole.Primary)
+                {
+                    primaries[glyph.CompanionClusterIndex] = glyph;
+                }
+                else if (glyph.CompanionMemberRole ==
+                    GroundPaintedAccentCompanionMemberRole.Secondary)
+                {
+                    secondaries[glyph.CompanionClusterIndex] = glyph;
+                }
+            }
+
+            float minimum = float.PositiveInfinity;
+            float maximum = 0f;
+            double total = 0d;
+            float fractionMinimum = float.PositiveInfinity;
+            float fractionMaximum = 0f;
+            double fractionTotal = 0d;
+            int pairCount = 0;
+            List<int> pairKeys = new List<int>(primaries.Keys);
+            pairKeys.Sort();
+            for (int pairIndex = 0;
+                 pairIndex < pairKeys.Count;
+                 pairIndex++)
+            {
+                int pairKey = pairKeys[pairIndex];
+                if (!secondaries.TryGetValue(
+                        pairKey,
+                        out GroundPaintedAccentProjectedGlyph secondary))
+                {
+                    continue;
+                }
+
+                GroundPaintedAccentProjectedGlyph primary =
+                    primaries[pairKey];
+                Vector2 pairNormal =
+                    ResolveProjectedPairSharedNormal(
+                        primary.LocalProjectedPoints,
+                        secondary.LocalProjectedPoints);
+                float step =
+                    Mathf.Abs(
+                        Vector2.Dot(
+                            ResolveProjectedCentroid(
+                                secondary.LocalProjectedPoints) -
+                            ResolveProjectedCentroid(
+                                primary.LocalProjectedPoints),
+                            pairNormal));
+                float minimumLength =
+                    Mathf.Max(
+                        0.0001f,
+                        Mathf.Min(
+                            primary.AuthoredLength,
+                            secondary.AuthoredLength));
+                float stepFraction = step / minimumLength;
+                minimum = Mathf.Min(minimum, step);
+                maximum = Mathf.Max(maximum, step);
+                total += step;
+                fractionMinimum =
+                    Mathf.Min(fractionMinimum, stepFraction);
+                fractionMaximum =
+                    Mathf.Max(fractionMaximum, stepFraction);
+                fractionTotal += stepFraction;
+                pairCount++;
+            }
+
+            if (pairCount <= 0)
+            {
+                return;
+            }
+
+            stepMinimum = minimum;
+            stepMean = (float)(total / pairCount);
+            stepMaximum = maximum;
+            stepFractionMinimum = fractionMinimum;
+            stepFractionMean = (float)(fractionTotal / pairCount);
+            stepFractionMaximum = fractionMaximum;
+        }
+
+        private static bool IsProjectedTripletAttachmentSlotOccupied(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            IReadOnlyList<ProjectedClusterContact> existingContacts,
+            int candidateMemberIndex,
+            int candidatePointIndex)
+        {
+            if (members == null ||
+                existingContacts == null ||
+                existingContacts.Count == 0)
+            {
+                return false;
+            }
+
+            for (int contactIndex = 0;
+                 contactIndex < existingContacts.Count;
+                 contactIndex++)
+            {
+                ProjectedClusterContact contact =
+                    existingContacts[contactIndex];
+                if (IsProjectedAttachmentSlotTooClose(
+                        members,
+                        candidateMemberIndex,
+                        candidatePointIndex,
+                        contact.AnchorMemberIndex,
+                        contact.AnchorPointIndex) ||
+                    IsProjectedAttachmentSlotTooClose(
+                        members,
+                        candidateMemberIndex,
+                        candidatePointIndex,
+                        contact.MovingMemberIndex,
+                        contact.MovingPointIndex))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsProjectedAttachmentSlotTooClose(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            int candidateMemberIndex,
+            int candidatePointIndex,
+            int occupiedMemberIndex,
+            int occupiedPointIndex)
+        {
+            if (candidateMemberIndex != occupiedMemberIndex ||
+                candidateMemberIndex < 0 ||
+                candidateMemberIndex >= members.Count)
+            {
+                return false;
+            }
+
+            int pointCount =
+                members[candidateMemberIndex].ProjectedPoints.Length;
+            int minimumIndexSeparation =
+                Mathf.Max(
+                    2,
+                    Mathf.CeilToInt(
+                        Mathf.Max(1, pointCount - 1) *
+                        MinimumTripletAttachmentIndexSeparationFraction));
+            return Mathf.Abs(candidatePointIndex - occupiedPointIndex) <
+                   minimumIndexSeparation;
+        }
+
+        private static bool IsProjectedTripletContactLocusTooClose(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            IReadOnlyList<ProjectedClusterContact> existingContacts,
+            Vector2 candidateAnchorPoint,
+            float minimumAuthoredLength,
+            float candidateCombinedHalfWidth)
+        {
+            if (members == null ||
+                existingContacts == null ||
+                existingContacts.Count == 0)
+            {
+                return false;
+            }
+
+            float minimumSeparation =
+                Mathf.Max(
+                    Mathf.Max(0f, minimumAuthoredLength) *
+                    MinimumTripletContactSeparationLengthFraction,
+                    Mathf.Max(0f, candidateCombinedHalfWidth) *
+                    MinimumTripletContactSeparationWidthMultiplier);
+            float minimumSeparationSquared =
+                minimumSeparation * minimumSeparation;
+            for (int contactIndex = 0;
+                 contactIndex < existingContacts.Count;
+                 contactIndex++)
+            {
+                ProjectedClusterContact contact =
+                    existingContacts[contactIndex];
+                if (IsProjectedPointNearContactSide(
+                        members,
+                        candidateAnchorPoint,
+                        contact.AnchorMemberIndex,
+                        contact.AnchorPointIndex,
+                        minimumSeparationSquared) ||
+                    IsProjectedPointNearContactSide(
+                        members,
+                        candidateAnchorPoint,
+                        contact.MovingMemberIndex,
+                        contact.MovingPointIndex,
+                        minimumSeparationSquared))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsProjectedPointNearContactSide(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            Vector2 candidatePoint,
+            int memberIndex,
+            int pointIndex,
+            float minimumSeparationSquared)
+        {
+            if (memberIndex < 0 || memberIndex >= members.Count)
+            {
+                return false;
+            }
+
+            IReadOnlyList<Vector2> points =
+                members[memberIndex].ProjectedPoints;
+            if (pointIndex < 0 || pointIndex >= points.Count)
+            {
+                return false;
+            }
+
+            return (candidatePoint - points[pointIndex]).sqrMagnitude <
+                   minimumSeparationSquared;
+        }
+
+        private static bool HasNearParallelProjectedBodyBlend(
+            IReadOnlyList<Vector2> leftPoints,
+            IReadOnlyList<float> leftHalfWidths,
+            IReadOnlyList<Vector2> rightPoints,
+            IReadOnlyList<float> rightHalfWidths,
+            float minimumAuthoredLength,
+            GroundPaintedAccentProjectedGlyphScratch scratch,
+            GroundPaintedAccentNearParallelAuditAccumulator nearParallelAudit)
+        {
+            long rightSegmentMetadataPreparations = 0;
+            long rightSegmentsPrepared = 0;
+            long segmentPairsConsidered = 0;
+            long segmentPairsRejectedByAxisGap = 0;
+            long segmentPairsRejectedByAlignment = 0;
+            long segmentPairsSentToExactDistance = 0;
+            long exactDistancePasses = 0;
+            long exactIntervalOverlapEvaluations = 0;
+            long blendsDetected = 0;
+
+            try
+            {
+                if (leftPoints == null ||
+                    rightPoints == null ||
+                    leftHalfWidths == null ||
+                    rightHalfWidths == null ||
+                    leftPoints.Count < 2 ||
+                    rightPoints.Count < 2 ||
+                    leftHalfWidths.Count != leftPoints.Count ||
+                    rightHalfWidths.Count != rightPoints.Count ||
+                    !ProjectedBoundsOverlap(
+                        leftPoints,
+                        leftHalfWidths,
+                        rightPoints,
+                        rightHalfWidths,
+                        1f))
+                {
+                    return false;
+                }
+
+                GroundPaintedAccentProjectedGlyphScratch resolvedScratch =
+                    scratch ?? new GroundPaintedAccentProjectedGlyphScratch();
+                int rightSegmentCount = rightPoints.Count - 1;
+                resolvedScratch.EnsureNearParallelSegmentCapacity(
+                    rightSegmentCount);
+                rightSegmentMetadataPreparations = 1;
+                rightSegmentsPrepared = rightSegmentCount;
+                GroundPaintedAccentNearParallelSegmentMetadata[]
+                    rightSegments =
+                        resolvedScratch.NearParallelRightSegments;
+                for (int rightSegmentIndex = 0;
+                     rightSegmentIndex < rightSegmentCount;
+                     rightSegmentIndex++)
+                {
+                    rightSegments[rightSegmentIndex] =
+                        new GroundPaintedAccentNearParallelSegmentMetadata(
+                            rightPoints[rightSegmentIndex],
+                            rightPoints[rightSegmentIndex + 1],
+                            rightHalfWidths[rightSegmentIndex],
+                            rightHalfWidths[rightSegmentIndex + 1]);
+                }
+
+                float minimumBlendLength =
+                    Mathf.Max(
+                        MinimumNearParallelBlendWorldLength,
+                        Mathf.Max(0f, minimumAuthoredLength) *
+                        MinimumNearParallelBlendLengthFraction);
+                float minimumAlignment =
+                    Mathf.Cos(
+                        MaximumNearParallelBodyAngleDegrees * Mathf.Deg2Rad);
+                float accumulatedBlendLength = 0f;
+
+                for (int leftSegmentIndex = 0;
+                     leftSegmentIndex < leftPoints.Count - 1;
+                     leftSegmentIndex++)
+                {
+                    Vector2 leftStart = leftPoints[leftSegmentIndex];
+                    Vector2 leftEnd = leftPoints[leftSegmentIndex + 1];
+                    Vector2 leftDelta = leftEnd - leftStart;
+                    float leftLength = leftDelta.magnitude;
+                    if (leftLength <= 0.000001f)
+                    {
+                        continue;
+                    }
+
+                    Vector2 leftDirection = leftDelta / leftLength;
+                    float leftWidth =
+                        (leftHalfWidths[leftSegmentIndex] +
+                         leftHalfWidths[leftSegmentIndex + 1]) * 0.5f;
+                    float leftMinimumX = Mathf.Min(leftStart.x, leftEnd.x);
+                    float leftMaximumX = Mathf.Max(leftStart.x, leftEnd.x);
+                    float leftMinimumY = Mathf.Min(leftStart.y, leftEnd.y);
+                    float leftMaximumY = Mathf.Max(leftStart.y, leftEnd.y);
+                    float bestSegmentBlend = 0f;
+                    for (int rightSegmentIndex = 0;
+                         rightSegmentIndex < rightSegmentCount;
+                         rightSegmentIndex++)
+                    {
+                        GroundPaintedAccentNearParallelSegmentMetadata right =
+                            rightSegments[rightSegmentIndex];
+                        if (!right.IsValid)
+                        {
+                            continue;
+                        }
+
+                        segmentPairsConsidered++;
+                        float requiredClearance =
+                            Mathf.Max(
+                                MinimumProjectedExternalClearance,
+                                (leftWidth + right.AverageHalfWidth) *
+                                NearParallelBodyClearanceFraction);
+                        float xGap =
+                            Mathf.Max(
+                                0f,
+                                Mathf.Max(
+                                    leftMinimumX - right.MaximumX,
+                                    right.MinimumX - leftMaximumX));
+                        if (xGap > requiredClearance)
+                        {
+                            segmentPairsRejectedByAxisGap++;
+                            continue;
+                        }
+
+                        float yGap =
+                            Mathf.Max(
+                                0f,
+                                Mathf.Max(
+                                    leftMinimumY - right.MaximumY,
+                                    right.MinimumY - leftMaximumY));
+                        if (yGap > requiredClearance)
+                        {
+                            segmentPairsRejectedByAxisGap++;
+                            continue;
+                        }
+
+                        float signedAlignment =
+                            Vector2.Dot(leftDirection, right.Direction);
+                        float alignment = Mathf.Abs(signedAlignment);
+                        if (alignment < minimumAlignment)
+                        {
+                            segmentPairsRejectedByAlignment++;
+                            continue;
+                        }
+
+                        segmentPairsSentToExactDistance++;
+                        if (SqrDistanceBetweenProjectedSegments(
+                                leftStart,
+                                leftEnd,
+                                right.Start,
+                                right.End) >=
+                            requiredClearance * requiredClearance)
+                        {
+                            continue;
+                        }
+
+                        exactDistancePasses++;
+                        Vector2 alignedRightDirection =
+                            signedAlignment >= 0f
+                                ? right.Direction
+                                : -right.Direction;
+                        Vector2 sharedDirection =
+                            leftDirection + alignedRightDirection;
+                        if (sharedDirection.sqrMagnitude <= 0.000001f)
+                        {
+                            sharedDirection = leftDirection;
+                        }
+                        else
+                        {
+                            sharedDirection.Normalize();
+                        }
+
+                        exactIntervalOverlapEvaluations++;
+                        float overlapLength =
+                            ResolveProjectedSegmentIntervalOverlap(
+                                leftStart,
+                                leftEnd,
+                                right.Start,
+                                right.End,
+                                sharedDirection);
+                        bestSegmentBlend =
+                            Mathf.Max(bestSegmentBlend, overlapLength);
+                    }
+
+                    accumulatedBlendLength +=
+                        Mathf.Min(leftLength, bestSegmentBlend);
+                    if (accumulatedBlendLength >= minimumBlendLength)
+                    {
+                        blendsDetected++;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            finally
+            {
+                if (nearParallelAudit != null)
+                {
+                    nearParallelAudit.Accumulate(
+                        rightSegmentMetadataPreparations,
+                        rightSegmentsPrepared,
+                        segmentPairsConsidered,
+                        segmentPairsRejectedByAxisGap,
+                        segmentPairsRejectedByAlignment,
+                        segmentPairsSentToExactDistance,
+                        exactDistancePasses,
+                        exactIntervalOverlapEvaluations,
+                        blendsDetected);
+                }
+            }
+        }
+
+        private static float ResolveProjectedSegmentIntervalOverlap(
+            Vector2 leftStart,
+            Vector2 leftEnd,
+            Vector2 rightStart,
+            Vector2 rightEnd,
+            Vector2 axis)
+        {
+            float leftA = Vector2.Dot(leftStart, axis);
+            float leftB = Vector2.Dot(leftEnd, axis);
+            float rightA = Vector2.Dot(rightStart, axis);
+            float rightB = Vector2.Dot(rightEnd, axis);
+            float leftMinimum = Mathf.Min(leftA, leftB);
+            float leftMaximum = Mathf.Max(leftA, leftB);
+            float rightMinimum = Mathf.Min(rightA, rightB);
+            float rightMaximum = Mathf.Max(rightA, rightB);
+            return Mathf.Max(
+                0f,
+                Mathf.Min(leftMaximum, rightMaximum) -
+                Mathf.Max(leftMinimum, rightMinimum));
+        }
+
+        private static float SqrDistanceBetweenProjectedSegments(
+            Vector2 firstStart,
+            Vector2 firstEnd,
+            Vector2 secondStart,
+            Vector2 secondEnd)
+        {
+            if (SegmentsIntersect(
+                    firstStart,
+                    firstEnd,
+                    secondStart,
+                    secondEnd))
+            {
+                return 0f;
+            }
+
+            return Mathf.Min(
+                Mathf.Min(
+                    SqrDistanceFromProjectedPointToSegment(
+                        firstStart,
+                        secondStart,
+                        secondEnd),
+                    SqrDistanceFromProjectedPointToSegment(
+                        firstEnd,
+                        secondStart,
+                        secondEnd)),
+                Mathf.Min(
+                    SqrDistanceFromProjectedPointToSegment(
+                        secondStart,
+                        firstStart,
+                        firstEnd),
+                    SqrDistanceFromProjectedPointToSegment(
+                        secondEnd,
+                        firstStart,
+                        firstEnd)));
+        }
+
+        private static float SqrDistanceBetweenProjectedSegments(
+            Vector2 firstStart,
+            Vector2 firstEnd,
+            Vector2 secondStart,
+            Vector2 secondEnd,
+            out float firstT,
+            out float secondT)
+        {
+            Vector2 firstDirection = firstEnd - firstStart;
+            Vector2 secondDirection = secondEnd - secondStart;
+            Vector2 startDelta = firstStart - secondStart;
+            float firstLengthSquared = firstDirection.sqrMagnitude;
+            float secondLengthSquared = secondDirection.sqrMagnitude;
+            const float epsilon = 0.000001f;
+
+            if (firstLengthSquared <= epsilon &&
+                secondLengthSquared <= epsilon)
+            {
+                firstT = 0f;
+                secondT = 0f;
+                return startDelta.sqrMagnitude;
+            }
+
+            if (firstLengthSquared <= epsilon)
+            {
+                firstT = 0f;
+                secondT =
+                    Mathf.Clamp01(
+                        Vector2.Dot(secondDirection, startDelta) /
+                        secondLengthSquared);
+            }
+            else
+            {
+                float firstProjection =
+                    Vector2.Dot(firstDirection, startDelta);
+                if (secondLengthSquared <= epsilon)
+                {
+                    secondT = 0f;
+                    firstT =
+                        Mathf.Clamp01(
+                            -firstProjection / firstLengthSquared);
+                }
+                else
+                {
+                    float directionDot =
+                        Vector2.Dot(firstDirection, secondDirection);
+                    float secondProjection =
+                        Vector2.Dot(secondDirection, startDelta);
+                    float denominator =
+                        firstLengthSquared * secondLengthSquared -
+                        directionDot * directionDot;
+                    firstT =
+                        denominator > epsilon
+                            ? Mathf.Clamp01(
+                                (directionDot * secondProjection -
+                                 firstProjection * secondLengthSquared) /
+                                denominator)
+                            : 0f;
+                    secondT =
+                        (directionDot * firstT + secondProjection) /
+                        secondLengthSquared;
+
+                    if (secondT < 0f)
+                    {
+                        secondT = 0f;
+                        firstT =
+                            Mathf.Clamp01(
+                                -firstProjection / firstLengthSquared);
+                    }
+                    else if (secondT > 1f)
+                    {
+                        secondT = 1f;
+                        firstT =
+                            Mathf.Clamp01(
+                                (directionDot - firstProjection) /
+                                firstLengthSquared);
+                    }
+                }
+            }
+
+            Vector2 firstClosest =
+                firstStart + firstDirection * firstT;
+            Vector2 secondClosest =
+                secondStart + secondDirection * secondT;
+            return (firstClosest - secondClosest).sqrMagnitude;
+        }
+
+        private static float SqrDistanceFromProjectedPointToSegment(
+            Vector2 point,
+            Vector2 segmentStart,
+            Vector2 segmentEnd)
+        {
+            Vector2 segment = segmentEnd - segmentStart;
+            float segmentLengthSquared = segment.sqrMagnitude;
+            if (segmentLengthSquared <= 0.000001f)
+            {
+                return (point - segmentStart).sqrMagnitude;
+            }
+
+            float t =
+                Mathf.Clamp01(
+                    Vector2.Dot(point - segmentStart, segment) /
+                    segmentLengthSquared);
+            Vector2 closest = segmentStart + segment * t;
+            return (point - closest).sqrMagnitude;
+        }
+
+        private static bool HasCrowdedProjectedTripletJunctions(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            IReadOnlyList<ProjectedClusterContact> contacts)
+        {
+            if (members == null ||
+                members.Count != 3 ||
+                contacts == null ||
+                contacts.Count != 2 ||
+                !ProjectedContactsShareMember(contacts[0], contacts[1]) ||
+                !TryResolveProjectedContactLocus(
+                    members,
+                    contacts[0],
+                    out Vector2 firstLocus,
+                    out float firstCombinedHalfWidth) ||
+                !TryResolveProjectedContactLocus(
+                    members,
+                    contacts[1],
+                    out Vector2 secondLocus,
+                    out float secondCombinedHalfWidth))
+            {
+                return false;
+            }
+
+            float minimumAuthoredLength = float.PositiveInfinity;
+            for (int memberIndex = 0;
+                 memberIndex < members.Count;
+                 memberIndex++)
+            {
+                minimumAuthoredLength =
+                    Mathf.Min(
+                        minimumAuthoredLength,
+                        members[memberIndex].Stroke.AuthoredLength);
+            }
+
+            if (float.IsInfinity(minimumAuthoredLength) ||
+                minimumAuthoredLength <= 0f)
+            {
+                return false;
+            }
+
+            float minimumSeparation =
+                Mathf.Max(
+                    minimumAuthoredLength *
+                    MinimumCrowdedTripletJunctionLengthFraction,
+                    Mathf.Min(
+                        firstCombinedHalfWidth,
+                        secondCombinedHalfWidth) *
+                    MinimumCrowdedTripletJunctionWidthMultiplier);
+            return (firstLocus - secondLocus).sqrMagnitude <
+                   minimumSeparation * minimumSeparation;
+        }
+
+        private static bool ProjectedContactsShareMember(
+            ProjectedClusterContact first,
+            ProjectedClusterContact second)
+        {
+            return first.AnchorMemberIndex == second.AnchorMemberIndex ||
+                   first.AnchorMemberIndex == second.MovingMemberIndex ||
+                   first.MovingMemberIndex == second.AnchorMemberIndex ||
+                   first.MovingMemberIndex == second.MovingMemberIndex;
+        }
+
+        private static bool TryResolveProjectedContactLocus(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            ProjectedClusterContact contact,
+            out Vector2 locus,
+            out float combinedHalfWidth)
+        {
+            locus = Vector2.zero;
+            combinedHalfWidth = 0f;
+            if (members == null ||
+                contact.AnchorMemberIndex < 0 ||
+                contact.AnchorMemberIndex >= members.Count ||
+                contact.MovingMemberIndex < 0 ||
+                contact.MovingMemberIndex >= members.Count)
+            {
+                return false;
+            }
+
+            ProjectedGlyphPrototype anchor =
+                members[contact.AnchorMemberIndex];
+            ProjectedGlyphPrototype moving =
+                members[contact.MovingMemberIndex];
+            if (contact.AnchorPointIndex < 0 ||
+                contact.AnchorPointIndex >= anchor.ProjectedPoints.Length ||
+                contact.MovingPointIndex < 0 ||
+                contact.MovingPointIndex >= moving.ProjectedPoints.Length)
+            {
+                return false;
+            }
+
+            Vector2 anchorPoint =
+                anchor.ProjectedPoints[contact.AnchorPointIndex];
+            Vector2 movingPoint =
+                moving.ProjectedPoints[contact.MovingPointIndex];
+            locus = (anchorPoint + movingPoint) * 0.5f;
+            combinedHalfWidth =
+                Mathf.Max(0f, anchor.HalfWidths[contact.AnchorPointIndex]) +
+                Mathf.Max(0f, moving.HalfWidths[contact.MovingPointIndex]);
+            return true;
+        }
+
+        private static bool HasProjectedTripletFreeEndPseudoContact(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            IReadOnlyList<ProjectedClusterContact> contacts)
+        {
+            if (members == null || members.Count != 3 || contacts == null)
+            {
+                return false;
+            }
+
+            List<ProjectedTripletFreeTerminal> freeTerminals =
+                new List<ProjectedTripletFreeTerminal>(6);
+            for (int memberIndex = 0;
+                 memberIndex < members.Count;
+                 memberIndex++)
+            {
+                ProjectedGlyphPrototype member = members[memberIndex];
+                if (member.ProjectedPoints == null ||
+                    member.ProjectedPoints.Length < 2 ||
+                    member.HalfWidths == null ||
+                    member.HalfWidths.Length != member.ProjectedPoints.Length)
+                {
+                    continue;
+                }
+
+                int lastIndex = member.ProjectedPoints.Length - 1;
+                AddProjectedTripletFreeTerminal(
+                    member,
+                    memberIndex,
+                    0,
+                    contacts,
+                    freeTerminals);
+                AddProjectedTripletFreeTerminal(
+                    member,
+                    memberIndex,
+                    lastIndex,
+                    contacts,
+                    freeTerminals);
+            }
+
+            for (int leftIndex = 0;
+                 leftIndex < freeTerminals.Count;
+                 leftIndex++)
+            {
+                ProjectedTripletFreeTerminal left =
+                    freeTerminals[leftIndex];
+                for (int rightIndex = leftIndex + 1;
+                     rightIndex < freeTerminals.Count;
+                     rightIndex++)
+                {
+                    ProjectedTripletFreeTerminal right =
+                        freeTerminals[rightIndex];
+                    if (left.MemberIndex == right.MemberIndex)
+                    {
+                        continue;
+                    }
+
+                    Vector2 separation = right.Position - left.Position;
+                    float separationLength = separation.magnitude;
+                    float minimumAuthoredLength =
+                        Mathf.Min(left.AuthoredLength, right.AuthoredLength);
+                    float minimumSeparation =
+                        Mathf.Max(
+                            minimumAuthoredLength *
+                            MinimumTripletPseudoContactLengthFraction,
+                            (left.HalfWidth + right.HalfWidth) *
+                            MinimumTripletPseudoContactWidthMultiplier);
+                    if (separationLength <= 0.000001f ||
+                        separationLength >= minimumSeparation)
+                    {
+                        continue;
+                    }
+
+                    Vector2 direction = separation / separationLength;
+                    if (Vector2.Dot(left.Outward, direction) >=
+                            MinimumTripletPseudoContactApproachDot &&
+                        Vector2.Dot(right.Outward, -direction) >=
+                            MinimumTripletPseudoContactApproachDot)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            for (int terminalIndex = 0;
+                 terminalIndex < freeTerminals.Count;
+                 terminalIndex++)
+            {
+                ProjectedTripletFreeTerminal terminal =
+                    freeTerminals[terminalIndex];
+                for (int memberIndex = 0;
+                     memberIndex < members.Count;
+                     memberIndex++)
+                {
+                    if (memberIndex == terminal.MemberIndex ||
+                        !TryResolveClosestProjectedBodyPoint(
+                            terminal.Position,
+                            members[memberIndex],
+                            out Vector2 closestPoint,
+                            out float closestHalfWidth))
+                    {
+                        continue;
+                    }
+
+                    Vector2 approach = closestPoint - terminal.Position;
+                    float approachLength = approach.magnitude;
+                    float minimumAuthoredLength =
+                        Mathf.Min(
+                            terminal.AuthoredLength,
+                            members[memberIndex].Stroke.AuthoredLength);
+                    float minimumSeparation =
+                        Mathf.Max(
+                            minimumAuthoredLength *
+                            MinimumTripletPseudoContactBodyLengthFraction,
+                            (terminal.HalfWidth + closestHalfWidth) *
+                            MinimumTripletPseudoContactBodyWidthMultiplier);
+                    if (approachLength <= 0.000001f ||
+                        approachLength >= minimumSeparation)
+                    {
+                        continue;
+                    }
+
+                    if (Vector2.Dot(
+                            terminal.Outward,
+                            approach / approachLength) >=
+                        MinimumTripletPseudoContactApproachDot)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static void AddProjectedTripletFreeTerminal(
+            ProjectedGlyphPrototype member,
+            int memberIndex,
+            int pointIndex,
+            IReadOnlyList<ProjectedClusterContact> contacts,
+            List<ProjectedTripletFreeTerminal> terminals)
+        {
+            if (IsProjectedTerminalUsedByContact(
+                    contacts,
+                    memberIndex,
+                    pointIndex,
+                    member.ProjectedPoints.Length))
+            {
+                return;
+            }
+
+            Vector2 outward =
+                ResolveProjectedTerminalOutwardDirection(
+                    member.ProjectedPoints,
+                    pointIndex);
+            if (outward.sqrMagnitude <= 0.000001f)
+            {
+                return;
+            }
+
+            terminals.Add(
+                new ProjectedTripletFreeTerminal(
+                    memberIndex,
+                    member.ProjectedPoints[pointIndex],
+                    outward.normalized,
+                    member.HalfWidths[pointIndex],
+                    member.Stroke.AuthoredLength));
+        }
+
+        private static bool IsProjectedTerminalUsedByContact(
+            IReadOnlyList<ProjectedClusterContact> contacts,
+            int memberIndex,
+            int terminalPointIndex,
+            int pointCount)
+        {
+            int contactNeighborhood =
+                Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(
+                        Mathf.Max(1, pointCount - 1) *
+                        ProjectedContactNeighborhoodFraction));
+            for (int contactIndex = 0;
+                 contactIndex < contacts.Count;
+                 contactIndex++)
+            {
+                ProjectedClusterContact contact = contacts[contactIndex];
+                if (contact.AnchorMemberIndex == memberIndex &&
+                    Mathf.Abs(
+                        contact.AnchorPointIndex - terminalPointIndex) <=
+                    contactNeighborhood)
+                {
+                    return true;
+                }
+
+                if (contact.MovingMemberIndex == memberIndex &&
+                    Mathf.Abs(
+                        contact.MovingPointIndex - terminalPointIndex) <=
+                    contactNeighborhood)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static Vector2 ResolveProjectedTerminalOutwardDirection(
+            IReadOnlyList<Vector2> points,
+            int terminalPointIndex)
+        {
+            if (points == null || points.Count < 2)
+            {
+                return Vector2.zero;
+            }
+
+            if (terminalPointIndex <= 0)
+            {
+                return points[0] - points[1];
+            }
+
+            int lastIndex = points.Count - 1;
+            return points[lastIndex] - points[lastIndex - 1];
+        }
+
+        private static bool TryResolveClosestProjectedBodyPoint(
+            Vector2 point,
+            ProjectedGlyphPrototype member,
+            out Vector2 closestPoint,
+            out float closestHalfWidth)
+        {
+            closestPoint = Vector2.zero;
+            closestHalfWidth = 0f;
+            if (member == null ||
+                member.ProjectedPoints == null ||
+                member.ProjectedPoints.Length < 2 ||
+                member.HalfWidths == null ||
+                member.HalfWidths.Length != member.ProjectedPoints.Length)
+            {
+                return false;
+            }
+
+            float bestDistanceSquared = float.PositiveInfinity;
+            for (int segmentIndex = 0;
+                 segmentIndex < member.ProjectedPoints.Length - 1;
+                 segmentIndex++)
+            {
+                Vector2 segmentStart = member.ProjectedPoints[segmentIndex];
+                Vector2 segmentEnd = member.ProjectedPoints[segmentIndex + 1];
+                Vector2 segment = segmentEnd - segmentStart;
+                float segmentLengthSquared = segment.sqrMagnitude;
+                float t =
+                    segmentLengthSquared > 0.000001f
+                        ? Mathf.Clamp01(
+                            Vector2.Dot(point - segmentStart, segment) /
+                            segmentLengthSquared)
+                        : 0f;
+                Vector2 candidatePoint = segmentStart + segment * t;
+                float distanceSquared =
+                    (point - candidatePoint).sqrMagnitude;
+                if (distanceSquared >= bestDistanceSquared)
+                {
+                    continue;
+                }
+
+                bestDistanceSquared = distanceSquared;
+                closestPoint = candidatePoint;
+                closestHalfWidth =
+                    Mathf.Lerp(
+                        member.HalfWidths[segmentIndex],
+                        member.HalfWidths[segmentIndex + 1],
+                        t);
+            }
+
+            return !float.IsInfinity(bestDistanceSquared);
+        }
+
+        private static bool HasSeverelyCompressedProjectedTriplet(
+            IReadOnlyList<ProjectedGlyphPrototype> members)
+        {
+            if (members == null || members.Count != 3)
+            {
+                return false;
+            }
+
+            float minimumAuthoredLength = float.PositiveInfinity;
+            Vector2[] centroids = new Vector2[3];
+            for (int memberIndex = 0; memberIndex < members.Count; memberIndex++)
+            {
+                minimumAuthoredLength =
+                    Mathf.Min(
+                        minimumAuthoredLength,
+                        members[memberIndex].Stroke.AuthoredLength);
+                centroids[memberIndex] =
+                    ResolveProjectedCentroid(
+                        members[memberIndex].ProjectedPoints);
+            }
+
+            if (float.IsInfinity(minimumAuthoredLength) ||
+                minimumAuthoredLength <= 0f)
+            {
+                return false;
+            }
+
+            float maximumCentroidSpan =
+                Mathf.Max(
+                    Vector2.Distance(centroids[0], centroids[1]),
+                    Mathf.Max(
+                        Vector2.Distance(centroids[0], centroids[2]),
+                        Vector2.Distance(centroids[1], centroids[2])));
+            return maximumCentroidSpan <
+                   minimumAuthoredLength *
+                   MaximumSeverelyCompressedTripletCentroidSpanFraction;
+        }
+
         private static bool HasValidProjectedClusterSilhouette(
             IReadOnlyList<ProjectedGlyphPrototype> members,
             IReadOnlyList<ProjectedClusterContact> contacts)
         {
+            return HasValidProjectedClusterSilhouette(
+                members,
+                contacts,
+                out _,
+                null);
+        }
+
+        private static bool HasValidProjectedClusterSilhouette(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            IReadOnlyList<ProjectedClusterContact> contacts,
+            out bool sweptWidthOverlap)
+        {
+            return HasValidProjectedClusterSilhouette(
+                members,
+                contacts,
+                out sweptWidthOverlap,
+                null);
+        }
+
+        private static bool HasValidProjectedClusterSilhouette(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            IReadOnlyList<ProjectedClusterContact> contacts,
+            out bool sweptWidthOverlap,
+            GroundPaintedAccentInternalOverlapAuditAccumulator
+                internalOverlapAudit)
+        {
+            return HasValidProjectedClusterSilhouette(
+                members,
+                contacts,
+                out sweptWidthOverlap,
+                internalOverlapAudit,
+                null);
+        }
+
+        private static bool HasValidProjectedClusterSilhouette(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            IReadOnlyList<ProjectedClusterContact> contacts,
+            out bool sweptWidthOverlap,
+            GroundPaintedAccentInternalOverlapAuditAccumulator
+                internalOverlapAudit,
+            GroundPaintedAccentProjectedGlyphScratch scratch)
+        {
+            sweptWidthOverlap = false;
             for (int leftIndex = 0;
                  leftIndex < members.Count;
                  leftIndex++)
@@ -2113,15 +6383,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         rightIndex,
                         out leftContactIndex,
                         out rightContactIndex);
-                    if (HasUnintendedProjectedOverlap(
+                    if (HasUnintendedProjectedInternalOverlap(
                             members[leftIndex].ProjectedPoints,
                             members[leftIndex].HalfWidths,
                             members[rightIndex].ProjectedPoints,
                             members[rightIndex].HalfWidths,
                             leftContactIndex,
                             rightContactIndex,
-                            ProjectedUnintendedOverlapWidthFraction))
+                            out bool pairSweptWidthOverlap,
+                            internalOverlapAudit,
+                            true,
+                            scratch))
                     {
+                        sweptWidthOverlap |= pairSweptWidthOverlap;
                         return false;
                     }
                 }
@@ -2164,9 +6438,349 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return false;
         }
 
+        private static bool HasUnintendedProjectedInternalOverlap(
+            IReadOnlyList<Vector2> leftPoints,
+            IReadOnlyList<float> leftHalfWidths,
+            IReadOnlyList<Vector2> rightPoints,
+            IReadOnlyList<float> rightHalfWidths,
+            int leftContactIndex,
+            int rightContactIndex,
+            out bool sweptWidthOverlap)
+        {
+            return HasUnintendedProjectedInternalOverlap(
+                leftPoints,
+                leftHalfWidths,
+                rightPoints,
+                rightHalfWidths,
+                leftContactIndex,
+                rightContactIndex,
+                out sweptWidthOverlap,
+                null,
+                false,
+                null);
+        }
+
+        private static bool HasUnintendedProjectedInternalOverlap(
+            IReadOnlyList<Vector2> leftPoints,
+            IReadOnlyList<float> leftHalfWidths,
+            IReadOnlyList<Vector2> rightPoints,
+            IReadOnlyList<float> rightHalfWidths,
+            int leftContactIndex,
+            int rightContactIndex,
+            out bool sweptWidthOverlap,
+            GroundPaintedAccentInternalOverlapAuditAccumulator
+                internalOverlapAudit,
+            bool finalSilhouetteCall,
+            GroundPaintedAccentProjectedGlyphScratch scratch)
+        {
+            sweptWidthOverlap = false;
+            long segmentPairsConsidered = 0L;
+            long segmentPairsRejectedByBroadPhase = 0L;
+            long segmentPairsSentToExactNarrowPhase = 0L;
+            long exactSegmentIntersectionsFound = 0L;
+            long exactSweptClearanceRejections = 0L;
+            try
+            {
+                if (leftPoints == null ||
+                    rightPoints == null ||
+                    leftHalfWidths == null ||
+                    rightHalfWidths == null ||
+                    leftPoints.Count < 2 ||
+                    rightPoints.Count < 2 ||
+                    leftHalfWidths.Count != leftPoints.Count ||
+                    rightHalfWidths.Count != rightPoints.Count ||
+                    !ProjectedBoundsOverlap(
+                        leftPoints,
+                        leftHalfWidths,
+                        rightPoints,
+                        rightHalfWidths,
+                        1f))
+                {
+                    return false;
+                }
+
+                int leftSegmentCount = leftPoints.Count - 1;
+                int rightSegmentCount = rightPoints.Count - 1;
+                GroundPaintedAccentProjectedGlyphScratch resolvedScratch =
+                    scratch ?? new GroundPaintedAccentProjectedGlyphScratch();
+                resolvedScratch.EnsureInternalOverlapSegmentCapacity(
+                    leftSegmentCount,
+                    rightSegmentCount);
+                GroundPaintedAccentInternalOverlapSegmentMetadata[]
+                    leftSegments = resolvedScratch.InternalOverlapLeftSegments;
+                GroundPaintedAccentInternalOverlapSegmentMetadata[]
+                    rightSegments = resolvedScratch.InternalOverlapRightSegments;
+                for (int leftSegmentIndex = 0;
+                     leftSegmentIndex < leftSegmentCount;
+                     leftSegmentIndex++)
+                {
+                    leftSegments[leftSegmentIndex] =
+                        new GroundPaintedAccentInternalOverlapSegmentMetadata(
+                            leftPoints[leftSegmentIndex],
+                            leftPoints[leftSegmentIndex + 1],
+                            leftHalfWidths[leftSegmentIndex],
+                            leftHalfWidths[leftSegmentIndex + 1]);
+                }
+                for (int rightSegmentIndex = 0;
+                     rightSegmentIndex < rightSegmentCount;
+                     rightSegmentIndex++)
+                {
+                    rightSegments[rightSegmentIndex] =
+                        new GroundPaintedAccentInternalOverlapSegmentMetadata(
+                            rightPoints[rightSegmentIndex],
+                            rightPoints[rightSegmentIndex + 1],
+                            rightHalfWidths[rightSegmentIndex],
+                            rightHalfWidths[rightSegmentIndex + 1]);
+                }
+
+                for (int leftSegmentIndex = 0;
+                     leftSegmentIndex < leftSegmentCount;
+                     leftSegmentIndex++)
+                {
+                    GroundPaintedAccentInternalOverlapSegmentMetadata left =
+                        leftSegments[leftSegmentIndex];
+                    for (int rightSegmentIndex = 0;
+                         rightSegmentIndex < rightSegmentCount;
+                         rightSegmentIndex++)
+                    {
+                        segmentPairsConsidered++;
+                        GroundPaintedAccentInternalOverlapSegmentMetadata right =
+                            rightSegments[rightSegmentIndex];
+                        bool exactContactSegmentPair =
+                            IsExactProjectedContactSegmentPair(
+                                leftSegmentIndex,
+                                leftPoints.Count,
+                                leftContactIndex,
+                                rightSegmentIndex,
+                                rightPoints.Count,
+                                rightContactIndex);
+                        float clearanceFraction =
+                            exactContactSegmentPair
+                                ? ProjectedContactSweptClearanceFraction
+                                : ProjectedInternalSweptClearanceFraction;
+                        if (!CouldProjectedSegmentsReachSweptClearance(
+                                left,
+                                right,
+                                clearanceFraction))
+                        {
+                            segmentPairsRejectedByBroadPhase++;
+                            continue;
+                        }
+
+                        segmentPairsSentToExactNarrowPhase++;
+                        if (SegmentsIntersect(
+                                left.Start,
+                                left.End,
+                                right.Start,
+                                right.End))
+                        {
+                            exactSegmentIntersectionsFound++;
+                            sweptWidthOverlap = true;
+                            return true;
+                        }
+
+                        float distanceSquared =
+                            SqrDistanceBetweenProjectedSegments(
+                                left.Start,
+                                left.End,
+                                right.Start,
+                                right.End,
+                                out float leftT,
+                                out float rightT);
+                        float leftHalfWidth =
+                            Mathf.Lerp(
+                                left.StartHalfWidth,
+                                left.EndHalfWidth,
+                                leftT);
+                        float rightHalfWidth =
+                            Mathf.Lerp(
+                                right.StartHalfWidth,
+                                right.EndHalfWidth,
+                                rightT);
+                        float requiredClearance =
+                            Mathf.Max(
+                                MinimumProjectedExternalClearance,
+                                (leftHalfWidth + rightHalfWidth) *
+                                clearanceFraction);
+                        float toleratedClearance =
+                            Mathf.Max(
+                                0f,
+                                requiredClearance -
+                                ProjectedSweptClearanceTolerance);
+                        if (distanceSquared <
+                            toleratedClearance * toleratedClearance)
+                        {
+                            exactSweptClearanceRejections++;
+                            sweptWidthOverlap = true;
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+            finally
+            {
+                if (internalOverlapAudit != null)
+                {
+                    internalOverlapAudit.Accumulate(
+                        finalSilhouetteCall,
+                        segmentPairsConsidered,
+                        segmentPairsRejectedByBroadPhase,
+                        segmentPairsSentToExactNarrowPhase,
+                        exactSegmentIntersectionsFound,
+                        exactSweptClearanceRejections);
+                }
+            }
+        }
+
+        private static bool CouldProjectedSegmentsReachSweptClearance(
+            GroundPaintedAccentInternalOverlapSegmentMetadata left,
+            GroundPaintedAccentInternalOverlapSegmentMetadata right,
+            float clearanceFraction)
+        {
+            float maximumRequiredClearance =
+                Mathf.Max(
+                    MinimumProjectedExternalClearance,
+                    (left.MaximumHalfWidth + right.MaximumHalfWidth) *
+                    Mathf.Max(0f, clearanceFraction));
+            float xGap =
+                Mathf.Max(
+                    0f,
+                    Mathf.Max(
+                        left.MinimumX - right.MaximumX,
+                        right.MinimumX - left.MaximumX));
+            if (xGap > maximumRequiredClearance)
+            {
+                return false;
+            }
+
+            float yGap =
+                Mathf.Max(
+                    0f,
+                    Mathf.Max(
+                        left.MinimumY - right.MaximumY,
+                        right.MinimumY - left.MaximumY));
+            return yGap <= maximumRequiredClearance;
+        }
+
+        private static bool IsExactProjectedContactSegmentPair(
+            int leftSegmentIndex,
+            int leftPointCount,
+            int leftContactIndex,
+            int rightSegmentIndex,
+            int rightPointCount,
+            int rightContactIndex)
+        {
+            if (leftContactIndex < 0 || rightContactIndex < 0)
+            {
+                return false;
+            }
+
+            bool leftIsMovingTerminal =
+                IsProjectedTerminalSegmentForContact(
+                    leftSegmentIndex,
+                    leftPointCount,
+                    leftContactIndex);
+            bool rightIsMovingTerminal =
+                IsProjectedTerminalSegmentForContact(
+                    rightSegmentIndex,
+                    rightPointCount,
+                    rightContactIndex);
+            bool leftContainsContact =
+                ProjectedSegmentContainsPointIndex(
+                    leftSegmentIndex,
+                    leftContactIndex);
+            bool rightContainsContact =
+                ProjectedSegmentContainsPointIndex(
+                    rightSegmentIndex,
+                    rightContactIndex);
+            return (leftIsMovingTerminal && rightContainsContact) ||
+                   (rightIsMovingTerminal && leftContainsContact);
+        }
+
+        private static bool IsProjectedTerminalSegmentForContact(
+            int segmentIndex,
+            int pointCount,
+            int contactIndex)
+        {
+            if (pointCount < 2)
+            {
+                return false;
+            }
+
+            return (contactIndex == 0 && segmentIndex == 0) ||
+                   (contactIndex == pointCount - 1 &&
+                    segmentIndex == pointCount - 2);
+        }
+
+        private static bool ProjectedSegmentContainsPointIndex(
+            int segmentIndex,
+            int pointIndex)
+        {
+            return pointIndex == segmentIndex ||
+                   pointIndex == segmentIndex + 1;
+        }
+
         private static bool HasProjectedClusterExternalConflict(
             IReadOnlyList<ProjectedGlyphPrototype> members,
-            IReadOnlyList<GroundPaintedAccentProjectedGlyph> acceptedGlyphs)
+            IReadOnlyList<GroundPaintedAccentProjectedGlyph> acceptedGlyphs,
+            ProjectedGlyphSpatialIndex acceptedGlyphSpatialIndex,
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit)
+        {
+            if (acceptedGlyphSpatialIndex == null)
+            {
+                return HasProjectedClusterExternalConflict(
+                    members,
+                    acceptedGlyphs,
+                    clusterAudit);
+            }
+
+            for (int memberIndex = 0;
+                 memberIndex < members.Count;
+                 memberIndex++)
+            {
+                ProjectedGlyphPrototype member = members[memberIndex];
+                IReadOnlyList<int> candidateIndices =
+                    acceptedGlyphSpatialIndex.Query(
+                        member.ProjectedPoints,
+                        member.HalfWidths,
+                        clusterAudit);
+                for (int candidateIndex = 0;
+                     candidateIndex < candidateIndices.Count;
+                     candidateIndex++)
+                {
+                    int glyphIndex = candidateIndices[candidateIndex];
+                    if (glyphIndex < 0 || glyphIndex >= acceptedGlyphs.Count)
+                    {
+                        continue;
+                    }
+
+                    GroundPaintedAccentProjectedGlyph glyph =
+                        acceptedGlyphs[glyphIndex];
+                    if (HasInstrumentedProjectedExternalOverlap(
+                            member.ProjectedPoints,
+                            member.HalfWidths,
+                            glyph.LocalProjectedPoints,
+                            glyph.HalfWidths,
+                            clusterAudit))
+                    {
+                        if (clusterAudit != null)
+                        {
+                            clusterAudit.ExternalConflictRejections++;
+                        }
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasProjectedClusterExternalConflict(
+            IReadOnlyList<ProjectedGlyphPrototype> members,
+            IReadOnlyList<GroundPaintedAccentProjectedGlyph> acceptedGlyphs,
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit = null)
         {
             for (int memberIndex = 0;
                  memberIndex < members.Count;
@@ -2179,21 +6793,107 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 {
                     GroundPaintedAccentProjectedGlyph glyph =
                         acceptedGlyphs[glyphIndex];
-                    if (HasUnintendedProjectedOverlap(
+                    if (HasInstrumentedProjectedExternalOverlap(
                             member.ProjectedPoints,
                             member.HalfWidths,
                             glyph.LocalProjectedPoints,
                             glyph.HalfWidths,
-                            -1,
-                            -1,
-                            ProjectedExternalConflictWidthFraction))
+                            clusterAudit))
                     {
+                        if (clusterAudit != null)
+                        {
+                            clusterAudit.ExternalConflictRejections++;
+                        }
                         return true;
                     }
                 }
             }
 
             return false;
+        }
+
+        private static bool HasInstrumentedProjectedReconciliationOverlap(
+            IReadOnlyList<Vector2> leftPoints,
+            IReadOnlyList<float> leftHalfWidths,
+            IReadOnlyList<Vector2> rightPoints,
+            IReadOnlyList<float> rightHalfWidths,
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit)
+        {
+            if (clusterAudit != null)
+            {
+                clusterAudit.ExternalGlyphCandidatesExamined++;
+                clusterAudit.ExternalBoundsTests++;
+                clusterAudit.ReconciliationNewIndependentRelationshipsTested++;
+                clusterAudit.ReconciliationBoundsTests++;
+            }
+
+            if (!ProjectedBoundsOverlap(
+                    leftPoints,
+                    leftHalfWidths,
+                    rightPoints,
+                    rightHalfWidths,
+                    ProjectedExternalConflictWidthFraction))
+            {
+                return false;
+            }
+
+            if (clusterAudit != null)
+            {
+                clusterAudit.ExternalBoundsOverlapPasses++;
+                clusterAudit.ExternalDetailedOverlapTests++;
+                clusterAudit.ReconciliationBoundsOverlapPasses++;
+                clusterAudit.ReconciliationDetailedOverlapTests++;
+            }
+
+            return HasUnintendedProjectedOverlap(
+                leftPoints,
+                leftHalfWidths,
+                rightPoints,
+                rightHalfWidths,
+                -1,
+                -1,
+                ProjectedExternalConflictWidthFraction,
+                true);
+        }
+
+        private static bool HasInstrumentedProjectedExternalOverlap(
+            IReadOnlyList<Vector2> leftPoints,
+            IReadOnlyList<float> leftHalfWidths,
+            IReadOnlyList<Vector2> rightPoints,
+            IReadOnlyList<float> rightHalfWidths,
+            GroundPaintedAccentClusterBuildAuditAccumulator clusterAudit)
+        {
+            if (clusterAudit != null)
+            {
+                clusterAudit.ExternalGlyphCandidatesExamined++;
+                clusterAudit.ExternalBoundsTests++;
+            }
+
+            if (!ProjectedBoundsOverlap(
+                    leftPoints,
+                    leftHalfWidths,
+                    rightPoints,
+                    rightHalfWidths,
+                    ProjectedExternalConflictWidthFraction))
+            {
+                return false;
+            }
+
+            if (clusterAudit != null)
+            {
+                clusterAudit.ExternalBoundsOverlapPasses++;
+                clusterAudit.ExternalDetailedOverlapTests++;
+            }
+
+            return HasUnintendedProjectedOverlap(
+                leftPoints,
+                leftHalfWidths,
+                rightPoints,
+                rightHalfWidths,
+                -1,
+                -1,
+                ProjectedExternalConflictWidthFraction,
+                true);
         }
 
         private static bool HasUnintendedProjectedOverlap(
@@ -2203,9 +6903,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             IReadOnlyList<float> rightHalfWidths,
             int leftContactIndex,
             int rightContactIndex,
-            float widthFraction)
+            float widthFraction,
+            bool boundsAlreadyOverlap = false)
         {
-            if (!ProjectedBoundsOverlap(
+            if (!boundsAlreadyOverlap &&
+                !ProjectedBoundsOverlap(
                     leftPoints,
                     leftHalfWidths,
                     rightPoints,
@@ -2234,18 +6936,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                      rightSegmentIndex < rightPoints.Count - 1;
                      rightSegmentIndex++)
                 {
-                    if (IsProjectedContactNeighborhood(
-                            leftSegmentIndex,
-                            leftContactIndex,
-                            leftNeighborhood) &&
-                        IsProjectedContactNeighborhood(
-                            rightSegmentIndex,
-                            rightContactIndex,
-                            rightNeighborhood))
-                    {
-                        continue;
-                    }
-
                     if (SegmentsIntersect(
                             leftPoints[leftSegmentIndex],
                             leftPoints[leftSegmentIndex + 1],
@@ -2343,16 +7033,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 maximum.x = Mathf.Max(maximum.x, point.x + padding);
                 maximum.y = Mathf.Max(maximum.y, point.y + padding);
             }
-        }
-
-        private static bool IsProjectedContactNeighborhood(
-            int segmentIndex,
-            int contactIndex,
-            int neighborhood)
-        {
-            return contactIndex >= 0 &&
-                   (Mathf.Abs(segmentIndex - contactIndex) <= neighborhood ||
-                    Mathf.Abs(segmentIndex + 1 - contactIndex) <= neighborhood);
         }
 
         private static GroundPaintedAccentGlyphFamilyStatistics
