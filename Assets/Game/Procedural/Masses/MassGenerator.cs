@@ -78,6 +78,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
 
 
+        public enum EdgeWearDebugEdgeState
+        {
+            Unassessed,
+            Certified,
+            Selected,
+            EligibleUnselected,
+            ArtisticFiltered,
+            WidthFloorFailure,
+            IsolatedRailFailure,
+            GeometricExcluded,
+            StructuralExcluded,
+            CoexistenceExcluded
+        }
+
         public struct EdgeWearDebugEdgeRecord
         {
             public int EdgeIndex;
@@ -85,6 +99,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public Vector3 End;
             public bool Selected;
             public bool Focus;
+            public EdgeWearDebugEdgeState State;
+            public string Reason;
+            public float Length;
+            public float DihedralDegrees;
 
             public EdgeWearDebugEdgeRecord(
                 int edgeIndex,
@@ -92,12 +110,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 end,
                 bool selected,
                 bool focus)
+                : this(
+                    edgeIndex,
+                    start,
+                    end,
+                    selected,
+                    focus,
+                    selected
+                        ? EdgeWearDebugEdgeState.Selected
+                        : EdgeWearDebugEdgeState.Unassessed,
+                    string.Empty,
+                    (end - start).magnitude,
+                    0f)
+            {
+            }
+
+            public EdgeWearDebugEdgeRecord(
+                int edgeIndex,
+                Vector3 start,
+                Vector3 end,
+                bool selected,
+                bool focus,
+                EdgeWearDebugEdgeState state,
+                string reason,
+                float length,
+                float dihedralDegrees)
             {
                 EdgeIndex = edgeIndex;
                 Start = start;
                 End = end;
                 Selected = selected;
                 Focus = focus;
+                State = state;
+                Reason = reason ?? string.Empty;
+                Length = length;
+                DihedralDegrees = dihedralDegrees;
             }
         }
 
@@ -126,6 +173,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public bool PlacementCaptured;
             public bool CornerSolutionValid;
             public bool PreviewApplied;
+            public bool RequireAllGeometricCandidates;
             public int ShapeSeed;
             public float EdgeWearWidth;
             public double TotalMilliseconds;
@@ -135,6 +183,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int GeometricEligibleCount;
             public int CoexistenceEligibleCount;
             public int CoexistenceIneligibleCount;
+            public int ArtisticEligibleCount;
+            public int CandidateCount;
             public int SelectedCount;
             public int CertifiedCount;
             public int DeferredCount;
@@ -194,8 +244,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public string PrimaryFailure = string.Empty;
             public string CoexistenceSearchTrace = string.Empty;
 
-            public float CertifiedRatio => CoexistenceEligibleCount > 0
-                ? (float)CertifiedCount / CoexistenceEligibleCount
+            public int ExpectedCertificationCount =>
+                RequireAllGeometricCandidates
+                    ? CoexistenceEligibleCount
+                    : SelectedCount;
+
+            public float CertifiedRatio => ExpectedCertificationCount > 0
+                ? (float)CertifiedCount / ExpectedCertificationCount
                 : CertifiedCount == 0 ? 1f : 0f;
 
             public bool Passed =>
@@ -204,8 +259,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 PlacementCaptured &&
                 CornerSolutionValid &&
                 PreviewApplied &&
-                SelectedCount == CoexistenceEligibleCount &&
-                CertifiedCount == CoexistenceEligibleCount &&
+                (!RequireAllGeometricCandidates ||
+                 SelectedCount == CoexistenceEligibleCount) &&
+                CertifiedCount == ExpectedCertificationCount &&
                 MinimumWidthScale + 0.0001f >=
                     EdgeWearMinimumFeasibleWidthFraction &&
                 DeferredCount == 0 &&
@@ -278,6 +334,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             LegacyDiagnosticAudit,
             BoundedSingleEdgePreview,
             UnifiedBoundedPreview,
+            UnifiedBatchAudit,
+            UnifiedPreviewBatchAudit,
             SourceEdgeIndexDebug
         }
 
@@ -357,11 +415,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 #if UNITY_EDITOR
         public static SourceEdgeIndexDebugStatus
             GenerateSourceEdgeIndexDebug(
-                MassRecipe recipe)
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings surfaceFeatures)
         {
             GenerateInternal(
                 recipe,
-                null,
+                surfaceFeatures,
                 EdgeWearEvaluationMode.SourceEdgeIndexDebug,
                 -1,
                 out _,
@@ -371,7 +430,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 debugStatus.DebugEdges ??
                     Array.Empty<EdgeWearDebugEdgeRecord>();
             string diagnostic = edges.Length > 0
-                ? "source topology graph built"
+                ? "source topology and edge-wear eligibility graph built; " +
+                    "seed=" + recipe.ShapeSeed +
+                    ",edges=" + edges.Length
                 : "source-edge indexing is unavailable for this mass archetype";
             return new SourceEdgeIndexDebugStatus(
                 edges.Length > 0,
@@ -444,6 +505,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 MassRecipe recipe,
                 MassSurfaceFeatureSettings surfaceFeatures)
         {
+            return GenerateEdgeWearBatchAuditCase(
+                recipe,
+                surfaceFeatures,
+                EdgeWearEvaluationMode.UnifiedBatchAudit,
+                true);
+        }
+
+        public static EdgeWearBatchAuditCaseResult
+            GenerateUnifiedEdgeWearPreviewParityAuditCase(
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings surfaceFeatures)
+        {
+            return GenerateEdgeWearBatchAuditCase(
+                recipe,
+                surfaceFeatures,
+                EdgeWearEvaluationMode.UnifiedPreviewBatchAudit,
+                false);
+        }
+
+        private static EdgeWearBatchAuditCaseResult
+            GenerateEdgeWearBatchAuditCase(
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings surfaceFeatures,
+                EdgeWearEvaluationMode evaluationMode,
+                bool requireAllGeometricCandidates)
+        {
             if (recipe == null)
             {
                 throw new ArgumentNullException(nameof(recipe));
@@ -452,6 +539,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (!TryBeginEdgeWearBatchAuditCapture(
                     recipe.ShapeSeed,
                     surfaceFeatures.EdgeWearWidth,
+                    requireAllGeometricCandidates,
                     out EdgeWearBatchAuditCaseResult immediateFailure))
             {
                 return immediateFailure;
@@ -465,7 +553,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 GenerateInternal(
                     recipe,
                     surfaceFeatures,
-                    EdgeWearEvaluationMode.UnifiedBoundedPreview,
+                    evaluationMode,
                     -1,
                     out _,
                     out _,
@@ -580,7 +668,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 unifiedPreviewStatus.DebugEdges,
                 edgeDebugPositions);
             if (edgeWearEvaluationMode ==
-                EdgeWearEvaluationMode.UnifiedBoundedPreview)
+                    EdgeWearEvaluationMode.UnifiedBoundedPreview ||
+                edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.UnifiedBatchAudit ||
+                edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.UnifiedPreviewBatchAudit)
             {
                 AppendMassPlacementFrameTelemetry(
                     placementFrame,

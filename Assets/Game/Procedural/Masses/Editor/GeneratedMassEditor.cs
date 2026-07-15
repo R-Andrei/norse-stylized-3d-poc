@@ -49,6 +49,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         private const float EdgeWearBatchMinimumWidthScale = 0.25f;
 
+        private enum EdgeWearMatrixKind
+        {
+            TopologyViability,
+            ArtisticPreviewParity
+        }
+
         private static EdgeWearViabilityMatrixJob
             activeEdgeWearViabilityMatrixJob;
         private static string lastEdgeWearBatchSummary = string.Empty;
@@ -202,7 +208,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private static void DrawGlobalSourceEdgeIndexOverlay(
             SceneView sceneView)
         {
-            if (!sourceEdgeIndexOverlayEnabled || Application.isPlaying)
+            if (!sourceEdgeIndexOverlayEnabled || Application.isPlaying ||
+                activeEdgeWearViabilityMatrixJob != null)
             {
                 return;
             }
@@ -213,6 +220,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 sourceEdgeIndexOverlayEnabled = false;
                 sourceEdgeIndexOverlayTarget = null;
                 return;
+            }
+
+            if (!mass.SourceEdgeIndexDebugIsCurrent)
+            {
+                if (Event.current.type != EventType.Repaint ||
+                    GUIUtility.hotControl != 0 ||
+                    EditorGUIUtility.editingTextField)
+                {
+                    return;
+                }
+                mass.RefreshSourceEdgeIndexDebug();
             }
 
             DrawSourceEdgeIndexOverlay(
@@ -665,12 +683,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 running))
             {
                 if (GUILayout.Button(
-                        "Run Edge-Wear Viability Matrix (30 Cases)"))
+                        "Run Topology Viability Matrix " +
+                        "(30 Exhaustive Cases)"))
                 {
                     GeneratedMass mass = target as GeneratedMass;
                     if (mass != null)
                     {
-                        StartEdgeWearViabilityMatrix(mass);
+                        StartEdgeWearViabilityMatrix(
+                            mass,
+                            EdgeWearMatrixKind.TopologyViability);
+                    }
+                }
+                if (GUILayout.Button(
+                        "Run Artistic Preview Parity Matrix (30 Cases)"))
+                {
+                    GeneratedMass mass = target as GeneratedMass;
+                    if (mass != null)
+                    {
+                        StartEdgeWearViabilityMatrix(
+                            mass,
+                            EdgeWearMatrixKind.ArtisticPreviewParity);
                     }
                 }
             }
@@ -680,12 +712,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EdgeWearViabilityMatrixJob job =
                     activeEdgeWearViabilityMatrixJob;
                 EditorGUILayout.HelpBox(
-                    "Running viability matrix: case " +
+                    "Running " + job.DisplayName + ": case " +
                     (job.CompletedCaseCount + 1) + "/" +
                     job.TotalCaseCount + ". The selected mass and its " +
                     "preview are not modified.",
                     MessageType.Info);
-                if (GUILayout.Button("Cancel Viability Matrix"))
+                if (GUILayout.Button("Cancel Matrix"))
                 {
                     job.CancelRequested = true;
                 }
@@ -700,14 +732,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             if (serializedObject.isEditingMultipleObjects)
             {
                 EditorGUILayout.HelpBox(
-                    "The viability matrix requires one selected mass because " +
-                    "it audits one immutable recipe/settings snapshot.",
+                    "The edge-wear matrices require one selected mass " +
+                    "because each audits one immutable recipe/settings " +
+                    "snapshot.",
                     MessageType.None);
             }
         }
 
         private static void StartEdgeWearViabilityMatrix(
-            GeneratedMass mass)
+            GeneratedMass mass,
+            EdgeWearMatrixKind kind)
         {
             if (mass == null || mass.Recipe == null ||
                 activeEdgeWearViabilityMatrixJob != null)
@@ -716,7 +750,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
 
             activeEdgeWearViabilityMatrixJob =
-                new EdgeWearViabilityMatrixJob(mass);
+                new EdgeWearViabilityMatrixJob(mass, kind);
             lastEdgeWearBatchSummary = string.Empty;
             EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
             EditorApplication.update += AdvanceEdgeWearViabilityMatrix;
@@ -758,7 +792,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             string widthName = EdgeWearBatchWidthNames[widthIndex];
             float progress = (float)caseIndex / job.TotalCaseCount;
             if (EditorUtility.DisplayCancelableProgressBar(
-                    "Generated Mass Edge-Wear Viability Matrix",
+                    job.ProgressTitle,
                     "Seed " + shapeSeed + ", " + widthName +
                     " width (case " + (caseIndex + 1) + "/" +
                     job.TotalCaseCount + ")",
@@ -824,9 +858,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     job.CreaseLength,
                     job.CreaseBranching);
             MassGenerator.EdgeWearBatchAuditCaseResult result =
-                MassGenerator.GenerateUnifiedEdgeWearBatchAuditCase(
-                    caseRecipe,
-                    settings);
+                job.RequireAllGeometricCandidates
+                    ? MassGenerator.GenerateUnifiedEdgeWearBatchAuditCase(
+                        caseRecipe,
+                        settings)
+                    : MassGenerator
+                        .GenerateUnifiedEdgeWearPreviewParityAuditCase(
+                            caseRecipe,
+                            settings);
             return new EdgeWearViabilityMatrixCase(
                 shapeSeed,
                 widthName,
@@ -860,13 +899,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     terminalReason);
             WriteEdgeWearViabilityMatrixReports(job, aggregate);
 
-            lastEdgeWearBatchSummary = aggregate.Status + ": " +
-                aggregate.CasesPassed + "/" +
-                aggregate.CasesRun + " cases passed. Reports: " +
-                "Library/GeneratedMassEdgeWearBatchAudit.txt and .csv";
+            lastEdgeWearBatchSummary = job.DisplayName + " " +
+                aggregate.Status + ": " + aggregate.CasesPassed + "/" +
+                aggregate.CasesRun + " cases passed. Reports: Library/" +
+                job.ReportTextFileName + " and " +
+                job.ReportCsvFileName;
 
             string message =
-                "GeneratedMass edge-wear viability matrix. " +
+                "GeneratedMass edge-wear " + job.ConsoleName + ". " +
                 "status:" + aggregate.Status +
                 ",cases:" + aggregate.CasesPassed + "/" +
                     aggregate.CasesRun +
@@ -898,7 +938,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     aggregate.MaximumTotalMilliseconds.ToString(
                         "G9", CultureInfo.InvariantCulture) +
                 ",statePreserved:" + (statePreserved ? "1" : "0") +
-                ",reports=Library/GeneratedMassEdgeWearBatchAudit.txt|csv";
+                ",reports=Library/" + job.ReportTextFileName + "|" +
+                    job.ReportCsvFileName;
             Debug.LogFormat(
                 aggregate.CasesFailed > 0 || !statePreserved
                     ? LogType.Warning
@@ -958,7 +999,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
                 bool coverageFailure =
                     result.CertifiedCount !=
-                        result.CoexistenceEligibleCount ||
+                        result.ExpectedCertificationCount ||
                     result.CoverageValid != 1;
                 if (coverageFailure)
                 {
@@ -1098,20 +1139,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 File.WriteAllText(
                     Path.Combine(
                         libraryPath,
-                        "GeneratedMassEdgeWearBatchAudit.txt"),
+                        job.ReportTextFileName),
                     BuildEdgeWearViabilityMatrixText(job, aggregate),
                     new UTF8Encoding(false));
                 File.WriteAllText(
                     Path.Combine(
                         libraryPath,
-                        "GeneratedMassEdgeWearBatchAudit.csv"),
+                        job.ReportCsvFileName),
                     BuildEdgeWearViabilityMatrixCsv(job),
                     new UTF8Encoding(false));
             }
             catch (Exception exception)
             {
                 Debug.LogError(
-                    "GeneratedMass viability matrix report write failed: " +
+                    "GeneratedMass edge-wear matrix report write failed: " +
                     exception.GetType().Name + ":" + exception.Message);
             }
         }
@@ -1121,9 +1162,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             EdgeWearViabilityMatrixAggregate aggregate)
         {
             StringBuilder builder = new StringBuilder(16384);
-            builder.AppendLine(
-                "GeneratedMass edge-wear multi-seed viability matrix");
-            builder.AppendLine("contract=EW-B4.2R10R4");
+            builder.AppendLine(job.ReportTitle);
+            builder.Append("contract=");
+            builder.AppendLine(job.Contract);
+            builder.Append("candidatePolicy=");
+            builder.AppendLine(job.RequireAllGeometricCandidates
+                ? "all-geometric"
+                : "artistic-preview");
             builder.Append("object=");
             builder.AppendLine(job.TargetName);
             builder.Append("entityId=");
@@ -1217,6 +1262,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append(result.GeometricEligibleCount);
                 builder.Append('/');
                 builder.Append(result.CoexistenceEligibleCount);
+                builder.Append(",artistic/candidates/expected=");
+                builder.Append(result.ArtisticEligibleCount);
+                builder.Append('/');
+                builder.Append(result.CandidateCount);
+                builder.Append('/');
+                builder.Append(result.ExpectedCertificationCount);
                 builder.Append(",selected/certified/deferred/rejected=");
                 builder.Append(result.SelectedCount);
                 builder.Append('/');
@@ -1552,6 +1603,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         private sealed class EdgeWearViabilityMatrixJob
         {
+            public readonly EdgeWearMatrixKind Kind;
             public readonly GeneratedMass Target;
             public readonly string TargetName;
             public readonly string TargetEntityId;
@@ -1571,8 +1623,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public int CompletedCaseCount;
             public bool CancelRequested;
 
-            public EdgeWearViabilityMatrixJob(GeneratedMass target)
+            public EdgeWearViabilityMatrixJob(
+                GeneratedMass target,
+                EdgeWearMatrixKind kind)
             {
+                Kind = kind;
                 Target = target;
                 TargetName = target.name;
                 TargetEntityId = target.GetEntityId().ToString();
@@ -1592,6 +1647,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     ? meshFilter.sharedMesh
                     : null;
             }
+
+            public bool RequireAllGeometricCandidates =>
+                Kind == EdgeWearMatrixKind.TopologyViability;
+
+            public string DisplayName => RequireAllGeometricCandidates
+                ? "topology viability matrix"
+                : "artistic preview parity matrix";
+
+            public string ConsoleName => RequireAllGeometricCandidates
+                ? "topology viability matrix"
+                : "artistic preview parity matrix";
+
+            public string ProgressTitle => RequireAllGeometricCandidates
+                ? "Generated Mass Topology Viability Matrix"
+                : "Generated Mass Artistic Preview Parity Matrix";
+
+            public string ReportTextFileName =>
+                RequireAllGeometricCandidates
+                    ? "GeneratedMassEdgeWearBatchAudit.txt"
+                    : "GeneratedMassEdgeWearPreviewParityAudit.txt";
+
+            public string ReportCsvFileName =>
+                RequireAllGeometricCandidates
+                    ? "GeneratedMassEdgeWearBatchAudit.csv"
+                    : "GeneratedMassEdgeWearPreviewParityAudit.csv";
+
+            public string ReportTitle => RequireAllGeometricCandidates
+                ? "GeneratedMass edge-wear multi-seed topology " +
+                    "viability matrix"
+                : "GeneratedMass edge-wear multi-seed artistic " +
+                    "preview parity matrix";
+
+            public string Contract => RequireAllGeometricCandidates
+                ? "EW-B4.2R11A.1-topology"
+                : "EW-B4.2R11A.1-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *
@@ -1694,12 +1784,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "Source Edge Index Debug",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Independent editor-only source-topology view. It builds the " +
-                "numbered source graph directly from the current mass recipe " +
-                "and does not require a successful bevel preview. All source " +
-                "edge records are retained; visible edges are depth-tested by " +
-                "default, with optional x-ray drawing for hidden edges. Current " +
-                "bevel-search edges can be highlighted when evidence exists.",
+                "This editor-only view rebuilds from the current shape and " +
+                "edge-wear controls. Edge labels are classified in-place: " +
+                "C certified, A artistically filtered, W width-floor failure, " +
+                "R isolated-rail failure. The cache invalidates automatically " +
+                "when generation inputs change.",
                 MessageType.Info);
 
             if (serializedObject.isEditingMultipleObjects)
@@ -1725,7 +1814,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             {
                 showSourceEdgeIndexDebug = nextShow;
                 if (showSourceEdgeIndexDebug &&
-                    mass.SourceEdgeIndexDebugEdges.Length == 0)
+                    !mass.SourceEdgeIndexDebugIsCurrent)
                 {
                     mass.RefreshSourceEdgeIndexDebug();
                 }
@@ -1778,7 +1867,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 CountCurrentSearchFocusEdges(mass);
             EditorGUILayout.LabelField(
                 "Source Graph Data",
-                records.Length + " edges; " + focusCount +
+                "seed " + mass.SourceEdgeIndexDebugShapeSeed +
+                    "; " + records.Length + " edges; " + focusCount +
                     " current search highlights");
             if (records.Length == 0)
             {
@@ -3280,25 +3370,115 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 Mathf.Sin(angle) * radius);
         }
 
+        private static int CountSourceEdgeDebugState(
+            MassGenerator.EdgeWearDebugEdgeRecord[] records,
+            MassGenerator.EdgeWearDebugEdgeState state)
+        {
+            if (records == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int recordIndex = 0;
+                 recordIndex < records.Length;
+                 recordIndex++)
+            {
+                if (records[recordIndex].State == state)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static Color ResolveSourceEdgeDebugColor(
+            MassGenerator.EdgeWearDebugEdgeState state)
+        {
+            return state switch
+            {
+                MassGenerator.EdgeWearDebugEdgeState.Certified =>
+                    new Color(0.82f, 0.96f, 1f, 0.95f),
+                MassGenerator.EdgeWearDebugEdgeState.Selected =>
+                    new Color(0.45f, 1f, 0.58f, 0.95f),
+                MassGenerator.EdgeWearDebugEdgeState.EligibleUnselected =>
+                    new Color(0.35f, 0.82f, 0.68f, 0.9f),
+                MassGenerator.EdgeWearDebugEdgeState.ArtisticFiltered =>
+                    new Color(1f, 0.35f, 0.9f, 0.95f),
+                MassGenerator.EdgeWearDebugEdgeState.WidthFloorFailure =>
+                    new Color(1f, 0.82f, 0.18f, 0.98f),
+                MassGenerator.EdgeWearDebugEdgeState.IsolatedRailFailure =>
+                    new Color(1f, 0.25f, 0.18f, 0.98f),
+                MassGenerator.EdgeWearDebugEdgeState.CoexistenceExcluded =>
+                    new Color(1f, 0.56f, 0.12f, 0.95f),
+                MassGenerator.EdgeWearDebugEdgeState.GeometricExcluded =>
+                    new Color(0.42f, 0.68f, 1f, 0.82f),
+                MassGenerator.EdgeWearDebugEdgeState.StructuralExcluded =>
+                    new Color(0.55f, 0.58f, 0.62f, 0.78f),
+                _ => new Color(0.72f, 0.76f, 0.82f, 0.82f)
+            };
+        }
+
+        private static string ResolveSourceEdgeDebugCode(
+            MassGenerator.EdgeWearDebugEdgeState state)
+        {
+            return state switch
+            {
+                MassGenerator.EdgeWearDebugEdgeState.Certified => "C",
+                MassGenerator.EdgeWearDebugEdgeState.Selected => "S",
+                MassGenerator.EdgeWearDebugEdgeState.EligibleUnselected => "E",
+                MassGenerator.EdgeWearDebugEdgeState.ArtisticFiltered => "A",
+                MassGenerator.EdgeWearDebugEdgeState.WidthFloorFailure => "W",
+                MassGenerator.EdgeWearDebugEdgeState.IsolatedRailFailure => "R",
+                MassGenerator.EdgeWearDebugEdgeState.CoexistenceExcluded => "X",
+                MassGenerator.EdgeWearDebugEdgeState.GeometricExcluded => "G",
+                MassGenerator.EdgeWearDebugEdgeState.StructuralExcluded => "B",
+                _ => "?"
+            };
+        }
+
         private static void DrawSourceEdgeIndexStatusPanel(
             GeneratedMass mass,
             MassGenerator.EdgeWearDebugEdgeRecord[] records,
             bool highlightSearchEdges)
         {
             int totalCount = records == null ? 0 : records.Length;
+            int certifiedCount = CountSourceEdgeDebugState(
+                records,
+                MassGenerator.EdgeWearDebugEdgeState.Certified);
+            int artisticCount = CountSourceEdgeDebugState(
+                records,
+                MassGenerator.EdgeWearDebugEdgeState.ArtisticFiltered);
+            int widthCount = CountSourceEdgeDebugState(
+                records,
+                MassGenerator.EdgeWearDebugEdgeState.WidthFloorFailure);
+            int railCount = CountSourceEdgeDebugState(
+                records,
+                MassGenerator.EdgeWearDebugEdgeState.IsolatedRailFailure);
+            int otherCount = Mathf.Max(
+                0,
+                totalCount - certifiedCount - artisticCount -
+                    widthCount - railCount);
             string focusEvidence = highlightSearchEdges
                 ? BuildCurrentSearchFocusEvidence(mass)
                 : "disabled";
             Handles.BeginGUI();
-            Rect panel = new Rect(12f, 12f, 340f, 58f);
+            Rect panel = new Rect(12f, 12f, 390f, 82f);
             GUI.Box(panel, GUIContent.none, EditorStyles.helpBox);
             GUI.Label(
-                new Rect(22f, 18f, 318f, 20f),
-                "Source edge index debug: " + totalCount +
-                    " records / " + totalCount + " total",
+                new Rect(22f, 18f, 368f, 20f),
+                "Source edges: seed " +
+                    mass.SourceEdgeIndexDebugShapeSeed +
+                    " / " + totalCount + " records",
                 EditorStyles.boldLabel);
             GUI.Label(
-                new Rect(22f, 40f, 318f, 18f),
+                new Rect(22f, 40f, 368f, 18f),
+                "C " + certifiedCount + "  A " + artisticCount +
+                    "  W " + widthCount + "  R " + railCount +
+                    "  Other " + otherCount,
+                EditorStyles.miniLabel);
+            GUI.Label(
+                new Rect(22f, 60f, 368f, 18f),
                 "Search highlights: {" + focusEvidence + "}",
                 EditorStyles.miniLabel);
             Handles.EndGUI();
@@ -3374,9 +3554,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     HandleUtility.GetHandleSize(midpoint);
                 Color edgeColor = focus
                     ? new Color(1f, 0.58f, 0.08f, 1f)
-                    : record.Selected
-                        ? new Color(0.92f, 0.95f, 1f, 0.9f)
-                        : new Color(0.5f, 0.75f, 1f, 0.78f);
+                    : ResolveSourceEdgeDebugColor(record.State);
 
                 Handles.color = new Color(0f, 0f, 0f, 0.88f);
                 Handles.DrawAAPolyLine(
@@ -3404,9 +3582,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     1.25f,
                     midpoint,
                     labelPosition);
+                normalStyle.normal.textColor = edgeColor;
                 Handles.Label(
                     labelPosition,
-                    " " + record.EdgeIndex + " ",
+                    " " + record.EdgeIndex + " " +
+                        ResolveSourceEdgeDebugCode(record.State) + " ",
                     focus ? focusStyle : normalStyle);
             }
 

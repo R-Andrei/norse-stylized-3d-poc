@@ -440,6 +440,57 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             ? "Awaiting readback"
                             : "No completed readback"
                     : unavailable);
+
+            if (runtime == null)
+            {
+                DrawReadOnlyRow(
+                    new GUIContent("Object Contact Shell"),
+                    unavailable);
+                DrawReadOnlyRow(
+                    new GUIContent("Raw Object Half-Extents"),
+                    unavailable);
+                return;
+            }
+
+            Vector2 lateralCellRange =
+                runtime.FoamLateralCellSpacingRangeMetres;
+            string lateralCellText = lateralCellRange.y > 0f
+                ? Mathf.Approximately(lateralCellRange.x, lateralCellRange.y)
+                    ? $"{lateralCellRange.x:0.###} m across"
+                    : $"{lateralCellRange.x:0.###}-{lateralCellRange.y:0.###} m across"
+                : "across unavailable";
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Object Contact Shell",
+                    "Object source occupancy is fixed to immediate water-cell adjacency. The metre size depends on the current Foam grid; Arc/Semi-Arc Profile Scale and Fleck Size cannot widen this shell."),
+                $"1 cell | {runtime.FoamLongitudinalCellSpacingMetres:0.###} m along | {lateralCellText}");
+
+            if (runtime.TryGetAutomaticObjectRawHalfExtentRanges(
+                    out Vector2 alongRange,
+                    out Vector2 acrossRange))
+            {
+                string alongText = Mathf.Approximately(
+                    alongRange.x,
+                    alongRange.y)
+                        ? $"{alongRange.x:0.###} m"
+                        : $"{alongRange.x:0.###}-{alongRange.y:0.###} m";
+                string acrossText = Mathf.Approximately(
+                    acrossRange.x,
+                    acrossRange.y)
+                        ? $"{acrossRange.x:0.###} m"
+                        : $"{acrossRange.x:0.###}-{acrossRange.y:0.###} m";
+                DrawReadOnlyRow(
+                    new GUIContent(
+                        "Raw Object Half-Extents",
+                        "Unpadded physical obstacle half-extents used for Object Foam local bounds. These are carried by the historically named StaticPressure... fields, not the padded general disturbance extents."),
+                    $"along {alongText} | across {acrossText} | {runtime.AutomaticObjectBirthAnchorCountLastUpdate} anchor(s)");
+            }
+            else
+            {
+                DrawReadOnlyRow(
+                    new GUIContent("Raw Object Half-Extents"),
+                    "No active object anchors");
+            }
         }
 
         private int DrawDebugViewSelector(

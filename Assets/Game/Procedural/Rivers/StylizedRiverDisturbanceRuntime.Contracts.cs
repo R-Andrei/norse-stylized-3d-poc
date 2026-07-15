@@ -44,8 +44,11 @@ namespace ProgrammaticStylized3D.Rivers
         public float AcrossMetres { get; }
         public float AcrossNormalized { get; }
         public float SurfaceHalfWidth { get; }
+        // General disturbance/wake extents include the registered source padding.
         public float AlongHalfLength { get; }
         public float AcrossHalfWidth { get; }
+        // Historical names: these values are the zero-padding raw physical
+        // obstacle half-extents and are intentionally used by Object Foam.
         public float StaticPressureAlongHalfLength { get; }
         public float StaticPressureAcrossHalfWidth { get; }
         public float StaticTargetHeightMetres { get; }

@@ -160,23 +160,17 @@
                 half4 baseSample =
                     SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
 
-                // Ground macro variation must live at terrain scale, not pixel-cell
-                // scale. The previous _PixelCellSize * 8 path produced ~0.44 m
-                // patches with the snowfield material, which read as repeated
-                // granular mottling from the isometric camera.
-                float broadCellSize = max(_GroundMacroPatchScale, 0.0001);
-                float3 broadCoordinate =
-                    input.positionWS / broadCellSize + _PixelSeed * 0.013;
-                float3 warp =
-                    float3(
-                        PS3D_ValueNoise31(broadCoordinate + 11.17),
-                        PS3D_ValueNoise31(broadCoordinate + 23.31),
-                        PS3D_ValueNoise31(broadCoordinate + 37.47)) *
-                    2.0 -
-                    1.0;
+                // One world-continuous XZ evaluator now owns both broad macro
+                // composition and the low-frequency offset used by fine pixel cells.
+                // It replaces the previous three-axis warp plus raw broad-noise lobe
+                // without increasing the value-noise sample count.
+                PS3D_GroundMacroRegionResult macroRegion =
+                    PS3D_EvaluateGroundMacroRegion(input.positionWS);
                 float3 pixelPositionWS =
                     input.positionWS +
-                    warp * _PixelCellSize * _PixelWarpStrength;
+                    float3(macroRegion.warp.x, 0.0, macroRegion.warp.y) *
+                    _PixelCellSize *
+                    _PixelWarpStrength;
 
                 float pixelVariation;
                 PixelCellVariation_float(
@@ -187,8 +181,7 @@
                     _PixelClusterStrength,
                     pixelVariation);
 
-                float broadValue =
-                    PS3D_ValueNoise31(broadCoordinate + 53.29) * 2.0 - 1.0;
+                float broadValue = macroRegion.signedRegion;
                 float contractMask =
                     1.0 -
                     step(
@@ -203,13 +196,18 @@
                     lerp(1.0, 1.0 - saturate(_WetPixelSoftening), saturate(_Wetness)) *
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength)) *
                     lerp(1.0, 0.25, saturate(_MonolithicFlatten));
-                float tonalOffset =
+                float fineTonalOffset =
                     (pixelVariation * _PixelVariation +
-                     vertexVariation * _PixelVertexVariation +
-                     broadValue * _PixelBroadVariation) *
-                    pixelProfileContrast;
+                     vertexVariation * _PixelVertexVariation) *
+                    pixelProfileContrast *
+                    _PixelEffectStrength;
+                float macroTonalOffset =
+                    broadValue *
+                    PS3D_ResolveGroundMacroTonalAmplitude();
                 half tonalScale =
-                    (half)max(0.0, 1.0 + tonalOffset * _PixelEffectStrength);
+                    (half)max(
+                        0.0,
+                        1.0 + fineTonalOffset + macroTonalOffset);
 
                 float groundTonal = ResolveGroundTonalMask(input);
                 float tonalSigned = (groundTonal - 0.5) * 2.0 * contractMask;

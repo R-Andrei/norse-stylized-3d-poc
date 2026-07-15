@@ -13,7 +13,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
         _PixelVariation("Pixel Variation", Range(0, 0.25)) = 0.047
         _PixelVertexVariation("Vertex Variation", Range(0, 0.25)) = 0.221
         _PixelEffectStrength("Pixel Effect Strength", Range(0, 2)) = 1
-        _PixelBroadVariation("Broad Variation", Range(0, 0.25)) = 0.022
+        _PixelBroadVariation("Macro Patch Intensity", Range(0, 0.1)) = 0.022
         _PixelWarpStrength("Cell Warp Strength", Range(0, 2)) = 0.18
 
         [Header(Ground Surface Response)]
@@ -27,6 +27,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
         _GroundShoreDampStrength("Ground Shore Damp Strength", Range(0, 2)) = 1
         _GroundPatchBlendStrength("Ground Patch Blend Strength", Range(0, 1)) = 0.55
         _GroundMacroPatchScale("Ground Macro Patch Scale", Range(0.5, 12)) = 4.5
+        _GroundMacroPatchTransitionSoftness("Ground Macro Patch Transition Softness", Range(0, 1)) = 0.75
         _GroundSnowTintStrength("Ground Snow Tint Strength", Range(0, 1)) = 0.58
         _GroundSnowBrightness("Ground Snow Brightness", Range(0, 0.5)) = 0.16
         _GroundDampDarkenStrength("Ground Damp Darken Strength", Range(0, 0.75)) = 0.34
@@ -151,6 +152,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
 
             #include "../Includes/PixelSurfaceGroundForwardTypes.hlsl"
             #include "../Includes/PixelSurfaceGroundResponse.hlsl"
+            #include "../Includes/PixelSurfaceGroundMacro.hlsl"
             #include "../Includes/PixelSurfaceColorUtility.hlsl"
             #include "../Includes/PixelSurfaceGroundMaskDebug.hlsl"
             #include "../Includes/PixelSurfaceGroundForwardPass.hlsl"

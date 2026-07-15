@@ -23,6 +23,7 @@
                 float _GroundShoreDampStrength;
                 float _GroundPatchBlendStrength;
                 float _GroundMacroPatchScale;
+                float _GroundMacroPatchTransitionSoftness;
                 float _GroundSnowTintStrength;
                 float _GroundSnowBrightness;
                 float _GroundDampDarkenStrength;

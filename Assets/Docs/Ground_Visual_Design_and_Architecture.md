@@ -35,6 +35,45 @@ The Painted Accent system is complete and accepted as a mesh-free graphic Ground
 - Ink Colour and Ink Opacity are appearance-only Material updates.
 - Raw Coverage Binding and Contract Coverage debug views distinguish texture/mapping faults from mask or final-composition faults.
 
+### New Painted Accent recipe defaults
+
+Newly authored Painted Accent recipes use the accepted Snowfield baseline below. Changing an existing feature entry to `Painted Accent Lines` initializes this complete set. Existing serialized Painted Accent recipes are not migrated or overwritten.
+
+```text
+Enabled                         true
+Execution Path                  Shader Only
+Stroke Intensity                1.00
+Ink Colour                      #93979A
+Ink Opacity                     0.80
+Stroke Width                    0.016 m
+
+Surface Suitability Influence   0.85
+Pattern Seed Offset             67
+Stroke Density                  700
+Distribution Scale              11
+Distribution Contrast           0.95
+Cluster Region Bias             0.99
+
+Companion Participation         1.00
+Triplet Share                   0.40
+Companion Tightness             1.00
+Cluster Verticality             1.00
+
+Pair weights                    0.55 / 0.45 / 0.50 / 0.05
+Triplet weights                 0.40 / 0.30 / 0.25 / 0.05
+Glyph-family weights            0.50 / 0.40 / 0.50 / 0.50
+
+Stroke Length Min / Max         0.20 / 0.65 m
+Facing Direction                90 degrees
+Angle Jitter                    20 degrees
+Stroke Path Wiggle              0.85
+
+Profile Height                  0.12 m
+Crest Crown Height              0.03 m
+Profile Irregularity            0.85
+End Taper                       0.55
+```
+
 ### Production contract
 
 ```text
@@ -1326,7 +1365,7 @@ cast shadows: off
 receive shadows: off
 ```
 
-`GroundSurfaceFeatureRecipe` now owns one `PaintedAccentInkColor` value, exposed as **Ink Color** in both Painted Accent authoring surfaces. The default is a dark warm neutral `(0.12, 0.10, 0.08, 1)`. Alpha is not authored because the shader is intentionally opaque. A renderer property block supplies the colour per GeneratedGround preview while retaining one shared material and one combined mesh, so different style variants are not forced to share one static colour.
+`GroundSurfaceFeatureRecipe` now owns one `PaintedAccentInkColor` value, exposed as **Ink Color** in both Painted Accent authoring surfaces. The current new-recipe default is neutral grey `#93979A`; the earlier dark warm neutral `(0.12, 0.10, 0.08, 1)` is historical and remains only on assets that already serialized it. Alpha is not authored because the shader is intentionally opaque. A renderer property block supplies the colour per GeneratedGround preview while retaining one shared material and one combined mesh, so different style variants are not forced to share one static colour.
 
 C8 removes the C7 UV1 seed stream and all corresponding generation, statistics, constants, and diagnostics. UV0 remains available but the flat shader does not consume it. With position, normal, and UV0 retained, estimated stride returns from 40 to 32 bytes. For the demonstrated 36-stroke topology:
 

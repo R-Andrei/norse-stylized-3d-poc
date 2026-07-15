@@ -23,12 +23,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MassSurfaceFeatureSettings settings,
             float amount01,
             float requestedWidth,
+            bool includeAllGeometricCandidates,
             out EdgeWearCoverageAudit coverageAudit)
         {
             bool maximumCoverageMode =
                 settings.EdgeWearCoverage >= 2f - 0.0001f;
             coverageAudit = new EdgeWearCoverageAudit(
-                maximumCoverageMode);
+                maximumCoverageMode,
+                includeAllGeometricCandidates);
             System.Diagnostics.Stopwatch viabilityStopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
 
@@ -412,7 +414,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 bool includeCandidate =
-                    maximumCoverageMode || lifecycle.ArtisticEligible;
+                    includeAllGeometricCandidates ||
+                    lifecycle.ArtisticEligible;
                 if (!includeCandidate)
                 {
                     lifecycle.ViabilityState =

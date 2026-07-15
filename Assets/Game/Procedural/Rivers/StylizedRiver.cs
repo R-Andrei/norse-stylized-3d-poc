@@ -1164,19 +1164,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactArcLengthMaxMetres = 1.80f;
 
-        [Tooltip("Minimum authored Object Contact Arc width in metres before deterministic variation is applied.")]
+        [Tooltip("Minimum Object Contact Arc profile scale in metres before deterministic variation. This shapes early tangential reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactArcWidthMinMetres = 0.035f;
 
-        [Tooltip("Maximum authored Object Contact Arc width in metres before deterministic variation is applied.")]
+        [Tooltip("Maximum Object Contact Arc profile scale in metres before deterministic variation. This shapes early tangential reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactArcWidthMaxMetres = 0.120f;
 
-        [Tooltip("Minimum offset from the obstacle pressure/contact edge for Object Contact Arc sources.")]
+        [Tooltip("Minimum profile offset from the physical obstacle contact shell for Object Contact Arc sources. This biases profile placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactArcOffsetMinMetres = 0.015f;
 
-        [Tooltip("Maximum offset from the obstacle pressure/contact edge for Object Contact Arc sources.")]
+        [Tooltip("Maximum profile offset from the physical obstacle contact shell for Object Contact Arc sources. This biases profile placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactArcOffsetMaxMetres = 0.120f;
 
@@ -1208,19 +1208,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactSemiArcLengthMaxMetres = 1.35f;
 
-        [Tooltip("Minimum authored Object Contact Semi-Arc width in metres before deterministic variation is applied.")]
+        [Tooltip("Minimum Object Contact Semi-Arc profile scale in metres before deterministic variation. This shapes one-sided reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactSemiArcWidthMinMetres = 0.030f;
 
-        [Tooltip("Maximum authored Object Contact Semi-Arc width in metres before deterministic variation is applied.")]
+        [Tooltip("Maximum Object Contact Semi-Arc profile scale in metres before deterministic variation. This shapes one-sided reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactSemiArcWidthMaxMetres = 0.105f;
 
-        [Tooltip("Minimum offset from the obstacle pressure/contact edge for Object Contact Semi-Arc sources.")]
+        [Tooltip("Minimum profile offset from the physical obstacle contact shell for Object Contact Semi-Arc sources. This biases profile placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactSemiArcOffsetMinMetres = 0.020f;
 
-        [Tooltip("Maximum offset from the obstacle pressure/contact edge for Object Contact Semi-Arc sources.")]
+        [Tooltip("Maximum profile offset from the physical obstacle contact shell for Object Contact Semi-Arc sources. This biases profile placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactSemiArcOffsetMaxMetres = 0.140f;
 
@@ -1260,19 +1260,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactFleckLengthMaxMetres = 0.55f;
 
-        [Tooltip("Minimum authored Object Contact Fleck width in metres before deterministic variation is applied.")]
+        [Tooltip("Minimum Object Contact Fleck capsule size in metres before deterministic variation. This controls the fleck shape inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactFleckWidthMinMetres = 0.025f;
 
-        [Tooltip("Maximum authored Object Contact Fleck width in metres before deterministic variation is applied.")]
+        [Tooltip("Maximum Object Contact Fleck capsule size in metres before deterministic variation. This controls the fleck shape inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactFleckWidthMaxMetres = 0.080f;
 
-        [Tooltip("Minimum offset from the obstacle pressure/contact edge for Object Contact Fleck sources.")]
+        [Tooltip("Minimum shape offset from the physical obstacle contact shell for Object Contact Fleck sources. This biases fleck placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactFleckOffsetMinMetres = 0.020f;
 
-        [Tooltip("Maximum offset from the obstacle pressure/contact edge for Object Contact Fleck sources.")]
+        [Tooltip("Maximum shape offset from the physical obstacle contact shell for Object Contact Fleck sources. This biases fleck placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactFleckOffsetMaxMetres = 0.160f;
 

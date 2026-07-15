@@ -987,6 +987,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
         [NonSerialized]
         private string sourceEdgeIndexDebugDiagnostic;
+        [NonSerialized]
+        private bool sourceEdgeIndexDebugStateValid;
+        [NonSerialized]
+        private ProductionGenerationState
+            sourceEdgeIndexDebugProductionState;
+        [NonSerialized]
+        private float sourceEdgeIndexDebugEdgeWearAmount;
+        [NonSerialized]
+        private float sourceEdgeIndexDebugEdgeWearWidth;
+        [NonSerialized]
+        private float sourceEdgeIndexDebugEdgeWearCoverage;
+        [NonSerialized]
+        private int sourceEdgeIndexDebugShapeSeed = -1;
 #endif
 
         public event Action GeometryChanged;
@@ -1110,32 +1123,87 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
         public string SourceEdgeIndexDebugDiagnostic =>
             sourceEdgeIndexDebugDiagnostic ?? string.Empty;
+        public int SourceEdgeIndexDebugShapeSeed =>
+            sourceEdgeIndexDebugShapeSeed;
+        public bool SourceEdgeIndexDebugIsCurrent =>
+            IsSourceEdgeIndexDebugCurrent();
 
         public void RefreshSourceEdgeIndexDebug()
         {
-            if (Application.isPlaying || recipe == null)
+            if (Application.isPlaying || regenerationInProgress ||
+                recipe == null)
             {
                 sourceEdgeIndexDebugEdges =
                     Array.Empty<
                         MassGenerator.EdgeWearDebugEdgeRecord>();
                 sourceEdgeIndexDebugDiagnostic = recipe == null
                     ? "no mass recipe is assigned"
-                    : "source-edge debug is unavailable in Play Mode";
+                    : regenerationInProgress
+                        ? "source-edge debug is waiting for mass regeneration"
+                        : "source-edge debug is unavailable in Play Mode";
+                sourceEdgeIndexDebugStateValid = false;
+                sourceEdgeIndexDebugShapeSeed = -1;
                 return;
             }
 
+            MassSurfaceFeatureSettings featureSettings =
+                CreateSurfaceFeatureSettings();
             MassGenerator.SourceEdgeIndexDebugStatus status =
-                MassGenerator.GenerateSourceEdgeIndexDebug(recipe);
-            sourceEdgeIndexDebugEdges = status.Edges ??
-                Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
-            sourceEdgeIndexDebugDiagnostic = status.Diagnostic;
+                MassGenerator.GenerateSourceEdgeIndexDebug(
+                    recipe,
+                    featureSettings);
+            SetSourceEdgeIndexDebugFromCurrentEvaluation(
+                status.Edges,
+                status.Diagnostic);
         }
 
         public void ClearSourceEdgeIndexDebug()
         {
+            InvalidateSourceEdgeIndexDebug(string.Empty);
+        }
+
+        private bool IsSourceEdgeIndexDebugCurrent()
+        {
+            if (!sourceEdgeIndexDebugStateValid || recipe == null)
+            {
+                return false;
+            }
+
+            ProductionGenerationState currentProductionState =
+                CaptureProductionGenerationState();
+            return sourceEdgeIndexDebugProductionState.Matches(
+                       currentProductionState) &&
+                   sourceEdgeIndexDebugEdgeWearAmount == edgeWearAmount &&
+                   sourceEdgeIndexDebugEdgeWearWidth == edgeWearWidth &&
+                   sourceEdgeIndexDebugEdgeWearCoverage ==
+                       edgeWearCoverage;
+        }
+
+        private void SetSourceEdgeIndexDebugFromCurrentEvaluation(
+            MassGenerator.EdgeWearDebugEdgeRecord[] records,
+            string diagnostic)
+        {
+            sourceEdgeIndexDebugEdges = records ??
+                Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+            sourceEdgeIndexDebugDiagnostic = diagnostic ?? string.Empty;
+            sourceEdgeIndexDebugProductionState =
+                CaptureProductionGenerationState();
+            sourceEdgeIndexDebugEdgeWearAmount = edgeWearAmount;
+            sourceEdgeIndexDebugEdgeWearWidth = edgeWearWidth;
+            sourceEdgeIndexDebugEdgeWearCoverage = edgeWearCoverage;
+            sourceEdgeIndexDebugShapeSeed = recipe != null
+                ? recipe.ShapeSeed
+                : -1;
+            sourceEdgeIndexDebugStateValid = recipe != null;
+        }
+
+        private void InvalidateSourceEdgeIndexDebug(string diagnostic)
+        {
             sourceEdgeIndexDebugEdges =
                 Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
-            sourceEdgeIndexDebugDiagnostic = string.Empty;
+            sourceEdgeIndexDebugDiagnostic = diagnostic ?? string.Empty;
+            sourceEdgeIndexDebugStateValid = false;
+            sourceEdgeIndexDebugShapeSeed = -1;
         }
 
         public void EvaluateUnifiedEdgeWearPreview()
@@ -1860,6 +1928,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             CacheComponents();
             RemoveLegacySurfaceFeatureObjects();
+#if UNITY_EDITOR
+            InvalidateSourceEdgeIndexDebug(
+                "source-edge debug stale after mass regeneration");
+#endif
 
             if (recipe == null)
             {
@@ -1965,6 +2037,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     unifiedStatus.DebugEdges ??
                         Array.Empty<
                             MassGenerator.EdgeWearDebugEdgeRecord>();
+                SetSourceEdgeIndexDebugFromCurrentEvaluation(
+                    unifiedEdgeWearPreviewDebugEdges,
+                    "current edge-wear eligibility graph built from unified preview");
                 unifiedEdgeWearPreviewStale = false;
             }
             else

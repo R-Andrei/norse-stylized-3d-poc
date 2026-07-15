@@ -1989,6 +1989,7 @@ private struct EdgeWearGraphBuildStats
         private sealed class EdgeWearCoverageAudit
         {
             public readonly bool MaximumCoverageMode;
+            public readonly bool RequireAllGeometricCandidates;
             public readonly List<EdgeWearEdgeLifecycleRecord> Records =
                 new List<EdgeWearEdgeLifecycleRecord>();
             public readonly Dictionary<EdgeKey, EdgeWearEdgeLifecycleRecord>
@@ -2040,9 +2041,13 @@ private struct EdgeWearGraphBuildStats
             public int RejectedCount;
             public int UnmappedCount;
 
-            public EdgeWearCoverageAudit(bool maximumCoverageMode)
+            public EdgeWearCoverageAudit(
+                bool maximumCoverageMode,
+                bool requireAllGeometricCandidates)
             {
                 MaximumCoverageMode = maximumCoverageMode;
+                RequireAllGeometricCandidates =
+                    requireAllGeometricCandidates;
             }
         }
 

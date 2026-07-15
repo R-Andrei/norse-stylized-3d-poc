@@ -733,6 +733,77 @@ namespace ProgrammaticStylized3D.Rivers
             automaticBirthDebugLiveAffectedTexels;
         public bool AutomaticBirthSourcesDebugActive =>
             IsAutomaticBirthSourcesDebugActive;
+        public float FoamLongitudinalCellSpacingMetres =>
+            Mathf.Max(0f, minimumTransportLongitudinalSpacing);
+        public Vector2 FoamLateralCellSpacingRangeMetres
+        {
+            get
+            {
+                float minimum = float.PositiveInfinity;
+                float maximum = 0f;
+                for (int index = 0; index < metricRows.Length; index++)
+                {
+                    float spacing = metricRows[index].WidthsAndSpacing.w;
+                    if (spacing <= 0f || float.IsNaN(spacing) ||
+                        float.IsInfinity(spacing))
+                    {
+                        continue;
+                    }
+
+                    minimum = Mathf.Min(minimum, spacing);
+                    maximum = Mathf.Max(maximum, spacing);
+                }
+
+                return float.IsInfinity(minimum)
+                    ? Vector2.zero
+                    : new Vector2(minimum, maximum);
+            }
+        }
+
+        public bool TryGetAutomaticObjectRawHalfExtentRanges(
+            out Vector2 alongRangeMetres,
+            out Vector2 acrossRangeMetres)
+        {
+            alongRangeMetres = Vector2.zero;
+            acrossRangeMetres = Vector2.zero;
+            int sourceCount = Mathf.Min(
+                automaticObjectBirthAnchorCountLastUpdate,
+                automaticObjectFoamSources.Count);
+            if (sourceCount <= 0)
+            {
+                return false;
+            }
+
+            float minimumAlong = float.PositiveInfinity;
+            float maximumAlong = 0f;
+            float minimumAcross = float.PositiveInfinity;
+            float maximumAcross = 0f;
+            for (int index = 0; index < sourceCount; index++)
+            {
+                RiverFoamStaticObjectSource source =
+                    automaticObjectFoamSources[index];
+                float along = Mathf.Max(
+                    0f,
+                    source.StaticPressureAlongHalfLength);
+                float across = Mathf.Max(
+                    0f,
+                    source.StaticPressureAcrossHalfWidth);
+                minimumAlong = Mathf.Min(minimumAlong, along);
+                maximumAlong = Mathf.Max(maximumAlong, along);
+                minimumAcross = Mathf.Min(minimumAcross, across);
+                maximumAcross = Mathf.Max(maximumAcross, across);
+            }
+
+            if (float.IsInfinity(minimumAlong) ||
+                float.IsInfinity(minimumAcross))
+            {
+                return false;
+            }
+
+            alongRangeMetres = new Vector2(minimumAlong, maximumAlong);
+            acrossRangeMetres = new Vector2(minimumAcross, maximumAcross);
+            return true;
+        }
         public string AutomaticShoreBirthStatus => automaticShoreBirthStatus;
         public int AutomaticShoreBirthSubmittedLastUpdate =>
             automaticShoreBirthSubmittedLastUpdate;

@@ -52,42 +52,42 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [Tooltip("Painted Accent Lines only. Visible projected-contour width in metres. The transformed footprint uses this value directly; BodyWidth remains texture/debug support only.")]
         [Range(0.002f, 0.20f)]
         [SerializeField]
-        private float paintedAccentStrokeWidth = 0.12f;
+        private float paintedAccentStrokeWidth = 0.016f;
 
         [Tooltip("Painted Accent Lines only. Approximate requested stroke proposals per standard 40x40 ground patch. Regional concentration redistributes a fixed average share of this population; physical validation may reduce the final accepted count.")]
         [Range(0f, 2000f)]
         [SerializeField]
-        private float paintedAccentStrokeDensity = 34f;
+        private float paintedAccentStrokeDensity = 700f;
 
         [Tooltip("Painted Accent Lines only. High-level world-space size of sparse and dense distribution structure. Lower values create smaller, more frequent variation; higher values create broader local patches and larger coherent regions. This single control drives both underlying distribution scales.")]
         [Range(2f, 24f)]
         [SerializeField]
-        private float paintedAccentDistributionPatchScale = 9f;
+        private float paintedAccentDistributionPatchScale = 11f;
 
         [Tooltip("Painted Accent Lines only. High-level strength of sparse-versus-dense separation. Zero approaches an even field; one strongly concentrates marks into accent areas while retaining a protected non-zero sparse-region floor. This single control drives patch preference, regional redistribution, and the sparse floor.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentDistributionPatchiness = 0.70f;
+        private float paintedAccentDistributionPatchiness = 0.95f;
 
         [Tooltip("Painted Accent Lines only. Authoritative target share of final valid projected marks assigned to complete two- or three-member companion clusters. Zero keeps every mark independent; one assigns every mathematically and geometrically feasible mark to a cluster. The resolved whole-mark quota is reported after generation.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentHorizontalCompanionStrength;
+        private float paintedAccentHorizontalCompanionStrength = 1f;
 
         [Tooltip("Painted Accent Lines only. Of all marks assigned to companion clusters, the authoritative target share assigned to three-member clusters. The remainder is assigned to pairs. Whole-cluster rounding is resolved deterministically and reported after generation.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentCompanionTripletShare = 0.45f;
+        private float paintedAccentCompanionTripletShare = 0.40f;
 
         [Tooltip("Painted Accent Lines only. Controls where the fixed companion quota is concentrated. Zero distributes cluster anchors like the overall field; one strongly favours the denser accent regions. This changes cluster location only, never the global pair/triplet quota.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentCompanionAccentBias = 0.65f;
+        private float paintedAccentCompanionAccentBias = 0.99f;
 
         [Tooltip("Painted Accent Lines only. Controls endpoint spacing inside companion clusters. Zero leaves broader gaps; one targets touching marks or an approximately one-to-two-pixel rendered break. Members remain independent and validate separately.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentCompanionTightness = 0.65f;
+        private float paintedAccentCompanionTightness = 1f;
 
         [Tooltip("Painted Accent Lines only. Controls translation-driven stepping inside both pair and triplet clusters. Zero favours shallow offsets; one creates pronounced terraces and vertical centre differences. This does not change companion participation, pair/triplet quotas, or the bounded Angle Jitter contract.")]
         [Range(0f, 1f)]
@@ -106,17 +106,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [Tooltip("Painted Accent Lines only. Relative authoritative weight for Stepped pair layouts. Pair layout weights are normalized and converted to exact whole-cluster counts.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentPairSteppedWeight = 0.45f;
+        private float paintedAccentPairSteppedWeight = 0.55f;
 
         [Tooltip("Painted Accent Lines only. Relative authoritative weight for Shoulder pair layouts.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentPairShoulderWeight = 0.30f;
+        private float paintedAccentPairShoulderWeight = 0.45f;
 
         [Tooltip("Painted Accent Lines only. Relative authoritative weight for Offset pair layouts.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentPairOffsetWeight = 0.20f;
+        private float paintedAccentPairOffsetWeight = 0.50f;
 
         [Tooltip("Painted Accent Lines only. Relative authoritative weight for the quieter Shallow Offset pair layout. This layout preserves a visible break or pair-local offset and never becomes a seamless collinear continuation.")]
         [Range(0f, 1f)]
@@ -149,22 +149,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [Tooltip("Painted Accent Lines only. Relative selection weight for the complete two-sided mound glyph family. Family weights are normalized internally and do not alter authored stroke length or width.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentCompleteMoundWeight = 0.20f;
+        private float paintedAccentCompleteMoundWeight = 0.50f;
 
         [Tooltip("Painted Accent Lines only. Relative selection weight for the asymmetric mound glyph family. Family weights are normalized internally and do not alter authored stroke length or width.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentAsymmetricMoundWeight = 0.30f;
+        private float paintedAccentAsymmetricMoundWeight = 0.40f;
 
         [Tooltip("Painted Accent Lines only. Relative selection weight for the single-shoulder glyph family. Family weights are normalized internally and do not alter authored stroke length or width.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentSingleShoulderWeight = 0.30f;
+        private float paintedAccentSingleShoulderWeight = 0.50f;
 
         [Tooltip("Painted Accent Lines only. Relative selection weight for the shallow-crest glyph family. Family weights are normalized internally and do not alter authored stroke length or width.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentShallowCrestWeight = 0.20f;
+        private float paintedAccentShallowCrestWeight = 0.50f;
 
         [SerializeField, HideInInspector]
         private bool paintedAccentGlyphFamilyWeightsInitialized;
@@ -172,12 +172,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [Tooltip("Painted Accent Lines only. Minimum accepted ground-surface descriptor length in metres.")]
         [Range(0.20f, 4.0f)]
         [SerializeField]
-        private float paintedAccentStrokeLengthMin = 0.55f;
+        private float paintedAccentStrokeLengthMin = 0.20f;
 
         [Tooltip("Painted Accent Lines only. Maximum accepted ground-surface descriptor length in metres.")]
         [Range(0.25f, 6.0f)]
         [SerializeField]
-        private float paintedAccentStrokeLengthMax = 1.55f;
+        private float paintedAccentStrokeLengthMax = 0.65f;
 
         [Tooltip("Painted Accent Lines only. Local X/Z player or camera-facing direction in degrees. Accepted ground-surface descriptors are perpendicular to this direction, then Angle Jitter Degrees rolls around that perpendicular stroke angle.")]
         [Range(0f, 360f)]
@@ -188,12 +188,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [Tooltip("Painted Accent Lines only. Maximum signed angle offset in degrees applied around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently in [-value, +value].")]
         [Range(0f, 30f)]
         [SerializeField]
-        private float paintedAccentStrokeAngleJitterDegrees = 18f;
+        private float paintedAccentStrokeAngleJitterDegrees = 20f;
 
         [Tooltip("Painted Accent Lines only. Controls smooth lateral curvature of the ground-surface stroke path before the projected contour profile is applied. Zero keeps the baseline nearly straight; one permits the strongest non-looping organic bend. This is independent from Profile Irregularity and generic feature Contrast.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentStrokePathWiggle = 0.35f;
+        private float paintedAccentStrokePathWiggle = 0.85f;
 
         [SerializeField, HideInInspector]
         private bool paintedAccentStrokePathWiggleInitialized;
@@ -201,33 +201,33 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [Tooltip("Painted Accent Lines only. Primary mesh-free projected contour amplitude in metres, applied toward fixed world +Z, which is permanent gameplay screen-up.")]
         [Range(0f, 0.50f)]
         [SerializeField]
-        private float paintedAccentFoldHeight = 0.018f;
+        private float paintedAccentFoldHeight = 0.12f;
 
         [Tooltip("Painted Accent Lines only. Additional projected crest/cap amplitude in metres, added to the fixed world +Z contour displacement.")]
         [Range(0f, 0.05f)]
         [SerializeField]
-        private float paintedAccentCrestCrownHeight = 0.02f;
+        private float paintedAccentCrestCrownHeight = 0.03f;
 
         [Tooltip("Painted Accent Lines only. Controls seeded longitudinal variation in the mesh-free projected contour profile.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentFoldIrregularity = 0.55f;
+        private float paintedAccentFoldIrregularity = 0.85f;
 
         [Tooltip("Painted Accent Lines only. Controls the projected contour and visible-width endpoint envelope.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentFoldEndTaper = 0.65f;
+        private float paintedAccentFoldEndTaper = 0.55f;
 
         [Tooltip("Painted Accent Lines only. Family/variant-authored ink colour blended through the generated projected coverage field into ground albedo. Ink Opacity controls the independent material-only blend amount.")]
         [ColorUsage(false, false)]
         [SerializeField]
         private Color paintedAccentInkColor =
-            new Color(0.12f, 0.10f, 0.08f, 1f);
+            new Color(147f / 255f, 151f / 255f, 154f / 255f, 1f);
 
         [Tooltip("Painted Accent Lines only. Material-only albedo blend applied after coverage generation. This does not change placement, projected glyphs, or coverage and therefore does not rebuild them.")]
         [Range(0f, 1f)]
         [SerializeField]
-        private float paintedAccentInkOpacity = 1f;
+        private float paintedAccentInkOpacity = 0.8f;
 
         [SerializeField, HideInInspector]
         private bool paintedAccentInkOpacityInitialized;

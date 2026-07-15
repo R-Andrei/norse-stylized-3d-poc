@@ -47,11 +47,11 @@ Stage 3 — Surface Motion and Coherent Flow     complete and validated
 Stage 4 — Refraction and Optical Distortion    complete and validated
 Stage 5 — Runtime Disturbance and Interaction  accepted for the current milestone
 Stage 6 — Foam                                 complete and validated
-Stage 7 — Secondary Water Effects              provisionally complete
+Stage 7 — Secondary Water Effects              complete and validated
 Stage 8 — Reflections and Final Integration    stale/retired roadmap item
 ```
 
-Stage 7 has no broad implementation queue. The targeted closure correction is now implemented as `4.11C.5.18C — Contact-Attached Pressure and Thin Birth Sources` and awaits Unity validation before Stage 7 is formally closed. `5.18C` retains the `5.18B` shared automatic-source evaluator but replaces cumulative source history with latest-update-only evidence, narrows object and Shore Ribbon source footprints, and gives Static Pressure an end-to-end authored Front Reach.
+The user Unity-validated `4.11C.5.18C — Contact-Attached Pressure and Thin Birth Sources`; the live-only source diagnostics, pressure reach, object shell, Shore Ribbon, free-water regression, and Final Foam behaved as intended. `4.11C.5.18D — Object Birth Control Semantics and Stage 7 Closure` now reconciles the remaining Inspector terminology and existing diagnostic readout without changing accepted runtime geometry or serialized values. Stage 7 is formally closed.
 
 The old Stage 8 plan is not an active production stage. The current River has no visible reflection feature. Any dormant or experimental reflection code must not be treated as a completed system or as required future work. A future reflection feature would require a new explicitly approved scope.
 
@@ -76,37 +76,37 @@ P4 accounting and the shader compile recovery checklist remain evidence sources 
 
 ## Current active queue
 
-There is no active Chipping, Remaining-Life, reflection, or performance patch.
+There is no active River visual-feature patch. Chipping, Remaining-Life morphology, reflection, and isolated performance work are not queued.
 
-The only active River item is Unity validation of `4.11C.5.18C`. Validate latest-update-only Automatic Birth Sources first, then Static Pressure Front Reach, the immediate one-cell object shell, and cross-river-cell Shore Ribbon thickness before judging transported Final Foam. The experimental `0.50`-pressure-texel raster floor, default Front Reach, and any later object Width relabelling remain evidence-gated. After acceptance, close Stage 7 formally or select a new explicitly scoped feature.
-
-## `4.11C.5.18C` validation gate
+`4.11C.5.18D` is a behaviour-preserving authoring/documentation closure:
 
 ```text
+Arc/Semi-Arc Width labels → Profile Scale;
+Fleck Width label → Fleck Size;
+fixed shell and raw extent evidence → two rows in the existing source view;
+serialized backing fields and source arithmetic → unchanged.
+```
+
+After Unity import confirms the Inspector labels and existing debug view, the next sensible River effort is the separately scoped **Full River Performance Pass**. Do not start it implicitly; it requires explicit approval and should audit the whole River rather than produce isolated micro-patches.
+
+## `4.11C.5.18D` import gate
+
+```text
+C# and compute import
+  no errors; no serialized value reset.
+
+Object Foam Inspector
+  Arc and Semi-Arc expose Profile Scale, not Width;
+  Fleck exposes Fleck Size;
+  help text states that the one-cell shell owns normal thickness.
+
 Automatic Birth Sources
-  no history trails; black after a material update with no source;
-  yellow/cyan/magenta remain visible on first write;
-  white means same-update overlap only.
-
-Static Pressure Target
-  Front Reach changes total upstream distance monotonically;
-  requested and resolved metres/texels are reported honestly;
-  Strength does not change reach; Contact Sharpness does not change total reach;
-  wake and lee remain unchanged.
-
-Object births
-  cyan is an immediate one-water-cell shell outside obstacles;
-  no obstacle-interior writes; Pressure cannot widen the shell;
-  Arc Length changes tangential extent only.
-
-Shore births
-  Shore Ribbon is approximately one cross-river source cell at default;
-  long longitudinal cells do not widen it;
-  Inward Wash remains the only deliberately inward-reaching shore source.
+  existing view only; no additional selector;
+  Object Contact Shell reports one cell plus current metre dimensions;
+  Raw Object Half-Extents reports unpadded registered ranges when anchors exist.
 
 Regression
-  free-water source geometry, transport, Remaining Life, Chipping, Strands,
-  and Final Foam remain unchanged apart from material born from thinner sources.
+  equivalent settings produce unchanged source and Final Foam geometry.
 ```
 
 ## Reopen conditions

@@ -4,7 +4,7 @@
 
 The GeneratedGround Inspector and Painted Accent production workstream is complete, Unity-validated, and accepted through GI-A1–GI-A4 and PA-B1–PA-B4.1. **GeneratedGround and the broader Ground visual roadmap are not complete.**
 
-The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. The active milestone is **V3M — Broad Macro Patch Completion**, audited in `Ground_Macro_Patch_Audit_and_Architecture.md`. **V4 — Contact / Edge Accents** remains architecturally accepted but is queued until V3M passes gameplay-camera visual acceptance.
+The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. The active milestone is **V3M — Broad Macro Patch Completion**, audited in `Ground_Macro_Patch_Audit_and_Architecture.md`. V3M-A1.1 made the shaped shader regions genuinely visible, but gameplay-camera evidence showed that their fixed transitions were too hard. V3M-A1.2 now exposes Macro Patch Intensity and Macro Patch Transition Softness, uses a softer default blend, and awaits Unity validation. **V4 — Contact / Edge Accents** remains architecturally accepted but is queued until V3M passes gameplay-camera visual acceptance.
 
 The accepted current pipeline is:
 
@@ -46,8 +46,8 @@ Ground or scene no longer needs its bake
 ## Next work items
 
 1. Treat only the Inspector and Painted Accent production slice as closed.
-2. Unity-validate V3M-A0's slim macro diagnostics without changing normal lit Ground output.
-3. Implement V3M-A1 as a replacement shader macro-region proof only after the raw field and weighted influence are captured for Snowfield and Grassland.
+2. Unity-validate V3M-A1.2's Macro Patch Intensity and Macro Patch Transition Softness controls in Snowfield and Grassland.
+3. Tune intensity and transition softness from the gameplay camera, then decide whether morphology needs any additional refinement.
 4. Resume V4 Contact / Edge Accents only after broad macro composition is visually accepted from the gameplay camera.
 
 ---

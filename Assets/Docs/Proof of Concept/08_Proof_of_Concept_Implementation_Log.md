@@ -1921,7 +1921,7 @@ The current River milestone is reconciled as follows:
 ```text
 Stage 3 shore-wave controls and shared shoreline output = Unity-validated and accepted;
 Stage 6 Foam/Chipping = complete and accepted through D.1C;
-Stage 7 Secondary Water Effects = provisionally complete;
+Stage 7 Secondary Water Effects = complete and validated;
 Stage 8 reflection/final-integration roadmap = stale and retired;
 Remaining-Life morphology progression = optional future work, not queued;
 Fray/fine-fragment continuation = retired;
@@ -1944,7 +1944,7 @@ Removed the obsolete manual progressive trajectory painter, paint compute kernel
 
 ## 2026-07-15 — `4.11C.5.18C` Contact-Attached Pressure and Thin Birth Sources
 
-Implemented the evidence-driven correction revealed by `5.18B`. Unity validation remains pending.
+Implemented the evidence-driven correction revealed by `5.18B`. The user later Unity-validated the complete source/pressure/final-render gate and confirmed that it works as intended.
 
 Automatic Birth Sources is no longer cumulative. The existing debug texture is fully cleared once per material update, one live unique-texel counter is reset, and all automatic events from that update are rasterized through the shared production evaluator. RGB stores current shore/object/free-water categories; alpha is set only by a subsequent same-update write so white means overlap rather than every current source. The cumulative counter, cumulative state, and alpha-only transient-clear kernel are removed.
 
@@ -1961,5 +1961,12 @@ debug counters: 2 → 1;
 scene/prefab/material/asset/meta changes: none.
 ```
 
-Validation order: latest-update-only debug, Static Pressure Target reach sweep, object shell, Shore Ribbon thickness/offset, free-water regression, then Final Foam. The `0.50`-texel pressure floor and any object Width control relabelling remain provisional until visual evidence is captured.
+Validation passed in Unity: latest-update-only debug, Static Pressure Target reach, immediate object shell, Shore Ribbon thickness/offset, free-water regression, and Final Foam behaved as intended. The `0.50`-texel pressure floor and current Front Reach defaults are accepted for the milestone.
+## 2026-07-15 — `4.11C.5.18D` Object Birth Control Semantics and Stage 7 Closure
+
+Implemented the final behaviour-preserving Object Foam authoring cleanup after `5.18C` validation. The historically serialized Arc and Semi-Arc `Width` backing fields remain unchanged, but the Inspector now exposes them as `Profile Scale`, matching their actual responsibility for early tangential reveal, feather/profile gating, outward placement bias, and coarse local allowance inside the fixed one-cell contact shell. Fleck `Width` is exposed as `Fleck Size`, matching its capsule geometry. No control claims ownership of contact-normal source thickness.
+
+The existing `Automatic Birth Sources` view gains two compact read-only rows: one reports the fixed one-cell shell with current longitudinal and cross-river Foam cell dimensions; the other reports the range of raw unpadded object half-extents carried by the historically named `StaticPressure...HalfLength` fields. Contract comments explicitly distinguish those raw values from padded general disturbance/wake extents. No new debug selector is added.
+
+No compute or shader file changes. No scene, prefab, material, `.asset`, `.meta`, texture, channel, buffer, kernel, dispatch, persistent state, or serialized numeric value changes. Stage 7 Secondary Water Effects is formally complete and validated for the current milestone. The next reasonable River effort is the separately approved comprehensive performance pass, not another implicit visual patch.
 

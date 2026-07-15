@@ -4,41 +4,17 @@
             float ResolveGroundMacroRawShaderDebugValue(
                 Varyings input)
             {
-                float broadCellSize =
-                    max(_GroundMacroPatchScale, 0.0001);
-                float3 broadCoordinate =
-                    input.positionWS / broadCellSize +
-                    _PixelSeed * 0.013;
-
-                return
-                    PS3D_ValueNoise31(broadCoordinate + 53.29) *
-                    2.0 -
-                    1.0;
+                PS3D_GroundMacroRegionResult macroRegion =
+                    PS3D_EvaluateGroundMacroRegion(input.positionWS);
+                return macroRegion.signedRegion;
             }
 
             float ResolveGroundMacroWeightedTonalDebugInfluence(
                 Varyings input)
             {
-                float pixelProfileContrast =
-                    max(0.0, _ProfilePixelContrast) *
-                    lerp(
-                        1.0,
-                        1.0 - saturate(_WetPixelSoftening),
-                        saturate(_Wetness)) *
-                    lerp(
-                        1.0,
-                        max(0.0, _FrostContrast),
-                        saturate(_FrostStrength)) *
-                    lerp(
-                        1.0,
-                        0.25,
-                        saturate(_MonolithicFlatten));
-
                 return
                     ResolveGroundMacroRawShaderDebugValue(input) *
-                    _PixelBroadVariation *
-                    pixelProfileContrast *
-                    _PixelEffectStrength;
+                    PS3D_ResolveGroundMacroTonalAmplitude();
             }
 
             half3 ResolveMaskDebugColor(Varyings input)
@@ -134,7 +110,7 @@
                     float weightedInfluence =
                         ResolveGroundMacroWeightedTonalDebugInfluence(input);
                     float displayMagnitude =
-                        saturate(abs(weightedInfluence) * 20.0);
+                        saturate(abs(weightedInfluence) * 5.0);
                     float3 neutralColor =
                         float3(0.18, 0.18, 0.18);
                     float3 negativeColor =

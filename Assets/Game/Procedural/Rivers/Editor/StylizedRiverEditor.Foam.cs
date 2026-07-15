@@ -906,16 +906,20 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private void DrawMinMaxMetreControls(
             string label,
             SerializedProperty minimum,
-            SerializedProperty maximum)
+            SerializedProperty maximum,
+            string tooltip = null)
         {
             EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
             EditorGUI.indentLevel++;
+            string resolvedTooltip = string.IsNullOrEmpty(tooltip)
+                ? $"Authored {label.ToLowerInvariant()} range in metres."
+                : tooltip;
             EditorGUILayout.PropertyField(
                 minimum,
-                new GUIContent("Min", $"Minimum {label.ToLowerInvariant()} in metres."));
+                new GUIContent("Min", resolvedTooltip));
             EditorGUILayout.PropertyField(
                 maximum,
-                new GUIContent("Max", $"Maximum {label.ToLowerInvariant()} in metres."));
+                new GUIContent("Max", resolvedTooltip));
             EditorGUI.indentLevel--;
         }
 
@@ -1123,6 +1127,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     new GUIContent(
                         "Debug Pattern Mode",
                         "Mixed uses the normalized pattern weights below. Contact Arcs, Contact Semi-Arcs, and Contact Flecks force one pattern for validation."));
+                EditorGUILayout.HelpBox(
+                    "Object births are clipped to one immediate water-cell shell outside the physical obstacle. Arc and Semi-Arc Profile Scale shape reveal and feathering inside that shell; Fleck Size shapes the fleck capsule. None of these controls can widen contact-normal source thickness, and Static Pressure Front Reach remains independent.",
+                    MessageType.None);
 
                 EditorGUILayout.Space(4f);
                 EditorGUILayout.LabelField("Pattern Mix", EditorStyles.boldLabel);
@@ -1167,9 +1174,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamObjectContactArcLengthMinMetres"),
                         Find("foamObjectContactArcLengthMaxMetres"));
                     DrawMinMaxMetreControls(
-                        "Width",
+                        "Profile Scale",
                         Find("foamObjectContactArcWidthMinMetres"),
-                        Find("foamObjectContactArcWidthMaxMetres"));
+                        Find("foamObjectContactArcWidthMaxMetres"),
+                        "Arc profile scale in metres. It shapes early tangential reveal, feather/profile gating, and local allowance inside the fixed one-cell contact shell; it does not change shell thickness.");
                     DrawMinMaxMetreControls(
                         "Contact Offset",
                         Find("foamObjectContactArcOffsetMinMetres"),
@@ -1202,9 +1210,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamObjectContactSemiArcLengthMinMetres"),
                         Find("foamObjectContactSemiArcLengthMaxMetres"));
                     DrawMinMaxMetreControls(
-                        "Width",
+                        "Profile Scale",
                         Find("foamObjectContactSemiArcWidthMinMetres"),
-                        Find("foamObjectContactSemiArcWidthMaxMetres"));
+                        Find("foamObjectContactSemiArcWidthMaxMetres"),
+                        "Semi-Arc profile scale in metres. It shapes one-sided reveal, feather/profile gating, and local allowance inside the fixed one-cell contact shell; it does not change shell thickness.");
                     DrawMinMaxMetreControls(
                         "Contact Offset",
                         Find("foamObjectContactSemiArcOffsetMinMetres"),
@@ -1242,9 +1251,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamObjectContactFleckLengthMinMetres"),
                         Find("foamObjectContactFleckLengthMaxMetres"));
                     DrawMinMaxMetreControls(
-                        "Width",
+                        "Fleck Size",
                         Find("foamObjectContactFleckWidthMinMetres"),
-                        Find("foamObjectContactFleckWidthMaxMetres"));
+                        Find("foamObjectContactFleckWidthMaxMetres"),
+                        "Fleck capsule size in metres inside the fixed one-cell contact shell. It changes the discrete fleck geometry, not contact-normal shell thickness.");
                     DrawMinMaxMetreControls(
                         "Contact Offset",
                         Find("foamObjectContactFleckOffsetMinMetres"),

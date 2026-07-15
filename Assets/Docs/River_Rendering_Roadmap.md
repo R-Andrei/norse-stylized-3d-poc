@@ -16,11 +16,11 @@ Amount, Size, Spacing, Irregularity, Edge Width, Interior Access
 
 `D.1A.1` is rejected and rolled back. `D.1D — Coherent Edge-Bite Admission` is skipped because the current result is good enough. Remaining-Life interaction is deferred as optional future enhancement rather than an active dependency. The zoom-dependent thin-strip capture remains known technical debt and is not blocking completion.
 
-There is no active Chipping patch. The next River change is a targeted user-directed Foam adjustment.
+There is no active Chipping patch. Stage 7 is complete and validated; no further River visual feature is queued.
 
-## Targeted Stage 7 closure correction — `4.11C.5.18C` Contact-Attached Pressure and Thin Birth Sources
+## Accepted Stage 7 closure correction — `4.11C.5.18C` Contact-Attached Pressure and Thin Birth Sources
 
-Implemented; Unity validation pending. `5.18C` supersedes the cumulative evidence contract of `5.18B` while retaining its shared automatic-source evaluator and existing debug resources.
+Unity-validated and accepted. `5.18C` supersedes the cumulative evidence contract of `5.18B` while retaining its shared automatic-source evaluator and existing debug resources.
 
 ```text
 Automatic Birth Sources
@@ -46,11 +46,29 @@ Shore Ribbon
   stale Shore Ribbon inward-reach authority removed.
 ```
 
-No new texture, channel, buffer, dispatch, persistent material state, or free-water source change is introduced. Object contact checks fall from 24 neighbours to 8. Stage 7 may be marked formally complete only after compute import and the source/pressure/final-render validation gate passes.
+No new texture, channel, buffer, dispatch, persistent material state, or free-water source change is introduced. Object contact checks fall from 24 neighbours to 8. The user confirmed the source/pressure/final-render validation gate passed and the result works as intended.
+
+## Final Stage 7 authoring closure — `4.11C.5.18D` Object Birth Control Semantics
+
+Implemented; Unity import pending. This patch does not change accepted source arithmetic or serialized values. It corrects the authoring contract:
+
+```text
+Arc/Semi-Arc Profile Scale
+  early tangential reveal, feather/profile gates, and local allowance
+  inside the fixed immediate contact shell.
+
+Fleck Size
+  discrete fleck capsule geometry inside the same fixed shell.
+
+Object Contact Shell
+  structural immediate water-cell adjacency; not author-controlled width.
+```
+
+The existing Automatic Birth Sources view gains two compact evidence rows for current cell dimensions and raw physical obstacle half-extents. No new diagnostic view or runtime resource is introduced. Stage 7 is formally complete and validated.
 
 # Current River completion state
 
-The current fixed-strength Chipping and structural Strand result is accepted. No additional morphology or Remaining-Life patch is required. Stage 3 is fully validated. Stage 7 is provisionally complete pending one targeted user-directed tweak. The former Stage 8 reflection/final-integration queue is stale: the current River has no visible reflection feature and no active reflection plan.
+The current fixed-strength Chipping and structural Strand result is accepted. No additional morphology or Remaining-Life patch is required. Stage 3 is fully validated. Stage 7 is complete and validated through `5.18C`; `5.18D` records the final truthful authoring contract. The former Stage 8 reflection/final-integration queue is stale: the current River has no visible reflection feature and no active reflection plan.
 
 All River performance work is deferred to one later comprehensive pass covering offscreen/empty-field work, cadence, sleeping, shader/runtime cost, diagnostic/readback overhead, chunk policies, and dormant systems together.
 

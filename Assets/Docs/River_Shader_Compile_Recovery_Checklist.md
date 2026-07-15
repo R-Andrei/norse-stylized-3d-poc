@@ -4,6 +4,19 @@ D.1C imported, rendered, and passed the user’s functional Unity validation whi
 
 No dedicated cold-compile timing or final GPU comparison was supplied for D.1C. Those measurements remain deferred performance evidence, not a blocker for the accepted visual baseline. This checklist should only become active again for the comprehensive River performance pass or a new shader-iteration regression.
 
+## `4.11C.5.18D` compute/editor iteration impact
+
+`5.18D` is a behaviour-preserving C# authoring/documentation closure. It does not modify any compute shader, include, fragment shader, kernel, dispatch, or shader resource. C# changes are confined to Inspector labels/tooltips, two compact read-only rows in the existing Automatic Birth Sources view, and public diagnostic accessors over already resident CPU data.
+
+```text
+shader/compute files changed = 0;
+new shader variants/kernels/dispatches/resources = 0;
+production candidate/source arithmetic = unchanged;
+serialized source values = unchanged.
+```
+
+Required evidence is normal Unity C# import plus confirmation that equivalent settings preserve the accepted `5.18C` result. This patch does not reopen the Chipping compile-cost investigation.
+
 ## `4.11C.5.18C` compute/shader iteration impact
 
 `5.18C` changes two compute programs and the River C# dispatch/authoring path; it does not modify the production fragment shader or the accepted Chipping candidate loops.
@@ -26,7 +39,7 @@ resources
   normal automatic-source kernel still performs no debug UAV write.
 ```
 
-Required local evidence is Unity C# compilation, compute import, and visual validation of the pressure/source debug views. This patch does not reopen the accepted Chipping shader compile investigation or the deferred comprehensive River performance pass. If compute import fails, recover by checking the removed `ClearAutomaticBirthDebugTransient` kernel lookup/pragma, the one-element counter contract, and CPU/GPU `FoamSourceEventGpuData.shore.y` semantics before changing production behaviour.
+`5.18C` passed its Unity source/pressure/final-render validation gate and is accepted. Its retained compile evidence remains useful if a later regression appears. This patch does not reopen the accepted Chipping shader compile investigation or the deferred comprehensive River performance pass. If compute import fails, recover by checking the removed `ClearAutomaticBirthDebugTransient` kernel lookup/pragma, the one-element counter contract, and CPU/GPU `FoamSourceEventGpuData.shore.y` semantics before changing production behaviour.
 
 ## Canonical log policy
 

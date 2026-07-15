@@ -67,6 +67,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty pixelEffectStrength;
         private SerializedProperty cellWarpStrength;
         private SerializedProperty groundMacroPatchScale;
+        private SerializedProperty groundMacroPatchTransitionSoftness;
         private SerializedProperty profileContrastScale;
         private SerializedProperty profilePixelContrastScale;
         private SerializedProperty groundSnowResponseScale;
@@ -123,6 +124,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool showSurfaceDiagnostics;
         private bool showMaterialControls;
         private bool showMaterialPalette;
+        private bool showMaterialMacroPatchComposition = true;
         private bool showMaterialPixelVariation;
         private bool showMaterialSemanticResponse;
         private bool showMaterialWeatherFinish;
@@ -307,6 +309,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             groundMacroPatchScale =
                 groundMaterialControls.FindPropertyRelative("groundMacroPatchScale");
+
+            groundMacroPatchTransitionSoftness =
+                groundMaterialControls.FindPropertyRelative(
+                    "groundMacroPatchTransitionSoftness");
 
             profileContrastScale =
                 groundMaterialControls.FindPropertyRelative("profileContrastScale");
@@ -1237,8 +1243,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
                         if (!horizontalCompanionsInitialized.boolValue)
                         {
-                            horizontalCompanionStrength.floatValue = 0f;
-                            companionTightness.floatValue = 0.65f;
+                            horizontalCompanionStrength.floatValue = 1f;
+                            companionTightness.floatValue = 1f;
                             horizontalCompanionsInitialized.boolValue = true;
                         }
 
@@ -1250,16 +1256,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
                         if (!companionQuotaControlsInitialized.boolValue)
                         {
-                            companionTripletShare.floatValue = 0.45f;
-                            companionAccentBias.floatValue = 0.65f;
+                            companionTripletShare.floatValue = 0.40f;
+                            companionAccentBias.floatValue = 0.99f;
                             companionQuotaControlsInitialized.boolValue = true;
                         }
 
                         if (!companionLayoutWeightsInitialized.boolValue)
                         {
-                            pairSteppedWeight.floatValue = 0.45f;
-                            pairShoulderWeight.floatValue = 0.30f;
-                            pairOffsetWeight.floatValue = 0.20f;
+                            pairSteppedWeight.floatValue = 0.55f;
+                            pairShoulderWeight.floatValue = 0.45f;
+                            pairOffsetWeight.floatValue = 0.50f;
                             pairShallowWeight.floatValue = 0.05f;
                             tripletSteppedRunWeight.floatValue = 0.40f;
                             tripletCrownRunWeight.floatValue = 0.30f;
@@ -1270,16 +1276,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
                         if (!familyWeightsInitialized.boolValue)
                         {
-                            completeMoundWeight.floatValue = 0.20f;
-                            asymmetricMoundWeight.floatValue = 0.30f;
-                            singleShoulderWeight.floatValue = 0.30f;
-                            shallowCrestWeight.floatValue = 0.20f;
+                            completeMoundWeight.floatValue = 0.50f;
+                            asymmetricMoundWeight.floatValue = 0.40f;
+                            singleShoulderWeight.floatValue = 0.50f;
+                            shallowCrestWeight.floatValue = 0.50f;
                             familyWeightsInitialized.boolValue = true;
                         }
 
                         if (!strokePathWiggleInitialized.boolValue)
                         {
-                            strokePathWiggle.floatValue = 0.35f;
+                            strokePathWiggle.floatValue = 0.85f;
                             strokePathWiggleInitialized.boolValue = true;
                         }
 
@@ -3355,6 +3361,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         {
             bool materialChanged = false;
             materialChanged |= DrawMaterialSubsection(
+                ref showMaterialMacroPatchComposition,
+                "Macro Patch Composition",
+                groundMacroPatchScale,
+                broadVariation,
+                groundMacroPatchTransitionSoftness);
+
+            materialChanged |= DrawMaterialSubsection(
                 ref showMaterialPalette,
                 "Palette",
                 baseColor,
@@ -3368,16 +3381,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialPixelVariation,
-                "Pixel and Macro Variation",
+                "Pixel Variation",
                 pixelCellSize,
                 pixelToneCount,
                 pixelClusterStrength,
                 pixelVariation,
-                broadVariation,
                 vertexVariation,
                 pixelEffectStrength,
-                cellWarpStrength,
-                groundMacroPatchScale);
+                cellWarpStrength);
 
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialSemanticResponse,
@@ -3416,6 +3427,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         {
             bool materialChanged = false;
             materialChanged |= DrawMaterialSubsection(
+                ref showMaterialMacroPatchComposition,
+                "Macro Patch Composition",
+                materialControls.FindPropertyRelative("groundMacroPatchScale"),
+                materialControls.FindPropertyRelative("broadVariation"),
+                materialControls.FindPropertyRelative(
+                    "groundMacroPatchTransitionSoftness"));
+
+            materialChanged |= DrawMaterialSubsection(
                 ref showMaterialPalette,
                 "Palette",
                 materialControls.FindPropertyRelative("baseColor"),
@@ -3429,16 +3448,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialPixelVariation,
-                "Pixel and Macro Variation",
+                "Pixel Variation",
                 materialControls.FindPropertyRelative("pixelCellSize"),
                 materialControls.FindPropertyRelative("pixelToneCount"),
                 materialControls.FindPropertyRelative("pixelClusterStrength"),
                 materialControls.FindPropertyRelative("pixelVariation"),
-                materialControls.FindPropertyRelative("broadVariation"),
                 materialControls.FindPropertyRelative("vertexVariation"),
                 materialControls.FindPropertyRelative("pixelEffectStrength"),
-                materialControls.FindPropertyRelative("cellWarpStrength"),
-                materialControls.FindPropertyRelative("groundMacroPatchScale"));
+                materialControls.FindPropertyRelative("cellWarpStrength"));
 
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialSemanticResponse,

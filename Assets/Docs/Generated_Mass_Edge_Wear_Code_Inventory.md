@@ -1151,4 +1151,41 @@ Coexistence telemetry now has dedicated `cornerWidthMissing` and `cornerWidthIna
 
 ### `MassGenerator.cs` and `Editor/GeneratedMassEditor.cs`
 
-`EdgeWearBatchAuditCaseResult` carries both corner-width exclusion counts. The matrix contract is `EW-B4.2R10R4`; TXT and CSV output include both categories, and terminal candidate-conservation failures are no longer conflated with failed intermediate search states. Unity-side acceptance remains two deterministic `30/30` runs.
+`EdgeWearBatchAuditCaseResult` carries both corner-width exclusion counts. R10R4 introduced the `EW-B4.2R10R4` matrix contract; TXT and CSV output include both categories, and terminal candidate-conservation failures are no longer conflated with failed intermediate search states. Its solver acceptance was two deterministic `30/30` runs.
+
+
+## EW-B4.2R11A visual selection and overlay reliability
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+Ordinary inspector maximum Coverage no longer bypasses `ArtisticEligible`. The candidate list now contains only artistically eligible, geometrically viable records. `UnifiedBatchAudit` is the explicit editor-only exception that still includes every geometrically viable candidate so the frozen 30-case R10R4 solver matrix remains comparable.
+
+### `MassGenerator.cs` and `MassGenerator.EdgeWear.Orchestration.cs`
+
+`EdgeWearEvaluationMode.UnifiedBatchAudit` separates exhaustive matrix evaluation from normal visual preview. `EdgeWearDebugEdgeRecord` now carries a stable state, reason, length, and dihedral. The existing source-edge view uses the full current eligibility/certification evaluation and classifies each edge as certified, artistically filtered, width-floor failure, isolated-rail failure, coexistence-excluded, or another structural/geometric state.
+
+### `GeneratedMass.cs`
+
+The source-edge cache records the complete production-generation state plus edge-wear amount, width, and Coverage. Regeneration invalidates stale data; a successful unified preview reuses its current classified records. The overlay can therefore prove its shape seed and source-edge count rather than silently drawing a previous mass.
+
+### `Editor/GeneratedMassEditor.cs`
+
+The existing source-edge overlay auto-refreshes when its cached state no longer matches the selected mass. Labels include compact state codes (`C`, `S`, `E`, `A`, `W`, `R`, `X`, `G`, `B`) and the Scene panel reports the current shape seed and category counts. No additional debug view was added. The original single `EW-B4.2R11A` matrix contract is superseded by the dual R11A.1 topology and preview contracts documented below.
+
+## EW-B4.2R11A.1 preview coverage-contract repair
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+`EdgeWearCoverageAudit.RequireAllGeometricCandidates` separates exhaustive solver coverage from ordinary visual coverage. `MaximumCoverageMode` remains independent and continues to control maximum-coverage solver behavior.
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+`IsEdgeWearCoverageMaterialized` and `IsPlaneCutWinningStateFinalized` now require the coexistence denominator only when `RequireAllGeometricCandidates` is true. Ordinary previews certify exact materialization of the selected visual candidate set. No plane, clipping, topology, width-floor, or search geometry logic changed.
+
+### `MassGenerator.cs` and `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+`EdgeWearBatchAuditCaseResult` records the active denominator policy and calculates `ExpectedCertificationCount` accordingly. `GenerateUnifiedEdgeWearPreviewParityAuditCase` uses `UnifiedPreviewBatchAudit`, which captures the same immutable placement and full audit evidence as the exhaustive batch path without enabling all-geometric selection.
+
+### `Editor/GeneratedMassEditor.cs`
+
+The editor exposes two independent 30-case audits. The existing topology matrix remains exhaustive and writes the canonical batch report. The artistic preview parity matrix follows the ordinary preview candidate policy and writes separate TXT/CSV reports. Aggregate coverage failures and certified ratios use each case's explicit expected certification count. Report contracts are `EW-B4.2R11A.1-topology` and `EW-B4.2R11A.1-preview`.

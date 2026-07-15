@@ -34,6 +34,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             public int ShapeSeed;
             public float EdgeWearWidth;
+            public bool RequireAllGeometricCandidates;
             public bool AuditCaptured;
             public PlaneCutBevelAuditResult Audit;
             public bool CornerSolutionValid;
@@ -50,6 +51,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static bool TryBeginEdgeWearBatchAuditCapture(
             int shapeSeed,
             float edgeWearWidth,
+            bool requireAllGeometricCandidates,
             out EdgeWearBatchAuditCaseResult immediateFailure)
         {
             immediateFailure = null;
@@ -59,6 +61,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     ShapeSeed = shapeSeed,
                     EdgeWearWidth = edgeWearWidth,
+                    RequireAllGeometricCandidates =
+                        requireAllGeometricCandidates,
                     PrimaryFailure =
                         "another edge-wear batch evaluation is already active"
                 };
@@ -69,7 +73,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 new EdgeWearBatchAuditCapture
                 {
                     ShapeSeed = shapeSeed,
-                    EdgeWearWidth = edgeWearWidth
+                    EdgeWearWidth = edgeWearWidth,
+                    RequireAllGeometricCandidates =
+                        requireAllGeometricCandidates
                 };
             return true;
         }
@@ -90,6 +96,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     EdgeWearWidth = capture == null
                         ? 0f
                         : capture.EdgeWearWidth,
+                    RequireAllGeometricCandidates = capture != null &&
+                        capture.RequireAllGeometricCandidates,
                     TotalMilliseconds = totalMilliseconds,
                     ObjectTransformChanged = 0
                 };
@@ -171,6 +179,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             result.CoexistenceIneligibleCount = coverage == null
                 ? 0
                 : coverage.CoexistenceIneligibleCount;
+            result.ArtisticEligibleCount = coverage == null
+                ? 0
+                : coverage.ArtisticEligibleCount;
+            result.CandidateCount = coverage == null
+                ? 0
+                : coverage.CandidateCount;
             result.SelectedCount = coverage == null
                 ? audit.SelectedEdgeCount
                 : coverage.SelectedCount;
@@ -2458,6 +2472,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             RecalculateEdgeWearCoverageAudit(audit);
             return "max=" + (audit.MaximumCoverageMode ? "1" : "0") +
+                ",requireAllGeometric=" +
+                    (audit.RequireAllGeometricCandidates ? "1" : "0") +
                 ",source=" + audit.SourceEdgeCount +
                 ",structural=" + audit.StructuralEligibleCount +
                 ",geometric=" + audit.GeometricEligibleCount +

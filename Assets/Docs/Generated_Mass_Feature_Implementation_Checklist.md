@@ -3354,12 +3354,76 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 
 ### Validation
 
-- [ ] Confirm seed `2223/minimum` reports two pre-shell corner-width exclusions, root candidate conservation `32/32`, and one generic T-junction exclusion.
-- [ ] Confirm the final case reports `coexistenceEligible == selected == certified == 31`, `widthInactive == 2`, and `unresolvedWidthInactive == 0`.
-- [ ] Run the unchanged 30-case matrix twice and require `30/30`, identical fingerprints/exclusion sets, zero topology/face-quality/placement/cache failures, and minimum width scale at least `0.25`.
+- [x] Confirm seed `2223/minimum` reports two pre-shell corner-width exclusions, root candidate conservation `32/32`, and one generic T-junction exclusion.
+- [x] Confirm the final case reports `coexistenceEligible == selected == certified == 31`, `widthInactive == 2`, and `unresolvedWidthInactive == 0`.
+- [x] Run the unchanged 30-case matrix twice and require `30/30`, identical fingerprints/exclusion sets, zero topology/face-quality/placement/cache failures, and minimum width scale at least `0.25`.
 
 ### Explicit non-goals
 
 - [x] Do not alter topology, endpoint, plane, clipping, welding, or face-quality tolerances.
 - [x] Do not add endpoint snapping or expand search budgets.
 - [x] Do not change source generation, individual viability thresholds, canonical placement, rendering, scenes, prefabs, materials, components, tags, layers, or production geometry commit.
+
+
+## EW-B4.2R11A — Visual selection and overlay reliability
+
+### Selection separation
+
+- [x] Stop ordinary inspector maximum Coverage from bypassing `ArtisticEligible`.
+- [x] Add explicit editor-only `UnifiedBatchAudit` evaluation so the 30-case matrix still includes every geometrically viable candidate.
+- [x] Preserve all R10R4 topology, candidate-conservation, width-floor, placement, and coexistence rules.
+
+### Existing overlay upgrade
+
+- [x] Invalidate source-edge debug data when production-generation or edge-wear inputs change.
+- [x] Reuse classified records from a current unified preview; otherwise rebuild the current graph without committing geometry.
+- [x] Display the current shape seed and source-edge count in the Scene panel.
+- [x] Classify records in the existing view as certified, artistically filtered, width-floor failure, isolated-rail failure, coexistence exclusion, or another geometric/structural exclusion.
+- [x] Keep diagnostics to the single existing source-edge overlay; add no extra view.
+- [x] Update the matrix report contract to `EW-B4.2R11A`.
+
+### Validation
+
+- [ ] Confirm changing from seed `5727` to `2223` while the overlay remains enabled immediately changes the panel to seed `2223` and `39` source edges.
+- [ ] At ordinary maximum Coverage, confirm seed `5727` edge `39` and seed `2223` edge `33` are marked `A` and are not bevel candidates.
+- [ ] Confirm seed `2223` edges `13/14` are marked `W` and edge `36` is marked `R`.
+- [x] Run the exhaustive matrix under `EW-B4.2R11A`; it retained `30/30` and frozen R10R4 fingerprints, but did not validate the ordinary preview path. Superseded by the dual R11A.1 audits below.
+
+### Explicit non-goals
+
+- [x] Do not modify isolated-rail construction, the `0.25` width floor, dihedral thresholds, topology tolerances, welding, or coexistence search.
+- [x] Do not change bevel shading normals or shader response in R11A.
+- [x] Do not enable production geometry commit.
+
+## EW-B4.2R11A.1 — Preview coverage-contract repair
+
+### Runtime regression addressed
+
+- [x] Record that R11A's overlay refresh and artistic filtering worked, but ordinary preview certification still used the exhaustive `coexistenceEligible == selected` denominator.
+- [x] Correct seed `5727` so its valid `28/28` artistically selected shell is not rejected because one geometrically viable edge is intentionally marked `A`.
+- [x] Correct seed `2223` so its valid `30/30` winning child is not rejected because one artistically filtered edge remains coexistence-eligible.
+
+### Contract separation
+
+- [x] Add `RequireAllGeometricCandidates` to `EdgeWearCoverageAudit` and batch capture/result state.
+- [x] Require `coexistenceEligible == selected` only for the explicit exhaustive topology matrix.
+- [x] For ordinary preview, require `selected == active == attempted == built == retained`, zero unresolved inactive widths, and zero rejected/deferred/unmapped records.
+- [x] Keep maximum Coverage available for width-reduction behavior without treating it as an exhaustive candidate policy.
+
+### Editor audit parity
+
+- [x] Rename the existing audit to **Topology Viability Matrix (30 Exhaustive Cases)**.
+- [x] Add **Artistic Preview Parity Matrix (30 Cases)** using the same candidate path as the ordinary preview button.
+- [x] Write preview-parity reports to `Library/GeneratedMassEdgeWearPreviewParityAudit.txt|csv` without replacing the frozen topology report.
+- [x] Advance report contracts to `EW-B4.2R11A.1-topology` and `EW-B4.2R11A.1-preview`.
+
+### Validation
+
+- [ ] Rebuild seed `5727`; require `selected == attempted == certified == 28`, `coverageValid == 1`, and preview applied.
+- [ ] Rebuild seed `2223`; require edge `33` artistic filtering, one generic coexistence exclusion, final `selected == attempted == certified == 30`, and preview applied.
+- [ ] Run the topology matrix; require `30/30` and fingerprints/exclusions unchanged from frozen R10R4.
+- [ ] Run the artistic preview parity matrix; require `30/30` with zero coverage/topology/placement/cache failures.
+
+### Explicit non-goals
+
+- [x] Do not change candidate geometry, isolated-rail construction, width floor, topology tolerances, coexistence search, shading normals, shaders, or production commit.

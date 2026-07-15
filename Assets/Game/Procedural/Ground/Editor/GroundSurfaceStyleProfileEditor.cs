@@ -420,7 +420,69 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
                 EditorGUI.indentLevel++;
 
+                GroundSurfaceFeatureKind previousKind =
+                    (GroundSurfaceFeatureKind)kind.intValue;
+                EditorGUI.BeginChangeCheck();
                 EditorGUILayout.PropertyField(kind);
+                bool kindChanged = EditorGUI.EndChangeCheck();
+
+                if (kindChanged &&
+                    previousKind != GroundSurfaceFeatureKind.PaintedAccentLines &&
+                    (GroundSurfaceFeatureKind)kind.intValue ==
+                    GroundSurfaceFeatureKind.PaintedAccentLines)
+                {
+                    enabled.boolValue = true;
+                    costClass.intValue =
+                        (int)GroundSurfaceFeatureCostClass.ShaderOnly;
+                    strength.floatValue = 1f;
+                    maskInfluence.floatValue = 0.85f;
+                    seedOffset.intValue = 67;
+                    paintedAccentStrokeWidth.floatValue = 0.016f;
+                    paintedAccentStrokeDensity.floatValue = 700f;
+                    paintedAccentDistributionPatchScale.floatValue = 11f;
+                    paintedAccentDistributionPatchiness.floatValue = 0.95f;
+                    paintedAccentHorizontalCompanionStrength.floatValue = 1f;
+                    paintedAccentCompanionTripletShare.floatValue = 0.40f;
+                    paintedAccentCompanionAccentBias.floatValue = 0.99f;
+                    paintedAccentCompanionTightness.floatValue = 1f;
+                    paintedAccentCompanionTripletVerticality.floatValue = 1f;
+                    paintedAccentPairSteppedWeight.floatValue = 0.55f;
+                    paintedAccentPairShoulderWeight.floatValue = 0.45f;
+                    paintedAccentPairOffsetWeight.floatValue = 0.50f;
+                    paintedAccentPairShallowWeight.floatValue = 0.05f;
+                    paintedAccentTripletSteppedRunWeight.floatValue = 0.40f;
+                    paintedAccentTripletCrownRunWeight.floatValue = 0.30f;
+                    paintedAccentTripletBrokenTerraceWeight.floatValue = 0.25f;
+                    paintedAccentTripletShallowRunWeight.floatValue = 0.05f;
+                    paintedAccentCompleteMoundWeight.floatValue = 0.50f;
+                    paintedAccentAsymmetricMoundWeight.floatValue = 0.40f;
+                    paintedAccentSingleShoulderWeight.floatValue = 0.50f;
+                    paintedAccentShallowCrestWeight.floatValue = 0.50f;
+                    paintedAccentStrokeLengthMin.floatValue = 0.20f;
+                    paintedAccentStrokeLengthMax.floatValue = 0.65f;
+                    paintedAccentStrokeFacingDirectionDegrees.floatValue = 90f;
+                    paintedAccentStrokeAngleJitterDegrees.floatValue = 20f;
+                    paintedAccentStrokePathWiggle.floatValue = 0.85f;
+                    paintedAccentFoldHeight.floatValue = 0.12f;
+                    paintedAccentCrestCrownHeight.floatValue = 0.03f;
+                    paintedAccentFoldIrregularity.floatValue = 0.85f;
+                    paintedAccentFoldEndTaper.floatValue = 0.55f;
+                    paintedAccentInkColor.colorValue =
+                        new Color(
+                            147f / 255f,
+                            151f / 255f,
+                            154f / 255f,
+                            1f);
+                    paintedAccentInkOpacity.floatValue = 0.8f;
+                    paintedAccentHorizontalCompanionsInitialized.boolValue = true;
+                    paintedAccentCompanionTripletVerticalityInitialized.boolValue = true;
+                    paintedAccentCompanionQuotaControlsInitialized.boolValue = true;
+                    paintedAccentCompanionLayoutWeightsInitialized.boolValue = true;
+                    paintedAccentGlyphFamilyWeightsInitialized.boolValue = true;
+                    paintedAccentStrokePathWiggleInitialized.boolValue = true;
+                    paintedAccentInkOpacityInitialized.boolValue = true;
+                }
+
                 EditorGUILayout.PropertyField(enabled);
                 EditorGUILayout.PropertyField(costClass);
 
@@ -485,8 +547,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
                             if (!paintedAccentHorizontalCompanionsInitialized.boolValue)
                             {
-                                paintedAccentHorizontalCompanionStrength.floatValue = 0f;
-                                paintedAccentCompanionTightness.floatValue = 0.65f;
+                                paintedAccentHorizontalCompanionStrength.floatValue = 1f;
+                                paintedAccentCompanionTightness.floatValue = 1f;
                                 paintedAccentHorizontalCompanionsInitialized.boolValue = true;
                             }
 
@@ -498,16 +560,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
                             if (!paintedAccentCompanionQuotaControlsInitialized.boolValue)
                             {
-                                paintedAccentCompanionTripletShare.floatValue = 0.45f;
-                                paintedAccentCompanionAccentBias.floatValue = 0.65f;
+                                paintedAccentCompanionTripletShare.floatValue = 0.40f;
+                                paintedAccentCompanionAccentBias.floatValue = 0.99f;
                                 paintedAccentCompanionQuotaControlsInitialized.boolValue = true;
                             }
 
                             if (!paintedAccentCompanionLayoutWeightsInitialized.boolValue)
                             {
-                                paintedAccentPairSteppedWeight.floatValue = 0.45f;
-                                paintedAccentPairShoulderWeight.floatValue = 0.30f;
-                                paintedAccentPairOffsetWeight.floatValue = 0.20f;
+                                paintedAccentPairSteppedWeight.floatValue = 0.55f;
+                                paintedAccentPairShoulderWeight.floatValue = 0.45f;
+                                paintedAccentPairOffsetWeight.floatValue = 0.50f;
                                 paintedAccentPairShallowWeight.floatValue = 0.05f;
                                 paintedAccentTripletSteppedRunWeight.floatValue = 0.40f;
                                 paintedAccentTripletCrownRunWeight.floatValue = 0.30f;
@@ -518,16 +580,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
                             if (!paintedAccentGlyphFamilyWeightsInitialized.boolValue)
                             {
-                                paintedAccentCompleteMoundWeight.floatValue = 0.20f;
-                                paintedAccentAsymmetricMoundWeight.floatValue = 0.30f;
-                                paintedAccentSingleShoulderWeight.floatValue = 0.30f;
-                                paintedAccentShallowCrestWeight.floatValue = 0.20f;
+                                paintedAccentCompleteMoundWeight.floatValue = 0.50f;
+                                paintedAccentAsymmetricMoundWeight.floatValue = 0.40f;
+                                paintedAccentSingleShoulderWeight.floatValue = 0.50f;
+                                paintedAccentShallowCrestWeight.floatValue = 0.50f;
                                 paintedAccentGlyphFamilyWeightsInitialized.boolValue = true;
                             }
 
                             if (!paintedAccentStrokePathWiggleInitialized.boolValue)
                             {
-                                paintedAccentStrokePathWiggle.floatValue = 0.35f;
+                                paintedAccentStrokePathWiggle.floatValue = 0.85f;
                                 paintedAccentStrokePathWiggleInitialized.boolValue = true;
                             }
                         }
@@ -1138,37 +1200,37 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             if (strokeWidth != null)
             {
-                strokeWidth.floatValue = 0.12f;
+                strokeWidth.floatValue = 0.016f;
             }
 
             if (strokeDensity != null)
             {
-                strokeDensity.floatValue = 34f;
+                strokeDensity.floatValue = 700f;
             }
 
             if (distributionPatchScale != null)
             {
-                distributionPatchScale.floatValue = 9f;
+                distributionPatchScale.floatValue = 11f;
             }
 
             if (distributionPatchiness != null)
             {
-                distributionPatchiness.floatValue = 0.70f;
+                distributionPatchiness.floatValue = 0.95f;
             }
 
             if (horizontalCompanionStrength != null)
             {
-                horizontalCompanionStrength.floatValue = 0f;
+                horizontalCompanionStrength.floatValue = 1f;
             }
 
             if (companionTripletShare != null)
             {
-                companionTripletShare.floatValue = 0.45f;
+                companionTripletShare.floatValue = 0.40f;
             }
 
             if (companionAccentBias != null)
             {
-                companionAccentBias.floatValue = 0.65f;
+                companionAccentBias.floatValue = 0.99f;
             }
 
             if (companionQuotaControlsInitialized != null)
@@ -1178,17 +1240,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             if (pairSteppedWeight != null)
             {
-                pairSteppedWeight.floatValue = 0.45f;
+                pairSteppedWeight.floatValue = 0.55f;
             }
 
             if (pairShoulderWeight != null)
             {
-                pairShoulderWeight.floatValue = 0.30f;
+                pairShoulderWeight.floatValue = 0.45f;
             }
 
             if (pairOffsetWeight != null)
             {
-                pairOffsetWeight.floatValue = 0.20f;
+                pairOffsetWeight.floatValue = 0.50f;
             }
 
             if (pairShallowWeight != null)
@@ -1223,7 +1285,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             if (companionTightness != null)
             {
-                companionTightness.floatValue = 0.65f;
+                companionTightness.floatValue = 1f;
             }
 
             if (companionTripletVerticality != null)
@@ -1243,22 +1305,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             if (completeMoundWeight != null)
             {
-                completeMoundWeight.floatValue = 0.20f;
+                completeMoundWeight.floatValue = 0.50f;
             }
 
             if (asymmetricMoundWeight != null)
             {
-                asymmetricMoundWeight.floatValue = 0.30f;
+                asymmetricMoundWeight.floatValue = 0.40f;
             }
 
             if (singleShoulderWeight != null)
             {
-                singleShoulderWeight.floatValue = 0.30f;
+                singleShoulderWeight.floatValue = 0.50f;
             }
 
             if (shallowCrestWeight != null)
             {
-                shallowCrestWeight.floatValue = 0.20f;
+                shallowCrestWeight.floatValue = 0.50f;
             }
 
             if (familyWeightsInitialized != null)
@@ -1268,12 +1330,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             if (strokeLengthMin != null)
             {
-                strokeLengthMin.floatValue = 0.55f;
+                strokeLengthMin.floatValue = 0.20f;
             }
 
             if (strokeLengthMax != null)
             {
-                strokeLengthMax.floatValue = 1.55f;
+                strokeLengthMax.floatValue = 0.65f;
             }
 
             if (strokeFacingDirectionDegrees != null)
@@ -1283,12 +1345,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             if (strokeAngleJitterDegrees != null)
             {
-                strokeAngleJitterDegrees.floatValue = 18f;
+                strokeAngleJitterDegrees.floatValue = 20f;
             }
 
             if (strokePathWiggle != null)
             {
-                strokePathWiggle.floatValue = 0.35f;
+                strokePathWiggle.floatValue = 0.85f;
             }
 
             if (strokePathWiggleInitialized != null)
@@ -1298,33 +1360,37 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             if (foldHeight != null)
             {
-                foldHeight.floatValue = 0.018f;
+                foldHeight.floatValue = 0.12f;
             }
 
             if (crestCrownHeight != null)
             {
-                crestCrownHeight.floatValue = 0.02f;
+                crestCrownHeight.floatValue = 0.03f;
             }
 
             if (foldIrregularity != null)
             {
-                foldIrregularity.floatValue = 0.55f;
+                foldIrregularity.floatValue = 0.85f;
             }
 
             if (foldEndTaper != null)
             {
-                foldEndTaper.floatValue = 0.65f;
+                foldEndTaper.floatValue = 0.55f;
             }
 
             if (inkColor != null)
             {
                 inkColor.colorValue =
-                    new Color(0.12f, 0.10f, 0.08f, 1f);
+                    new Color(
+                        147f / 255f,
+                        151f / 255f,
+                        154f / 255f,
+                        1f);
             }
 
             if (inkOpacity != null)
             {
-                inkOpacity.floatValue = 1f;
+                inkOpacity.floatValue = 0.8f;
             }
 
             if (inkOpacityInitialized != null)

@@ -49,7 +49,35 @@ all River performance optimization = deferred to one later comprehensive River p
 
 No scene, prefab, material, `.meta`, Ground, or Generated Mass file is part of this documentation reconciliation.
 
-## Contact-attached Pressure and thin automatic birth sources — `4.11C.5.18C` — implemented, Unity validation pending
+## Object Birth Control Semantics and Stage 7 closure — `4.11C.5.18D` — implemented, Unity import pending
+
+The user validated `4.11C.5.18C` in Unity and confirmed that the live-only source view, contact-attached Static Pressure, immediate object shell, and cell-based Shore Ribbon work as intended. Stage 7 Secondary Water Effects is therefore complete and validated for the current milestone.
+
+`5.18D` performs the final authoring and documentation reconciliation without changing accepted source geometry or serialized values:
+
+```text
+Object Contact Arc Width      → Inspector label: Profile Scale;
+Object Contact Semi-Arc Width → Inspector label: Profile Scale;
+Object Contact Fleck Width    → Inspector label: Fleck Size.
+```
+
+The existing serialized backing fields and numeric values remain untouched. Arc/Semi-Arc Profile Scale truthfully describes early tangential reveal, feather/profile gating, outward placement bias, and coarse local allowance inside the fixed one-cell shell. Fleck Size describes the fleck capsule geometry. None of these controls owns contact-normal source thickness. The existing serialized and compute field names remain historical implementation details so the validated source arithmetic and stored values stay untouched.
+
+The existing `Automatic Birth Sources` diagnostic gains only two compact read-only rows: the fixed one-cell object shell with current Foam cell dimensions, and the registered raw physical object half-extent range. No new debug view is added. The `RiverFoamStaticObjectSource` contract now explicitly records that its historically named `StaticPressure...HalfLength` members are the zero-padding physical obstacle extents, while the general extent members are padded disturbance/wake bounds.
+
+Resource and behaviour contract:
+
+```text
+production source geometry/arithmetic = unchanged;
+compute/shader files = unchanged;
+serialized field names/values = unchanged;
+new textures/channels/buffers/dispatches = 0;
+new debug views = 0;
+existing debug rows = +2 compact rows;
+Stage 7 = complete and validated.
+```
+
+## Contact-attached Pressure and thin automatic birth sources — `4.11C.5.18C` — Unity-validated and accepted
 
 `4.11C.5.18C` keeps the shared production/debug source evaluator introduced by `5.18B`, but supersedes its cumulative diagnostic contract and corrects the actual source/contact geometry revealed by that view.
 
@@ -82,7 +110,7 @@ Static Pressure full-field clear/finalize = unchanged;
 full River performance pass = still deferred.
 ```
 
-Unity compute import and visual validation are required before `5.18C` is accepted and Stage 7 is formally closed.
+`5.18C` was Unity-validated by the user and works as intended. Its `0.50`-texel pressure raster floor and current default Front Reach are accepted for the milestone; any future retuning requires a new visual justification rather than continuation of the closed Stage 7 queue.
 
 # River Foam Stage 6 Canonical Architecture
 

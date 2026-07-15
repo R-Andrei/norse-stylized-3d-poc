@@ -1366,11 +1366,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 IsEdgeWearCoverageMaterialized(coverageAudit, result)
                     ? 1
                     : 0;
-            bool exhaustiveCoverageRequired = coverageAudit != null &&
-                coverageAudit.MaximumCoverageMode;
             bool previewContractValid = geometryValid &&
-                (!exhaustiveCoverageRequired ||
-                 result.MaterializedEdgeCoverageValid == 1);
+                result.MaterializedEdgeCoverageValid == 1;
             if (previewContractValid)
             {
                 previewSoup = auditedSoup;
@@ -1641,16 +1638,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             RecalculateEdgeWearCoverageAudit(audit);
-            if (!audit.MaximumCoverageMode)
-            {
-                return audit.ActiveCount == audit.BuiltCount &&
-                    audit.DeferredCount == 0 &&
-                    audit.RejectedCount == 0;
-            }
-
-            return audit.CoexistenceEligibleCount == audit.SelectedCount &&
-                audit.SelectedCount == audit.BuiltCount &&
+            bool exhaustiveDenominatorValid =
+                !audit.RequireAllGeometricCandidates ||
+                audit.CoexistenceEligibleCount == audit.SelectedCount;
+            return exhaustiveDenominatorValid &&
+                audit.SelectedCount == audit.ActiveCount &&
+                audit.ActiveCount == audit.AttemptedBuiltCount &&
+                audit.AttemptedBuiltCount == audit.BuiltCount &&
                 audit.UnresolvedWidthInactiveCount == 0 &&
+                audit.TrialRejectedCount == 0 &&
                 audit.DeferredCount == 0 &&
                 audit.RejectedCount == 0 &&
                 audit.UnmappedCount == 0;
@@ -3945,9 +3941,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             int retainedCount = retainedCandidates == null
                 ? 0
                 : retainedCandidates.Count;
+            bool exhaustiveDenominatorValid = coverage != null &&
+                (!coverage.RequireAllGeometricCandidates ||
+                 coverage.CoexistenceEligibleCount ==
+                    coverage.SelectedCount);
             bool valid = coverage != null &&
-                coverage.CoexistenceEligibleCount ==
-                    coverage.SelectedCount &&
+                exhaustiveDenominatorValid &&
                 coverage.SelectedCount ==
                     coverage.AttemptedBuiltCount &&
                 coverage.AttemptedBuiltCount == coverage.BuiltCount &&
@@ -3976,6 +3975,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         coverage.AttemptedBuiltCount + "/" +
                         coverage.BuiltCount) +
                 "/" + retainedCount +
+                ",requireAllGeometricCandidates=" +
+                (coverage != null &&
+                 coverage.RequireAllGeometricCandidates ? "1" : "0") +
                 ",widthInactive/unresolvedWidthInactive/" +
                     "trialRejected/deferred/rejected/unmapped=" +
                 (coverage == null

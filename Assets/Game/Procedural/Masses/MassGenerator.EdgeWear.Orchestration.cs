@@ -37,6 +37,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool applyUnifiedBoundedPreview =
                 evaluationMode ==
                     EdgeWearEvaluationMode.UnifiedBoundedPreview;
+            bool runUnifiedBatchAudit =
+                evaluationMode == EdgeWearEvaluationMode.UnifiedBatchAudit;
+            bool runUnifiedPreviewBatchAudit =
+                evaluationMode ==
+                    EdgeWearEvaluationMode.UnifiedPreviewBatchAudit;
+            bool buildSourceEdgeIndexDebug =
+                evaluationMode == EdgeWearEvaluationMode.SourceEdgeIndexDebug;
+            bool runUnifiedEvaluation =
+                applyUnifiedBoundedPreview ||
+                runUnifiedBatchAudit ||
+                runUnifiedPreviewBatchAudit ||
+                buildSourceEdgeIndexDebug;
+            bool includeAllGeometricCandidates = runUnifiedBatchAudit;
+            bool logUnifiedAudit = !buildSourceEdgeIndexDebug;
             if (!surfaceFeatures.HasValue || faces == null || faces.Count < 4)
             {
                 return null;
@@ -66,6 +80,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     settings,
                     amount01,
                     requestedWidth,
+                    includeAllGeometricCandidates,
                     out EdgeWearCoverageAudit coverageAudit);
             if (candidates.Count == 0)
             {
@@ -75,15 +90,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     new ChamferReadinessStats(0, 0),
                     false,
                     noViableCandidateReason);
-                if (applyUnifiedBoundedPreview)
+                if (runUnifiedEvaluation)
                 {
                     PlaneCutBevelAuditResult emptyAudit = default;
                     emptyAudit.CoverageAudit = coverageAudit;
                     emptyAudit.Diagnostic = noViableCandidateReason;
-                    LogUnifiedAllEdgeBevelAudit(
-                        emptyAudit,
-                        false,
-                        noViableCandidateReason);
+                    if (logUnifiedAudit)
+                    {
+                        LogUnifiedAllEdgeBevelAudit(
+                            emptyAudit,
+                            false,
+                            noViableCandidateReason);
+                    }
                     unifiedPreviewStatus =
                         new UnifiedEdgeWearPreviewStatus(
                             false,
@@ -96,7 +114,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             0,
                             0,
                             noViableCandidateReason,
-                            Array.Empty<EdgeWearDebugEdgeRecord>());
+                            BuildSourceEdgeIndexDebugEdges(
+                                faces,
+                                coverageAudit));
                 }
                 return null;
             }
@@ -135,7 +155,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             LogChamferReadiness(stats, ready, blocker);
-            if (!ready && applyUnifiedBoundedPreview)
+            if (!ready && runUnifiedEvaluation)
             {
                 PlaneCutBevelAuditResult readinessAudit = default;
                 readinessAudit.CoverageAudit = coverageAudit;
@@ -143,10 +163,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 readinessAudit.Diagnostic = string.IsNullOrEmpty(blocker)
                     ? "viable edge topology context failed"
                     : blocker;
-                LogUnifiedAllEdgeBevelAudit(
-                    readinessAudit,
-                    false,
-                    readinessAudit.Diagnostic);
+                if (logUnifiedAudit)
+                {
+                    LogUnifiedAllEdgeBevelAudit(
+                        readinessAudit,
+                        false,
+                        readinessAudit.Diagnostic);
+                }
+                unifiedPreviewStatus =
+                    new UnifiedEdgeWearPreviewStatus(
+                        false,
+                        selectedCount,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        readinessAudit.Diagnostic,
+                        BuildSourceEdgeIndexDebugEdges(
+                            faces,
+                            coverageAudit));
             }
 
             if (ready)
@@ -154,7 +192,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float minimumStableFaceArea =
                     maximumDimension * maximumDimension * 0.000001f;
 
-                if (applyUnifiedBoundedPreview)
+                if (runUnifiedEvaluation)
                 {
                     ChamferCornerStats cornerStats =
                         new ChamferCornerStats();
@@ -197,10 +235,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 : cornerBlocker;
                     }
 
-                    LogUnifiedAllEdgeBevelAudit(
-                        allEdgeAudit,
-                        cornersReady,
-                        cornerBlocker);
+                    if (logUnifiedAudit)
+                    {
+                        LogUnifiedAllEdgeBevelAudit(
+                            allEdgeAudit,
+                            cornersReady,
+                            cornerBlocker);
+                    }
 
                     bool previewApplied =
                         cornersReady &&
@@ -220,6 +261,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             allEdgeAudit.Diagnostic,
                             BuildUnifiedEdgeWearDebugEdges(
                                 context,
+                                coverageAudit,
                                 allEdgeAudit.DebugFocusEdgeIndices));
                     if (previewApplied)
                     {
@@ -810,7 +852,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private static EdgeWearDebugEdgeRecord[]
             BuildSourceEdgeIndexDebugEdges(
-                List<PolygonFace> faces)
+                List<PolygonFace> faces,
+                EdgeWearCoverageAudit coverageAudit = null)
         {
             if (faces == null || faces.Count == 0 ||
                 !TryBuildEdgeWearTopologyGraph(
@@ -821,6 +864,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return Array.Empty<EdgeWearDebugEdgeRecord>();
             }
 
+            return BuildEdgeWearDebugEdges(
+                graph,
+                coverageAudit,
+                null);
+        }
+
+        private static EdgeWearDebugEdgeRecord[]
+            BuildUnifiedEdgeWearDebugEdges(
+                ChamferTopologyContext context,
+                EdgeWearCoverageAudit coverageAudit,
+                List<int> focusEdgeIndices)
+        {
+            if (context == null || context.Graph == null)
+            {
+                return Array.Empty<EdgeWearDebugEdgeRecord>();
+            }
+
+            return BuildEdgeWearDebugEdges(
+                context.Graph,
+                coverageAudit,
+                focusEdgeIndices);
+        }
+
+        private static EdgeWearDebugEdgeRecord[]
+            BuildEdgeWearDebugEdges(
+                EdgeWearTopologyGraph graph,
+                EdgeWearCoverageAudit coverageAudit,
+                List<int> focusEdgeIndices)
+        {
+            if (graph == null)
+            {
+                return Array.Empty<EdgeWearDebugEdgeRecord>();
+            }
+
+            HashSet<int> focusEdges = focusEdgeIndices == null
+                ? new HashSet<int>()
+                : new HashSet<int>(focusEdgeIndices);
             EdgeWearDebugEdgeRecord[] records =
                 new EdgeWearDebugEdgeRecord[graph.Edges.Count];
             for (int edgeIndex = 0;
@@ -828,47 +908,146 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                  edgeIndex++)
             {
                 EdgeWearGraphEdge edge = graph.Edges[edgeIndex];
+                Vector3 start =
+                    graph.Vertices[edge.VertexA].Position;
+                Vector3 end =
+                    graph.Vertices[edge.VertexB].Position;
+                EdgeWearEdgeLifecycleRecord lifecycle = null;
+                if (coverageAudit != null)
+                {
+                    if (!coverageAudit.RecordByGraphEdge.TryGetValue(
+                            edgeIndex,
+                            out lifecycle))
+                    {
+                        coverageAudit.RecordByKey.TryGetValue(
+                            new EdgeKey(start, end),
+                            out lifecycle);
+                    }
+                }
+
                 bool manifold = edge.FaceA >= 0 &&
                     edge.FaceB >= 0 &&
                     edge.ExtraFaceCount == 0;
+                bool selected = lifecycle != null
+                    ? lifecycle.Selected
+                    : edge.Selected;
+                EdgeWearDebugEdgeState state = lifecycle != null
+                    ? ResolveEdgeWearDebugEdgeState(lifecycle)
+                    : manifold
+                        ? EdgeWearDebugEdgeState.Unassessed
+                        : EdgeWearDebugEdgeState.StructuralExcluded;
+                string reason = lifecycle != null
+                    ? ResolveEdgeWearDebugEdgeReason(lifecycle)
+                    : manifold
+                        ? "unassessed"
+                        : "non-manifold-or-boundary";
                 records[edgeIndex] = new EdgeWearDebugEdgeRecord(
                     edgeIndex,
-                    graph.Vertices[edge.VertexA].Position,
-                    graph.Vertices[edge.VertexB].Position,
-                    manifold,
-                    false);
+                    start,
+                    end,
+                    selected,
+                    focusEdges.Contains(edgeIndex),
+                    state,
+                    reason,
+                    lifecycle != null
+                        ? lifecycle.Length
+                        : (end - start).magnitude,
+                    lifecycle != null
+                        ? lifecycle.DihedralDegrees
+                        : 0f);
             }
             return records;
         }
 
-        private static EdgeWearDebugEdgeRecord[]
-            BuildUnifiedEdgeWearDebugEdges(
-                ChamferTopologyContext context,
-                List<int> focusEdgeIndices)
+        private static EdgeWearDebugEdgeState
+            ResolveEdgeWearDebugEdgeState(
+                EdgeWearEdgeLifecycleRecord record)
         {
-            if (context == null || context.Graph == null)
+            if (record == null)
             {
-                return Array.Empty<EdgeWearDebugEdgeRecord>();
+                return EdgeWearDebugEdgeState.Unassessed;
             }
-            HashSet<int> focusEdges = focusEdgeIndices == null
-                ? new HashSet<int>()
-                : new HashSet<int>(focusEdgeIndices);
-            EdgeWearDebugEdgeRecord[] records =
-                new EdgeWearDebugEdgeRecord[
-                    context.Graph.Edges.Count];
-            for (int edgeIndex = 0;
-                 edgeIndex < context.Graph.Edges.Count;
-                 edgeIndex++)
+            if (record.Built)
             {
-                EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
-                records[edgeIndex] = new EdgeWearDebugEdgeRecord(
-                    edgeIndex,
-                    context.Graph.Vertices[edge.VertexA].Position,
-                    context.Graph.Vertices[edge.VertexB].Position,
-                    edge.Selected,
-                    focusEdges.Contains(edgeIndex));
+                return EdgeWearDebugEdgeState.Certified;
             }
-            return records;
+
+            string viabilityFailure = record.Viability != null
+                ? record.Viability.FailureReason
+                : string.Empty;
+            string coexistenceFailure =
+                record.CoexistenceFailureReason ?? string.Empty;
+            if (viabilityFailure ==
+                    "maximum-feasible-width-below-minimum-scale" ||
+                coexistenceFailure == "global-width-floor-conflict" ||
+                coexistenceFailure == "corner-width-missing" ||
+                coexistenceFailure == "corner-width-inactive")
+            {
+                return EdgeWearDebugEdgeState.WidthFloorFailure;
+            }
+            if (viabilityFailure.StartsWith(
+                    "isolated-rail",
+                    StringComparison.Ordinal))
+            {
+                return EdgeWearDebugEdgeState.IsolatedRailFailure;
+            }
+            if (record.GeometricEligible && !record.ArtisticEligible)
+            {
+                return EdgeWearDebugEdgeState.ArtisticFiltered;
+            }
+            if (record.GeometricEligible &&
+                !record.CoexistenceEligible)
+            {
+                return EdgeWearDebugEdgeState.CoexistenceExcluded;
+            }
+            if (record.Selected)
+            {
+                return EdgeWearDebugEdgeState.Selected;
+            }
+            if (record.GeometricEligible &&
+                record.CoexistenceEligible &&
+                record.ArtisticEligible)
+            {
+                return EdgeWearDebugEdgeState.EligibleUnselected;
+            }
+            if (!record.StructuralEligible)
+            {
+                return EdgeWearDebugEdgeState.StructuralExcluded;
+            }
+            if (!record.GeometricEligible)
+            {
+                return EdgeWearDebugEdgeState.GeometricExcluded;
+            }
+            return EdgeWearDebugEdgeState.Unassessed;
+        }
+
+        private static string ResolveEdgeWearDebugEdgeReason(
+            EdgeWearEdgeLifecycleRecord record)
+        {
+            if (record == null)
+            {
+                return "unassessed";
+            }
+            if (record.Built)
+            {
+                return "certified";
+            }
+            if (!string.IsNullOrEmpty(record.CoexistenceFailureReason))
+            {
+                return record.CoexistenceFailureReason;
+            }
+            if (record.Viability != null &&
+                !string.IsNullOrEmpty(record.Viability.FailureReason))
+            {
+                return record.Viability.FailureReason;
+            }
+            if (!string.IsNullOrEmpty(record.CandidateReason))
+            {
+                return record.CandidateReason;
+            }
+            return string.IsNullOrEmpty(record.FinalReason)
+                ? "unassessed"
+                : record.FinalReason;
         }
 
         #endregion

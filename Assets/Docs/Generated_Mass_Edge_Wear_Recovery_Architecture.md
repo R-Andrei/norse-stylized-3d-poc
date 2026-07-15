@@ -1116,7 +1116,7 @@ Maximum Coverage is then defined as every coexistence-eligible edge certified. C
 
 `[Coexistence Viability Closure]` records the geometric-to-coexistence denominator, reason counts and IDs, star/pair/trial evaluations and cache uses, exclusions, and minimum committed width scale. Stable evaluation fingerprints include the coexistence denominator and coexistence exclusion state.
 
-The 30-case editor matrix remains unchanged, but its current `EW-B4.2R10R4` pass contract requires `certified == coexistenceEligible`, exact candidate conservation, and `minimumWidthScale >= 0.25`. Aggregate failure categories derive from structured primary and retry evidence, including plane-band and candidate-conservation failures.
+The exhaustive 30-case topology matrix preserves the frozen R10R4 pass requirements: `certified == coexistenceEligible`, exact candidate conservation, and `minimumWidthScale >= 0.25`. Beginning with R11A.1, it uses the `EW-B4.2R11A.1-topology` contract and is paired with a separate ordinary-preview parity matrix. Aggregate failure categories derive from structured primary and retry evidence, including plane-band and candidate-conservation failures.
 
 ### Methods decision
 
@@ -1224,7 +1224,7 @@ Committed exclusion reporting is the union of pre-shell corner-width exclusions 
 
 ### Validation status
 
-Implementation is complete in the R10R4 patch. Unity-side validation remains required. The expected seed `2223/minimum` sequence is `32/32` root candidate conservation, one generic exclusion from `{18/35}`, and a final `31/31` certified shell with two resolved `corner-width-inactive` records and zero unresolved inactive widths. The authoritative acceptance target remains a deterministic `30/30` matrix on two consecutive runs.
+R10R4 is runtime validated and frozen as the topology/coexistence baseline. The unchanged matrix passed `30/30` twice with identical fingerprints, exclusion sets, winning depths, and selected/certified counts. Seed `2223/minimum` produced `32/32` root candidate conservation, one generic exclusion from `{18/35}`, and a final `31/31` certified shell with two resolved `corner-width-inactive` records and zero unresolved inactive widths.
 
 ### Methods decision
 
@@ -1233,3 +1233,72 @@ Implementation is complete in the R10R4 patch. Unity-side validation remains req
 - Accepted: report the union of pre-shell and search exclusions without conflating their causes.
 - Rejected: endpoint snapping, tolerance expansion, welding changes, or search-budget expansion.
 - Rejected: clearing `WidthInactive` merely to satisfy finalization.
+
+
+## Visual selection and source-edge diagnostic authority
+
+R11A separates exhaustive solver certification from the normal visual result. Maximum Coverage in the inspector means all artistically eligible candidates, not all geometrically viable candidates. The explicit editor-only `UnifiedBatchAudit` mode preserves exhaustive geometric coverage and the frozen R10R4 solver contract. The first R11A runtime pass nevertheless retained an exhaustive denominator in ordinary preview finalization; R11A.1 below is the authoritative correction.
+
+The existing source-edge overlay is now an authoritative current-state diagnostic rather than a shape-only cache. Its validity key includes the complete production-generation state and current edge-wear amount, width, and Coverage. Any regeneration or relevant control change invalidates it. A current unified preview may seed the cache directly; otherwise the overlay performs a non-committing current eligibility/certification evaluation.
+
+Each source edge receives one compact visual state:
+
+```text
+C  certified bevel
+A  geometrically viable but artistically filtered
+W  width-floor or shared-width exclusion
+R  isolated-rail construction failure
+X  coexistence exclusion
+G  other geometric exclusion
+B  structural exclusion
+```
+
+The overlay panel displays the shape seed and exact source-edge count. This directly prevents the previously observed 5727 graph from remaining visible after regeneration to seed 2223.
+
+### Methods decision
+
+- Accepted: exhaustive geometric candidate inclusion only through explicit batch-audit mode.
+- Accepted: automatic source-overlay invalidation keyed by generation and edge-wear inputs.
+- Accepted: update the existing overlay with compact state classification rather than adding views.
+- Rejected: changing R10R4 topology, width-floor, intersection, welding, or coexistence rules in the visual-selection patch.
+- Deferred: isolated-rail recovery and rendered bevel-normal correction.
+
+## R11A.1 preview and exhaustive coverage contracts
+
+R11A proved that artistic candidate filtering must be separate from exhaustive solver certification, but its first runtime pass exposed a stale denominator assumption. `MaximumCoverageMode` was still used as if it meant "all geometric candidates are required." That rejected otherwise valid ordinary previews whenever an `A` edge remained geometrically and coexistence eligible.
+
+R11A.1 introduces the explicit invariant `RequireAllGeometricCandidates`:
+
+- The topology viability matrix sets it to `true`; candidate inclusion is exhaustive and final certification requires `coexistenceEligible == selected == built`.
+- Ordinary preview and the artistic preview parity matrix set it to `false`; final certification requires the selected visual set to materialize exactly, while intentionally artistically filtered records remain outside the denominator.
+- `MaximumCoverageMode` remains a width/coverage tuning input and may still select cluster width reduction. It no longer defines the certification denominator.
+
+The ordinary preview contract is:
+
+```text
+selected == active == attemptedBuilt == built == retained
+unresolvedWidthInactive == 0
+trialRejected == deferred == rejected == unmapped == 0
+```
+
+The exhaustive topology contract adds:
+
+```text
+coexistenceEligible == selected
+```
+
+Two separate editor audits are authoritative:
+
+```text
+Topology Viability Matrix
+  contract: EW-B4.2R11A.1-topology
+  policy: all-geometric
+  reports: Library/GeneratedMassEdgeWearBatchAudit.txt|csv
+
+Artistic Preview Parity Matrix
+  contract: EW-B4.2R11A.1-preview
+  policy: artistic-preview
+  reports: Library/GeneratedMassEdgeWearPreviewParityAudit.txt|csv
+```
+
+The second audit is required because a passing exhaustive matrix alone cannot prove that the ordinary preview path builds. The plane construction, viability thresholds, coexistence search, topology certification, and frozen R10R4 geometry rules remain unchanged.

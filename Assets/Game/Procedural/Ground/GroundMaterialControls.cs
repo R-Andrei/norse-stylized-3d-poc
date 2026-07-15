@@ -63,8 +63,9 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float pixelVariation = 0.024f;
 
-    [Tooltip("Broad terrain-scale tonal variation mixed into the ground shader.")]
-    [Range(0f, 0.25f)]
+    [InspectorName("Macro Patch Intensity")]
+    [Tooltip("Visible tonal intensity of shader-side macro patches. This is independent from fine pixel and generated vertex variation.")]
+    [Range(0f, 0.1f)]
     [SerializeField]
     private float broadVariation = 0.032f;
 
@@ -87,6 +88,12 @@ public sealed class GroundMaterialControls
     [Range(0.5f, 12f)]
     [SerializeField]
     private float groundMacroPatchScale = 4.5f;
+
+    [InspectorName("Macro Patch Transition Softness")]
+    [Tooltip("Softness of the transition between neutral terrain and light or dark macro patches. Zero gives narrow edges; one gives broad seamless blending.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float groundMacroPatchTransitionSoftness = 0.75f;
 
     [Header("Semantic Response")]
     [Tooltip("Multiplier for profile-driven broad response contrast.")]
@@ -217,11 +224,13 @@ public sealed class GroundMaterialControls
     public float PixelToneCount => Mathf.Clamp(pixelToneCount, 2f, 8f);
     public float PixelClusterStrength => Mathf.Clamp01(pixelClusterStrength);
     public float PixelVariation => Mathf.Clamp(pixelVariation, 0f, 0.25f);
-    public float BroadVariation => Mathf.Clamp(broadVariation, 0f, 0.25f);
+    public float BroadVariation => Mathf.Clamp(broadVariation, 0f, 0.1f);
     public float VertexVariation => Mathf.Clamp(vertexVariation, 0f, 0.25f);
     public float PixelEffectStrength => Mathf.Clamp(pixelEffectStrength, 0f, 2f);
     public float CellWarpStrength => Mathf.Clamp(cellWarpStrength, 0f, 2f);
     public float GroundMacroPatchScale => Mathf.Clamp(groundMacroPatchScale, 0.5f, 12f);
+    public float GroundMacroPatchTransitionSoftness =>
+        Mathf.Clamp01(groundMacroPatchTransitionSoftness);
     public float ProfileContrastScale => Mathf.Clamp(profileContrastScale, 0f, 2f);
     public float ProfilePixelContrastScale => Mathf.Clamp(profilePixelContrastScale, 0f, 2f);
     public float GroundSnowResponseScale => Mathf.Clamp(groundSnowResponseScale, 0f, 2.5f);
@@ -282,6 +291,8 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = source.pixelEffectStrength;
         cellWarpStrength = source.cellWarpStrength;
         groundMacroPatchScale = source.groundMacroPatchScale;
+        groundMacroPatchTransitionSoftness =
+            source.groundMacroPatchTransitionSoftness;
         profileContrastScale = source.profileContrastScale;
         profilePixelContrastScale = source.profilePixelContrastScale;
         groundSnowResponseScale = source.groundSnowResponseScale;
@@ -346,6 +357,7 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = 0.92f;
         cellWarpStrength = 0.08f;
         groundMacroPatchScale = 4.8f;
+        groundMacroPatchTransitionSoftness = 0.75f;
         profileContrastScale = 0.95f;
         profilePixelContrastScale = 0.92f;
         groundSnowResponseScale = 1.10f;
@@ -388,6 +400,7 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = 1.18f;
         cellWarpStrength = 0.18f;
         groundMacroPatchScale = 3.25f;
+        groundMacroPatchTransitionSoftness = 0.75f;
         profileContrastScale = 1.35f;
         profilePixelContrastScale = 1.16f;
         groundSnowResponseScale = 1.00f;
@@ -430,6 +443,7 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = 1.08f;
         cellWarpStrength = 0.24f;
         groundMacroPatchScale = 3.1f;
+        groundMacroPatchTransitionSoftness = 0.75f;
         profileContrastScale = 1.20f;
         profilePixelContrastScale = 1.02f;
         groundSnowResponseScale = 0.62f;
@@ -472,6 +486,7 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = 0.72f;
         cellWarpStrength = 0.035f;
         groundMacroPatchScale = 8.6f;
+        groundMacroPatchTransitionSoftness = 0.75f;
         profileContrastScale = 0.70f;
         profilePixelContrastScale = 0.70f;
         groundSnowResponseScale = 1.38f;

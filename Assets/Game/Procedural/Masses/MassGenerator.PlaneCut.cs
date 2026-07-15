@@ -116,28 +116,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             placementReferenceSoup = sourcePlacementSoup;
 
             TriangleSoup planeCutPreviewSoup = null;
-            if (edgeWearEvaluationMode ==
-                EdgeWearEvaluationMode.SourceEdgeIndexDebug)
-            {
-                EdgeWearDebugEdgeRecord[] debugEdges =
-                    BuildSourceEdgeIndexDebugEdges(faces);
-                unifiedPreviewStatus =
-                    new UnifiedEdgeWearPreviewStatus(
-                        false,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        debugEdges.Length > 0
-                            ? "source topology graph built"
-                            : "source topology graph failed validation",
-                        debugEdges);
-            }
-            else if (edgeWearEvaluationMode !=
+            if (edgeWearEvaluationMode !=
                 EdgeWearEvaluationMode.None)
             {
                 planeCutPreviewSoup = ApplyGeneratedEdgeWearBevels(
@@ -149,13 +128,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out previewStatus,
                     out boundedPreviewStatus,
                     out unifiedPreviewStatus);
+                if (edgeWearEvaluationMode ==
+                        EdgeWearEvaluationMode.SourceEdgeIndexDebug &&
+                    (unifiedPreviewStatus.DebugEdges == null ||
+                     unifiedPreviewStatus.DebugEdges.Length == 0))
+                {
+                    EdgeWearDebugEdgeRecord[] fallbackEdges =
+                        BuildSourceEdgeIndexDebugEdges(faces);
+                    unifiedPreviewStatus =
+                        new UnifiedEdgeWearPreviewStatus(
+                            false,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            fallbackEdges.Length > 0
+                                ? "source topology graph built without " +
+                                    "edge-wear eligibility evaluation"
+                                : "source topology graph failed validation",
+                            fallbackEdges);
+                }
             }
             if ((edgeWearEvaluationMode ==
                     EdgeWearEvaluationMode.PlaneCutPreview ||
                  edgeWearEvaluationMode ==
                     EdgeWearEvaluationMode.BoundedSingleEdgePreview ||
-                 edgeWearEvaluationMode ==
-                    EdgeWearEvaluationMode.UnifiedBoundedPreview) &&
+                 (edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.UnifiedBoundedPreview ||
+                  edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.UnifiedBatchAudit ||
+                  edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.UnifiedPreviewBatchAudit)) &&
                 planeCutPreviewSoup != null)
             {
                 return planeCutPreviewSoup;
