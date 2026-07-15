@@ -348,6 +348,8 @@ This River-only performance gate does not correct the River→GeneratedGround re
 
 **Generated channel and terrain integration:** A dedicated spline-following corridor generates the riverbed, slopes, shoreline, hidden overlap, collider handoff, and buried terrain apron. It samples an immutable pre-river ground snapshot and matches ground height, slope, normals, UVs, and surface metadata at the handoff.
 
+The visible corridor render mesh exposes a **River Corridor Material Masks** stream in Unity UV channel index `3` / HLSL `TEXCOORD3`. `X` is Riverbed Support: it is `1` on `Centre`, `FlatBedEdge`, and `BedSlope`, and `0` on `HiddenCover`, `OuterBlend`, and `BuriedApron`. `Y/Z/W` are reserved and currently zero. This stream is semantic support only; River code does not own riverbed colour, wetness, smoothness, detail normals, cavity response, or substrate style. Existing `UV2.y` remains the shore/waterline influence and is not replaced or reinterpreted.
+
 **Natural channel variation:** Deterministic river-space controls provide asymmetric shoreline width variation and safety-limited bed roughness with configurable lower-slope reach. The water surface, corridor, collider, ground concealment, and spatial queries consume the same resolved channel shape.
 
 **Directional-light shadow stability:** The main directional light uses a tested Depth Bias of `0.13`, preventing low-angle light leaks and holes in elongated shadows while keeping acceptable contact and self-shadowing.

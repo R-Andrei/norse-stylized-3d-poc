@@ -321,6 +321,8 @@ namespace ProgrammaticStylized3D.Rivers
                 new List<float>();
             List<Vector3> sampledGroundNormals =
                 new List<Vector3>();
+            List<Vector4> riverMaterialMasks =
+                new List<Vector4>(rings.Count * acrossVertexCount);
 
             float resolvedDepth = Mathf.Max(0.05f, depth);
             float resolvedBankBlend = Mathf.Max(0.1f, bankBlend);
@@ -517,6 +519,12 @@ namespace ProgrammaticStylized3D.Rivers
                             corridorShoreInfluence,
                             groundSample.RockyDry,
                             groundSample.ReservedSurfaceMask));
+                    riverMaterialMasks.Add(
+                        new Vector4(
+                            ResolveRiverbedSupport(crossPoint),
+                            0f,
+                            0f,
+                            0f));
                     terrainIntegrationWeights.Add(
                         terrainIntegrationWeight);
                     sampledGroundNormals.Add(localGroundNormal);
@@ -546,6 +554,15 @@ namespace ProgrammaticStylized3D.Rivers
                 renderData,
                 renderMesh,
                 "PS3D_StylizedRiverCorridor");
+
+            if (riverMaterialMasks.Count != renderData.VertexCount)
+            {
+                throw new InvalidOperationException(
+                    "River corridor material-mask count must match the render vertex count.");
+            }
+
+            renderMesh.SetUVs(3, riverMaterialMasks);
+
             MeshBuilder.ApplyToMesh(
                 colliderData,
                 colliderMesh,
@@ -1203,6 +1220,17 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Pow(
                     Mathf.Clamp01(influence),
                     1.32f));
+        }
+
+        private static float ResolveRiverbedSupport(CrossPoint point)
+        {
+            return point.Region switch
+            {
+                CrossRegion.Centre => 1f,
+                CrossRegion.FlatBedEdge => 1f,
+                CrossRegion.BedSlope => 1f,
+                _ => 0f
+            };
         }
 
         private static float ResolveTerrainIntegrationWeight(
