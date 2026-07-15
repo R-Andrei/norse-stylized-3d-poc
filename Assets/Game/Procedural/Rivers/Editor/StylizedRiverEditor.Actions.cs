@@ -158,15 +158,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 runtime != null
                     ? $"{runtime.LastFoamCompositionSegmentLength:0.000} m"
                     : "—");
-            DrawReadOnlyRow(
-                new GUIContent("Source Texels"),
-                runtime != null
-                    ? runtime.ProgressiveBirthDebugReadbackAvailable
-                        ? $"{runtime.ProgressiveBirthDebugLatestAffectedTexels:N0} latest"
-                        : runtime.ProgressiveBirthDebugReadbackPending
-                            ? "Awaiting readback"
-                            : "No completed source readback"
-                    : "—");
         }
 
         private void DrawMajorCandidatePreview()

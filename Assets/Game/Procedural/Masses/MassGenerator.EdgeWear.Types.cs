@@ -1931,6 +1931,61 @@ private struct EdgeWearGraphBuildStats
             public int InvalidEdgeCount;
         }
 
+        private enum EdgeWearViabilityState
+        {
+            Unassessed,
+            StructuralIneligible,
+            GeometricIneligible,
+            CoexistenceIneligible,
+            ViableUnselected,
+            ViableSelected
+        }
+
+        private sealed class EdgeWearEdgeViabilityRecord
+        {
+            public EdgeKey Key;
+            public int SourceEdgeIndex = -1;
+            public bool Evaluated;
+            public bool DihedralValid;
+            public bool FootprintValid;
+            public bool LocalityValid;
+            public bool IsolatedConstructionValid;
+            public bool FeasibleWidthFractionValid;
+            public bool EndpointSpanValid;
+            public bool Viable;
+            public float MinimumDihedralDegrees;
+            public float RequestedWidth;
+            public float RequiredFootprintLength;
+            public float LengthToWidthRatio;
+            public float LocalityRetainPlaneFloor;
+            public float LocalityRemovalPlaneCeiling;
+            public float LocalityFeasibleMargin;
+            public float LocalityGuardMargin;
+            public float LocalityMinimumRemoval;
+            public int LocalityLimitingVertex = -1;
+            public Vector3 LocalityLimitingPosition;
+            public float LocalityLimitingProjection;
+            // Internal viability values retained for unchanged geometry decisions.
+            public float MaximumLocallyFeasibleWidth;
+            public float FeasibleWidthFraction;
+            // Truthful audit semantics: failed attempts are not certified widths.
+            public bool IsolatedSucceeded;
+            public int IsolatedWidthAttemptCount;
+            public float IsolatedLastAttemptedWidth;
+            public float IsolatedMaximumCertifiedWidth;
+            public float IsolatedMaximumCertifiedWidthFraction;
+            public float EndpointConsumptionA;
+            public float EndpointConsumptionB;
+            public float RemainingCentralSpan;
+            public float MinimumCentralSpan;
+            public int IsolatedOpenEdgeCount;
+            public int IsolatedNonManifoldEdgeCount;
+            public int IsolatedTJunctionCount;
+            public int IsolatedInvalidFaceCount;
+            public string IsolatedDiagnostic = string.Empty;
+            public string FailureReason = string.Empty;
+        }
+
         private sealed class EdgeWearCoverageAudit
         {
             public readonly bool MaximumCoverageMode;
@@ -1942,13 +1997,40 @@ private struct EdgeWearGraphBuildStats
             public readonly Dictionary<int, EdgeWearEdgeLifecycleRecord>
                 RecordByGraphEdge =
                     new Dictionary<int, EdgeWearEdgeLifecycleRecord>();
+            public readonly Dictionary<EdgeKey, EdgeWearEdgeViabilityRecord>
+                ViabilityByKey =
+                    new Dictionary<EdgeKey, EdgeWearEdgeViabilityRecord>();
+            public readonly Dictionary<int, EdgeWearEdgeViabilityRecord>
+                ViabilityByGraphEdge =
+                    new Dictionary<int, EdgeWearEdgeViabilityRecord>();
             public int SourceEdgeCount;
+            public int ViabilityLocalityEvaluationCount;
+            public int ViabilityIsolatedEvaluationCount;
+            public int ViabilityLocalityCacheUseCount;
+            public int ViabilityLocalityCacheMissCount;
+            public int ViabilityLocalityRecomputationCount;
+            public double ViabilityPreflightMilliseconds;
             public int StructuralEligibleCount;
+            public int GeometricEligibleCount;
+            public int GeometricIneligibleCount;
+            public int CoexistenceEligibleCount;
+            public int CoexistenceIneligibleCount;
+            public int CoexistenceStarEvaluationCount;
+            public int CoexistenceStarCacheUseCount;
+            public int CoexistencePairEvaluationCount;
+            public int CoexistencePairCacheUseCount;
+            public int CoexistenceTrialCount;
+            public int CoexistenceExclusionCount;
+            public int CoexistencePreShellExclusionCount;
+            public int CoexistenceSearchExclusionCount;
+            public int CornerWidthMissingExclusionCount;
+            public int CornerWidthInactiveExclusionCount;
             public int ArtisticEligibleCount;
             public int ArtisticFilteredCount;
             public int CandidateCount;
             public int SelectedCount;
             public int WidthInactiveCount;
+            public int UnresolvedWidthInactiveCount;
             public int WidthReducedCount;
             public int ActiveCount;
             public int AttemptedBuiltCount;
@@ -1985,7 +2067,12 @@ private struct EdgeWearGraphBuildStats
             public BoundedEdgeClassification Classification =
                 BoundedEdgeClassification.None;
             public bool StructuralEligible;
+            public bool GeometricEligible;
+            public bool CoexistenceEligible;
             public bool ArtisticEligible;
+            public EdgeWearViabilityState ViabilityState =
+                EdgeWearViabilityState.Unassessed;
+            public EdgeWearEdgeViabilityRecord Viability;
             public bool Candidate;
             public bool Selected;
             public bool WidthInactive;
@@ -1996,6 +2083,7 @@ private struct EdgeWearGraphBuildStats
             public bool Deferred;
             public bool Rejected;
             public string CandidateReason = string.Empty;
+            public string CoexistenceFailureReason = string.Empty;
             public string FinalReason = string.Empty;
         }
 

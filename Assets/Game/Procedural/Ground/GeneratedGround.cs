@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+#if UNITY_EDITOR
+using System.Security.Cryptography;
+#endif
 using UnityEngine;
 using UnityEngine.Serialization;
 using Unity.Profiling;
@@ -76,7 +79,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     {
         None = 0,
 
-        [InspectorName("Ground Tonal")]
+        [InspectorName("Ground Generated Tonal Mask")]
         GroundTonal = 7,
 
         [InspectorName("Ground Exposure")]
@@ -97,14 +100,23 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [InspectorName("Ground Rocky Dry")]
         GroundRockyDry = 13,
 
-        [InspectorName("Ground Combined")]
+        [InspectorName("Ground Semantic Combined")]
         GroundCombined = 14,
 
         [InspectorName("Ground Standing Water Potential")]
         GroundStandingWaterPotential = 27,
 
-        [InspectorName("Ground Painted Accent Lines")]
+        [InspectorName("Ground Painted Accent Contract Coverage")]
         GroundPaintedAccentLines = 28,
+
+        [InspectorName("Ground Painted Accent Raw Coverage Binding")]
+        GroundPaintedAccentRawCoverage = 29,
+
+        [InspectorName("Ground Macro Raw Shader Field")]
+        GroundMacroRawShaderField = 30,
+
+        [InspectorName("Ground Macro Weighted Tonal Influence")]
+        GroundMacroWeightedTonalInfluence = 31,
     }
 
     public enum PaintedAccentGlyphFamilyPreview
@@ -133,6 +145,180 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [InspectorName("Effective Proposal Weight")]
         EffectiveProposalWeight = 1
     }
+
+    public readonly struct GroundPaintedAccentVisibilityDiagnostics
+    {
+        public GroundPaintedAccentVisibilityDiagnostics(
+            bool hasRuntimeFeature,
+            bool coverageGenerated,
+            bool coverageEnabled,
+            bool coverageTextureBindingCurrent,
+            bool coverageEnableBindingCurrent,
+            bool coverageOriginSizeBindingCurrent,
+            bool coverageTransformBindingCurrent,
+            bool inkColorBindingCurrent,
+            bool inkOpacityBindingCurrent,
+            bool coverageMappingMatchesMeshBounds,
+            int textureWidth,
+            int textureHeight,
+            float maximumTexelWorldSize,
+            float authoredStrokeWidth,
+            float inkOpacity,
+            Color inkColor,
+            Color baseColor)
+        {
+            HasRuntimeFeature = hasRuntimeFeature;
+            CoverageGenerated = coverageGenerated;
+            CoverageEnabled = coverageEnabled;
+            CoverageTextureBindingCurrent = coverageTextureBindingCurrent;
+            CoverageEnableBindingCurrent = coverageEnableBindingCurrent;
+            CoverageOriginSizeBindingCurrent = coverageOriginSizeBindingCurrent;
+            CoverageTransformBindingCurrent = coverageTransformBindingCurrent;
+            InkColorBindingCurrent = inkColorBindingCurrent;
+            InkOpacityBindingCurrent = inkOpacityBindingCurrent;
+            CoverageMappingMatchesMeshBounds = coverageMappingMatchesMeshBounds;
+            TextureWidth = Mathf.Max(0, textureWidth);
+            TextureHeight = Mathf.Max(0, textureHeight);
+            MaximumTexelWorldSize = Mathf.Max(0f, maximumTexelWorldSize);
+            AuthoredStrokeWidth = Mathf.Max(0f, authoredStrokeWidth);
+            InkOpacity = Mathf.Clamp01(inkOpacity);
+            InkColor = inkColor;
+            BaseColor = baseColor;
+        }
+
+        public bool HasRuntimeFeature { get; }
+        public bool CoverageGenerated { get; }
+        public bool CoverageEnabled { get; }
+        public bool CoverageTextureBindingCurrent { get; }
+        public bool CoverageEnableBindingCurrent { get; }
+        public bool CoverageOriginSizeBindingCurrent { get; }
+        public bool CoverageTransformBindingCurrent { get; }
+        public bool InkColorBindingCurrent { get; }
+        public bool InkOpacityBindingCurrent { get; }
+        public bool CoverageMappingMatchesMeshBounds { get; }
+        public int TextureWidth { get; }
+        public int TextureHeight { get; }
+        public float MaximumTexelWorldSize { get; }
+        public float AuthoredStrokeWidth { get; }
+        public float InkOpacity { get; }
+        public Color InkColor { get; }
+        public Color BaseColor { get; }
+
+        public float AuthoredWidthInTexels =>
+            MaximumTexelWorldSize > 0.000001f
+                ? AuthoredStrokeWidth / MaximumTexelWorldSize
+                : 0f;
+
+        public float MaximumPaletteChannelDifference =>
+            Mathf.Max(
+                Mathf.Abs(BaseColor.r - InkColor.r),
+                Mathf.Max(
+                    Mathf.Abs(BaseColor.g - InkColor.g),
+                    Mathf.Abs(BaseColor.b - InkColor.b)));
+
+        public float EstimatedMaximumVisibleChannelDifference =>
+            MaximumPaletteChannelDifference * InkOpacity;
+
+        public bool MaterialBindingCurrent =>
+            CoverageTextureBindingCurrent &&
+            CoverageEnableBindingCurrent &&
+            CoverageOriginSizeBindingCurrent &&
+            CoverageTransformBindingCurrent &&
+            InkColorBindingCurrent &&
+            InkOpacityBindingCurrent;
+    }
+
+    public enum GroundPaintedAccentRuntimeCoverageStatus
+    {
+        NotEvaluated = 0,
+        NotRequired = 1,
+        Current = 2,
+        Missing = 3,
+        Incompatible = 4
+    }
+
+#if UNITY_EDITOR
+    public enum GroundPaintedAccentLivePreviewStatus
+    {
+        Missing = 0,
+        Current = 1,
+        Stale = 2
+    }
+
+    public enum GroundPaintedAccentProductionBakeStatus
+    {
+        Missing = 0,
+        Current = 1,
+        Stale = 2,
+        Incompatible = 3
+    }
+
+    public readonly struct GroundPaintedAccentProductionBakeSource
+    {
+        public GroundPaintedAccentProductionBakeSource(
+            Texture2D coverageTexture,
+            Vector4 originSize,
+            GroundPaintedAccentCoverageDiagnostics diagnostics,
+            string coverageSignature)
+        {
+            CoverageTexture = coverageTexture;
+            OriginSize = originSize;
+            Diagnostics = diagnostics;
+            CoverageSignature = coverageSignature ?? string.Empty;
+        }
+
+        public Texture2D CoverageTexture { get; }
+        public Vector4 OriginSize { get; }
+        public GroundPaintedAccentCoverageDiagnostics Diagnostics { get; }
+        public string CoverageSignature { get; }
+
+        public bool IsValid =>
+            CoverageTexture != null &&
+            CoverageTexture.isReadable &&
+            CoverageTexture.format == TextureFormat.R8 &&
+            Diagnostics.IsValid &&
+            !string.IsNullOrWhiteSpace(CoverageSignature);
+    }
+
+    public readonly struct GroundPaintedAccentProductionBakeDiagnostics
+    {
+        public GroundPaintedAccentProductionBakeDiagnostics(
+            GroundPaintedAccentLivePreviewStatus livePreviewStatus,
+            GroundPaintedAccentProductionBakeStatus productionStatus,
+            Texture2D productionTexture,
+            string bakeIdentifier,
+            string storedCoverageSignature,
+            string currentCoverageSignature,
+            int storedFormatRevision,
+            Vector4 storedOriginSize,
+            int coveredTexelCount,
+            float coveredTexelFraction)
+        {
+            LivePreviewStatus = livePreviewStatus;
+            ProductionStatus = productionStatus;
+            ProductionTexture = productionTexture;
+            BakeIdentifier = bakeIdentifier ?? string.Empty;
+            StoredCoverageSignature = storedCoverageSignature ?? string.Empty;
+            CurrentCoverageSignature = currentCoverageSignature ?? string.Empty;
+            StoredFormatRevision = storedFormatRevision;
+            StoredOriginSize = storedOriginSize;
+            CoveredTexelCount = Mathf.Max(0, coveredTexelCount);
+            CoveredTexelFraction = Mathf.Clamp01(coveredTexelFraction);
+        }
+
+        public GroundPaintedAccentLivePreviewStatus LivePreviewStatus { get; }
+        public GroundPaintedAccentProductionBakeStatus ProductionStatus { get; }
+        public Texture2D ProductionTexture { get; }
+        public string BakeIdentifier { get; }
+        public string StoredCoverageSignature { get; }
+        public string CurrentCoverageSignature { get; }
+        public int StoredFormatRevision { get; }
+        public Vector4 StoredOriginSize { get; }
+        public int CoveredTexelCount { get; }
+        public float CoveredTexelFraction { get; }
+    }
+
+#endif
 
     public enum GroundSurfaceType
     {
@@ -269,6 +455,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             RiverChanged,
             SurfaceStyleChanged,
             MaterialRefresh,
+            PaintedAccentProductionBake,
+            PaintedAccentProductionValidation,
             Count
         }
 
@@ -304,6 +492,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             "snowfield.wind_scoured";
 
         private const int CurrentSurfaceStyleMigrationVersion = 1;
+        public const int CurrentPaintedAccentProductionBakeFormatRevision = 1;
 
         [SerializeField]
         private GroundRecipe recipe = new GroundRecipe();
@@ -378,6 +567,28 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 PaintedAccentPlacementOverlayWeightMode.PatchPreference;
 
         [SerializeField, HideInInspector]
+        private string paintedAccentProductionBakeIdentifier = string.Empty;
+
+        [SerializeField, HideInInspector]
+        private Texture2D paintedAccentProductionCoverageTexture;
+
+        [SerializeField, HideInInspector]
+        private string paintedAccentProductionCoverageSignature = string.Empty;
+
+        [SerializeField, HideInInspector]
+        private int paintedAccentProductionBakeFormatRevision;
+
+        [SerializeField, HideInInspector]
+        private Vector4 paintedAccentProductionCoverageOriginSize =
+            new Vector4(0f, 0f, 1f, 1f);
+
+        [SerializeField, HideInInspector]
+        private int paintedAccentProductionCoveredTexelCount;
+
+        [SerializeField, HideInInspector]
+        private float paintedAccentProductionCoveredTexelFraction;
+
+        [SerializeField, HideInInspector]
         private GroundModifier[] modifiers = Array.Empty<GroundModifier>();
 
         [SerializeField, HideInInspector]
@@ -441,8 +652,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private GroundPaintedAccentCoverageDiagnostics
             paintedAccentCoverageDiagnostics =
                 GroundPaintedAccentCoverageDiagnostics.Empty;
+        private GroundPaintedAccentRuntimeCoverageStatus
+            paintedAccentRuntimeCoverageStatus =
+                GroundPaintedAccentRuntimeCoverageStatus.NotEvaluated;
+        private string paintedAccentRuntimeCoverageFailureReason = string.Empty;
+        private string loggedPaintedAccentRuntimeCoverageFailure = string.Empty;
         private string lastRegenerationTimingDiagnostics =
             "Ground regeneration has not been measured yet.";
+        private string lastCompletedPaintedAccentSurfaceStrokeTimingDiagnostics =
+            "No Painted Accent SurfaceStrokes timing has completed yet.";
+        private string lastCompletedPaintedAccentProjectedGlyphTimingDiagnostics =
+            "No Painted Accent ProjectedGlyphs timing has completed yet.";
+        private string lastCompletedPaintedAccentCoverageTimingDiagnostics =
+            "No Painted Accent coverage timing has completed yet.";
         private double lastSnapshotsMilliseconds;
         private double lastGeometryMilliseconds;
         private double lastMeshApplyMilliseconds;
@@ -456,6 +678,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private double lastTotalRegenerationMilliseconds;
 
 #if UNITY_EDITOR
+        private string currentPaintedAccentProductionCoverageSignature =
+            string.Empty;
         private GroundEditorRegenerationBatch activeEditorRegenerationBatch;
         private string lastEditorRegenerationAccountingReport =
             "No Ground regeneration-accounting batch has completed yet.";
@@ -577,6 +801,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundPaintedAccentCoverageWorldToLocal");
         private static readonly int GroundPaintedAccentInkColorId =
             Shader.PropertyToID("_GroundPaintedAccentInkColor");
+        private static readonly int GroundPaintedAccentInkOpacityId =
+            Shader.PropertyToID("_GroundPaintedAccentInkOpacity");
         private static readonly int GroundFeatureModeId =
             Shader.PropertyToID("_GroundFeatureMode");
         private static readonly int GroundFeatureStrengthId =
@@ -640,6 +866,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             meshRenderer != null
                 ? meshRenderer.sharedMaterial
                 : null;
+        public string PaintedAccentProductionBakeIdentifier =>
+            paintedAccentProductionBakeIdentifier;
+        public Texture2D PaintedAccentProductionCoverageTexture =>
+            paintedAccentProductionCoverageTexture;
+#if UNITY_EDITOR
+        public bool PaintedAccentProductionBakeRequired =>
+            ResolveShaderFeature(
+                GroundSurfaceFeatureKind.PaintedAccentLines) != null;
+#endif
+        public GroundPaintedAccentRuntimeCoverageStatus
+            PaintedAccentRuntimeCoverageStatus =>
+                paintedAccentRuntimeCoverageStatus;
+        public string PaintedAccentRuntimeCoverageFailureReason =>
+            paintedAccentRuntimeCoverageFailureReason;
         public string LastSurfaceMaskDiagnostics =>
             string.IsNullOrWhiteSpace(lastSurfaceMaskDiagnostics)
                 ? "Surface masks have not been generated yet."
@@ -649,6 +889,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             string.IsNullOrWhiteSpace(lastRegenerationTimingDiagnostics)
                 ? "Ground regeneration has not been measured yet."
                 : lastRegenerationTimingDiagnostics;
+
+        public string LastCompletedPaintedAccentSurfaceStrokeTimingDiagnostics =>
+            string.IsNullOrWhiteSpace(
+                lastCompletedPaintedAccentSurfaceStrokeTimingDiagnostics)
+                ? "No Painted Accent SurfaceStrokes timing has completed yet."
+                : lastCompletedPaintedAccentSurfaceStrokeTimingDiagnostics;
+
+        public string LastCompletedPaintedAccentProjectedGlyphTimingDiagnostics =>
+            string.IsNullOrWhiteSpace(
+                lastCompletedPaintedAccentProjectedGlyphTimingDiagnostics)
+                ? "No Painted Accent ProjectedGlyphs timing has completed yet."
+                : lastCompletedPaintedAccentProjectedGlyphTimingDiagnostics;
+
+        public string LastCompletedPaintedAccentCoverageTimingDiagnostics =>
+            string.IsNullOrWhiteSpace(
+                lastCompletedPaintedAccentCoverageTimingDiagnostics)
+                ? "No Painted Accent coverage timing has completed yet."
+                : lastCompletedPaintedAccentCoverageTimingDiagnostics;
 
 #if UNITY_EDITOR
         public string LastEditorRegenerationAccountingReport =>
@@ -817,6 +1075,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                 EnsureGeneratedMesh();
 
+                bool useProductionPaintedAccentCoverage =
+                    ShouldUsePaintedAccentProductionCoverage();
                 List<GroundModifierSnapshot> allModifierSnapshots;
                 IReadOnlyList<GroundModifierSnapshot> heightModifierSnapshots;
                 List<StylizedRiverGroundSnapshot> riverSnapshots;
@@ -832,21 +1092,39 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     }
 
                     riverSnapshots = BuildRiverSnapshots(
-                        out paintedAccentRiverExclusionSnapshots);
-                    paintedAccentModifierSnapshots =
-                        allModifierSnapshots.ToArray();
-                    paintedAccentRiverSnapshots =
-                        riverSnapshots.ToArray();
+                        !useProductionPaintedAccentCoverage,
+                        out GroundPaintedAccentRiverExclusionSnapshot[]
+                            exclusionSnapshots);
                     currentSnapshotSignature =
                         CalculateGroundSnapshotSignature(
                             allModifierSnapshots,
                             riverSnapshots,
                             false);
-                    currentPaintedAccentDomainSignature =
-                        CalculateGroundSnapshotSignature(
-                            allModifierSnapshots,
-                            riverSnapshots,
-                            true);
+
+                    if (useProductionPaintedAccentCoverage)
+                    {
+                        paintedAccentModifierSnapshots =
+                            Array.Empty<GroundModifierSnapshot>();
+                        paintedAccentRiverSnapshots =
+                            Array.Empty<StylizedRiverGroundSnapshot>();
+                        paintedAccentRiverExclusionSnapshots =
+                            Array.Empty<GroundPaintedAccentRiverExclusionSnapshot>();
+                        currentPaintedAccentDomainSignature = 0;
+                    }
+                    else
+                    {
+                        paintedAccentModifierSnapshots =
+                            allModifierSnapshots.ToArray();
+                        paintedAccentRiverSnapshots =
+                            riverSnapshots.ToArray();
+                        paintedAccentRiverExclusionSnapshots =
+                            exclusionSnapshots;
+                        currentPaintedAccentDomainSignature =
+                            CalculateGroundSnapshotSignature(
+                                allModifierSnapshots,
+                                riverSnapshots,
+                                true);
+                    }
                 }
                 lastSnapshotsMilliseconds =
                     ResolveElapsedMilliseconds(stageStartedAt);
@@ -922,29 +1200,42 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 lastValidatedGenerationSignature =
                     CalculateGenerationSignature();
 
-                int previousSurfaceRevision =
-                    paintedAccentSurfaceStrokeRevision;
-                EnsurePaintedAccentSurfaceStrokesCurrent();
-                if (paintedAccentSurfaceStrokeRevision !=
-                    previousSurfaceRevision)
+                if (useProductionPaintedAccentCoverage)
                 {
-                    executedStages |= GroundRegenerationStage.SurfaceStrokes;
+                    ApplyPaintedAccentProductionCoverageRuntimeState();
                 }
+                else
+                {
+                    int previousSurfaceRevision =
+                        paintedAccentSurfaceStrokeRevision;
+                    EnsurePaintedAccentSurfaceStrokesCurrent();
+                    if (paintedAccentSurfaceStrokeRevision !=
+                        previousSurfaceRevision)
+                    {
+                        executedStages |= GroundRegenerationStage.SurfaceStrokes;
+                    }
 
-                int previousProjectedSignature =
-                    paintedAccentProjectedGlyphSignature;
-                int previousCoverageSignature =
-                    paintedAccentCoverageSignature;
-                EnsurePaintedAccentCoverageCurrent();
-                if (paintedAccentProjectedGlyphSignature !=
-                    previousProjectedSignature)
-                {
-                    executedStages |= GroundRegenerationStage.ProjectedGlyphs;
-                }
-                if (paintedAccentCoverageSignature !=
-                    previousCoverageSignature)
-                {
-                    executedStages |= GroundRegenerationStage.Coverage;
+                    int previousProjectedSignature =
+                        paintedAccentProjectedGlyphSignature;
+                    int previousCoverageSignature =
+                        paintedAccentCoverageSignature;
+                    EnsurePaintedAccentCoverageCurrent();
+                    if (paintedAccentProjectedGlyphSignature !=
+                        previousProjectedSignature)
+                    {
+                        executedStages |= GroundRegenerationStage.ProjectedGlyphs;
+                    }
+                    if (paintedAccentCoverageSignature !=
+                        previousCoverageSignature)
+                    {
+                        executedStages |= GroundRegenerationStage.Coverage;
+                    }
+#if UNITY_EDITOR
+                    currentPaintedAccentProductionCoverageSignature =
+                        CalculatePaintedAccentProductionCoverageSignature(
+                            ResolveShaderFeature(
+                                GroundSurfaceFeatureKind.PaintedAccentLines));
+#endif
                 }
 
                 stageStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -1272,6 +1563,353 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public PaintedAccentPlacementOverlayWeightMode
             PaintedAccentPlacementOverlayWeight =>
                 paintedAccentPlacementOverlayWeight;
+
+        public GroundPaintedAccentVisibilityDiagnostics
+            GetPaintedAccentVisibilityDiagnostics()
+        {
+            CacheComponents();
+
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            GroundMaterialControls materialControls = ResolveMaterialControls();
+            Color baseColor =
+                materialControls != null
+                    ? materialControls.BaseColor
+                    : Color.white;
+            Color inkColor =
+                feature != null
+                    ? feature.PaintedAccentInkColor
+                    : new Color(0.12f, 0.10f, 0.08f, 1f);
+            float inkOpacity =
+                feature != null
+                    ? feature.PaintedAccentInkOpacity
+                    : 0f;
+
+            materialProperties ??= new MaterialPropertyBlock();
+            if (meshRenderer != null)
+            {
+                meshRenderer.GetPropertyBlock(materialProperties);
+            }
+            else
+            {
+                materialProperties.Clear();
+            }
+
+            Texture2D expectedCoverageTexture =
+                ResolvePaintedAccentCoverageTexture();
+            Texture boundTexture =
+                materialProperties.GetTexture(
+                    GroundPaintedAccentCoverageId);
+            float boundEnabled =
+                materialProperties.GetFloat(
+                    GroundPaintedAccentCoverageEnabledId);
+            Vector4 boundOriginSize =
+                materialProperties.GetVector(
+                    GroundPaintedAccentCoverageOriginSizeId);
+            Matrix4x4 boundWorldToLocal =
+                materialProperties.GetMatrix(
+                    GroundPaintedAccentCoverageWorldToLocalId);
+            Color boundInkColor =
+                materialProperties.GetColor(
+                    GroundPaintedAccentInkColorId);
+            float boundInkOpacity =
+                materialProperties.GetFloat(
+                    GroundPaintedAccentInkOpacityId);
+
+            bool coverageMappingMatchesMeshBounds = false;
+            if (generatedMesh != null)
+            {
+                Bounds bounds = generatedMesh.bounds;
+                Vector4 expectedOriginSize =
+                    new Vector4(
+                        bounds.min.x,
+                        bounds.min.z,
+                        Mathf.Max(0.0001f, bounds.size.x),
+                        Mathf.Max(0.0001f, bounds.size.z));
+                coverageMappingMatchesMeshBounds =
+                    Approximately(boundOriginSize, expectedOriginSize) &&
+                    Approximately(
+                        paintedAccentCoverageOriginSize,
+                        expectedOriginSize);
+            }
+
+            bool runtimeProductionMode =
+                ShouldUsePaintedAccentProductionCoverage();
+            GroundPaintedAccentCoverageDiagnostics coverage =
+                paintedAccentCoverageDiagnostics;
+            int coverageWidth =
+                runtimeProductionMode && paintedAccentProductionCoverageTexture != null
+                    ? paintedAccentProductionCoverageTexture.width
+                    : coverage.TextureWidth;
+            int coverageHeight =
+                runtimeProductionMode && paintedAccentProductionCoverageTexture != null
+                    ? paintedAccentProductionCoverageTexture.height
+                    : coverage.TextureHeight;
+            float maximumTexelWorldSize =
+                runtimeProductionMode && coverageWidth > 0 && coverageHeight > 0
+                    ? Mathf.Max(
+                        paintedAccentCoverageOriginSize.z / coverageWidth,
+                        paintedAccentCoverageOriginSize.w / coverageHeight)
+                    : Mathf.Max(
+                        coverage.TexelWorldSizeX,
+                        coverage.TexelWorldSizeZ);
+            bool coverageAvailable =
+                runtimeProductionMode
+                    ? paintedAccentRuntimeCoverageStatus ==
+                        GroundPaintedAccentRuntimeCoverageStatus.Current
+                    : coverage.IsValid;
+
+            return new GroundPaintedAccentVisibilityDiagnostics(
+                feature != null && feature.CanApplyAsShaderOnly,
+                coverageAvailable,
+                paintedAccentCoverageEnabled,
+                boundTexture == expectedCoverageTexture,
+                Mathf.Abs(
+                    boundEnabled -
+                    (paintedAccentCoverageEnabled ? 1f : 0f)) <= 0.0001f,
+                Approximately(
+                    boundOriginSize,
+                    paintedAccentCoverageOriginSize),
+                Approximately(
+                    boundWorldToLocal,
+                    transform.worldToLocalMatrix),
+                Approximately(boundInkColor, inkColor),
+                Mathf.Abs(boundInkOpacity - inkOpacity) <= 0.0001f,
+                coverageMappingMatchesMeshBounds,
+                coverageWidth,
+                coverageHeight,
+                maximumTexelWorldSize,
+                feature != null
+                    ? feature.PaintedAccentStrokeWidth
+                    : 0f,
+                inkOpacity,
+                inkColor,
+                baseColor);
+        }
+
+#if UNITY_EDITOR
+        public GroundPaintedAccentProductionBakeDiagnostics
+            GetPaintedAccentProductionBakeDiagnostics()
+        {
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            bool runtimeProductionMode =
+                ShouldUsePaintedAccentProductionCoverage();
+            int expectedLiveSignature =
+                runtimeProductionMode
+                    ? 0
+                    : CalculatePaintedAccentCoverageSignature(feature);
+            bool liveCoverageAvailable =
+                !runtimeProductionMode &&
+                paintedAccentCoverageTexture != null &&
+                paintedAccentCoverageEnabled &&
+                paintedAccentCoverageDiagnostics.IsValid;
+            GroundPaintedAccentLivePreviewStatus liveStatus =
+                !liveCoverageAvailable
+                    ? GroundPaintedAccentLivePreviewStatus.Missing
+                    : paintedAccentCoverageSignature == expectedLiveSignature
+                        ? GroundPaintedAccentLivePreviewStatus.Current
+                        : GroundPaintedAccentLivePreviewStatus.Stale;
+
+            string currentCoverageSignature =
+                runtimeProductionMode
+                    ? paintedAccentProductionCoverageSignature
+                    : currentPaintedAccentProductionCoverageSignature;
+            GroundPaintedAccentProductionBakeStatus productionStatus;
+            if (paintedAccentProductionCoverageTexture == null ||
+                string.IsNullOrWhiteSpace(
+                    paintedAccentProductionCoverageSignature))
+            {
+                productionStatus =
+                    GroundPaintedAccentProductionBakeStatus.Missing;
+            }
+            else if (
+                paintedAccentProductionBakeFormatRevision !=
+                    CurrentPaintedAccentProductionBakeFormatRevision ||
+                paintedAccentProductionCoverageTexture.format !=
+                    TextureFormat.R8 ||
+                paintedAccentProductionCoverageTexture.width <= 0 ||
+                paintedAccentProductionCoverageTexture.height <= 0 ||
+                paintedAccentProductionCoverageOriginSize.z <= 0.0001f ||
+                paintedAccentProductionCoverageOriginSize.w <= 0.0001f)
+            {
+                productionStatus =
+                    GroundPaintedAccentProductionBakeStatus.Incompatible;
+            }
+            else if (runtimeProductionMode &&
+                     (paintedAccentRuntimeCoverageStatus ==
+                          GroundPaintedAccentRuntimeCoverageStatus.Missing ||
+                      paintedAccentRuntimeCoverageStatus ==
+                          GroundPaintedAccentRuntimeCoverageStatus.Incompatible))
+            {
+                productionStatus =
+                    paintedAccentRuntimeCoverageStatus ==
+                        GroundPaintedAccentRuntimeCoverageStatus.Missing
+                            ? GroundPaintedAccentProductionBakeStatus.Missing
+                            : GroundPaintedAccentProductionBakeStatus.Incompatible;
+            }
+            else if (!runtimeProductionMode &&
+                     (liveStatus !=
+                          GroundPaintedAccentLivePreviewStatus.Current ||
+                      string.IsNullOrWhiteSpace(currentCoverageSignature) ||
+                      !string.Equals(
+                          paintedAccentProductionCoverageSignature,
+                          currentCoverageSignature,
+                          StringComparison.Ordinal)))
+            {
+                productionStatus =
+                    GroundPaintedAccentProductionBakeStatus.Stale;
+            }
+            else
+            {
+                productionStatus =
+                    GroundPaintedAccentProductionBakeStatus.Current;
+            }
+
+            return new GroundPaintedAccentProductionBakeDiagnostics(
+                liveStatus,
+                productionStatus,
+                paintedAccentProductionCoverageTexture,
+                paintedAccentProductionBakeIdentifier,
+                paintedAccentProductionCoverageSignature,
+                currentCoverageSignature,
+                paintedAccentProductionBakeFormatRevision,
+                paintedAccentProductionCoverageOriginSize,
+                paintedAccentProductionCoveredTexelCount,
+                paintedAccentProductionCoveredTexelFraction);
+        }
+
+        public bool TryPreparePaintedAccentProductionBake(
+            out GroundPaintedAccentProductionBakeSource source,
+            out string failureReason)
+        {
+            return TryPreparePaintedAccentProductionSource(
+                GroundRegenerationRequestOrigin.PaintedAccentProductionBake,
+                out source,
+                out failureReason);
+        }
+
+        public bool TryPreparePaintedAccentProductionValidation(
+            out GroundPaintedAccentProductionBakeSource source,
+            out string failureReason)
+        {
+            return TryPreparePaintedAccentProductionSource(
+                GroundRegenerationRequestOrigin
+                    .PaintedAccentProductionValidation,
+                out source,
+                out failureReason);
+        }
+
+        private bool TryPreparePaintedAccentProductionSource(
+            GroundRegenerationRequestOrigin requestOrigin,
+            out GroundPaintedAccentProductionBakeSource source,
+            out string failureReason)
+        {
+            source = default;
+            failureReason = string.Empty;
+
+            if (Application.isPlaying)
+            {
+                failureReason =
+                    "Painted Accent production output can only be evaluated in Edit Mode.";
+                return false;
+            }
+
+            if (EditorUtility.IsPersistent(this))
+            {
+                failureReason =
+                    "Painted Accent production output cannot be evaluated from a persistent prefab or asset. Use a scene instance instead.";
+                return false;
+            }
+
+            RefreshModifiers();
+            RequestRegeneration(
+                requestOrigin,
+                false);
+
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            if (!CanGeneratePaintedAccentSurfaceStrokes(feature))
+            {
+                failureReason =
+                    "No runtime-applicable Painted Accent recipe resolves. Enable Painted Accents, use Shader Only, and keep Stroke Intensity above zero.";
+                return false;
+            }
+
+            if (!paintedAccentCoverageEnabled ||
+                !paintedAccentCoverageDiagnostics.IsValid ||
+                paintedAccentCoverageTexture == null)
+            {
+                failureReason =
+                    "The current Painted Accent preview did not produce valid coverage. Review the retained placement, projected-glyph, and coverage reports before baking or building.";
+                return false;
+            }
+
+            if (!paintedAccentCoverageTexture.isReadable ||
+                paintedAccentCoverageTexture.format != TextureFormat.R8)
+            {
+                failureReason =
+                    "The current live coverage texture is not a readable R8 texture.";
+                return false;
+            }
+
+            string coverageSignature =
+                currentPaintedAccentProductionCoverageSignature;
+            if (string.IsNullOrWhiteSpace(coverageSignature))
+            {
+                failureReason =
+                    "The current Ground state could not produce a stable Painted Accent production signature.";
+                return false;
+            }
+
+            source = new GroundPaintedAccentProductionBakeSource(
+                paintedAccentCoverageTexture,
+                paintedAccentCoverageOriginSize,
+                paintedAccentCoverageDiagnostics,
+                coverageSignature);
+            return source.IsValid;
+        }
+
+        public void EditorApplyPaintedAccentProductionBake(
+            string bakeIdentifier,
+            Texture2D coverageTexture,
+            string coverageSignature,
+            Vector4 originSize,
+            GroundPaintedAccentCoverageDiagnostics diagnostics)
+        {
+            paintedAccentProductionBakeIdentifier =
+                bakeIdentifier ?? string.Empty;
+            paintedAccentProductionCoverageTexture = coverageTexture;
+            paintedAccentProductionCoverageSignature =
+                coverageSignature ?? string.Empty;
+            paintedAccentProductionBakeFormatRevision =
+                CurrentPaintedAccentProductionBakeFormatRevision;
+            paintedAccentProductionCoverageOriginSize = originSize;
+            paintedAccentProductionCoveredTexelCount =
+                diagnostics.CoveredTexelCount;
+            paintedAccentProductionCoveredTexelFraction =
+                diagnostics.CoveredTexelFraction;
+        }
+
+        public void EditorReleasePaintedAccentProductionBake()
+        {
+            paintedAccentProductionBakeIdentifier = string.Empty;
+            paintedAccentProductionCoverageTexture = null;
+            paintedAccentProductionCoverageSignature = string.Empty;
+            paintedAccentProductionBakeFormatRevision = 0;
+            paintedAccentProductionCoverageOriginSize =
+                new Vector4(0f, 0f, 1f, 1f);
+            paintedAccentProductionCoveredTexelCount = 0;
+            paintedAccentProductionCoveredTexelFraction = 0f;
+            paintedAccentRuntimeCoverageStatus =
+                GroundPaintedAccentRuntimeCoverageStatus.NotEvaluated;
+            paintedAccentRuntimeCoverageFailureReason = string.Empty;
+            loggedPaintedAccentRuntimeCoverageFailure = string.Empty;
+        }
+#endif
 
         public int CalculatePaintedAccentPlacementDebugSignature()
         {
@@ -1604,6 +2242,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             out GroundPaintedAccentProjectedGlyphDebugSnapshot snapshot)
         {
             snapshot = GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
+            if (ShouldUsePaintedAccentProductionCoverage())
+            {
+                return false;
+            }
+
             CacheComponents();
 
             GroundSurfaceFeatureRecipe feature =
@@ -1652,18 +2295,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         public string GetLastPaintedAccentProjectedGlyphStatistics()
         {
-            CacheComponents();
-            GroundSurfaceFeatureRecipe feature =
-                ResolveShaderFeature(
-                    GroundSurfaceFeatureKind.PaintedAccentLines);
-
-            if (!CanGeneratePaintedAccentSurfaceStrokes(feature))
+            if (!paintedAccentProjectedGlyphDebugSnapshot.IsValid)
             {
-                return "No Painted Accent projected glyphs can be generated from the current ground and feature settings.";
+                return "No completed Painted Accent ProjectedGlyphs result is available yet.";
             }
-
-            EnsurePaintedAccentSurfaceStrokesCurrent();
-            EnsurePaintedAccentProjectedGlyphsCurrent(feature);
 
             GroundPaintedAccentProjectedGlyphDiagnostics diagnostics =
                 paintedAccentProjectedGlyphDebugSnapshot.Diagnostics;
@@ -1983,28 +2618,35 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 GroundRegenerationStage.None;
 
             CacheComponents();
-            int previousSurfaceRevision =
-                paintedAccentSurfaceStrokeRevision;
-            EnsurePaintedAccentSurfaceStrokesCurrent();
-            if (paintedAccentSurfaceStrokeRevision != previousSurfaceRevision)
+            if (ShouldUsePaintedAccentProductionCoverage())
             {
-                executedStages |= GroundRegenerationStage.SurfaceStrokes;
+                ApplyPaintedAccentProductionCoverageRuntimeState();
             }
+            else
+            {
+                int previousSurfaceRevision =
+                    paintedAccentSurfaceStrokeRevision;
+                EnsurePaintedAccentSurfaceStrokesCurrent();
+                if (paintedAccentSurfaceStrokeRevision != previousSurfaceRevision)
+                {
+                    executedStages |= GroundRegenerationStage.SurfaceStrokes;
+                }
 
-            int previousProjectedSignature =
-                paintedAccentProjectedGlyphSignature;
-            int previousCoverageSignature =
-                paintedAccentCoverageSignature;
-            EnsurePaintedAccentCoverageCurrent();
-            if (paintedAccentProjectedGlyphSignature !=
-                previousProjectedSignature)
-            {
-                executedStages |= GroundRegenerationStage.ProjectedGlyphs;
-            }
-            if (paintedAccentCoverageSignature !=
-                previousCoverageSignature)
-            {
-                executedStages |= GroundRegenerationStage.Coverage;
+                int previousProjectedSignature =
+                    paintedAccentProjectedGlyphSignature;
+                int previousCoverageSignature =
+                    paintedAccentCoverageSignature;
+                EnsurePaintedAccentCoverageCurrent();
+                if (paintedAccentProjectedGlyphSignature !=
+                    previousProjectedSignature)
+                {
+                    executedStages |= GroundRegenerationStage.ProjectedGlyphs;
+                }
+                if (paintedAccentCoverageSignature !=
+                    previousCoverageSignature)
+                {
+                    executedStages |= GroundRegenerationStage.Coverage;
+                }
             }
 
             long materialStartedAt =
@@ -2176,14 +2818,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         }
 
         private List<StylizedRiverGroundSnapshot> BuildRiverSnapshots(
+            bool includePaintedAccentExclusions,
             out GroundPaintedAccentRiverExclusionSnapshot[] exclusionSnapshots)
         {
             List<StylizedRiverGroundSnapshot> snapshots =
                 new List<StylizedRiverGroundSnapshot>();
             List<GroundPaintedAccentRiverExclusionSnapshot> exclusions =
-                new List<GroundPaintedAccentRiverExclusionSnapshot>();
+                includePaintedAccentExclusions
+                    ? new List<GroundPaintedAccentRiverExclusionSnapshot>()
+                    : null;
             List<StylizedRiverSplineSample> splineSamples =
-                new List<StylizedRiverSplineSample>();
+                includePaintedAccentExclusions
+                    ? new List<StylizedRiverSplineSample>()
+                    : null;
 
             if (rivers == null)
             {
@@ -2211,14 +2858,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 }
 
                 snapshots.Add(snapshot);
-                exclusions.Add(
-                    BuildPaintedAccentRiverExclusionSnapshot(
-                        river,
-                        snapshot,
-                        splineSamples));
+                if (includePaintedAccentExclusions)
+                {
+                    exclusions.Add(
+                        BuildPaintedAccentRiverExclusionSnapshot(
+                            river,
+                            snapshot,
+                            splineSamples));
+                }
             }
 
-            exclusionSnapshots = exclusions.ToArray();
+            exclusionSnapshots =
+                exclusions != null
+                    ? exclusions.ToArray()
+                    : Array.Empty<GroundPaintedAccentRiverExclusionSnapshot>();
             return snapshots;
         }
 
@@ -2932,6 +3585,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
         }
 
+        private static bool Approximately(
+            Vector4 a,
+            Vector4 b)
+        {
+            return
+                Mathf.Abs(a.x - b.x) <= 0.0001f &&
+                Mathf.Abs(a.y - b.y) <= 0.0001f &&
+                Mathf.Abs(a.z - b.z) <= 0.0001f &&
+                Mathf.Abs(a.w - b.w) <= 0.0001f;
+        }
+
+        private static bool Approximately(
+            Color a,
+            Color b)
+        {
+            return
+                Mathf.Abs(a.r - b.r) <= 0.0001f &&
+                Mathf.Abs(a.g - b.g) <= 0.0001f &&
+                Mathf.Abs(a.b - b.b) <= 0.0001f &&
+                Mathf.Abs(a.a - b.a) <= 0.0001f;
+        }
+
+        private static bool Approximately(
+            Matrix4x4 a,
+            Matrix4x4 b)
+        {
+            for (int index = 0; index < 16; index++)
+            {
+                if (Mathf.Abs(a[index] - b[index]) > 0.0001f)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static int Quantize(float value)
         {
             return Mathf.RoundToInt(value * 10000f);
@@ -3218,10 +3908,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             properties.SetColor(
                 GroundPaintedAccentInkColorId,
                 inkColor);
+            properties.SetFloat(
+                GroundPaintedAccentInkOpacityId,
+                feature != null && feature.CanApplyAsShaderOnly
+                    ? feature.PaintedAccentInkOpacity
+                    : 0f);
         }
 
         private Texture2D ResolvePaintedAccentCoverageTexture()
         {
+            if (ShouldUsePaintedAccentProductionCoverage())
+            {
+                return paintedAccentRuntimeCoverageStatus ==
+                           GroundPaintedAccentRuntimeCoverageStatus.Current &&
+                       paintedAccentProductionCoverageTexture != null
+                    ? paintedAccentProductionCoverageTexture
+                    : Texture2D.blackTexture;
+            }
+
             if (paintedAccentCoverageTexture == null)
             {
                 paintedAccentCoverageTexture =
@@ -3229,6 +3933,122 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             return paintedAccentCoverageTexture;
+        }
+
+        private bool ShouldUsePaintedAccentProductionCoverage()
+        {
+#if UNITY_EDITOR
+            return Application.isPlaying ||
+                   EditorApplication.isPlayingOrWillChangePlaymode;
+#else
+            return true;
+#endif
+        }
+
+        private void ApplyPaintedAccentProductionCoverageRuntimeState()
+        {
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            if (feature == null || !feature.CanApplyAsShaderOnly)
+            {
+                paintedAccentRuntimeCoverageStatus =
+                    GroundPaintedAccentRuntimeCoverageStatus.NotRequired;
+                paintedAccentRuntimeCoverageFailureReason = string.Empty;
+                loggedPaintedAccentRuntimeCoverageFailure = string.Empty;
+                paintedAccentCoverageEnabled = false;
+                paintedAccentCoverageDiagnostics =
+                    GroundPaintedAccentCoverageDiagnostics.Empty;
+                ApplyProductionCoverageOriginOrMeshBounds();
+                return;
+            }
+
+            if (paintedAccentProductionCoverageTexture == null ||
+                string.IsNullOrWhiteSpace(
+                    paintedAccentProductionCoverageSignature))
+            {
+                SetPaintedAccentProductionRuntimeFailure(
+                    GroundPaintedAccentRuntimeCoverageStatus.Missing,
+                    "Persistent Painted Accent production coverage is missing. " +
+                    "Return to Edit Mode and use Bake Painted Accents.");
+                return;
+            }
+
+            if (paintedAccentProductionBakeFormatRevision !=
+                    CurrentPaintedAccentProductionBakeFormatRevision ||
+                paintedAccentProductionCoverageTexture.format !=
+                    TextureFormat.R8 ||
+                paintedAccentProductionCoverageTexture.width <= 0 ||
+                paintedAccentProductionCoverageTexture.height <= 0 ||
+                paintedAccentProductionCoverageOriginSize.z <= 0.0001f ||
+                paintedAccentProductionCoverageOriginSize.w <= 0.0001f)
+            {
+                SetPaintedAccentProductionRuntimeFailure(
+                    GroundPaintedAccentRuntimeCoverageStatus.Incompatible,
+                    "Persistent Painted Accent production coverage uses an " +
+                    "incompatible format, mapping, or bake revision. Rebake it " +
+                    "in the current project version.");
+                return;
+            }
+
+            paintedAccentRuntimeCoverageStatus =
+                GroundPaintedAccentRuntimeCoverageStatus.Current;
+            paintedAccentRuntimeCoverageFailureReason = string.Empty;
+            loggedPaintedAccentRuntimeCoverageFailure = string.Empty;
+            paintedAccentCoverageEnabled = true;
+            paintedAccentCoverageOriginSize =
+                paintedAccentProductionCoverageOriginSize;
+            paintedAccentCoverageDiagnostics =
+                GroundPaintedAccentCoverageDiagnostics.Empty;
+        }
+
+        private void SetPaintedAccentProductionRuntimeFailure(
+            GroundPaintedAccentRuntimeCoverageStatus status,
+            string reason)
+        {
+            paintedAccentRuntimeCoverageStatus = status;
+            paintedAccentRuntimeCoverageFailureReason = reason ?? string.Empty;
+            paintedAccentCoverageEnabled = false;
+            paintedAccentCoverageDiagnostics =
+                GroundPaintedAccentCoverageDiagnostics.Empty;
+            ApplyProductionCoverageOriginOrMeshBounds();
+
+            if (!string.Equals(
+                    loggedPaintedAccentRuntimeCoverageFailure,
+                    paintedAccentRuntimeCoverageFailureReason,
+                    StringComparison.Ordinal))
+            {
+                loggedPaintedAccentRuntimeCoverageFailure =
+                    paintedAccentRuntimeCoverageFailureReason;
+                Debug.LogError(
+                    $"GeneratedGround '{name}' cannot render Painted Accents " +
+                    $"from production coverage: " +
+                    $"{paintedAccentRuntimeCoverageFailureReason} " +
+                    "No procedural runtime fallback was executed.",
+                    this);
+            }
+        }
+
+        private void ApplyProductionCoverageOriginOrMeshBounds()
+        {
+            if (paintedAccentProductionCoverageOriginSize.z > 0.0001f &&
+                paintedAccentProductionCoverageOriginSize.w > 0.0001f)
+            {
+                paintedAccentCoverageOriginSize =
+                    paintedAccentProductionCoverageOriginSize;
+                return;
+            }
+
+            Bounds localBounds =
+                generatedMesh != null
+                    ? generatedMesh.bounds
+                    : new Bounds(Vector3.zero, Vector3.one);
+            paintedAccentCoverageOriginSize =
+                new Vector4(
+                    localBounds.min.x,
+                    localBounds.min.z,
+                    Mathf.Max(0.0001f, localBounds.size.x),
+                    Mathf.Max(0.0001f, localBounds.size.z));
         }
 
         private void EnsurePaintedAccentSurfaceStrokesCurrent()
@@ -3288,6 +4108,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             lastSurfaceStrokeMilliseconds =
                 ResolveElapsedMilliseconds(startedAt);
+            UpdateLastCompletedPaintedAccentSurfaceStrokeTimingDiagnostics();
         }
 
         private bool CanGeneratePaintedAccentSurfaceStrokes(
@@ -3368,6 +4189,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentCoverageDiagnostics = diagnostics;
             lastCoverageRasterMilliseconds = rasterMilliseconds;
             lastCoverageUploadMilliseconds = uploadMilliseconds;
+            UpdateLastCompletedPaintedAccentCoverageTimingDiagnostics();
         }
 
         private int CalculatePaintedAccentCoverageSignature(
@@ -3388,8 +4210,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentCoverageEnabled = false;
             paintedAccentCoverageDiagnostics =
                 GroundPaintedAccentCoverageDiagnostics.Empty;
-            ReplacePaintedAccentCoverageTexture(
-                GroundPaintedAccentCoverageBaker.CreateNeutralTexture());
+            if (!ShouldUsePaintedAccentProductionCoverage())
+            {
+                ReplacePaintedAccentCoverageTexture(
+                    GroundPaintedAccentCoverageBaker.CreateNeutralTexture());
+            }
 
             Bounds localBounds =
                 generatedMesh != null
@@ -3466,6 +4291,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             lastProjectedGlyphMilliseconds =
                 ResolveElapsedMilliseconds(startedAt);
+            UpdateLastCompletedPaintedAccentProjectedGlyphTimingDiagnostics();
         }
 
         private int CalculatePaintedAccentProjectedGlyphSignature(
@@ -3520,6 +4346,87 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
         }
 
+#if UNITY_EDITOR
+        private string CalculatePaintedAccentProductionCoverageSignature(
+            GroundSurfaceFeatureRecipe feature)
+        {
+            if (feature == null ||
+                !feature.CanApplyAsShaderOnly ||
+                feature.Strength <= 0.0001f ||
+                !paintedAccentCoverageDiagnostics.IsValid)
+            {
+                return string.Empty;
+            }
+
+            return EditorCalculatePaintedAccentProductionCoverageSignature(
+                paintedAccentCoverageTexture,
+                paintedAccentCoverageOriginSize);
+        }
+
+        public static string
+            EditorCalculatePaintedAccentProductionCoverageSignature(
+                Texture2D coverageTexture,
+                Vector4 originSize)
+        {
+            if (coverageTexture == null ||
+                !coverageTexture.isReadable ||
+                coverageTexture.format != TextureFormat.R8 ||
+                coverageTexture.width <= 0 ||
+                coverageTexture.height <= 0 ||
+                originSize.z <= 0.0001f ||
+                originSize.w <= 0.0001f)
+            {
+                return string.Empty;
+            }
+
+            var rawData = coverageTexture.GetRawTextureData<byte>();
+            int expectedLength =
+                coverageTexture.width * coverageTexture.height;
+            if (rawData.Length != expectedLength)
+            {
+                return string.Empty;
+            }
+
+            StringBuilder header = new StringBuilder(192);
+            header.Append(CurrentPaintedAccentProductionBakeFormatRevision)
+                .Append('|')
+                .Append(GroundPaintedAccentCoverageBaker.Revision)
+                .Append('|')
+                .Append(coverageTexture.width)
+                .Append('|')
+                .Append(coverageTexture.height)
+                .Append('|')
+                .Append(Quantize(originSize.x))
+                .Append('|')
+                .Append(Quantize(originSize.y))
+                .Append('|')
+                .Append(Quantize(originSize.z))
+                .Append('|')
+                .Append(Quantize(originSize.w))
+                .Append('|');
+
+            byte[] headerBytes = Encoding.UTF8.GetBytes(header.ToString());
+            byte[] coverageBytes = rawData.ToArray();
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                sha256.TransformBlock(
+                    headerBytes,
+                    0,
+                    headerBytes.Length,
+                    headerBytes,
+                    0);
+                sha256.TransformFinalBlock(
+                    coverageBytes,
+                    0,
+                    coverageBytes.Length);
+                return BitConverter.ToString(sha256.Hash)
+                    .Replace("-", string.Empty)
+                    .ToLowerInvariant();
+            }
+        }
+
+#endif
+
         private Vector2 ResolvePaintedAccentVisualHorizontalLocalXZ()
         {
             Vector3 localHorizontal3 =
@@ -3565,10 +4472,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     (feature != null && feature.CanApplyAsShaderOnly ? 1 : 0);
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.Strength : 0f);
-                hash = hash * 31 + Quantize(
-                    feature != null ? feature.Scale : 0f);
-                hash = hash * 31 + Quantize(
-                    feature != null ? feature.Contrast : 0f);
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.MaskInfluence : 0f);
                 hash = hash * 31 + Quantize(
@@ -3679,52 +4582,145 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             lastTotalRegenerationMilliseconds = 0d;
         }
 
-        private void UpdateRegenerationTimingDiagnostics()
+        private void UpdateLastCompletedPaintedAccentSurfaceStrokeTimingDiagnostics()
         {
-            lastRegenerationTimingDiagnostics =
-                $"Executed stages: {lastExecutedRegenerationStages}\n" +
-                $"Total: {lastTotalRegenerationMilliseconds:F2} ms\n" +
-                $"Snapshots: {lastSnapshotsMilliseconds:F2} ms\n" +
-                $"Ground generation: {lastGeometryMilliseconds:F2} ms\n" +
-                $"Mesh apply: {lastMeshApplyMilliseconds:F2} ms\n" +
-                $"Collider cook: {lastColliderMilliseconds:F2} ms\n" +
-                $"Painted Accent strokes: {lastSurfaceStrokeMilliseconds:F2} ms\n" +
-                $"  candidate build + weighting: {paintedAccentPlacementDiagnostics.BuildTimings.CandidateBuildMilliseconds:F2} ms\n" +
-                $"    regional weighting subset: {paintedAccentPlacementDiagnostics.BuildTimings.RegionalWeightingMilliseconds:F2} ms\n" +
-                $"  candidate ordering: {paintedAccentPlacementDiagnostics.BuildTimings.CandidateOrderingMilliseconds:F2} ms\n" +
-                $"  composition setup: {paintedAccentPlacementDiagnostics.BuildTimings.CompositionSetupMilliseconds:F2} ms\n" +
-                $"  stroke setup: {paintedAccentPlacementDiagnostics.BuildTimings.StrokeSetupMilliseconds:F2} ms\n" +
-                $"  surface construction + validation: {paintedAccentPlacementDiagnostics.BuildTimings.SurfaceConstructionValidationMilliseconds:F2} ms\n" +
-                $"  placement diagnostics: {paintedAccentPlacementDiagnostics.BuildTimings.DiagnosticsMilliseconds:F2} ms\n" +
-                $"Painted Accent projection: {lastProjectedGlyphMilliseconds:F2} ms\n" +
-                $"  profile build: {paintedAccentProjectedGlyphBuildTimings.ProfileBuildMilliseconds:F2} ms\n" +
-                $"  family validation: {paintedAccentProjectedGlyphBuildTimings.FamilyValidationMilliseconds:F2} ms\n" +
-                $"  point construction: {paintedAccentProjectedGlyphBuildTimings.PointConstructionMilliseconds:F2} ms\n" +
-                $"  topology + turn: {paintedAccentProjectedGlyphBuildTimings.TopologyValidationMilliseconds:F2} ms\n" +
-                $"  projected cluster composition: {paintedAccentProjectedGlyphBuildTimings.ClusterCompositionMilliseconds:F2} ms\n" +
-                $"    cluster allocation wall time: {paintedAccentProjectedGlyphBuildTimings.ClusterAuditTotalMilliseconds:F2} ms\n" +
-                $"      contact solving total: {paintedAccentProjectedGlyphBuildTimings.ClusterContactSolvingMilliseconds:F2} ms\n" +
-                $"        contact placement + other: {paintedAccentProjectedGlyphBuildTimings.ClusterContactPlacementMilliseconds:F2} ms\n" +
-                $"        near-parallel validation: {paintedAccentProjectedGlyphBuildTimings.ClusterNearParallelValidationMilliseconds:F2} ms\n" +
-                $"        candidate internal-overlap validation: {paintedAccentProjectedGlyphBuildTimings.ClusterCandidateInternalOverlapValidationMilliseconds:F2} ms\n" +
-                $"      final silhouette overlap validation: {paintedAccentProjectedGlyphBuildTimings.ClusterFinalSilhouetteOverlapValidationMilliseconds:F2} ms\n" +
-                $"      internal silhouette + quality total: {paintedAccentProjectedGlyphBuildTimings.ClusterInternalValidationMilliseconds:F2} ms\n" +
-                $"      projected surface/domain in cluster attempts: {paintedAccentProjectedGlyphBuildTimings.ClusterSurfaceValidationMilliseconds:F2} ms\n" +
-                $"      external accepted-glyph conflicts: {paintedAccentProjectedGlyphBuildTimings.ClusterExternalConflictMilliseconds:F2} ms\n" +
-                $"      final reconciliation: {paintedAccentProjectedGlyphBuildTimings.ClusterReconciliationMilliseconds:F2} ms\n" +
-                $"  surface/domain validation: {paintedAccentProjectedGlyphBuildTimings.SurfaceValidationMilliseconds:F2} ms\n" +
-                $"    footprint preparation: {paintedAccentProjectedGlyphBuildTimings.FootprintPreparationMilliseconds:F2} ms\n" +
-                $"    ground sampling: {paintedAccentProjectedGlyphBuildTimings.GroundSamplingMilliseconds:F2} ms\n" +
-                $"    broad slope: {paintedAccentProjectedGlyphBuildTimings.BroadSlopeMilliseconds:F2} ms\n" +
-                $"    river exclusion: {paintedAccentProjectedGlyphBuildTimings.RiverExclusionMilliseconds:F2} ms\n" +
-                $"    modifier exclusion: {paintedAccentProjectedGlyphBuildTimings.ModifierExclusionMilliseconds:F2} ms\n" +
-                $"    transverse grade: {paintedAccentProjectedGlyphBuildTimings.TransverseGradeMilliseconds:F2} ms\n" +
-                $"    longitudinal grade: {paintedAccentProjectedGlyphBuildTimings.LongitudinalGradeMilliseconds:F2} ms\n" +
-                $"  diagnostics: {paintedAccentProjectedGlyphBuildTimings.DiagnosticsMilliseconds:F2} ms\n" +
+            GroundPaintedAccentSurfaceStrokeBuildTimings timings =
+                paintedAccentPlacementDiagnostics.BuildTimings;
+            lastCompletedPaintedAccentSurfaceStrokeTimingDiagnostics =
+                $"Total SurfaceStrokes: {lastSurfaceStrokeMilliseconds:F2} ms\n" +
+                $"Candidate build + weighting: {timings.CandidateBuildMilliseconds:F2} ms\n" +
+                $"  Regional weighting subset: {timings.RegionalWeightingMilliseconds:F2} ms\n" +
+                $"Candidate ordering: {timings.CandidateOrderingMilliseconds:F2} ms\n" +
+                $"Composition setup: {timings.CompositionSetupMilliseconds:F2} ms\n" +
+                $"Stroke setup: {timings.StrokeSetupMilliseconds:F2} ms\n" +
+                $"Surface construction + validation: {timings.SurfaceConstructionValidationMilliseconds:F2} ms\n" +
+                $"Placement diagnostics: {timings.DiagnosticsMilliseconds:F2} ms";
+        }
+
+        private void UpdateLastCompletedPaintedAccentProjectedGlyphTimingDiagnostics()
+        {
+            GroundPaintedAccentProjectedGlyphBuildTimings timings =
+                paintedAccentProjectedGlyphBuildTimings;
+            lastCompletedPaintedAccentProjectedGlyphTimingDiagnostics =
+                $"Total ProjectedGlyphs: {lastProjectedGlyphMilliseconds:F2} ms\n" +
+                $"Profile build: {timings.ProfileBuildMilliseconds:F2} ms\n" +
+                $"Family validation: {timings.FamilyValidationMilliseconds:F2} ms\n" +
+                $"Point construction: {timings.PointConstructionMilliseconds:F2} ms\n" +
+                $"Topology + turn: {timings.TopologyValidationMilliseconds:F2} ms\n" +
+                $"Projected cluster composition: {timings.ClusterCompositionMilliseconds:F2} ms\n" +
+                $"  Cluster allocation wall time: {timings.ClusterAuditTotalMilliseconds:F2} ms\n" +
+                $"    Contact solving total: {timings.ClusterContactSolvingMilliseconds:F2} ms\n" +
+                $"      Contact placement + other: {timings.ClusterContactPlacementMilliseconds:F2} ms\n" +
+                $"      Near-parallel validation: {timings.ClusterNearParallelValidationMilliseconds:F2} ms\n" +
+                $"      Candidate internal-overlap validation: {timings.ClusterCandidateInternalOverlapValidationMilliseconds:F2} ms\n" +
+                $"    Final silhouette overlap validation: {timings.ClusterFinalSilhouetteOverlapValidationMilliseconds:F2} ms\n" +
+                $"    Internal silhouette + quality total: {timings.ClusterInternalValidationMilliseconds:F2} ms\n" +
+                $"    Projected surface/domain in cluster attempts: {timings.ClusterSurfaceValidationMilliseconds:F2} ms\n" +
+                $"    External accepted-glyph conflicts: {timings.ClusterExternalConflictMilliseconds:F2} ms\n" +
+                $"    Final reconciliation: {timings.ClusterReconciliationMilliseconds:F2} ms\n" +
+                $"Surface/domain validation: {timings.SurfaceValidationMilliseconds:F2} ms\n" +
+                $"  Footprint preparation: {timings.FootprintPreparationMilliseconds:F2} ms\n" +
+                $"  Ground sampling: {timings.GroundSamplingMilliseconds:F2} ms\n" +
+                $"  Broad slope: {timings.BroadSlopeMilliseconds:F2} ms\n" +
+                $"  River exclusion: {timings.RiverExclusionMilliseconds:F2} ms\n" +
+                $"  Modifier exclusion: {timings.ModifierExclusionMilliseconds:F2} ms\n" +
+                $"  Transverse grade: {timings.TransverseGradeMilliseconds:F2} ms\n" +
+                $"  Longitudinal grade: {timings.LongitudinalGradeMilliseconds:F2} ms\n" +
+                $"Diagnostics: {timings.DiagnosticsMilliseconds:F2} ms";
+        }
+
+        private void UpdateLastCompletedPaintedAccentCoverageTimingDiagnostics()
+        {
+            lastCompletedPaintedAccentCoverageTimingDiagnostics =
                 $"Coverage raster: {lastCoverageRasterMilliseconds:F2} ms\n" +
                 $"Coverage upload: {lastCoverageUploadMilliseconds:F2} ms\n" +
-                $"Material apply: {lastMaterialMilliseconds:F2} ms\n" +
-                $"River corridor notification: {lastRiverCorridorMilliseconds:F2} ms";
+                $"Coverage total: " +
+                $"{lastCoverageRasterMilliseconds + lastCoverageUploadMilliseconds:F2} ms";
+        }
+
+        private void UpdateRegenerationTimingDiagnostics()
+        {
+            StringBuilder report = new StringBuilder(512);
+            report.Append("Executed stages: ")
+                .Append(lastExecutedRegenerationStages)
+                .Append('\n');
+            report.Append("Total: ")
+                .Append(lastTotalRegenerationMilliseconds.ToString("F2"))
+                .Append(" ms");
+
+            AppendCurrentStageTiming(
+                report,
+                GroundRegenerationStage.Snapshots,
+                "Snapshots",
+                lastSnapshotsMilliseconds);
+            AppendCurrentStageTiming(
+                report,
+                GroundRegenerationStage.Geometry,
+                "Ground generation",
+                lastGeometryMilliseconds);
+            AppendCurrentStageTiming(
+                report,
+                GroundRegenerationStage.Mesh,
+                "Mesh apply",
+                lastMeshApplyMilliseconds);
+            AppendCurrentStageTiming(
+                report,
+                GroundRegenerationStage.Collider,
+                "Collider cook",
+                lastColliderMilliseconds);
+            AppendCurrentStageTiming(
+                report,
+                GroundRegenerationStage.SurfaceStrokes,
+                "Painted Accent SurfaceStrokes",
+                lastSurfaceStrokeMilliseconds);
+            AppendCurrentStageTiming(
+                report,
+                GroundRegenerationStage.ProjectedGlyphs,
+                "Painted Accent ProjectedGlyphs",
+                lastProjectedGlyphMilliseconds);
+
+            if ((lastExecutedRegenerationStages &
+                 GroundRegenerationStage.Coverage) != 0)
+            {
+                report.Append('\n')
+                    .Append("Coverage raster: ")
+                    .Append(lastCoverageRasterMilliseconds.ToString("F2"))
+                    .Append(" ms\n")
+                    .Append("Coverage upload: ")
+                    .Append(lastCoverageUploadMilliseconds.ToString("F2"))
+                    .Append(" ms");
+            }
+
+            AppendCurrentStageTiming(
+                report,
+                GroundRegenerationStage.Material,
+                "Material apply",
+                lastMaterialMilliseconds);
+            AppendCurrentStageTiming(
+                report,
+                GroundRegenerationStage.RiverCorridor,
+                "River corridor notification",
+                lastRiverCorridorMilliseconds);
+
+            lastRegenerationTimingDiagnostics = report.ToString();
+        }
+
+        private void AppendCurrentStageTiming(
+            StringBuilder report,
+            GroundRegenerationStage stage,
+            string label,
+            double milliseconds)
+        {
+            if ((lastExecutedRegenerationStages & stage) == 0)
+            {
+                return;
+            }
+
+            report.Append('\n')
+                .Append(label)
+                .Append(": ")
+                .Append(milliseconds.ToString("F2"))
+                .Append(" ms");
         }
 
         private void EnsureGeneratedMesh()
@@ -3751,6 +4747,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             groundGeometryRevision = 0;
             currentSnapshotSignature = 0;
             currentPaintedAccentDomainSignature = 0;
+            paintedAccentRuntimeCoverageStatus =
+                GroundPaintedAccentRuntimeCoverageStatus.NotEvaluated;
+            paintedAccentRuntimeCoverageFailureReason = string.Empty;
+            loggedPaintedAccentRuntimeCoverageFailure = string.Empty;
+#if UNITY_EDITOR
+            currentPaintedAccentProductionCoverageSignature = string.Empty;
+#endif
             paintedAccentSurfaceStrokeSignature = 0;
             paintedAccentSurfaceStrokesInitialized = false;
             paintedAccentModifierSnapshots = Array.Empty<GroundModifierSnapshot>();

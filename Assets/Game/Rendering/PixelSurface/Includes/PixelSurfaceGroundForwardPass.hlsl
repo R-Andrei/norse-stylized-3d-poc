@@ -257,7 +257,7 @@
                 float paintedAccentCoverage =
                     ResolveGroundPaintedAccentCoverage(input) *
                     contractMask *
-                    saturate(_GroundPaintedAccentLineStrength);
+                    saturate(_GroundPaintedAccentInkOpacity);
 
 
                 float profileContrast =

@@ -1,4 +1,64 @@
-## 2026-07-14 — Active PA-P4 External-Conflict and Reconciliation Contract
+# Ground Visual Design and Architecture
+
+## Actual Ground mission and active milestone — 2026-07-15
+
+Ground is not complete. Painted Accents are one accepted layer inside a larger restrained-stylized terrain system.
+
+The authoritative static composition goal is:
+
+```text
+playable terrain shape
+→ calm family/variant base material
+→ broad macro patch composition
+→ semantic surface-mask response
+→ Painted Accent lines
+→ Contact / Edge Accents
+→ sparse motifs and stamps
+→ runtime surface state later
+```
+
+The current active milestone is **V3M Broad Macro Patch Completion**. The current macro-related fields are active but do not yet produce deliberate, gameplay-readable broad regions. The audit, slim diagnostic proof, and replacement-field boundary are defined in `Ground_Macro_Patch_Audit_and_Architecture.md`. **V4 Contact / Edge Accents** remains architecturally accepted and queued after V3M. The completed Painted Accent architecture below remains authoritative for that feature only and must not be read as a declaration that the Ground visual stack is finished.
+
+Semantic region masks and independent visual macro composition are separate responsibilities. River-, exposure-, damp-, vegetation-, compaction-, rocky-, and standing-water response may bias macro appearance, but none of those semantic fields alone satisfies the broad macro-composition layer.
+
+## Current authoritative Painted Accent architecture — 2026-07-15
+
+The Painted Accent system is complete and accepted as a mesh-free graphic Ground feature.
+
+### Visual contract
+
+- Painted Accents are projected line/glyph coverage, not raised geometry, decals, or runtime objects.
+- The retired 3D ridge path must not be restored.
+- Edit Mode builds deterministic SurfaceStrokes, projected glyphs, pair/triplet companion layouts, and R8 coverage for live authoring.
+- The Ground shader applies flat graphic ink through the coverage field while remaining integrated with Ground lighting.
+- **Stroke Intensity** affects generated stroke character; **Ink Opacity** independently controls final visible blend.
+- Ink Colour and Ink Opacity are appearance-only Material updates.
+- Raw Coverage Binding and Contract Coverage debug views distinguish texture/mapping faults from mask or final-composition faults.
+
+### Production contract
+
+```text
+Edit Mode procedural preview
+→ Bake Painted Accents
+→ persistent scene/Ground-owned R8 coverage asset
+→ Play Mode and Player sample the persistent asset only
+```
+
+Player runtime performs no Painted Accent proposal generation, placement validation, projected-glyph construction, cluster solving, coverage rasterization, or CPU coverage upload. PA-B3 blocks invalid builds, and PA-B4 supplies the explicit all-project orphan audit and cleanup workflow.
+
+### Authoring and lifecycle contract
+
+- `GeneratedGround` is the unified authoring façade, including resolved shared profile, variant, material, shader-feature, and Painted Accent controls.
+- Shared ownership remains explicit; the façade does not silently clone or migrate shared assets.
+- The production asset is created and assigned automatically. The author does not choose a path, create a texture, drag a reference, or edit a material.
+- Coverage-changing edits mark the production output stale; Ink Colour and Ink Opacity do not.
+- Obsolete output is released explicitly from its Ground, followed by manual scene save and the project-wide Confirmed-orphan cleanup.
+
+The dated sections below are the historical visual and implementation ledger. Where an older section describes 3D ridge output, procedural Player rendering, weak Strength-based visibility, or an unbaked transient-only path, this current contract supersedes it.
+
+---
+
+## 2026-07-14 — Accepted PA-P4 External-Conflict and Reconciliation Contract
 
 Authoritative projected-cluster construction maintains a deterministic 0.50 m fixed-grid index over each already accepted glyph's external-conflict-expanded bounds. Candidate members query their own touched cells, deduplicate glyph indices, sort them into original accepted-list order, and then retain the exact bounds, segment-intersection, and point-clearance authority. The grid never declares validity; it only proves that glyphs occupying no shared indexed cell cannot have overlapping expanded bounds.
 

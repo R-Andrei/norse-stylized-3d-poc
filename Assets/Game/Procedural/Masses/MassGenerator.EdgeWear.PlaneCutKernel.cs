@@ -180,6 +180,101 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public readonly List<int> LinkedEdgeIndices = new List<int>();
         }
 
+        private enum PlaneCutCoexistenceFailureCategory
+        {
+            None,
+            PlaneBand,
+            StrictIntersection,
+            MissingJunction,
+            TJunction,
+            OpenBoundary,
+            FaceQuality,
+            CandidateConservation,
+            RetainedVolume,
+            SourceBounds,
+            SurfaceTriangulation,
+            General
+        }
+
+        private sealed class PlaneCutCoexistenceFailureDossier
+        {
+            public PlaneCutCoexistenceFailureCategory Category;
+            public string Stage = string.Empty;
+            public int SourceVertex = -1;
+            public int VictimEdge = -1;
+            public int ForeignEdge = -1;
+            public readonly List<int> LinkedEdges = new List<int>();
+            public readonly List<int> IncidentStarEdges = new List<int>();
+            public int OpenEdgeCount;
+            public int TJunctionCount;
+            public int NonPlanarCount;
+            public string Diagnostic = string.Empty;
+        }
+
+        private sealed class PlaneCutCoexistenceTrialOutcome
+        {
+            public string CacheKey = string.Empty;
+            public readonly List<int> ExcludedEdgeIndices = new List<int>();
+            public string ExclusionReason = string.Empty;
+            public bool FullyValid;
+            public bool CandidateConservationValid = true;
+            public int ExpectedCandidateCount;
+            public int ActualCandidateCount;
+            public int CertifiedCandidateCount;
+            public readonly List<int> ExpectedCandidateEdgeIndices =
+                new List<int>();
+            public readonly List<int> ActualCandidateEdgeIndices =
+                new List<int>();
+            public readonly List<int> MissingCandidateEdgeIndices =
+                new List<int>();
+            public readonly List<int> UnexpectedCandidateEdgeIndices =
+                new List<int>();
+            public string FailureSignature = string.Empty;
+            public Dictionary<int, float> ScaleByEdge =
+                new Dictionary<int, float>();
+            public List<PlaneCutBevelCandidate> Candidates =
+                new List<PlaneCutBevelCandidate>();
+            public List<PolygonFace> Faces = new List<PolygonFace>();
+            public PlaneCutTopologyScaleTrialRecord Trial;
+            public PlaneCutBevelAuditResult Audit;
+            public PlaneCutCoexistenceFailureDossier DirectFailureDossier;
+            public string Blocker = string.Empty;
+        }
+
+        private sealed class PlaneCutCoexistenceSearchNode
+        {
+            public PlaneCutCoexistenceTrialOutcome Outcome;
+            public PlaneCutCoexistenceFailureDossier EffectiveFailureDossier;
+            public Dictionary<int, string> ReasonByExcludedEdge =
+                new Dictionary<int, string>();
+        }
+
+        private sealed class PlaneCutCoexistenceSearchStateRecord
+        {
+            public int StateIndex;
+            public int Depth;
+            public string ExclusionEvidence = string.Empty;
+            public string FailureCategory = string.Empty;
+            public string FailureStage = string.Empty;
+            public int SourceVertex = -1;
+            public int VictimEdge = -1;
+            public int ForeignEdge = -1;
+            public string LinkedEdgeEvidence = string.Empty;
+            public string IncidentStarEvidence = string.Empty;
+            public string ImplicatedEdgeEvidence = string.Empty;
+            public int ExpectedCandidateCount;
+            public int ActualCandidateCount;
+            public int CertifiedCandidateCount;
+            public string ExpectedCandidateEvidence = string.Empty;
+            public string ActualCandidateEvidence = string.Empty;
+            public string MissingCandidateEvidence = string.Empty;
+            public string UnexpectedCandidateEvidence = string.Empty;
+            public int CandidateConservationValid;
+            public float MinimumWidthScale;
+            public int FullyValid;
+            public string FailureSignature = string.Empty;
+        }
+
         private sealed class PlaneCutTopologyScaleTrialRecord
         {
             public int TrialIndex;
@@ -503,44 +598,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
-        private readonly struct PlaneCutJunctionCoverageRecord
-        {
-            public readonly int VertexIndex;
-            public readonly Vector3 SourcePosition;
-            public readonly string IncidentBuiltEdges;
-            public readonly int IncidentBuiltEdgeCount;
-            public readonly int JunctionExpected;
-            public readonly int JunctionFaceCount;
-            public readonly int AssignedOpenEdgeCount;
-            public readonly string FailureReason;
-
-            public PlaneCutJunctionCoverageRecord(
-                int vertexIndex,
-                Vector3 sourcePosition,
-                string incidentBuiltEdges,
-                int incidentBuiltEdgeCount,
-                int junctionExpected,
-                int junctionFaceCount,
-                int assignedOpenEdgeCount,
-                string failureReason)
-            {
-                VertexIndex = vertexIndex;
-                SourcePosition = sourcePosition;
-                IncidentBuiltEdges = incidentBuiltEdges;
-                IncidentBuiltEdgeCount = incidentBuiltEdgeCount;
-                JunctionExpected = junctionExpected;
-                JunctionFaceCount = junctionFaceCount;
-                AssignedOpenEdgeCount = assignedOpenEdgeCount;
-                FailureReason = failureReason;
-            }
-        }
-
         private sealed class PlaneCutNumericalRepairTelemetry
         {
             public int IntersectionRequestCount;
             public int StrictCrossingIntersectionCount;
             public int ProjectedFallbackIntersectionCount;
             public int CachedIntersectionReuseCount;
+            public int CachedIntersectionInvalidationCount;
+            public int CachedIntersectionRecomputeSuccessCount;
             public int IntersectionProjectionCount;
             public float MaximumIntersectionProjectionDistance;
             public int StrictInsideClassificationCount;
@@ -655,6 +720,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int EdgeConflictWidthReductionCount;
             public int EdgeConflictClusterCount;
             public int EdgeConflictUnresolvedCount;
+            public int CoexistenceStarEvaluationCount;
+            public int CoexistenceStarCacheUseCount;
+            public int CoexistencePairEvaluationCount;
+            public int CoexistencePairCacheUseCount;
+            public int CoexistenceTrialCount;
+            public int CoexistenceTrialCacheUseCount;
+            public int CoexistenceExclusionCount;
+            public int CoexistenceSearchStatesEvaluated;
+            public int CoexistenceSearchStatesDeduplicated;
+            public int CoexistenceSearchMaximumDepth;
+            public int CoexistenceSearchFrontierRemaining;
+            public int CoexistenceSearchWinningDepth;
+            public int CoexistenceCandidateConservationFailureCount;
+            public string CoexistenceCandidateExpectedEvidence;
+            public string CoexistenceCandidateActualEvidence;
+            public string CoexistenceCandidateMissingEvidence;
+            public string CoexistenceCandidateUnexpectedEvidence;
+            public List<PlaneCutCoexistenceSearchStateRecord>
+                CoexistenceSearchStates;
+            public float CoexistenceMinimumCommittedWidthScale;
+            public string CoexistenceExcludedEdgeEvidence;
+            public string CoexistenceExclusionReasonEvidence;
             public int EdgeConflictTopologyRejectedPassCount;
             public int EdgeConflictTopologyExpandedClusterCount;
             public int EdgeConflictTopologyRollbackCount;
@@ -738,7 +825,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public List<PlaneCutTJunctionFailureRecord> TJunctionFailures;
             public List<PlaneCutLocalityDeferralRecord>
                 LocalityDeferrals;
-            public List<PlaneCutJunctionCoverageRecord> JunctionCoverage;
             public Dictionary<string, string>
                 FaceFirstNonPlanarStageByIdentity;
             public HashSet<string> BoundaryConformityTouchedFaces;
@@ -747,12 +833,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 SeamRepairMaximumMovementByIdentity;
             public PlaneCutNumericalRepairTelemetry NumericalRepairs;
             public EdgeWearCoverageAudit CoverageAudit;
-            public int JunctionCoverageTouchedVertexCount;
-            public int JunctionCoverageExpectedCount;
-            public int JunctionCoverageBuiltCount;
-            public int JunctionCoverageMissingCount;
+            public GeneratedGeometryStableFingerprint
+                ExclusionReasonFingerprint;
+            public GeneratedGeometryStableFingerprint SelectedEdgeFingerprint;
+            public GeneratedGeometryStableFingerprint CertifiedEdgeFingerprint;
+            public GeneratedGeometryStableFingerprint GeometryTopologyFingerprint;
+            public int StableFingerprintPrepared;
             public int GeometryValid;
-            public string LocalJunctionDiagnostic;
             public string Diagnostic;
         }
 
@@ -776,6 +863,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     EdgeConflictVertexIndex = -1,
                     EdgeConflictDeferredEdgeIndex = -1,
                     EdgeConflictMinimumWidthScale = 1f,
+                    CoexistenceMinimumCommittedWidthScale = 1f,
+                    CoexistenceSearchWinningDepth = -1,
+                    CoexistenceCandidateExpectedEvidence = "none",
+                    CoexistenceCandidateActualEvidence = "none",
+                    CoexistenceCandidateMissingEvidence = "none",
+                    CoexistenceCandidateUnexpectedEvidence = "none",
+                    CoexistenceSearchStates =
+                        new List<PlaneCutCoexistenceSearchStateRecord>(),
+                    CoexistenceExcludedEdgeEvidence = "none",
+                    CoexistenceExclusionReasonEvidence = "none",
                     EdgeConflictWidthReductions =
                         new List<PlaneCutConflictWidthReductionRecord>(),
                     FaceQualityFailures =
@@ -803,8 +900,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ActiveSearchFailureEvidence = "none",
                     DebugFocusEdgeIndices = new List<int>(),
                     TopologyScaleSearchCollateralChangedEvidence = "none",
-                    JunctionCoverage =
-                        new List<PlaneCutJunctionCoverageRecord>(),
                     FaceFirstNonPlanarStageByIdentity =
                         new Dictionary<string, string>(),
                     BoundaryConformityTouchedFaces =
@@ -848,14 +943,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             solution.WidthByEdge.TryGetValue(
                                 selected.GraphEdgeIndex,
                                 out float inactiveWidth);
-                        lifecycle.SolvedWidth = hasInactiveWidth
-                            ? inactiveWidth
-                            : 0f;
-                        lifecycle.WidthInactive = true;
-                        lifecycle.Active = false;
-                        lifecycle.FinalReason = hasInactiveWidth
-                            ? "width-inactive"
-                            : "width-missing";
+                        SetEdgeWearCornerWidthCoexistenceIneligibility(
+                            lifecycle,
+                            hasInactiveWidth ? inactiveWidth : 0f,
+                            hasInactiveWidth
+                                ? "corner-width-inactive"
+                                : "corner-width-missing");
                     }
                     continue;
                 }
@@ -870,10 +963,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     lifecycle.FinalReason = "active";
                 }
 
+                EdgeWearEdgeViabilityRecord cachedViability =
+                    lifecycle != null ? lifecycle.Viability : null;
+                if (coverageAudit != null)
+                {
+                    if (cachedViability != null &&
+                        cachedViability.Evaluated &&
+                        cachedViability.LocalityValid)
+                    {
+                        coverageAudit.ViabilityLocalityCacheUseCount++;
+                    }
+                    else
+                    {
+                        coverageAudit.ViabilityLocalityCacheMissCount++;
+                    }
+                }
                 if (!TryBuildPlaneCutBevelCandidate(
                         context,
                         solution,
                         selected,
+                        cachedViability,
                         minimumStableEdgeLength,
                         out PlaneCutBevelCandidate candidate,
                         out bool localityDeferred,
@@ -916,6 +1025,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             RecalculateEdgeWearCoverageAudit(coverageAudit);
+            if (coverageAudit != null)
+            {
+                result.SelectedEdgeCount = coverageAudit.SelectedCount;
+                result.ActiveEdgeCount = coverageAudit.ActiveCount;
+                SynchronizePlaneCutCoexistenceExclusionEvidence(
+                    coverageAudit,
+                    ref result);
+            }
 
             if (result.ActiveEdgeCount == 0)
             {
@@ -989,16 +1106,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             result.CertifiedPlanesBuilt = 0;
             result.TrialRejectedPlanes = planeCandidates.Count;
             result.ActiveEdgeEvidence =
-                FormatPlaneCutEdgeIndexEvidence(activeEdgeIndices);
+                FormatPlaneCutCandidateEdgeEvidence(planeCandidates);
             result.AttemptedEdgeEvidence =
                 FormatPlaneCutCandidateEdgeEvidence(planeCandidates);
             result.BuiltEdgeEvidence = "none";
             result.TrialRejectedEdgeEvidence =
                 result.AttemptedEdgeEvidence;
             result.DeferredEdgeEvidence =
-                FormatPlaneCutDeferredEdgeEvidence(
-                    activeEdgeIndices,
-                    planeCandidates);
+                result.CoexistenceExclusionCount > 0
+                    ? "none"
+                    : FormatPlaneCutDeferredEdgeEvidence(
+                        activeEdgeIndices,
+                        planeCandidates);
             result.MaterializedEdgeCoverageValid = 0;
 
             for (int candidateIndex = 0;
@@ -1043,8 +1162,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 planeCandidates,
                 minimumStableEdgeLength,
                 ref result,
-                out string localJunctionBlocker);
-            result.LocalJunctionDiagnostic = localJunctionBlocker;
+                out _);
             if (result.FaceQualityNonPlanarCount > 0)
             {
                 SetPlaneCutBevelDiagnostic(
@@ -1075,12 +1193,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 planeCandidates,
                 minimumStableEdgeLength,
                 ref result);
-            AuditPlaneCutJunctionCoverage(
-                edgeOnlyFaces,
-                context,
-                planeCandidates,
-                ref result);
-
             double resultVolume =
                 CalculatePlaneCutPolyhedronVolume(edgeOnlyFaces);
             bool volumeValid = sourceVolume > 0.000000001 &&
@@ -1263,7 +1375,111 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 previewSoup = auditedSoup;
             }
+            PrepareEdgeWearStableEvaluationFingerprints(
+                edgeOnlyFaces,
+                ref result);
             return result;
+        }
+
+        private static void PrepareEdgeWearStableEvaluationFingerprints(
+            List<PolygonFace> finalFaces,
+            ref PlaneCutBevelAuditResult result)
+        {
+            EdgeWearCoverageAudit coverage = result.CoverageAudit;
+
+            GeneratedGeometryStableHashBuilder exclusions =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.GeneratedMass.EdgeWear.Exclusions.v1");
+            GeneratedGeometryStableHashBuilder selected =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.GeneratedMass.EdgeWear.SelectedEdges.v1");
+            GeneratedGeometryStableHashBuilder certified =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.GeneratedMass.EdgeWear.CertifiedEdges.v1");
+
+            List<EdgeWearEdgeLifecycleRecord> ordered =
+                coverage == null
+                    ? new List<EdgeWearEdgeLifecycleRecord>()
+                    : new List<EdgeWearEdgeLifecycleRecord>(coverage.Records);
+            ordered.Sort((left, right) =>
+                left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+
+            int exclusionCount = 0;
+            int selectedCount = 0;
+            int certifiedCount = 0;
+            for (int recordIndex = 0;
+                 recordIndex < ordered.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record = ordered[recordIndex];
+                if (record.ViabilityState ==
+                        EdgeWearViabilityState.StructuralIneligible ||
+                    record.ViabilityState ==
+                        EdgeWearViabilityState.GeometricIneligible ||
+                    record.ViabilityState ==
+                        EdgeWearViabilityState.CoexistenceIneligible)
+                {
+                    exclusionCount++;
+                    exclusions.AddInt32(record.SourceEdgeIndex);
+                    exclusions.AddInt32((int)record.ViabilityState);
+                    exclusions.AddString(record.FinalReason ?? string.Empty);
+                }
+                if (record.Selected)
+                {
+                    selectedCount++;
+                    selected.AddInt32(record.SourceEdgeIndex);
+                }
+                if (record.Built)
+                {
+                    certifiedCount++;
+                    certified.AddInt32(record.SourceEdgeIndex);
+                }
+            }
+            exclusions.AddInt32(exclusionCount);
+            selected.AddInt32(selectedCount);
+            certified.AddInt32(certifiedCount);
+
+            GeneratedGeometryStableHashBuilder topology =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.GeneratedMass.EdgeWear.GeometryTopology.v1");
+            int faceCount = finalFaces == null ? 0 : finalFaces.Count;
+            topology.AddInt32(faceCount);
+            for (int faceIndex = 0; faceIndex < faceCount; faceIndex++)
+            {
+                PolygonFace face = finalFaces[faceIndex];
+                if (face == null)
+                {
+                    topology.AddBoolean(false);
+                    continue;
+                }
+                topology.AddBoolean(true);
+                topology.AddInt32((int)face.ProvenanceKind);
+                topology.AddInt32(face.ProvenanceIndex);
+                topology.AddInt32((int)face.Feature);
+                topology.AddSingle(face.FeatureStrength);
+                topology.AddVector3(face.Normal);
+                int vertexCount = face.Vertices == null
+                    ? 0
+                    : face.Vertices.Count;
+                topology.AddInt32(vertexCount);
+                for (int vertexIndex = 0;
+                     vertexIndex < vertexCount;
+                     vertexIndex++)
+                {
+                    topology.AddVector3(face.Vertices[vertexIndex]);
+                }
+            }
+            topology.AddInt32(result.OpenEdgeCount);
+            topology.AddInt32(result.NonManifoldEdgeCount);
+            topology.AddInt32(result.TJunctionCount);
+            topology.AddInt32(result.InvalidFaceCount);
+            topology.AddInt32(result.PreviewTriangleCount);
+
+            result.ExclusionReasonFingerprint = exclusions.Finish();
+            result.SelectedEdgeFingerprint = selected.Finish();
+            result.CertifiedEdgeFingerprint = certified.Finish();
+            result.GeometryTopologyFingerprint = topology.Finish();
+            result.StableFingerprintPrepared = 1;
         }
 
         private static void FinalizeEdgeWearCoverageAfterPlaneShell(
@@ -1432,9 +1648,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     audit.RejectedCount == 0;
             }
 
-            return audit.StructuralEligibleCount == audit.SelectedCount &&
+            return audit.CoexistenceEligibleCount == audit.SelectedCount &&
                 audit.SelectedCount == audit.BuiltCount &&
-                audit.WidthInactiveCount == 0 &&
+                audit.UnresolvedWidthInactiveCount == 0 &&
                 audit.DeferredCount == 0 &&
                 audit.RejectedCount == 0 &&
                 audit.UnmappedCount == 0;
@@ -1676,6 +1892,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     result.TrialRejectedEdgeEvidence =
                         result.AttemptedEdgeEvidence;
                     result.PlanesDeferred = localityDeferredCount;
+                    if (TryResolvePlaneCutCoexistenceByExclusion(
+                            sourceFaces,
+                            context,
+                            allCandidates,
+                            noJunctions,
+                            minimumStableEdgeLength,
+                            minimumStableFaceArea,
+                            localityDeferredCount,
+                            scaleByEdge,
+                            minimumScaleByEdge,
+                            passIndex + 1,
+                            blocker,
+                            ref result,
+                            out retainedCandidates,
+                            out preparedFaces,
+                            out string buildCoexistenceBlocker))
+                    {
+                        blocker = string.Empty;
+                        return true;
+                    }
+                    blocker = string.IsNullOrEmpty(buildCoexistenceBlocker)
+                        ? blocker
+                        : buildCoexistenceBlocker;
                     return false;
                 }
 
@@ -1730,6 +1969,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     result.TrialRejectedEdgeEvidence =
                         result.AttemptedEdgeEvidence;
                     result.PlanesDeferred = localityDeferredCount;
+                    if (TryResolvePlaneCutCoexistenceByExclusion(
+                            sourceFaces,
+                            context,
+                            allCandidates,
+                            noJunctions,
+                            minimumStableEdgeLength,
+                            minimumStableFaceArea,
+                            localityDeferredCount,
+                            scaleByEdge,
+                            minimumScaleByEdge,
+                            passIndex + 1,
+                            blocker,
+                            ref result,
+                            out retainedCandidates,
+                            out preparedFaces,
+                            out string preparationCoexistenceBlocker))
+                    {
+                        blocker = string.Empty;
+                        return true;
+                    }
+                    blocker = string.IsNullOrEmpty(preparationCoexistenceBlocker)
+                        ? blocker
+                        : preparationCoexistenceBlocker;
                     return false;
                 }
 
@@ -1865,6 +2127,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             : 0;
                     result.EdgeConflictMinimumWidthScale =
                         ResolveMinimumPlaneCutScale(scaleByEdge);
+                    result.CoexistenceMinimumCommittedWidthScale =
+                        result.EdgeConflictMinimumWidthScale;
                     CopyPlaneCutBandAudit(bandAudit, ref result);
                     return true;
                 }
@@ -2090,6 +2354,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             result.EdgeConflictResolvedCount = 1;
                             result.EdgeConflictMinimumWidthScale =
                                 ResolveMinimumPlaneCutScale(scaleByEdge);
+                            result.CoexistenceMinimumCommittedWidthScale =
+                                result.EdgeConflictMinimumWidthScale;
                             return true;
                         }
 
@@ -2368,7 +2634,1908 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumStableEdgeLength,
                     ref result);
             }
+            if (TryResolvePlaneCutCoexistenceByExclusion(
+                    sourceFaces,
+                    context,
+                    allCandidates,
+                    noJunctions,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    localityDeferredCount,
+                    scaleByEdge,
+                    minimumScaleByEdge,
+                    result.EdgeConflictPassCount,
+                    blocker,
+                    ref result,
+                    out retainedCandidates,
+                    out preparedFaces,
+                    out string coexistenceBlocker))
+            {
+                blocker = string.Empty;
+                return true;
+            }
+            blocker = string.IsNullOrEmpty(coexistenceBlocker)
+                ? blocker
+                : coexistenceBlocker;
             return false;
+        }
+
+        private static bool TryResolvePlaneCutCoexistenceByExclusion(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            List<PlaneCutBevelCandidate> allCandidates,
+            List<PlaneCutVertexJunctionCandidate> noJunctions,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            int localityDeferredCount,
+            Dictionary<int, float> startingScaleByEdge,
+            Dictionary<int, float> minimumScaleByEdge,
+            int basePassIndex,
+            string initialBlocker,
+            ref PlaneCutBevelAuditResult result,
+            out List<PlaneCutBevelCandidate> retainedCandidates,
+            out List<PolygonFace> preparedFaces,
+            out string blocker)
+        {
+            const int maximumExclusions = 12;
+            const int maximumEvaluatedStates = 128;
+            const int maximumConflictCandidates = 10;
+
+            retainedCandidates = new List<PlaneCutBevelCandidate>();
+            preparedFaces = null;
+            blocker = string.Empty;
+            if (allCandidates == null || allCandidates.Count <= 1)
+            {
+                blocker = string.IsNullOrEmpty(initialBlocker)
+                    ? "coexistence closure requires at least two candidates"
+                    : initialBlocker;
+                return false;
+            }
+
+            Dictionary<int, float> rootScaleByEdge =
+                ClonePlaneCutScaleMap(startingScaleByEdge);
+            for (int candidateIndex = 0;
+                 candidateIndex < allCandidates.Count;
+                 candidateIndex++)
+            {
+                int edgeIndex = allCandidates[candidateIndex].SourceEdgeIndex;
+                float stored = rootScaleByEdge.TryGetValue(
+                        edgeIndex,
+                        out float value)
+                    ? value
+                    : 1f;
+                rootScaleByEdge[edgeIndex] = Mathf.Clamp(
+                    stored,
+                    EdgeWearMinimumFeasibleWidthFraction,
+                    1f);
+            }
+
+            List<int> rootExpectedEdgeIndices =
+                BuildPlaneCutExpectedCoexistenceEdgeSet(
+                    result.CoverageAudit,
+                    allCandidates);
+            Dictionary<string, PlaneCutCoexistenceTrialOutcome> trialCache =
+                new Dictionary<string, PlaneCutCoexistenceTrialOutcome>();
+            HashSet<string> enqueuedStateKeys = new HashSet<string>();
+            List<PlaneCutCoexistenceSearchNode> frontier =
+                new List<PlaneCutCoexistenceSearchNode>();
+            PlaneCutCoexistenceTrialOutcome rootOutcome =
+                new PlaneCutCoexistenceTrialOutcome
+                {
+                    CacheKey = BuildPlaneCutCoexistenceSearchStateKey(
+                        new List<int>(),
+                        rootScaleByEdge),
+                    ScaleByEdge = rootScaleByEdge,
+                    Candidates = new List<PlaneCutBevelCandidate>(
+                        allCandidates),
+                    Audit = result,
+                    Blocker = initialBlocker ?? string.Empty,
+                    FailureSignature =
+                        BuildPlaneCutCoexistenceFailureSignature(
+                            result,
+                            initialBlocker)
+                };
+            rootOutcome.DirectFailureDossier =
+                BuildPlaneCutCoexistenceFailureDossier(
+                    result,
+                    null,
+                    initialBlocker,
+                    allCandidates);
+            PopulatePlaneCutCandidateConservation(
+                rootExpectedEdgeIndices,
+                rootOutcome.ExcludedEdgeIndices,
+                rootOutcome.Candidates,
+                rootOutcome.Candidates.Count,
+                false,
+                ref rootOutcome);
+            frontier.Add(new PlaneCutCoexistenceSearchNode
+            {
+                Outcome = rootOutcome,
+                EffectiveFailureDossier =
+                    rootOutcome.DirectFailureDossier
+            });
+            enqueuedStateKeys.Add(
+                BuildPlaneCutCoexistenceSearchNodeKey(
+                    rootOutcome.CacheKey,
+                    rootOutcome.DirectFailureDossier));
+
+            int trialOrdinal = 0;
+            int processedStates = 0;
+            int deduplicatedStates = 0;
+            int maximumDepth = 0;
+            string lastFailure = string.IsNullOrEmpty(initialBlocker)
+                ? "coexistence closure found no certified state"
+                : initialBlocker;
+            Bounds sourceBounds = CalculateFaceBounds(sourceFaces);
+            double sourceVolume = CalculatePlaneCutPolyhedronVolume(
+                sourceFaces);
+
+            while (frontier.Count > 0 &&
+                processedStates < maximumEvaluatedStates)
+            {
+                frontier.Sort((left, right) =>
+                    ComparePlaneCutCoexistenceSearchNodes(
+                        left,
+                        right,
+                        allCandidates));
+                PlaneCutCoexistenceSearchNode node = frontier[0];
+                frontier.RemoveAt(0);
+                PlaneCutCoexistenceTrialOutcome outcome = node.Outcome;
+                processedStates++;
+                maximumDepth = Mathf.Max(
+                    maximumDepth,
+                    outcome.ExcludedEdgeIndices.Count);
+
+                if (outcome.FullyValid)
+                {
+                    RecordPlaneCutCoexistenceSearchState(
+                        processedStates,
+                        "none",
+                        new List<int>(),
+                        node.EffectiveFailureDossier,
+                        outcome,
+                        ref result);
+                    SortedSet<int> winningExclusions =
+                        new SortedSet<int>(
+                            outcome.ExcludedEdgeIndices);
+                    result.CoexistenceSearchStatesEvaluated =
+                        processedStates;
+                    result.CoexistenceSearchStatesDeduplicated =
+                        deduplicatedStates;
+                    result.CoexistenceSearchMaximumDepth = maximumDepth;
+                    result.CoexistenceSearchFrontierRemaining =
+                        frontier.Count;
+                    result.CoexistenceSearchWinningDepth =
+                        outcome.ExcludedEdgeIndices.Count;
+                    result.CoexistenceCandidateExpectedEvidence =
+                        FormatPlaneCutEdgeIndexEvidence(
+                            outcome.ExpectedCandidateEdgeIndices);
+                    result.CoexistenceCandidateActualEvidence =
+                        FormatPlaneCutEdgeIndexEvidence(
+                            outcome.ActualCandidateEdgeIndices);
+                    result.CoexistenceCandidateMissingEvidence = "none";
+                    result.CoexistenceCandidateUnexpectedEvidence = "none";
+                    if (!ApplyPlaneCutCoexistenceSuccess(
+                            outcome,
+                            winningExclusions,
+                            node.ReasonByExcludedEdge,
+                            localityDeferredCount,
+                            basePassIndex,
+                            ref result,
+                            out retainedCandidates,
+                            out preparedFaces,
+                            out string finalizationBlocker))
+                    {
+                        blocker = finalizationBlocker;
+                        return false;
+                    }
+                    return true;
+                }
+
+                string exclusionReason =
+                    ResolvePlaneCutCoexistenceExclusionReason(
+                        node.EffectiveFailureDossier,
+                        outcome);
+                List<int> conflictEdges =
+                    BuildPlaneCutCoexistenceConflictEdgeSet(
+                        node.EffectiveFailureDossier,
+                        allCandidates,
+                        outcome.ExcludedEdgeIndices,
+                        context,
+                        maximumConflictCandidates,
+                        outcome);
+                RecordPlaneCutCoexistenceSearchState(
+                    processedStates,
+                    exclusionReason,
+                    conflictEdges,
+                    node.EffectiveFailureDossier,
+                    outcome,
+                    ref result);
+
+                if (string.Equals(
+                        exclusionReason,
+                        "coexistence-incompatible",
+                        StringComparison.Ordinal) ||
+                    conflictEdges.Count == 0 ||
+                    outcome.ExcludedEdgeIndices.Count >= maximumExclusions)
+                {
+                    if (!string.IsNullOrEmpty(outcome.Blocker))
+                    {
+                        lastFailure = outcome.Blocker;
+                    }
+                    continue;
+                }
+
+                bool starConflict = string.Equals(
+                    exclusionReason,
+                    "source-vertex-star-incompatible",
+                    StringComparison.Ordinal);
+                bool pairConflict = string.Equals(
+                        exclusionReason,
+                        "plane-pair-incompatible",
+                        StringComparison.Ordinal) ||
+                    string.Equals(
+                        exclusionReason,
+                        "plane-band-incompatible",
+                        StringComparison.Ordinal);
+                HashSet<int> alreadyExcluded = new HashSet<int>(
+                    outcome.ExcludedEdgeIndices);
+                for (int edgeOrdinal = 0;
+                     edgeOrdinal < conflictEdges.Count &&
+                     trialOrdinal < maximumEvaluatedStates;
+                     edgeOrdinal++)
+                {
+                    int edgeToExclude = conflictEdges[edgeOrdinal];
+                    if (alreadyExcluded.Contains(edgeToExclude))
+                    {
+                        continue;
+                    }
+
+                    List<int> childExclusions =
+                        new List<int>(outcome.ExcludedEdgeIndices)
+                        {
+                            edgeToExclude
+                        };
+                    childExclusions.Sort();
+                    if (childExclusions.Count > maximumExclusions)
+                    {
+                        continue;
+                    }
+                    Dictionary<int, string> childReasons =
+                        ClonePlaneCutCoexistenceReasonMap(
+                            node.ReasonByExcludedEdge);
+                    childReasons[edgeToExclude] = exclusionReason;
+                    PlaneCutCoexistenceTrialOutcome childOutcome =
+                        EvaluatePlaneCutCoexistenceExclusionTrial(
+                            sourceFaces,
+                            sourceBounds,
+                            sourceVolume,
+                            context,
+                            allCandidates,
+                            noJunctions,
+                            minimumStableEdgeLength,
+                            minimumStableFaceArea,
+                            minimumScaleByEdge,
+                            outcome.ScaleByEdge,
+                            rootExpectedEdgeIndices,
+                            childExclusions,
+                            exclusionReason,
+                            basePassIndex,
+                            trialCache,
+                            ref trialOrdinal,
+                            ref result,
+                            starConflict,
+                            pairConflict);
+                    PlaneCutCoexistenceFailureDossier
+                        childEffectiveDossier =
+                            ResolvePlaneCutEffectiveFailureDossier(
+                                childOutcome.DirectFailureDossier,
+                                node.EffectiveFailureDossier,
+                                childExclusions,
+                                allCandidates);
+                    string childStateKey =
+                        BuildPlaneCutCoexistenceSearchNodeKey(
+                            childOutcome.CacheKey,
+                            childEffectiveDossier);
+                    if (!enqueuedStateKeys.Add(childStateKey))
+                    {
+                        deduplicatedStates++;
+                        continue;
+                    }
+                    frontier.Add(new PlaneCutCoexistenceSearchNode
+                    {
+                        Outcome = childOutcome,
+                        EffectiveFailureDossier =
+                            childEffectiveDossier,
+                        ReasonByExcludedEdge = childReasons
+                    });
+                }
+            }
+
+            result.CoexistenceTrialCount = trialOrdinal;
+            result.CoexistenceSearchStatesEvaluated = processedStates;
+            result.CoexistenceSearchStatesDeduplicated = deduplicatedStates;
+            result.CoexistenceSearchMaximumDepth = maximumDepth;
+            result.CoexistenceSearchFrontierRemaining = frontier.Count;
+            result.CoexistenceSearchWinningDepth = -1;
+            blocker = frontier.Count > 0
+                ? "coexistence closure exhausted its bounded state budget"
+                : string.IsNullOrEmpty(lastFailure)
+                    ? "coexistence closure exhausted its conflict-directed frontier"
+                    : lastFailure;
+            return false;
+        }
+
+        private static PlaneCutCoexistenceTrialOutcome
+            EvaluatePlaneCutCoexistenceExclusionTrial(
+                List<PolygonFace> sourceFaces,
+                Bounds sourceBounds,
+                double sourceVolume,
+                ChamferTopologyContext context,
+                List<PlaneCutBevelCandidate> allCandidates,
+                List<PlaneCutVertexJunctionCandidate> noJunctions,
+                float minimumStableEdgeLength,
+                float minimumStableFaceArea,
+                Dictionary<int, float> minimumScaleByEdge,
+                Dictionary<int, float> scaleByEdge,
+                List<int> rootExpectedEdgeIndices,
+                List<int> excludedEdges,
+                string exclusionReason,
+                int basePassIndex,
+                Dictionary<string, PlaneCutCoexistenceTrialOutcome> cache,
+                ref int trialOrdinal,
+                ref PlaneCutBevelAuditResult result,
+                bool starConflict,
+                bool pairConflict)
+        {
+            excludedEdges.Sort();
+            HashSet<int> excluded = new HashSet<int>(excludedEdges);
+            List<PlaneCutBevelCandidate> subset =
+                new List<PlaneCutBevelCandidate>();
+            Dictionary<int, float> subsetScales =
+                new Dictionary<int, float>();
+            for (int candidateIndex = 0;
+                 candidateIndex < allCandidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate = allCandidates[candidateIndex];
+                if (excluded.Contains(candidate.SourceEdgeIndex))
+                {
+                    continue;
+                }
+                subset.Add(candidate);
+                subsetScales[candidate.SourceEdgeIndex] =
+                    scaleByEdge.TryGetValue(
+                            candidate.SourceEdgeIndex,
+                            out float scale)
+                        ? Mathf.Clamp(
+                            scale,
+                            EdgeWearMinimumFeasibleWidthFraction,
+                            1f)
+                        : 1f;
+            }
+
+            string cacheKey = BuildPlaneCutCoexistenceTrialCacheKey(
+                excludedEdges,
+                subset,
+                subsetScales);
+            if (cache.TryGetValue(
+                    cacheKey,
+                    out PlaneCutCoexistenceTrialOutcome cached))
+            {
+                result.CoexistenceTrialCacheUseCount++;
+                if (starConflict)
+                {
+                    result.CoexistenceStarCacheUseCount++;
+                }
+                if (pairConflict)
+                {
+                    result.CoexistencePairCacheUseCount++;
+                }
+                return cached;
+            }
+
+            trialOrdinal++;
+            result.CoexistenceTrialCount = trialOrdinal;
+            if (starConflict)
+            {
+                result.CoexistenceStarEvaluationCount++;
+            }
+            if (pairConflict)
+            {
+                result.CoexistencePairEvaluationCount++;
+            }
+
+            PlaneCutCoexistenceTrialOutcome outcome =
+                new PlaneCutCoexistenceTrialOutcome
+                {
+                    CacheKey = cacheKey,
+                    ExclusionReason = exclusionReason,
+                    ScaleByEdge = subsetScales,
+                    Candidates = subset
+                };
+            outcome.ExcludedEdgeIndices.AddRange(excludedEdges);
+            if (subset.Count == 0)
+            {
+                outcome.FullyValid = false;
+                outcome.Blocker = "coexistence trial excluded every candidate";
+                outcome.FailureSignature = outcome.Blocker;
+                outcome.DirectFailureDossier =
+                    BuildPlaneCutCoexistenceFailureDossier(
+                        outcome.Audit,
+                        outcome.Trial,
+                        outcome.Blocker,
+                        allCandidates);
+                cache.Add(cacheKey, outcome);
+                return outcome;
+            }
+
+            PlaneCutSolverTransactionState baseState =
+                new PlaneCutSolverTransactionState
+                {
+                    Name = "coexistence-base",
+                    PassIndex = Mathf.Max(1, basePassIndex),
+                    ScaleByEdge = subsetScales
+                };
+            baseState.Candidates.AddRange(subset);
+            bool fullyValid = TryEvaluatePlaneCutRetreatTrial(
+                sourceFaces,
+                sourceBounds,
+                sourceVolume,
+                context,
+                subset,
+                noJunctions,
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                minimumScaleByEdge,
+                baseState,
+                new List<int>(),
+                trialOrdinal,
+                1f,
+                "coexistence-exclusion",
+                "none",
+                out PlaneCutTopologyScaleTrialRecord trial,
+                out Dictionary<int, float> trialScaleByEdge,
+                out List<PlaneCutBevelCandidate> trialCandidates,
+                out List<PolygonFace> trialFaces,
+                out PlaneCutBevelAuditResult trialAudit,
+                out string trialBlocker);
+            outcome.ScaleByEdge = trialScaleByEdge;
+            outcome.Candidates = trialCandidates;
+            outcome.Faces = trialFaces;
+            outcome.Trial = trial;
+            outcome.Audit = trialAudit;
+            outcome.Blocker = trialBlocker ?? string.Empty;
+            PopulatePlaneCutCandidateConservation(
+                rootExpectedEdgeIndices,
+                outcome.ExcludedEdgeIndices,
+                trialCandidates,
+                trial == null ? 0 : trial.AttemptedBuiltCount,
+                fullyValid,
+                ref outcome);
+            outcome.FullyValid = fullyValid &&
+                outcome.CandidateConservationValid &&
+                outcome.CertifiedCandidateCount ==
+                    outcome.ExpectedCandidateCount;
+            if (fullyValid && !outcome.FullyValid)
+            {
+                RecordPlaneCutCandidateConservationFailure(
+                    outcome,
+                    ref result);
+                outcome.Blocker = "candidate-conservation-failed";
+            }
+            outcome.FailureSignature =
+                BuildPlaneCutCoexistenceFailureSignature(
+                    trialAudit,
+                    outcome.Blocker);
+            outcome.DirectFailureDossier =
+                BuildPlaneCutCoexistenceFailureDossier(
+                    trialAudit,
+                    trial,
+                    outcome.Blocker,
+                    allCandidates);
+            cache.Add(cacheKey, outcome);
+            return outcome;
+        }
+
+        private static bool ApplyPlaneCutCoexistenceSuccess(
+            PlaneCutCoexistenceTrialOutcome outcome,
+            SortedSet<int> excludedEdges,
+            Dictionary<int, string> reasonByExcludedEdge,
+            int localityDeferredCount,
+            int basePassIndex,
+            ref PlaneCutBevelAuditResult result,
+            out List<PlaneCutBevelCandidate> retainedCandidates,
+            out List<PolygonFace> preparedFaces,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            retainedCandidates = outcome.Candidates;
+            preparedFaces = outcome.Faces;
+            ApplyPlaneCutTopologyTrialAuditToResult(
+                outcome.Audit,
+                ref result);
+            result.Diagnostic = string.Empty;
+            result.RetryFailureDossiers.Clear();
+            result.FirstOpenEdgeStage = "none";
+            result.FirstTJunctionStage = "none";
+            result.FirstNonPlanarStage = "none";
+            result.EdgeConflictBudgetExhausted = 0;
+            result.EdgeConflictUnresolvedCount = 0;
+            result.EdgeConflictResolvedCount = 1;
+            result.EdgeConflictVictimEdgeIndex = -1;
+            result.EdgeConflictForeignEdgeIndex = -1;
+            result.EdgeConflictVertexIndex = -1;
+            result.EdgeConflictDeferredEdgeIndex = -1;
+            result.EdgeConflictVictimCoverageRatio = 0f;
+            result.EdgeConflictForeignAxialParameter = 0f;
+            result.EdgeConflictForeignSharedSpanRatio = 0f;
+            result.ActiveSearchFailureStage = "none";
+            result.ActiveSearchFailureCause = "none";
+            result.ActiveSearchFailureEvidence = "none";
+            result.CoexistenceExclusionCount = excludedEdges.Count;
+            result.CoexistenceExcludedEdgeEvidence =
+                FormatPlaneCutEdgeIndexEvidence(
+                    new List<int>(excludedEdges));
+            result.CoexistenceExclusionReasonEvidence =
+                FormatPlaneCutCoexistenceReasonEvidence(
+                    excludedEdges,
+                    reasonByExcludedEdge);
+            result.CoexistenceMinimumCommittedWidthScale =
+                ResolveMinimumPlaneCutScale(outcome.ScaleByEdge);
+            result.EdgeConflictMinimumWidthScale =
+                result.CoexistenceMinimumCommittedWidthScale;
+            result.PlanesBuilt = retainedCandidates.Count;
+            result.AttemptedPlanesBuilt = retainedCandidates.Count;
+            result.CertifiedPlanesBuilt = retainedCandidates.Count;
+            result.TrialRejectedPlanes = 0;
+            result.PlanesDeferred = localityDeferredCount;
+            result.PlanesLocalized = CountLocalizedPlaneCutCandidates(
+                retainedCandidates);
+            result.AttemptedEdgeEvidence =
+                FormatPlaneCutCandidateEdgeEvidence(retainedCandidates);
+            result.BuiltEdgeEvidence =
+                result.AttemptedEdgeEvidence;
+            result.TrialRejectedEdgeEvidence = "none";
+            result.DeferredEdgeEvidence = "none";
+            result.LatestAttemptedState =
+                CapturePlaneCutSolverTransactionState(
+                    "coexistence-attempted",
+                    Mathf.Max(1, basePassIndex),
+                    retainedCandidates,
+                    preparedFaces,
+                    outcome.ScaleByEdge,
+                    true,
+                    true,
+                    outcome.Audit.StageFinalCertification);
+            result.LatestBandCleanState =
+                CapturePlaneCutSolverTransactionState(
+                    "coexistence-band-clean",
+                    Mathf.Max(1, basePassIndex),
+                    retainedCandidates,
+                    preparedFaces,
+                    outcome.ScaleByEdge,
+                    true,
+                    true,
+                    outcome.Audit.StageFinalCertification);
+            result.LatestTopologyCleanState =
+                CapturePlaneCutSolverTransactionState(
+                    "coexistence-topology-clean",
+                    Mathf.Max(1, basePassIndex),
+                    retainedCandidates,
+                    preparedFaces,
+                    outcome.ScaleByEdge,
+                    true,
+                    true,
+                    outcome.Audit.StageFinalCertification);
+            result.LatestCertifiedState =
+                CapturePlaneCutSolverTransactionState(
+                    "solver-clean",
+                    Mathf.Max(1, basePassIndex),
+                    retainedCandidates,
+                    preparedFaces,
+                    outcome.ScaleByEdge,
+                    true,
+                    true,
+                    outcome.Audit.StageFinalCertification);
+
+            EdgeWearCoverageAudit coverage = result.CoverageAudit;
+            if (coverage != null)
+            {
+                coverage.CoexistenceStarEvaluationCount =
+                    result.CoexistenceStarEvaluationCount;
+                coverage.CoexistenceStarCacheUseCount =
+                    result.CoexistenceStarCacheUseCount;
+                coverage.CoexistencePairEvaluationCount =
+                    result.CoexistencePairEvaluationCount;
+                coverage.CoexistencePairCacheUseCount =
+                    result.CoexistencePairCacheUseCount;
+                coverage.CoexistenceTrialCount =
+                    result.CoexistenceTrialCount;
+                coverage.CoexistenceSearchExclusionCount =
+                    excludedEdges.Count;
+                for (int recordIndex = 0;
+                     recordIndex < coverage.Records.Count;
+                     recordIndex++)
+                {
+                    EdgeWearEdgeLifecycleRecord record =
+                        coverage.Records[recordIndex];
+                    if (!excludedEdges.Contains(record.SourceEdgeIndex))
+                    {
+                        continue;
+                    }
+                    string reason = reasonByExcludedEdge.TryGetValue(
+                            record.SourceEdgeIndex,
+                            out string storedReason)
+                        ? storedReason
+                        : "coexistence-incompatible";
+                    record.CoexistenceEligible = false;
+                    record.CoexistenceFailureReason = reason;
+                    record.ViabilityState =
+                        EdgeWearViabilityState.CoexistenceIneligible;
+                    record.Candidate = false;
+                    record.CandidateIndex = -1;
+                    record.CandidateReason = reason;
+                    record.Selected = false;
+                    record.Active = false;
+                    record.AttemptedBuilt = false;
+                    record.Built = false;
+                    record.TrialRejected = false;
+                    record.Deferred = false;
+                    record.Rejected = false;
+                    record.MaterializedWidth = 0f;
+                    record.MaterializedWidthScale = 0f;
+                    record.WidthReduced = false;
+                    record.FinalReason = reason;
+                }
+                RecalculateEdgeWearCoverageAudit(coverage);
+                SynchronizePlaneCutCoexistenceExclusionEvidence(
+                    coverage,
+                    ref result);
+                result.SelectedEdgeCount = coverage.SelectedCount;
+                result.ActiveEdgeCount = coverage.ActiveCount;
+            }
+            else
+            {
+                result.SelectedEdgeCount = retainedCandidates.Count;
+                result.ActiveEdgeCount = retainedCandidates.Count;
+            }
+
+            FinalizeEdgeWearCoverageAfterPlaneShell(
+                result.CoverageAudit,
+                retainedCandidates);
+            result.CertifiedPlanesBuilt = retainedCandidates.Count;
+            result.TrialRejectedPlanes = 0;
+            result.PlanesBuilt = retainedCandidates.Count;
+            result.BuiltEdgeEvidence = result.AttemptedEdgeEvidence;
+            result.TrialRejectedEdgeEvidence = "none";
+            result.MaterializedEdgeCoverageValid =
+                IsEdgeWearCoverageMaterialized(
+                    result.CoverageAudit,
+                    result)
+                    ? 1
+                    : 0;
+            if (!IsPlaneCutWinningStateFinalized(
+                    retainedCandidates,
+                    localityDeferredCount,
+                    ref result,
+                    out blocker))
+            {
+                result.Diagnostic = blocker;
+                return false;
+            }
+            return true;
+        }
+
+        private static List<int> BuildPlaneCutCoexistenceConflictEdgeSet(
+            PlaneCutCoexistenceFailureDossier dossier,
+            List<PlaneCutBevelCandidate> allCandidates,
+            List<int> excludedEdges,
+            ChamferTopologyContext context,
+            int maximumCount,
+            PlaneCutCoexistenceTrialOutcome outcome)
+        {
+            HashSet<int> excluded = new HashSet<int>(
+                excludedEdges ?? new List<int>());
+            HashSet<int> active = new HashSet<int>();
+            for (int candidateIndex = 0;
+                 candidateIndex < allCandidates.Count;
+                 candidateIndex++)
+            {
+                int edge = allCandidates[candidateIndex].SourceEdgeIndex;
+                if (!excluded.Contains(edge))
+                {
+                    active.Add(edge);
+                }
+            }
+
+            SortedSet<int> implicated = new SortedSet<int>();
+            if (outcome != null)
+            {
+                for (int index = 0;
+                     index < outcome.MissingCandidateEdgeIndices.Count;
+                     index++)
+                {
+                    implicated.Add(
+                        outcome.MissingCandidateEdgeIndices[index]);
+                }
+                for (int index = 0;
+                     index < outcome.UnexpectedCandidateEdgeIndices.Count;
+                     index++)
+                {
+                    implicated.Add(
+                        outcome.UnexpectedCandidateEdgeIndices[index]);
+                }
+            }
+            if (dossier != null)
+            {
+                AddPlaneCutActiveDossierEdge(
+                    dossier.VictimEdge,
+                    active,
+                    implicated);
+                AddPlaneCutActiveDossierEdge(
+                    dossier.ForeignEdge,
+                    active,
+                    implicated);
+                AddPlaneCutActiveDossierEdges(
+                    dossier.LinkedEdges,
+                    active,
+                    implicated);
+                AddPlaneCutActiveDossierEdges(
+                    dossier.IncidentStarEdges,
+                    active,
+                    implicated);
+            }
+
+            List<PlaneCutBevelCandidate> ordered =
+                new List<PlaneCutBevelCandidate>();
+            for (int candidateIndex = 0;
+                 candidateIndex < allCandidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate =
+                    allCandidates[candidateIndex];
+                if (active.Contains(candidate.SourceEdgeIndex) &&
+                    implicated.Contains(candidate.SourceEdgeIndex))
+                {
+                    ordered.Add(candidate);
+                }
+            }
+            ordered.Sort((left, right) =>
+                ComparePlaneCutBacktrackCandidates(
+                    left,
+                    right,
+                    context));
+            List<int> result = new List<int>();
+            for (int candidateIndex = 0;
+                 candidateIndex < ordered.Count &&
+                 result.Count < maximumCount;
+                 candidateIndex++)
+            {
+                result.Add(ordered[candidateIndex].SourceEdgeIndex);
+            }
+            return result;
+        }
+
+        private static void AddPlaneCutActiveDossierEdge(
+            int edge,
+            HashSet<int> active,
+            SortedSet<int> destination)
+        {
+            if (edge >= 0 && active.Contains(edge))
+            {
+                destination.Add(edge);
+            }
+        }
+
+        private static void AddPlaneCutActiveDossierEdges(
+            List<int> edges,
+            HashSet<int> active,
+            SortedSet<int> destination)
+        {
+            if (edges == null)
+            {
+                return;
+            }
+            for (int index = 0; index < edges.Count; index++)
+            {
+                AddPlaneCutActiveDossierEdge(
+                    edges[index],
+                    active,
+                    destination);
+            }
+        }
+
+        private static void AddPlaneCutIncidentCandidateEdges(
+            List<PlaneCutBevelCandidate> candidates,
+            int vertexIndex,
+            SortedSet<int> destination)
+        {
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate = candidates[candidateIndex];
+                if (candidate.VertexA == vertexIndex ||
+                    candidate.VertexB == vertexIndex)
+                {
+                    destination.Add(candidate.SourceEdgeIndex);
+                }
+            }
+        }
+
+        private static string ResolvePlaneCutCoexistenceExclusionReason(
+            PlaneCutCoexistenceFailureDossier dossier,
+            PlaneCutCoexistenceTrialOutcome outcome)
+        {
+            if (outcome != null &&
+                !outcome.CandidateConservationValid)
+            {
+                return "candidate-conservation-incompatible";
+            }
+            if (dossier == null)
+            {
+                return "coexistence-incompatible";
+            }
+            switch (dossier.Category)
+            {
+                case PlaneCutCoexistenceFailureCategory.PlaneBand:
+                    return "plane-band-incompatible";
+                case PlaneCutCoexistenceFailureCategory.StrictIntersection:
+                case PlaneCutCoexistenceFailureCategory.TJunction:
+                    return "plane-pair-incompatible";
+                case PlaneCutCoexistenceFailureCategory.MissingJunction:
+                    return "source-vertex-star-incompatible";
+                case PlaneCutCoexistenceFailureCategory.CandidateConservation:
+                    return "candidate-conservation-incompatible";
+                default:
+                    return "coexistence-incompatible";
+            }
+        }
+
+        private static PlaneCutCoexistenceFailureDossier
+            BuildPlaneCutCoexistenceFailureDossier(
+                PlaneCutBevelAuditResult audit,
+                PlaneCutTopologyScaleTrialRecord trial,
+                string blocker,
+                List<PlaneCutBevelCandidate> originalCandidates)
+        {
+            PlaneCutCoexistenceFailureDossier dossier =
+                new PlaneCutCoexistenceFailureDossier
+                {
+                    Stage = trial == null ||
+                            string.IsNullOrEmpty(trial.FailureStage)
+                        ? "none"
+                        : trial.FailureStage,
+                    Diagnostic = blocker ?? string.Empty
+                };
+            if (trial != null && trial.FullyValid == 1)
+            {
+                return dossier;
+            }
+            if (string.Equals(
+                    blocker,
+                    "candidate-conservation-failed",
+                    StringComparison.Ordinal))
+            {
+                dossier.Category =
+                    PlaneCutCoexistenceFailureCategory
+                        .CandidateConservation;
+                return dossier;
+            }
+            PlaneCutNumericalRepairTelemetry numerical =
+                audit.NumericalRepairs;
+            if (numerical != null &&
+                numerical.FirstExactFailureRecorded == 1)
+            {
+                dossier.Category =
+                    PlaneCutCoexistenceFailureCategory
+                        .StrictIntersection;
+                if (numerical.FirstExactFailureOwnerProvenanceKind ==
+                    PolygonFaceProvenanceKind.EdgeBevelPlane)
+                {
+                    dossier.VictimEdge =
+                        numerical.FirstExactFailureOwnerProvenanceIndex;
+                    AddPlaneCutUniqueDossierEdge(
+                        dossier.LinkedEdges,
+                        dossier.VictimEdge);
+                }
+                if (numerical.FirstExactFailureCutProvenanceKind ==
+                    PolygonFaceProvenanceKind.EdgeBevelPlane)
+                {
+                    dossier.ForeignEdge =
+                        numerical.FirstExactFailureCutProvenanceIndex;
+                    AddPlaneCutUniqueDossierEdge(
+                        dossier.LinkedEdges,
+                        dossier.ForeignEdge);
+                }
+                return dossier;
+            }
+
+            PlaneCutOpenEdgeFailureRecord? openFailure =
+                FindPlaneCutSourceVertexOpenFailure(audit);
+            if (openFailure.HasValue)
+            {
+                PlaneCutOpenEdgeFailureRecord failure =
+                    openFailure.Value;
+                dossier.Category =
+                    PlaneCutCoexistenceFailureCategory.MissingJunction;
+                dossier.Stage = string.IsNullOrEmpty(
+                        failure.FirstFailureStage)
+                    ? dossier.Stage
+                    : failure.FirstFailureStage;
+                dossier.SourceVertex =
+                    failure.AssociatedSourceVertex;
+                BuildPlaneCutImmutableIncidentStar(
+                    originalCandidates,
+                    dossier.SourceVertex,
+                    dossier.IncidentStarEdges);
+                dossier.LinkedEdges.AddRange(
+                    dossier.IncidentStarEdges);
+                dossier.OpenEdgeCount = Mathf.Max(
+                    1,
+                    audit.OpenEdgeCount);
+                return dossier;
+            }
+
+            PlaneCutTJunctionFailureRecord tJunction =
+                FindPlaneCutCoexistenceTJunctionFailure(audit);
+            if (tJunction != null)
+            {
+                dossier.Category =
+                    PlaneCutCoexistenceFailureCategory.TJunction;
+                dossier.Stage = string.IsNullOrEmpty(tJunction.Stage)
+                    ? dossier.Stage
+                    : tJunction.Stage;
+                AddPlaneCutUniqueDossierEdges(
+                    dossier.LinkedEdges,
+                    tJunction.LinkedEdgeIndices);
+                dossier.TJunctionCount = Mathf.Max(
+                    1,
+                    audit.TJunctionCount);
+                return dossier;
+            }
+            PlaneCutRetryFailureDossier retryFailure =
+                ResolveLatestPlaneCutRetryFailureDossier(audit);
+            if (retryFailure != null &&
+                retryFailure.TJunctionCount > 0 &&
+                retryFailure.LinkedEdgeIndices.Count > 0)
+            {
+                dossier.Category =
+                    PlaneCutCoexistenceFailureCategory.TJunction;
+                dossier.Stage = string.IsNullOrEmpty(retryFailure.Stage)
+                    ? dossier.Stage
+                    : retryFailure.Stage;
+                AddPlaneCutUniqueDossierEdges(
+                    dossier.LinkedEdges,
+                    retryFailure.LinkedEdgeIndices);
+                dossier.TJunctionCount = retryFailure.TJunctionCount;
+                return dossier;
+            }
+
+            if (audit.EdgeConflictVictimEdgeIndex >= 0 &&
+                audit.EdgeConflictForeignEdgeIndex >= 0)
+            {
+                dossier.Category =
+                    PlaneCutCoexistenceFailureCategory.PlaneBand;
+                dossier.Stage = "BandIntegrity";
+                dossier.VictimEdge =
+                    audit.EdgeConflictVictimEdgeIndex;
+                dossier.ForeignEdge =
+                    audit.EdgeConflictForeignEdgeIndex;
+                dossier.SourceVertex = audit.EdgeConflictVertexIndex;
+                if (dossier.SourceVertex >= 0)
+                {
+                    BuildPlaneCutImmutableIncidentStar(
+                        originalCandidates,
+                        dossier.SourceVertex,
+                        dossier.IncidentStarEdges);
+                }
+                AddPlaneCutUniqueDossierEdge(
+                    dossier.LinkedEdges,
+                    dossier.VictimEdge);
+                AddPlaneCutUniqueDossierEdge(
+                    dossier.LinkedEdges,
+                    dossier.ForeignEdge);
+                return dossier;
+            }
+            if (trial != null &&
+                trial.BandVictimEdgeIndex >= 0 &&
+                trial.BandForeignEdgeIndex >= 0)
+            {
+                dossier.Category =
+                    PlaneCutCoexistenceFailureCategory.PlaneBand;
+                dossier.Stage = "BandIntegrity";
+                dossier.VictimEdge = trial.BandVictimEdgeIndex;
+                dossier.ForeignEdge = trial.BandForeignEdgeIndex;
+                AddPlaneCutUniqueDossierEdge(
+                    dossier.LinkedEdges,
+                    dossier.VictimEdge);
+                AddPlaneCutUniqueDossierEdge(
+                    dossier.LinkedEdges,
+                    dossier.ForeignEdge);
+                return dossier;
+            }
+
+            dossier.OpenEdgeCount = audit.OpenEdgeCount;
+            dossier.TJunctionCount = audit.TJunctionCount;
+            dossier.NonPlanarCount = audit.FaceQualityNonPlanarCount;
+            if (audit.FaceQualityNonPlanarCount > 0 ||
+                audit.InvalidFaceCount > 0)
+            {
+                dossier.Category =
+                    PlaneCutCoexistenceFailureCategory.FaceQuality;
+                return dossier;
+            }
+            if (trial != null)
+            {
+                if (string.Equals(
+                        trial.FailureCause,
+                        "retained-volume",
+                        StringComparison.Ordinal))
+                {
+                    dossier.Category =
+                        PlaneCutCoexistenceFailureCategory
+                            .RetainedVolume;
+                    return dossier;
+                }
+                if (string.Equals(
+                        trial.FailureCause,
+                        "source-bounds",
+                        StringComparison.Ordinal))
+                {
+                    dossier.Category =
+                        PlaneCutCoexistenceFailureCategory.SourceBounds;
+                    return dossier;
+                }
+                if (string.Equals(
+                        trial.FailureCause,
+                        "one-surface-render",
+                        StringComparison.Ordinal) ||
+                    string.Equals(
+                        trial.FailureCause,
+                        "preview-mesh",
+                        StringComparison.Ordinal))
+                {
+                    dossier.Category =
+                        PlaneCutCoexistenceFailureCategory
+                            .SurfaceTriangulation;
+                    return dossier;
+                }
+            }
+            dossier.Category = audit.OpenEdgeCount > 0 ||
+                    audit.NonManifoldEdgeCount > 0
+                ? PlaneCutCoexistenceFailureCategory.OpenBoundary
+                : PlaneCutCoexistenceFailureCategory.General;
+            return dossier;
+        }
+
+        private static PlaneCutCoexistenceFailureDossier
+            ResolvePlaneCutEffectiveFailureDossier(
+                PlaneCutCoexistenceFailureDossier direct,
+                PlaneCutCoexistenceFailureDossier parent,
+                List<int> excludedEdges,
+                List<PlaneCutBevelCandidate> originalCandidates)
+        {
+            if (HasPlaneCutAuthoritativeFailureDossier(direct))
+            {
+                return ClonePlaneCutCoexistenceFailureDossier(direct);
+            }
+            if (!HasPlaneCutExpandableFailureDossier(parent))
+            {
+                return direct == null
+                    ? new PlaneCutCoexistenceFailureDossier
+                    {
+                        Category =
+                            PlaneCutCoexistenceFailureCategory.General
+                    }
+                    : ClonePlaneCutCoexistenceFailureDossier(direct);
+            }
+
+            PlaneCutCoexistenceFailureDossier inherited =
+                ClonePlaneCutCoexistenceFailureDossier(parent);
+            inherited.Stage = "inherited:" +
+                (string.IsNullOrEmpty(parent.Stage)
+                    ? "unknown"
+                    : parent.Stage);
+            if (direct != null &&
+                !string.IsNullOrEmpty(direct.Diagnostic))
+            {
+                inherited.Diagnostic = direct.Diagnostic;
+            }
+            if (inherited.Category ==
+                    PlaneCutCoexistenceFailureCategory.MissingJunction &&
+                inherited.IncidentStarEdges.Count == 0 &&
+                inherited.SourceVertex >= 0)
+            {
+                BuildPlaneCutImmutableIncidentStar(
+                    originalCandidates,
+                    inherited.SourceVertex,
+                    inherited.IncidentStarEdges);
+            }
+            return inherited;
+        }
+
+        private static bool HasPlaneCutAuthoritativeFailureDossier(
+            PlaneCutCoexistenceFailureDossier dossier)
+        {
+            if (dossier == null)
+            {
+                return false;
+            }
+            return dossier.Category !=
+                    PlaneCutCoexistenceFailureCategory.None &&
+                dossier.Category !=
+                    PlaneCutCoexistenceFailureCategory.General &&
+                dossier.Category !=
+                    PlaneCutCoexistenceFailureCategory.OpenBoundary;
+        }
+
+        private static bool HasPlaneCutExpandableFailureDossier(
+            PlaneCutCoexistenceFailureDossier dossier)
+        {
+            if (dossier == null)
+            {
+                return false;
+            }
+            return dossier.Category ==
+                    PlaneCutCoexistenceFailureCategory.PlaneBand ||
+                dossier.Category ==
+                    PlaneCutCoexistenceFailureCategory
+                        .StrictIntersection ||
+                dossier.Category ==
+                    PlaneCutCoexistenceFailureCategory.MissingJunction ||
+                dossier.Category ==
+                    PlaneCutCoexistenceFailureCategory.TJunction;
+        }
+
+        private static PlaneCutCoexistenceFailureDossier
+            ClonePlaneCutCoexistenceFailureDossier(
+                PlaneCutCoexistenceFailureDossier source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+            PlaneCutCoexistenceFailureDossier clone =
+                new PlaneCutCoexistenceFailureDossier
+                {
+                    Category = source.Category,
+                    Stage = source.Stage,
+                    SourceVertex = source.SourceVertex,
+                    VictimEdge = source.VictimEdge,
+                    ForeignEdge = source.ForeignEdge,
+                    OpenEdgeCount = source.OpenEdgeCount,
+                    TJunctionCount = source.TJunctionCount,
+                    NonPlanarCount = source.NonPlanarCount,
+                    Diagnostic = source.Diagnostic
+                };
+            clone.LinkedEdges.AddRange(source.LinkedEdges);
+            clone.IncidentStarEdges.AddRange(source.IncidentStarEdges);
+            return clone;
+        }
+
+        private static PlaneCutOpenEdgeFailureRecord?
+            FindPlaneCutSourceVertexOpenFailure(
+                PlaneCutBevelAuditResult audit)
+        {
+            if (audit.OpenEdgeFailures != null)
+            {
+                for (int index = 0;
+                     index < audit.OpenEdgeFailures.Count;
+                     index++)
+                {
+                    PlaneCutOpenEdgeFailureRecord failure =
+                        audit.OpenEdgeFailures[index];
+                    if (failure.AssociatedSourceVertex >= 0)
+                    {
+                        return failure;
+                    }
+                }
+            }
+            PlaneCutRetryFailureDossier retry =
+                ResolveLatestPlaneCutRetryFailureDossier(audit);
+            if (retry != null)
+            {
+                for (int index = 0;
+                     index < retry.OpenEdgeFailures.Count;
+                     index++)
+                {
+                    PlaneCutOpenEdgeFailureRecord failure =
+                        retry.OpenEdgeFailures[index];
+                    if (failure.AssociatedSourceVertex >= 0)
+                    {
+                        return failure;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private static PlaneCutTJunctionFailureRecord
+            FindPlaneCutCoexistenceTJunctionFailure(
+                PlaneCutBevelAuditResult audit)
+        {
+            if (audit.TJunctionFailures != null &&
+                audit.TJunctionFailures.Count > 0)
+            {
+                return audit.TJunctionFailures[0];
+            }
+            PlaneCutRetryFailureDossier retry =
+                ResolveLatestPlaneCutRetryFailureDossier(audit);
+            if (retry != null &&
+                retry.TJunctionFailures.Count > 0)
+            {
+                return retry.TJunctionFailures[0];
+            }
+            return null;
+        }
+
+        private static PlaneCutRetryFailureDossier
+            ResolveLatestPlaneCutRetryFailureDossier(
+                PlaneCutBevelAuditResult audit)
+        {
+            return audit.RetryFailureDossiers == null ||
+                    audit.RetryFailureDossiers.Count == 0
+                ? null
+                : audit.RetryFailureDossiers[
+                    audit.RetryFailureDossiers.Count - 1];
+        }
+
+        private static void BuildPlaneCutImmutableIncidentStar(
+            List<PlaneCutBevelCandidate> originalCandidates,
+            int sourceVertex,
+            List<int> destination)
+        {
+            destination.Clear();
+            if (originalCandidates == null || sourceVertex < 0)
+            {
+                return;
+            }
+            SortedSet<int> star = new SortedSet<int>();
+            for (int candidateIndex = 0;
+                 candidateIndex < originalCandidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate =
+                    originalCandidates[candidateIndex];
+                if (candidate.VertexA == sourceVertex ||
+                    candidate.VertexB == sourceVertex)
+                {
+                    star.Add(candidate.SourceEdgeIndex);
+                }
+            }
+            destination.AddRange(star);
+        }
+
+        private static void AddPlaneCutUniqueDossierEdges(
+            List<int> destination,
+            List<int> source)
+        {
+            if (source == null)
+            {
+                return;
+            }
+            for (int index = 0; index < source.Count; index++)
+            {
+                AddPlaneCutUniqueDossierEdge(
+                    destination,
+                    source[index]);
+            }
+        }
+
+        private static void AddPlaneCutUniqueDossierEdge(
+            List<int> destination,
+            int edge)
+        {
+            if (edge >= 0 && !destination.Contains(edge))
+            {
+                destination.Add(edge);
+                destination.Sort();
+            }
+        }
+
+        private static bool IsPlaneCutWinningStateFinalized(
+            List<PlaneCutBevelCandidate> retainedCandidates,
+            int localityDeferredCount,
+            ref PlaneCutBevelAuditResult result,
+            out string blocker)
+        {
+            EdgeWearCoverageAudit coverage = result.CoverageAudit;
+            int retainedCount = retainedCandidates == null
+                ? 0
+                : retainedCandidates.Count;
+            bool valid = coverage != null &&
+                coverage.CoexistenceEligibleCount ==
+                    coverage.SelectedCount &&
+                coverage.SelectedCount ==
+                    coverage.AttemptedBuiltCount &&
+                coverage.AttemptedBuiltCount == coverage.BuiltCount &&
+                coverage.BuiltCount == retainedCount &&
+                coverage.UnresolvedWidthInactiveCount == 0 &&
+                coverage.TrialRejectedCount == 0 &&
+                coverage.DeferredCount == 0 &&
+                coverage.RejectedCount == 0 &&
+                coverage.UnmappedCount == 0 &&
+                result.AttemptedPlanesBuilt == retainedCount &&
+                result.CertifiedPlanesBuilt == retainedCount &&
+                result.TrialRejectedPlanes == 0 &&
+                localityDeferredCount == 0 &&
+                result.MaterializedEdgeCoverageValid == 1;
+            if (valid)
+            {
+                blocker = string.Empty;
+                return true;
+            }
+            blocker = "winning-state-finalization-failed:" +
+                "coexistence/selected/attempted/built/retained=" +
+                (coverage == null
+                    ? "missing"
+                    : coverage.CoexistenceEligibleCount + "/" +
+                        coverage.SelectedCount + "/" +
+                        coverage.AttemptedBuiltCount + "/" +
+                        coverage.BuiltCount) +
+                "/" + retainedCount +
+                ",widthInactive/unresolvedWidthInactive/" +
+                    "trialRejected/deferred/rejected/unmapped=" +
+                (coverage == null
+                    ? "missing"
+                    : coverage.WidthInactiveCount + "/" +
+                        coverage.UnresolvedWidthInactiveCount + "/" +
+                        coverage.TrialRejectedCount + "/" +
+                        coverage.DeferredCount + "/" +
+                        coverage.RejectedCount + "/" +
+                        coverage.UnmappedCount) +
+                ",planes=" + result.AttemptedPlanesBuilt + "/" +
+                    result.CertifiedPlanesBuilt + "/" +
+                    result.TrialRejectedPlanes +
+                ",localityDeferred=" + localityDeferredCount +
+                ",materialized=" +
+                    result.MaterializedEdgeCoverageValid;
+            return false;
+        }
+
+        private static string BuildPlaneCutCoexistenceFailureSignature(
+            PlaneCutBevelAuditResult audit,
+            string blocker)
+        {
+            if (string.Equals(
+                    blocker,
+                    "candidate-conservation-failed",
+                    StringComparison.Ordinal))
+            {
+                return "candidate-conservation";
+            }
+            PlaneCutNumericalRepairTelemetry numerical =
+                audit.NumericalRepairs;
+            if (numerical != null &&
+                numerical.FirstExactFailureRecorded == 1)
+            {
+                return "strict:" +
+                    numerical.FirstExactFailureOwnerProvenanceKind + ":" +
+                    numerical.FirstExactFailureOwnerProvenanceIndex + "/" +
+                    numerical.FirstExactFailureCutProvenanceKind + ":" +
+                    numerical.FirstExactFailureCutProvenanceIndex;
+            }
+            if (audit.OpenEdgeFailures != null &&
+                audit.OpenEdgeFailures.Count > 0)
+            {
+                PlaneCutOpenEdgeFailureRecord failure =
+                    audit.OpenEdgeFailures[0];
+                return "open:" + failure.FirstFailureStage + ":" +
+                    failure.AssociatedSourceVertex + ":" + failure.Cause;
+            }
+            if (audit.TJunctionFailures != null &&
+                audit.TJunctionFailures.Count > 0)
+            {
+                PlaneCutTJunctionFailureRecord failure =
+                    audit.TJunctionFailures[0];
+                return "tjunction:" + failure.Stage + ":" +
+                    FormatPlaneCutEdgeIndexEvidence(
+                        failure.LinkedEdgeIndices);
+            }
+            if (audit.EdgeConflictVictimEdgeIndex >= 0 ||
+                audit.EdgeConflictForeignEdgeIndex >= 0)
+            {
+                return "band:" + audit.EdgeConflictVictimEdgeIndex + "/" +
+                    audit.EdgeConflictForeignEdgeIndex;
+            }
+            return string.IsNullOrEmpty(blocker)
+                ? "unknown"
+                : blocker;
+        }
+
+        private static string BuildPlaneCutCoexistenceTrialCacheKey(
+            List<int> excludedEdges,
+            List<PlaneCutBevelCandidate> candidates,
+            Dictionary<int, float> scaleByEdge)
+        {
+            List<int> edges = new List<int>();
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                edges.Add(candidates[candidateIndex].SourceEdgeIndex);
+            }
+            edges.Sort();
+            StringBuilder builder = new StringBuilder();
+            builder.Append("excluded:");
+            builder.Append(FormatPlaneCutEdgeIndexEvidence(
+                excludedEdges));
+            builder.Append('|');
+            for (int edgeOrdinal = 0;
+                 edgeOrdinal < edges.Count;
+                 edgeOrdinal++)
+            {
+                if (edgeOrdinal > 0)
+                {
+                    builder.Append('/');
+                }
+                int edge = edges[edgeOrdinal];
+                builder.Append(edge);
+                builder.Append('=');
+                builder.Append(scaleByEdge.TryGetValue(edge, out float scale)
+                    ? scale.ToString("R")
+                    : "1");
+            }
+            return builder.ToString();
+        }
+
+        private static void
+            SynchronizePlaneCutCoexistenceExclusionEvidence(
+                EdgeWearCoverageAudit coverage,
+                ref PlaneCutBevelAuditResult result)
+        {
+            if (coverage == null || coverage.Records == null)
+            {
+                return;
+            }
+
+            SortedSet<int> excludedEdges = new SortedSet<int>();
+            Dictionary<int, string> reasonByExcludedEdge =
+                new Dictionary<int, string>();
+            for (int recordIndex = 0;
+                 recordIndex < coverage.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    coverage.Records[recordIndex];
+                if (record.ViabilityState !=
+                        EdgeWearViabilityState.CoexistenceIneligible ||
+                    record.SourceEdgeIndex < 0)
+                {
+                    continue;
+                }
+
+                excludedEdges.Add(record.SourceEdgeIndex);
+                string reason = string.IsNullOrEmpty(
+                        record.CoexistenceFailureReason)
+                    ? record.FinalReason
+                    : record.CoexistenceFailureReason;
+                reasonByExcludedEdge[record.SourceEdgeIndex] =
+                    string.IsNullOrEmpty(reason)
+                        ? "coexistence-incompatible"
+                        : reason;
+            }
+
+            result.CoexistenceExclusionCount = excludedEdges.Count;
+            result.CoexistenceExcludedEdgeEvidence =
+                FormatPlaneCutEdgeIndexEvidence(
+                    new List<int>(excludedEdges));
+            result.CoexistenceExclusionReasonEvidence =
+                FormatPlaneCutCoexistenceReasonEvidence(
+                    excludedEdges,
+                    reasonByExcludedEdge);
+        }
+
+        private static List<int> BuildPlaneCutExpectedCoexistenceEdgeSet(
+            EdgeWearCoverageAudit coverage,
+            List<PlaneCutBevelCandidate> candidates)
+        {
+            SortedSet<int> expected = new SortedSet<int>();
+            if (coverage != null)
+            {
+                for (int recordIndex = 0;
+                     recordIndex < coverage.Records.Count;
+                     recordIndex++)
+                {
+                    EdgeWearEdgeLifecycleRecord record =
+                        coverage.Records[recordIndex];
+                    if (record.Selected &&
+                        record.Active &&
+                        !record.WidthInactive &&
+                        record.CoexistenceEligible &&
+                        !record.Deferred &&
+                        !record.Rejected &&
+                        record.ViabilityState !=
+                            EdgeWearViabilityState.CoexistenceIneligible)
+                    {
+                        expected.Add(record.SourceEdgeIndex);
+                    }
+                }
+            }
+            if (coverage == null && candidates != null)
+            {
+                for (int candidateIndex = 0;
+                     candidateIndex < candidates.Count;
+                     candidateIndex++)
+                {
+                    expected.Add(
+                        candidates[candidateIndex].SourceEdgeIndex);
+                }
+            }
+            return new List<int>(expected);
+        }
+
+        private static void PopulatePlaneCutCandidateConservation(
+            List<int> rootExpectedEdgeIndices,
+            List<int> excludedEdgeIndices,
+            List<PlaneCutBevelCandidate> actualCandidates,
+            int attemptedBuiltCount,
+            bool geometryFullyValid,
+            ref PlaneCutCoexistenceTrialOutcome outcome)
+        {
+            HashSet<int> excluded = new HashSet<int>(
+                excludedEdgeIndices ?? new List<int>());
+            SortedSet<int> expected = new SortedSet<int>();
+            for (int index = 0;
+                 index < rootExpectedEdgeIndices.Count;
+                 index++)
+            {
+                int edge = rootExpectedEdgeIndices[index];
+                if (!excluded.Contains(edge))
+                {
+                    expected.Add(edge);
+                }
+            }
+            SortedSet<int> actual = new SortedSet<int>();
+            if (actualCandidates != null)
+            {
+                for (int candidateIndex = 0;
+                     candidateIndex < actualCandidates.Count;
+                     candidateIndex++)
+                {
+                    actual.Add(
+                        actualCandidates[candidateIndex].SourceEdgeIndex);
+                }
+            }
+
+            outcome.ExpectedCandidateEdgeIndices.Clear();
+            outcome.ActualCandidateEdgeIndices.Clear();
+            outcome.MissingCandidateEdgeIndices.Clear();
+            outcome.UnexpectedCandidateEdgeIndices.Clear();
+            outcome.ExpectedCandidateEdgeIndices.AddRange(expected);
+            outcome.ActualCandidateEdgeIndices.AddRange(actual);
+            foreach (int edge in expected)
+            {
+                if (!actual.Contains(edge))
+                {
+                    outcome.MissingCandidateEdgeIndices.Add(edge);
+                }
+            }
+            foreach (int edge in actual)
+            {
+                if (!expected.Contains(edge))
+                {
+                    outcome.UnexpectedCandidateEdgeIndices.Add(edge);
+                }
+            }
+            outcome.ExpectedCandidateCount = expected.Count;
+            outcome.ActualCandidateCount = actual.Count;
+            outcome.CertifiedCandidateCount = geometryFullyValid
+                ? actual.Count
+                : 0;
+            outcome.CandidateConservationValid =
+                outcome.MissingCandidateEdgeIndices.Count == 0 &&
+                outcome.UnexpectedCandidateEdgeIndices.Count == 0 &&
+                attemptedBuiltCount == actual.Count;
+        }
+
+        private static void RecordPlaneCutCandidateConservationFailure(
+            PlaneCutCoexistenceTrialOutcome outcome,
+            ref PlaneCutBevelAuditResult result)
+        {
+            result.CoexistenceCandidateConservationFailureCount++;
+            result.CoexistenceCandidateExpectedEvidence =
+                FormatPlaneCutEdgeIndexEvidence(
+                    outcome.ExpectedCandidateEdgeIndices);
+            result.CoexistenceCandidateActualEvidence =
+                FormatPlaneCutEdgeIndexEvidence(
+                    outcome.ActualCandidateEdgeIndices);
+            result.CoexistenceCandidateMissingEvidence =
+                FormatPlaneCutEdgeIndexEvidence(
+                    outcome.MissingCandidateEdgeIndices);
+            result.CoexistenceCandidateUnexpectedEvidence =
+                FormatPlaneCutEdgeIndexEvidence(
+                    outcome.UnexpectedCandidateEdgeIndices);
+        }
+
+        private static string BuildPlaneCutCoexistenceSearchNodeKey(
+            string outcomeKey,
+            PlaneCutCoexistenceFailureDossier dossier)
+        {
+            if (dossier == null)
+            {
+                return outcomeKey + "|dossier:none";
+            }
+            return outcomeKey + "|dossier:" +
+                dossier.Category + ":" +
+                dossier.SourceVertex + ":" +
+                dossier.VictimEdge + ":" +
+                dossier.ForeignEdge + ":" +
+                FormatPlaneCutEdgeIndexEvidence(dossier.LinkedEdges) +
+                ":" +
+                FormatPlaneCutEdgeIndexEvidence(
+                    dossier.IncidentStarEdges);
+        }
+
+        private static string BuildPlaneCutCoexistenceSearchStateKey(
+            List<int> excludedEdges,
+            Dictionary<int, float> scaleByEdge)
+        {
+            List<int> orderedEdges = new List<int>(
+                scaleByEdge.Keys);
+            orderedEdges.Sort();
+            StringBuilder builder = new StringBuilder();
+            builder.Append("excluded:");
+            builder.Append(FormatPlaneCutEdgeIndexEvidence(
+                excludedEdges));
+            builder.Append('|');
+            for (int index = 0; index < orderedEdges.Count; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append('/');
+                }
+                int edge = orderedEdges[index];
+                builder.Append(edge);
+                builder.Append('=');
+                builder.Append(scaleByEdge[edge].ToString("R"));
+            }
+            return builder.ToString();
+        }
+
+        private static Dictionary<int, string>
+            ClonePlaneCutCoexistenceReasonMap(
+                Dictionary<int, string> source)
+        {
+            return source == null
+                ? new Dictionary<int, string>()
+                : new Dictionary<int, string>(source);
+        }
+
+        private static int ComparePlaneCutCoexistenceSearchNodes(
+            PlaneCutCoexistenceSearchNode left,
+            PlaneCutCoexistenceSearchNode right,
+            List<PlaneCutBevelCandidate> allCandidates)
+        {
+            int objective = ComparePlaneCutCoexistenceOutcomes(
+                left.Outcome,
+                right.Outcome,
+                allCandidates);
+            if (objective != 0)
+            {
+                return objective;
+            }
+            float leftScale = ResolveMinimumPlaneCutScale(
+                left.Outcome.ScaleByEdge);
+            float rightScale = ResolveMinimumPlaneCutScale(
+                right.Outcome.ScaleByEdge);
+            int scale = rightScale.CompareTo(leftScale);
+            if (scale != 0)
+            {
+                return scale;
+            }
+            return string.CompareOrdinal(
+                left.Outcome.CacheKey,
+                right.Outcome.CacheKey);
+        }
+
+        private static void RecordPlaneCutCoexistenceSearchState(
+            int stateIndex,
+            string failureCategory,
+            List<int> implicatedEdges,
+            PlaneCutCoexistenceFailureDossier dossier,
+            PlaneCutCoexistenceTrialOutcome outcome,
+            ref PlaneCutBevelAuditResult result)
+        {
+            if (result.CoexistenceSearchStates == null)
+            {
+                result.CoexistenceSearchStates =
+                    new List<PlaneCutCoexistenceSearchStateRecord>();
+            }
+            if (!outcome.CandidateConservationValid)
+            {
+                result.CoexistenceCandidateExpectedEvidence =
+                    FormatPlaneCutEdgeIndexEvidence(
+                        outcome.ExpectedCandidateEdgeIndices);
+                result.CoexistenceCandidateActualEvidence =
+                    FormatPlaneCutEdgeIndexEvidence(
+                        outcome.ActualCandidateEdgeIndices);
+                result.CoexistenceCandidateMissingEvidence =
+                    FormatPlaneCutEdgeIndexEvidence(
+                        outcome.MissingCandidateEdgeIndices);
+                result.CoexistenceCandidateUnexpectedEvidence =
+                    FormatPlaneCutEdgeIndexEvidence(
+                        outcome.UnexpectedCandidateEdgeIndices);
+            }
+            result.CoexistenceSearchStates.Add(
+                new PlaneCutCoexistenceSearchStateRecord
+                {
+                    StateIndex = stateIndex,
+                    Depth = outcome.ExcludedEdgeIndices.Count,
+                    ExclusionEvidence =
+                        FormatPlaneCutEdgeIndexEvidence(
+                            outcome.ExcludedEdgeIndices),
+                    FailureCategory = string.IsNullOrEmpty(failureCategory)
+                        ? "unknown"
+                        : failureCategory,
+                    FailureStage = dossier == null ||
+                            string.IsNullOrEmpty(dossier.Stage)
+                        ? "none"
+                        : dossier.Stage,
+                    SourceVertex = dossier == null
+                        ? -1
+                        : dossier.SourceVertex,
+                    VictimEdge = dossier == null
+                        ? -1
+                        : dossier.VictimEdge,
+                    ForeignEdge = dossier == null
+                        ? -1
+                        : dossier.ForeignEdge,
+                    LinkedEdgeEvidence = dossier == null
+                        ? "none"
+                        : FormatPlaneCutEdgeIndexEvidence(
+                            dossier.LinkedEdges),
+                    IncidentStarEvidence = dossier == null
+                        ? "none"
+                        : FormatPlaneCutEdgeIndexEvidence(
+                            dossier.IncidentStarEdges),
+                    ImplicatedEdgeEvidence =
+                        FormatPlaneCutEdgeIndexEvidence(
+                            implicatedEdges),
+                    ExpectedCandidateCount =
+                        outcome.ExpectedCandidateCount,
+                    ActualCandidateCount =
+                        outcome.ActualCandidateCount,
+                    CertifiedCandidateCount =
+                        outcome.CertifiedCandidateCount,
+                    ExpectedCandidateEvidence =
+                        FormatPlaneCutEdgeIndexEvidence(
+                            outcome.ExpectedCandidateEdgeIndices),
+                    ActualCandidateEvidence =
+                        FormatPlaneCutEdgeIndexEvidence(
+                            outcome.ActualCandidateEdgeIndices),
+                    MissingCandidateEvidence =
+                        FormatPlaneCutEdgeIndexEvidence(
+                            outcome.MissingCandidateEdgeIndices),
+                    UnexpectedCandidateEvidence =
+                        FormatPlaneCutEdgeIndexEvidence(
+                            outcome.UnexpectedCandidateEdgeIndices),
+                    CandidateConservationValid =
+                        outcome.CandidateConservationValid ? 1 : 0,
+                    MinimumWidthScale = ResolveMinimumPlaneCutScale(
+                        outcome.ScaleByEdge),
+                    FullyValid = outcome.FullyValid ? 1 : 0,
+                    FailureSignature = outcome.FailureSignature ??
+                        string.Empty
+                });
+        }
+
+        private static int ComparePlaneCutCoexistenceOutcomes(
+            PlaneCutCoexistenceTrialOutcome left,
+            PlaneCutCoexistenceTrialOutcome right,
+            List<PlaneCutBevelCandidate> allCandidates)
+        {
+            int count = left.ExcludedEdgeIndices.Count.CompareTo(
+                right.ExcludedEdgeIndices.Count);
+            if (count != 0)
+            {
+                return count;
+            }
+            float leftWidth = CalculatePlaneCutExcludedWidth(
+                left.ExcludedEdgeIndices,
+                allCandidates);
+            float rightWidth = CalculatePlaneCutExcludedWidth(
+                right.ExcludedEdgeIndices,
+                allCandidates);
+            int width = leftWidth.CompareTo(rightWidth);
+            if (width != 0)
+            {
+                return width;
+            }
+            float leftScore = CalculatePlaneCutExcludedSelectionScore(
+                left.ExcludedEdgeIndices,
+                allCandidates);
+            float rightScore = CalculatePlaneCutExcludedSelectionScore(
+                right.ExcludedEdgeIndices,
+                allCandidates);
+            int score = leftScore.CompareTo(rightScore);
+            if (score != 0)
+            {
+                return score;
+            }
+            return ComparePlaneCutEdgeIndexLists(
+                left.ExcludedEdgeIndices,
+                right.ExcludedEdgeIndices);
+        }
+
+        private static float CalculatePlaneCutExcludedWidth(
+            List<int> excludedEdges,
+            List<PlaneCutBevelCandidate> candidates)
+        {
+            HashSet<int> excluded = new HashSet<int>(excludedEdges);
+            float sum = 0f;
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                if (excluded.Contains(
+                        candidates[candidateIndex].SourceEdgeIndex))
+                {
+                    sum += candidates[candidateIndex].Width;
+                }
+            }
+            return sum;
+        }
+
+        private static float CalculatePlaneCutExcludedSelectionScore(
+            List<int> excludedEdges,
+            List<PlaneCutBevelCandidate> candidates)
+        {
+            HashSet<int> excluded = new HashSet<int>(excludedEdges);
+            float sum = 0f;
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                if (excluded.Contains(
+                        candidates[candidateIndex].SourceEdgeIndex))
+                {
+                    sum += candidates[candidateIndex].SelectionScore;
+                }
+            }
+            return sum;
+        }
+
+        private static int ComparePlaneCutEdgeIndexLists(
+            List<int> left,
+            List<int> right)
+        {
+            int count = Mathf.Min(left.Count, right.Count);
+            for (int index = 0; index < count; index++)
+            {
+                int comparison = left[index].CompareTo(right[index]);
+                if (comparison != 0)
+                {
+                    return comparison;
+                }
+            }
+            return left.Count.CompareTo(right.Count);
+        }
+
+        private static string FormatPlaneCutCoexistenceReasonEvidence(
+            SortedSet<int> excludedEdges,
+            Dictionary<int, string> reasons)
+        {
+            if (excludedEdges == null || excludedEdges.Count == 0)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            foreach (int edge in excludedEdges)
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(edge);
+                builder.Append('=');
+                builder.Append(reasons.TryGetValue(edge, out string reason)
+                    ? reason
+                    : "coexistence-incompatible");
+            }
+            return builder.ToString();
         }
 
         private static bool IsPlaneCutRetryGeometryClean(
@@ -4033,8 +6200,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 TopologyScaleSearchTopologyLinkedEvidence = "none",
                 TopologyScaleSearchClusterEvidence = "none",
                 TopologyScaleSearchCollateralChangedEvidence = "none",
-                JunctionCoverage =
-                    new List<PlaneCutJunctionCoverageRecord>(),
                 FaceFirstNonPlanarStageByIdentity =
                     new Dictionary<string, string>(),
                 BoundaryConformityTouchedFaces =
@@ -4477,7 +6642,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float widthScale = candidate.Width > 0f
                 ? PointMergeDistance * 2f / candidate.Width
                 : 1f;
-            return Mathf.Clamp01(Mathf.Max(removalScale, widthScale));
+            return Mathf.Clamp01(Mathf.Max(
+                EdgeWearMinimumFeasibleWidthFraction,
+                Mathf.Max(removalScale, widthScale)));
         }
 
         private static bool TryBuildPlaneCutConflictCluster(
@@ -4942,6 +7109,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ChamferTopologyContext context,
             ChamferCornerSolution solution,
             EdgeWearSelectedGraphEdge selected,
+            EdgeWearEdgeViabilityRecord viability,
             float minimumStableEdgeLength,
             out PlaneCutBevelCandidate candidate,
             out bool localityDeferred,
@@ -5019,57 +7187,54 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             float solvedDistance = (d0 + d1 + d2 + d3) * 0.25f;
-            float localizedDistance = solvedDistance;
-            float localGuardMargin = Mathf.Max(
-                PointMergeDistance * 2f,
-                minimumStableEdgeLength * 0.001f);
-            int limitingUnrelatedVertex = -1;
-            Vector3 limitingUnrelatedPosition = default;
-            float limitingUnrelatedProjection = float.NegativeInfinity;
-            for (int vertexIndex = 0;
-                 vertexIndex < context.Graph.Vertices.Count;
-                 vertexIndex++)
+            if (viability == null || !viability.Evaluated)
             {
-                if (vertexIndex == edge.VertexA ||
-                    vertexIndex == edge.VertexB)
-                {
-                    continue;
-                }
-
-                Vector3 unrelated =
-                    context.Graph.Vertices[vertexIndex].Position;
-                float unrelatedProjection =
-                    Vector3.Dot(normal, unrelated);
-                float guardedProjection =
-                    unrelatedProjection + localGuardMargin;
-                if (guardedProjection > localizedDistance)
-                {
-                    localizedDistance = guardedProjection;
-                    limitingUnrelatedVertex = vertexIndex;
-                    limitingUnrelatedPosition = unrelated;
-                    limitingUnrelatedProjection = unrelatedProjection;
-                }
+                blocker =
+                    "a selected edge lacks its cached viability preflight";
+                return false;
+            }
+            if (!viability.LocalityValid)
+            {
+                blocker = "a selected edge failed cached independent-plane locality viability";
+                return false;
             }
 
+            float localizedDistance = Mathf.Max(
+                solvedDistance,
+                viability.LocalityRetainPlaneFloor);
+            float localGuardMargin =
+                viability.LocalityGuardMargin;
+            int limitingUnrelatedVertex =
+                viability.LocalityLimitingVertex;
+            Vector3 limitingUnrelatedPosition =
+                viability.LocalityLimitingPosition;
+            float limitingUnrelatedProjection =
+                viability.LocalityLimitingProjection;
             bool wasLocalized = localizedDistance >
                 solvedDistance + PointMergeDistance * 0.25f;
-            CutPlane plane = new CutPlane(normal, localizedDistance);
             Vector3 sourceA =
                 context.Graph.Vertices[edge.VertexA].Position;
             Vector3 sourceB =
                 context.Graph.Vertices[edge.VertexB].Position;
-            float minimumRemoval = Mathf.Max(
-                PointMergeDistance * 2f,
-                minimumStableEdgeLength * 0.02f);
+            float minimumRemoval =
+                viability.LocalityMinimumRemoval;
+            if (localizedDistance >
+                viability.LocalityRemovalPlaneCeiling +
+                    PointMergeDistance * 0.25f)
+            {
+                blocker =
+                    "the globally solved bevel plane lies outside the cached locality-feasible interval";
+                return false;
+            }
+
+            CutPlane plane = new CutPlane(normal, localizedDistance);
             float sourceRemovalA = plane.SignedDistance(sourceA);
             float sourceRemovalB = plane.SignedDistance(sourceB);
             if (sourceRemovalA <= minimumRemoval ||
                 sourceRemovalB <= minimumRemoval)
             {
-                localityDeferred = wasLocalized;
-                blocker = wasLocalized
-                    ? "a localized bevel plane cannot retain unrelated vertices and still remove its source edge"
-                    : "the solved bevel plane does not remove its source edge";
+                blocker =
+                    "the globally solved bevel plane does not remove its source edge inside the cached locality interval";
                 localityEvidence = new PlaneCutLocalityDeferralRecord
                 {
                     SourceEdgeIndex = edgeIndex,
@@ -6873,105 +9038,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             ? "FinalCertification"
                             : result.FirstOpenEdgeStage,
                         cause));
-            }
-        }
-
-        private static void AuditPlaneCutJunctionCoverage(
-            List<PolygonFace> faces,
-            ChamferTopologyContext context,
-            List<PlaneCutBevelCandidate> candidates,
-            ref PlaneCutBevelAuditResult result)
-        {
-            if (result.JunctionCoverage == null)
-            {
-                result.JunctionCoverage =
-                    new List<PlaneCutJunctionCoverageRecord>();
-            }
-            else
-            {
-                result.JunctionCoverage.Clear();
-            }
-            result.JunctionCoverageTouchedVertexCount = 0;
-            result.JunctionCoverageExpectedCount = 0;
-            result.JunctionCoverageBuiltCount = 0;
-            result.JunctionCoverageMissingCount = 0;
-            if (context == null || candidates == null)
-            {
-                return;
-            }
-
-            SortedSet<int> touchedVertices = new SortedSet<int>();
-            for (int candidateIndex = 0;
-                 candidateIndex < candidates.Count;
-                 candidateIndex++)
-            {
-                touchedVertices.Add(candidates[candidateIndex].VertexA);
-                touchedVertices.Add(candidates[candidateIndex].VertexB);
-            }
-
-            result.JunctionCoverageTouchedVertexCount =
-                touchedVertices.Count;
-            foreach (int vertexIndex in touchedVertices)
-            {
-                List<int> incidentEdges =
-                    CollectPlaneCutIncidentCandidateEdges(
-                        candidates,
-                        vertexIndex);
-                int expected = incidentEdges.Count >= 2 ? 1 : 0;
-                int junctionFaceCount = CountPlaneCutJunctionFaces(
-                    faces,
-                    vertexIndex);
-                int assignedOpenEdges = 0;
-                if (result.OpenEdgeFailures != null)
-                {
-                    for (int openIndex = 0;
-                         openIndex < result.OpenEdgeFailures.Count;
-                         openIndex++)
-                    {
-                        if (result.OpenEdgeFailures[openIndex]
-                                .AssociatedSourceVertex == vertexIndex)
-                        {
-                            assignedOpenEdges++;
-                        }
-                    }
-                }
-
-                if (expected == 1)
-                {
-                    result.JunctionCoverageExpectedCount++;
-                    if (junctionFaceCount > 0)
-                    {
-                        result.JunctionCoverageBuiltCount++;
-                    }
-                    else
-                    {
-                        result.JunctionCoverageMissingCount++;
-                    }
-                }
-
-                string failureReason = expected == 1 &&
-                        junctionFaceCount == 0 &&
-                        assignedOpenEdges > 0
-                    ? "junction-required-open-boundary"
-                    : expected == 1 && junctionFaceCount == 0
-                        ? "junction-required-no-cap"
-                        : junctionFaceCount > 1
-                            ? "duplicate-junction-faces"
-                            : "none";
-                Vector3 sourcePosition = vertexIndex >= 0 &&
-                        vertexIndex < context.Graph.Vertices.Count
-                    ? context.Graph.Vertices[vertexIndex].Position
-                    : Vector3.zero;
-                result.JunctionCoverage.Add(
-                    new PlaneCutJunctionCoverageRecord(
-                        vertexIndex,
-                        sourcePosition,
-                        FormatPlaneCutEdgeIndexEvidence(incidentEdges),
-                        incidentEdges.Count,
-                        expected,
-                        junctionFaceCount,
-                        assignedOpenEdges,
-                        failureReason));
             }
         }
 

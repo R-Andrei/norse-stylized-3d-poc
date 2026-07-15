@@ -11,6 +11,429 @@ namespace ProgrammaticStylized3D.Geometry.Masses
     {
         #region Edge wear diagnostic logging
 
+        private sealed class PendingEdgeWearStableFingerprint
+        {
+            public bool Valid;
+            public int SourceEdgeCount;
+            public int StructuralEligibleCount;
+            public int GeometricEligibleCount;
+            public int CoexistenceEligibleCount;
+            public int SelectedCount;
+            public int CertifiedCount;
+            public GeneratedGeometryStableFingerprint ExclusionReasons;
+            public GeneratedGeometryStableFingerprint SelectedEdges;
+            public GeneratedGeometryStableFingerprint CertifiedEdges;
+            public GeneratedGeometryStableFingerprint GeometryTopology;
+        }
+
+        private static PendingEdgeWearStableFingerprint
+            pendingEdgeWearStableFingerprint;
+
+#if UNITY_EDITOR
+        private sealed class EdgeWearBatchAuditCapture
+        {
+            public int ShapeSeed;
+            public float EdgeWearWidth;
+            public bool AuditCaptured;
+            public PlaneCutBevelAuditResult Audit;
+            public bool CornerSolutionValid;
+            public string CornerBlocker = string.Empty;
+            public bool PlacementCaptured;
+            public MassPlacementFrame PlacementFrame;
+            public bool UsesImmutableSourcePlacementFrame;
+            public bool PreviewApplied;
+        }
+
+        private static EdgeWearBatchAuditCapture
+            activeEdgeWearBatchAuditCapture;
+
+        private static bool TryBeginEdgeWearBatchAuditCapture(
+            int shapeSeed,
+            float edgeWearWidth,
+            out EdgeWearBatchAuditCaseResult immediateFailure)
+        {
+            immediateFailure = null;
+            if (activeEdgeWearBatchAuditCapture != null)
+            {
+                immediateFailure = new EdgeWearBatchAuditCaseResult
+                {
+                    ShapeSeed = shapeSeed,
+                    EdgeWearWidth = edgeWearWidth,
+                    PrimaryFailure =
+                        "another edge-wear batch evaluation is already active"
+                };
+                return false;
+            }
+
+            activeEdgeWearBatchAuditCapture =
+                new EdgeWearBatchAuditCapture
+                {
+                    ShapeSeed = shapeSeed,
+                    EdgeWearWidth = edgeWearWidth
+                };
+            return true;
+        }
+
+        private static EdgeWearBatchAuditCaseResult
+            CompleteEdgeWearBatchAuditCapture(
+                double totalMilliseconds,
+                Exception evaluationException)
+        {
+            EdgeWearBatchAuditCapture capture =
+                activeEdgeWearBatchAuditCapture;
+            activeEdgeWearBatchAuditCapture = null;
+
+            EdgeWearBatchAuditCaseResult result =
+                new EdgeWearBatchAuditCaseResult
+                {
+                    ShapeSeed = capture == null ? 0 : capture.ShapeSeed,
+                    EdgeWearWidth = capture == null
+                        ? 0f
+                        : capture.EdgeWearWidth,
+                    TotalMilliseconds = totalMilliseconds,
+                    ObjectTransformChanged = 0
+                };
+
+            if (capture == null)
+            {
+                result.PrimaryFailure =
+                    "edge-wear batch capture state was lost";
+                return result;
+            }
+
+            result.AuditCaptured = capture.AuditCaptured;
+            result.PlacementCaptured = capture.PlacementCaptured;
+            result.CornerSolutionValid = capture.CornerSolutionValid;
+            result.PreviewApplied = capture.PreviewApplied;
+            result.PlacementFrameUsesImmutableSource =
+                capture.UsesImmutableSourcePlacementFrame ? 1 : 0;
+            result.PreviewDerivedPlacementParameters =
+                capture.PreviewApplied &&
+                !capture.UsesImmutableSourcePlacementFrame
+                    ? 1
+                    : 0;
+            result.PreviewUsesCanonicalFrame =
+                capture.PreviewApplied &&
+                capture.UsesImmutableSourcePlacementFrame
+                    ? 1
+                    : 0;
+
+            if (capture.AuditCaptured)
+            {
+                PopulateEdgeWearBatchAuditResult(
+                    result,
+                    capture.Audit);
+            }
+            if (capture.PlacementCaptured)
+            {
+                PopulateEdgeWearBatchPlacementFingerprints(
+                    result,
+                    capture.Audit,
+                    capture.PlacementFrame);
+            }
+
+            result.Completed = evaluationException == null;
+            if (evaluationException != null)
+            {
+                result.PrimaryFailure =
+                    evaluationException.GetType().Name + ":" +
+                    evaluationException.Message;
+            }
+            else if (string.IsNullOrEmpty(result.PrimaryFailure) &&
+                !string.IsNullOrEmpty(capture.CornerBlocker))
+            {
+                result.PrimaryFailure = capture.CornerBlocker;
+            }
+            if (string.IsNullOrEmpty(result.PrimaryFailure))
+            {
+                result.PrimaryFailure = "none";
+            }
+            return result;
+        }
+
+        private static void PopulateEdgeWearBatchAuditResult(
+            EdgeWearBatchAuditCaseResult result,
+            PlaneCutBevelAuditResult audit)
+        {
+            EdgeWearCoverageAudit coverage = audit.CoverageAudit;
+            result.SourceEdgeCount = coverage == null
+                ? 0
+                : coverage.SourceEdgeCount;
+            result.StructuralEligibleCount = coverage == null
+                ? 0
+                : coverage.StructuralEligibleCount;
+            result.GeometricEligibleCount = coverage == null
+                ? 0
+                : coverage.GeometricEligibleCount;
+            result.CoexistenceEligibleCount = coverage == null
+                ? 0
+                : coverage.CoexistenceEligibleCount;
+            result.CoexistenceIneligibleCount = coverage == null
+                ? 0
+                : coverage.CoexistenceIneligibleCount;
+            result.SelectedCount = coverage == null
+                ? audit.SelectedEdgeCount
+                : coverage.SelectedCount;
+            result.CertifiedCount = audit.CertifiedPlanesBuilt;
+            result.DeferredCount = audit.PlanesDeferred;
+            result.RejectedCount = audit.PlanesRejected;
+            result.TrialRejectedCount = audit.TrialRejectedPlanes;
+            result.SolverPassCount = audit.EdgeConflictPassCount;
+            result.WidthReductionCount =
+                audit.EdgeConflictWidthReductionCount;
+            result.MinimumWidthScale =
+                audit.EdgeConflictMinimumWidthScale;
+            result.CoexistenceTrialCount = audit.CoexistenceTrialCount;
+            result.CoexistenceCacheUseCount =
+                audit.CoexistenceTrialCacheUseCount;
+            result.CoexistenceSearchStatesEvaluated =
+                audit.CoexistenceSearchStatesEvaluated;
+            result.CoexistenceSearchStatesDeduplicated =
+                audit.CoexistenceSearchStatesDeduplicated;
+            result.CoexistenceSearchMaximumDepth =
+                audit.CoexistenceSearchMaximumDepth;
+            result.CoexistenceSearchFrontierRemaining =
+                audit.CoexistenceSearchFrontierRemaining;
+            result.CoexistenceSearchWinningDepth =
+                audit.CoexistenceSearchWinningDepth;
+            result.CandidateConservationFailureCount =
+                audit.CoexistenceCandidateConservationFailureCount;
+            result.OpenEdgeCount = audit.OpenEdgeCount;
+            result.NonManifoldEdgeCount = audit.NonManifoldEdgeCount;
+            result.TJunctionCount = audit.TJunctionCount;
+            result.InvalidFaceCount = audit.InvalidFaceCount;
+            result.NonPlanarFaceCount =
+                audit.FaceQualityNonPlanarCount;
+            result.SurfaceRenderValid = audit.BevelRegionRenderValid;
+            result.MeshValid = audit.PreviewGeometryValid;
+            result.GeometryValid = audit.GeometryValid;
+            result.CoverageValid =
+                audit.MaterializedEdgeCoverageValid;
+            result.StableFingerprintPrepared =
+                audit.StableFingerprintPrepared;
+            result.PreflightMilliseconds = coverage == null
+                ? 0.0
+                : coverage.ViabilityPreflightMilliseconds;
+            result.LocalityEvaluationCount = coverage == null
+                ? 0
+                : coverage.ViabilityLocalityEvaluationCount;
+            result.LocalityConstructionUseCount = coverage == null
+                ? 0
+                : coverage.ViabilityLocalityCacheUseCount;
+            result.LocalityCacheMissCount = coverage == null
+                ? 0
+                : coverage.ViabilityLocalityCacheMissCount;
+            result.LocalitySolverRecomputationCount = coverage == null
+                ? 0
+                : coverage.ViabilityLocalityRecomputationCount;
+            result.ExclusionReasonHash =
+                audit.ExclusionReasonFingerprint.ToString();
+            result.SelectedEdgeHash =
+                audit.SelectedEdgeFingerprint.ToString();
+            result.CertifiedEdgeHash =
+                audit.CertifiedEdgeFingerprint.ToString();
+            result.GeometryTopologyHash =
+                audit.GeometryTopologyFingerprint.ToString();
+            result.CoexistenceSearchTrace =
+                FormatPlaneCutCoexistenceSearchTrace(audit);
+            result.PrimaryFailure =
+                FormatPlaneCutPrimaryFailure(audit);
+            if (string.IsNullOrEmpty(result.PrimaryFailure) ||
+                string.Equals(
+                    result.PrimaryFailure,
+                    "none",
+                    StringComparison.Ordinal))
+            {
+                result.PrimaryFailure = string.IsNullOrEmpty(
+                        audit.Diagnostic)
+                    ? "none"
+                    : audit.Diagnostic;
+            }
+
+            if (coverage == null || coverage.Records == null)
+            {
+                return;
+            }
+            for (int recordIndex = 0;
+                 recordIndex < coverage.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    coverage.Records[recordIndex];
+                if (record.ViabilityState ==
+                    EdgeWearViabilityState.CoexistenceIneligible)
+                {
+                    switch (ResolveEdgeWearCoexistenceExclusionCategory(
+                        record.FinalReason))
+                    {
+                        case 0:
+                            result.SourceVertexStarExclusionCount++;
+                            break;
+                        case 1:
+                            result.PlanePairExclusionCount++;
+                            break;
+                        case 2:
+                            result.PlaneBandExclusionCount++;
+                            break;
+                        case 3:
+                            result.GlobalWidthFloorExclusionCount++;
+                            break;
+                        case 4:
+                            result.CandidateConservationExclusionCount++;
+                            break;
+                        case 5:
+                            result.CornerWidthMissingExclusionCount++;
+                            break;
+                        case 6:
+                            result.CornerWidthInactiveExclusionCount++;
+                            break;
+                        default:
+                            result.OtherExclusionCount++;
+                            break;
+                    }
+                    continue;
+                }
+                if (record.ViabilityState !=
+                        EdgeWearViabilityState.StructuralIneligible &&
+                    record.ViabilityState !=
+                        EdgeWearViabilityState.GeometricIneligible)
+                {
+                    continue;
+                }
+                switch (ResolveEdgeWearViabilityExclusionCategory(
+                    record.FinalReason))
+                {
+                    case 0:
+                        result.BoundaryExclusionCount++;
+                        break;
+                    case 1:
+                        result.DihedralExclusionCount++;
+                        break;
+                    case 2:
+                        result.FootprintExclusionCount++;
+                        break;
+                    case 3:
+                        result.LocalityExclusionCount++;
+                        break;
+                    case 4:
+                        result.IsolatedRailExclusionCount++;
+                        break;
+                    case 5:
+                        result.SupportExclusionCount++;
+                        break;
+                    case 6:
+                        result.WidthFractionExclusionCount++;
+                        break;
+                    case 7:
+                        result.EndpointSpanExclusionCount++;
+                        break;
+                    default:
+                        result.OtherExclusionCount++;
+                        break;
+                }
+            }
+        }
+
+        private static void PopulateEdgeWearBatchPlacementFingerprints(
+            EdgeWearBatchAuditCaseResult result,
+            PlaneCutBevelAuditResult audit,
+            MassPlacementFrame placementFrame)
+        {
+            GeneratedGeometryStableFingerprint placementFingerprint =
+                BuildEdgeWearPlacementFrameFingerprint(placementFrame);
+            result.PlacementFrameHash = placementFingerprint.ToString();
+
+            EdgeWearCoverageAudit coverage = audit.CoverageAudit;
+            GeneratedGeometryStableHashBuilder evaluation =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.GeneratedMass.EdgeWear.Evaluation.v2");
+            evaluation.AddInt32(coverage == null
+                ? 0
+                : coverage.SourceEdgeCount);
+            evaluation.AddInt32(coverage == null
+                ? 0
+                : coverage.StructuralEligibleCount);
+            evaluation.AddInt32(coverage == null
+                ? 0
+                : coverage.GeometricEligibleCount);
+            evaluation.AddInt32(coverage == null
+                ? 0
+                : coverage.CoexistenceEligibleCount);
+            evaluation.AddInt32(coverage == null
+                ? 0
+                : coverage.SelectedCount);
+            evaluation.AddInt32(coverage == null
+                ? 0
+                : coverage.BuiltCount);
+            evaluation.AddFingerprint(
+                audit.ExclusionReasonFingerprint);
+            evaluation.AddFingerprint(audit.SelectedEdgeFingerprint);
+            evaluation.AddFingerprint(audit.CertifiedEdgeFingerprint);
+            evaluation.AddFingerprint(audit.GeometryTopologyFingerprint);
+            evaluation.AddFingerprint(placementFingerprint);
+            result.EvaluationHash = evaluation.Finish().ToString();
+        }
+
+        private static GeneratedGeometryStableFingerprint
+            BuildEdgeWearPlacementFrameFingerprint(
+                MassPlacementFrame placementFrame)
+        {
+            GeneratedGeometryStableHashBuilder placement =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.GeneratedMass.EdgeWear.PlacementFrame.v1");
+            placement.AddInt32(placementFrame.ReferenceVertexCount);
+            placement.AddSingle(placementFrame.LeanMinimumY);
+            placement.AddSingle(placementFrame.LeanHeight);
+            placement.AddVector3(placementFrame.LeanDirection);
+            placement.AddSingle(placementFrame.LeanDistance);
+            placement.AddSingle(placementFrame.GroundingMinimumY);
+            placement.AddSingle(placementFrame.GroundingHeight);
+            placement.AddSingle(placementFrame.GroundingTop);
+            placement.AddSingle(
+                placementFrame.GroundingFlatteningStrength);
+            placement.AddSingle(
+                placementFrame.GroundingBroadeningStrength);
+            placement.AddSingle(placementFrame.RecenterMinimumY);
+            placement.AddSingle(placementFrame.ContactBand);
+            placement.AddVector2(placementFrame.ContactCentre);
+            placement.AddVector3(placementFrame.RecenterOffset);
+            return placement.Finish();
+        }
+#endif
+
+        private static void CapturePendingEdgeWearStableFingerprint(
+            PlaneCutBevelAuditResult audit)
+        {
+            EdgeWearCoverageAudit coverage = audit.CoverageAudit;
+            pendingEdgeWearStableFingerprint =
+                new PendingEdgeWearStableFingerprint
+                {
+                    Valid = audit.StableFingerprintPrepared == 1,
+                    SourceEdgeCount = coverage == null
+                        ? 0
+                        : coverage.SourceEdgeCount,
+                    StructuralEligibleCount = coverage == null
+                        ? 0
+                        : coverage.StructuralEligibleCount,
+                    GeometricEligibleCount = coverage == null
+                        ? 0
+                        : coverage.GeometricEligibleCount,
+                    CoexistenceEligibleCount = coverage == null
+                        ? 0
+                        : coverage.CoexistenceEligibleCount,
+                    SelectedCount = coverage == null
+                        ? 0
+                        : coverage.SelectedCount,
+                    CertifiedCount = coverage == null
+                        ? 0
+                        : coverage.BuiltCount,
+                    ExclusionReasons = audit.ExclusionReasonFingerprint,
+                    SelectedEdges = audit.SelectedEdgeFingerprint,
+                    CertifiedEdges = audit.CertifiedEdgeFingerprint,
+                    GeometryTopology = audit.GeometryTopologyFingerprint
+                };
+        }
+
         private static int BuildChamferDiagnosticGeometrySignature(
             List<ChamferProvisionalFaceRecord> records)
         {
@@ -73,6 +496,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool warning)
         {
 #if UNITY_EDITOR
+            if (activeEdgeWearBatchAuditCapture != null)
+            {
+                return;
+            }
             Debug.LogFormat(
                 warning ? LogType.Warning : LogType.Log,
                 LogOption.NoStacktrace,
@@ -621,20 +1048,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     FormatPlaneCutVector(failure.NearestSegmentEnd);
         }
 
-        private static string FormatPlaneCutJunctionCoverage(
-            PlaneCutJunctionCoverageRecord coverage)
-        {
-            return "vertex=" + coverage.VertexIndex +
-                ",position=" +
-                    FormatPlaneCutVector(coverage.SourcePosition) +
-                ",incidentEdges={" + coverage.IncidentBuiltEdges + "}" +
-                ",incidentCount=" + coverage.IncidentBuiltEdgeCount +
-                ",expected=" + coverage.JunctionExpected +
-                ",faces=" + coverage.JunctionFaceCount +
-                ",openEdges=" + coverage.AssignedOpenEdgeCount +
-                ",reason=" + coverage.FailureReason;
-        }
-
         private static string FormatPlaneCutTJunctionFailure(
             PlaneCutTJunctionFailureRecord failure,
             bool includeOwners)
@@ -1157,52 +1570,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return builder.ToString();
         }
 
-        private static string FormatCappedPlaneCutJunctionFailures(
-            PlaneCutBevelAuditResult audit,
-            int cap)
-        {
-            if (audit.JunctionCoverage == null ||
-                audit.JunctionCoverage.Count == 0)
-            {
-                return "none";
-            }
-            StringBuilder builder = new StringBuilder();
-            int written = 0;
-            int failureCount = 0;
-            for (int index = 0;
-                 index < audit.JunctionCoverage.Count;
-                 index++)
-            {
-                PlaneCutJunctionCoverageRecord coverage =
-                    audit.JunctionCoverage[index];
-                if (coverage.FailureReason == "none")
-                {
-                    continue;
-                }
-                failureCount++;
-                if (written >= cap)
-                {
-                    continue;
-                }
-                if (written > 0)
-                {
-                    builder.Append('|');
-                }
-                builder.Append(FormatPlaneCutJunctionCoverage(coverage));
-                written++;
-            }
-            if (failureCount == 0)
-            {
-                return "none";
-            }
-            if (failureCount > written)
-            {
-                builder.Append("|omitted=");
-                builder.Append(failureCount - written);
-            }
-            return builder.ToString();
-        }
-
         private static string FormatPlaneCutNumericalRepairs(
             PlaneCutNumericalRepairTelemetry repairs)
         {
@@ -1227,6 +1594,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     repairs.MaximumOnPlaneSnapDistance.ToString("G9") +
                 ",cacheReuse:" +
                     repairs.CachedIntersectionReuseCount +
+                ",cacheInvalidated:" +
+                    repairs.CachedIntersectionInvalidationCount +
+                ",cacheRecomputed:" +
+                    repairs.CachedIntersectionRecomputeSuccessCount +
                 ",twoPlaneCorrections:" +
                     repairs.IntersectionProjectionCount +
                 ",maxCorrection:" +
@@ -1845,15 +2216,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.AppendLine();
             builder.AppendLine("[Evaluation Summary]");
             builder.AppendLine(FormatPlaneCutBevelAuditFields(audit));
-            builder.Append("legacyLocalJunctionDiagnostic=");
-            builder.AppendLine(string.IsNullOrEmpty(
-                    audit.LocalJunctionDiagnostic)
-                ? "none"
-                : audit.LocalJunctionDiagnostic);
             builder.AppendLine();
             builder.AppendLine("[Edge Coverage Summary]");
             builder.AppendLine(FormatEdgeWearCoverageSummary(
                 audit.CoverageAudit));
+            builder.AppendLine();
+            builder.AppendLine("[Viability Exclusion Summary]");
+            builder.AppendLine(FormatEdgeWearViabilityExclusionSummary(
+                audit.CoverageAudit,
+                true));
+            builder.AppendLine();
+            builder.AppendLine("[Coexistence Viability Closure]");
+            builder.AppendLine(FormatEdgeWearCoexistenceSummary(audit, true));
+            builder.AppendLine();
+            builder.AppendLine("[Coexistence Conflict-Directed Search]");
+            AppendPlaneCutCoexistenceSearchStates(builder, audit);
+            builder.AppendLine();
+            builder.AppendLine("[Locality Cache Contract]");
+            builder.AppendLine(FormatEdgeWearLocalityCacheContract(
+                audit.CoverageAudit));
+            builder.AppendLine();
+            builder.AppendLine("[Edge Viability Preflight]");
+            AppendEdgeWearViabilityPreflight(
+                builder,
+                audit.CoverageAudit);
             builder.AppendLine();
             builder.AppendLine("[Edge Lifecycle]");
             AppendEdgeWearCoverageLifecycle(
@@ -2010,28 +2396,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
             builder.AppendLine();
-            builder.AppendLine("[Legacy Junction Heuristic - Non-Authoritative]");
-            builder.Append("touched=");
-            builder.Append(audit.JunctionCoverageTouchedVertexCount);
-            builder.Append(",expected=");
-            builder.Append(audit.JunctionCoverageExpectedCount);
-            builder.Append(",built=");
-            builder.Append(audit.JunctionCoverageBuiltCount);
-            builder.Append(",missing=");
-            builder.AppendLine(audit.JunctionCoverageMissingCount.ToString());
-            if (audit.JunctionCoverage != null)
-            {
-                for (int index = 0;
-                     index < audit.JunctionCoverage.Count;
-                     index++)
-                {
-                    builder.Append(index);
-                    builder.Append(':');
-                    builder.AppendLine(FormatPlaneCutJunctionCoverage(
-                        audit.JunctionCoverage[index]));
-                }
-            }
-            builder.AppendLine();
             builder.AppendLine("[Preparation Movement]");
             builder.Append("boundaryConformityTouched=");
             builder.AppendLine(FormatPlaneCutStringSet(
@@ -2096,12 +2460,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return "max=" + (audit.MaximumCoverageMode ? "1" : "0") +
                 ",source=" + audit.SourceEdgeCount +
                 ",structural=" + audit.StructuralEligibleCount +
+                ",geometric=" + audit.GeometricEligibleCount +
+                ",geometricIneligible=" +
+                    audit.GeometricIneligibleCount +
+                ",coexistence=" + audit.CoexistenceEligibleCount +
+                ",coexistenceIneligible=" +
+                    audit.CoexistenceIneligibleCount +
                 ",artistic=" + audit.ArtisticEligibleCount +
                 ",wouldBeArtisticallyFiltered=" +
                     audit.ArtisticFilteredCount +
                 ",candidates=" + audit.CandidateCount +
                 ",selected=" + audit.SelectedCount +
                 ",widthInactive=" + audit.WidthInactiveCount +
+                ",unresolvedWidthInactive=" +
+                    audit.UnresolvedWidthInactiveCount +
+                ",cornerWidthMissingExclusions=" +
+                    audit.CornerWidthMissingExclusionCount +
+                ",cornerWidthInactiveExclusions=" +
+                    audit.CornerWidthInactiveExclusionCount +
                 ",widthReduced=" + audit.WidthReducedCount +
                 ",active=" + audit.ActiveCount +
                 ",attemptedBuilt=" + audit.AttemptedBuiltCount +
@@ -2124,6 +2500,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     FormatEdgeWearCoverageIds(
                         audit,
                         "structural-ineligible") + "}" +
+                ",geometricIneligible={" +
+                    FormatEdgeWearCoverageIds(
+                        audit,
+                        "geometric-ineligible") + "}" +
+                ",coexistenceIneligible={" +
+                    FormatEdgeWearCoverageIds(
+                        audit,
+                        "coexistence-ineligible") + "}" +
                 ",wouldBeArtisticallyFiltered={" +
                     FormatEdgeWearCoverageIds(
                         audit,
@@ -2166,8 +2550,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     "structural-ineligible" =>
                         !record.StructuralEligible,
-                    "artistic-filtered" =>
+                    "geometric-ineligible" =>
                         record.StructuralEligible &&
+                        !record.GeometricEligible,
+                    "coexistence-ineligible" =>
+                        record.GeometricEligible &&
+                        !record.CoexistenceEligible,
+                    "artistic-filtered" =>
+                        record.GeometricEligible &&
                         !record.ArtisticEligible,
                     "width-inactive" => record.WidthInactive,
                     "trial-rejected" => record.TrialRejected,
@@ -2197,6 +2587,646 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(indices[index]);
             }
             return builder.ToString();
+        }
+
+        private static string FormatEdgeWearViabilityExclusionSummary(
+            EdgeWearCoverageAudit audit,
+            bool includeEdgeIds)
+        {
+            string[] names =
+            {
+                "boundary",
+                "dihedral",
+                "footprint",
+                "locality",
+                "isolatedRail",
+                "support",
+                "widthFraction",
+                "endpointSpan",
+                "other"
+            };
+            int[] counts = new int[names.Length];
+            List<int>[] edgeIds = new List<int>[names.Length];
+            for (int categoryIndex = 0;
+                 categoryIndex < edgeIds.Length;
+                 categoryIndex++)
+            {
+                edgeIds[categoryIndex] = new List<int>();
+            }
+
+            if (audit != null && audit.Records != null)
+            {
+                for (int recordIndex = 0;
+                     recordIndex < audit.Records.Count;
+                     recordIndex++)
+                {
+                    EdgeWearEdgeLifecycleRecord record =
+                        audit.Records[recordIndex];
+                    if (record.ViabilityState !=
+                            EdgeWearViabilityState.StructuralIneligible &&
+                        record.ViabilityState !=
+                            EdgeWearViabilityState.GeometricIneligible)
+                    {
+                        continue;
+                    }
+
+                    int category = ResolveEdgeWearViabilityExclusionCategory(
+                        record.FinalReason);
+                    counts[category]++;
+                    if (record.SourceEdgeIndex >= 0)
+                    {
+                        edgeIds[category].Add(record.SourceEdgeIndex);
+                    }
+                }
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int categoryIndex = 0;
+                 categoryIndex < names.Length;
+                 categoryIndex++)
+            {
+                if (categoryIndex > 0)
+                {
+                    builder.Append(',');
+                }
+                builder.Append(names[categoryIndex]);
+                builder.Append('=');
+                builder.Append(counts[categoryIndex]);
+                if (!includeEdgeIds)
+                {
+                    continue;
+                }
+                edgeIds[categoryIndex].Sort();
+                builder.Append("{");
+                builder.Append(FormatPlaneCutEdgeIndexEvidence(
+                    edgeIds[categoryIndex]));
+                builder.Append('}');
+            }
+            return builder.ToString();
+        }
+
+        private static void AppendPlaneCutCoexistenceSearchStates(
+            StringBuilder builder,
+            PlaneCutBevelAuditResult audit)
+        {
+            builder.Append("statesEvaluated=");
+            builder.Append(audit.CoexistenceSearchStatesEvaluated);
+            builder.Append(",statesDeduplicated=");
+            builder.Append(audit.CoexistenceSearchStatesDeduplicated);
+            builder.Append(",maximumDepth=");
+            builder.Append(audit.CoexistenceSearchMaximumDepth);
+            builder.Append(",frontierRemaining=");
+            builder.Append(audit.CoexistenceSearchFrontierRemaining);
+            builder.Append(",winningDepth=");
+            builder.Append(audit.CoexistenceSearchWinningDepth);
+            builder.Append(",searchStateCandidateConservationFailures=");
+            builder.AppendLine(
+                audit.CoexistenceCandidateConservationFailureCount.ToString());
+            List<PlaneCutCoexistenceSearchStateRecord> states =
+                audit.CoexistenceSearchStates;
+            if (states == null || states.Count == 0)
+            {
+                builder.AppendLine("none");
+                return;
+            }
+            for (int index = 0; index < states.Count; index++)
+            {
+                PlaneCutCoexistenceSearchStateRecord state = states[index];
+                builder.Append("state=");
+                builder.Append(state.StateIndex);
+                builder.Append(",depth=");
+                builder.Append(state.Depth);
+                builder.Append(",exclusions={");
+                builder.Append(string.IsNullOrEmpty(state.ExclusionEvidence)
+                    ? "none"
+                    : state.ExclusionEvidence);
+                builder.Append("},failureCategory=");
+                builder.Append(string.IsNullOrEmpty(state.FailureCategory)
+                    ? "none"
+                    : state.FailureCategory);
+                builder.Append(",stage=");
+                builder.Append(string.IsNullOrEmpty(state.FailureStage)
+                    ? "none"
+                    : state.FailureStage);
+                builder.Append(",sourceVertex=");
+                builder.Append(state.SourceVertex);
+                builder.Append(",victim/foreign=");
+                builder.Append(state.VictimEdge);
+                builder.Append('/');
+                builder.Append(state.ForeignEdge);
+                builder.Append(",linked={");
+                builder.Append(string.IsNullOrEmpty(
+                        state.LinkedEdgeEvidence)
+                    ? "none"
+                    : state.LinkedEdgeEvidence);
+                builder.Append("},star={");
+                builder.Append(string.IsNullOrEmpty(
+                        state.IncidentStarEvidence)
+                    ? "none"
+                    : state.IncidentStarEvidence);
+                builder.Append("},implicated={");
+                builder.Append(string.IsNullOrEmpty(
+                        state.ImplicatedEdgeEvidence)
+                    ? "none"
+                    : state.ImplicatedEdgeEvidence);
+                builder.Append("},expected/actual/certified=");
+                builder.Append(state.ExpectedCandidateCount);
+                builder.Append('/');
+                builder.Append(state.ActualCandidateCount);
+                builder.Append('/');
+                builder.Append(state.CertifiedCandidateCount);
+                builder.Append(",expectedEdges={");
+                builder.Append(string.IsNullOrEmpty(
+                        state.ExpectedCandidateEvidence)
+                    ? "none"
+                    : state.ExpectedCandidateEvidence);
+                builder.Append("},actualEdges={");
+                builder.Append(string.IsNullOrEmpty(
+                        state.ActualCandidateEvidence)
+                    ? "none"
+                    : state.ActualCandidateEvidence);
+                builder.Append("},missingEdges={");
+                builder.Append(string.IsNullOrEmpty(
+                        state.MissingCandidateEvidence)
+                    ? "none"
+                    : state.MissingCandidateEvidence);
+                builder.Append("},unexpectedEdges={");
+                builder.Append(string.IsNullOrEmpty(
+                        state.UnexpectedCandidateEvidence)
+                    ? "none"
+                    : state.UnexpectedCandidateEvidence);
+                builder.Append("},conservationValid=");
+                builder.Append(state.CandidateConservationValid);
+                builder.Append(",minimumWidthScale=");
+                builder.Append(state.MinimumWidthScale.ToString("G9"));
+                builder.Append(",fullyValid=");
+                builder.Append(state.FullyValid);
+                builder.Append(",signature=");
+                builder.AppendLine(string.IsNullOrEmpty(
+                        state.FailureSignature)
+                    ? "none"
+                    : state.FailureSignature);
+            }
+        }
+
+        private static string FormatPlaneCutCoexistenceSearchTrace(
+            PlaneCutBevelAuditResult audit)
+        {
+            if (audit.CoexistenceSearchStates == null ||
+                audit.CoexistenceSearchStates.Count == 0)
+            {
+                return string.Empty;
+            }
+            StringBuilder builder = new StringBuilder();
+            AppendPlaneCutCoexistenceSearchStates(builder, audit);
+            return builder.ToString().TrimEnd();
+        }
+
+        private static int ResolveEdgeWearViabilityExclusionCategory(
+            string reason)
+        {
+            if (string.Equals(reason, "boundary-edge",
+                    StringComparison.Ordinal))
+            {
+                return 0;
+            }
+            if (string.Equals(reason,
+                    "dihedral-below-bevel-viability",
+                    StringComparison.Ordinal))
+            {
+                return 1;
+            }
+            if (string.Equals(reason,
+                    "edge-too-short-for-bevel-footprint",
+                    StringComparison.Ordinal))
+            {
+                return 2;
+            }
+            if (string.Equals(reason,
+                    "independent-plane-locality-infeasible",
+                    StringComparison.Ordinal))
+            {
+                return 3;
+            }
+            if (string.Equals(reason,
+                    "isolated-rail-solve-failed",
+                    StringComparison.Ordinal))
+            {
+                return 4;
+            }
+            if (string.Equals(reason,
+                    "owner-face-support-insufficient",
+                    StringComparison.Ordinal))
+            {
+                return 5;
+            }
+            if (string.Equals(reason,
+                    "maximum-feasible-width-below-minimum-scale",
+                    StringComparison.Ordinal))
+            {
+                return 6;
+            }
+            if (string.Equals(reason,
+                    "endpoint-star-consumes-edge-span",
+                    StringComparison.Ordinal))
+            {
+                return 7;
+            }
+            return 8;
+        }
+
+        private static string FormatEdgeWearCoexistenceSummary(
+            PlaneCutBevelAuditResult audit,
+            bool includeEdgeIds)
+        {
+            EdgeWearCoverageAudit coverage = audit.CoverageAudit;
+            int star = 0;
+            int pair = 0;
+            int band = 0;
+            int widthFloor = 0;
+            int conservation = 0;
+            int cornerMissing = 0;
+            int cornerInactive = 0;
+            int other = 0;
+            List<int> starEdges = new List<int>();
+            List<int> pairEdges = new List<int>();
+            List<int> bandEdges = new List<int>();
+            List<int> widthEdges = new List<int>();
+            List<int> conservationEdges = new List<int>();
+            List<int> cornerMissingEdges = new List<int>();
+            List<int> cornerInactiveEdges = new List<int>();
+            List<int> otherEdges = new List<int>();
+            if (coverage != null && coverage.Records != null)
+            {
+                for (int index = 0; index < coverage.Records.Count; index++)
+                {
+                    EdgeWearEdgeLifecycleRecord record = coverage.Records[index];
+                    if (record.ViabilityState !=
+                        EdgeWearViabilityState.CoexistenceIneligible)
+                    {
+                        continue;
+                    }
+                    int category = ResolveEdgeWearCoexistenceExclusionCategory(
+                        record.FinalReason);
+                    if (category == 0)
+                    {
+                        star++;
+                        starEdges.Add(record.SourceEdgeIndex);
+                    }
+                    else if (category == 1)
+                    {
+                        pair++;
+                        pairEdges.Add(record.SourceEdgeIndex);
+                    }
+                    else if (category == 2)
+                    {
+                        band++;
+                        bandEdges.Add(record.SourceEdgeIndex);
+                    }
+                    else if (category == 3)
+                    {
+                        widthFloor++;
+                        widthEdges.Add(record.SourceEdgeIndex);
+                    }
+                    else if (category == 4)
+                    {
+                        conservation++;
+                        conservationEdges.Add(record.SourceEdgeIndex);
+                    }
+                    else if (category == 5)
+                    {
+                        cornerMissing++;
+                        cornerMissingEdges.Add(record.SourceEdgeIndex);
+                    }
+                    else if (category == 6)
+                    {
+                        cornerInactive++;
+                        cornerInactiveEdges.Add(record.SourceEdgeIndex);
+                    }
+                    else
+                    {
+                        other++;
+                        otherEdges.Add(record.SourceEdgeIndex);
+                    }
+                }
+            }
+            string FormatCategory(string name, int count, List<int> ids)
+            {
+                if (!includeEdgeIds)
+                {
+                    return name + "=" + count;
+                }
+                ids.Sort();
+                return name + "=" + count + "{" +
+                    FormatPlaneCutEdgeIndexEvidence(ids) + "}";
+            }
+            return "eligible=" + (coverage == null
+                    ? 0
+                    : coverage.CoexistenceEligibleCount) +
+                ",ineligible=" + (coverage == null
+                    ? 0
+                    : coverage.CoexistenceIneligibleCount) +
+                "," + FormatCategory("sourceVertexStar", star, starEdges) +
+                "," + FormatCategory("planePair", pair, pairEdges) +
+                "," + FormatCategory("planeBand", band, bandEdges) +
+                "," + FormatCategory("globalWidthFloor", widthFloor, widthEdges) +
+                "," + FormatCategory("candidateConservation", conservation,
+                    conservationEdges) +
+                "," + FormatCategory("cornerWidthMissing", cornerMissing,
+                    cornerMissingEdges) +
+                "," + FormatCategory("cornerWidthInactive", cornerInactive,
+                    cornerInactiveEdges) +
+                "," + FormatCategory("other", other, otherEdges) +
+                ",starEvaluations=" + audit.CoexistenceStarEvaluationCount +
+                ",starCacheUses=" + audit.CoexistenceStarCacheUseCount +
+                ",pairEvaluations=" + audit.CoexistencePairEvaluationCount +
+                ",pairCacheUses=" + audit.CoexistencePairCacheUseCount +
+                ",trials=" + audit.CoexistenceTrialCount +
+                ",trialCacheUses=" + audit.CoexistenceTrialCacheUseCount +
+                ",statesEvaluated=" +
+                    audit.CoexistenceSearchStatesEvaluated +
+                ",statesDeduplicated=" +
+                    audit.CoexistenceSearchStatesDeduplicated +
+                ",maximumDepth=" + audit.CoexistenceSearchMaximumDepth +
+                ",frontierRemaining=" +
+                    audit.CoexistenceSearchFrontierRemaining +
+                ",winningDepth=" + audit.CoexistenceSearchWinningDepth +
+                ",searchStateCandidateConservationFailures=" +
+                    audit.CoexistenceCandidateConservationFailureCount +
+                ",preShellExclusions=" +
+                    (coverage == null
+                        ? 0
+                        : coverage.CoexistencePreShellExclusionCount) +
+                ",searchExclusions=" +
+                    (coverage == null
+                        ? 0
+                        : coverage.CoexistenceSearchExclusionCount) +
+                ",exclusions=" + audit.CoexistenceExclusionCount +
+                ",minimumCommittedWidthScale=" +
+                    audit.CoexistenceMinimumCommittedWidthScale.ToString("G9") +
+                ",candidateExpected={" +
+                    (string.IsNullOrEmpty(
+                        audit.CoexistenceCandidateExpectedEvidence)
+                        ? "none"
+                        : audit.CoexistenceCandidateExpectedEvidence) + "}" +
+                ",candidateActual={" +
+                    (string.IsNullOrEmpty(
+                        audit.CoexistenceCandidateActualEvidence)
+                        ? "none"
+                        : audit.CoexistenceCandidateActualEvidence) + "}" +
+                ",candidateMissing={" +
+                    (string.IsNullOrEmpty(
+                        audit.CoexistenceCandidateMissingEvidence)
+                        ? "none"
+                        : audit.CoexistenceCandidateMissingEvidence) + "}" +
+                ",candidateUnexpected={" +
+                    (string.IsNullOrEmpty(
+                        audit.CoexistenceCandidateUnexpectedEvidence)
+                        ? "none"
+                        : audit.CoexistenceCandidateUnexpectedEvidence) + "}" +
+                ",excludedEdges={" +
+                    (string.IsNullOrEmpty(audit.CoexistenceExcludedEdgeEvidence)
+                        ? "none"
+                        : audit.CoexistenceExcludedEdgeEvidence) + "}" +
+                ",reasons={" +
+                    (string.IsNullOrEmpty(audit.CoexistenceExclusionReasonEvidence)
+                        ? "none"
+                        : audit.CoexistenceExclusionReasonEvidence) + "}";
+        }
+
+        private static int ResolveEdgeWearCoexistenceExclusionCategory(
+            string reason)
+        {
+            if (string.Equals(reason,
+                    "source-vertex-star-incompatible",
+                    StringComparison.Ordinal))
+            {
+                return 0;
+            }
+            if (string.Equals(reason,
+                    "plane-pair-incompatible",
+                    StringComparison.Ordinal))
+            {
+                return 1;
+            }
+            if (string.Equals(reason,
+                    "plane-band-incompatible",
+                    StringComparison.Ordinal))
+            {
+                return 2;
+            }
+            if (string.Equals(reason,
+                    "global-width-floor-conflict",
+                    StringComparison.Ordinal))
+            {
+                return 3;
+            }
+            if (string.Equals(reason,
+                    "candidate-conservation-incompatible",
+                    StringComparison.Ordinal))
+            {
+                return 4;
+            }
+            if (string.Equals(reason,
+                    "corner-width-missing",
+                    StringComparison.Ordinal))
+            {
+                return 5;
+            }
+            if (string.Equals(reason,
+                    "corner-width-inactive",
+                    StringComparison.Ordinal))
+            {
+                return 6;
+            }
+            return 7;
+        }
+
+        private static string FormatEdgeWearLocalityCacheContract(
+            EdgeWearCoverageAudit audit)
+        {
+            if (audit == null)
+            {
+                return "evaluations=0,constructionUses=0," +
+                    "recomputationsDuringSolver=0,unusedEvaluatedRecords=0," +
+                    "localityCacheMissesDuringConstruction=0";
+            }
+            int unused = Mathf.Max(
+                0,
+                audit.ViabilityLocalityEvaluationCount -
+                    audit.ViabilityLocalityCacheUseCount);
+            return "evaluations=" +
+                    audit.ViabilityLocalityEvaluationCount +
+                ",constructionUses=" +
+                    audit.ViabilityLocalityCacheUseCount +
+                ",recomputationsDuringSolver=" +
+                    audit.ViabilityLocalityRecomputationCount +
+                ",unusedEvaluatedRecords=" + unused +
+                ",localityCacheMissesDuringConstruction=" +
+                    audit.ViabilityLocalityCacheMissCount;
+        }
+
+        private static void AppendEdgeWearViabilityPreflight(
+            StringBuilder builder,
+            EdgeWearCoverageAudit audit)
+        {
+            if (builder == null)
+            {
+                return;
+            }
+            if (audit == null || audit.Records == null)
+            {
+                builder.AppendLine("notCaptured");
+                return;
+            }
+
+            List<EdgeWearEdgeLifecycleRecord> ordered =
+                new List<EdgeWearEdgeLifecycleRecord>(audit.Records);
+            ordered.Sort((left, right) =>
+                left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+            builder.Append("thresholds={minimumDihedral:");
+            builder.Append(
+                EdgeWearMinimumViableDihedralDegrees.ToString("G9"));
+            builder.Append(",footprintMultiplier:");
+            builder.Append(
+                EdgeWearMinimumFootprintLengthMultiplier.ToString("G9"));
+            builder.Append(",minimumWidthFraction:");
+            builder.Append(
+                EdgeWearMinimumFeasibleWidthFraction.ToString("G9"));
+            builder.Append(",minimumCentralSpanMultiplier:");
+            builder.Append(
+                EdgeWearMinimumCentralSpanWidthMultiplier.ToString("G9"));
+            builder.AppendLine("}");
+            builder.Append("cache={localityEvaluations:");
+            builder.Append(audit.ViabilityLocalityEvaluationCount);
+            builder.Append(",isolatedEvaluations:");
+            builder.Append(audit.ViabilityIsolatedEvaluationCount);
+            builder.Append(",constructionUses:");
+            builder.Append(audit.ViabilityLocalityCacheUseCount);
+            builder.Append(",cacheMisses:");
+            builder.Append(audit.ViabilityLocalityCacheMissCount);
+            builder.Append(",solverRecomputations:");
+            builder.Append(audit.ViabilityLocalityRecomputationCount);
+            builder.Append(",unusedEvaluatedRecords:");
+            builder.Append(Mathf.Max(
+                0,
+                audit.ViabilityLocalityEvaluationCount -
+                    audit.ViabilityLocalityCacheUseCount));
+            builder.Append(",milliseconds:");
+            builder.Append(
+                audit.ViabilityPreflightMilliseconds.ToString("G9"));
+            builder.AppendLine("}");
+            builder.Append("count=");
+            builder.AppendLine(ordered.Count.ToString());
+            for (int recordIndex = 0;
+                 recordIndex < ordered.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord lifecycle =
+                    ordered[recordIndex];
+                EdgeWearEdgeViabilityRecord record =
+                    lifecycle.Viability;
+                builder.Append("edge=");
+                builder.Append(lifecycle.SourceEdgeIndex);
+                builder.Append(",state=");
+                builder.Append(lifecycle.ViabilityState);
+                builder.Append(",structural=");
+                builder.Append(lifecycle.StructuralEligible ? '1' : '0');
+                builder.Append(",geometric=");
+                builder.Append(lifecycle.GeometricEligible ? '1' : '0');
+                builder.Append(",length=");
+                builder.Append(lifecycle.Length.ToString("G9"));
+                builder.Append(",dihedral=");
+                builder.Append(lifecycle.DihedralDegrees.ToString("G9"));
+                if (record == null)
+                {
+                    builder.AppendLine(",preflight=notCaptured");
+                    continue;
+                }
+                builder.Append(",requestedWidth=");
+                builder.Append(record.RequestedWidth.ToString("G9"));
+                builder.Append(",requiredFootprintLength=");
+                builder.Append(
+                    record.RequiredFootprintLength.ToString("G9"));
+                builder.Append(",lengthToWidthRatio=");
+                builder.Append(record.LengthToWidthRatio.ToString("G9"));
+                builder.Append(",gates={dihedral:");
+                builder.Append(record.DihedralValid ? '1' : '0');
+                builder.Append(",footprint:");
+                builder.Append(record.FootprintValid ? '1' : '0');
+                builder.Append(",locality:");
+                builder.Append(record.LocalityValid ? '1' : '0');
+                builder.Append(",isolated:");
+                builder.Append(
+                    record.IsolatedConstructionValid ? '1' : '0');
+                builder.Append(",widthFraction:");
+                builder.Append(
+                    record.FeasibleWidthFractionValid ? '1' : '0');
+                builder.Append(",endpointSpan:");
+                builder.Append(record.EndpointSpanValid ? '1' : '0');
+                builder.Append('}');
+                builder.Append(",locality={retainFloor:");
+                builder.Append(
+                    record.LocalityRetainPlaneFloor.ToString("G9"));
+                builder.Append(",removalCeiling:");
+                builder.Append(
+                    record.LocalityRemovalPlaneCeiling.ToString("G9"));
+                builder.Append(",margin:");
+                builder.Append(
+                    record.LocalityFeasibleMargin.ToString("G9"));
+                builder.Append(",guard:");
+                builder.Append(
+                    record.LocalityGuardMargin.ToString("G9"));
+                builder.Append(",minimumRemoval:");
+                builder.Append(
+                    record.LocalityMinimumRemoval.ToString("G9"));
+                builder.Append(",limitingVertex:");
+                builder.Append(record.LocalityLimitingVertex);
+                builder.Append(",limitingPosition:");
+                builder.Append(FormatPlaneCutVector(
+                    record.LocalityLimitingPosition));
+                builder.Append('}');
+                builder.Append(",isolated={succeeded:");
+                builder.Append(record.IsolatedSucceeded ? '1' : '0');
+                builder.Append(",attempts:");
+                builder.Append(record.IsolatedWidthAttemptCount);
+                builder.Append(",lastAttemptedWidth:");
+                builder.Append(
+                    record.IsolatedLastAttemptedWidth.ToString("G9"));
+                builder.Append(",maximumCertifiedWidth:");
+                builder.Append(
+                    record.IsolatedMaximumCertifiedWidth.ToString("G9"));
+                builder.Append(",maximumCertifiedFraction:");
+                builder.Append(
+                    record.IsolatedMaximumCertifiedWidthFraction
+                        .ToString("G9"));
+                builder.Append(",endpointConsumption:");
+                builder.Append(record.EndpointConsumptionA.ToString("G9"));
+                builder.Append('/');
+                builder.Append(record.EndpointConsumptionB.ToString("G9"));
+                builder.Append(",remainingSpan:");
+                builder.Append(record.RemainingCentralSpan.ToString("G9"));
+                builder.Append(",minimumSpan:");
+                builder.Append(record.MinimumCentralSpan.ToString("G9"));
+                builder.Append(",topology:");
+                builder.Append(record.IsolatedOpenEdgeCount);
+                builder.Append('/');
+                builder.Append(record.IsolatedNonManifoldEdgeCount);
+                builder.Append('/');
+                builder.Append(record.IsolatedTJunctionCount);
+                builder.Append('/');
+                builder.Append(record.IsolatedInvalidFaceCount);
+                builder.Append(",diagnostic:");
+                builder.Append(string.IsNullOrEmpty(
+                        record.IsolatedDiagnostic)
+                    ? "none"
+                    : record.IsolatedDiagnostic);
+                builder.Append('}');
+                builder.Append(",failureReason=");
+                builder.AppendLine(string.IsNullOrEmpty(record.FailureReason)
+                    ? "none"
+                    : record.FailureReason);
+            }
         }
 
         private static void AppendEdgeWearCoverageLifecycle(
@@ -2246,6 +3276,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(record.Classification);
                 builder.Append(",structural=");
                 builder.Append(record.StructuralEligible ? '1' : '0');
+                builder.Append(",geometric=");
+                builder.Append(record.GeometricEligible ? '1' : '0');
+                builder.Append(",coexistence=");
+                builder.Append(record.CoexistenceEligible ? '1' : '0');
+                builder.Append(",coexistenceReason=");
+                builder.Append(string.IsNullOrEmpty(
+                        record.CoexistenceFailureReason)
+                    ? "none"
+                    : record.CoexistenceFailureReason);
+                builder.Append(",viabilityState=");
+                builder.Append(record.ViabilityState);
                 builder.Append(",artistic=");
                 builder.Append(record.ArtisticEligible ? '1' : '0');
                 builder.Append(",candidate=");
@@ -2290,16 +3331,277 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        private static void AppendStableEvaluationFingerprint(
+            StringBuilder builder,
+            MassPlacementFrame placementFrame)
+        {
+            builder.AppendLine();
+            builder.AppendLine("[Stable Evaluation Fingerprint]");
+            PendingEdgeWearStableFingerprint pending =
+                pendingEdgeWearStableFingerprint;
+            if (pending == null || !pending.Valid)
+            {
+                builder.AppendLine("status=notCaptured");
+                pendingEdgeWearStableFingerprint = null;
+                return;
+            }
+
+            GeneratedGeometryStableHashBuilder placement =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.GeneratedMass.EdgeWear.PlacementFrame.v1");
+            placement.AddInt32(placementFrame.ReferenceVertexCount);
+            placement.AddSingle(placementFrame.LeanMinimumY);
+            placement.AddSingle(placementFrame.LeanHeight);
+            placement.AddVector3(placementFrame.LeanDirection);
+            placement.AddSingle(placementFrame.LeanDistance);
+            placement.AddSingle(placementFrame.GroundingMinimumY);
+            placement.AddSingle(placementFrame.GroundingHeight);
+            placement.AddSingle(placementFrame.GroundingTop);
+            placement.AddSingle(
+                placementFrame.GroundingFlatteningStrength);
+            placement.AddSingle(
+                placementFrame.GroundingBroadeningStrength);
+            placement.AddSingle(placementFrame.RecenterMinimumY);
+            placement.AddSingle(placementFrame.ContactBand);
+            placement.AddVector2(placementFrame.ContactCentre);
+            placement.AddVector3(placementFrame.RecenterOffset);
+            GeneratedGeometryStableFingerprint placementFingerprint =
+                placement.Finish();
+
+            GeneratedGeometryStableHashBuilder evaluation =
+                GeneratedGeometryStableHashBuilder.Create(
+                    "PS3D.GeneratedMass.EdgeWear.Evaluation.v2");
+            evaluation.AddInt32(pending.SourceEdgeCount);
+            evaluation.AddInt32(pending.StructuralEligibleCount);
+            evaluation.AddInt32(pending.GeometricEligibleCount);
+            evaluation.AddInt32(pending.CoexistenceEligibleCount);
+            evaluation.AddInt32(pending.SelectedCount);
+            evaluation.AddInt32(pending.CertifiedCount);
+            evaluation.AddFingerprint(pending.ExclusionReasons);
+            evaluation.AddFingerprint(pending.SelectedEdges);
+            evaluation.AddFingerprint(pending.CertifiedEdges);
+            evaluation.AddFingerprint(pending.GeometryTopology);
+            evaluation.AddFingerprint(placementFingerprint);
+            GeneratedGeometryStableFingerprint evaluationFingerprint =
+                evaluation.Finish();
+
+            builder.Append("sourceEdges=");
+            builder.AppendLine(pending.SourceEdgeCount.ToString());
+            builder.Append("structuralEligible=");
+            builder.AppendLine(
+                pending.StructuralEligibleCount.ToString());
+            builder.Append("geometricEligible=");
+            builder.AppendLine(
+                pending.GeometricEligibleCount.ToString());
+            builder.Append("coexistenceEligible=");
+            builder.AppendLine(
+                pending.CoexistenceEligibleCount.ToString());
+            builder.Append("selected=");
+            builder.AppendLine(pending.SelectedCount.ToString());
+            builder.Append("certified=");
+            builder.AppendLine(pending.CertifiedCount.ToString());
+            builder.Append("exclusionReasonHash=");
+            builder.AppendLine(pending.ExclusionReasons.ToString());
+            builder.Append("selectedEdgeHash=");
+            builder.AppendLine(pending.SelectedEdges.ToString());
+            builder.Append("certifiedEdgeHash=");
+            builder.AppendLine(pending.CertifiedEdges.ToString());
+            builder.Append("geometryTopologyHash=");
+            builder.AppendLine(pending.GeometryTopology.ToString());
+            builder.Append("placementFrameHash=");
+            builder.AppendLine(placementFingerprint.ToString());
+            builder.Append("evaluationHash=");
+            builder.AppendLine(evaluationFingerprint.ToString());
+
+            pendingEdgeWearStableFingerprint = null;
+        }
+
+        private static void AppendMassPlacementFrameTelemetry(
+            MassPlacementFrame canonicalFrame,
+            MassPlacementFrame legacyPreviewFrame,
+            bool hasLegacyPreviewFrame,
+            bool usesImmutableSourcePlacementFrame,
+            bool previewApplied,
+            int outputVertexCount,
+            int debugPositionCount)
+        {
+#if UNITY_EDITOR
+            if (activeEdgeWearBatchAuditCapture != null)
+            {
+                activeEdgeWearBatchAuditCapture.PlacementCaptured = true;
+                activeEdgeWearBatchAuditCapture.PlacementFrame =
+                    canonicalFrame;
+                activeEdgeWearBatchAuditCapture
+                    .UsesImmutableSourcePlacementFrame =
+                        usesImmutableSourcePlacementFrame;
+                activeEdgeWearBatchAuditCapture.PreviewApplied =
+                    previewApplied;
+                return;
+            }
+
+            StringBuilder builder = new StringBuilder(1024);
+            builder.AppendLine();
+            builder.AppendLine("[Canonical Placement Frame]");
+            builder.Append("placementFrameSource=");
+            builder.AppendLine(usesImmutableSourcePlacementFrame
+                ? "immutable-pre-bevel"
+                : "output-soup");
+            builder.AppendLine("placementFrameBuilds=1");
+            int placementFrameReuses =
+                (usesImmutableSourcePlacementFrame ? 1 : 0) +
+                (debugPositionCount > 0 ? 1 : 0);
+            builder.Append("placementFrameReuses=");
+            builder.AppendLine(placementFrameReuses.ToString());
+            builder.Append("previewApplied=");
+            builder.AppendLine(previewApplied ? "1" : "0");
+            builder.Append("previewDerivedPlacementParameters=");
+            builder.AppendLine(
+                previewApplied && !usesImmutableSourcePlacementFrame
+                    ? "1"
+                    : "0");
+            builder.AppendLine("objectTransformChanged=0");
+            builder.Append("sourceDebugUsesCanonicalFrame=");
+            builder.AppendLine(debugPositionCount > 0 ? "1" : "0");
+            builder.Append("previewUsesCanonicalFrame=");
+            builder.AppendLine(
+                previewApplied && usesImmutableSourcePlacementFrame
+                    ? "1"
+                    : "0");
+            builder.Append("referenceVertexCount=");
+            builder.AppendLine(
+                canonicalFrame.ReferenceVertexCount.ToString());
+            builder.Append("outputVertexCount=");
+            builder.AppendLine(outputVertexCount.ToString());
+            builder.Append("debugPositionCount=");
+            builder.AppendLine(debugPositionCount.ToString());
+            builder.Append("lean={minimumY:");
+            builder.Append(canonicalFrame.LeanMinimumY.ToString("G9"));
+            builder.Append(",height:");
+            builder.Append(canonicalFrame.LeanHeight.ToString("G9"));
+            builder.Append(",direction:");
+            builder.Append(FormatPlaneCutVector(
+                canonicalFrame.LeanDirection));
+            builder.Append(",distance:");
+            builder.Append(canonicalFrame.LeanDistance.ToString("G9"));
+            builder.AppendLine("}");
+            builder.Append("grounding={minimumY:");
+            builder.Append(
+                canonicalFrame.GroundingMinimumY.ToString("G9"));
+            builder.Append(",height:");
+            builder.Append(
+                canonicalFrame.GroundingHeight.ToString("G9"));
+            builder.Append(",top:");
+            builder.Append(canonicalFrame.GroundingTop.ToString("G9"));
+            builder.Append(",flattening:");
+            builder.Append(
+                canonicalFrame.GroundingFlatteningStrength.ToString("G9"));
+            builder.Append(",broadening:");
+            builder.Append(
+                canonicalFrame.GroundingBroadeningStrength.ToString("G9"));
+            builder.AppendLine("}");
+            builder.Append("recenter={minimumY:");
+            builder.Append(
+                canonicalFrame.RecenterMinimumY.ToString("G9"));
+            builder.Append(",contactBand:");
+            builder.Append(canonicalFrame.ContactBand.ToString("G9"));
+            builder.Append(",contactCentre:(");
+            builder.Append(canonicalFrame.ContactCentre.x.ToString("G9"));
+            builder.Append('/');
+            builder.Append(canonicalFrame.ContactCentre.y.ToString("G9"));
+            builder.Append("),offset:");
+            builder.Append(FormatPlaneCutVector(
+                canonicalFrame.RecenterOffset));
+            builder.AppendLine("}");
+            builder.Append("legacyPreviewFrameCaptured=");
+            builder.AppendLine(hasLegacyPreviewFrame ? "1" : "0");
+            if (hasLegacyPreviewFrame)
+            {
+                Vector3 recenterOffsetDelta =
+                    legacyPreviewFrame.RecenterOffset -
+                    canonicalFrame.RecenterOffset;
+                Vector2 contactCentreDelta =
+                    legacyPreviewFrame.ContactCentre -
+                    canonicalFrame.ContactCentre;
+                builder.Append("legacyPreviewFrameDelta={recenterOffset:");
+                builder.Append(FormatPlaneCutVector(recenterOffsetDelta));
+                builder.Append(",leanDistance:");
+                builder.Append((
+                    legacyPreviewFrame.LeanDistance -
+                    canonicalFrame.LeanDistance).ToString("G9"));
+                builder.Append(",leanMinimumY:");
+                builder.Append((
+                    legacyPreviewFrame.LeanMinimumY -
+                    canonicalFrame.LeanMinimumY).ToString("G9"));
+                builder.Append(",groundingMinimumY:");
+                builder.Append((
+                    legacyPreviewFrame.GroundingMinimumY -
+                    canonicalFrame.GroundingMinimumY).ToString("G9"));
+                builder.Append(",contactCentre:(");
+                builder.Append(contactCentreDelta.x.ToString("G9"));
+                builder.Append('/');
+                builder.Append(contactCentreDelta.y.ToString("G9"));
+                builder.AppendLine(")}");
+            }
+            else
+            {
+                builder.AppendLine("legacyPreviewFrameDelta={none}");
+            }
+
+            AppendStableEvaluationFingerprint(
+                builder,
+                canonicalFrame);
+
+            try
+            {
+                string projectRoot = Path.GetFullPath(
+                    Path.Combine(Application.dataPath, ".."));
+                string fullPath = Path.Combine(
+                    projectRoot,
+                    "Library",
+                    "GeneratedMassEdgeWearTelemetry.txt");
+                string directory = Path.GetDirectoryName(fullPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                File.AppendAllText(
+                    fullPath,
+                    builder.ToString(),
+                    new UTF8Encoding(
+                        encoderShouldEmitUTF8Identifier: false));
+            }
+            catch (Exception exception)
+            {
+                LogChamferNoStackTrace(
+                    "GeneratedMass placement-frame telemetry write failed: " +
+                    exception.GetType().Name + ":" + exception.Message,
+                    true);
+            }
+#endif
+        }
+
         private static void LogUnifiedAllEdgeBevelAudit(
             PlaneCutBevelAuditResult audit,
             bool cornerSolutionValid,
             string cornerBlocker)
         {
 #if UNITY_EDITOR
+            if (activeEdgeWearBatchAuditCapture != null)
+            {
+                activeEdgeWearBatchAuditCapture.AuditCaptured = true;
+                activeEdgeWearBatchAuditCapture.Audit = audit;
+                activeEdgeWearBatchAuditCapture.CornerSolutionValid =
+                    cornerSolutionValid;
+                activeEdgeWearBatchAuditCapture.CornerBlocker =
+                    cornerBlocker ?? string.Empty;
+                return;
+            }
+
             const string relativePath =
                 "Library/GeneratedMassEdgeWearTelemetry.txt";
             int writeSucceeded = 0;
             string writeFailure = string.Empty;
+            CapturePendingEdgeWearStableFingerprint(audit);
             string detailed = BuildPlaneCutDetailedTelemetry(
                 audit,
                 cornerSolutionValid,
@@ -2353,6 +3655,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     audit.MaterializedEdgeCoverageValid +
                 ",coverage:{" +
                     FormatEdgeWearCoverageSummary(
+                        audit.CoverageAudit) + "}" +
+                ",viabilityExclusions:{" +
+                    FormatEdgeWearViabilityExclusionSummary(
+                        audit.CoverageAudit,
+                        false) + "}" +
+                ",coexistence:{" +
+                    FormatEdgeWearCoexistenceSummary(audit, false) + "}" +
+                ",localityCache:{" +
+                    FormatEdgeWearLocalityCacheContract(
                         audit.CoverageAudit) + "}" +
                 ",coverageIds:{" +
                     FormatEdgeWearCoverageIdSummary(
@@ -2421,13 +3732,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         : audit.LocalityDeferrals.Count) +
                     ",examples:{" +
                     FormatCappedPlaneCutLocalityDeferrals(audit, 2) + "}" +
-                ",legacyJunctionHeuristic=nonAuthoritative:1" +
-                    ",touched:" +
-                    audit.JunctionCoverageTouchedVertexCount +
-                    ",expected:" +
-                    audit.JunctionCoverageExpectedCount +
-                    ",built:" + audit.JunctionCoverageBuiltCount +
-                    ",missing:" + audit.JunctionCoverageMissingCount +
                 ",stageTimeline:{" +
                     FormatPlaneCutStageTimeline(audit) + "}" +
                 ",meshTriangles:" + audit.PreviewTriangleCount +

@@ -108,7 +108,7 @@ namespace ProgrammaticStylized3D.Rivers
                 resolution);
             FillEnclosedHoles(cleaned, resolution);
             CloseTinyGaps(cleaned, resolution, settings.EmptyMargin);
-            RemoveShortSpikesAndSerrations(
+            RemoveShortContourSpikes(
                 cleaned,
                 resolution,
                 settings.EmptyMargin);
@@ -472,7 +472,7 @@ namespace ProgrammaticStylized3D.Rivers
             ClearMandatoryMargin(mask, resolution, emptyMargin);
         }
 
-        private static void RemoveShortSpikesAndSerrations(
+        private static void RemoveShortContourSpikes(
             byte[] mask,
             int resolution,
             int emptyMargin)

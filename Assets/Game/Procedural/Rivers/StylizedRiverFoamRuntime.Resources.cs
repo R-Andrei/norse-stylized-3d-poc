@@ -1052,7 +1052,7 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref filmSupportTexture);
             ReleaseTexture(ref visualOccupancyA);
             ReleaseTexture(ref visualOccupancyB);
-            ReleaseProgressiveBirthDiagnosticResources();
+            ReleaseAutomaticBirthDiagnosticResources();
             ReleaseTexture(ref topologyTexture);
             ReleaseTexture(ref topologySourcesTexture);
             ReleaseTexture(ref topologyGeneratedTexture);
@@ -1206,7 +1206,10 @@ namespace ProgrammaticStylized3D.Rivers
             clearKernel = -1;
             injectKernel = -1;
             rasterizeFoamSourceEventKernel = -1;
+            rasterizeFoamSourceEventDebugKernel = -1;
             writeIsolatedLifeProbeKernel = -1;
+            clearAutomaticBirthDebugAllKernel = -1;
+            clearAutomaticBirthDebugTransientKernel = -1;
             buildCurrentShoreEdgesKernel = -1;
             composeTopologyKernel = -1;
             captureGeneratedTopologyKernel = -1;

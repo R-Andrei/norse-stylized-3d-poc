@@ -146,31 +146,25 @@ namespace ProgrammaticStylized3D.Rivers
         // Zero is the exact normal rendered result and debug-off state.
         Final = 0,
         FoamAndAgingTopology = 1,
-        ProgressiveBirthSource = 2,
+        AutomaticBirthSources = 2,
         MaterialPresence = 3,
         MaterialRemainingLife = 4,
         FoamMotionField = 5,
         FoamMotionFieldCellGrid = 6,
         FoamEvaluatedShape = 7,
         FoamShapeDifference = 8,
-        FoamShaderDetailProbe = 9,
-        FoamShaderDetailDifference = 10,
+        FoamChipAndStrandProbe = 9,
+        FoamChipAndStrandDifference = 10,
         FoamFilmSource = 11,
         FoamFilmSupport = 12,
         FoamFilmTarget = 13,
         FoamTemporalOccupancy = 14,
         FoamTemporalDifference = 15,
-        // Serialized value 16 is retired and resolves safely to Final.
+        // Numeric values remain explicit for serialized compatibility.
         FoamEvaluatedFinalPreview = 17,
         ChipCandidateField = 18,
-        ChipActivatedCandidates = 19,
-        ChipEdgeEligibility = 20,
-        ChipFinalSelection = 21,
-        // Serialized values 22 and 23 are retired and resolve safely to Final.
-        ChipInteriorAuthority = 24,
         ProductionChipMask = 25,
         ChipEligibilityComposite = 26,
-        // Serialized value 27 is retired and resolves safely to Final.
     }
 
 
@@ -315,7 +309,6 @@ namespace ProgrammaticStylized3D.Rivers
 
         private const int CurrentFoamMaterialLifecycleTuningVersion = 1;
         private const int CurrentFoamVelocityTuningVersion = 1;
-        private const int CurrentFoamChipSelectionTuningVersion = 9;
         private const float MinimumFoamNeutralLifetime = 1f;
         private const float MaximumFoamNeutralLifetime = 10f;
         private const float DefaultFoamNeutralLifetime = 4f;
@@ -366,25 +359,18 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamChipCandidateSpacing = 0.10f;
         private const float MaximumFoamChipCandidateSpacing = 3.00f;
         private const float DefaultFoamChipCandidateSpacing = 1.15f;
-        private const float DefaultFoamChipDistributionIrregularity = 1f;
-        private const float MinimumLegacyFoamChipRadius = 0.05f;
-        private const float MaximumLegacyFoamChipRadius = 1.25f;
-        private const float DefaultLegacyFoamChipRadius = 0.275f;
-        private const float MinimumFoamChipRadiusRatio = 0.05f;
-        private const float MaximumFoamChipRadiusRatio = 0.65f;
-        private const float DefaultFoamChipRadiusRatio =
-            DefaultLegacyFoamChipRadius / DefaultFoamChipCandidateSpacing;
-        private const float DefaultFoamChipSizeIrregularity = 1f;
-        private const float DefaultFoamChipShapeIrregularity = 1f;
+        // Chip Size is authored as one bounded 0-1 control. Internally it
+        // maps to a radius-to-spacing ratio so the adaptive candidate search
+        // retains its proven 3x3 through 5x11 cost ceiling.
+        private const float DefaultFoamChipSize = 0.3152174f;
+        private const float DefaultFoamChipIrregularity = 1f;
         private const float MinimumFoamChipStableScreenRadiusPixels = 0f;
-        private const float MaximumFoamChipStableScreenRadiusPixels = 4f;
+        private const float MaximumFoamChipStableScreenRadiusPixels = 16f;
         private const float DefaultFoamChipStableScreenRadiusPixels = 2f;
         private const float MinimumFoamChipMaximumViewScale = 1f;
         private const float MaximumFoamChipMaximumViewScale = 2.5f;
         private const float DefaultFoamChipMaximumViewScale = 1.75f;
-        private const float MinimumFoamChipSelectionDepth = 0.05f;
-        private const float MaximumFoamChipSelectionDepth = 0.95f;
-        private const float DefaultFoamChipSelectionDepth = 0.42f;
+        private const float DefaultFoamChipEdgeWidthPixels = 4f;
         private const float DefaultFoamChipInteriorAccess = 0f;
         private const float MinimumFoamChipFieldSpeed = 0f;
         private const float MaximumFoamChipFieldSpeed = 12f;
@@ -414,10 +400,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamChipShapeTransitionTime = 0.10f;
         private const float MaximumFoamChipShapeTransitionTime = 30f;
         private const float DefaultFoamChipShapeTransitionTime = 4f;
-        private const float MinimumFoamChipEvolutionRate = 0f;
-        private const float MaximumFoamChipEvolutionRate = 2f;
-        private const float DefaultFoamChipEvolutionRate = 0.20f;
-        private const float DefaultFoamChipEvolutionAmount = 0f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
         private const float MaximumFoamProgressiveRibbonDuration = 5f;
         private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
@@ -1596,51 +1578,26 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(-1f, 1f)]
         [SerializeField] private float foamEdgeContrast;
 
-        // Legacy storage remains only for serialized Chip migration. It has no
-        // runtime shader binding or current artistic authority.
-        [HideInInspector, Range(0f, 1f)]
-        [SerializeField] private float foamChipStrength;
-
-        [FormerlySerializedAs("foamBreakupScale")]
-        [HideInInspector, Range(0f, 1f)]
-        [SerializeField] private float legacyFoamBreakupScale = 0.5f;
-
         [Tooltip("Fraction of analytical Chip candidates selected for production removal. Zero disables production Chipping; one selects every available candidate before edge and transported-material gating.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamChipActivation;
 
-        [Tooltip("World-space metres between analytical Chip candidate lattice cells. This controls average density and is the absolute scale basis for Candidate Radius Ratio; it does not control placement jitter or silhouette shape.")]
+        [Tooltip("World-space metres between analytical Chip candidate centres. Lower values create more candidates; higher values create fewer, more isolated candidates. Chip Size is resolved relative to this spacing so the adaptive search remains bounded and predictable.")]
         [Range(MinimumFoamChipCandidateSpacing, MaximumFoamChipCandidateSpacing)]
         [SerializeField] private float foamChipCandidateSpacing =
             DefaultFoamChipCandidateSpacing;
 
-        [Tooltip("How far candidate centres may deviate from their regular lattice positions. Zero produces evenly spaced centres; one uses the full deterministic jitter range. This does not change candidate size or shape.")]
+        [Tooltip("Relative mean Chip size within the authored spacing. Zero maps to a radius of 5% of Chip Spacing; one maps to 65%. The Inspector reports the effective world-space radius and diameter. This bounded relationship prevents hidden candidate-loop expansion.")]
         [Range(0f, 1f)]
-        [SerializeField] private float foamChipDistributionIrregularity =
-            DefaultFoamChipDistributionIrregularity;
+        [SerializeField] private float foamChipSize =
+            DefaultFoamChipSize;
 
-        // Retained only so tuning version 4 can migrate the previously
-        // serialized metre radius into the truthful spacing-relative ratio.
-        [HideInInspector]
-        [SerializeField] private float foamChipRadius =
-            DefaultLegacyFoamChipRadius;
-
-        [Tooltip("Mean candidate radius as a fraction of Candidate Spacing. Absolute world-space radius is Spacing × Ratio. The shader uses a 3×3 search for compact settings and expands to 5×5 only when authored pulse or lateral reach requires it.")]
-        [Range(MinimumFoamChipRadiusRatio, MaximumFoamChipRadiusRatio)]
-        [SerializeField] private float foamChipRadiusRatio =
-            DefaultFoamChipRadiusRatio;
-
-        [Tooltip("Candidate-to-candidate radius variation around the authored mean. Zero gives identical sizes; one spans approximately 0.58× to 1.42× the mean. This does not move or reshape candidates.")]
+        [Tooltip("One static variation control for Chip placement, size, and connected contour shape. Zero gives a regular lattice of equal circles. One enables the accepted maximum centre jitter, approximately 0.80×-1.40× radius variation, and strongly asymmetric connected contours. The raised minimum removes the former tiny-size tail.")]
         [Range(0f, 1f)]
-        [SerializeField] private float foamChipSizeIrregularity =
-            DefaultFoamChipSizeIrregularity;
+        [SerializeField] private float foamChipIrregularity =
+            DefaultFoamChipIrregularity;
 
-        [Tooltip("Individual candidate silhouette distortion at a fixed outer radius. Zero produces a circle; one warps a single connected contour into a strongly asymmetric blob. This does not change spacing or size variation.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamChipShapeIrregularity =
-            DefaultFoamChipShapeIrregularity;
-
-        [Tooltip("Minimum readable radius in screen pixels for each fully formed Chip. Zero preserves pure world-space sizing. Positive values smoothly enlarge only undersized distant Chips; formation, dissolution, dormancy, size irregularity, and pulse remain authoritative.")]
+        [Tooltip("Target readable radius in screen pixels for each fully formed Chip. Zero preserves pure world-space sizing. Positive values first use the bounded enlargement, then fade candidates that still cannot approach the target instead of leaving distant pixel dirt. Formation, dissolution, dormancy, Chip Irregularity, and pulse remain authoritative.")]
         [Range(MinimumFoamChipStableScreenRadiusPixels, MaximumFoamChipStableScreenRadiusPixels)]
         [SerializeField] private float foamChipStableScreenRadiusPixels =
             DefaultFoamChipStableScreenRadiusPixels;
@@ -1650,12 +1607,12 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamChipMaximumViewScale =
             DefaultFoamChipMaximumViewScale;
 
-        [Tooltip("Controls only the Presence-transition edge territory available to production Chipping. Low values permit very thin weak-material strips; high values permit all non-saturated edge material. Established interiors are controlled separately by Chip Interior Access; this is not a world-space distance.")]
-        [Range(MinimumFoamChipSelectionDepth, MaximumFoamChipSelectionDepth)]
-        [SerializeField] private float foamChipSelectionDepth =
-            DefaultFoamChipSelectionDepth;
+        [Tooltip("Approximate inward width, in rendered pixels, of the canonical pre-Chip Foam edge territory. Zero disables edge permission exactly. The Inspector slider covers 0–256 px, while direct numeric entry accepts any non-negative value for deliberately extreme tests. This is a derivative-normalized local screen-space estimate, not a global geometric distance field.")]
+        [Min(0f)]
+        [SerializeField] private float foamChipEdgeWidthPixels =
+            DefaultFoamChipEdgeWidthPixels;
 
-        [Tooltip("Fraction of activated analytical candidate cells granted permission to cut established visible Foam beyond the edge-only band. Zero keeps every candidate edge-only; one grants every activated candidate full visible-body access. Admission is deterministic per candidate, so connected Chip contours remain intact.")]
+        [Tooltip("Fraction of activated analytical candidate cells granted permission in the established visible body complementary to Chip Edge Width. Zero keeps every candidate edge-only; one grants every activated candidate full visible-body access. Admission is deterministic per candidate, so connected Chip contours remain intact.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamChipInteriorAccess =
             DefaultFoamChipInteriorAccess;
@@ -1685,7 +1642,7 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamChipDormantTime =
             DefaultFoamChipDormantTime;
 
-        [Tooltip("Maximum rigid lateral excursion of each Chip centre as a fraction of Candidate Spacing. Zero disables lateral movement; 1 moves plus or minus one full spacing, and 2.5 moves plus or minus two and a half spacings. The shader expands its lateral candidate search to keep the translated contours complete.")]
+        [Tooltip("Maximum rigid lateral excursion of each Chip centre as a fraction of Chip Spacing. Zero disables lateral movement; 1 moves plus or minus one full spacing, and 2.5 moves plus or minus two and a half spacings. The shader expands its lateral candidate search to keep the translated contours complete.")]
         [Range(MinimumFoamChipLateralMotionAmount, MaximumFoamChipLateralMotionAmount)]
         [SerializeField] private float foamChipLateralMotionAmount =
             DefaultFoamChipLateralMotionAmount;
@@ -1715,7 +1672,7 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamChipSizePulseSpeed =
             DefaultFoamChipSizePulseSpeed;
 
-        [Tooltip("Authority of multi-axis temporal silhouette morphing while a Chip is established. Zero preserves the static contour; one blends toward a strong candidate-specific sine-harmonic geometry trajectory with exact temporal radial-area preservation. This is independent of Shape Irregularity and does not change Candidate Radius, Size Pulse, or lifecycle scale; redistributed lobes are covered by the adaptive search.")]
+        [Tooltip("Authority of multi-axis temporal silhouette morphing while a Chip is established. Zero preserves the static contour; one blends toward a strong candidate-specific sine-harmonic geometry trajectory with exact temporal radial-area preservation. This is independent of static Chip Irregularity and does not change the authored Chip Size, Size Pulse, or lifecycle scale; redistributed lobes are covered by the adaptive search.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamChipShapeChangeAmount =
             DefaultFoamChipShapeChangeAmount;
@@ -1729,20 +1686,6 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(MinimumFoamChipShapeTransitionTime, MaximumFoamChipShapeTransitionTime)]
         [SerializeField] private float foamChipShapeTransitionTime =
             DefaultFoamChipShapeTransitionTime;
-
-        // Retained only for one-way migration from the rejected coupled B.2E
-        // control model. Production code does not bind or read these fields.
-        [HideInInspector]
-        [SerializeField] private float foamChipEvolutionRate =
-            DefaultFoamChipEvolutionRate;
-
-        [HideInInspector]
-        [SerializeField] private float foamChipEvolutionAmount =
-            DefaultFoamChipEvolutionAmount;
-
-        [FormerlySerializedAs("foamChipFraySelectionTuningVersion")]
-        [SerializeField, HideInInspector]
-        private int foamChipSelectionTuningVersion;
 
         [Tooltip("Strength of the render-only structural Foam lineification. Zero produces the coherent Foam body; higher values create elongated anisotropic cuts and remnants.")]
         [Range(0f, 1f)]
@@ -2756,17 +2699,10 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipCandidateSpacing,
                 MinimumFoamChipCandidateSpacing,
                 MaximumFoamChipCandidateSpacing);
-        public float FoamChipDistributionIrregularity =>
-            Mathf.Clamp01(foamChipDistributionIrregularity);
-        public float FoamChipRadiusRatio =>
-            Mathf.Clamp(
-                foamChipRadiusRatio,
-                MinimumFoamChipRadiusRatio,
-                MaximumFoamChipRadiusRatio);
-        public float FoamChipSizeIrregularity =>
-            Mathf.Clamp01(foamChipSizeIrregularity);
-        public float FoamChipShapeIrregularity =>
-            Mathf.Clamp01(foamChipShapeIrregularity);
+        public float FoamChipSize =>
+            Mathf.Clamp01(foamChipSize);
+        public float FoamChipIrregularity =>
+            Mathf.Clamp01(foamChipIrregularity);
         public float FoamChipStableScreenRadiusPixels =>
             Mathf.Clamp(
                 foamChipStableScreenRadiusPixels,
@@ -2777,11 +2713,8 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipMaximumViewScale,
                 MinimumFoamChipMaximumViewScale,
                 MaximumFoamChipMaximumViewScale);
-        public float FoamChipSelectionDepth =>
-            Mathf.Clamp(
-                foamChipSelectionDepth,
-                MinimumFoamChipSelectionDepth,
-                MaximumFoamChipSelectionDepth);
+        public float FoamChipEdgeWidthPixels =>
+            Mathf.Max(0f, foamChipEdgeWidthPixels);
         public float FoamChipInteriorAccess =>
             Mathf.Clamp01(foamChipInteriorAccess);
         public float FoamChipFieldSpeed =>
@@ -3402,7 +3335,6 @@ namespace ProgrammaticStylized3D.Rivers
             foamStateHeld = false;
             MigrateFoamMaterialLifecycleTuningIfRequired();
             MigrateFoamVelocityTuningIfRequired();
-            MigrateFoamChipSelectionTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -3484,8 +3416,8 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 case (int)StylizedRiverFoamDebugView.FoamAndAgingTopology:
                     return StylizedRiverFoamDebugView.FoamAndAgingTopology;
-                case (int)StylizedRiverFoamDebugView.ProgressiveBirthSource:
-                    return StylizedRiverFoamDebugView.ProgressiveBirthSource;
+                case (int)StylizedRiverFoamDebugView.AutomaticBirthSources:
+                    return StylizedRiverFoamDebugView.AutomaticBirthSources;
                 case (int)StylizedRiverFoamDebugView.MaterialPresence:
                     return StylizedRiverFoamDebugView.MaterialPresence;
                 case (int)StylizedRiverFoamDebugView.MaterialRemainingLife:
@@ -3498,10 +3430,10 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamEvaluatedShape;
                 case (int)StylizedRiverFoamDebugView.FoamShapeDifference:
                     return StylizedRiverFoamDebugView.FoamShapeDifference;
-                case (int)StylizedRiverFoamDebugView.FoamShaderDetailProbe:
-                    return StylizedRiverFoamDebugView.FoamShaderDetailProbe;
-                case (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference:
-                    return StylizedRiverFoamDebugView.FoamShaderDetailDifference;
+                case (int)StylizedRiverFoamDebugView.FoamChipAndStrandProbe:
+                    return StylizedRiverFoamDebugView.FoamChipAndStrandProbe;
+                case (int)StylizedRiverFoamDebugView.FoamChipAndStrandDifference:
+                    return StylizedRiverFoamDebugView.FoamChipAndStrandDifference;
                 case (int)StylizedRiverFoamDebugView.FoamFilmSource:
                     return StylizedRiverFoamDebugView.FoamFilmSource;
                 case (int)StylizedRiverFoamDebugView.FoamFilmSupport:
@@ -3516,14 +3448,6 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamEvaluatedFinalPreview;
                 case (int)StylizedRiverFoamDebugView.ChipCandidateField:
                     return StylizedRiverFoamDebugView.ChipCandidateField;
-                case (int)StylizedRiverFoamDebugView.ChipActivatedCandidates:
-                    return StylizedRiverFoamDebugView.ChipActivatedCandidates;
-                case (int)StylizedRiverFoamDebugView.ChipEdgeEligibility:
-                    return StylizedRiverFoamDebugView.ChipEdgeEligibility;
-                case (int)StylizedRiverFoamDebugView.ChipFinalSelection:
-                    return StylizedRiverFoamDebugView.ChipFinalSelection;
-                case (int)StylizedRiverFoamDebugView.ChipInteriorAuthority:
-                    return StylizedRiverFoamDebugView.ChipInteriorAuthority;
                 case (int)StylizedRiverFoamDebugView.ProductionChipMask:
                     return StylizedRiverFoamDebugView.ProductionChipMask;
                 case (int)StylizedRiverFoamDebugView.ChipEligibilityComposite:
@@ -3593,147 +3517,10 @@ namespace ProgrammaticStylized3D.Rivers
             foamVelocityTuningVersion = CurrentFoamVelocityTuningVersion;
         }
 
-        private void MigrateFoamChipSelectionTuningIfRequired()
-        {
-            if (foamChipSelectionTuningVersion < 1)
-            {
-                float legacyScale = Mathf.Clamp01(legacyFoamBreakupScale);
-                foamChipActivation = Mathf.Clamp01(foamChipStrength);
-                foamChipCandidateSpacing = Mathf.Lerp(
-                    0.70f,
-                    1.60f,
-                    legacyScale);
-                foamChipRadius = Mathf.Lerp(0.18f, 0.37f, legacyScale);
-                foamChipSelectionTuningVersion = 1;
-            }
-
-            if (foamChipSelectionTuningVersion < 2)
-            {
-                // A.1 adds independent selection-depth authority. Preserve
-                // every already-authored A control and initialize only the new
-                // Chip depth; the historical serialized field alias preserves existing data.
-                foamChipSelectionDepth = DefaultFoamChipSelectionDepth;
-                foamChipSelectionTuningVersion = 2;
-            }
-
-            if (foamChipSelectionTuningVersion < 3)
-            {
-                // B.1 exposes the fixed A.1 candidate variation as three
-                // independent mathematical controls. Defaults preserve the
-                // previously validated maximum jitter/shape/size behavior.
-                foamChipDistributionIrregularity =
-                    DefaultFoamChipDistributionIrregularity;
-                foamChipSizeIrregularity =
-                    DefaultFoamChipSizeIrregularity;
-                foamChipShapeIrregularity =
-                    DefaultFoamChipShapeIrregularity;
-                foamChipSelectionTuningVersion = 3;
-            }
-
-            if (foamChipSelectionTuningVersion < 4)
-            {
-                // B.1A removes the hidden spacing cap from the authoring
-                // contract. Preserve the previously visible effective radius
-                // by migrating min(old metres, spacing * 0.46) into the new
-                // bounded spacing-relative radius ratio.
-                float spacing = Mathf.Clamp(
-                    foamChipCandidateSpacing,
-                    MinimumFoamChipCandidateSpacing,
-                    MaximumFoamChipCandidateSpacing);
-                float legacyRadius = Mathf.Clamp(
-                    foamChipRadius,
-                    MinimumLegacyFoamChipRadius,
-                    MaximumLegacyFoamChipRadius);
-                float legacyEffectiveRadius = Mathf.Min(
-                    legacyRadius,
-                    spacing * 0.46f);
-                foamChipRadiusRatio = Mathf.Clamp(
-                    legacyEffectiveRadius / Mathf.Max(spacing, 0.0001f),
-                    MinimumFoamChipRadiusRatio,
-                    MaximumFoamChipRadiusRatio);
-                foamChipSelectionTuningVersion = 4;
-            }
-
-            if (foamChipSelectionTuningVersion < 5)
-            {
-                // B.2 adds optional render-only evolution. Preserve every
-                // existing River's validated static result until the author
-                // deliberately raises Field Speed or Evolution Amount.
-                foamChipFieldSpeed = DefaultFoamChipFieldSpeed;
-                foamChipEvolutionRate = DefaultFoamChipEvolutionRate;
-                foamChipEvolutionAmount = DefaultFoamChipEvolutionAmount;
-                foamChipSelectionTuningVersion = 5;
-            }
-
-            if (foamChipSelectionTuningVersion < 6)
-            {
-                // B.2D separates edge-only coverage from explicit established-
-                // body permission. Existing Rivers remain edge-only by default;
-                // the new binary material admission starts at a neutral 0.5.
-                foamChipInteriorAccess = DefaultFoamChipInteriorAccess;
-                foamChipSelectionTuningVersion = 6;
-            }
-
-            if (foamChipSelectionTuningVersion < 7)
-            {
-                // B.2F retires the coupled Evolution Amount/Rate model. Every
-                // participating candidate receives an always-active, slow,
-                // explicit lifecycle. Preserve only the old small pulse and
-                // contour authorities. The rejected nonlinear warp has no
-                // trustworthy rigid-motion equivalent, so migration leaves the
-                // new lateral and rotation amounts neutral for deliberate tuning.
-                float legacyEvolutionAmount = Mathf.Clamp01(
-                    foamChipEvolutionAmount);
-                foamChipFormationTime = DefaultFoamChipFormationTime;
-                foamChipStableTime = DefaultFoamChipStableTime;
-                foamChipDissolveTime = DefaultFoamChipDissolveTime;
-                foamChipDormantTime = DefaultFoamChipDormantTime;
-                foamChipLateralMotionAmount =
-                    DefaultFoamChipLateralMotionAmount;
-                foamChipLateralMotionSpeed =
-                    DefaultFoamChipLateralMotionSpeed;
-                foamChipRotationAmountDegrees =
-                    DefaultFoamChipRotationAmountDegrees;
-                foamChipRotationSpeed = DefaultFoamChipRotationSpeed;
-                foamChipSizePulseAmount = Mathf.Clamp(
-                    legacyEvolutionAmount * 0.08f,
-                    MinimumFoamChipSizePulseAmount,
-                    MaximumFoamChipSizePulseAmount);
-                foamChipSizePulseSpeed = DefaultFoamChipSizePulseSpeed;
-                foamChipShapeChangeAmount = legacyEvolutionAmount;
-                foamChipShapeChangeSpeed = DefaultFoamChipShapeChangeSpeed;
-                foamChipSelectionTuningVersion = 7;
-            }
-
-            if (foamChipSelectionTuningVersion < 8)
-            {
-                // B.2G adds bounded projected-size LOD. Existing Rivers receive
-                // the accepted readability defaults; the scale cap and existing
-                // spacing-relative radius cap prevent unbounded world growth.
-                foamChipStableScreenRadiusPixels =
-                    DefaultFoamChipStableScreenRadiusPixels;
-                foamChipMaximumViewScale =
-                    DefaultFoamChipMaximumViewScale;
-                foamChipSelectionTuningVersion = 8;
-            }
-
-            if (foamChipSelectionTuningVersion < 9)
-            {
-                // B.2L separates target-change cadence from the duration of the
-                // actual contour transition. Preserve the authored cadence and
-                // initialize a deliberately slow four-second geometric morph.
-                foamChipShapeTransitionTime =
-                    DefaultFoamChipShapeTransitionTime;
-                foamChipSelectionTuningVersion = 9;
-            }
-
-        }
-
         private void OnValidate()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
             MigrateFoamVelocityTuningIfRequired();
-            MigrateFoamChipSelectionTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -5148,26 +4935,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamEdgeContrast,
                 -1f,
                 1f);
-            foamChipStrength = Mathf.Clamp01(foamChipStrength);
             foamChipActivation = Mathf.Clamp01(foamChipActivation);
             foamChipCandidateSpacing = Mathf.Clamp(
                 foamChipCandidateSpacing,
                 MinimumFoamChipCandidateSpacing,
                 MaximumFoamChipCandidateSpacing);
-            foamChipDistributionIrregularity = Mathf.Clamp01(
-                foamChipDistributionIrregularity);
-            foamChipRadius = Mathf.Clamp(
-                foamChipRadius,
-                MinimumLegacyFoamChipRadius,
-                MaximumLegacyFoamChipRadius);
-            foamChipRadiusRatio = Mathf.Clamp(
-                foamChipRadiusRatio,
-                MinimumFoamChipRadiusRatio,
-                MaximumFoamChipRadiusRatio);
-            foamChipSizeIrregularity = Mathf.Clamp01(
-                foamChipSizeIrregularity);
-            foamChipShapeIrregularity = Mathf.Clamp01(
-                foamChipShapeIrregularity);
+            foamChipSize = Mathf.Clamp01(foamChipSize);
+            foamChipIrregularity = Mathf.Clamp01(
+                foamChipIrregularity);
             foamChipStableScreenRadiusPixels = Mathf.Clamp(
                 foamChipStableScreenRadiusPixels,
                 MinimumFoamChipStableScreenRadiusPixels,
@@ -5176,10 +4951,9 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipMaximumViewScale,
                 MinimumFoamChipMaximumViewScale,
                 MaximumFoamChipMaximumViewScale);
-            foamChipSelectionDepth = Mathf.Clamp(
-                foamChipSelectionDepth,
-                MinimumFoamChipSelectionDepth,
-                MaximumFoamChipSelectionDepth);
+            foamChipEdgeWidthPixels = Mathf.Max(
+                0f,
+                foamChipEdgeWidthPixels);
             foamChipInteriorAccess = Mathf.Clamp01(
                 foamChipInteriorAccess);
             foamChipFieldSpeed = Mathf.Clamp(
@@ -5236,12 +5010,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipShapeTransitionTime,
                 MinimumFoamChipShapeTransitionTime,
                 MaximumFoamChipShapeTransitionTime);
-            foamChipEvolutionRate = Mathf.Clamp(
-                foamChipEvolutionRate,
-                MinimumFoamChipEvolutionRate,
-                MaximumFoamChipEvolutionRate);
-            foamChipEvolutionAmount = Mathf.Clamp01(
-                foamChipEvolutionAmount);
             foamStrandStrength = Mathf.Clamp01(foamStrandStrength);
             foamStrandScale = Mathf.Clamp01(foamStrandScale);
             foamStrandDensity = Mathf.Clamp01(foamStrandDensity);

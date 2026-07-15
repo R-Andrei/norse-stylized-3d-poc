@@ -214,14 +214,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             "Material Presence",
             "Material Remaining Life",
-            "Progressive Birth Source (Test Source)"
+            "Automatic Birth Sources"
         };
 
         private static readonly int[] FoamLayerCValues =
         {
             (int)StylizedRiverFoamDebugView.MaterialPresence,
             (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
-            (int)StylizedRiverFoamDebugView.ProgressiveBirthSource
+            (int)StylizedRiverFoamDebugView.AutomaticBirthSources
         };
 
         private static readonly string[] FoamLayerDPrimaryLabels =
@@ -267,35 +267,27 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private static readonly string[] FoamLayerDChipLabels =
         {
             "Chip Candidate Field",
-            "Chip Activated Candidates",
-            "Chip Edge Coverage",
             "Chip Eligibility Composite",
-            "Chip Final Selection",
-            "Chip Interior Access",
             "Production Chip Mask"
         };
 
         private static readonly int[] FoamLayerDChipValues =
         {
             (int)StylizedRiverFoamDebugView.ChipCandidateField,
-            (int)StylizedRiverFoamDebugView.ChipActivatedCandidates,
-            (int)StylizedRiverFoamDebugView.ChipEdgeEligibility,
             (int)StylizedRiverFoamDebugView.ChipEligibilityComposite,
-            (int)StylizedRiverFoamDebugView.ChipFinalSelection,
-            (int)StylizedRiverFoamDebugView.ChipInteriorAuthority,
             (int)StylizedRiverFoamDebugView.ProductionChipMask
         };
 
         private static readonly string[] FoamLayerELabels =
         {
-            "Foam Shader Detail Probe",
-            "Foam Shader Detail Difference"
+            "Foam Chip And Strand Probe",
+            "Foam Chip And Strand Difference"
         };
 
         private static readonly int[] FoamLayerEValues =
         {
-            (int)StylizedRiverFoamDebugView.FoamShaderDetailProbe,
-            (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference
+            (int)StylizedRiverFoamDebugView.FoamChipAndStrandProbe,
+            (int)StylizedRiverFoamDebugView.FoamChipAndStrandDifference
         };
 
 
@@ -388,6 +380,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         description,
                         MessageType.None);
                 }
+                if (selectedFeature == RiverDebugFeature.Foam &&
+                    selectedView ==
+                        (int)StylizedRiverFoamDebugView.AutomaticBirthSources)
+                {
+                    DrawAutomaticBirthSourceDebugStatus();
+                }
             }
             else if (!hasMixedSelection)
             {
@@ -421,6 +419,36 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     RiverDebugFeature.FinalRender,
                     0);
             }
+        }
+
+        private void DrawAutomaticBirthSourceDebugStatus()
+        {
+            StylizedRiver selectedRiver = target as StylizedRiver;
+            StylizedRiverFoamRuntime runtime = selectedRiver != null
+                ? selectedRiver.GetComponent<StylizedRiverFoamRuntime>()
+                : null;
+            string unavailable = Application.isPlaying
+                ? "Runtime unavailable"
+                : "Not in Play Mode";
+
+            DrawReadOnlyRow(
+                new GUIContent("Latest Source Texels"),
+                runtime != null
+                    ? runtime.AutomaticBirthDebugReadbackAvailable
+                        ? runtime.AutomaticBirthDebugLatestAffectedTexels.ToString("N0")
+                        : runtime.AutomaticBirthDebugReadbackPending
+                            ? "Awaiting readback"
+                            : "No completed readback"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent("Cumulative Source Texels"),
+                runtime != null
+                    ? runtime.AutomaticBirthDebugReadbackAvailable
+                        ? runtime.AutomaticBirthDebugCumulativeAffectedTexels.ToString("N0")
+                        : runtime.AutomaticBirthDebugReadbackPending
+                            ? "Awaiting readback"
+                            : "No completed readback"
+                    : unavailable);
         }
 
         private int DrawDebugViewSelector(
@@ -1353,9 +1381,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     return
                         "One combined lifecycle-validation view. Dark water is neutral valid fluid. Green is the maximum positive lifespan support from Major, Connector, Pressure, Lee, and Shore Support. Red is Negative Aging Pressure. Yellow is their overlap. Blue is the canonical current-water Obstacle Footprint. Bright cyan/white is the exact final Foam mask used by normal rendering. Remaining Life is verified through the Material Lifetime and Topology Interaction summaries, not by broad Foam opacity.";
 
-                case StylizedRiverFoamDebugView.ProgressiveBirthSource:
+                case StylizedRiverFoamDebugView.AutomaticBirthSources:
                     return
-                        "Source isolation before persistent transport and aging. Blue is the complete planned accepted source, green is cumulative accepted source geometry since the latest idle start, red is source submitted during the latest material update, and yellow is the current emission head. Amount selects deterministic coherent area rather than persistent intensity.";
+                        "Exact automatic Layer C birth footprints before transport and aging. Yellow is Shore Ribbon and Inward Wash, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, and white marks source texels touched during the latest material update. Category history accumulates from entering this view until Foam is cleared or resources are rebuilt.";
 
                 case StylizedRiverFoamDebugView.MaterialPresence:
                     return
@@ -1381,42 +1409,26 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     return
                         "Layer D difference diagnostic. Black means _FoamShapeMask matches raw persistent Material Presence, green means evaluated shape adds visual coverage, and magenta/red means evaluated shape removes visual coverage. This exists so Layer D changes are visible without guessing between two similar masks.";
 
-                case StylizedRiverFoamDebugView.FoamShaderDetailProbe:
+                case StylizedRiverFoamDebugView.FoamChipAndStrandProbe:
                     return
-                        "Layer E production breakup mask after the committed Final Foam silhouette receives the current Chip and Strand controls. It is render-only: it does not write FoamState or _FoamShapeMask, but it is the same local morphology consumed by normal Final Foam.";
+                        "Layer E production Chip-and-Strand mask after the committed Final Foam silhouette receives the current Chip and Strand controls. It is render-only: it does not write FoamState or _FoamShapeMask, but it is the same local morphology consumed by normal Final Foam.";
 
-                case StylizedRiverFoamDebugView.FoamShaderDetailDifference:
+                case StylizedRiverFoamDebugView.FoamChipAndStrandDifference:
                     return
-                        "Layer E production breakup difference. Black means the committed Final Foam silhouette is unchanged; magenta/red means coverage is removed by Chipping or Strands. This proof never adds coverage, so the green channel remains zero.";
+                        "Layer E production Chip-and-Strand difference. Black means the committed Final Foam silhouette is unchanged; magenta/red means coverage is removed by Chipping or Strands. This proof never adds coverage, so the green channel remains zero.";
 
 
                 case StylizedRiverFoamDebugView.ChipCandidateField:
                     return
-                        "Chip construction diagnostic. White shows the current deterministic candidate contours after lifecycle, rigid motion, size pulse, rotation, and bounded shape change, but before Chip Activation, edge restriction, Interior Access, or transported-material gating.";
-
-                case StylizedRiverFoamDebugView.ChipActivatedCandidates:
-                    return
-                        "Chip construction diagnostic. Yellow shows the current candidates retained by Chip Activation after the explicit lifecycle and independent rigid-motion/living-variation controls, but before Foam-edge restriction, Interior Access, and transported-material gating.";
-
-                case StylizedRiverFoamDebugView.ChipEdgeEligibility:
-                    return
-                        "Chip construction diagnostic. Cyan shows the visible Presence-transition territory permitted by Chip Edge Coverage. It is deliberately edge-only; established-body permission is added separately by Chip Interior Access and appears in Chip Final Selection.";
+                        "Chip construction diagnostic. Orange shows the exact activated analytical candidate field after lifecycle, rigid motion, view stabilization, rotation, pulse, and shape change, but before material permission.";
 
                 case StylizedRiverFoamDebugView.ChipEligibilityComposite:
                     return
-                        "Chip permission diagnostic, independent of current candidates and Chip Activation. Dark gray is pre-Chip rendered Foam coverage. Bright yellow is the Edge Coverage territory; established-body yellow intensity is the expected permission authored by fractional Chip Interior Access. Cyan indicates permission outside visible support and should normally be absent.";
-
-                case StylizedRiverFoamDebugView.ChipFinalSelection:
-                    return
-                        "Chip construction diagnostic. Magenta shows the complete production selection before soft-shape reconstruction: edge-only candidate selection plus deterministic candidates granted Interior Access, clipped to pre-Chip visible Foam support.";
-
-                case StylizedRiverFoamDebugView.ChipInteriorAuthority:
-                    return
-                        "Chip permission diagnostic. Green shows candidate-independent established-body authority from Chip Interior Access, clipped to pre-Chip visible Foam support. Intensity is the expected fraction of activated candidate cells granted full-body permission; current candidate contours and Activation are intentionally excluded.";
+                        "Canonical Chip permission diagnostic, independent of current candidates and Activation. Dark gray is exact pre-Chip rendered Foam, yellow is the derivative-normalized Chip Edge Width band, magenta is optional established-body permission from Chip Interior Access, and cyan is permission outside visible support and should be absent.";
 
                 case StylizedRiverFoamDebugView.ProductionChipMask:
                     return
-                        "Production Chip diagnostic. Magenta shows the exact hardened Final Foam coverage removed after candidate activation, parallel Edge Coverage or Interior Access permission, and soft-shape reconstruction. It matches the production cut before Strands.";
+                        "Production Chip diagnostic. Magenta shows the exact hardened Final Foam coverage removed after activated candidates meet the canonical Edge Width or optional Interior Access permission. It matches the production cut before Strands.";
 
                 case StylizedRiverFoamDebugView.FoamFilmSource:
                     return

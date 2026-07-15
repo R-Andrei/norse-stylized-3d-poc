@@ -1,12 +1,24 @@
-# River Shader Compile Recovery Progress Log and Checklist
+# Current shader-iteration status after accepted D.1C
 
-> **D.0 cross-impact note — 2026-07-14**
->
-> Final-Edge Fray retirement edits `RiverWaterFoam.hlsl` but preserves the exact adaptive `[loop]` Chip candidate bounds and iteration body introduced by Patch 1. D.0 removes the Fray helper, procedural fields, and dead transient carriers without adding replacement shader work. Unity must record a fresh cold compile after shader invalidation; any regression must be compared against the rolled-loop baseline rather than the former unrolled implementation.
+D.1C imported, rendered, and passed the user’s functional Unity validation while preserving the adaptive rolled-loop `3×3` through `5×11` search. Chipping is accepted and no longer blocked on shader functionality.
+
+No dedicated cold-compile timing or final GPU comparison was supplied for D.1C. Those measurements remain deferred performance evidence, not a blocker for the accepted visual baseline. This checklist should only become active again for the comprehensive River performance pass or a new shader-iteration regression.
+
+## `4.11C.5.18B` automatic-birth debug impact
+
+The automatic source debug change is debug-isolated. `RasterizeFoamSourceEvent` remains the normal kernel and contains no birth-debug UAV write. Only while Foam debug view `2` is active does the runtime substitute `RasterizeFoamSourceEventDebug` for the same automatic source-event dispatch. Both kernels call the same source evaluator, so the visualization cannot drift from production source shape.
+
+```text
+normal rendering: no new dispatch, texture sample, buffer, or debug write;
+debug view active: existing debug texture/counter resources plus one UAV write per accepted source texel;
+manual progressive trajectory paint kernel: removed.
+```
+
+Unity compute-shader import and runtime validation remain required. This is not a reason to reopen the deferred full River performance pass.
 
 ## Canonical log policy
 
-This document is the active progress ledger for recovering StylizedRiver shader iteration performance. It owns the accepted findings, methods tried, patch status, validation evidence, and immediate next action.
+This document is the retained evidence ledger for StylizedRiver shader iteration performance. It owns the accepted findings, methods tried, patch status, and validation evidence. It has no immediate patch action and reopens only during the comprehensive River performance pass or a new regression.
 
 `River_Editor_Loading_Performance_Full_Diagnosis.md` remains the authoritative captured incident report. `Ground_River_Regeneration_Orchestration_Manual.md` remains authoritative for the separate Ground/River ownership redesign. This checklist does not replace either document.
 
@@ -66,7 +78,7 @@ Confidence that the fixed unrolled search is the dominant per-variant compile re
 - [x] Runtime owner: `Assets/Game/Procedural/Rivers/StylizedRiver.cs` resolves the river shader resource.
 - [x] No Ground, Generated Mass, vegetation, generic PixelSurface, or unrelated water shader directly includes the changed file.
 - [x] No shader properties, material serialization, textures, buffers, components, tags, layers, assets, or render-pass declarations are changed by Patch 1.
-- [ ] Unity validation must still confirm that all river debug modes and production Foam paths compile and render correctly.
+- [x] Unity import and production Chipping render validation passed through D.1C. Exhaustive timing/debug-mode measurement remains deferred performance evidence.
 
 ## Methods ledger
 
@@ -78,7 +90,11 @@ Confidence that the fixed unrolled search is the dominant per-variant compile re
 | Strip URP variants first | Deferred | A single required variant must become cheap before multiplier reduction is useful; stripping also needs a complete renderer/quality/build audit. |
 | Prepared compute/texture/buffer candidate field | Deferred durable option | High architecture cost and current view-dependent derivative behaviour require a separate design. |
 | Separate production and diagnostic shader responsibilities | Approved follow-up candidate | Valuable after Patch 1 measurement, but larger than the minimum causal experiment. |
-| Exact adaptive rolled loops | **Implemented; awaiting Unity validation** | Preserves the complete reach contract while exposing one candidate body instead of 55 unrolled copies. |
+| Exact adaptive rolled loops | **Functionally accepted; dedicated cold-timing measurement deferred** | Preserves the complete reach contract while exposing one candidate body instead of 55 unrolled copies. |
+| Presence-isovalue `Chip Edge Coverage` | **Rejected and removed by D.1A** | It selected scalar coverage, not spatial edge distance, producing non-uniform territory. |
+| Derivative-normalized existing `softVisibility` | **Accepted with deferred thin-strip limitation** | Zero-resource local pixel-coordinate approximation; D.1A.1 persistent-carrier alternative was rejected and rolled back. |
+| Consolidated Size/Irregularity authoring | **Unity-validated and accepted** | Replaces four uniforms with two while preserving the adaptive search ceiling. |
+| Medium/large-biased readable population | **Unity-validated and accepted** | Reuses existing hashes and projected radius; no search or resource expansion. |
 
 ## Patch 1 — Exact adaptive rolled candidate search
 
@@ -117,7 +133,7 @@ The maximum runtime candidate count is intentionally unchanged. The expected Edi
 - production Chipping or debug modes 18–27 if candidate iteration changes unexpectedly;
 - cold compile time if Unity ignores the loop attribute and still aggressively unrolls the body.
 
-The patch is not accepted until Unity evidence addresses those risks.
+Functional acceptance is complete. These risks require renewed measurement only if the comprehensive performance pass or a new regression reopens shader iteration work.
 
 ## Validation checklist
 
@@ -135,36 +151,25 @@ The patch is not accepted until Unity evidence addresses those risks.
 - [ ] Select another object and then StylizedRiver twice; confirm the second river selection is immediate or within the agreed warm budget.
 - [ ] Confirm no new river shader-cache artifact appears during an already-warm repeated selection.
 
-### C. Production visual equivalence
+### C. Functional Unity validation record
 
-- [ ] Compare normal Final Foam before and after at current serialized settings.
-- [ ] Validate Chipping with Activation `0` and `1`.
-- [ ] Validate minimum `3 x 3`, representative `3 x 5`, and maximum `5 x 11` reach configurations.
-- [ ] At maxima, test Candidate Radius, Maximum View Scale, Size Irregularity, Size Pulse, Shape Change, Distribution Irregularity, and Lateral Motion together.
-- [ ] Confirm no missing candidates, clipping, popping, pink output, or changed lifecycle/motion identity.
+- [x] The river shader imported and rendered through D.1C without a reported shader failure.
+- [x] Current production Chipping was visually accepted at the gameplay camera.
+- [x] D.1A eligibility, D.1B authoring, and D.1C readable population were accepted as the current baseline.
+- [x] The surviving diagnostics are `Chip Candidate Field`, `Chip Eligibility Composite`, and `Production Chip Mask`.
 
-### D. Diagnostic equivalence
+### D. Deferred performance measurements
 
-- [ ] Validate surviving Layer E debug views `18–21` and `24–26`; retired values `22`, `23`, and `27` must resolve safely to Final.
-- [ ] Confirm Candidate Field, Activated Candidates, Edge Eligibility, Interior Authority, Potential Eligibility, Final Selection, and Chip-removed output remain coherent.
-- [ ] Confirm surviving Strand output is unchanged outside the production boundary effects caused by Chipping.
+These are useful for the comprehensive River performance pass but do not block the accepted Chipping baseline:
 
-### E. Runtime GPU guard
+- [ ] Record deliberate cold Scene-view, Play-entry, and Inspector-preview timings.
+- [ ] Record warm-cache reuse timings.
+- [ ] Compare representative and maximum-reach runtime GPU cost.
+- [ ] Reopen shader-iteration architecture only if those measurements or a new regression justify it.
 
-- [ ] Compare representative river GPU cost before and after at current settings.
-- [ ] Compare maximum `5 x 11` settings before and after.
-- [ ] Reject or redesign the patch if Editor compile recovery creates a severe sustained GPU regression.
+## Performance acceptance criteria if this work resumes
 
-## Acceptance criteria
-
-Patch 1 is accepted only when all of the following are true:
-
-- [ ] D3D11 compiles without shader errors.
-- [ ] Cold Scene, Play, and Inspector contexts are materially faster than the captured multi-minute baseline.
-- [ ] Warm reuse does not repeat cold shader work without a source/configuration change.
-- [ ] Current and extreme Chip visuals remain equivalent within normal rasterization tolerance.
-- [ ] Diagnostic views remain correct.
-- [ ] Runtime GPU cost remains acceptable.
+A future compile/performance patch should preserve all accepted Chipping visuals and diagnostics while materially improving measured iteration or GPU cost. Do not reduce the accepted candidate reach or add prepared resources without new evidence.
 
 ## Local validation record
 
@@ -175,27 +180,23 @@ Patch 1 is accepted only when all of the following are true:
 - [x] Exhaustive offset-set equivalence was checked for every legal integer pair: downstream offsets `1..2`, lateral offsets `1..5`.
 - [x] Changed-file line endings remain LF and the include remains ASCII.
 
-This is not a Unity ShaderLab, URP-variant, D3D11-driver, or in-project compile. Unity validation remains mandatory before acceptance.
+This is not a Unity ShaderLab, URP-variant, D3D11-driver, or in-project compile. This local validation is not a substitute for Unity measurement. Functional Unity acceptance is complete; dedicated timing evidence remains deferred to the comprehensive performance pass.
 
 ## D.0 cross-patch preservation note
 
-D.0 removes Final-Edge Fray and its dead transient carriers from the same include. It must preserve the adaptive `[loop]` Chip candidate search, its runtime bounds, and its maximum `5 × 11` reach byte-for-byte. The retirement removes procedural work and adds no texture, buffer, dispatch, shader property, candidate iteration, or replacement morphology. Because any include edit invalidates dependent shader variants, record a fresh cold compile timing after D.0 and compare it with the rolled-loop recovery baseline before attributing regressions.
+It must preserve the adaptive `[loop]` Chip candidate search, its runtime bounds, and its maximum `5 × 11` reach byte-for-byte. The retirement removes procedural work and adds no texture, buffer, dispatch, shader property, candidate iteration, or replacement morphology. Because any include edit invalidates dependent shader variants, record a fresh cold compile timing after D.0 and compare it with the rolled-loop recovery baseline before attributing regressions.
 
 ## Current status
 
 ```text
 Source analysis: complete
-Patch 1 implementation: complete
-Local HLSL parser/code-generation validation: complete
-Unity D3D11 validation: pending
-Cold timing validation: pending
-Visual equivalence validation: pending
-Runtime GPU comparison: pending
+Rolled-loop implementation: functionally accepted in Unity
+D.1A / D.1B / D.1C visual baseline: Unity-validated and accepted
+Cold Scene/Play/Inspector timing record: deferred
+Final runtime GPU comparison: deferred
+Active Chipping blocker: none
 ```
 
-## Next decision after validation
+## Next decision
 
-1. If Patch 1 removes the multi-minute stalls and runtime cost remains acceptable, accept it as the immediate recovery baseline.
-2. If compile time remains excessive, isolate production Chip selection from diagnostic-only outputs next.
-3. If the rolled loop causes unacceptable GPU cost, design a coarse prepared candidate index/field rather than reducing accepted visual reach blindly.
-4. Only after one required variant is cheap, audit and constrain the actual URP shader variant surface.
+There is no active compile-recovery or Chipping decision. If shader iteration regresses again, resume this ledger with fresh timings. Otherwise, perform the remaining cold-context and GPU measurements during the comprehensive River performance pass.

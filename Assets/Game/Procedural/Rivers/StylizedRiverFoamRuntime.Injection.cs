@@ -396,6 +396,15 @@ namespace ProgrammaticStylized3D.Rivers
                 countY = Mathf.Max(1, endY - startY + 1);
             }
 
+            bool debugWriteAvailable =
+                IsAutomaticBirthSourcesDebugActive &&
+                rasterizeFoamSourceEventDebugKernel >= 0 &&
+                automaticBirthDebugTexture != null &&
+                automaticBirthDebugCounterBuffer != null;
+            int rasterKernel = debugWriteAvailable
+                ? rasterizeFoamSourceEventDebugKernel
+                : rasterizeFoamSourceEventKernel;
+
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat(
@@ -409,23 +418,23 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInt("_FoamRangeCountY", countY);
             computeShader.SetInt("_FoamSourceEventIndex", eventIndex);
             computeShader.SetBuffer(
-                rasterizeFoamSourceEventKernel,
+                rasterKernel,
                 "_FoamMetricRows",
                 metricBuffer);
             computeShader.SetBuffer(
-                rasterizeFoamSourceEventKernel,
+                rasterKernel,
                 "_FoamSourceEvents",
                 automaticFoamSourceEventBuffer);
             computeShader.SetTexture(
-                rasterizeFoamSourceEventKernel,
+                rasterKernel,
                 "_FoamBoundary",
                 boundaryTexture);
             computeShader.SetTexture(
-                rasterizeFoamSourceEventKernel,
+                rasterKernel,
                 "_FoamObstacleExclusionRead",
                 obstacleExclusionTexture);
             computeShader.SetTexture(
-                rasterizeFoamSourceEventKernel,
+                rasterKernel,
                 "_FoamCurrentShoreEdgesRead",
                 currentShoreEdgesTexture);
             disturbanceRuntime ??=
@@ -448,7 +457,7 @@ namespace ProgrammaticStylized3D.Rivers
                 staticPressureDimensions.x,
                 staticPressureDimensions.y);
             computeShader.SetTexture(
-                rasterizeFoamSourceEventKernel,
+                rasterKernel,
                 "_FoamStaticPressureField",
                 staticPressureTexture);
             Texture objectContactFieldReadTexture =
@@ -458,15 +467,26 @@ namespace ProgrammaticStylized3D.Rivers
                         ? (Texture)neutralDisturbanceTexture
                         : Texture2D.blackTexture);
             computeShader.SetTexture(
-                rasterizeFoamSourceEventKernel,
+                rasterKernel,
                 "_FoamObjectContactFieldRead",
                 objectContactFieldReadTexture);
             computeShader.SetTexture(
-                rasterizeFoamSourceEventKernel,
+                rasterKernel,
                 "_FoamStateWrite",
                 target);
+            if (debugWriteAvailable)
+            {
+                computeShader.SetTexture(
+                    rasterKernel,
+                    "_FoamBirthDebugWrite",
+                    automaticBirthDebugTexture);
+                computeShader.SetBuffer(
+                    rasterKernel,
+                    "_FoamBirthDebugCounters",
+                    automaticBirthDebugCounterBuffer);
+            }
 
-            Dispatch(rasterizeFoamSourceEventKernel, countX, countY);
+            Dispatch(rasterKernel, countX, countY);
         }
 
         private void BuildObjectContactField()

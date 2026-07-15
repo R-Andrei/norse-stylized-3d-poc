@@ -58,6 +58,7 @@
                 float4 _GroundTrampledWearDirection;
                 float _GroundTrampledWearSeed;
                 float _GroundPaintedAccentLineStrength;
+                float _GroundPaintedAccentInkOpacity;
                 float _GroundPaintedAccentCoverageEnabled;
                 float4 _GroundPaintedAccentCoverageOriginSize;
                 float4x4 _GroundPaintedAccentCoverageWorldToLocal;

@@ -14,10 +14,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MassSurfaceFeatureSettings? surfaceFeatures,
             EdgeWearEvaluationMode edgeWearEvaluationMode,
             int boundedEdgeOrdinal,
+            out TriangleSoup placementReferenceSoup,
             out PlaneCutBevelPreviewStatus previewStatus,
             out BoundedEdgePreviewStatus boundedPreviewStatus,
             out UnifiedEdgeWearPreviewStatus unifiedPreviewStatus)
         {
+            placementReferenceSoup = null;
             previewStatus = default;
             boundedPreviewStatus = default;
             unifiedPreviewStatus = default;
@@ -106,8 +108,37 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ApplyCut(faces, normal, depth);
             }
 
+            TriangleSoup sourcePlacementSoup = TriangulatePolyhedron(
+                faces,
+                recipe.SurfaceFacetDensity,
+                recipe.EdgeCharacter,
+                recipe.SurfaceSeed);
+            placementReferenceSoup = sourcePlacementSoup;
+
             TriangleSoup planeCutPreviewSoup = null;
-            if (edgeWearEvaluationMode != EdgeWearEvaluationMode.None)
+            if (edgeWearEvaluationMode ==
+                EdgeWearEvaluationMode.SourceEdgeIndexDebug)
+            {
+                EdgeWearDebugEdgeRecord[] debugEdges =
+                    BuildSourceEdgeIndexDebugEdges(faces);
+                unifiedPreviewStatus =
+                    new UnifiedEdgeWearPreviewStatus(
+                        false,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        debugEdges.Length > 0
+                            ? "source topology graph built"
+                            : "source topology graph failed validation",
+                        debugEdges);
+            }
+            else if (edgeWearEvaluationMode !=
+                EdgeWearEvaluationMode.None)
             {
                 planeCutPreviewSoup = ApplyGeneratedEdgeWearBevels(
                     faces,
@@ -130,11 +161,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return planeCutPreviewSoup;
             }
 
-            return TriangulatePolyhedron(
-                faces,
-                recipe.SurfaceFacetDensity,
-                recipe.EdgeCharacter,
-                recipe.SurfaceSeed);
+            return sourcePlacementSoup;
         }
 
         private static BoxExtents CreateBoxExtents(

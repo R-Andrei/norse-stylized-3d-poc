@@ -229,7 +229,6 @@ float _FoamInjectionSegmentEndGlobalDistance;
 float _FoamInjectionSegmentEndAcrossNormalized;
 float _FoamInjectionSegmentEndRadius;
 float _FoamInjectionSegmentEndAmount;
-float _FoamBirthDebugPaintMode;
 int4 _FoamLifeProbeRectA;
 int4 _FoamLifeProbeRectB;
 int4 _FoamLifeProbeRectC;

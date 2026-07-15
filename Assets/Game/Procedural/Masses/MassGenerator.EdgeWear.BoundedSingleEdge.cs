@@ -18,6 +18,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int WidthAttemptCount;
             public int TargetBoundaryCount;
             public float SolvedWidth;
+            public float EndpointConsumptionA;
+            public float EndpointConsumptionB;
+            public float RemainingCentralSpan;
+            public float MinimumCentralSpan;
             public int CanonicalRailCount;
             public float MaximumBoundarySnapDistance;
             public int OwnerClipAttemptedCount;
@@ -568,6 +572,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float requestedWidth,
                 float minimumStableEdgeLength,
                 float minimumStableFaceArea,
+                bool auditCandidatePool,
                 out TriangleSoup previewSoup)
         {
             previewSoup = null;
@@ -647,13 +652,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float edgeClassificationTolerance = Mathf.Max(
                 PointMergeDistance * 8f,
                 minimumStableEdgeLength * 0.02f);
-            AuditBoundedEdgeClassificationPool(
-                sourceFaces,
-                context,
-                eligible,
-                sourceSolidCentre,
-                edgeClassificationTolerance,
-                ref result);
+            if (auditCandidatePool)
+            {
+                AuditBoundedEdgeClassificationPool(
+                    sourceFaces,
+                    context,
+                    eligible,
+                    sourceSolidCentre,
+                    edgeClassificationTolerance,
+                    ref result);
+            }
             AuditBoundedSelectedEdgeClassification(
                 sourceFaces,
                 context,
@@ -683,6 +691,42 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             result.IsolatedRailSolved = 1;
             result.WidthAttemptCount = widthAttemptCount;
             result.SolvedWidth = solvedWidth;
+            EdgeWearGraphEdge isolatedSourceEdge =
+                context.Graph.Edges[selected.GraphEdgeIndex];
+            Vector3 isolatedSourceA = context.Graph.Vertices[
+                isolatedSourceEdge.VertexA].Position;
+            Vector3 isolatedSourceB = context.Graph.Vertices[
+                isolatedSourceEdge.VertexB].Position;
+            Vector3 isolatedAxis = isolatedSourceB - isolatedSourceA;
+            float isolatedSourceLength = isolatedAxis.magnitude;
+            if (isolatedSourceLength > PointMergeDistance)
+            {
+                isolatedAxis /= isolatedSourceLength;
+                Vector3 endpointRailA =
+                    (isolatedRails[0].Position +
+                     isolatedRails[2].Position) * 0.5f;
+                Vector3 endpointRailB =
+                    (isolatedRails[1].Position +
+                     isolatedRails[3].Position) * 0.5f;
+                result.EndpointConsumptionA = Mathf.Max(
+                    0f,
+                    Vector3.Dot(
+                        endpointRailA - isolatedSourceA,
+                        isolatedAxis));
+                result.EndpointConsumptionB = Mathf.Max(
+                    0f,
+                    Vector3.Dot(
+                        isolatedSourceB - endpointRailB,
+                        isolatedAxis));
+                result.RemainingCentralSpan = Mathf.Max(
+                    0f,
+                    isolatedSourceLength -
+                    result.EndpointConsumptionA -
+                    result.EndpointConsumptionB);
+            }
+            result.MinimumCentralSpan = Mathf.Max(
+                minimumStableEdgeLength,
+                requestedWidth * 0.5f);
             result.TargetBoundaryCount = isolatedRails.Length;
             for (int railIndex = 0;
                  railIndex < isolatedRails.Length;

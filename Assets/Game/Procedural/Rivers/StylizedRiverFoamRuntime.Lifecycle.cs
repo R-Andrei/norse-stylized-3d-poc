@@ -176,8 +176,15 @@ namespace ProgrammaticStylized3D.Rivers
             fullyFrozenLastUpdate = false;
 
             bool topologyDebugActive = IsTopologyDebugActive;
-            bool progressiveBirthDebugActive =
-                IsProgressiveBirthSourceDebugActive;
+            bool automaticBirthDebugActive =
+                IsAutomaticBirthSourcesDebugActive;
+            if (automaticBirthDebugActive &&
+                !automaticBirthDebugActiveLastUpdate)
+            {
+                ResetAutomaticBirthDiagnosticSession();
+            }
+            automaticBirthDebugActiveLastUpdate =
+                automaticBirthDebugActive;
             bool motionFieldDebugActive = IsMotionFieldDebugActive;
             bool shapeProductDebugActive = IsShapeProductDebugActive;
             bool shapeProductDebugEnteredThisUpdate =
@@ -209,7 +216,7 @@ namespace ProgrammaticStylized3D.Rivers
                 activeFoamCompositionEventCount > 0 ||
                 IsAutomaticSourcePopulationActive;
             bool hasWork = materialWork || topologyDebugActive ||
-                progressiveBirthDebugActive || motionFieldDebugActive ||
+                automaticBirthDebugActive || motionFieldDebugActive ||
                 shapeProductDebugActive;
 
             if (!hasWork && currentState == null &&
@@ -367,9 +374,9 @@ namespace ProgrammaticStylized3D.Rivers
 
                 simulationAccumulator -= stepDuration;
                 lastMaterialStepsThisFrame++;
-                if (progressiveBirthDebugActive)
+                if (automaticBirthDebugActive)
                 {
-                    BeginProgressiveBirthDebugStep();
+                    BeginAutomaticBirthDebugStep();
                 }
 
                 bool foamCompositionDeposited =
@@ -443,9 +450,9 @@ namespace ProgrammaticStylized3D.Rivers
                             usedTransportSubsteps);
                 }
 
-                if (progressiveBirthDebugActive)
+                if (automaticBirthDebugActive)
                 {
-                    EndProgressiveBirthDebugStep();
+                    EndAutomaticBirthDebugStep();
                 }
             }
 

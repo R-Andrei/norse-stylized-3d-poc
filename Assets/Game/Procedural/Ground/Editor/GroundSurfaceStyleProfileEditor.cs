@@ -379,6 +379,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
             SerializedProperty paintedAccentInkColor =
                 feature.FindPropertyRelative("paintedAccentInkColor");
+            SerializedProperty paintedAccentInkOpacity =
+                feature.FindPropertyRelative("paintedAccentInkOpacity");
+            SerializedProperty paintedAccentInkOpacityInitialized =
+                feature.FindPropertyRelative("paintedAccentInkOpacityInitialized");
 
             string featureKey = $"feature_{features.propertyPath}_{index}";
             bool expanded = GetFoldout(featureKey, false);
@@ -419,62 +423,117 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 EditorGUILayout.PropertyField(kind);
                 EditorGUILayout.PropertyField(enabled);
                 EditorGUILayout.PropertyField(costClass);
-                EditorGUILayout.Slider(strength, 0f, 1f);
-                EditorGUILayout.Slider(scale, 0.1f, 30f);
-                EditorGUILayout.Slider(contrast, 0f, 1f);
-                EditorGUILayout.Slider(maskInfluence, 0f, 1f);
-                EditorGUILayout.PropertyField(direction);
-                EditorGUILayout.PropertyField(seedOffset);
 
-                if ((GroundSurfaceFeatureKind)kind.intValue ==
-                    GroundSurfaceFeatureKind.PaintedAccentLines)
+                bool isPaintedAccent =
+                    (GroundSurfaceFeatureKind)kind.intValue ==
+                    GroundSurfaceFeatureKind.PaintedAccentLines;
+
+                if (isPaintedAccent)
                 {
-                    if (!paintedAccentHorizontalCompanionsInitialized.boolValue)
-                    {
-                        paintedAccentHorizontalCompanionStrength.floatValue = 0f;
-                        paintedAccentCompanionTightness.floatValue = 0.65f;
-                        paintedAccentHorizontalCompanionsInitialized.boolValue = true;
-                    }
+                    EditorGUILayout.Slider(
+                        strength,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Stroke Intensity",
+                            "Generated per-stroke strength and slight projected-profile amplitude. Zero makes the recipe runtime-inactive; this is separate from material-only Ink Opacity."));
+                    EditorGUILayout.Slider(
+                        maskInfluence,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Surface Suitability Influence",
+                            "How strongly generated Ground masks gate Painted Accent placement."));
+                    EditorGUILayout.PropertyField(
+                        seedOffset,
+                        new GUIContent(
+                            "Pattern Seed Offset",
+                            "Stable feature seed offset mixed with the Ground seed."));
+                }
+                else
+                {
+                    EditorGUILayout.Slider(strength, 0f, 1f);
+                    EditorGUILayout.Slider(scale, 0.1f, 30f);
+                    EditorGUILayout.Slider(contrast, 0f, 1f);
+                    EditorGUILayout.Slider(maskInfluence, 0f, 1f);
+                    EditorGUILayout.PropertyField(direction);
+                    EditorGUILayout.PropertyField(seedOffset);
+                }
 
-                    if (!paintedAccentCompanionTripletVerticalityInitialized.boolValue)
-                    {
-                        paintedAccentCompanionTripletVerticality.floatValue = 1f;
-                        paintedAccentCompanionTripletVerticalityInitialized.boolValue = true;
-                    }
+                if (isPaintedAccent)
+                {
+                    bool needsPaintedAccentInitialization =
+                        !paintedAccentHorizontalCompanionsInitialized.boolValue ||
+                        !paintedAccentCompanionTripletVerticalityInitialized.boolValue ||
+                        !paintedAccentCompanionQuotaControlsInitialized.boolValue ||
+                        !paintedAccentCompanionLayoutWeightsInitialized.boolValue ||
+                        !paintedAccentGlyphFamilyWeightsInitialized.boolValue ||
+                        !paintedAccentStrokePathWiggleInitialized.boolValue;
 
-                    if (!paintedAccentCompanionQuotaControlsInitialized.boolValue)
+                    if (needsPaintedAccentInitialization)
                     {
-                        paintedAccentCompanionTripletShare.floatValue = 0.45f;
-                        paintedAccentCompanionAccentBias.floatValue = 0.65f;
-                        paintedAccentCompanionQuotaControlsInitialized.boolValue = true;
-                    }
+                        EditorGUILayout.HelpBox(
+                            "This recipe still relies on compatibility defaults. The Inspector no longer writes those defaults merely by being drawn. Initialize them explicitly before editing Painted Accent-specific values.",
+                            MessageType.Warning);
 
-                    if (!paintedAccentCompanionLayoutWeightsInitialized.boolValue)
-                    {
-                        paintedAccentPairSteppedWeight.floatValue = 0.45f;
-                        paintedAccentPairShoulderWeight.floatValue = 0.30f;
-                        paintedAccentPairOffsetWeight.floatValue = 0.20f;
-                        paintedAccentPairShallowWeight.floatValue = 0.05f;
-                        paintedAccentTripletSteppedRunWeight.floatValue = 0.40f;
-                        paintedAccentTripletCrownRunWeight.floatValue = 0.30f;
-                        paintedAccentTripletBrokenTerraceWeight.floatValue = 0.25f;
-                        paintedAccentTripletShallowRunWeight.floatValue = 0.05f;
-                        paintedAccentCompanionLayoutWeightsInitialized.boolValue = true;
-                    }
+                        if (GUILayout.Button(
+                                "Initialize Painted Accent Authoring Values"))
+                        {
+                            Undo.RecordObject(
+                                target,
+                                "Initialize Painted Accent Authoring Values");
 
-                    if (!paintedAccentGlyphFamilyWeightsInitialized.boolValue)
-                    {
-                        paintedAccentCompleteMoundWeight.floatValue = 0.20f;
-                        paintedAccentAsymmetricMoundWeight.floatValue = 0.30f;
-                        paintedAccentSingleShoulderWeight.floatValue = 0.30f;
-                        paintedAccentShallowCrestWeight.floatValue = 0.20f;
-                        paintedAccentGlyphFamilyWeightsInitialized.boolValue = true;
-                    }
+                            if (!paintedAccentHorizontalCompanionsInitialized.boolValue)
+                            {
+                                paintedAccentHorizontalCompanionStrength.floatValue = 0f;
+                                paintedAccentCompanionTightness.floatValue = 0.65f;
+                                paintedAccentHorizontalCompanionsInitialized.boolValue = true;
+                            }
 
-                    if (!paintedAccentStrokePathWiggleInitialized.boolValue)
-                    {
-                        paintedAccentStrokePathWiggle.floatValue = 0.35f;
-                        paintedAccentStrokePathWiggleInitialized.boolValue = true;
+                            if (!paintedAccentCompanionTripletVerticalityInitialized.boolValue)
+                            {
+                                paintedAccentCompanionTripletVerticality.floatValue = 1f;
+                                paintedAccentCompanionTripletVerticalityInitialized.boolValue = true;
+                            }
+
+                            if (!paintedAccentCompanionQuotaControlsInitialized.boolValue)
+                            {
+                                paintedAccentCompanionTripletShare.floatValue = 0.45f;
+                                paintedAccentCompanionAccentBias.floatValue = 0.65f;
+                                paintedAccentCompanionQuotaControlsInitialized.boolValue = true;
+                            }
+
+                            if (!paintedAccentCompanionLayoutWeightsInitialized.boolValue)
+                            {
+                                paintedAccentPairSteppedWeight.floatValue = 0.45f;
+                                paintedAccentPairShoulderWeight.floatValue = 0.30f;
+                                paintedAccentPairOffsetWeight.floatValue = 0.20f;
+                                paintedAccentPairShallowWeight.floatValue = 0.05f;
+                                paintedAccentTripletSteppedRunWeight.floatValue = 0.40f;
+                                paintedAccentTripletCrownRunWeight.floatValue = 0.30f;
+                                paintedAccentTripletBrokenTerraceWeight.floatValue = 0.25f;
+                                paintedAccentTripletShallowRunWeight.floatValue = 0.05f;
+                                paintedAccentCompanionLayoutWeightsInitialized.boolValue = true;
+                            }
+
+                            if (!paintedAccentGlyphFamilyWeightsInitialized.boolValue)
+                            {
+                                paintedAccentCompleteMoundWeight.floatValue = 0.20f;
+                                paintedAccentAsymmetricMoundWeight.floatValue = 0.30f;
+                                paintedAccentSingleShoulderWeight.floatValue = 0.30f;
+                                paintedAccentShallowCrestWeight.floatValue = 0.20f;
+                                paintedAccentGlyphFamilyWeightsInitialized.boolValue = true;
+                            }
+
+                            if (!paintedAccentStrokePathWiggleInitialized.boolValue)
+                            {
+                                paintedAccentStrokePathWiggle.floatValue = 0.35f;
+                                paintedAccentStrokePathWiggleInitialized.boolValue = true;
+                            }
+                        }
+
+                        EditorGUI.indentLevel--;
+                        return;
                     }
 
                     EditorGUILayout.Space(4f);
@@ -693,23 +752,65 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                             "Projected contour and visible-width endpoint envelope."));
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
-                        "Authored Ink",
+                        "Ink and Visibility",
                         EditorStyles.miniBoldLabel);
                     EditorGUILayout.PropertyField(
                         paintedAccentInkColor,
                         new GUIContent(
-                            "Ink Color",
-                            "Family/variant-authored opaque ink colour blended through the generated projected coverage texture into ground albedo."));
+                            "Ink Colour",
+                            "Family/variant-authored line colour. Material-only; does not rebuild Painted Accent coverage."));
+                    DrawPaintedAccentInkOpacityControl(
+                        paintedAccentInkOpacity,
+                        paintedAccentInkOpacityInitialized);
 
                     if (paintedAccentStrokeLengthMax.floatValue <
                         paintedAccentStrokeLengthMin.floatValue + 0.05f)
                     {
-                        paintedAccentStrokeLengthMax.floatValue =
-                            paintedAccentStrokeLengthMin.floatValue + 0.05f;
+                        EditorGUILayout.HelpBox(
+                            "Stroke Length Max is below the minimum valid separation. Runtime currently resolves it to Stroke Length Min + 0.05 m; edit the value explicitly to remove this compatibility correction.",
+                            MessageType.Warning);
                     }
                 }
 
                 EditorGUI.indentLevel--;
+            }
+        }
+
+        private static void DrawPaintedAccentInkOpacityControl(
+            SerializedProperty opacity,
+            SerializedProperty initialized)
+        {
+            if (opacity == null || initialized == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Ink Opacity serialization is unavailable for this recipe.",
+                    MessageType.Error);
+                return;
+            }
+
+            float resolvedOpacity =
+                initialized.boolValue
+                    ? Mathf.Clamp01(opacity.floatValue)
+                    : 1f;
+            EditorGUI.BeginChangeCheck();
+            float authoredOpacity = EditorGUILayout.Slider(
+                new GUIContent(
+                    "Ink Opacity",
+                    "Material-only albedo blend after coverage generation. This does not alter placement, glyphs, or coverage."),
+                resolvedOpacity,
+                0f,
+                1f);
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                opacity.floatValue = authoredOpacity;
+                initialized.boolValue = true;
+            }
+            else if (!initialized.boolValue)
+            {
+                EditorGUILayout.HelpBox(
+                    "Existing recipe compatibility default: Ink Opacity 1.00. Moving the control records an explicit value; drawing the Inspector does not mutate the asset.",
+                    MessageType.Info);
             }
         }
 
@@ -835,6 +936,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     feature.FindPropertyRelative("enabled");
                 SerializedProperty costClass =
                     feature.FindPropertyRelative("costClass");
+                SerializedProperty strength =
+                    feature.FindPropertyRelative("strength");
 
                 if (!enabled.boolValue)
                 {
@@ -855,10 +958,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 else if (resolvedCostClass == GroundSurfaceFeatureCostClass.ShaderOnly &&
                          IsCurrentlyRenderableShaderFeature(resolvedKind))
                 {
-                    if (!seenShaderFeatureKinds.Add(resolvedKind))
+                    if (strength.floatValue <= 0f)
                     {
                         EditorGUILayout.HelpBox(
-                            $"Variant '{variantId}' has multiple enabled '{resolvedKind}' shader features. The shader feature stack uses the first enabled recipe of each kind.",
+                            $"Variant '{variantId}' has an enabled '{resolvedKind}' feature with zero Strength. Runtime ignores this entry.",
+                            MessageType.Info);
+                    }
+                    else if (!seenShaderFeatureKinds.Add(resolvedKind))
+                    {
+                        EditorGUILayout.HelpBox(
+                            $"Variant '{variantId}' has multiple runtime-applicable '{resolvedKind}' shader features. Runtime uses the first applicable recipe of each kind.",
                             MessageType.Warning);
                     }
                 }
@@ -1022,6 +1131,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
             SerializedProperty inkColor =
                 feature.FindPropertyRelative("paintedAccentInkColor");
+            SerializedProperty inkOpacity =
+                feature.FindPropertyRelative("paintedAccentInkOpacity");
+            SerializedProperty inkOpacityInitialized =
+                feature.FindPropertyRelative("paintedAccentInkOpacityInitialized");
 
             if (strokeWidth != null)
             {
@@ -1207,6 +1320,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             {
                 inkColor.colorValue =
                     new Color(0.12f, 0.10f, 0.08f, 1f);
+            }
+
+            if (inkOpacity != null)
+            {
+                inkOpacity.floatValue = 1f;
+            }
+
+            if (inkOpacityInitialized != null)
+            {
+                inkOpacityInitialized.boolValue = true;
             }
         }
 

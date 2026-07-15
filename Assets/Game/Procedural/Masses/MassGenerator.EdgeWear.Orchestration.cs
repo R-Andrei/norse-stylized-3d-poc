@@ -54,6 +54,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 0.0001f,
                 Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z)));
 
+            float requestedWidth = ResolveGeneratedEdgeWearWidth(
+                maximumDimension,
+                settings.EdgeWearWidth);
             List<EdgeWearBevelCandidate> candidates =
                 BuildEdgeWearBevelCandidates(
                     faces,
@@ -62,13 +65,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     recipe,
                     settings,
                     amount01,
+                    requestedWidth,
                     out EdgeWearCoverageAudit coverageAudit);
             if (candidates.Count == 0)
             {
+                const string noViableCandidateReason =
+                    "no geometrically viable edge-wear candidates";
                 LogChamferReadiness(
                     new ChamferReadinessStats(0, 0),
                     false,
-                    "no convex edge-wear candidates");
+                    noViableCandidateReason);
+                if (applyUnifiedBoundedPreview)
+                {
+                    PlaneCutBevelAuditResult emptyAudit = default;
+                    emptyAudit.CoverageAudit = coverageAudit;
+                    emptyAudit.Diagnostic = noViableCandidateReason;
+                    LogUnifiedAllEdgeBevelAudit(
+                        emptyAudit,
+                        false,
+                        noViableCandidateReason);
+                    unifiedPreviewStatus =
+                        new UnifiedEdgeWearPreviewStatus(
+                            false,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            noViableCandidateReason,
+                            Array.Empty<EdgeWearDebugEdgeRecord>());
+                }
                 return null;
             }
 
@@ -106,12 +135,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             LogChamferReadiness(stats, ready, blocker);
+            if (!ready && applyUnifiedBoundedPreview)
+            {
+                PlaneCutBevelAuditResult readinessAudit = default;
+                readinessAudit.CoverageAudit = coverageAudit;
+                readinessAudit.SelectedEdgeCount = selectedCount;
+                readinessAudit.Diagnostic = string.IsNullOrEmpty(blocker)
+                    ? "viable edge topology context failed"
+                    : blocker;
+                LogUnifiedAllEdgeBevelAudit(
+                    readinessAudit,
+                    false,
+                    readinessAudit.Diagnostic);
+            }
 
             if (ready)
             {
-                float requestedWidth = ResolveGeneratedEdgeWearWidth(
-                    maximumDimension,
-                    settings.EdgeWearWidth);
                 float minimumStableFaceArea =
                     maximumDimension * maximumDimension * 0.000001f;
 
@@ -125,6 +164,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         requestedWidth,
                         minimumStableEdgeLength,
                         minimumStableFaceArea,
+                        coverageAudit,
                         null,
                         ref cornerStats,
                         out ChamferCornerSolution cornerSolution,
@@ -196,6 +236,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             requestedWidth,
                             minimumStableEdgeLength,
                             minimumStableFaceArea,
+                            true,
                             out TriangleSoup boundedPreviewSoup);
                     LogBoundedSingleEdgeAudit(boundedAudit);
 
@@ -230,6 +271,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         requestedWidth,
                         minimumStableEdgeLength,
                         minimumStableFaceArea,
+                        coverageAudit,
                         null,
                         ref cornerStats,
                         out ChamferCornerSolution cornerSolution,
@@ -764,6 +806,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
             return true;
+        }
+
+        private static EdgeWearDebugEdgeRecord[]
+            BuildSourceEdgeIndexDebugEdges(
+                List<PolygonFace> faces)
+        {
+            if (faces == null || faces.Count == 0 ||
+                !TryBuildEdgeWearTopologyGraph(
+                    faces,
+                    out EdgeWearTopologyGraph graph,
+                    out _))
+            {
+                return Array.Empty<EdgeWearDebugEdgeRecord>();
+            }
+
+            EdgeWearDebugEdgeRecord[] records =
+                new EdgeWearDebugEdgeRecord[graph.Edges.Count];
+            for (int edgeIndex = 0;
+                 edgeIndex < graph.Edges.Count;
+                 edgeIndex++)
+            {
+                EdgeWearGraphEdge edge = graph.Edges[edgeIndex];
+                bool manifold = edge.FaceA >= 0 &&
+                    edge.FaceB >= 0 &&
+                    edge.ExtraFaceCount == 0;
+                records[edgeIndex] = new EdgeWearDebugEdgeRecord(
+                    edgeIndex,
+                    graph.Vertices[edge.VertexA].Position,
+                    graph.Vertices[edge.VertexB].Position,
+                    manifold,
+                    false);
+            }
+            return records;
         }
 
         private static EdgeWearDebugEdgeRecord[]

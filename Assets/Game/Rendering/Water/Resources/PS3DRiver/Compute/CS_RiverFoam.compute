@@ -1,10 +1,10 @@
 #pragma kernel ClearRange
 #pragma kernel InjectFoam
 #pragma kernel RasterizeFoamSourceEvent
+#pragma kernel RasterizeFoamSourceEventDebug
 #pragma kernel WriteIsolatedLifeProbe
-#pragma kernel ClearProgressiveBirthDebugAll
-#pragma kernel ClearProgressiveBirthDebugTransient
-#pragma kernel PaintProgressiveBirthDebugSegment
+#pragma kernel ClearAutomaticBirthDebugAll
+#pragma kernel ClearAutomaticBirthDebugTransient
 #pragma kernel BuildCurrentShoreEdges
 #pragma kernel ComposeTopology
 #pragma kernel CaptureGeneratedTopology
@@ -1599,28 +1599,29 @@ float FoamEvaluateFreeWaterTornFragmentSource(
     return shape;
 }
 
-[numthreads(8, 8, 1)]
-void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
+struct FoamAutomaticSourceRasterSample
 {
-    if (dispatchId.x >= (uint)_FoamRangeCount ||
-        dispatchId.y >= (uint)_FoamRangeCountY)
-    {
-        return;
-    }
+    float4 packedState;
+    float injectedPresence;
+    float sourceType;
+    float clearState;
+};
 
-    int x = _FoamRangeStart + (int)dispatchId.x;
-    int y = _FoamRangeStartY + (int)dispatchId.y;
-    if (x < 0 || x >= _FoamDimensions.x ||
-        y < 0 || y >= _FoamDimensions.y)
-    {
-        return;
-    }
+FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
+    int2 coordinate)
+{
+    FoamAutomaticSourceRasterSample result;
+    result.packedState = 0.0.xxxx;
+    result.injectedPresence = 0.0;
+    result.sourceType = 0.0;
+    result.clearState = 0.0;
 
-    int2 coordinate = int2(x, y);
+    int x = coordinate.x;
+    int y = coordinate.y;
     if (!IsFoamColumnInsideDomain(x))
     {
-        _FoamStateWrite[coordinate] = 0.0.xxxx;
-        return;
+        result.clearState = 1.0;
+        return result;
     }
 
     float coverage = LoadBoundaryCoverage(coordinate);
@@ -1629,16 +1630,17 @@ void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
     float validFluid = coverage * (1.0 - obstacleFootprint);
     if (validFluid <= 0.001)
     {
-        _FoamStateWrite[coordinate] = 0.0.xxxx;
-        return;
+        result.clearState = 1.0;
+        return result;
     }
 
     FoamSourceEventData sourceEvent =
         _FoamSourceEvents[max(0, _FoamSourceEventIndex)];
     float sourceType = sourceEvent.header.x;
+    result.sourceType = sourceType;
     if (sourceType < 0.5)
     {
-        return;
+        return result;
     }
 
     FoamMetricRow metric = _FoamMetricRows[x];
@@ -1660,14 +1662,14 @@ void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
         ? lateralMetres - shoreMetres
         : shoreMetres - lateralMetres;
     bool shoreSource = sourceType < 2.5;
-    if (shoreSource && inwardMetres < -max(sourceEvent.shore.w, physicalCellSpacing.y))
+    if (shoreSource &&
+        inwardMetres < -max(sourceEvent.shore.w, physicalCellSpacing.y))
     {
-        return;
+        return result;
     }
 
     float amountMultiplier = 1.0;
     float shape = 0.0;
-    float2 domainUV = FoamTexelCentreUV(uint2((uint)x, (uint)y), _FoamDimensions);
     if (sourceType < 1.5)
     {
         shape = FoamEvaluateShoreRibbonSource(
@@ -1747,12 +1749,12 @@ void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
     }
     else
     {
-        return;
+        return result;
     }
 
     if (shape <= FoamMaterialStateEpsilon)
     {
-        return;
+        return result;
     }
 
     float sourceFillBlend = saturate(sourceEvent.kinematics.w);
@@ -1770,7 +1772,7 @@ void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
         validFluid);
     if (injectedPresence <= FoamMaterialStateEpsilon)
     {
-        return;
+        return result;
     }
 
     FoamMaterialState sourceState;
@@ -1781,12 +1783,109 @@ void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
         sourceEvent.material.z,
         sourceEvent.material.w,
         physicalCellSpacing);
-    float4 sourcePacked = FoamEncodeMaterialState(sourceState);
-    _FoamStateWrite[coordinate] = FoamMergeBornPresence(
-        _FoamStateWrite[coordinate],
-        sourcePacked);
+    result.packedState = FoamEncodeMaterialState(sourceState);
+    result.injectedPresence = injectedPresence;
+    return result;
 }
 
+void ApplyFoamAutomaticSourceRasterSample(
+    int2 coordinate,
+    FoamAutomaticSourceRasterSample sample)
+{
+    if (sample.clearState > 0.5)
+    {
+        _FoamStateWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    if (sample.injectedPresence <= FoamMaterialStateEpsilon)
+    {
+        return;
+    }
+
+    _FoamStateWrite[coordinate] = FoamMergeBornPresence(
+        _FoamStateWrite[coordinate],
+        sample.packedState);
+}
+
+void WriteFoamAutomaticSourceDebug(
+    int2 coordinate,
+    FoamAutomaticSourceRasterSample sample)
+{
+    if (sample.injectedPresence <= FoamMaterialStateEpsilon)
+    {
+        return;
+    }
+
+    float3 categoryMask = sample.sourceType < 2.5
+        ? float3(1.0, 0.0, 0.0)
+        : (sample.sourceType < 5.5
+            ? float3(0.0, 1.0, 0.0)
+            : float3(0.0, 0.0, 1.0));
+    float4 debugState = _FoamBirthDebugWrite[coordinate];
+    uint ignored;
+    if (debugState.a <= 0.001)
+    {
+        InterlockedAdd(_FoamBirthDebugCounters[0], 1, ignored);
+    }
+    if (max(debugState.r, max(debugState.g, debugState.b)) <= 0.001)
+    {
+        InterlockedAdd(_FoamBirthDebugCounters[1], 1, ignored);
+    }
+
+    debugState.rgb = max(
+        debugState.rgb,
+        categoryMask * sample.injectedPresence);
+    debugState.a = 1.0;
+    _FoamBirthDebugWrite[coordinate] = saturate(debugState);
+}
+
+[numthreads(8, 8, 1)]
+void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamRangeCountY)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(
+        _FoamRangeStart + (int)dispatchId.x,
+        _FoamRangeStartY + (int)dispatchId.y);
+    if (coordinate.x < 0 || coordinate.x >= _FoamDimensions.x ||
+        coordinate.y < 0 || coordinate.y >= _FoamDimensions.y)
+    {
+        return;
+    }
+
+    FoamAutomaticSourceRasterSample sample =
+        EvaluateFoamAutomaticSourceRasterSample(coordinate);
+    ApplyFoamAutomaticSourceRasterSample(coordinate, sample);
+}
+
+[numthreads(8, 8, 1)]
+void RasterizeFoamSourceEventDebug(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamRangeCountY)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(
+        _FoamRangeStart + (int)dispatchId.x,
+        _FoamRangeStartY + (int)dispatchId.y);
+    if (coordinate.x < 0 || coordinate.x >= _FoamDimensions.x ||
+        coordinate.y < 0 || coordinate.y >= _FoamDimensions.y)
+    {
+        return;
+    }
+
+    FoamAutomaticSourceRasterSample sample =
+        EvaluateFoamAutomaticSourceRasterSample(coordinate);
+    ApplyFoamAutomaticSourceRasterSample(coordinate, sample);
+    WriteFoamAutomaticSourceDebug(coordinate, sample);
+}
 
 bool IsInsideLifeProbeRect(int2 coordinate, int4 rect)
 {
@@ -1851,7 +1950,7 @@ void WriteIsolatedLifeProbe(uint3 dispatchId : SV_DispatchThreadID)
 }
 
 [numthreads(8, 8, 1)]
-void ClearProgressiveBirthDebugAll(uint3 dispatchId : SV_DispatchThreadID)
+void ClearAutomaticBirthDebugAll(uint3 dispatchId : SV_DispatchThreadID)
 {
     if (dispatchId.x >= (uint)_FoamRangeCount ||
         dispatchId.y >= (uint)_FoamDimensions.y)
@@ -1875,7 +1974,7 @@ void ClearProgressiveBirthDebugAll(uint3 dispatchId : SV_DispatchThreadID)
 }
 
 [numthreads(8, 8, 1)]
-void ClearProgressiveBirthDebugTransient(
+void ClearAutomaticBirthDebugTransient(
     uint3 dispatchId : SV_DispatchThreadID)
 {
     if (dispatchId.x >= (uint)_FoamRangeCount ||
@@ -1893,7 +1992,6 @@ void ClearProgressiveBirthDebugTransient(
 
     int2 coordinate = int2(x, y);
     float4 debugState = _FoamBirthDebugWrite[coordinate];
-    debugState.r = 0.0;
     debugState.a = 0.0;
     _FoamBirthDebugWrite[coordinate] = debugState;
     if (dispatchId.x == 0 && dispatchId.y == 0)
@@ -1902,101 +2000,6 @@ void ClearProgressiveBirthDebugTransient(
     }
 }
 
-[numthreads(8, 8, 1)]
-void PaintProgressiveBirthDebugSegment(
-    uint3 dispatchId : SV_DispatchThreadID)
-{
-    if (dispatchId.x >= (uint)_FoamRangeCount ||
-        dispatchId.y >= (uint)_FoamDimensions.y)
-    {
-        return;
-    }
-
-    int x = _FoamRangeStart + (int)dispatchId.x;
-    int y = (int)dispatchId.y;
-    if (x < 0 || x >= _FoamDimensions.x ||
-        !IsFoamColumnInsideDomain(x))
-    {
-        return;
-    }
-
-    int2 coordinate = int2(x, y);
-    float coverage = LoadBoundaryCoverage(coordinate);
-    float obstacleFootprint = saturate(
-        _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
-    float validFluid = coverage * (1.0 - obstacleFootprint);
-    if (validFluid <= 0.001)
-    {
-        return;
-    }
-
-    FoamMetricRow metric = _FoamMetricRows[x];
-    float across01 = FoamAcross01AtTexel(y);
-    float lateralMetres = FoamAcross01ToMetres(
-        across01,
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
-    float globalDistance = _FoamGlobalStart +
-        FoamLocalDistanceAtTexel(x);
-    float2 physicalPosition = float2(globalDistance, lateralMetres);
-    float2 physicalCellSpacing = float2(
-        max(0.01, metric.widthsAndSpacing.z),
-        max(0.01, metric.widthsAndSpacing.w));
-    float4 segmentSample = ResolveFoamSegmentInjectionSample(
-        physicalPosition,
-        physicalCellSpacing,
-        metric);
-    float segmentShape = segmentSample.x;
-    float sourceAmount = segmentSample.y;
-
-    float sourceFill = EvaluateFoamSourceFillCoverage(
-        physicalPosition,
-        sourceAmount,
-        _FoamInjectionSourceFillSeed,
-        _FoamInjectionSourceFillFeatureSize,
-        physicalCellSpacing);
-    float source = saturate(segmentShape * sourceFill * validFluid);
-
-    float4 debugState = _FoamBirthDebugWrite[coordinate];
-    if (_FoamBirthDebugPaintMode > 0.5)
-    {
-        debugState.b = max(debugState.b, source);
-        _FoamBirthDebugWrite[coordinate] = saturate(debugState);
-        return;
-    }
-
-    if (source > 0.001)
-    {
-        uint ignored;
-        if (debugState.r <= 0.001)
-        {
-            InterlockedAdd(_FoamBirthDebugCounters[0], 1, ignored);
-        }
-        if (debugState.g <= 0.001)
-        {
-            InterlockedAdd(_FoamBirthDebugCounters[1], 1, ignored);
-        }
-
-        debugState.r = max(debugState.r, source);
-        debugState.g = max(debugState.g, source);
-    }
-
-    float endAcrossMetres = FoamAcross01ToMetres(
-        saturate(_FoamInjectionSegmentEndAcrossNormalized * 0.5 + 0.5),
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
-    float2 segmentEnd = float2(
-        _FoamInjectionSegmentEndGlobalDistance,
-        endAcrossMetres);
-    float headRadius = max(
-        0.05,
-        min(_FoamInjectionSegmentEndRadius * 0.28, 0.20));
-    float headShape = saturate(
-        1.0 - distance(physicalPosition, segmentEnd) / headRadius);
-    headShape = headShape * headShape * (3.0 - 2.0 * headShape);
-    debugState.a = max(debugState.a, headShape * validFluid);
-    _FoamBirthDebugWrite[coordinate] = saturate(debugState);
-}
 
 [numthreads(64, 1, 1)]
 void BuildCurrentShoreEdges(uint3 dispatchId : SV_DispatchThreadID)

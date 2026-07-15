@@ -310,48 +310,44 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Production Chipping",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
-                "Production Chipping uses two parallel permissions: Chip Edge Coverage controls the weak Presence-transition fringe, while Chip Interior Access independently admits complete activated candidates to established visible Foam. Use Chip Edge Coverage, Chip Interior Access, Chip Eligibility Composite, and Production Chip Mask to inspect the handoffs.",
+                "Production Chipping now exposes six primary controls: Amount, Size, Spacing, Irregularity, Edge Width, and optional Interior Access. One canonical material-permission model owns edge and interior territory. Use Chip Candidate Field, Chip Eligibility Composite, and Production Chip Mask to inspect the complete handoff.",
                 MessageType.Info);
             EditorGUILayout.PropertyField(
                 Find("foamChipActivation"),
                 new GUIContent(
-                    "Chip Activation",
-                    "Fraction of analytical candidates retained for production Chipping. Zero disables Chipping; one retains every available candidate before the independent Edge Coverage and Interior Access permissions."));
-            EditorGUILayout.PropertyField(
-                Find("foamChipCandidateSpacing"),
-                new GUIContent(
-                    "Candidate Spacing (m)",
-                    "Average world-space spacing between possible Chip centres. Absolute mean radius is derived as Spacing × Candidate Radius Ratio; spacing does not control placement jitter or silhouette shape."));
-            SerializedProperty chipDistributionIrregularity = Find(
-                "foamChipDistributionIrregularity");
-            EditorGUILayout.PropertyField(
-                chipDistributionIrregularity,
-                new GUIContent(
-                    "Distribution Irregularity",
-                    "How far candidate centres deviate from the regular lattice. Zero is evenly spaced; one uses maximum deterministic jitter without changing candidate size or shape."));
+                    "Chip Amount",
+                    "Fraction of deterministic Chip identities active in production. Zero is an exact no-Chip result; one activates every available candidate before Edge Width and optional Interior Access permissions."));
             SerializedProperty chipSpacing = Find("foamChipCandidateSpacing");
-            SerializedProperty chipRadiusRatio = Find("foamChipRadiusRatio");
-            SerializedProperty chipSizeIrregularity = Find(
-                "foamChipSizeIrregularity");
+            SerializedProperty chipSize = Find("foamChipSize");
+            SerializedProperty chipIrregularity = Find(
+                "foamChipIrregularity");
             EditorGUILayout.PropertyField(
-                chipRadiusRatio,
+                chipSize,
                 new GUIContent(
-                    "Candidate Radius Ratio",
-                    "Mean candidate radius as a fraction of Candidate Spacing. Absolute radius is Spacing × Ratio. Candidate search expands independently downstream and laterally only as far as radius, jitter, pulse, view scale, and rigid lateral travel require."));
+                    "Chip Size",
+                    "Relative mean Chip size within Chip Spacing. Zero maps to a radius of 5% of spacing; one maps to 65%. This bounded representation keeps candidate search cost predictable."));
             EditorGUILayout.PropertyField(
-                chipSizeIrregularity,
+                chipSpacing,
                 new GUIContent(
-                    "Size Irregularity",
-                    "Candidate-to-candidate radius variation around the authored mean. Zero gives identical sizes; one spans approximately 0.58× to 1.42× the mean radius."));
+                    "Chip Spacing (m)",
+                    "Average world-space spacing between possible Chip centres. Lower values create more candidates; higher values create fewer, more isolated candidates."));
+            EditorGUILayout.PropertyField(
+                chipIrregularity,
+                new GUIContent(
+                    "Chip Irregularity",
+                    "One static variation control for centre jitter, candidate size variance, and connected contour asymmetry. Zero gives equal circles on a regular lattice; one uses the camera-readable 0.80×–1.40× radius range and the accepted maximum contour variation."));
 
-            bool mixedRadiusInputs =
+            bool mixedChipShapeInputs =
                 chipSpacing.hasMultipleDifferentValues ||
-                chipRadiusRatio.hasMultipleDifferentValues ||
-                chipSizeIrregularity.hasMultipleDifferentValues;
-            if (mixedRadiusInputs)
+                chipSize.hasMultipleDifferentValues ||
+                chipIrregularity.hasMultipleDifferentValues;
+            if (mixedChipShapeInputs)
             {
                 DrawReadOnlyRow(
                     new GUIContent("Effective Mean Radius"),
+                    "Mixed");
+                DrawReadOnlyRow(
+                    new GUIContent("Effective Mean Diameter"),
                     "Mixed");
                 DrawReadOnlyRow(
                     new GUIContent("Effective Radius Range"),
@@ -359,38 +355,64 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
             else
             {
-                float meanRadius = Mathf.Max(0f, chipSpacing.floatValue) *
-                    Mathf.Max(0f, chipRadiusRatio.floatValue);
+                float spacingMetres = Mathf.Max(
+                    0.10f,
+                    chipSpacing.floatValue);
+                float sizeAuthority = Mathf.Clamp01(
+                    chipSize.floatValue);
+                float radiusRatio = Mathf.Lerp(
+                    0.05f,
+                    0.65f,
+                    sizeAuthority);
+                float meanRadius = spacingMetres * radiusRatio;
                 float irregularity = Mathf.Clamp01(
-                    chipSizeIrregularity.floatValue);
+                    chipIrregularity.floatValue);
                 float minimumMultiplier = Mathf.Lerp(
                     1f,
-                    0.58f,
+                    0.80f,
                     irregularity);
                 float maximumMultiplier = Mathf.Lerp(
                     1f,
-                    1.42f,
+                    1.40f,
                     irregularity);
+                float expectedMeanMultiplier = Mathf.Lerp(
+                    1f,
+                    1.10f,
+                    irregularity);
+                float expectedMeanRadius =
+                    meanRadius * expectedMeanMultiplier;
                 DrawReadOnlyRow(
-                    new GUIContent("Effective Mean Radius"),
-                    $"{meanRadius:0.###} m");
+                    new GUIContent(
+                        "Expected Mean Radius",
+                        "Average candidate radius after the current Chip Irregularity size distribution."),
+                    $"{expectedMeanRadius:0.###} m");
+                DrawReadOnlyRow(
+                    new GUIContent("Expected Mean Diameter"),
+                    $"{expectedMeanRadius * 2f:0.###} m");
                 DrawReadOnlyRow(
                     new GUIContent("Effective Radius Range"),
                     $"{meanRadius * minimumMultiplier:0.###}–" +
                     $"{meanRadius * maximumMultiplier:0.###} m");
             }
-            EditorGUILayout.PropertyField(
-                Find("foamChipShapeIrregularity"),
-                new GUIContent(
-                    "Shape Irregularity",
-                    "Individual silhouette distortion at a fixed outer radius. Zero produces a circle; one warps a single connected contour into a strongly asymmetric blob."));
 
+            DrawUnboundedNonNegativeSlider(
+                Find("foamChipEdgeWidthPixels"),
+                new GUIContent(
+                    "Chip Edge Width (px)",
+                    "Approximate inward width of the canonical visible Foam edge band in rendered pixels. Zero disables edge permission exactly. The slider covers 0–256 px; the numeric field accepts any non-negative value for deliberately extreme bands."),
+                0f,
+                256f);
+            EditorGUILayout.PropertyField(
+                Find("foamChipInteriorAccess"),
+                new GUIContent(
+                    "Chip Interior Access",
+                    "Fraction of activated candidate identities granted permission in the established body outside Chip Edge Width. Zero is edge-only; one lets every active candidate cut the full visible body. Intermediate values admit complete deterministic candidates, not pixel noise."));
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
                 "View Readability LOD",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
-                "Candidate identity and animation stay in River-space metres. This bounded rendering LOD enlarges only undersized distant Chips, never shrinks close Chips, and is applied before pulse/lifecycle so formation and death still reach exact zero.",
+                "Chip identity and animation stay in River-space metres. This bounded rendering LOD enlarges undersized distant Chips first, then fades candidates that still cannot reach a useful projected size. Close Chips are never shrunk, and the decision is resolved before pulse/lifecycle so formation and death retain exact zero.",
                 MessageType.Info);
             SerializedProperty chipStableScreenRadiusPixels = Find(
                 "foamChipStableScreenRadiusPixels");
@@ -400,23 +422,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 chipStableScreenRadiusPixels,
                 new GUIContent(
                     "Minimum Stable Radius (px)",
-                    "Target minimum screen radius for each fully formed Chip. Zero keeps pure world-space sizing. The transition is smooth and bounded by Maximum View Scale."));
+                    "Target readable screen radius for each fully formed Chip. Zero keeps the previous pure world-space behavior. Positive values use bounded enlargement, then fade candidates that remain below 65–100% of the target. The range extends to 16 px for deliberate isometric-camera readability tests."));
             EditorGUILayout.PropertyField(
                 chipMaximumViewScale,
                 new GUIContent(
                     "Maximum View Scale",
                     "Largest permitted readability enlargement. One disables enlargement; 1.75 permits at most 75% extra radius before the existing spacing-relative cap."));
 
-            EditorGUILayout.PropertyField(
-                Find("foamChipSelectionDepth"),
-                new GUIContent(
-                    "Chip Edge Coverage",
-                    "Controls only the Presence-transition edge territory. Low values permit very thin weak-material strips; high values permit all non-saturated edge material. It does not provide geometric distance into established Foam."));
-            EditorGUILayout.PropertyField(
-                Find("foamChipInteriorAccess"),
-                new GUIContent(
-                    "Chip Interior Access",
-                    "Fraction of activated candidate cells granted complete visible-body permission. Zero keeps all candidates edge-only; one lets every activated candidate cut established Foam. Intermediate values admit whole deterministic candidates, not pixel noise."));
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
                 "Lifecycle — Always Active",
@@ -496,7 +508,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 chipLateralMotionAmount,
                 new GUIContent(
                     "Lateral Motion Amount (spacing)",
-                    "Maximum plus/minus rigid lateral travel as a fraction of Candidate Spacing. One means one full spacing in either direction; 2.5 means two and a half spacings. The candidate search expands laterally to preserve complete contours."));
+                    "Maximum plus/minus rigid lateral travel as a fraction of Chip Spacing. One means one full spacing in either direction; 2.5 means two and a half spacings. The candidate search expands laterally to preserve complete contours."));
             SerializedProperty chipLateralMotionSpeed = Find(
                 "foamChipLateralMotionSpeed");
             EditorGUILayout.PropertyField(
@@ -587,7 +599,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 chipShapeChangeAmount,
                 new GUIContent(
                     "Shape Change Amount",
-                    "Authority of multi-axis temporal silhouette morphing. Zero preserves the static contour; one blends toward the full candidate-specific sine-harmonic trajectory. Squared-radius blending preserves temporal radial area exactly, so this does not become a Size Pulse. Shape Change remains visible when Shape Irregularity is zero; redistributed lobes can reach up to 1.52x the area-equivalent Candidate Radius and are covered by the adaptive search."));
+                    "Authority of multi-axis temporal silhouette morphing. Zero preserves the static contour; one blends toward the full candidate-specific sine-harmonic trajectory. Squared-radius blending preserves temporal radial area exactly, so this does not become a Size Pulse. Shape Change remains visible when Chip Irregularity is zero; redistributed lobes can reach up to 1.52x the area-equivalent mean radius and are covered by the adaptive search."));
             SerializedProperty chipShapeChangeCadence = Find(
                 "foamChipShapeChangeSpeed");
             SerializedProperty chipShapeTransitionTime = Find(
@@ -640,9 +652,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             bool mixedSearchInputs =
-                chipRadiusRatio.hasMultipleDifferentValues ||
-                chipDistributionIrregularity.hasMultipleDifferentValues ||
-                chipSizeIrregularity.hasMultipleDifferentValues ||
+                chipSize.hasMultipleDifferentValues ||
+                chipIrregularity.hasMultipleDifferentValues ||
                 chipSizePulseAmount.hasMultipleDifferentValues ||
                 chipShapeChangeAmount.hasMultipleDifferentValues ||
                 chipLateralMotionAmount.hasMultipleDifferentValues ||
@@ -656,9 +667,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
             else
             {
-                float authoredRadiusRatio = Mathf.Max(
-                    0f,
-                    chipRadiusRatio.floatValue);
+                float authoredRadiusRatio = Mathf.Lerp(
+                    0.05f,
+                    0.65f,
+                    Mathf.Clamp01(chipSize.floatValue));
                 float viewScaleCeiling =
                     chipStableScreenRadiusPixels.floatValue > 0.0001f
                         ? Mathf.Clamp(
@@ -678,8 +690,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     stabilizedRadiusRatio *
                     Mathf.Lerp(
                         1f,
-                        1.42f,
-                        Mathf.Clamp01(chipSizeIrregularity.floatValue)) *
+                        1.40f,
+                        Mathf.Clamp01(chipIrregularity.floatValue)) *
                     (1f + Mathf.Clamp(
                         chipSizePulseAmount.floatValue,
                         0f,
@@ -693,7 +705,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         2.5f);
                 float cellCentreReach = 0.5f +
                     0.39f * Mathf.Clamp01(
-                        chipDistributionIrregularity.floatValue);
+                        chipIrregularity.floatValue);
                 int downstreamOffset = Mathf.Clamp(
                     Mathf.FloorToInt(
                         maximumRadiusReachInSpacings +
@@ -713,7 +725,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 DrawReadOnlyRow(
                     new GUIContent(
                         "Candidate Search",
-                        "Smallest rectangular source-cell search that encloses maximum area-equivalent candidate radius, multi-axis shape-lobe reach, deterministic centre jitter, bounded view scale, size pulse, and rigid lateral excursion. Maximum is 5×11."),
+                        "Smallest rectangular source-cell search that encloses maximum Chip Size, multi-axis shape-lobe reach, deterministic centre jitter, bounded view scale, size pulse, and rigid lateral excursion. Maximum is 5×11."),
                     $"{downstreamCells}×{lateralCells} adaptive " +
                     $"(R {maximumRadiusReachInSpacings:0.###}, " +
                     $"Y {maximumLateralReachInSpacings:0.###} spacing)");
@@ -789,6 +801,52 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Strands own structural anisotropic lineification. Scale, Density, and Reach shape elongated cuts and remnants.",
                 MessageType.None);
 
+        }
+
+        private static void DrawUnboundedNonNegativeSlider(
+            SerializedProperty property,
+            GUIContent label,
+            float sliderMinimum,
+            float sliderMaximum)
+        {
+            Rect row = EditorGUILayout.GetControlRect();
+            row = EditorGUI.PrefixLabel(row, label);
+            const float FieldWidth = 72f;
+            const float Gap = 4f;
+            Rect sliderRect = new Rect(
+                row.x,
+                row.y,
+                Mathf.Max(0f, row.width - FieldWidth - Gap),
+                row.height);
+            Rect fieldRect = new Rect(
+                sliderRect.xMax + Gap,
+                row.y,
+                FieldWidth,
+                row.height);
+
+            float current = Mathf.Max(0f, property.floatValue);
+            EditorGUI.showMixedValue = property.hasMultipleDifferentValues;
+
+            EditorGUI.BeginChangeCheck();
+            float sliderValue = GUI.HorizontalSlider(
+                sliderRect,
+                Mathf.Clamp(current, sliderMinimum, sliderMaximum),
+                sliderMinimum,
+                sliderMaximum);
+            if (EditorGUI.EndChangeCheck())
+            {
+                property.floatValue = Mathf.Max(0f, sliderValue);
+                current = property.floatValue;
+            }
+
+            EditorGUI.BeginChangeCheck();
+            float fieldValue = EditorGUI.FloatField(fieldRect, current);
+            if (EditorGUI.EndChangeCheck())
+            {
+                property.floatValue = Mathf.Max(0f, fieldValue);
+            }
+
+            EditorGUI.showMixedValue = false;
         }
 
         private void DrawNormalizedPatternWeight(

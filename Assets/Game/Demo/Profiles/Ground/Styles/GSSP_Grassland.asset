@@ -19,15 +19,15 @@ MonoBehaviour:
     displayName: Clean Meadow
     materialControls:
       baseColor: {r: 0.47, g: 0.52, b: 0.34, a: 1}
-      frostColor: {r: 0.68, g: 0.74, b: 0.70, a: 1}
-      dampTint: {r: 0.30, g: 0.34, b: 0.23, a: 1}
-      dampTintStrength: 0.20
-      rockyDryTint: {r: 0.55, g: 0.50, b: 0.36, a: 1}
+      frostColor: {r: 0.68, g: 0.74, b: 0.7, a: 1}
+      dampTint: {r: 0.3, g: 0.34, b: 0.23, a: 1}
+      dampTintStrength: 0.2
+      rockyDryTint: {r: 0.55, g: 0.5, b: 0.36, a: 1}
       rockyDryTintStrength: 0.16
       vegetationTint: {r: 0.36, g: 0.49, b: 0.25, a: 1}
       vegetationTintStrength: 0.42
       pixelCellSize: 0.065
-      pixelToneCount: 5.0
+      pixelToneCount: 5
       pixelClusterStrength: 0.38
       pixelVariation: 0.012
       broadVariation: 0.036
@@ -36,7 +36,7 @@ MonoBehaviour:
       cellWarpStrength: 0.045
       groundMacroPatchScale: 6.4
       profileContrastScale: 0.84
-      profilePixelContrastScale: 0.70
+      profilePixelContrastScale: 0.7
       groundSnowResponseScale: 0.08
       groundDampResponseScale: 0.78
       groundVegetationResponseScale: 1.08
@@ -44,13 +44,13 @@ MonoBehaviour:
       groundShoreDampStrengthScale: 0.72
       groundPatchBlendStrength: 0.36
       groundSnowTintStrength: 0.03
-      groundSnowBrightness: 0.0
+      groundSnowBrightness: 0
       groundDampDarkenStrength: 0.18
-      wetness: 0.0
+      wetness: 0
       wetDarkenStrength: 0.12
       wetPixelSoftening: 0.54
       wetSmoothnessBoost: 0.08
-      frostStrength: 0.0
+      frostStrength: 0
       frostContrast: 0.85
       monolithicFlatten: 0.06
       monolithicSmoothnessBoost: 0.14
@@ -60,20 +60,59 @@ MonoBehaviour:
     - kind: 20
       enabled: 1
       costClass: 0
-      strength: 0.14
+      strength: 0.635
       scale: 6.2
       contrast: 0.3
-      maskInfluence: 0.54
+      maskInfluence: 0.876
       direction: {x: 0.82, y: 0.36}
       seedOffset: 501
+      paintedAccentStrokeWidth: 0.025
+      paintedAccentStrokeDensity: 500
+      paintedAccentDistributionPatchScale: 18.17
+      paintedAccentDistributionPatchiness: 0.758
+      paintedAccentHorizontalCompanionStrength: 0.956
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.776
+      paintedAccentCompanionTightness: 1
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 1
+      paintedAccentCompanionTripletVerticalityInitialized: 1
+      paintedAccentCompanionQuotaControlsInitialized: 1
+      paintedAccentPairSteppedWeight: 0.877
+      paintedAccentPairShoulderWeight: 0.425
+      paintedAccentPairOffsetWeight: 0.442
+      paintedAccentPairShallowWeight: 0.169
+      paintedAccentTripletSteppedRunWeight: 0.851
+      paintedAccentTripletCrownRunWeight: 0.466
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 1
+      paintedAccentCompleteMoundWeight: 0.388
+      paintedAccentAsymmetricMoundWeight: 0.201
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 1
+      paintedAccentStrokeLengthMin: 0.2
+      paintedAccentStrokeLengthMax: 0.6
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 20
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 1
+      paintedAccentFoldHeight: 0.14
+      paintedAccentCrestCrownHeight: 0.0349
+      paintedAccentFoldIrregularity: 0.771
+      paintedAccentFoldEndTaper: 0.702
+      paintedAccentInkColor: {r: 0.18439744, g: 0.21698111, b: 0.18115875, a: 1}
+      paintedAccentInkOpacity: 1
+      paintedAccentInkOpacityInitialized: 0
   - id: grassland.patchy_meadow
     displayName: Patchy Meadow
     materialControls:
-      baseColor: {r: 0.48, g: 0.50, b: 0.33, a: 1}
-      frostColor: {r: 0.68, g: 0.74, b: 0.70, a: 1}
+      baseColor: {r: 0.48, g: 0.5, b: 0.33, a: 1}
+      frostColor: {r: 0.68, g: 0.74, b: 0.7, a: 1}
       dampTint: {r: 0.31, g: 0.33, b: 0.22, a: 1}
       dampTintStrength: 0.22
-      rockyDryTint: {r: 0.58, g: 0.50, b: 0.34, a: 1}
+      rockyDryTint: {r: 0.58, g: 0.5, b: 0.34, a: 1}
       rockyDryTintStrength: 0.28
       vegetationTint: {r: 0.34, g: 0.46, b: 0.24, a: 1}
       vegetationTintStrength: 0.36
@@ -85,7 +124,7 @@ MonoBehaviour:
       vertexVariation: 0.145
       pixelEffectStrength: 0.66
       cellWarpStrength: 0.065
-      groundMacroPatchScale: 5.0
+      groundMacroPatchScale: 5
       profileContrastScale: 0.94
       profilePixelContrastScale: 0.76
       groundSnowResponseScale: 0.06
@@ -95,13 +134,13 @@ MonoBehaviour:
       groundShoreDampStrengthScale: 0.76
       groundPatchBlendStrength: 0.46
       groundSnowTintStrength: 0.02
-      groundSnowBrightness: 0.0
+      groundSnowBrightness: 0
       groundDampDarkenStrength: 0.22
-      wetness: 0.0
+      wetness: 0
       wetDarkenStrength: 0.12
-      wetPixelSoftening: 0.50
+      wetPixelSoftening: 0.5
       wetSmoothnessBoost: 0.08
-      frostStrength: 0.0
+      frostStrength: 0
       frostContrast: 0.86
       monolithicFlatten: 0.04
       monolithicSmoothnessBoost: 0.14
@@ -117,16 +156,55 @@ MonoBehaviour:
       maskInfluence: 0.62
       direction: {x: 0.82, y: 0.36}
       seedOffset: 509
+      paintedAccentStrokeWidth: 0.12
+      paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
+      paintedAccentStrokeLengthMin: 0.55
+      paintedAccentStrokeLengthMax: 1.55
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
+      paintedAccentFoldHeight: 0.018
+      paintedAccentCrestCrownHeight: 0.02
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
+      paintedAccentInkOpacity: 1
+      paintedAccentInkOpacityInitialized: 0
   - id: grassland.damp_meadow
     displayName: Damp Meadow
     materialControls:
       baseColor: {r: 0.39, g: 0.45, b: 0.31, a: 1}
-      frostColor: {r: 0.64, g: 0.70, b: 0.68, a: 1}
-      dampTint: {r: 0.24, g: 0.29, b: 0.20, a: 1}
+      frostColor: {r: 0.64, g: 0.7, b: 0.68, a: 1}
+      dampTint: {r: 0.24, g: 0.29, b: 0.2, a: 1}
       dampTintStrength: 0.34
       rockyDryTint: {r: 0.49, g: 0.45, b: 0.32, a: 1}
       rockyDryTintStrength: 0.16
-      vegetationTint: {r: 0.30, g: 0.42, b: 0.24, a: 1}
+      vegetationTint: {r: 0.3, g: 0.42, b: 0.24, a: 1}
       vegetationTintStrength: 0.38
       pixelCellSize: 0.065
       pixelToneCount: 4.6
@@ -137,22 +215,22 @@ MonoBehaviour:
       pixelEffectStrength: 0.62
       cellWarpStrength: 0.055
       groundMacroPatchScale: 5.7
-      profileContrastScale: 0.90
+      profileContrastScale: 0.9
       profilePixelContrastScale: 0.72
       groundSnowResponseScale: 0.04
-      groundDampResponseScale: 1.20
+      groundDampResponseScale: 1.2
       groundVegetationResponseScale: 0.92
       groundRockyDryResponseScale: 0.42
-      groundShoreDampStrengthScale: 1.10
+      groundShoreDampStrengthScale: 1.1
       groundPatchBlendStrength: 0.42
       groundSnowTintStrength: 0.02
-      groundSnowBrightness: 0.0
-      groundDampDarkenStrength: 0.30
+      groundSnowBrightness: 0
+      groundDampDarkenStrength: 0.3
       wetness: 0.02
       wetDarkenStrength: 0.12
       wetPixelSoftening: 0.48
       wetSmoothnessBoost: 0.012
-      frostStrength: 0.0
+      frostStrength: 0
       frostContrast: 0.78
       monolithicFlatten: 0.06
       monolithicSmoothnessBoost: 0.15
@@ -168,6 +246,45 @@ MonoBehaviour:
       maskInfluence: 0.54
       direction: {x: 1, y: 0}
       seedOffset: 251
+      paintedAccentStrokeWidth: 0.12
+      paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
+      paintedAccentStrokeLengthMin: 0.55
+      paintedAccentStrokeLengthMax: 1.55
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
+      paintedAccentFoldHeight: 0.018
+      paintedAccentCrestCrownHeight: 0.02
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
+      paintedAccentInkOpacity: 1
+      paintedAccentInkOpacityInitialized: 0
     - kind: 20
       enabled: 1
       costClass: 0
@@ -177,16 +294,55 @@ MonoBehaviour:
       maskInfluence: 0.66
       direction: {x: 0.82, y: 0.36}
       seedOffset: 521
+      paintedAccentStrokeWidth: 0.12
+      paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
+      paintedAccentStrokeLengthMin: 0.55
+      paintedAccentStrokeLengthMax: 1.55
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
+      paintedAccentFoldHeight: 0.018
+      paintedAccentCrestCrownHeight: 0.02
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
+      paintedAccentInkOpacity: 1
+      paintedAccentInkOpacityInitialized: 0
   - id: grassland.worn_meadow
     displayName: Worn Meadow
     materialControls:
-      baseColor: {r: 0.43, g: 0.42, b: 0.30, a: 1}
-      frostColor: {r: 0.64, g: 0.70, b: 0.68, a: 1}
+      baseColor: {r: 0.43, g: 0.42, b: 0.3, a: 1}
+      frostColor: {r: 0.64, g: 0.7, b: 0.68, a: 1}
       dampTint: {r: 0.28, g: 0.27, b: 0.18, a: 1}
       dampTintStrength: 0.28
       rockyDryTint: {r: 0.56, g: 0.47, b: 0.32, a: 1}
       rockyDryTintStrength: 0.34
-      vegetationTint: {r: 0.31, g: 0.40, b: 0.22, a: 1}
+      vegetationTint: {r: 0.31, g: 0.4, b: 0.22, a: 1}
       vegetationTintStrength: 0.24
       pixelCellSize: 0.058
       pixelToneCount: 4.4
@@ -206,18 +362,18 @@ MonoBehaviour:
       groundShoreDampStrengthScale: 0.82
       groundPatchBlendStrength: 0.48
       groundSnowTintStrength: 0.02
-      groundSnowBrightness: 0.0
+      groundSnowBrightness: 0
       groundDampDarkenStrength: 0.28
-      wetness: 0.0
+      wetness: 0
       wetDarkenStrength: 0.12
       wetPixelSoftening: 0.46
       wetSmoothnessBoost: 0.008
-      frostStrength: 0.0
+      frostStrength: 0
       frostContrast: 0.82
       monolithicFlatten: 0.03
       monolithicSmoothnessBoost: 0.14
       smoothness: 0.095
-      specularStrength: 0.030
+      specularStrength: 0.03
     features:
     - kind: 32
       enabled: 1
@@ -228,6 +384,45 @@ MonoBehaviour:
       maskInfluence: 0.78
       direction: {x: 1, y: 0}
       seedOffset: 277
+      paintedAccentStrokeWidth: 0.12
+      paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
+      paintedAccentStrokeLengthMin: 0.55
+      paintedAccentStrokeLengthMax: 1.55
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
+      paintedAccentFoldHeight: 0.018
+      paintedAccentCrestCrownHeight: 0.02
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
+      paintedAccentInkOpacity: 1
+      paintedAccentInkOpacityInitialized: 0
     - kind: 20
       enabled: 1
       costClass: 0
@@ -237,3 +432,42 @@ MonoBehaviour:
       maskInfluence: 0.76
       direction: {x: 0.82, y: 0.36}
       seedOffset: 541
+      paintedAccentStrokeWidth: 0.12
+      paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentHorizontalCompanionStrength: 0
+      paintedAccentCompanionTripletShare: 0.45
+      paintedAccentCompanionAccentBias: 0.65
+      paintedAccentCompanionTightness: 0.65
+      paintedAccentCompanionTripletVerticality: 1
+      paintedAccentHorizontalCompanionsInitialized: 0
+      paintedAccentCompanionTripletVerticalityInitialized: 0
+      paintedAccentCompanionQuotaControlsInitialized: 0
+      paintedAccentPairSteppedWeight: 0.45
+      paintedAccentPairShoulderWeight: 0.3
+      paintedAccentPairOffsetWeight: 0.2
+      paintedAccentPairShallowWeight: 0.05
+      paintedAccentTripletSteppedRunWeight: 0.4
+      paintedAccentTripletCrownRunWeight: 0.3
+      paintedAccentTripletBrokenTerraceWeight: 0.25
+      paintedAccentTripletShallowRunWeight: 0.05
+      paintedAccentCompanionLayoutWeightsInitialized: 0
+      paintedAccentCompleteMoundWeight: 0.2
+      paintedAccentAsymmetricMoundWeight: 0.3
+      paintedAccentSingleShoulderWeight: 0.3
+      paintedAccentShallowCrestWeight: 0.2
+      paintedAccentGlyphFamilyWeightsInitialized: 0
+      paintedAccentStrokeLengthMin: 0.55
+      paintedAccentStrokeLengthMax: 1.55
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentStrokePathWiggle: 0.35
+      paintedAccentStrokePathWiggleInitialized: 0
+      paintedAccentFoldHeight: 0.018
+      paintedAccentCrestCrownHeight: 0.02
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
+      paintedAccentInkOpacity: 1
+      paintedAccentInkOpacityInitialized: 0

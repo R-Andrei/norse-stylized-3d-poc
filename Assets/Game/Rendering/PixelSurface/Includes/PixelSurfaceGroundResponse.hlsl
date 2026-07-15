@@ -93,7 +93,7 @@
                 return
                     ResolveGroundPaintedAccentCoverage(input) *
                     contractMask *
-                    saturate(_GroundPaintedAccentLineStrength);
+                    saturate(_GroundPaintedAccentInkOpacity);
             }
 
 #endif // PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES

@@ -1,8 +1,8 @@
-# Current continuation — `4.11C.5.17D.0` Final-Edge Fray Retirement
+# Current accepted Chipping baseline — `4.11C.5.17D.1C`
 
-Gameplay-camera validation rejected Fray as a useful independent morphology category. Centimetre-scale teeth were not readable from the production isometric camera, while enlarged teeth became indistinguishable from Chipping. C.1, C.1A, and C.1B improved ordering and control ownership but did not establish a stable visual category worth its shader, Inspector, migration, or diagnostic cost.
+Static Chipping work is complete for the current milestone and is Unity-validated as a whole.
 
-Fray is therefore retired completely. The active Layer E order is now:
+Accepted production sequence:
 
 ```text
 coherent Foam
@@ -11,69 +11,126 @@ coherent Foam
 → composition
 ```
 
-Removed production ownership:
+Accepted Chipping authoring surface:
 
 ```text
-final-boundary Fray helper and result structure;
-cluster/tooth procedural fields and boundary reconstruction;
-Fray shader properties and runtime bindings;
-Fray serialized authoring fields, Inspector controls, and tooltips;
-Fray diagnostics and debug categories;
-dead transient breakupField carrier and runtime _FoamBreakupScale path.
-
-No scene, prefab, material, or other serialized Unity asset is modified. Existing stale Fray values may remain in serialized assets and are ignored because their active fields and bindings no longer exist; any manual asset cleanup is left to the project owner.
+Chip Amount
+Chip Size
+Chip Spacing
+Chip Irregularity
+Chip Edge Width
+Chip Interior Access
 ```
 
-Serialized debug values `22`, `23`, and `27` are retired and resolve safely to Final. A hidden `legacyFoamBreakupScale` field remains only as a `FormerlySerializedAs` migration source for historical Chip tuning; it has no shader property, runtime binding, Inspector control, or production effect. The historical tuning-version alias containing `ChipFray` is also retained only so old Chip migration state deserializes correctly.
-
-The settled readable morphology ownership is:
+Accepted implementation state:
 
 ```text
-Chipping = medium/large subtractive bites and holes
-Strands  = elongated anisotropic cuts and remnants
-Base lifecycle morphology = broad coherent deterioration
-Fray = retired
+D.0   dedicated fine-edge/Fray system retired;
+D.1A  canonical zero-resource derivative-normalized edge/interior permission accepted;
+D.1A.1 persistent-Presence carrier rejected and rolled back;
+D.1B  six-control Chipping authoring refactor accepted;
+D.1C  medium/large-biased, camera-readable Chip population accepted.
 ```
 
-The next morphology task is `4.11C.5.17D.1 — Chipping Readability Audit` from the gameplay camera. Remaining-Life morphology integration stays blocked until the surviving Chip and Strand vocabularies are accepted.
+The current edge band is good enough for production continuation. `D.1D — Coherent Edge-Bite Admission` is not required and is skipped. The zoom-dependent over-capture around unresolved thin visual strips remains a known deferred limitation. Remaining-Life interaction is not part of the current completion contract and may be reconsidered only as a future optional enhancement.
 
-## Methods-tried decision — Fray
+There is no active Chipping patch. Future Chipping work requires a new visual or performance justification rather than continuation of the retired queue.
 
-| Method | Status | Reason |
-| --- | --- | --- |
-| Legacy pre-Strand Fray | Rejected | Could not see Chip- or Strand-created final boundaries. |
-| C.1 post-Strand hybrid-boundary Fray | Structurally useful, artistically rejected | Correct order, but weak scale readability and control authority. |
-| C.1A monotonic Coverage | Rejected | High coverage became broad silhouette recession. |
-| C.1B master authority and intermittent teeth | Rejected and retired | Small teeth vanished at production distance; large teeth duplicated Chipping. |
-| Final decision | Accepted | Remove Fray and invest in camera-readable Chipping. |
 
-> **Supersession note:** Later sections retain historical Fray experiments and terminology as the canonical methods-tried record. Any statement below that describes Fray as active, pending, or planned is superseded by `4.11C.5.17D.0` above.
-
-## Decoupled Chip shape cadence and transition — `4.11C.5.17B.2D2B-B.2L` — implemented, Unity validation pending
-
-B.2K established meaningful multi-axis contour geometry, but its single cycles-per-second control simultaneously determined when the trajectory advanced and how fast the geometry crossed between configurations. Runtime evidence showed short, visually abrupt contour switches. B.2L keeps the B.2K Fourier geometry and separates the two timing responsibilities:
+Current closure contract:
 
 ```text
-Shape Change Cadence (changes/s)
-= how often a candidate selects its next deterministic contour target
-
-Shape Transition Time (seconds)
-= how long the actual geometry takes to move from the previous target to the next
+Stage 6 Foam and Chipping = complete and validated;
+Remaining-Life morphology progression = optional future experiment, not queued;
+dedicated Fray/fine-fragment work = retired;
+Layer D evaluated-shape production integration = not required by the accepted Final Foam result;
+all River performance optimization = deferred to one later comprehensive River performance pass.
 ```
 
-Consecutive targets are fixed golden-angle steps through each candidate's accepted two-axis morph plane. The target distance is therefore constant instead of varying randomly. A quintic transition moves between targets, then holds the target for the remainder of the cadence interval. Candidate-specific phase offsets stagger target events across the field. If Transition Time exceeds the cadence interval, the effective transition uses the complete interval and remains continuously in motion.
+No scene, prefab, material, `.meta`, Ground, or Generated Mass file is part of this documentation reconciliation.
 
-The timing equation is:
+## Automatic Birth Sources debug — `4.11C.5.18B` — implemented, Unity validation pending
+
+Foam debug-view value `2` is repurposed from the obsolete manual `Progressive Birth Source` path to `Automatic Birth Sources`. The view now displays the exact accepted automatic Layer C source-event footprint evaluated by the production rasterizer before transport and aging.
 
 ```text
-interval = 1 / cadence
-effective transition = min(authored transition time, interval)
-hold = interval - effective transition
+yellow  = Shore Ribbon and Inward Wash history;
+cyan    = Object Contact Arc, Semi-Arc, and Fleck history;
+magenta = Free-Water Lace, Cross-Lace, and Torn Fragment history;
+white   = texels touched during the latest material update.
 ```
 
-The average coefficient-plane angular speed during a transition is the fixed golden-angle step divided by effective transition time. Shape Change Amount remains the sole geometric-excursion control. Candidate Radius, Size Pulse, lifecycle scale, movement, rotation, projected-size LOD, permission, and Strands are unchanged. Fray was later retired by D.0.
+Category history accumulates from entering the view until Foam is cleared or resources are rebuilt. The latest and cumulative unique source-texel counts are exposed beside the view.
+
+The normal automatic-source kernel and the debug kernel call one shared source evaluator. Normal rendering keeps the existing production kernel and pays no debug UAV write or extra dispatch. Selecting the debug view reuses the existing birth-debug texture and counter buffer, substitutes the debug raster kernel for the same automatic event dispatch, and performs one additional debug write.
+
+The obsolete manual-only trajectory painter, paint kernel, trajectory-pending state, and manual-source texel readout are removed. The manual injection test tool itself remains available, but it no longer owns this debug view.
 
 # River Foam Stage 6 Canonical Architecture
+
+## Canonical zero-resource Chip eligibility — `4.11C.5.17D.1A` — Unity-validated and accepted
+
+The previous edge selector thresholded `materialEdgeDepth = baseMask`. That scalar represented local Presence-derived coverage, not distance from the actual rendered boundary. Equal scalar thresholds therefore produced thick territory where Presence rose slowly and little or no territory where it rose sharply.
+
+D.1A deletes `materialEdgeDepth` from patterned-mask outputs, stored/warped/lead/trail evaluations, surface coupling, retained-material ownership, the result structure, shader properties, runtime bindings, Inspector authoring, and diagnostics.
+
+The replacement reuses the existing production fields:
+
+```text
+V = ResolveBaseCoverage(preChipMask)
+S = saturate(preChipSoftVisibility)
+G = max(fwidth(S), 0.001)
+P = max(0, S - 0.06) / G
+```
+
+`P` is an approximate inward coordinate measured in rendered pixels. It is a local derivative-normalized estimate, not a global geometric distance field. For authored edge width `W >= 0`:
+
+```text
+W = 0:
+  edgeBand = 0 exactly
+
+W > 0:
+  edgeMembership = 1 - smoothstep(W - 0.5, W + 0.5, P)
+  edgeBand = V × edgeMembership
+  interiorRegion = V × (1 - edgeMembership)
+```
+
+Production uses one permission helper:
+
+```text
+edgeSelection = activatedCandidates × edgeBand
+interiorSelection = interiorAdmittedCandidates × interiorRegion
+productionSelection = max(edgeSelection, interiorSelection)
+```
+
+The Inspector slider covers `0–256 px`, while direct numeric entry accepts any non-negative value for intentionally extreme tests. No hidden upper shader clamp is applied.
+
+Diagnostics are reduced to three exact handoffs:
+
+```text
+Chip Candidate Field
+  activated analytical candidates before material permission;
+
+Chip Eligibility Composite
+  dark gray = pre-Chip Foam;
+  yellow = canonical edge band;
+  magenta = optional Interior Access authority;
+  cyan = permission outside visible support, expected absent;
+
+Production Chip Mask
+  exact hardened coverage removed before Strands.
+```
+
+Performance contract:
+
+```text
+new textures/channels/samples = 0
+new kernels/dispatches = 0
+new candidate iterations = 0
+new persistent memory = 0
+```
+
+The patch adds one local division and removes the complete `materialEdgeDepth` carrier and four redundant Chip debug paths.
 
 
 ## Multi-axis Chip contour geometry — `4.11C.5.17B.2D2B-B.2K` — geometry accepted; timing superseded by B.2L
@@ -101,9 +158,11 @@ temporalArea = constant for every trajectory phase
 finalRadiusSquared = lerp(staticRadiusSquared, temporalRadiusSquared, ShapeChangeAmount)
 ```
 
-This preserves temporal radial area exactly instead of turning Shape Change into another Size Pulse. Shape Irregularity owns static cosine asymmetry, while Shape Change independently owns temporal sine geometry; either may be zero without disabling the other. Candidate Radius remains the area-equivalent authored scale. Redistributed lobes can reach at most `1.52x` that radius, so B.2K extends only the adaptive lateral search ceiling from `5x9` to `5x11`; no texture, sample, buffer, compute, persistent-state, lifecycle, motion, rotation, view-readability, eligibility, Strand, or Fray behavior changes.
+This preserves temporal radial area exactly instead of turning Shape Change into another Size Pulse. Shape Irregularity owns static cosine asymmetry, while Shape Change independently owns temporal sine geometry; either may be zero without disabling the other. Candidate Radius remains the area-equivalent authored scale.
 
-## Simplified orthogonal Chip permission — `4.11C.5.17B.2D2B-B.2J` — Unity-validated and accepted
+## Historical orthogonal Chip permission — `4.11C.5.17B.2D2B-B.2J` — superseded by D.1A
+
+> Historical methods-tried record. D.1A removes the Presence-isovalue edge territory described below and retains only deterministic Interior Access as an optional permission within the canonical complementary interior.
 
 Unity validation rejected B.2I. Its local visible-support/material-depth proxy contained no reliable established-body distance information, compressed useful response into the top of the slider, and was multiplied after both Edge Coverage and Interior Access. `Chip Inward Admission` therefore duplicated and serially gated the two existing permissions instead of owning an independent domain.
 
@@ -136,10 +195,9 @@ interiorAuthority = V × InteriorAccess
 potentialEligibility = max(edgeAuthority, interiorAuthority)
 ```
 
-The dedicated debug slot formerly used by Inward Admission now shows `Chip Interior Access` authority. No candidate lifecycle, rigid motion, projected-size LOD, search bounds, Strand logic, Fray logic, texture, sample, buffer, dispatch, or persistent state changes are included. Removing the failed gate also removes its square root, derivative, smoothstep, shader property, binding, and serialized Inspector control.
+The dedicated debug slot formerly used by Inward Admission now shows `Chip Interior Access` authority. Removing the failed gate also removes its square root, derivative, smoothstep, shader property, binding, and serialized Inspector control.
 
-
-## Extended rigid lateral Chip travel — `4.11C.5.17B.2D2B-B.2H` — implemented, Unity validation pending
+## Extended rigid lateral Chip travel — `4.11C.5.17B.2D2B-B.2H` — retained in the accepted current baseline
 
 B.2F/B.2G are Unity-validated and accepted for lifecycle, rigid evolution, and bounded projected-size readability. B.2H changes only the authority and search completeness of the existing rigid lateral centre motion.
 
@@ -183,17 +241,16 @@ required lateral offset    = floor(R + A + C), clamped to 1–4
 The shader evaluates the smallest enclosing rectangle from `3×3` through `5×9`. At the complete authored maxima:
 
 ```text
-R <= 0.65 × 1.42 × 1.45 = 1.338 spacings
+R <= 0.65 × 1.40 × 1.45 = 1.320 spacings
 A <= 2.5 spacings
 C <= 0.89 spacings
 
-required downstream offset = floor(1.338 + 0.89) = 2
-required lateral offset    = floor(1.338 + 2.5 + 0.89) = 4
+required downstream offset = floor(1.320 + 0.89) = 2
+required lateral offset    = floor(1.320 + 2.5 + 0.89) = 4
 maximum search             = 5×9
 ```
 
-Lower settings retain smaller rectangles, including `3×3`, `3×5`, `3×7`, `3×9`, `5×3`, `5×5`, `5×7`, and `5×9` as required. No texture, sample, buffer, compute dispatch, candidate identity, lifecycle, eligibility, Strand, Fray, Layer C/D, or production-order change is added.
-
+Lower settings retain smaller rectangles, including `3×3`, `3×5`, `3×7`, `3×9`, `5×3`, `5×5`, `5×7`, and `5×9` as required.
 
 ## Bounded projected-size Chip LOD — `4.11C.5.17B.2D2B-B.2G` — Unity-validated and accepted
 
@@ -249,10 +306,21 @@ The old whole-candidate attenuation between approximately `0.75–2.0 px` radius
 subpixelVisibility = smoothstep(0.25, 0.75, finalRadius / metresPerPixel)
 ```
 
+D.1C adds a separate fully formed readability admission after bounded enlargement:
+
+```text
+stabilizedPixels = stabilizedStaticRadius / metresPerPixel
+readabilityVisibility =
+  Minimum Stable Radius <= 0
+    ? 1
+    : smoothstep(0.65 × target, target, stabilizedPixels)
+```
+
+This admission suppresses candidates that remain too small even after `Maximum View Scale` has been exhausted. It is evaluated before Size Pulse and lifecycle, so those systems do not redefine candidate readability and still reach exact zero through their existing paths.
+
 The same singular-value metric is used as conservative world-space contour antialias width. Candidate-search selection and the Inspector readout use the conservative `Maximum View Scale` ceiling. The existing `3×3`/`5×5` search and `1.34 × spacing` final-radius cap remain sufficient.
 
-Serialized tuning version 8 assigns `Minimum Stable Radius = 2 px` and `Maximum View Scale = 1.75`. No texture, texture sample, buffer, compute dispatch, persistent state, candidate identity change, density LOD, Strand change, Fray change, or production-order change is added.
-
+Serialized tuning version 8 assigns `Minimum Stable Radius = 2 px` and `Maximum View Scale = 1.75`.
 
 ## Independent Chip lifecycle and rigid evolution — `4.11C.5.17B.2D2B-B.2F` — Unity-validated and accepted
 
@@ -277,7 +345,7 @@ Living Variation — established stage only
   Shape Change Amount / Cadence / Transition Time
 ```
 
-The retired hidden `foamChipEvolutionAmount` and `foamChipEvolutionRate` fields remain serialized only for one-way tuning-version-7 migration. They are no longer bound to the shader.
+The rejected coupled Evolution Amount/Rate storage and the obsolete Chip tuning-version migration chain are removed by D.1B.
 
 ### Four-stage lifecycle
 
@@ -332,11 +400,9 @@ shapeReach = sqrt(lerp(1, 1.52^2, ShapeChangeAmount))
 The maximum lateral offset therefore extends to five source cells, producing a `5×11` maximum only when the combined radius, morph, jitter, and lateral settings require it. The area-equivalent candidate-radius base remains:
 
 ```text
-0.65 Radius Ratio × 1.42 Size Irregularity × 1.45 Size Pulse
-= 1.338 × Candidate Spacing
+0.65 Chip Size ratio × 1.40 Chip Irregularity size ceiling × 1.45 Size Pulse
+= 1.320 × Chip Spacing
 ```
-
-No texture, texture sample, compute dispatch, persistent field, Layer C/D write, Strand change, Fray change, or production-order change is added.
 
 ### Migration
 
@@ -351,12 +417,11 @@ Shape Change Amount   = old amount
 
 The rejected nonlinear warp is not reinterpreted as rigid movement. Lateral and rotation therefore start neutral and require deliberate authoring.
 
-All independent speeds receive slow defaults. Existing Edge Coverage, Interior Access, candidate construction, Strands, and temporary legacy Fray remain unchanged.
-
+All independent speeds receive slow defaults.
 
 ## Superseded Chip turnover and warp-safety model — `4.11C.5.17B.2D2B-B.2E`
 
-B.2D production selection is retained. B.2E changes exactly three remaining responsibilities without adding a resource or changing Strands, Fray, Layer C, or Layer D.
+B.2D production selection is retained.
 
 ### Candidate-independent eligibility domain
 
@@ -395,8 +460,7 @@ blends to the uncorrected evolved-space delta when the basis is unstable.
 
 This replaces the former inverse correction that permitted up to `6×` local-vector amplification. No texture, sample, kernel, dispatch, buffer, persistent write, serialized control, migration, or candidate-loop expansion is added.
 
-
-## Visible Chip domain and binary admission — `4.11C.5.17B.2D2B-B.2D` — implemented, Unity validation pending
+## Historical visible Chip domain and binary admission — `4.11C.5.17B.2D2B-B.2D` — superseded by D.1A
 
 The B.2C composite exposed a real production limitation, not merely a diagnostic mismatch. Production `Chip Selection Depth` was evaluated against `materialEdgeDepth = baseMask`, which is a local Presence-derived coverage value rather than geometric distance from the Foam boundary. Established material saturates that scalar to `1`, while the serialized selector stops at `0.95`; established Foam was therefore mathematically unavailable to the Chip path. The same path multiplied `materialBody` twice and used a smooth Material Pattern value as cut strength, allowing hardening to erase many partial cuts.
 
@@ -453,14 +517,10 @@ At B.2D, the Chip composite was corrected only to compare pre-material Chip Fina
 | Binary antialiased Material Pattern admission | Rejected after Unity evidence | Produced disconnected transported ranking islands and duplicated Activation/Interior Access ownership. |
 | Threshold visible-support/material-depth geometric mean | Rejected after B.2I validation | Local coverage saturated through established bodies, useful response collapsed near one, and the serial multiplier made it dependent on Interior Access. |
 | Remove the third gate; keep Edge Coverage and Interior Access as parallel permissions | Implemented in B.2J | Restores independent control ownership and removes unnecessary per-fragment admission work. |
-| Single soft Fray threshold from `0.88` to `0.30` with unbounded `fwidth` | Rejected after C.1 Unity evidence | Maximum Coverage never admitted the complete perimeter, while wide threshold antialiasing changed partial displacement across mostly the same locations. |
-| `1 - Coverage` admission plus a `0.55–1.0` continuous serration profile | Rejected after C.1A Unity evidence | High Coverage admitted broad edge areas but never restored untouched gaps, so Fray read as smooth large-area recession rather than teeth. |
-| Independent Strand-side Fray cutter | Rejected after C.1A Unity evidence | Ignored all Fray controls and produced visible tooth-like cuts when Fray Amount and Tooth Depth were zero. |
-| Fray master-off contract plus separate cluster/tooth patterns | Implemented in C.1B, validation pending | Makes zero authoritative across final and Strand boundaries, retains untouched gaps at maximum Amount, and uses camera-readable tooth sizes without new resources. |
 | Three cosine harmonics interpolated along one A-to-B line | Rejected after B.2J validation | Stayed mirror-symmetric, depended on Shape Irregularity, and read as one dragged blob with weak pulse-like flexing. |
 | Independent sine-harmonic two-axis temporal geometry | Accepted in B.2K; timing decoupled in B.2L | Decouples temporal shape from static irregularity, keeps coefficient authority constant, and redistributes lobes without changing radius controls. |
 | One cycles-per-second control for both target cadence and transition speed | Rejected after B.2K validation | Correct geometry could still switch abruptly because event spacing and interpolation duration were inseparable. |
-| Shape Change Cadence plus Shape Transition Time | Implemented in B.2L, validation pending | Uses constant-distance deterministic targets and quintic transitions so event frequency and actual geometric speed are independently authored. |
+| Shape Change Cadence plus Shape Transition Time | Retained in the accepted current Chipping baseline; no separate validation task remains | Uses constant-distance deterministic targets and quintic transitions so event frequency and actual geometric speed are independently authored. |
 | Candidate-shaped Eligibility Composite | Rejected after B.2D validation | Showed where current chips landed, not the candidate-independent area where Chipping is permitted. |
 | Expected permission field for fractional Interior Access | Implemented in B.2E | Represents candidate-level admission probability without changing production behavior. |
 | Lifecycle radius floor of `0.13×` | Rejected | Prevented true growth from and return to zero. |
@@ -481,17 +541,15 @@ At B.2D, the Chip composite was corrected only to compare pre-material Chip Fina
 | Raise Lateral Motion Amount without expanding source-cell search | Rejected | Candidates can clip or disappear when translated beyond the searched lattice rows. |
 | Rigid `0–2.5 spacing` lateral travel with exact adaptive rectangular search | Implemented in B.2H | Provides tenfold travel authority while preserving complete candidate contours and smaller search tiers at lower settings. |
 
-
 ## Purpose
 
 This is the canonical architecture contract for Stage 6 river Foam.
 
-This document is the active source of truth for how the Foam system is allowed to work. It supersedes older persistent-morph, lateral-row-commit, pocket/entity, shader-macro-stretch, local-edge-fray, and one-off coherent-warp plans wherever they conflict with this contract.
+This document is the active source of truth for how the Foam system is allowed to work.
 
 The goal is to reproduce the broad behavior of the visual inspiration river: stylized pale surface-film sheets, connected ribbons, bank and obstacle skirts, temporary bridges, pinches, fractures, edge chipping, small fragments, and thin bright surface streaks, while preserving a performance-safe field-based architecture.
 
 The target is not a physically exact fluid solver and not a foam entity database. The target is a fixed-grid mathematical field system with strict ownership boundaries and no circular dependencies.
-
 
 ## Historical evidence gate — eligibility composites and shape-preserving Chip advection — `4.11C.5.17B.2D2B-B.2C`
 
@@ -501,14 +559,13 @@ B.2C also adds exactly two comparison diagnostics using existing fragment data a
 
 ```text
 Chip Eligibility Composite
-Fray Eligibility Composite
 
 Dark gray   exact current Final Foam mask;
 Cyan        eligibility outside the rendered mask;
 Bright yellow rendered Foam overlapping eligibility.
 ```
 
-At B.2C time these views compared the post-breakup rendered silhouette against the then-current Chip Edge Eligibility and Fray Permitted Band. B.2C deliberately did not alter either formula. Its Chip comparison contract and production eligibility are superseded by B.2D above; the Fray evidence remains preliminary until `2D2B-C`. No texture, compute dispatch, buffer, persistent state, authoring control, candidate-loop expansion, Strand change, or Fray production change was introduced.
+B.2C deliberately did not alter either formula.
 
 ## Chaotic Chip advection and geometric turnover — `4.11C.5.17B.2D2B-B.2B`
 
@@ -571,7 +628,7 @@ Distribution, size, and shape hashes remain stable and independent. B.2B adds co
 
 ## Superseded production Chip handoff — `4.11C.5.17B.2D2B-B`
 
-This section records the original B production contract and is superseded for Chip domain/admission mathematics by B.2D above. C.1 later inserted final-boundary Fray, and D.0 retired that feature. Current production order is:
+This section records the original B production contract and is superseded for Chip domain/admission mathematics first by B.2D/B.2J and now authoritatively by D.1A above. Current production order is:
 
 ```text
 Layer C persistent material and transported Material Pattern
@@ -625,9 +682,6 @@ Production Chip Mask       exact hardened coverage removed
 ```
 
 `Production Chip Mask` must agree with Final Foam. `Chip Activation = 0` must reproduce the pre-B result exactly. Strands remain unchanged and are clipped only because the already-chipped body reaches them first.
-
-Historical C.1 superseded the diagnostic-only Fray prototype, but D.0 later retired the entire Fray production, authoring, binding, and diagnostic path. No Fray resource, control, helper, or debug view remains active.
-
 
 ## Play Mode topology startup policy — `4.11C.5.17B.P1`
 
@@ -751,14 +805,11 @@ Status: `5.16E.2` is Unity-validated and accepted. Normal Final Foam matches the
 
 The River Inspector and diagnostics redesign R1–R5 is also Unity-validated and accepted. It changes only Editor organization and presentation: all sections are collapsed by default, authoring follows feature ownership and Foam Layers A–E, one exclusive debug hub controls the existing serialized debug fields, runtime telemetry is read-only and stable-height, mutating tools live under Actions, and constant repaint is limited to visible live diagnostic leaves.
 
-`4.11C.5.17A.1 — Interior Composition Authority Correction` is accepted. `5.17B` and `5.17B.1` are rejected; `5.17B.2` established usable pre-hardening authority and `5.17B.2C` provides state-preserving Inspector tuning and Hold Foam State. Same-state evidence rejected `5.17B.2B`, the periodic `5.17B.2A` Strand path, reconstructed D1, and the D1B/D1C shaping models. `5.17B.2D1A` proved exact lineification extraction. `5.17B.2D1D` is Unity-validated and accepted: Strength, Scale, Density, and Reach now produce viable Strands without excessive visual artefacting. Unity visually rejected `5.17B.2D2`: although it changed patterns and scalar thresholds, Chip and Fray still cut iso-contours from a procedurally eroded visibility field and therefore remained visually similar to the former lineification behavior. `5.17B.2D2A` is partially useful but not accepted. Unity evidence shows Chip is more recognizably chip-like, but still needs a stronger medium-to-large bias; Fray remains visually ineffective, and Chip/Fray/Strands still compete for substantially the same weak-presence territory. It preserves accepted D1D Strands and reconstructs Chip/Fray from a transient material-edge-depth field derived from the pre-morphology base material footprint.
-
+`4.11C.5.17A.1 — Interior Composition Authority Correction` is accepted. `5.17B` and `5.17B.1` are rejected; `5.17B.2` established usable pre-hardening authority and `5.17B.2C` provides state-preserving Inspector tuning and Hold Foam State. Same-state evidence rejected `5.17B.2B`, the periodic `5.17B.2A` Strand path, reconstructed D1, and the D1B/D1C shaping models. `5.17B.2D1A` proved exact lineification extraction. `5.17B.2D1D` is Unity-validated and accepted: Strength, Scale, Density, and Reach now produce viable Strands without excessive visual artefacting. `5.17B.2D2A` is partially useful but not accepted.
 
 ## Approved Layer E finishing contract — `4.11C.5.17P`
 
 The inspiration comparison is refreshed before final rendering work. The production river is not expected to copy the reference one-to-one. Its accepted macro result already contains the required family resemblance: broad predominantly horizontal bands, lateral travel, split/merge behavior, obstacle-driven convergence, and stronger shore accumulation. Slightly fatter ribbons and greater bank accumulation are acceptable consequences of the current field resolution and source grammar. Layer C and the existing motion system remain the macro authority.
-
-The remaining target is local rendered character: foam should read as pale, substantially opaque, chipped, frayed, and energetic while preserving the accepted macro ribbons.
 
 The approved Layer E order is:
 
@@ -797,11 +848,11 @@ At neutral values, opacity reduces exactly to `smoothstep(0.08, 0.46, mask) × F
 
 ### `5.17B / 5.17B.1 — Rejected Hardened-Mask Breakup`
 
-`4.11C.5.17B` and `4.11C.5.17B.1` are both visually rejected. The decisive blind comparison used Breakup Scale `0` with Chip/Fray `0` versus `1`; the difference was weak enough that the images were identified backwards. Stronger threshold constants did not solve the ownership error.
+`4.11C.5.17B` and `4.11C.5.17B.1` are both visually rejected. Stronger threshold constants did not solve the ownership error.
 
 Both patches applied breakup after the visibility signal had already been hardened:
 
-```hlsl
+```text
 float hardVisible = smoothstep(0.22, 0.58, softVisibility);
 float fringe = smoothstep(0.06, 0.34, softVisibility) * 0.34;
 float hardenedMask = saturate(max(hardVisible, fringe));
@@ -811,32 +862,28 @@ Most visible body pixels therefore entered the breakup helper near `1.0`. The ol
 
 ### Historical `5.17B.2 — Pre-Hardening Binary Edge Cuts`
 
-> Superseded for active authoring and future implementation by the D2A findings and `2D2B-A` control-divorce/selection-diagnostic contract above. The text below records what that historical patch did; it is not the current Chip/Fray plan.
-
-Historical status: Unity-validated for visible authority at that time. Their neutral-versus-maximum comparison is unmistakable and both controls produce the intended zero-coverage bites and serration. Breakup Scale visibly modifies the result and is provisionally accepted with the rest of this feature family; no separate Scale-coherence correction blocks current work.
+Historical status: Unity-validated for visible authority at that time. Breakup Scale visibly modifies the result and is provisionally accepted with the rest of this feature family; no separate Scale-coherence correction blocks current work.
 
 The public authoring surface is unchanged:
 
 ```text
 Chip Strength   0–1; default 0
-Fray Strength   0–1; default 0
 Breakup Scale   0–1; default 0.5
 ```
 
-`RiverWaterFoamPatternedMask` now preserves its continuous pre-hardening `softVisibility` transiently while leaving the accepted hardening equation numerically unchanged. `RiverWaterFoamResult` carries that scalar through the existing visual warp, stretch, surface-break, stored-retention, and freeze coupling beside the existing hardened mask. Layer E then performs antialiased binary survival tests against `softVisibility` and multiplies the result into the hardened mask. Selected chips and short cuts may therefore reach true zero coverage; fray uses a shallower threshold. Exact saturated soft cores remain protected. The post-breakup result is removal-only and always satisfies `postBreakupMask <= hardenedMask`, so Interior Opacity Floor cannot refill a removed pixel.
+`RiverWaterFoamPatternedMask` now preserves its continuous pre-hardening `softVisibility` transiently while leaving the accepted hardening equation numerically unchanged. `RiverWaterFoamResult` carries that scalar through the existing visual warp, stretch, surface-break, stored-retention, and freeze coupling beside the existing hardened mask. Layer E then performs antialiased binary survival tests against `softVisibility` and multiplies the result into the hardened mask. Exact saturated soft cores remain protected. The post-breakup result is removal-only and always satisfies `postBreakupMask <= hardenedMask`, so Interior Opacity Floor cannot refill a removed pixel.
 
-The stable pattern path still evaluates exactly the same broad, diagonal, mid, and fine noise calls. Only the transient Chip/Fray outputs are normalized before Scale interpolation: mid and broad chip fields receive separate contrast normalization, as do fine and mid fray fields. Static distribution analysis shows the selected-field means remain effectively matched across Scale endpoints, so Scale changes feature size/frequency without silently collapsing authority. The accepted combined visibility pattern is unchanged.
+The stable pattern path still evaluates exactly the same broad, diagonal, mid, and fine noise calls. Static distribution analysis shows the selected-field means remain effectively matched across Scale endpoints, so Scale changes feature size/frequency without silently collapsing authority. The accepted combined visibility pattern is unchanged.
 
 Production Final Foam, Foam Evaluated Final Preview, Foam Shader Detail Probe, and Foam Shader Detail Difference continue to use the same breakup helper. The Probe shows the exact production post-breakup silhouette. Difference remains removal-only: black is unchanged and magenta/red is removed coverage; green remains zero. The evaluated preview supplies its evaluated shape to the same binary helper without promoting Layer D to production.
 
-Neutral Chip and Fray values return the exact accepted hardened mask, and Breakup Scale alone does nothing. The fixed proof still reads no Remaining Life, Support, Negative Topology, surface-energy multiplier, river-location multiplier, or additional time input. It adds no texture sample, procedural-noise call, texture, buffer, persistent field, compute kernel, dispatch, readback, shader property, or C# binding. Incremental cost is fragment arithmetic plus one transient scalar and possible register pressure.
+The fixed proof still reads no Remaining Life, Support, Negative Topology, surface-energy multiplier, river-location multiplier, or additional time input. It adds no texture sample, procedural-noise call, texture, buffer, persistent field, compute kernel, dispatch, readback, shader property, or C# binding. Incremental cost is fragment arithmetic plus one transient scalar and possible register pressure.
 
-Unity validation passed the authority requirement: Chip and Fray are clearly visible at maximum strength and behave as described. The original short-cut contribution is separated into optional `5.17B.2A` Foam Strands. Breakup Scale visibly modifies the accepted Chip/Fray result and is provisionally accepted; no separate coherence patch is active.
-
+The original short-cut contribution is separated into optional `5.17B.2A` Foam Strands.
 
 ### Superseded `5.17B.2A` / rejected `5.17B.2B`
 
-The periodic-lane Strand implementation and the partial-presence Edge Fragmentation model are no longer part of the active architecture. The Strand control group is retained, but D1 remaps it to the actual hidden Chip/Fray lineification family. The Fragmentation controls and shader properties are removed.
+The periodic-lane Strand implementation and the partial-presence Edge Fragmentation model are no longer part of the active architecture. The Fragmentation controls and shader properties are removed.
 
 ### `5.17B.2C — State-Preserving Foam Authoring`
 
@@ -861,24 +908,18 @@ This patch adds no texture, buffer, shader property, compute kernel, dispatch, r
 
 ### `5.17B.2D1 / D1A — Lineification Extraction`
 
-`5.17B.2D1` is visually rejected. It reconstructed Strands from a coherent-to-lineified delta, a fixed canonical Chip/Fray pattern pair, broad group suppression, and a derivative threshold over the already-cut removal mask. Unity close-ups showed that this was not the current Chip-plus-Fray morphology: it produced short screen-aligned dashes, square steps, discontinuous groups, and severe pixel quantisation. The failed reconstruction and its transient Strand field are removed.
+`5.17B.2D1` is visually rejected. The failed reconstruction and its transient Strand field are removed.
 
-`4.11C.5.17B.2D1A — Exact Lineification Extraction` is Unity-validated for exact same-state Chip-plus-Fray versus Strand equivalence. The neutral body and separate stable lineified soft signal from D1 are retained. Current Chip and Fray remain unchanged as the reference. Strand Strength now literally calls the same current Chip and Fray survival helpers with:
+The neutral body and separate stable lineified soft signal from D1 are retained.
 
 ```text
 same lineified soft visibility
 same Breakup-Scale-selected Chip pattern
-same Breakup-Scale-selected Fray pattern
 same fwidth antialiasing footprint
 same exact-core protection
 ```
 
 Therefore, at the same Breakup Scale, these configurations are intended to be mathematically equivalent:
-
-```text
-A: Chip Strength = 1, Fray Strength = 1, Strand Strength = 0
-B: Chip Strength = 0, Fray Strength = 0, Strand Strength = 1
-```
 
 The proof deliberately adds no spacing reinterpretation, width reinterpretation, curvature warp, grouping mask, delta reconstruction, or post-threshold screen-space culling. Strand Spacing, Strand Width, and Strand Curvature remain serialized for the later shaping step but are visibly disabled in the Inspector and have no shader authority during D1A. Production Final Foam and Foam Evaluated Final Preview use the same exact helper.
 
@@ -890,7 +931,6 @@ D1A removes the failed four-component transient Strand field and its propagation
 
 ```text
 Strand Spacing
-  biases continuous Chip/Fray selection density;
   higher values retain fewer, more separated structures.
 
 Strand Width
@@ -904,12 +944,11 @@ Strand Curvature
 
 The shader now carries a dedicated transient `strandSoftVisibility` beside the coherent and legacy lineified signals. At the serialized reference values (`Spacing 0.55`, `Width 0.50`, `Curvature 0.55`) and when source bands are resolved, the Strand path reduces to D1A. Projected river-space footprint is measured once before wake/lee branching. The Strand-only pattern pair then falls back continuously from fine to medium and from medium to broad existing bands as source density becomes unresolved; the anisotropic band breaker similarly falls back to the existing broad/diagonal field. No finished removal mask is re-thresholded, grouped, dithered, or culled per pixel.
 
-D1B adds no texture sample, procedural-noise/hash call, texture, buffer, persistent field, compute kernel, dispatch, readback, Layer C mutation, or Layer D mutation. It adds transient arithmetic/register pressure only. Current Chip and Fray remain unchanged until D1B proves that controlled Strands retain the desired visual family without distant square/dash noise.
-
+D1B adds no texture sample, procedural-noise/hash call, texture, buffer, persistent field, compute kernel, dispatch, readback, Layer C mutation, or Layer D mutation. It adds transient arithmetic/register pressure only.
 
 ### `5.17B.2D1C — Strand Spatial Controls and Resolution Cutoff`
 
-`4.11C.5.17B.2D1C` is visually rejected. Static mathematics assigned distinct coordinate-frequency, band-width, and coordinate-warp operations, but Unity evidence showed that all three controls were effectively inert. The audit proved why: the visible extracted lineification is an intersection of the anisotropic soft band with separate Chip and Fray candidate patterns. D1C shaped only the anisotropic band while the decisive candidate topology remained fixed. Its projected-detail estimate also omitted the transported Material Pattern phase that participates in every procedural coordinate. No further constant calibration is allowed on that control model.
+`4.11C.5.17B.2D1C` is visually rejected. Static mathematics assigned distinct coordinate-frequency, band-width, and coordinate-warp operations, but Unity evidence showed that all three controls were effectively inert. D1C shaped only the anisotropic band while the decisive candidate topology remained fixed. Its projected-detail estimate also omitted the transported Material Pattern phase that participates in every procedural coordinate. No further constant calibration is allowed on that control model.
 
 ### `5.17B.2D1D — Strand Control Model Reset and Coherent Pattern Transport`
 
@@ -936,47 +975,21 @@ Strand Reach
 
 The old serialized Spacing, Width, and Curvature values migrate into Scale, Density, and Reach through `FormerlySerializedAs`; the obsolete names are removed from bindings, shader properties, Inspector labels, and active documentation.
 
-D1D gives Strands a dedicated candidate-pattern pair without modifying the legacy Chip/Fray pair. Strand Scale builds that pair hierarchically from the existing broad, medium, and fine bands. Fine and medium contribution disappear first as their projected footprint becomes unresolved; if even the broad organization is unresolved, Strand authority returns to the coherent Foam body. Candidate thresholds receive derivative-aware antialiasing.
+Strand Scale builds that pair hierarchically from the existing broad, medium, and fine bands. Fine and medium contribution disappear first as their projected footprint becomes unresolved; if even the broad organization is unresolved, Strand authority returns to the coherent Foam body. Candidate thresholds receive derivative-aware antialiasing.
 
-Projected resolution now includes the transported Material Pattern derivative multiplied by the same seed factors used by the broad, diagonal, medium, fine, and anisotropic sources. The derivative is resolved outside wake/lee branching. Stored, warped, lead, and trail Strand patterns and resolution authority are transported with the soft shape that owns them; `max` paths choose the winning sample's pattern rather than applying the stored pattern to a different visible shape. At D1D time, the legacy Chip/Fray `breakupField` remained stored-authority; D.0 later removed that dead carrier after Fray retirement.
+Projected resolution now includes the transported Material Pattern derivative multiplied by the same seed factors used by the broad, diagonal, medium, fine, and anisotropic sources. The derivative is resolved outside wake/lee branching. Stored, warped, lead, and trail Strand patterns and resolution authority are transported with the soft shape that owns them; `max` paths choose the winning sample's pattern rather than applying the stored pattern to a different visible shape.
 
 D1D adds no texture sample, texture, buffer, persistent field, compute kernel, dispatch, readback, Layer C mutation, or Layer D mutation. It removes the extra D1C shaped-coordinate noise call and replaces it with arithmetic, transient Strand pattern/resolution values, and derivative-aware candidate selection.
 
 ### `5.17B.2D2 — Rejected Visibility-Contour Role Separation`
 
-Unity visually rejected D2. The implementation moved Chip and Fray away from the explicit Strand signal, but still thresholded `coherentSoftVisibility`. That scalar contains procedural noise, time-driven morphology, wake/stretch composition, and internal valleys; it is not monotonic distance from the Foam silhouette. Spatially varying thresholds therefore exposed nested iso-contours and elongated channels rather than edge-connected bites and shallow perimeter roughness. Sequential multiplication did not create geometric boundary awareness. No further threshold calibration of that model is allowed.
-
-### `5.17B.2D2A — Presence-Space Chip and Fray Reconstruction`
-
-`4.11C.5.17B.2D2A` is implemented with Unity validation pending. It keeps the public controls unchanged and preserves the accepted D1D Strand source and survival equations.
-
-`RiverWaterFoamPatternedMask` now exposes a transient `materialEdgeDepth` sourced from `baseMask`, before procedural coherent morphology, anisotropic lineification, surface-break modulation, and final hardening. That depth travels with the same stored, warped, lead, trail, and stored-retention coherent-shape owner as the Chip/Fray pattern pair. It adds no texture, buffer, persistent channel, compute work, dispatch, or readback.
-
-Chip and Fray now build one material-depth requirement:
-
-```text
-Chip
-  broad/medium candidate pattern
-  medium inward material-depth requirement
-
-Fray
-  medium/fine candidate pattern
-  shallow perturbation added to the same requirement
-```
-
-The combined requirement is compared against `materialEdgeDepth`. Fully established material remains protected. The resulting edge keep is applied to coherent soft visibility before the accepted hardening equation is reconstructed. A reconstructed-mask ratio preserves the existing coupled/wake-shaped production mask exactly when Chip and Fray are neutral while applying only removal when they are active. Accepted Strands remain a final independent removal stage.
-
-D2A must be rejected if Chip still forms long internal contours, Fray still removes medium body regions, or Strand-only output changes. If the presence-space model fails, the no-new-sample scalar route is exhausted and the next escalation requires neighbour-derived edge geometry or a small edge-distance resource.
+Unity visually rejected D2. That scalar contains procedural noise, time-driven morphology, wake/stretch composition, and internal valleys; it is not monotonic distance from the Foam silhouette. Spatially varying thresholds therefore exposed nested iso-contours and elongated channels rather than edge-connected bites and shallow perimeter roughness. Sequential multiplication did not create geometric boundary awareness. No further threshold calibration of that model is allowed.
 
 ### Lifetime and topology rule
 
-Direct Support or Negative Topology breakup multipliers are explicitly excluded from `5.17A` and the first `5.17B` proof. Layer C already converts topology into Remaining Life through the configured aging rates. Supported foam therefore remains visually younger for much longer, neutral foam follows normal lifetime, and negative foam expires rapidly. Current proof tuning is Neutral Lifetime `7.5 s`, Supported Aging Rate `0.08×`, and Negative Aging Rate `7.5×`; these values describe the validation setup and are not silently promoted to new project defaults. The first `5.17B` proof does not read Remaining Life at all; it isolates the fixed morphology vocabulary before temporal progression is introduced. `5.17C` will then use Remaining Life as the initial and sole temporal fragility signal, allowing the existing lifecycle system to prove whether it supplies enough differentiation without hidden additional help.
+Layer C remains the sole owner of Remaining Life. Support and Negative Topology influence Foam through the accepted Layer C aging rates. Layer E must never modify Remaining Life.
 
-Do not sample support/negative topology directly for breakup unless later Unity evidence shows that Remaining Life alone is insufficient and the user separately approves that coupling. Layer E must never modify Remaining Life.
-
-### Later polish
-
-`5.17C` is planned Remaining-Life progression for the accepted deterioration vocabulary: chips, fray, extracted strands, detached flecks, broken streak remnants, and sparse old-foam remnants should advance as Layer C Remaining Life falls. Supported and Negative Topology must initially influence that progression only through their existing Layer C aging rates; direct topology, support, negative-pressure, or river-location breakup multipliers remain deferred unless Remaining Life demonstrably proves insufficient. `5.17D` is planned fine-fragment and final-energy work rather than an optional bucket to omit: tiny detached flecks, small fragments, thin streak remnants, micro-bubbles, and selective bright glints are part of the intended final Foam pass. Their underlying Foam availability and deterioration follow the lifecycle-derived mask; optical glints may additionally respond to lighting.
+The former `5.17C` lifecycle-derived morphology progression and `5.17D` fine-fragment/final-energy queue are retired from the active completion contract. Remaining-Life modulation of Chipping or Strands may be reconsidered only as a future optional experiment. Dedicated Fray, micro-fragment, micro-bubble, and glint systems are not required for the production camera.
 
 ### Performance contract
 
@@ -989,7 +1002,6 @@ wide neighbourhood sampling = rejected by default
 
 Reuse the existing shader-detail probe and available samples where practical. Profile before accepting any broad sampling stencil.
 
-
 ---
 
 # 0. Non-negotiable design goals
@@ -999,22 +1011,22 @@ Reuse the existing shader-detail probe and available samples where practical. Pr
 The reference river is not one effect. It is a stack of visual phenomena:
 
 1. **Broad pale surface film**
-   Large white/pale sheets sit on the water surface. They read as continuous film rather than as discrete particles.
+Large white/pale sheets sit on the water surface. They read as continuous film rather than as discrete particles.
 
 2. **Connected ribbons and current seams**
-   Foam forms long broken bands along flow lanes, banks, rocks, and darker water pockets.
+Foam forms long broken bands along flow lanes, banks, rocks, and darker water pockets.
 
 3. **Emergent split / merge / pinch / reunite appearance**
-   Visible film narrows, separates, rejoins, and creates temporary necks through material advection and temporal sheet evolution. A separate persistent macro-fracture state is explicitly rejected.
+Visible film narrows, separates, rejoins, and creates temporary necks through material advection and temporal sheet evolution. A separate persistent macro-fracture state is explicitly rejected.
 
 4. **Chipping and edge chaos**
-   Edges chip, fray, crack, and flutter. This can be largely procedural and local.
+This can be largely procedural and local.
 
 5. **Thin bright streaks**
-   Narrow fast white scratches/streaks in the reference are not the same layer as broad film. They should be shader-side detail or a separate lightweight detail layer.
+Narrow fast white scratches/streaks in the reference are not the same layer as broad film. They should be shader-side detail or a separate lightweight detail layer.
 
 6. **Bank / rock / obstacle contact foam**
-   Pale film gathers around banks and obstacles. This is not merely transported material; the visual system needs external contact/support fields.
+Pale film gathers around banks and obstacles. This is not merely transported material; the visual system needs external contact/support fields.
 
 ## 0.2 Performance target
 
@@ -1438,7 +1450,7 @@ River Flow Speed × Liquid Factor × Downstream Speed Ratio: base Foam speed.
 
 Canonical pure resolver:
 
-```hlsl
+```text
 lateralIntent = clamp(
     lerp(laneIntent, obstacleIntent, obstacleInfluence),
     -1,
@@ -1578,7 +1590,7 @@ A = reserved / future use
 
 Decoded state:
 
-```hlsl
+```text
 struct FoamMaterialState
 {
     float presence;
@@ -1798,7 +1810,7 @@ Foam Shape Difference = compares _FoamShapeMask against raw persistent Presence.
 
 After validation of 5.10, the 5.9z coordinate-warp prototype was retired and `EvaluateFoamShape` was reset to a clean pass-through baseline:
 
-```hlsl
+```text
 float FoamEvaluateIntrinsicShapeMask(
     FoamMaterialState material,
     float validFluid)
@@ -2357,7 +2369,6 @@ final foam color
 opacity
 edge softness
 small local chipping
-small local fray
 thin bright streaks
 sparkle/highlights
 reflection/refraction blending
@@ -2503,7 +2514,7 @@ Existing useful debug views:
 ```text
 Final Foam
 Foam + Aging Topology
-Progressive Birth Source
+Automatic Birth Sources
 Material Presence
 Material Remaining Life
 Foam Motion Field
@@ -2692,7 +2703,6 @@ neighbour-resampled morphology that writes FoamState
 fractional lateral row weighting
 per-cell stochastic lateral row commit
 dense interior hole cutting as the main look
-tiny local edge-fray as the main look
 5.9z coordinate warp as the final shape solution
 naive full-res 179-sample wide-neighbour classifiers as default
 shader-side wide-neighbour structural foam search
@@ -2863,9 +2873,8 @@ determine how much reference-like fine chaos can be achieved with local shader m
 Implemented diagnostic scope:
 
 ```text
-Foam Shader Detail Probe debug view
-Foam Shader Detail Difference debug view
-shader-side local procedural chipping/fray/cuts based on river metres, material UV, material pattern, time, Remaining Life, and surface energy
+Foam Chip And Strand Probe debug view
+Foam Chip And Strand Difference debug view
 sub-cell granular edge breakup at rendered-pixel scale
 no neighbourhood search
 no persistent mutation
@@ -2940,12 +2949,12 @@ Permanent rule:
 do not restore 5.16D–5.16D.2 breakup code;
 do not add a persistent damage field or packed damage channel;
 use emergent lateral advection/temporal occupancy for macro separation;
-use Layer E for micro-tearing and edge erosion.
+use the accepted Layer E Chipping and structural Strands for visible breakup; no micro-tearing continuation is queued.
 ```
 
-## Phase 7 — Coordinate-Consistent Final Foam Integration
+## Historical Phase 7 — Coordinate-Consistent Final Foam Integration
 
-Next active phase.
+Status: not required by the accepted Final Foam result; retained as historical architecture only.
 
 Scope:
 
@@ -2967,7 +2976,7 @@ normal material lifetime, pattern, and spawning remain unchanged;
 performance cost is measured and bounded.
 ```
 
-## Phase 8 — Shader-Local Micro-Tearing and Edge Erosion
+## Historical Phase 8 — Shader-Local Micro-Tearing and Edge Erosion — retired
 
 Scope:
 
@@ -2979,7 +2988,7 @@ rendered-pixel procedural math only;
 zero new persistent textures, fields, channels, or compute dispatches.
 ```
 
-## Phase 9 — Thin bright streak and local polish layer
+## Historical Phase 9 — Thin bright streak and local polish layer — not queued
 
 Scope:
 
@@ -2990,7 +2999,7 @@ local/no-neighbour procedural math;
 separate from broad film structure.
 ```
 
-## Phase 10 — Performance tiers and chunk scheduling
+## Deferred comprehensive River performance pass
 
 Formalize:
 
@@ -3015,8 +3024,8 @@ Layer D owns material-derived Film Source / Film Support;
 Layer D owns the accepted advected temporal visual occupancy sheet;
 Layer D does not own a separate persistent fracture or damage state;
 _FoamShapeMask is the full-resolution diagnostic product;
-Layer E owns rendered-pixel micro-tearing, streaks, colour, and lighting;
-Final Foam consumes committed Layer C state directly and remains disconnected from `_FoamShapeMask` until a separate Layer D production decision is accepted.
+Layer E owns the accepted analytical Chipping, structural Strands, colour, opacity, and lighting;
+Final Foam consumes committed Layer C state directly; `_FoamShapeMask` remains a diagnostic/evaluated product and has no queued production-integration patch.
 ```
 
 `4.11C.5.16E.2` is the active architecture state and is Unity-validated. Point-velocity residual prediction is retired after the committed/evaluated previews proved stable while residual-predicted Final Foam stuttered. Final Foam keeps both reversible visibility policies, the supported-aging minimum is `0.05`, and lifecycle aging is quantized once per complete material tick rather than once per CFL substep. `_FoamShapeMask` remains diagnostic-only.
@@ -3076,9 +3085,7 @@ The engineering target remains `0.10%`. `5.16E.3C` introduces an Editor-only tem
 
 Exact receiver-acceptance transport was deferred because the audited multi-pass solution would cost approximately `2–3×` the current Layer C transport work. The cheaper single-pass directional vacancy cap was also deferred because its estimated `10–25%` Layer C transport cost is not justified by the current sub-1% and visually tolerated loss. Fractional shoreline storage relaxation remains a future zero-dispatch visual A/B candidate, but it is explicitly partial and may create hidden shoreline reservoirs.
 
-Capacity-hit category counters can overlap; `Total` is the union of hit samples, while unit and boundary counts may both include the same cell-substep. The next active work is Layer E interior composition, followed by shader-local micro tearing. The numerical issue must be reopened if the `1.00%` review threshold is exceeded, visible loss appears, or materially different content invalidates the controlled evidence.
-
-
+Capacity-hit category counters can overlap; `Total` is the union of hit samples, while unit and boundary counts may both include the same cell-substep. No morphology continuation is queued. The numerical issue must be reopened if the `1.00%` review threshold is exceeded, visible loss appears, or materially different content invalidates the controlled evidence; otherwise it belongs to the deferred comprehensive River performance pass.
 
 ---
 
@@ -3173,7 +3180,6 @@ RiverWaterFoam.hlsl:
 
 Do not reverse this split. If a future effect needs durable material motion, it belongs in Layer C. If a future effect needs broad visual film support, it belongs in Layer D and writes domain-space visual products. If a future effect needs pixel-scale local polish, it belongs in Layer E and must not feed back into compute state.
 
-
 # Addendum — 4.11C.5.13C Material-Gated Layer D Film Source
 
 `4.11C.5.13C` fixes a semantic Layer D bug exposed after the domain-space sampling fix. The bug was not a coordinate issue. The film products were stable, but `Foam Film Source`, `Foam Film Support`, `Foam Evaluated Shape`, `Foam Shape Difference`, and the shader-detail probe inherited shapes from Layer B support topology because Film Source allowed support to become source directly.
@@ -3213,15 +3219,15 @@ Debug-view audit from the 5.13B baseline:
 ```text
 0 Final Foam — clean from the Layer D support-source bug; still uses legacy Final Foam.
 1 Foam And Aging Topology — intentionally topology/support-based.
-2 Progressive Birth Source — clean from topology-support film contamination.
+2 Automatic Birth Sources — exact accepted automatic Layer C source-event footprints; no manual/test-source ownership.
 3 Material Presence — clean Layer C material truth.
 4 Material Remaining Life — clean Layer C material-life truth.
 5 Foam Motion Field — external motion/routing debug, not topology support.
 6 Foam Motion Field + Cell Grid — external motion plus intentional material-space cell grid.
 7 Foam Evaluated Shape — contaminated before 5.13C through _FoamShapeMask.
 8 Foam Shape Difference — truthful comparison, but its evaluated-shape input was contaminated before 5.13C.
-9 Foam Shader Detail Probe — inherited contaminated _FoamShapeMask before 5.13C.
-10 Foam Shader Detail Difference — inherited contaminated _FoamShapeMask before 5.13C.
+9 Foam Chip And Strand Probe — inherited contaminated _FoamShapeMask before 5.13C.
+10 Foam Chip And Strand Difference — inherited contaminated _FoamShapeMask before 5.13C.
 11 Foam Film Source — direct root of the support-source contamination before 5.13C.
 12 Foam Film Support — inherited contaminated Film Source before 5.13C.
 ```
@@ -3337,7 +3343,6 @@ EvaluateFoamShape:
   keep additions visible but selective.
 ```
 
-
 Implementation completed in this patch:
 
 ```text
@@ -3407,8 +3412,6 @@ No phase/cell-grid stutter returns.
 Final Foam remains unchanged.
 ```
 
-
-
 ### 2026-07-09 — River Foam 4.11C.5.14A Layer C Automatic Shore/Contact Source Population
 
 Audited the current birth architecture after 5.13D validation. The audit found that manual/progressive birth, support/lifetime capture, topology/contact fields, and Layer D material-derived spread exist, but automatic birth near specific environmental locations was missing. The correct next step is therefore Layer C source population, not a new Layer D environmental-film authority.
@@ -3416,7 +3419,6 @@ Audited the current birth architecture after 5.13D validation. The audit found t
 Implemented the first conservative source class: disabled-by-default automatic shore/contact birth. The runtime scans sparse shore-support-band candidates at a low fixed cadence, accepts a bounded subset based on the river seed and amount, then queues real persistent material through `PendingInjection`, `QueueMaterialBirth`, and the existing `InjectFoam` compute kernel. The material then lives or dies under the existing support/negative aging system.
 
 This patch initially added Inspector controls under `Source Population`: `Automatic Birth Enabled` and `Shore Contact Birth Amount`, plus runtime counters/status. Validation showed that the single amount slider was overloaded and could create large shore chunks. Patch `4.11C.5.14B` then overcorrected by exposing too many implementation controls. Patch `4.11C.5.14C` simplified the control surface, but validation showed the hidden implementation was too starved. Patch `4.11C.5.14D` keeps the Layer C source-population route and uses deterministic full-strength source events controlled by Coverage, Activity, Patch Size, and Pattern. It does not switch Final Foam, does not create support-only Film Source, does not add a visual-only environmental film texture, and does not create entities or pocket IDs.
-
 
 ### 2026-07-09 — River Foam 4.11C.5.14B Source Population Controls / Shore Birth Profile
 
@@ -3446,7 +3448,6 @@ Pattern: Mixed / Shore Ribbons / Inward Wash
 ```
 
 Two recipes are implemented: `Shore Ribbon`, a bank-parallel opaque ribbon source event, and `Inward Wash`, a shore-attached event that drifts inward/downstream from the bank contact band. Both are scheduled through deterministic slots distributed along both banks, bounded by a maximum number of starts and scans per update.
-
 
 ### 2026-07-09 — River Foam 4.11C.5.14E Automatic Source Event Rasterizer
 
@@ -3491,7 +3492,6 @@ The refined rule is:
 - `Mixed` is protected from bad wash dominance by greatly reducing Inward Wash weighting.
 
 This patch still writes real persistent FoamState material through the Layer C rasterizer. It does not alter Layer D visual-film evaluation or Final Foam.
-
 
 ### 4.11C.5.14H foam birth authoring framework
 
@@ -3555,4 +3555,3 @@ The source-event dispatch path now supports an optional Y range. Existing shore/
 Free Water Foam now has a third source grammar: **Cross-Lace Connector**. The original Lace Connector is flow-aligned because its sampled path runs along global distance. Cross-Lace swaps that path basis so the source head travels across the river laterally while the ribbon only bends slightly along flow. This is intended to supply the horizontal/cross-current pale ribbons visible in the visual target without increasing global spawn density or inserting final foam art.
 
 Cross-Lace remains Layer C material birth only. It writes persistent FoamState through the existing automatic source-event rasterizer, is clipped by river boundary and obstacle exclusion, and uses the existing local X/Y dispatch bounds.
-

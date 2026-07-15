@@ -1,51 +1,21 @@
-# Current River continuation — `4.11C.5.17D.0`
+# Current River continuation — post-D.1C milestone closure
 
-Final-Edge Fray is retired after gameplay-camera validation. Small teeth did not survive the production isometric view, while large teeth became visually equivalent to Chipping or broad erosion. All Fray-only controls, active serialized fields, shader properties, runtime bindings, helper mathematics, debug views, and dead transient carriers are removed from code. No scene, prefab, material, or other serialized Unity asset is modified; stale serialized values remain inert and owner-controlled.
-
-Current Layer E order:
+The current Chipping baseline is Unity-validated and accepted. Stage 3 shore-wave controls are validated. Stage 7 is provisionally complete; the targeted tweak is implemented as `4.11C.5.18B — Automatic Birth Sources Debug` and awaits Unity validation. The old Stage 8 reflection/final-integration plan is stale and retired; the current River has no visible reflection feature. All performance work is deferred to one future comprehensive River performance pass.
 
 ```text
-coherent Foam → analytical Chipping → structural Strands → composition
+D.0   dedicated fine-edge/Fray retirement
+D.1A  canonical zero-resource Chip eligibility
+D.1B  six-control Chipping authoring refactor
+D.1C  camera-readable medium/large-biased population
 ```
 
-Retained compatibility is limited to historical serialized aliases needed to preserve Chip migration data; no Fray runtime path remains. Debug values `22`, `23`, and `27` are retired and safely fall back to Final. The next active work is `4.11C.5.17D.1 — Chipping Readability Audit`, followed by an evidence-driven Chipping rework. Remaining-Life morphology is still deferred.
+Current controls are Amount, Size, Spacing, Irregularity, Edge Width, and optional Interior Access. `D.1A.1` is rejected and rolled back. `D.1D — Coherent Edge-Bite Admission` is skipped because the current result is good enough. Remaining-Life interaction is deferred as optional future work. The zoom-dependent thin-strip capture remains known deferred technical debt.
 
-> **Historical note:** The C.1/C.1A/C.1B sections below record rejected experiments and are no longer active architecture.
+Current active direction: validate `4.11C.5.18B`, then either close Stage 7 formally or select a newly scoped feature. Do not infer an active reflection, Remaining-Life, Fray, micro-fragment, or isolated performance queue from older notes.
 
-# Historical River continuation — C.1B
+B.2K/B.2L geometry and timing remain part of the accepted current baseline; no dedicated B.2L validation task remains.
 
-C.1B is the active Fray isolation patch. C.1A's monotonic Coverage mapping was not sufficient: an independent Strand Fray helper ignored the visible Fray controls, and the final Fray profile continuously removed at least `55%` authority across admitted regions. The resulting system could not turn Fray off globally and read as broad hiding rather than teeth.
-
-Current contract:
-
-```text
-Fray Amount = 0 OR Tooth Depth = 0
-→ exact post-Chip/post-Strand silhouette
-→ no tooth-like Fray on ordinary, Chip, or Strand boundaries
-```
-
-Strands own structural lineification only. Final Fray owns intermittent camera-readable teeth through separate cluster and tooth patterns with real gaps. `Tooth Size (m)` is authored for the isometric camera over `0.12–1.20 m`. C.1B preserves the exact post-Strand baseline, hybrid boundary reconstruction, adaptive rolled Chip loops, and all Ground/River performance work. Remaining Life coupling is still excluded. Unity validation pending.
-
-## Deferred Chipping validation — `4.11C.5.17B.2D2B-B.2L`
-
-B.2J permission is accepted. B.2K supplies independent multi-axis contour geometry. B.2L remains implemented as a deferred Chipping timing validation patch. Its former sequencing before Fray is obsolete because Fray was retired by D.0.
-
-Current controls:
-
-```text
-Shape Change Amount
-= geometric excursion only
-
-Shape Change Cadence (changes/s)
-= how often a new deterministic contour target is selected
-
-Shape Transition Time (s)
-= how long the geometry takes to reach that target
-```
-
-Targets use a constant golden-angle separation in the accepted B.2K two-axis coefficient plane. Quintic interpolation reaches zero velocity at both target endpoints. The resolved Inspector timing reports `effective transition / hold`, where the effective transition is clamped to the cadence interval. Existing candidate phase offsets stagger changes.
-
-Validate isolated candidates with Size Pulse, Rotation, and Lateral Motion disabled. Confirm that Cadence changes event spacing, Transition Time changes actual morph speed, Amount changes only geometric extent, and no size/lifecycle/motion behavior changed. After acceptance, return to the D.1 Chipping Readability Audit rather than any Fray continuation.
+This handoff is historical below the supersession notice. Use `Docs/River_Foam_Stage6_Architecture.md` and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md` for active Foam status.
 
 # Rock And River Refactor Handoff
 
@@ -53,14 +23,13 @@ Validate isolated candidates with Size Pulse, Rotation, and Lateral Motion disab
 >
 > This handoff is historical for earlier rock/river refactor context. Any river Foam architecture, static-foam, morphing, lateral motion, or rendering responsibility statement in this document is superseded by `Docs/River_Foam_Stage6_Architecture.md` and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`. Use those documents as the active Foam source of truth.
 
-
 ## Accepted Chipping geometry foundation — `4.11C.5.17B.2D2B-B.2K`
 
 B.2K's multi-axis contour geometry is retained. It owns independent sine-harmonic shape evolution, temporal radial-area preservation, and the bounded `1.52×` lobe/search contract. B.2L changes timing only: target cadence and transition duration are now separate.
 
 ## Superseded River Foam continuation — `4.11C.5.17B.2D2B-B.2E`
 
-B.2D body access and binary Material Admission remain the production foundation. B.2E is implemented and awaits Unity validation for exactly three corrections:
+Historical note: B.2D/B.2E were intermediate production foundations and are superseded by the accepted D.1A–D.1C baseline. Their three corrections were:
 
 ```text
 Eligibility Composite
@@ -82,14 +51,13 @@ Warp safety
   to 0.67×–1.50× instead of the former 6× amplification allowance.
 ```
 
-No control, texture, sample, dispatch, persistent state, candidate-loop size, Strand behavior, Fray behavior, or production order is changed. Validate the permission view first, then complete lifecycle, then maximum-amount smear/noise stress behavior. Final-boundary Fray remains blocked until B.2E is accepted.
+Validate the permission view first, then complete lifecycle, then maximum-amount smear/noise stress behavior.
 
-
-## B.2D production foundation — `4.11C.5.17B.2D2B-B.2D`
+## Historical B.2D production foundation — superseded by D.1A
 
 The production Chipping blocker is source-proven. `materialEdgeDepth` was a local Presence-derived coverage value, not geometric boundary distance. It saturates to `1` throughout established Foam, while the serialized selector stopped at `0.95`; most visible bodies were therefore impossible to chip. The smooth transported Material Pattern gate then acted as removal strength and was often erased by later hardening.
 
-B.2D is implemented and awaits Unity validation:
+This historical B.2D implementation was later superseded by D.1A:
 
 ```text
 Chip Edge Coverage
@@ -102,10 +70,7 @@ Chip Material Admission (historical B.2D source, removed by B.2J)
   binary antialiased threshold over the transported ranking signal.
 ```
 
-The complete pre-material selection is clipped to pre-Chip base coverage. `materialBody` is no longer multiplied twice. At Activation `1` and Interior Access `1`, every activated candidate can fully cut visible established Foam beneath its contour. Historical Rivers migrated to Interior Access `0`; the removed admission value is now ignored. No texture, sample, compute pass, persistent state, or candidate-loop expansion was added by B.2D. Its historical statement that temporary legacy Fray remained unchanged is superseded by C.1.
-
-B.2D validation remains relevant for Chipping, while C.1 separately validates exact neutral Fray equivalence and final-boundary behavior.
-
+The complete pre-material selection is clipped to pre-Chip base coverage. `materialBody` is no longer multiplied twice. At Activation `1` and Interior Access `1`, every activated candidate can fully cut visible established Foam beneath its contour. Historical Rivers migrated to Interior Access `0`; the removed admission value is now ignored. No texture, sample, compute pass, persistent state, or candidate-loop expansion was added by B.2D.
 
 ## Superseded River Foam continuation — `4.11C.5.17B.2D2B-B.2C`
 
@@ -117,15 +82,11 @@ Two new debug views are the immediate evidence gate:
 
 ```text
 Chip Eligibility Composite
-Fray Eligibility Composite
 
 Dark gray     exact current Final Foam;
 Cyan          eligibility outside rendered Foam;
 Bright yellow overlap.
 ```
-
-The Chip Edge Eligibility and Fray Permitted Band formulas were unchanged by B.2C. B.2D above now supersedes the Chip formula and composite contract; Fray remains pending. No new texture, compute pass, persistent state, control, candidate-loop expansion, Strand change, or production Fray change was included in B.2C.
-
 
 ## Current River Foam continuation — `4.11C.5.16E.2` committed Final Foam
 
@@ -198,7 +159,6 @@ The current continuation contract is now locked by:
 4.11C.5.17A.1 — Interior Composition Authority Correction (Unity-validated and accepted)
 4.11C.5.17B — Layer E Edge Breakup Proof (visually rejected)
 4.11C.5.17B.1 — Breakup Authority Calibration (visually rejected)
-4.11C.5.17B.2 — Pre-Hardening Binary Edge Cuts (Unity-validated for Chip/Fray)
 4.11C.5.17B.2A — original periodic Strand proof (superseded)
 4.11C.5.17B.2B — Edge-Band Regional Fragmentation (visually rejected and removed)
 4.11C.5.17B.2C — State-Preserving Foam Authoring
@@ -207,15 +167,13 @@ The current continuation contract is now locked by:
 4.11C.5.17B.2D1B — Strand Shaping and Projected Detail Floor (visually rejected)
 4.11C.5.17B.2D1C — Strand Spatial Controls and Resolution Cutoff (visually rejected)
 4.11C.5.17B.2D1D — Strand Control Model Reset and Coherent Pattern Transport (Unity-validated and accepted)
-4.11C.5.17B.2D2 — Chip and Fray Role Separation (visually rejected)
-4.11C.5.17B.2D2A — Presence-Space Chip and Fray Reconstruction (partially useful; not accepted)
 ```
 
 The original `5.17A` controls were bound correctly but lacked visual authority: fill operated after established coverage was already hardened, the floor was capped by Foam Colour alpha, and edge emphasis did not control the existing bright rim. `5.17A.1` removes Interior Fill, makes Interior Opacity Floor absolute for established Foam, and replaces Edge Emphasis with signed Edge Contrast that directly suppresses or intensifies the current edge-versus-interior lighting transition. Normal Final Foam and Foam Evaluated Final Preview still share one arithmetic-only helper. Floor `0` and Contrast `0` preserve the previous render. The patch adds no texture sample, persistent resource, compute work, morphology, lifecycle rule, or topology lookup.
 
-`5.17B` and `5.17B.1` are rejected. `5.17B.2` fixes breakup authority. Same-state evidence proved that the desirable lineification came from the hidden anisotropic band breaker combined with current Chip and Fray, not the explicit periodic Strand path. `5.17B.2B` and its three Fragmentation controls are removed.
+`5.17B` and `5.17B.1` are rejected. `5.17B.2` fixes breakup authority. `5.17B.2B` and its three Fragmentation controls are removed.
 
-`5.17B.2C` preserves Foam state during non-structural Inspector tuning and provides Hold Foam State. D1 retained a coherent neutral body and separate lineified soft signal but its reconstructed Strand mask was rejected. D1A proved exact equality; D1B and D1C were rejected control models. D1D is now Unity-validated and accepted: Strength, Scale, Density, and Reach produce viable controlled Strands. D2 preserved the accepted Strand implementation but was visually rejected because it still thresholded procedurally eroded coherent visibility and exposed internal iso-contours. D2A preserves Strands and carries a transient base-material edge depth with the coherent render sample. Unity evidence found Chip more recognizably chip-like but still too scattered and insufficiently biased toward medium-to-large bites; Fray remained visually ineffective. Chip, Fray, and Strands still compete for the same partial-presence territory. Remaining-Life orchestration remains blocked until a real post-Strand → Chip → final-boundary Fray hierarchy is accepted.
+`5.17B.2C` preserves Foam state during non-structural Inspector tuning and provides Hold Foam State. D1 retained a coherent neutral body and separate lineified soft signal but its reconstructed Strand mask was rejected. D1A proved exact equality; D1B and D1C were rejected control models. D1D is now Unity-validated and accepted: Strength, Scale, Density, and Reach produce viable controlled Strands. D2 preserved the accepted Strand implementation but was visually rejected because it still thresholded procedurally eroded coherent visibility and exposed internal iso-contours. D2A preserves Strands and carries a transient base-material edge depth with the coherent render sample.
 
 Do not reintroduce duplicate selectors, editable diagnostic controls, dynamic-height warning boxes, or ordinary-authoring repaint conditions while validating those metrics.
 
@@ -239,19 +197,18 @@ This handoff reflects the current files on disk in the workspace.
 ### Rock generation
 
 - Generated rock component and collider assignment:
-  [GeneratedMass.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Masses/GeneratedMass.cs)
+[GeneratedMass.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Masses/GeneratedMass.cs)
 - Rock generation data/settings:
-  [GeneratedMass.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Masses/GeneratedMass.cs)
-  `MassRecipe` and its related enums live in the same file.
+[GeneratedMass.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Masses/GeneratedMass.cs) `MassRecipe` and its related enums live in the same file.
 - Rock mesh generator:
-  [MassGenerator.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Masses/MassGenerator.cs)
+[MassGenerator.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Masses/MassGenerator.cs)
 
 ### River files requested
 
 - River body/current controller:
-  [StylizedRiver.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Rivers/StylizedRiver.cs)
+[StylizedRiver.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Rivers/StylizedRiver.cs)
 - Static foam generator:
-  [StylizedRiverStaticFoam.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Rivers/StylizedRiverStaticFoam.cs)
+[StylizedRiverStaticFoam.cs](/F:/Unity/Projects/Norse%20Stylized%203D%20PoC/Assets/Game/Procedural/Rivers/StylizedRiverStaticFoam.cs)
 
 ## High-Level System Map
 
@@ -387,7 +344,7 @@ The following enums are part of the live shape description:
 
 ### Current supported archetypes
 
-```csharp
+```text
 public enum MassArchetype
 {
     TerrainBoulder,
@@ -430,7 +387,7 @@ Surface data:
 
 ### Current `MassRecipe` source excerpt
 
-```csharp
+```text
 [Serializable]
 public sealed class MassRecipe
 {
@@ -533,7 +490,7 @@ Current behavior by archetype:
 
 ### Current core flow
 
-```csharp
+```text
 private void OnEnable()
 {
     EnsureRecipeState();
@@ -559,7 +516,7 @@ private void OnValidate()
 
 This is the most important path for a refactor because it spans generation ownership, mesh naming, render assignment, and collider assignment:
 
-```csharp
+```text
 [ContextMenu("Regenerate Mass")]
 public void Regenerate()
 {
@@ -600,9 +557,7 @@ Important lines:
 - `[RequireComponent(typeof(MeshCollider))]`
 - cached field `private MeshCollider meshCollider;`
 - assignment:
-  `meshCollider.sharedMesh = null;`
-  `meshCollider.sharedMesh = generatedMesh;`
-  `meshCollider.convex = false;`
+`meshCollider.sharedMesh = null;` `meshCollider.sharedMesh = generatedMesh;` `meshCollider.convex = false;`
 
 That makes `GeneratedMass.cs` both:
 
@@ -613,7 +568,7 @@ That makes `GeneratedMass.cs` both:
 
 ### Public entry point
 
-```csharp
+```text
 public static MeshData Generate(MassRecipe recipe)
 {
     if (recipe == null)
@@ -640,7 +595,7 @@ public static MeshData Generate(MassRecipe recipe)
 
 The archetype split is currently very simple:
 
-```csharp
+```text
 private static bool UsesRadialBuilder(MassArchetype archetype)
 {
     return archetype == MassArchetype.PolishedStone;
@@ -656,7 +611,7 @@ Implication:
 
 At the top of the file:
 
-```csharp
+```text
 private const float PlaneEpsilon = 0.0001f;
 private const float PointMergeDistance = 0.00001f;
 private const float PointMergeDistanceSqr =
@@ -694,7 +649,7 @@ The current plane-cut generation pipeline is:
 
 Key excerpt:
 
-```csharp
+```text
 private static TriangleSoup BuildPlaneCutMass(MassRecipe recipe)
 {
     System.Random shapeRandom =
@@ -802,7 +757,7 @@ These functions are useful to keep in mind during refactor because they encode m
 
 Example excerpt:
 
-```csharp
+```text
 private static Vector3 GetBaseDimensions(MassArchetype archetype)
 {
     return archetype switch
@@ -818,7 +773,7 @@ private static Vector3 GetBaseDimensions(MassArchetype archetype)
 }
 ```
 
-```csharp
+```text
 private static float GetSizeMultiplier(MassScaleStep size)
 {
     return size switch
@@ -900,7 +855,7 @@ Advanced:
 
 ### Current header and important guardrail excerpt
 
-```csharp
+```text
 [Header("Water Body")]
 [SerializeField] private Color shallowColor = new Color(0.42f, 0.73f, 0.73f, 1f);
 [SerializeField] private Color deepColor = new Color(0.12f, 0.42f, 0.48f, 1f);
@@ -919,7 +874,7 @@ Advanced:
 
 ### Core rebuild flow
 
-```csharp
+```text
 [ContextMenu("Regenerate River and Ground")]
 public void RegenerateAll()
 {
@@ -948,7 +903,7 @@ This ordering matters:
 
 This is the current bridge into foam and other downstream systems:
 
-```csharp
+```text
 public float BuildSharedSplineSamples(
     List<StylizedRiverSplineSample> targetSamples)
 {
@@ -968,7 +923,7 @@ For refactor planning, this is already a useful seam because it externalizes the
 
 ### Surface mesh creation
 
-```csharp
+```text
 private void BuildSurface()
 {
     StylizedRiverGeometry.BuildSurfaceMesh(
@@ -984,7 +939,7 @@ private void BuildSurface()
 
 ### Current-accent generation
 
-```csharp
+```text
 private void BuildCurrentAccents()
 {
     if (!enableCurrentAccents)
@@ -1024,7 +979,7 @@ private void BuildCurrentAccents()
 
 ### Animation clocks
 
-```csharp
+```text
 private void AdvanceAnimation(float deltaTime)
 {
     if (deltaTime <= 0f)
@@ -1053,7 +1008,7 @@ Important implication:
 
 ### Body shader-property path
 
-```csharp
+```text
 private void ApplyBodyProperties()
 {
     if (meshRenderer == null)
@@ -1132,7 +1087,7 @@ Advanced:
 
 ### Current detection and rebuild entry point
 
-```csharp
+```text
 [ContextMenu("Regenerate Static Foam")]
 public void RegenerateStaticFoam()
 {
@@ -1231,7 +1186,7 @@ Current rejection logic:
 
 ### Interaction creation
 
-```csharp
+```text
 private bool TryCreateInteraction(
     Collider candidate,
     out StaticFoamInteraction interaction)
@@ -1317,7 +1272,7 @@ Current foam mesh generation uses two shape types per interaction:
 
 The main branch point:
 
-```csharp
+```text
 for (int index = 0; index < interactions.Count; index++)
 {
     StaticFoamInteraction interaction =
@@ -1343,7 +1298,7 @@ for (int index = 0; index < interactions.Count; index++)
 
 ### Contact arc excerpt
 
-```csharp
+```text
 private void AddContactArc(
     StaticFoamInteraction interaction,
     int segmentCount,
@@ -1376,7 +1331,7 @@ private void AddContactArc(
 
 ### Wake ribbon excerpt
 
-```csharp
+```text
 private void AddWakeRibbons(
     StaticFoamInteraction interaction,
     int rowCount,
@@ -1438,7 +1393,7 @@ Current coupling points:
 
 - `StylizedRiver` directly triggers `StylizedRiverStaticFoam.RegenerateStaticFoam()`;
 - foam detection depends on several river-derived quantities:
-  `SurfaceOffset`, `VisibleHalfWidth`, `Quality`, `VisualSeed`, and spline sampling;
+`SurfaceOffset`, `VisibleHalfWidth`, `Quality`, `VisualSeed`, and spline sampling;
 - body-flow guardrail comments establish future design constraints that a refactor should preserve.
 
 ## Practical File Content Summary
@@ -1446,17 +1401,17 @@ Current coupling points:
 If someone needs the shortest "what actually matters" list for the requested files:
 
 - `GeneratedMass.cs`
-  This is the generated rock component, the recipe owner, the mesh owner, and the collider assignment point.
+This is the generated rock component, the recipe owner, the mesh owner, and the collider assignment point.
 - `MassRecipe` in `GeneratedMass.cs`
-  This is the rock-generation settings/data class.
+This is the rock-generation settings/data class.
 - `MassGenerator.cs`
-  This is the procedural rock mesh builder.
+This is the procedural rock mesh builder.
 - `GeneratedMass.cs`
-  This is also the current rock collider assignment script.
+This is also the current rock collider assignment script.
 - `StylizedRiver.cs`
-  This is the current river controller including deferred Body Flow guardrails.
+This is the current river controller including deferred Body Flow guardrails.
 - `StylizedRiverStaticFoam.cs`
-  This is the current static-foam generator using explicit layer-mask-only detection.
+This is the current static-foam generator using explicit layer-mask-only detection.
 
 ## Files To Keep Open During Refactor
 
@@ -1529,7 +1484,6 @@ No downstream layer may feed an upstream layer.
 - `Layer B — External Influence Fields` owns foam-agnostic support/contact/motion/exclusion/wake/pressure influence fields. It may feed Layer C and Layer D, but it must not read `FoamState`, `_FoamShapeMask`, or Layer D helper fields.
 - `Layer C — Persistent Foam Material` owns durable `Presence`, `Remaining Life`, `Material Pattern`, birth, death, and real material movement.
 - `Layer D — Visual Foam / Film Evaluation` owns `_FoamShapeMask` and future foam-derived visual helper fields such as film source/support. It may visually widen, bridge, pinch, bend, and fragment foam, but it must not write persistent material.
-- `Layer E — Shader Composition` owns final color, opacity, soft edges, local procedural chipping/fray, thin streaks, reflection/refraction integration, and debug pixels. It must not own broad structural foam connectivity or feed back into compute.
 - `Layer F — Scheduling, Quality, Debug` owns update cadence, allocation, binding, quality tiers, debug view selection, and Inspector labels. It must not own foam behavior math.
 
 ## Active implementation direction
@@ -1537,7 +1491,6 @@ No downstream layer may feed an upstream layer.
 Do not tune 5.9z coordinate warp as the primary solution. The compliance/debug audit and `Foam Shape Difference` debug view were completed in `4.11C.5.10`; the failed coordinate warp was retired in `4.11C.5.10B`. `4.11C.5.11` then tested local procedural breakup inside Layer D, but validation showed cell/ribbon-shaped artifacts because `_FoamShapeMask` is too coarse for atomic detail. `4.11C.5.11B` retires that probe and restores the clean pass-through Layer D baseline. The next work should be:
 
 ```text
-1. Test Layer E shader-side local detail for sub-cell chipping/fray/thin streaks.
 2. Add low-res Layer D Film Source / Film Support for broad sheet/contact/bridge behavior.
 3. Integrate accepted macro support into full-res _FoamShapeMask.
 4. Switch Final Foam to _FoamShapeMask only after the evaluated shape is visibly better than current final foam.
@@ -1601,7 +1554,7 @@ Current rule: Layer D owns macro film structure, broad sheet/contact/bridge/pinc
 
 ## Addendum — River Foam 4.11C.5.12 Layer E Shader-Side Local Detail Probe
 
-After `4.11C.5.11B` restored a clean Layer D pass-through baseline, `4.11C.5.12` adds a debug-only Layer E shader-side local-detail probe. The purpose is to test fine chipping/fray/cuts at rendered-pixel scale, because the previous Layer D local-breakup probe proved `_FoamShapeMask` cells are too coarse for atomic detail.
+After `4.11C.5.11B` restored a clean Layer D pass-through baseline, `4.11C.5.12` adds a debug-only Layer E shader-side local-detail probe.
 
 Changed responsibility remains strict:
 
@@ -1631,8 +1584,6 @@ Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.
 
 Next decision after validation: accept, tune once, or reject Layer E local detail. Regardless of that result, broad inspiration-river sheet/contact/bridge behavior still requires the future low-res Layer D Film Source / Film Support system.
 
-
-
 ## Addendum — River Foam 4.11C.5.13 Low-Resolution Layer D Film Source / Film Support
 
 After the Layer E shader-detail proof, `4.11C.5.13` adds the first real structural Layer D helper fields. `_FoamFilmSource` is a half-resolution visual-film source/permission field built from persistent material and external support/contact fields. `_FoamFilmSupport` is a half-resolution directional spread field intended to create broad sheet/contact/bridge support without pocket IDs, connected components, or wide full-resolution neighbourhood classifiers.
@@ -1653,11 +1604,9 @@ Layer D reads FoamState through domainUV - phaseTransport / fieldLength, but wri
 
 This was introduced because the first 5.13 validation showed Film Source, Film Support, Evaluated Shape, and Shape Difference stuttering with the same rhythm as the material cell grid. The material cell grid may still move/snap in its own debug view; that is expected. Layer D visual products should not inherit that movement.
 
-
 ### River Foam 4.11C.5.13C note
 
 `4.11C.5.13C` corrects Layer D Film Source semantics. Generic Layer B support/contact/topology must not become visual film by itself. Film Source is now material-derived, with support used only as bias/suppression. The first path toward shore/rock/contact-looking foam should be Layer C source population: birth real persistent material where environmental source candidates justify it, then let support/lifetime capture decide how long it survives. Do not add a separate visual-only environmental film product before validating that source-population route.
-
 
 ## Addendum — River Foam 4.11C.5.13C validation and next-chat continuation target
 
@@ -1832,7 +1781,6 @@ Final Foam should remain unchanged.
 ### Next continuation target after 5.14A
 
 First validate whether sparse shore/contact source population creates useful real material in the intended places. If it does, the next source classes should be obstacle/pressure contact birth, lee/wake birth, and connector/major-support birth. If it overfills the river, reduce birth amount, acceptance, radius, or per-tick budget before adding any new source classes.
-
 
 ## Addendum — River Foam 4.11C.5.14B / 5.14C Source Population Controls
 
@@ -2049,7 +1997,6 @@ Final Foam should remain unchanged.
 
 If 5.14D validates, tune only the four high-level shore controls or hidden recipe constants. Do not add river-body, obstacle-contact, or lee/wake source classes until shore source events are acceptable. If 5.14D still looks wrong, diagnose whether the issue is slot eligibility, recipe geometry, progressive reveal envelope, or support/lifetime capture before adding new systems.
 
-
 ## Addendum — River Foam 4.11C.5.14E Automatic Source Event Rasterizer
 
 Use this as the current continuation point after `4.11C.5.14E`.
@@ -2150,7 +2097,6 @@ Current shore-spawning status:
 
 Next validation should stay strictly on shore spawning in `Material Remaining Life`: compare `Shore Ribbons`, `Inward Wash`, and `Mixed`. Do not move to object foam, free-water foam, Layer D tuning, or Final Foam until shore spawning is acceptable.
 
-
 ## River Foam handoff note — after 4.11C.5.14H
 
 Current shore-spawning status:
@@ -2197,8 +2143,6 @@ Free Water Foam birth is now implemented. The active free-water source patterns 
 ### River Foam State After 4.11C.5.15B.2
 
 Free Water Foam now has three source patterns: Lace Connectors, Cross-Lace Connectors, and Torn Fragments. Cross-Lace Connectors are the newest addition and are intended to address the missing horizontal/cross-current ribbons. They use a moving head+stroke across the river, pack lateral half-length/width/sign into existing source event object data, and use the existing rasterizer/valid-fluid clipping path. No density, Coverage, Activity, or glint-rendering changes were made in this patch.
-
-
 
 ## River Foam Handoff — after `4.11C.5.16A.1` implementation
 
@@ -2327,3 +2271,10 @@ coherent broad left/right movement.
 ```
 
 Do not begin Layer D visual history or fracture until this transport path is accepted. Layer D must later consume the same velocity contract.
+
+## Current targeted continuation — `4.11C.5.18B` Automatic Birth Sources Debug
+
+Debug-view value `2` no longer visualizes manual progressive test-source trajectories. It now displays the exact accepted automatic source-event footprint evaluated by the production Layer C rasterizer before transport and aging. Yellow identifies shore births, cyan object-contact births, magenta free-water births, and white source texels touched in the latest material update. Category history and unique-texel counters reset on view entry, Foam clear, or resource rebuild.
+
+Normal rendering retains the ordinary automatic-source kernel. The debug kernel is substituted only while the view is active and reuses the same evaluator plus the existing debug texture/counter resources. The obsolete manual trajectory paint code is removed. Unity validation is pending.
+

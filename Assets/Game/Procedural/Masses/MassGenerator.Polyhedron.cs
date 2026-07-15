@@ -871,6 +871,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             EdgeKey edgeKey = new EdgeKey(start, end);
+            bool recomputingInvalidCachedIntersection = false;
             if (intersectionCache != null &&
                 intersectionCache.TryGetValue(
                     edgeKey,
@@ -905,25 +906,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     return true;
                 }
 
-                RecordExactClipFailure(
-                    numericalRepairs,
-                    ownerProvenanceKind,
-                    ownerProvenanceIndex,
-                    cutProvenanceKind,
-                    cutProvenanceIndex,
-                    startDistance,
-                    endDistance,
-                    startClassification.ToString(),
-                    endClassification.ToString(),
-                    Mathf.Abs(plane.SignedDistance(cached)),
-                    Mathf.Abs(plane.SignedDistance(cached)),
-                    Mathf.Abs(Vector3.Dot(ownerPlaneNormal, cached) -
-                        ownerPlaneDistance),
-                    Mathf.Abs(Vector3.Dot(ownerPlaneNormal, cached) -
-                        ownerPlaneDistance),
-                    "cached-intersection-violates-owner-or-cut-plane");
-                intersection = Vector3.zero;
-                return false;
+                recomputingInvalidCachedIntersection = true;
+                intersectionCache.Remove(edgeKey);
+                if (numericalRepairs != null)
+                {
+                    numericalRepairs.CachedIntersectionInvalidationCount++;
+                }
             }
 
             float denominator = startDistance - endDistance;
@@ -1060,6 +1048,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (numericalRepairs != null)
             {
                 numericalRepairs.StrictCrossingIntersectionCount++;
+                if (recomputingInvalidCachedIntersection)
+                {
+                    numericalRepairs
+                        .CachedIntersectionRecomputeSuccessCount++;
+                }
             }
             if (intersectionCache != null)
             {

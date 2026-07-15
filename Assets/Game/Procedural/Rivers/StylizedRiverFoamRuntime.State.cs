@@ -196,7 +196,6 @@ namespace ProgrammaticStylized3D.Rivers
             public float PreviousAcrossNormalized;
             public float PreviousRadius;
             public float PreviousEmissionAmount;
-            public bool DebugTrajectoryPending;
         }
 
         [StructLayout(LayoutKind.Sequential)]

@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
 using ProgrammaticStylized3D.Geometry;
 using ProgrammaticStylized3D.Rivers;
 using UnityEditor;
@@ -9,9 +14,44 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
     [CanEditMultipleObjects]
     public sealed class GeneratedMassEditor : UnityEditor.Editor
     {
-        private static bool edgeWearSceneOverlayEnabled;
-        private static bool edgeWearSceneOverlayFocusOnly;
-        private static GeneratedMass edgeWearSceneOverlayTarget;
+        private static bool sourceEdgeIndexOverlayEnabled;
+        private static bool sourceEdgeIndexHighlightSearchEdges = true;
+        private static bool sourceEdgeIndexOverlayXRay;
+        private static GeneratedMass sourceEdgeIndexOverlayTarget;
+
+        private static readonly int[] EdgeWearBatchShapeSeeds =
+        {
+            1,
+            1112,
+            2223,
+            3334,
+            4445,
+            5556,
+            6667,
+            7778,
+            8889,
+            9999
+        };
+
+        private static readonly string[] EdgeWearBatchWidthNames =
+        {
+            "minimum",
+            "default",
+            "maximum"
+        };
+
+        private static readonly float[] EdgeWearBatchWidths =
+        {
+            0.05f,
+            1f,
+            2f
+        };
+
+        private const float EdgeWearBatchMinimumWidthScale = 0.25f;
+
+        private static EdgeWearViabilityMatrixJob
+            activeEdgeWearViabilityMatrixJob;
+        private static string lastEdgeWearBatchSummary = string.Empty;
 
         private const string ColdGreyStoneMaterialPath =
             "Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat";
@@ -137,58 +177,73 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private bool showCreviceShelterFeature = true;
         private bool showDirtDepositFeature = true;
         private bool showEdgeWearFeature;
-        private bool showEdgeWearEdgeNumbers;
-        private bool showOnlyEdgeWearFocusNumbers;
+        private bool showSourceEdgeIndexDebug;
+        private bool highlightSourceEdgeSearchEdges = true;
+        private bool sourceEdgeIndexDebugXRay;
         private bool showAdvancedFeatureDiagnostics;
         private bool showCreaseDebugFeature;
         private bool showPressureProfile;
 
         [InitializeOnLoadMethod]
-        private static void RegisterEdgeWearSceneOverlayRenderer()
+        private static void RegisterSourceEdgeIndexOverlayRenderer()
         {
-            SceneView.duringSceneGui -= DrawGlobalEdgeWearSceneOverlay;
-            SceneView.duringSceneGui += DrawGlobalEdgeWearSceneOverlay;
+            SceneView.duringSceneGui -= DrawGlobalSourceEdgeIndexOverlay;
+            SceneView.duringSceneGui += DrawGlobalSourceEdgeIndexOverlay;
+            AssemblyReloadEvents.beforeAssemblyReload -=
+                CancelEdgeWearViabilityMatrixForDomainReload;
+            AssemblyReloadEvents.beforeAssemblyReload +=
+                CancelEdgeWearViabilityMatrixForDomainReload;
+            EditorApplication.quitting -=
+                CancelEdgeWearViabilityMatrixForDomainReload;
+            EditorApplication.quitting +=
+                CancelEdgeWearViabilityMatrixForDomainReload;
         }
 
-        private static void DrawGlobalEdgeWearSceneOverlay(
+        private static void DrawGlobalSourceEdgeIndexOverlay(
             SceneView sceneView)
         {
-            if (!edgeWearSceneOverlayEnabled || Application.isPlaying)
+            if (!sourceEdgeIndexOverlayEnabled || Application.isPlaying)
             {
                 return;
             }
 
-            GeneratedMass mass = edgeWearSceneOverlayTarget;
+            GeneratedMass mass = sourceEdgeIndexOverlayTarget;
             if (mass == null)
             {
-                edgeWearSceneOverlayEnabled = false;
-                edgeWearSceneOverlayTarget = null;
+                sourceEdgeIndexOverlayEnabled = false;
+                sourceEdgeIndexOverlayTarget = null;
                 return;
             }
 
-            DrawEdgeWearEdgeNumberOverlay(
+            DrawSourceEdgeIndexOverlay(
                 mass,
-                edgeWearSceneOverlayFocusOnly,
+                sourceEdgeIndexHighlightSearchEdges,
+                sourceEdgeIndexOverlayXRay,
                 sceneView);
         }
 
-        private static void SetEdgeWearSceneOverlayState(
+        private static void SetSourceEdgeIndexOverlayState(
             GeneratedMass mass,
             bool enabled,
-            bool focusOnly)
+            bool highlightSearchEdges,
+            bool xRay)
         {
             bool nextEnabled = enabled && mass != null;
             GeneratedMass nextTarget = nextEnabled ? mass : null;
-            if (edgeWearSceneOverlayEnabled == nextEnabled &&
-                edgeWearSceneOverlayFocusOnly == focusOnly &&
-                edgeWearSceneOverlayTarget == nextTarget)
+            if (sourceEdgeIndexOverlayEnabled == nextEnabled &&
+                sourceEdgeIndexHighlightSearchEdges ==
+                    highlightSearchEdges &&
+                sourceEdgeIndexOverlayXRay == xRay &&
+                sourceEdgeIndexOverlayTarget == nextTarget)
             {
                 return;
             }
 
-            edgeWearSceneOverlayEnabled = nextEnabled;
-            edgeWearSceneOverlayFocusOnly = focusOnly;
-            edgeWearSceneOverlayTarget = nextTarget;
+            sourceEdgeIndexOverlayEnabled = nextEnabled;
+            sourceEdgeIndexHighlightSearchEdges =
+                highlightSearchEdges;
+            sourceEdgeIndexOverlayXRay = xRay;
+            sourceEdgeIndexOverlayTarget = nextTarget;
             SceneView.RepaintAll();
         }
 
@@ -391,6 +446,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             serializedObject.ApplyModifiedProperties();
 
             DrawEdgeWearBevelPreview();
+            DrawSourceEdgeIndexDebug();
 
             EditorGUILayout.Space(10f);
             EditorGUILayout.LabelField(
@@ -567,7 +623,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             EditorGUILayout.HelpBox(message, messageType);
 
-            using (new EditorGUI.DisabledScope(Application.isPlaying))
+            using (new EditorGUI.DisabledScope(
+                Application.isPlaying ||
+                activeEdgeWearViabilityMatrixJob != null))
             {
                 if (GUILayout.Button(
                         "Rebuild Edge-Wear Bevel Preview"))
@@ -587,67 +645,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 }
             }
 
-            bool nextShowEdgeNumbers = EditorGUILayout.ToggleLeft(
-                new GUIContent(
-                    "Show Source Edge Numbers in Scene",
-                    "Draws the authoritative source-edge indices used by the edge-wear graph directly on the rock in the Scene view."),
-                showEdgeWearEdgeNumbers);
-            if (nextShowEdgeNumbers != showEdgeWearEdgeNumbers)
-            {
-                showEdgeWearEdgeNumbers = nextShowEdgeNumbers;
-                SetEdgeWearSceneOverlayState(
-                    target as GeneratedMass,
-                    showEdgeWearEdgeNumbers,
-                    showOnlyEdgeWearFocusNumbers);
-            }
-            if (showEdgeWearEdgeNumbers)
-            {
-                bool nextFocusOnly = EditorGUILayout.ToggleLeft(
-                    new GUIContent(
-                        "Only Active Search Edges",
-                        "Shows only the edges implicated by the current transactional search and failure dossiers."),
-                    showOnlyEdgeWearFocusNumbers);
-                if (nextFocusOnly != showOnlyEdgeWearFocusNumbers)
-                {
-                    showOnlyEdgeWearFocusNumbers = nextFocusOnly;
-                    SetEdgeWearSceneOverlayState(
-                        target as GeneratedMass,
-                        showEdgeWearEdgeNumbers,
-                        showOnlyEdgeWearFocusNumbers);
-                }
-
-                GeneratedMass overlayMass = target as GeneratedMass;
-                SetEdgeWearSceneOverlayState(
-                    overlayMass,
-                    showEdgeWearEdgeNumbers,
-                    showOnlyEdgeWearFocusNumbers);
-                MassGenerator.EdgeWearDebugEdgeRecord[] overlayRecords =
-                    overlayMass != null
-                        ? overlayMass.UnifiedEdgeWearPreviewDebugEdges
-                        : null;
-                int overlayRecordCount = overlayRecords == null
-                    ? 0
-                    : overlayRecords.Length;
-                int overlayFocusCount =
-                    CountFocusedEdgeWearDebugRecords(overlayRecords);
-                EditorGUILayout.LabelField(
-                    "Edge Overlay Data",
-                    overlayFocusCount + " focused / " +
-                        overlayRecordCount + " total");
-                if (overlayRecordCount == 0)
-                {
-                    EditorGUILayout.HelpBox(
-                        "No source-edge overlay records are available. Rebuild the edge-wear bevel preview once.",
-                        MessageType.Warning);
-                }
-                else if (showOnlyEdgeWearFocusNumbers &&
-                         overlayFocusCount == 0)
-                {
-                    EditorGUILayout.HelpBox(
-                        "The current audit has no structured focus edges. Disable Only Active Search Edges to inspect the complete source graph.",
-                        MessageType.Warning);
-                }
-            }
+            EditorGUILayout.Space(4f);
+            DrawEdgeWearViabilityMatrixControls();
 
             if (Application.isPlaying)
             {
@@ -655,6 +654,1147 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "Explicit edge-wear evaluation is disabled in Play Mode; production geometry is used.",
                     MessageType.None);
             }
+        }
+
+        private void DrawEdgeWearViabilityMatrixControls()
+        {
+            bool running = activeEdgeWearViabilityMatrixJob != null;
+            using (new EditorGUI.DisabledScope(
+                Application.isPlaying ||
+                serializedObject.isEditingMultipleObjects ||
+                running))
+            {
+                if (GUILayout.Button(
+                        "Run Edge-Wear Viability Matrix (30 Cases)"))
+                {
+                    GeneratedMass mass = target as GeneratedMass;
+                    if (mass != null)
+                    {
+                        StartEdgeWearViabilityMatrix(mass);
+                    }
+                }
+            }
+
+            if (running)
+            {
+                EdgeWearViabilityMatrixJob job =
+                    activeEdgeWearViabilityMatrixJob;
+                EditorGUILayout.HelpBox(
+                    "Running viability matrix: case " +
+                    (job.CompletedCaseCount + 1) + "/" +
+                    job.TotalCaseCount + ". The selected mass and its " +
+                    "preview are not modified.",
+                    MessageType.Info);
+                if (GUILayout.Button("Cancel Viability Matrix"))
+                {
+                    job.CancelRequested = true;
+                }
+            }
+            else if (!string.IsNullOrEmpty(lastEdgeWearBatchSummary))
+            {
+                EditorGUILayout.HelpBox(
+                    lastEdgeWearBatchSummary,
+                    MessageType.None);
+            }
+
+            if (serializedObject.isEditingMultipleObjects)
+            {
+                EditorGUILayout.HelpBox(
+                    "The viability matrix requires one selected mass because " +
+                    "it audits one immutable recipe/settings snapshot.",
+                    MessageType.None);
+            }
+        }
+
+        private static void StartEdgeWearViabilityMatrix(
+            GeneratedMass mass)
+        {
+            if (mass == null || mass.Recipe == null ||
+                activeEdgeWearViabilityMatrixJob != null)
+            {
+                return;
+            }
+
+            activeEdgeWearViabilityMatrixJob =
+                new EdgeWearViabilityMatrixJob(mass);
+            lastEdgeWearBatchSummary = string.Empty;
+            EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
+            EditorApplication.update += AdvanceEdgeWearViabilityMatrix;
+        }
+
+        private static void AdvanceEdgeWearViabilityMatrix()
+        {
+            EdgeWearViabilityMatrixJob job =
+                activeEdgeWearViabilityMatrixJob;
+            if (job == null)
+            {
+                EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
+                EditorUtility.ClearProgressBar();
+                return;
+            }
+
+            if (job.CancelRequested || job.Target == null)
+            {
+                FinishEdgeWearViabilityMatrix(
+                    job,
+                    true,
+                    job.Target == null
+                        ? "target mass was destroyed"
+                        : "cancelled by user");
+                return;
+            }
+
+            int caseIndex = job.CompletedCaseCount;
+            if (caseIndex >= job.TotalCaseCount)
+            {
+                FinishEdgeWearViabilityMatrix(job, false, string.Empty);
+                return;
+            }
+
+            int seedIndex = caseIndex / EdgeWearBatchWidths.Length;
+            int widthIndex = caseIndex % EdgeWearBatchWidths.Length;
+            int shapeSeed = EdgeWearBatchShapeSeeds[seedIndex];
+            float width = EdgeWearBatchWidths[widthIndex];
+            string widthName = EdgeWearBatchWidthNames[widthIndex];
+            float progress = (float)caseIndex / job.TotalCaseCount;
+            if (EditorUtility.DisplayCancelableProgressBar(
+                    "Generated Mass Edge-Wear Viability Matrix",
+                    "Seed " + shapeSeed + ", " + widthName +
+                    " width (case " + (caseIndex + 1) + "/" +
+                    job.TotalCaseCount + ")",
+                    progress))
+            {
+                FinishEdgeWearViabilityMatrix(
+                    job,
+                    true,
+                    "cancelled by user");
+                return;
+            }
+
+            EdgeWearViabilityMatrixCase matrixCase =
+                EvaluateEdgeWearViabilityMatrixCase(
+                    job,
+                    shapeSeed,
+                    widthName,
+                    width);
+            job.Cases.Add(matrixCase);
+            job.CompletedCaseCount++;
+
+            if (job.CompletedCaseCount >= job.TotalCaseCount)
+            {
+                FinishEdgeWearViabilityMatrix(job, false, string.Empty);
+            }
+        }
+
+        private static EdgeWearViabilityMatrixCase
+            EvaluateEdgeWearViabilityMatrixCase(
+                EdgeWearViabilityMatrixJob job,
+                int shapeSeed,
+                string widthName,
+                float width)
+        {
+            MassRecipe caseRecipe = JsonUtility.FromJson<MassRecipe>(
+                job.RecipeJson);
+            if (caseRecipe == null)
+            {
+                return new EdgeWearViabilityMatrixCase(
+                    shapeSeed,
+                    widthName,
+                    width,
+                    new MassGenerator.EdgeWearBatchAuditCaseResult
+                    {
+                        ShapeSeed = shapeSeed,
+                        EdgeWearWidth = width,
+                        PrimaryFailure =
+                            "failed to clone the immutable mass recipe"
+                    });
+            }
+            caseRecipe.SetShapeSeed(shapeSeed);
+
+            MassSurfaceFeatureSettings settings =
+                new MassSurfaceFeatureSettings(
+                    caseRecipe.Archetype,
+                    caseRecipe.SurfaceSeed,
+                    job.EdgeWearAmount,
+                    width,
+                    2f,
+                    job.EdgeWearSoftness,
+                    job.CreaseAmount,
+                    job.CreaseWidth,
+                    job.CreaseLength,
+                    job.CreaseBranching);
+            MassGenerator.EdgeWearBatchAuditCaseResult result =
+                MassGenerator.GenerateUnifiedEdgeWearBatchAuditCase(
+                    caseRecipe,
+                    settings);
+            return new EdgeWearViabilityMatrixCase(
+                shapeSeed,
+                widthName,
+                width,
+                result);
+        }
+
+        private static void FinishEdgeWearViabilityMatrix(
+            EdgeWearViabilityMatrixJob job,
+            bool cancelled,
+            string terminalReason)
+        {
+            EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
+            EditorUtility.ClearProgressBar();
+            activeEdgeWearViabilityMatrixJob = null;
+
+            bool statePreserved = job.ValidateTargetStatePreserved(
+                out string stateDiagnostic);
+            if (!statePreserved)
+            {
+                terminalReason = string.IsNullOrEmpty(terminalReason)
+                    ? stateDiagnostic
+                    : terminalReason + "; " + stateDiagnostic;
+            }
+
+            EdgeWearViabilityMatrixAggregate aggregate =
+                BuildEdgeWearViabilityMatrixAggregate(
+                    job,
+                    cancelled,
+                    statePreserved,
+                    terminalReason);
+            WriteEdgeWearViabilityMatrixReports(job, aggregate);
+
+            lastEdgeWearBatchSummary = aggregate.Status + ": " +
+                aggregate.CasesPassed + "/" +
+                aggregate.CasesRun + " cases passed. Reports: " +
+                "Library/GeneratedMassEdgeWearBatchAudit.txt and .csv";
+
+            string message =
+                "GeneratedMass edge-wear viability matrix. " +
+                "status:" + aggregate.Status +
+                ",cases:" + aggregate.CasesPassed + "/" +
+                    aggregate.CasesRun +
+                ",coverageFailures:" +
+                    aggregate.CoexistenceCoverageFailures +
+                ",widthFloorFailures:" + aggregate.WidthFloorFailures +
+                ",missingJunctionFailures:" +
+                    aggregate.MissingJunctionFailures +
+                ",tJunctionFailures:" + aggregate.TJunctionFailures +
+                ",strictIntersectionFailures:" +
+                    aggregate.StrictIntersectionFailures +
+                ",planeBandFailures:" + aggregate.PlaneBandFailures +
+                ",terminalCandidateConservationFailures:" +
+                    aggregate.CandidateConservationFailures +
+                ",topologyFailures:" + aggregate.TopologyFailures +
+                ",faceQualityFailures:" +
+                    aggregate.FaceQualityFailures +
+                ",placementFailures:" +
+                    aggregate.PlacementFailures +
+                ",cacheFailures:" +
+                    aggregate.CacheContractFailures +
+                ",minimumCertifiedRatio:" +
+                    aggregate.MinimumCertifiedRatio.ToString(
+                        "G9", CultureInfo.InvariantCulture) +
+                ",maximumPreflightMs:" +
+                    aggregate.MaximumPreflightMilliseconds.ToString(
+                        "G9", CultureInfo.InvariantCulture) +
+                ",maximumTotalMs:" +
+                    aggregate.MaximumTotalMilliseconds.ToString(
+                        "G9", CultureInfo.InvariantCulture) +
+                ",statePreserved:" + (statePreserved ? "1" : "0") +
+                ",reports=Library/GeneratedMassEdgeWearBatchAudit.txt|csv";
+            Debug.LogFormat(
+                aggregate.CasesFailed > 0 || !statePreserved
+                    ? LogType.Warning
+                    : LogType.Log,
+                LogOption.NoStacktrace,
+                job.Target,
+                "{0}",
+                message);
+        }
+
+        private static void
+            CancelEdgeWearViabilityMatrixForDomainReload()
+        {
+            EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
+            EditorUtility.ClearProgressBar();
+            activeEdgeWearViabilityMatrixJob = null;
+        }
+
+        private static EdgeWearViabilityMatrixAggregate
+            BuildEdgeWearViabilityMatrixAggregate(
+                EdgeWearViabilityMatrixJob job,
+                bool cancelled,
+                bool statePreserved,
+                string terminalReason)
+        {
+            EdgeWearViabilityMatrixAggregate aggregate =
+                new EdgeWearViabilityMatrixAggregate
+                {
+                    CasesRun = job.Cases.Count,
+                    Cancelled = cancelled,
+                    StatePreserved = statePreserved,
+                    TerminalReason = terminalReason ?? string.Empty,
+                    MinimumCertifiedRatio = job.Cases.Count > 0
+                        ? 1f
+                        : 0f
+                };
+
+            for (int caseIndex = 0;
+                 caseIndex < job.Cases.Count;
+                 caseIndex++)
+            {
+                EdgeWearViabilityMatrixCase matrixCase =
+                    job.Cases[caseIndex];
+                MassGenerator.EdgeWearBatchAuditCaseResult result =
+                    matrixCase.Result;
+                if (result.Passed)
+                {
+                    aggregate.CasesPassed++;
+                }
+                else
+                {
+                    aggregate.FailureCoordinates.Add(
+                        "seed=" + matrixCase.ShapeSeed +
+                        "/width=" + matrixCase.WidthName +
+                        "/reason=" + result.PrimaryFailure);
+                }
+
+                bool coverageFailure =
+                    result.CertifiedCount !=
+                        result.CoexistenceEligibleCount ||
+                    result.CoverageValid != 1;
+                if (coverageFailure)
+                {
+                    aggregate.CoexistenceCoverageFailures++;
+                }
+                bool widthFloorFailure =
+                    result.SelectedCount > 0 &&
+                    result.MinimumWidthScale + 0.0001f <
+                        EdgeWearBatchMinimumWidthScale;
+                if (widthFloorFailure)
+                {
+                    aggregate.WidthFloorFailures++;
+                }
+
+                string failure = result.PrimaryFailure ?? string.Empty;
+                bool missingJunction = failure.IndexOf(
+                        "missing-junction",
+                        StringComparison.OrdinalIgnoreCase) >= 0;
+                bool tJunction = failure.IndexOf(
+                        "category=TJunction",
+                        StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    failure.IndexOf(
+                        "t-junctions:",
+                        StringComparison.OrdinalIgnoreCase) >= 0;
+                bool strictIntersection = failure.IndexOf(
+                        "category=StrictIntersection",
+                        StringComparison.OrdinalIgnoreCase) >= 0;
+                bool planeBand = failure.IndexOf(
+                        "splits bevel-band edge",
+                        StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    failure.IndexOf(
+                        "plane-band-incompatible",
+                        StringComparison.OrdinalIgnoreCase) >= 0;
+                bool candidateConservation = failure.IndexOf(
+                        "candidate-conservation",
+                        StringComparison.OrdinalIgnoreCase) >= 0;
+                bool faceQuality = failure.IndexOf(
+                        "FaceQuality",
+                        StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    failure.IndexOf(
+                        "NonPlanar",
+                        StringComparison.OrdinalIgnoreCase) >= 0;
+                bool topology = missingJunction || tJunction ||
+                    failure.IndexOf(
+                        "category=OpenEdge",
+                        StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    failure.IndexOf(
+                        "category=NonManifold",
+                        StringComparison.OrdinalIgnoreCase) >= 0;
+                if (missingJunction)
+                {
+                    aggregate.MissingJunctionFailures++;
+                }
+                if (tJunction)
+                {
+                    aggregate.TJunctionFailures++;
+                }
+                if (strictIntersection)
+                {
+                    aggregate.StrictIntersectionFailures++;
+                }
+                if (planeBand)
+                {
+                    aggregate.PlaneBandFailures++;
+                }
+                if (candidateConservation)
+                {
+                    aggregate.CandidateConservationFailures++;
+                }
+                if (topology)
+                {
+                    aggregate.TopologyFailures++;
+                }
+                if (faceQuality)
+                {
+                    aggregate.FaceQualityFailures++;
+                }
+                bool placementFailure = result.PreviewApplied &&
+                    (result.ObjectTransformChanged != 0 ||
+                     result.PreviewDerivedPlacementParameters != 0 ||
+                     result.PreviewUsesCanonicalFrame != 1 ||
+                     !result.PlacementCaptured);
+                if (placementFailure)
+                {
+                    aggregate.PlacementFailures++;
+                }
+                if (!result.Passed &&
+                    !coverageFailure &&
+                    !widthFloorFailure &&
+                    !topology &&
+                    !strictIntersection &&
+                    !planeBand &&
+                    !candidateConservation &&
+                    !faceQuality &&
+                    !placementFailure)
+                {
+                    aggregate.OtherConstructionFailures++;
+                }
+                if (result.LocalityCacheMissCount != 0 ||
+                    result.LocalitySolverRecomputationCount != 0)
+                {
+                    aggregate.CacheContractFailures++;
+                }
+                aggregate.MinimumCertifiedRatio = Mathf.Min(
+                    aggregate.MinimumCertifiedRatio,
+                    result.CertifiedRatio);
+                aggregate.MaximumPreflightMilliseconds = Math.Max(
+                    aggregate.MaximumPreflightMilliseconds,
+                    result.PreflightMilliseconds);
+                aggregate.MaximumTotalMilliseconds = Math.Max(
+                    aggregate.MaximumTotalMilliseconds,
+                    result.TotalMilliseconds);
+            }
+
+            aggregate.CasesFailed =
+                aggregate.CasesRun - aggregate.CasesPassed;
+            aggregate.Status = cancelled
+                ? "cancelled"
+                : aggregate.CasesRun == job.TotalCaseCount &&
+                    aggregate.CasesFailed == 0 &&
+                    statePreserved
+                        ? "passed"
+                        : "failed";
+            return aggregate;
+        }
+
+        private static void WriteEdgeWearViabilityMatrixReports(
+            EdgeWearViabilityMatrixJob job,
+            EdgeWearViabilityMatrixAggregate aggregate)
+        {
+            try
+            {
+                string projectRoot = Path.GetFullPath(
+                    Path.Combine(Application.dataPath, ".."));
+                string libraryPath = Path.Combine(projectRoot, "Library");
+                Directory.CreateDirectory(libraryPath);
+                File.WriteAllText(
+                    Path.Combine(
+                        libraryPath,
+                        "GeneratedMassEdgeWearBatchAudit.txt"),
+                    BuildEdgeWearViabilityMatrixText(job, aggregate),
+                    new UTF8Encoding(false));
+                File.WriteAllText(
+                    Path.Combine(
+                        libraryPath,
+                        "GeneratedMassEdgeWearBatchAudit.csv"),
+                    BuildEdgeWearViabilityMatrixCsv(job),
+                    new UTF8Encoding(false));
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "GeneratedMass viability matrix report write failed: " +
+                    exception.GetType().Name + ":" + exception.Message);
+            }
+        }
+
+        private static string BuildEdgeWearViabilityMatrixText(
+            EdgeWearViabilityMatrixJob job,
+            EdgeWearViabilityMatrixAggregate aggregate)
+        {
+            StringBuilder builder = new StringBuilder(16384);
+            builder.AppendLine(
+                "GeneratedMass edge-wear multi-seed viability matrix");
+            builder.AppendLine("contract=EW-B4.2R10R4");
+            builder.Append("object=");
+            builder.AppendLine(job.TargetName);
+            builder.Append("entityId=");
+            builder.AppendLine(job.TargetEntityId);
+            builder.Append("status=");
+            builder.AppendLine(aggregate.Status);
+            builder.Append("casesRun=");
+            builder.AppendLine(aggregate.CasesRun.ToString());
+            builder.Append("casesPassed=");
+            builder.AppendLine(aggregate.CasesPassed.ToString());
+            builder.Append("casesFailed=");
+            builder.AppendLine(aggregate.CasesFailed.ToString());
+            builder.Append("coexistenceCoverageFailures=");
+            builder.AppendLine(
+                aggregate.CoexistenceCoverageFailures.ToString());
+            builder.Append("widthFloorFailures=");
+            builder.AppendLine(aggregate.WidthFloorFailures.ToString());
+            builder.Append("missingJunctionFailures=");
+            builder.AppendLine(
+                aggregate.MissingJunctionFailures.ToString());
+            builder.Append("tJunctionFailures=");
+            builder.AppendLine(aggregate.TJunctionFailures.ToString());
+            builder.Append("strictIntersectionFailures=");
+            builder.AppendLine(
+                aggregate.StrictIntersectionFailures.ToString());
+            builder.Append("planeBandFailures=");
+            builder.AppendLine(aggregate.PlaneBandFailures.ToString());
+            builder.Append("terminalCandidateConservationFailures=");
+            builder.AppendLine(
+                aggregate.CandidateConservationFailures.ToString());
+            builder.Append("otherConstructionFailures=");
+            builder.AppendLine(
+                aggregate.OtherConstructionFailures.ToString());
+            builder.Append("topologyFailures=");
+            builder.AppendLine(aggregate.TopologyFailures.ToString());
+            builder.Append("faceQualityFailures=");
+            builder.AppendLine(aggregate.FaceQualityFailures.ToString());
+            builder.Append("placementFailures=");
+            builder.AppendLine(aggregate.PlacementFailures.ToString());
+            builder.Append("cacheContractFailures=");
+            builder.AppendLine(
+                aggregate.CacheContractFailures.ToString());
+            builder.Append("minimumCertifiedRatio=");
+            builder.AppendLine(aggregate.MinimumCertifiedRatio.ToString(
+                "G9", CultureInfo.InvariantCulture));
+            builder.Append("maximumPreflightMilliseconds=");
+            builder.AppendLine(
+                aggregate.MaximumPreflightMilliseconds.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+            builder.Append("maximumTotalMilliseconds=");
+            builder.AppendLine(aggregate.MaximumTotalMilliseconds.ToString(
+                "G9", CultureInfo.InvariantCulture));
+            builder.Append("statePreserved=");
+            builder.AppendLine(aggregate.StatePreserved ? "1" : "0");
+            builder.Append("terminalReason=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    aggregate.TerminalReason)
+                ? "none"
+                : aggregate.TerminalReason);
+            builder.Append("failureCoordinates=");
+            builder.AppendLine(aggregate.FailureCoordinates.Count == 0
+                ? "none"
+                : string.Join(";", aggregate.FailureCoordinates));
+            builder.AppendLine();
+            builder.AppendLine("[Cases]");
+
+            for (int caseIndex = 0;
+                 caseIndex < job.Cases.Count;
+                 caseIndex++)
+            {
+                EdgeWearViabilityMatrixCase matrixCase =
+                    job.Cases[caseIndex];
+                MassGenerator.EdgeWearBatchAuditCaseResult result =
+                    matrixCase.Result;
+                builder.Append("case=");
+                builder.Append(caseIndex + 1);
+                builder.Append(",seed=");
+                builder.Append(matrixCase.ShapeSeed);
+                builder.Append(",widthTier=");
+                builder.Append(matrixCase.WidthName);
+                builder.Append(",width=");
+                builder.Append(matrixCase.Width.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(",passed=");
+                builder.Append(result.Passed ? '1' : '0');
+                builder.Append(",source/structural/geometric/coexistence=");
+                builder.Append(result.SourceEdgeCount);
+                builder.Append('/');
+                builder.Append(result.StructuralEligibleCount);
+                builder.Append('/');
+                builder.Append(result.GeometricEligibleCount);
+                builder.Append('/');
+                builder.Append(result.CoexistenceEligibleCount);
+                builder.Append(",selected/certified/deferred/rejected=");
+                builder.Append(result.SelectedCount);
+                builder.Append('/');
+                builder.Append(result.CertifiedCount);
+                builder.Append('/');
+                builder.Append(result.DeferredCount);
+                builder.Append('/');
+                builder.Append(result.RejectedCount);
+                builder.Append(",exclusions=");
+                AppendBatchExclusionCounts(builder, result);
+                builder.Append(",coexistenceExclusions=");
+                builder.Append(result.SourceVertexStarExclusionCount);
+                builder.Append('/');
+                builder.Append(result.PlanePairExclusionCount);
+                builder.Append('/');
+                builder.Append(result.PlaneBandExclusionCount);
+                builder.Append('/');
+                builder.Append(result.GlobalWidthFloorExclusionCount);
+                builder.Append('/');
+                builder.Append(result.CandidateConservationExclusionCount);
+                builder.Append('/');
+                builder.Append(result.CornerWidthMissingExclusionCount);
+                builder.Append('/');
+                builder.Append(result.CornerWidthInactiveExclusionCount);
+                builder.Append(",coexistenceTrials/cacheUses=");
+                builder.Append(result.CoexistenceTrialCount);
+                builder.Append('/');
+                builder.Append(result.CoexistenceCacheUseCount);
+                builder.Append(",coexistenceSearch=");
+                builder.Append(result.CoexistenceSearchStatesEvaluated);
+                builder.Append('/');
+                builder.Append(result.CoexistenceSearchStatesDeduplicated);
+                builder.Append('/');
+                builder.Append(result.CoexistenceSearchMaximumDepth);
+                builder.Append('/');
+                builder.Append(result.CoexistenceSearchFrontierRemaining);
+                builder.Append('/');
+                builder.Append(result.CoexistenceSearchWinningDepth);
+                builder.Append(
+                    ",searchStateCandidateConservationFailures=");
+                builder.Append(result.CandidateConservationFailureCount);
+                builder.Append(",minimumWidthScale=");
+                builder.Append(result.MinimumWidthScale.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(",solverPasses/reductions=");
+                builder.Append(result.SolverPassCount);
+                builder.Append('/');
+                builder.Append(result.WidthReductionCount);
+                builder.Append(",topology=");
+                builder.Append(result.OpenEdgeCount);
+                builder.Append('/');
+                builder.Append(result.NonManifoldEdgeCount);
+                builder.Append('/');
+                builder.Append(result.TJunctionCount);
+                builder.Append('/');
+                builder.Append(result.InvalidFaceCount);
+                builder.Append('/');
+                builder.Append(result.NonPlanarFaceCount);
+                builder.Append(",validity=");
+                builder.Append(result.GeometryValid);
+                builder.Append('/');
+                builder.Append(result.CoverageValid);
+                builder.Append('/');
+                builder.Append(result.SurfaceRenderValid);
+                builder.Append('/');
+                builder.Append(result.MeshValid);
+                builder.Append(",fingerprintPrepared=");
+                builder.Append(result.StableFingerprintPrepared);
+                builder.Append(",cache=");
+                builder.Append(result.LocalityEvaluationCount);
+                builder.Append('/');
+                builder.Append(result.LocalityConstructionUseCount);
+                builder.Append('/');
+                builder.Append(result.LocalityCacheMissCount);
+                builder.Append('/');
+                builder.Append(result.LocalitySolverRecomputationCount);
+                builder.Append(",preflightMs=");
+                builder.Append(result.PreflightMilliseconds.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(",totalMs=");
+                builder.Append(result.TotalMilliseconds.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(",hashes=");
+                builder.Append(result.ExclusionReasonHash);
+                builder.Append('/');
+                builder.Append(result.SelectedEdgeHash);
+                builder.Append('/');
+                builder.Append(result.CertifiedEdgeHash);
+                builder.Append('/');
+                builder.Append(result.GeometryTopologyHash);
+                builder.Append('/');
+                builder.Append(result.PlacementFrameHash);
+                builder.Append('/');
+                builder.Append(result.EvaluationHash);
+                builder.Append(",primaryFailure=");
+                builder.AppendLine(string.IsNullOrEmpty(
+                        result.PrimaryFailure)
+                    ? "none"
+                    : result.PrimaryFailure);
+            }
+
+            bool wroteSearchTrace = false;
+            for (int caseIndex = 0;
+                 caseIndex < job.Cases.Count;
+                 caseIndex++)
+            {
+                MassGenerator.EdgeWearBatchAuditCaseResult result =
+                    job.Cases[caseIndex].Result;
+                if (string.IsNullOrEmpty(result.CoexistenceSearchTrace))
+                {
+                    continue;
+                }
+                if (!wroteSearchTrace)
+                {
+                    builder.AppendLine();
+                    wroteSearchTrace = true;
+                }
+                builder.Append("[Case ");
+                builder.Append(caseIndex + 1);
+                builder.AppendLine(" Coexistence Search]");
+                builder.AppendLine(result.CoexistenceSearchTrace);
+                builder.AppendLine();
+            }
+            return builder.ToString();
+        }
+
+        private static string BuildEdgeWearViabilityMatrixCsv(
+            EdgeWearViabilityMatrixJob job)
+        {
+            StringBuilder builder = new StringBuilder(16384);
+            builder.AppendLine(
+                "case,seed,widthTier,width,passed,sourceEdges," +
+                "structuralEligible,geometricEligible,coexistenceEligible," +
+                "coexistenceIneligible,selected,certified,deferred,rejected," +
+                "trialRejected,boundaryExclusions,dihedralExclusions," +
+                "footprintExclusions,localityExclusions," +
+                "isolatedRailExclusions,supportExclusions," +
+                "widthFractionExclusions,endpointSpanExclusions," +
+                "otherExclusions,sourceVertexStarExclusions," +
+                "planePairExclusions,planeBandExclusions," +
+                "globalWidthFloorExclusions," +
+                "candidateConservationExclusions," +
+                "cornerWidthMissingExclusions," +
+                "cornerWidthInactiveExclusions,coexistenceTrials," +
+                "coexistenceCacheUses,coexistenceSearchStatesEvaluated," +
+                "coexistenceSearchStatesDeduplicated," +
+                "coexistenceSearchMaximumDepth," +
+                "coexistenceSearchFrontierRemaining," +
+                "coexistenceSearchWinningDepth," +
+                "searchStateCandidateConservationFailures," +
+                "minimumWidthScale," +
+                "solverPasses,widthReductions,openEdges,nonManifoldEdges," +
+                "tJunctions,invalidFaces,nonPlanarFaces,geometryValid," +
+                "coverageValid,surfaceRenderValid,meshValid," +
+                "fingerprintPrepared,localityEvaluations," +
+                "localityConstructionUses,localityCacheMisses," +
+                "localitySolverRecomputations,preflightMilliseconds," +
+                "totalMilliseconds,exclusionReasonHash,selectedEdgeHash," +
+                "certifiedEdgeHash,geometryTopologyHash," +
+                "placementFrameHash,evaluationHash,primaryFailure");
+            for (int caseIndex = 0;
+                 caseIndex < job.Cases.Count;
+                 caseIndex++)
+            {
+                EdgeWearViabilityMatrixCase matrixCase =
+                    job.Cases[caseIndex];
+                MassGenerator.EdgeWearBatchAuditCaseResult result =
+                    matrixCase.Result;
+                AppendCsvValue(builder, (caseIndex + 1).ToString());
+                AppendCsvValue(builder, matrixCase.ShapeSeed.ToString());
+                AppendCsvValue(builder, matrixCase.WidthName);
+                AppendCsvValue(builder, matrixCase.Width.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder, result.Passed ? "1" : "0");
+                AppendCsvValue(builder, result.SourceEdgeCount.ToString());
+                AppendCsvValue(builder,
+                    result.StructuralEligibleCount.ToString());
+                AppendCsvValue(builder,
+                    result.GeometricEligibleCount.ToString());
+                AppendCsvValue(builder,
+                    result.CoexistenceEligibleCount.ToString());
+                AppendCsvValue(builder,
+                    result.CoexistenceIneligibleCount.ToString());
+                AppendCsvValue(builder, result.SelectedCount.ToString());
+                AppendCsvValue(builder, result.CertifiedCount.ToString());
+                AppendCsvValue(builder, result.DeferredCount.ToString());
+                AppendCsvValue(builder, result.RejectedCount.ToString());
+                AppendCsvValue(builder,
+                    result.TrialRejectedCount.ToString());
+                AppendCsvValue(builder,
+                    result.BoundaryExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.DihedralExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.FootprintExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.LocalityExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.IsolatedRailExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.SupportExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.WidthFractionExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.EndpointSpanExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.OtherExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.SourceVertexStarExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.PlanePairExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.PlaneBandExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.GlobalWidthFloorExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.CandidateConservationExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.CornerWidthMissingExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.CornerWidthInactiveExclusionCount.ToString());
+                AppendCsvValue(builder,
+                    result.CoexistenceTrialCount.ToString());
+                AppendCsvValue(builder,
+                    result.CoexistenceCacheUseCount.ToString());
+                AppendCsvValue(builder,
+                    result.CoexistenceSearchStatesEvaluated.ToString());
+                AppendCsvValue(builder,
+                    result.CoexistenceSearchStatesDeduplicated.ToString());
+                AppendCsvValue(builder,
+                    result.CoexistenceSearchMaximumDepth.ToString());
+                AppendCsvValue(builder,
+                    result.CoexistenceSearchFrontierRemaining.ToString());
+                AppendCsvValue(builder,
+                    result.CoexistenceSearchWinningDepth.ToString());
+                AppendCsvValue(builder,
+                    result.CandidateConservationFailureCount.ToString());
+                AppendCsvValue(builder, result.MinimumWidthScale.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder, result.SolverPassCount.ToString());
+                AppendCsvValue(builder,
+                    result.WidthReductionCount.ToString());
+                AppendCsvValue(builder, result.OpenEdgeCount.ToString());
+                AppendCsvValue(builder,
+                    result.NonManifoldEdgeCount.ToString());
+                AppendCsvValue(builder, result.TJunctionCount.ToString());
+                AppendCsvValue(builder, result.InvalidFaceCount.ToString());
+                AppendCsvValue(builder,
+                    result.NonPlanarFaceCount.ToString());
+                AppendCsvValue(builder, result.GeometryValid.ToString());
+                AppendCsvValue(builder, result.CoverageValid.ToString());
+                AppendCsvValue(builder,
+                    result.SurfaceRenderValid.ToString());
+                AppendCsvValue(builder, result.MeshValid.ToString());
+                AppendCsvValue(builder,
+                    result.StableFingerprintPrepared.ToString());
+                AppendCsvValue(builder,
+                    result.LocalityEvaluationCount.ToString());
+                AppendCsvValue(builder,
+                    result.LocalityConstructionUseCount.ToString());
+                AppendCsvValue(builder,
+                    result.LocalityCacheMissCount.ToString());
+                AppendCsvValue(builder,
+                    result.LocalitySolverRecomputationCount.ToString());
+                AppendCsvValue(builder, result.PreflightMilliseconds.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder, result.TotalMilliseconds.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder, result.ExclusionReasonHash);
+                AppendCsvValue(builder, result.SelectedEdgeHash);
+                AppendCsvValue(builder, result.CertifiedEdgeHash);
+                AppendCsvValue(builder, result.GeometryTopologyHash);
+                AppendCsvValue(builder, result.PlacementFrameHash);
+                AppendCsvValue(builder, result.EvaluationHash);
+                AppendCsvValue(
+                    builder,
+                    result.PrimaryFailure,
+                    true);
+            }
+            return builder.ToString();
+        }
+
+        private static void AppendBatchExclusionCounts(
+            StringBuilder builder,
+            MassGenerator.EdgeWearBatchAuditCaseResult result)
+        {
+            builder.Append(result.BoundaryExclusionCount);
+            builder.Append('/');
+            builder.Append(result.DihedralExclusionCount);
+            builder.Append('/');
+            builder.Append(result.FootprintExclusionCount);
+            builder.Append('/');
+            builder.Append(result.LocalityExclusionCount);
+            builder.Append('/');
+            builder.Append(result.IsolatedRailExclusionCount);
+            builder.Append('/');
+            builder.Append(result.SupportExclusionCount);
+            builder.Append('/');
+            builder.Append(result.WidthFractionExclusionCount);
+            builder.Append('/');
+            builder.Append(result.EndpointSpanExclusionCount);
+            builder.Append('/');
+            builder.Append(result.OtherExclusionCount);
+        }
+
+        private static void AppendCsvValue(
+            StringBuilder builder,
+            string value,
+            bool endOfLine = false)
+        {
+            value ??= string.Empty;
+            bool quote = value.IndexOfAny(
+                new[] { ',', '"', '\r', '\n' }) >= 0;
+            if (quote)
+            {
+                builder.Append('"');
+                builder.Append(value.Replace("\"", "\"\""));
+                builder.Append('"');
+            }
+            else
+            {
+                builder.Append(value);
+            }
+            if (endOfLine)
+            {
+                builder.AppendLine();
+            }
+            else
+            {
+                builder.Append(',');
+            }
+        }
+
+        private sealed class EdgeWearViabilityMatrixJob
+        {
+            public readonly GeneratedMass Target;
+            public readonly string TargetName;
+            public readonly string TargetEntityId;
+            public readonly string RecipeJson;
+            public readonly float EdgeWearAmount;
+            public readonly float EdgeWearSoftness;
+            public readonly float CreaseAmount;
+            public readonly float CreaseWidth;
+            public readonly float CreaseLength;
+            public readonly float CreaseBranching;
+            public readonly Vector3 LocalPosition;
+            public readonly Quaternion LocalRotation;
+            public readonly Vector3 LocalScale;
+            public readonly Mesh OriginalMesh;
+            public readonly List<EdgeWearViabilityMatrixCase> Cases =
+                new List<EdgeWearViabilityMatrixCase>(30);
+            public int CompletedCaseCount;
+            public bool CancelRequested;
+
+            public EdgeWearViabilityMatrixJob(GeneratedMass target)
+            {
+                Target = target;
+                TargetName = target.name;
+                TargetEntityId = target.GetEntityId().ToString();
+                RecipeJson = JsonUtility.ToJson(target.Recipe);
+                EdgeWearAmount = target.EdgeWearAmount;
+                EdgeWearSoftness = target.EdgeWearSoftness;
+                CreaseAmount = target.CreaseAmount;
+                CreaseWidth = target.CreaseWidth;
+                CreaseLength = target.CreaseLength;
+                CreaseBranching = target.CreaseBranching;
+                Transform targetTransform = target.transform;
+                LocalPosition = targetTransform.localPosition;
+                LocalRotation = targetTransform.localRotation;
+                LocalScale = targetTransform.localScale;
+                MeshFilter meshFilter = target.GetComponent<MeshFilter>();
+                OriginalMesh = meshFilter != null
+                    ? meshFilter.sharedMesh
+                    : null;
+            }
+
+            public int TotalCaseCount =>
+                EdgeWearBatchShapeSeeds.Length *
+                EdgeWearBatchWidths.Length;
+
+            public bool ValidateTargetStatePreserved(
+                out string diagnostic)
+            {
+                if (Target == null)
+                {
+                    diagnostic = "target mass no longer exists";
+                    return false;
+                }
+                Transform targetTransform = Target.transform;
+                MeshFilter meshFilter = Target.GetComponent<MeshFilter>();
+                bool transformMatches =
+                    targetTransform.localPosition == LocalPosition &&
+                    targetTransform.localRotation == LocalRotation &&
+                    targetTransform.localScale == LocalScale;
+                bool meshMatches =
+                    (meshFilter == null ? null : meshFilter.sharedMesh) ==
+                    OriginalMesh;
+                bool recipeMatches = string.Equals(
+                    JsonUtility.ToJson(Target.Recipe),
+                    RecipeJson,
+                    StringComparison.Ordinal);
+                if (transformMatches && meshMatches && recipeMatches)
+                {
+                    diagnostic = string.Empty;
+                    return true;
+                }
+                diagnostic =
+                    "selected mass state changed during the batch " +
+                    "(transform=" + (transformMatches ? "0" : "1") +
+                    ",mesh=" + (meshMatches ? "0" : "1") +
+                    ",recipe=" + (recipeMatches ? "0" : "1") + ")";
+                return false;
+            }
+        }
+
+        private readonly struct EdgeWearViabilityMatrixCase
+        {
+            public readonly int ShapeSeed;
+            public readonly string WidthName;
+            public readonly float Width;
+            public readonly MassGenerator.EdgeWearBatchAuditCaseResult
+                Result;
+
+            public EdgeWearViabilityMatrixCase(
+                int shapeSeed,
+                string widthName,
+                float width,
+                MassGenerator.EdgeWearBatchAuditCaseResult result)
+            {
+                ShapeSeed = shapeSeed;
+                WidthName = widthName ?? string.Empty;
+                Width = width;
+                Result = result ??
+                    new MassGenerator.EdgeWearBatchAuditCaseResult
+                    {
+                        ShapeSeed = shapeSeed,
+                        EdgeWearWidth = width,
+                        PrimaryFailure = "batch result was null"
+                    };
+            }
+        }
+
+        private sealed class EdgeWearViabilityMatrixAggregate
+        {
+            public string Status = string.Empty;
+            public int CasesRun;
+            public int CasesPassed;
+            public int CasesFailed;
+            public int CoexistenceCoverageFailures;
+            public int WidthFloorFailures;
+            public int MissingJunctionFailures;
+            public int TJunctionFailures;
+            public int StrictIntersectionFailures;
+            public int PlaneBandFailures;
+            public int CandidateConservationFailures;
+            public int OtherConstructionFailures;
+            public int TopologyFailures;
+            public int FaceQualityFailures;
+            public int PlacementFailures;
+            public int CacheContractFailures;
+            public float MinimumCertifiedRatio;
+            public double MaximumPreflightMilliseconds;
+            public double MaximumTotalMilliseconds;
+            public bool Cancelled;
+            public bool StatePreserved;
+            public string TerminalReason = string.Empty;
+            public readonly List<string> FailureCoordinates =
+                new List<string>();
+        }
+
+        private void DrawSourceEdgeIndexDebug()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Source Edge Index Debug",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Independent editor-only source-topology view. It builds the " +
+                "numbered source graph directly from the current mass recipe " +
+                "and does not require a successful bevel preview. All source " +
+                "edge records are retained; visible edges are depth-tested by " +
+                "default, with optional x-ray drawing for hidden edges. Current " +
+                "bevel-search edges can be highlighted when evidence exists.",
+                MessageType.Info);
+
+            if (serializedObject.isEditingMultipleObjects)
+            {
+                EditorGUILayout.HelpBox(
+                    "Source-edge indexing is available for one selected mass at a time.",
+                    MessageType.None);
+                return;
+            }
+
+            GeneratedMass mass = target as GeneratedMass;
+            if (mass == null)
+            {
+                return;
+            }
+
+            bool nextShow = EditorGUILayout.ToggleLeft(
+                new GUIContent(
+                    "Show All Source Edge Numbers in Scene",
+                    "Draws every authoritative source-topology edge and index, independently of bevel-preview success."),
+                showSourceEdgeIndexDebug);
+            if (nextShow != showSourceEdgeIndexDebug)
+            {
+                showSourceEdgeIndexDebug = nextShow;
+                if (showSourceEdgeIndexDebug &&
+                    mass.SourceEdgeIndexDebugEdges.Length == 0)
+                {
+                    mass.RefreshSourceEdgeIndexDebug();
+                }
+                SetSourceEdgeIndexOverlayState(
+                    mass,
+                    showSourceEdgeIndexDebug,
+                    highlightSourceEdgeSearchEdges,
+                    sourceEdgeIndexDebugXRay);
+            }
+
+            if (!showSourceEdgeIndexDebug)
+            {
+                SetSourceEdgeIndexOverlayState(
+                    mass,
+                    false,
+                    highlightSourceEdgeSearchEdges,
+                    sourceEdgeIndexDebugXRay);
+                return;
+            }
+
+            bool nextHighlight = EditorGUILayout.ToggleLeft(
+                new GUIContent(
+                    "Highlight Active Bevel Search Edges",
+                    "Keeps all source edges visible and only changes the colour of edges implicated by the current bevel-search telemetry."),
+                highlightSourceEdgeSearchEdges);
+            if (nextHighlight != highlightSourceEdgeSearchEdges)
+            {
+                highlightSourceEdgeSearchEdges = nextHighlight;
+            }
+
+            bool nextXRay = EditorGUILayout.ToggleLeft(
+                new GUIContent(
+                    "X-Ray Hidden Source Edges",
+                    "When disabled, source edges are depth-tested against the visible mass. Enable only when inspecting the complete rear-side topology through the mesh."),
+                sourceEdgeIndexDebugXRay);
+            if (nextXRay != sourceEdgeIndexDebugXRay)
+            {
+                sourceEdgeIndexDebugXRay = nextXRay;
+            }
+
+            if (GUILayout.Button("Refresh Source Edge Graph"))
+            {
+                mass.RefreshSourceEdgeIndexDebug();
+                SceneView.RepaintAll();
+            }
+
+            MassGenerator.EdgeWearDebugEdgeRecord[] records =
+                mass.SourceEdgeIndexDebugEdges;
+            int focusCount =
+                CountCurrentSearchFocusEdges(mass);
+            EditorGUILayout.LabelField(
+                "Source Graph Data",
+                records.Length + " edges; " + focusCount +
+                    " current search highlights");
+            if (records.Length == 0)
+            {
+                string diagnostic = mass.SourceEdgeIndexDebugDiagnostic;
+                EditorGUILayout.HelpBox(
+                    string.IsNullOrEmpty(diagnostic)
+                        ? "No independent source-edge graph is available. Press Refresh Source Edge Graph."
+                        : diagnostic,
+                    MessageType.Warning);
+            }
+
+            SetSourceEdgeIndexOverlayState(
+                mass,
+                true,
+                highlightSourceEdgeSearchEdges,
+                sourceEdgeIndexDebugXRay);
         }
 
         private void DrawFeatureRecipeWorkflow()
@@ -2053,9 +3193,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         }
 
 
-        private static int CountFocusedEdgeWearDebugRecords(
-            MassGenerator.EdgeWearDebugEdgeRecord[] records)
+        private static int CountCurrentSearchFocusEdges(
+            GeneratedMass mass)
         {
+            MassGenerator.EdgeWearDebugEdgeRecord[] records =
+                mass != null
+                    ? mass.UnifiedEdgeWearPreviewDebugEdges
+                    : null;
             if (records == null)
             {
                 return 0;
@@ -2073,9 +3217,37 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             return count;
         }
 
-        private static string BuildFocusedEdgeWearDebugEvidence(
-            MassGenerator.EdgeWearDebugEdgeRecord[] records)
+        private static bool IsCurrentSearchFocusEdge(
+            GeneratedMass mass,
+            int edgeIndex)
         {
+            MassGenerator.EdgeWearDebugEdgeRecord[] records =
+                mass != null
+                    ? mass.UnifiedEdgeWearPreviewDebugEdges
+                    : null;
+            if (records == null)
+            {
+                return false;
+            }
+            for (int recordIndex = 0;
+                 recordIndex < records.Length;
+                 recordIndex++)
+            {
+                if (records[recordIndex].EdgeIndex == edgeIndex)
+                {
+                    return records[recordIndex].Focus;
+                }
+            }
+            return false;
+        }
+
+        private static string BuildCurrentSearchFocusEvidence(
+            GeneratedMass mass)
+        {
+            MassGenerator.EdgeWearDebugEdgeRecord[] records =
+                mass != null
+                    ? mass.UnifiedEdgeWearPreviewDebugEdges
+                    : null;
             if (records == null)
             {
                 return "none";
@@ -2098,68 +3270,44 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             return evidence.Length == 0 ? "none" : evidence;
         }
 
-        private static Vector2 ResolveEdgeWearLabelOffset(
-            int visibleOrdinal)
+        private static Vector2 ResolveSourceEdgeLabelOffset(
+            int edgeIndex)
         {
-            switch (visibleOrdinal % 8)
-            {
-                case 0:
-                    return new Vector2(-0.34f, 0.30f);
-                case 1:
-                    return new Vector2(0.34f, 0.30f);
-                case 2:
-                    return new Vector2(-0.34f, -0.30f);
-                case 3:
-                    return new Vector2(0.34f, -0.30f);
-                case 4:
-                    return new Vector2(-0.48f, 0f);
-                case 5:
-                    return new Vector2(0.48f, 0f);
-                case 6:
-                    return new Vector2(0f, 0.44f);
-                default:
-                    return new Vector2(0f, -0.44f);
-            }
+            float angle = edgeIndex * 137.50777f * Mathf.Deg2Rad;
+            float radius = 0.24f + (edgeIndex % 3) * 0.08f;
+            return new Vector2(
+                Mathf.Cos(angle) * radius,
+                Mathf.Sin(angle) * radius);
         }
 
-        private static void DrawEdgeWearEdgeOverlayStatusPanel(
+        private static void DrawSourceEdgeIndexStatusPanel(
+            GeneratedMass mass,
             MassGenerator.EdgeWearDebugEdgeRecord[] records,
-            bool focusOnly,
-            int visibleCount)
+            bool highlightSearchEdges)
         {
             int totalCount = records == null ? 0 : records.Length;
-            int focusCount = CountFocusedEdgeWearDebugRecords(records);
-            string focusEvidence =
-                BuildFocusedEdgeWearDebugEvidence(records);
+            string focusEvidence = highlightSearchEdges
+                ? BuildCurrentSearchFocusEvidence(mass)
+                : "disabled";
             Handles.BeginGUI();
-            float panelHeight = focusOnly && focusCount == 0
-                ? 80f
-                : 58f;
-            Rect panel = new Rect(12f, 12f, 310f, panelHeight);
+            Rect panel = new Rect(12f, 12f, 340f, 58f);
             GUI.Box(panel, GUIContent.none, EditorStyles.helpBox);
             GUI.Label(
-                new Rect(22f, 18f, 288f, 20f),
-                "Source edge overlay: " + visibleCount +
-                    " shown / " + totalCount + " total",
+                new Rect(22f, 18f, 318f, 20f),
+                "Source edge index debug: " + totalCount +
+                    " records / " + totalCount + " total",
                 EditorStyles.boldLabel);
             GUI.Label(
-                new Rect(22f, 40f, 288f, 18f),
-                "Focus edges: {" + focusEvidence + "}" +
-                    (focusOnly ? "  (focus-only)" : string.Empty),
+                new Rect(22f, 40f, 318f, 18f),
+                "Search highlights: {" + focusEvidence + "}",
                 EditorStyles.miniLabel);
-            if (focusOnly && focusCount == 0)
-            {
-                GUI.Label(
-                    new Rect(22f, 57f, 288f, 18f),
-                    "No structured focus records; disable the filter.",
-                    EditorStyles.miniLabel);
-            }
             Handles.EndGUI();
         }
 
-        private static void DrawEdgeWearEdgeNumberOverlay(
+        private static void DrawSourceEdgeIndexOverlay(
             GeneratedMass mass,
-            bool focusOnly,
+            bool highlightSearchEdges,
+            bool xRay,
             SceneView sceneView)
         {
             if (Event.current.type != EventType.Repaint)
@@ -2167,19 +3315,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 return;
             }
             MassGenerator.EdgeWearDebugEdgeRecord[] records =
-                mass.UnifiedEdgeWearPreviewDebugEdges;
-            int focusCount = CountFocusedEdgeWearDebugRecords(records);
-            int visibleCount = records == null
-                ? 0
-                : focusOnly
-                    ? focusCount
-                    : records.Length;
-            DrawEdgeWearEdgeOverlayStatusPanel(
+                mass.SourceEdgeIndexDebugEdges;
+            DrawSourceEdgeIndexStatusPanel(
+                mass,
                 records,
-                focusOnly,
-                visibleCount);
-            if (records == null || records.Length == 0 ||
-                visibleCount == 0)
+                highlightSearchEdges);
+            if (records == null || records.Length == 0)
             {
                 return;
             }
@@ -2187,15 +3328,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             Color previousColor = Handles.color;
             UnityEngine.Rendering.CompareFunction previousZTest =
                 Handles.zTest;
-            Handles.zTest =
-                UnityEngine.Rendering.CompareFunction.Always;
+            Handles.zTest = xRay
+                ? UnityEngine.Rendering.CompareFunction.Always
+                : UnityEngine.Rendering.CompareFunction.LessEqual;
 
             GUIStyle normalStyle = new GUIStyle(
                 EditorStyles.helpBox)
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontStyle = FontStyle.Bold,
-                padding = new RectOffset(5, 5, 2, 2)
+                padding = new RectOffset(4, 4, 1, 1)
             };
             normalStyle.normal.textColor = Color.white;
             GUIStyle focusStyle = new GUIStyle(normalStyle);
@@ -2213,71 +3355,59 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 ? cameraTransform.up
                 : Vector3.up;
 
-            int visibleOrdinal = 0;
             for (int recordIndex = 0;
                  recordIndex < records.Length;
                  recordIndex++)
             {
                 MassGenerator.EdgeWearDebugEdgeRecord record =
                     records[recordIndex];
-                if (focusOnly && !record.Focus)
-                {
-                    continue;
-                }
-
-                Vector3 start = mass.transform.TransformPoint(record.Start);
-                Vector3 end = mass.transform.TransformPoint(record.End);
+                bool focus = highlightSearchEdges &&
+                    IsCurrentSearchFocusEdge(
+                        mass,
+                        record.EdgeIndex);
+                Vector3 start =
+                    mass.transform.TransformPoint(record.Start);
+                Vector3 end =
+                    mass.transform.TransformPoint(record.End);
                 Vector3 midpoint = (start + end) * 0.5f;
-                float handleSize = HandleUtility.GetHandleSize(midpoint);
-                Color edgeColor = record.Focus
+                float handleSize =
+                    HandleUtility.GetHandleSize(midpoint);
+                Color edgeColor = focus
                     ? new Color(1f, 0.58f, 0.08f, 1f)
                     : record.Selected
-                        ? new Color(1f, 1f, 1f, 0.86f)
-                        : new Color(0.55f, 0.78f, 1f, 0.72f);
+                        ? new Color(0.92f, 0.95f, 1f, 0.9f)
+                        : new Color(0.5f, 0.75f, 1f, 0.78f);
 
-                Handles.color = new Color(0f, 0f, 0f, 0.9f);
+                Handles.color = new Color(0f, 0f, 0f, 0.88f);
                 Handles.DrawAAPolyLine(
-                    record.Focus ? 8f : 5f,
+                    focus ? 7f : 4f,
                     start,
                     end);
                 Handles.color = edgeColor;
                 Handles.DrawAAPolyLine(
-                    record.Focus ? 4f : 2.5f,
+                    focus ? 3.5f : 1.8f,
                     start,
                     end);
-                Handles.DotHandleCap(
-                    0,
-                    start,
-                    Quaternion.identity,
-                    handleSize * (record.Focus ? 0.045f : 0.03f),
-                    EventType.Repaint);
-                Handles.DotHandleCap(
-                    0,
-                    end,
-                    Quaternion.identity,
-                    handleSize * (record.Focus ? 0.045f : 0.03f),
-                    EventType.Repaint);
 
                 Vector2 offset =
-                    ResolveEdgeWearLabelOffset(visibleOrdinal);
+                    ResolveSourceEdgeLabelOffset(record.EdgeIndex);
                 Vector3 labelPosition = midpoint +
                     (labelRight * offset.x + labelUp * offset.y) *
-                    handleSize * 0.38f;
-                Handles.color = new Color(0f, 0f, 0f, 0.82f);
+                    handleSize;
+                Handles.color = new Color(0f, 0f, 0f, 0.76f);
                 Handles.DrawAAPolyLine(
-                    3f,
+                    2.5f,
                     midpoint,
                     labelPosition);
                 Handles.color = edgeColor;
                 Handles.DrawAAPolyLine(
-                    1.5f,
+                    1.25f,
                     midpoint,
                     labelPosition);
                 Handles.Label(
                     labelPosition,
                     " " + record.EdgeIndex + " ",
-                    record.Focus ? focusStyle : normalStyle);
-                visibleOrdinal++;
+                    focus ? focusStyle : normalStyle);
             }
 
             Handles.zTest = previousZTest;

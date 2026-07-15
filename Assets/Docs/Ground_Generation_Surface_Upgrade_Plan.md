@@ -1,6 +1,60 @@
+# Ground Generation and Surface Upgrade Plan
+
+## Current authoritative status — 2026-07-15
+
+The GeneratedGround Inspector and Painted Accent production workstream is complete, Unity-validated, and accepted through GI-A1–GI-A4 and PA-B1–PA-B4.1. **GeneratedGround and the broader Ground visual roadmap are not complete.**
+
+The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. The active milestone is **V3M — Broad Macro Patch Completion**, audited in `Ground_Macro_Patch_Audit_and_Architecture.md`. **V4 — Contact / Edge Accents** remains architecturally accepted but is queued until V3M passes gameplay-camera visual acceptance.
+
+The accepted current pipeline is:
+
+```text
+GeneratedGround authoring façade
+→ deterministic mesh-free SurfaceStrokes and ProjectedGlyphs in Edit Mode
+→ transient authoritative R8 preview coverage
+→ one-button persistent R8 production bake
+→ baked-only Play Mode and Player rendering
+→ exact pre-build production validation
+→ explicit project-wide generated-asset audit and confirmed-orphan cleanup
+```
+
+Key production rules:
+
+- the old raised 3D Painted Accent ridge is retired;
+- Ink Colour and Ink Opacity are Material-only and do not stale the bake;
+- generation, geometry, modifier, River-exclusion, projection, cluster, or raster changes stale the bake;
+- Player runtime performs no Painted Accent SurfaceStroke generation, ProjectedGlyph generation, companion solving, coverage rasterization, or procedural upload;
+- a required Missing, Stale, Incompatible, duplicated, shared, or ownership-mismatched output blocks the build;
+- generated assets are never deleted automatically during bake or build;
+- obsolete outputs are removed only after the all-project audit classifies them as Confirmed orphan.
+
+The detailed sections below are the historical implementation ledger. Their patch-local “pending” or “next” language records the state at the time of that patch and does not override this final status. The canonical final ownership and maintenance contract is recorded in `GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`.
+
+## Maintenance workflow
+
+```text
+Normal change affecting coverage
+→ Bake Painted Accents
+
+Ground or scene no longer needs its bake
+→ Release Production Bake
+→ save scene manually
+→ Tools > Generated Ground > Audit and Clean Painted Accent Assets...
+→ review and delete Confirmed orphan assets only
+```
+
+## Next work items
+
+1. Treat only the Inspector and Painted Accent production slice as closed.
+2. Unity-validate V3M-A0's slim macro diagnostics without changing normal lit Ground output.
+3. Implement V3M-A1 as a replacement shader macro-region proof only after the raw field and weighted influence are captured for Snowfield and Grassland.
+4. Resume V4 Contact / Edge Accents only after broad macro composition is visually accepted from the gameplay camera.
+
+---
+
 ## PA-P4 — Deterministic External-Conflict Index and Incremental Reconciliation
 
-**Status:** Implemented; pending Unity compilation, deterministic-output parity, and performance telemetry. This is an execution-only optimization of the accepted PA-P3 projected-cluster path.
+**Status:** Unity-validated and accepted. Tightness `1.00` preserved the complete deterministic output baseline and reduced the complete ProjectedGlyphs/coverage pass to approximately `880.50 ms`, including approximately `2.67 ms` external-conflict validation and `38.23 ms` final reconciliation. This remains an execution-only optimization of the accepted PA-P3 projected-cluster path.
 
 Authoritative cluster construction now maintains a deterministic fixed-grid index over the expanded projected bounds of glyphs already accepted before each candidate. A candidate member queries only the grid cells touched by its own expanded bounds, deduplicates returned glyph indices, sorts them back into original accepted-list order, and then runs the unchanged bounds and exact external-overlap authority. The grid can only omit glyphs whose expanded bounds occupy no common cell; any genuinely overlapping expanded bounds necessarily share at least one indexed cell.
 
@@ -3299,12 +3353,13 @@ However, `TrampledWear` is now classified as a proof/experiment, not the next vi
 | 3 | Patch V2 — Base Ground Simplification | Implemented as an asset/docs retune. Snowfield and Wet Mudflat now use calmer matte bases with lower pixel variation, lower patch contrast, and reduced broad noise so future accents can sit on top. |
 | 4 | Patch V2B — Grassland Baseline Family | Implemented as a production `Grassland` family with Clean, Patchy, Damp, and Worn Meadow variants. Establishes the canonical three-family test set. |
 | 5 | Patch V3 — Shader Feature Stack + Painted Accent Lines | Implemented. Variants now use a real shader feature stack, and Painted Accent Lines are the first stackable doctrine layer. |
-| 6 | Patch V4 — Contact / Edge Accent Layer | Add localized accent response near shores, rocks, modifier boundaries, paths, banks, and object contact zones. Use existing masks first; add new generated/contact masks only when justified. |
-| 7 | Patch V5 — Sparse Motif Layer | Add reusable sparse marks such as chips, cracks, scuffs, stains, snow scratches, stones, or debris hints. Avoid stamp spam. |
-| 8 | Patch V6 — Feature Stack Authoring Polish | Add richer warnings, cost summaries, duplicate/combination guidance, and editor UX after more stack layers exist. |
-| 9 | Later | Ground Surface Runtime State Stub | Revisit runtime wetness, snow depth, compression, footprints, and disturbance after the static visual stack is accepted. |
-| 10 | Later | Footprints / Rain / Puddles / Grass Integration | Build on the runtime state contract only after the visual doctrine is stable. |
-| 11 | Future | Mixed Terrain / Profile Blending | Add explicit support for blended surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
+| 6 | Patch V3M — Broad Macro Patch Completion | **Active milestone.** Replace visually insufficient broad noise with deliberate, readable, restrained macro-region composition. See `Ground_Macro_Patch_Audit_and_Architecture.md`. |
+| 7 | Patch V4 — Contact / Edge Accent Layer | **Queued after V3M.** Add localized accent response near shores, rocks, modifier boundaries, paths, banks, and object contact zones. Existing semantic masks provide style context; the audited production geometry is a separate generated contact field. See `Ground_Contact_Edge_Accent_Audit_and_Architecture.md`. |
+| 8 | Patch V5 — Sparse Motif Layer | Add reusable sparse marks such as chips, cracks, scuffs, stains, snow scratches, stones, or debris hints. Avoid stamp spam. |
+| 9 | Patch V6 — Feature Stack Authoring Polish | Add richer warnings, cost summaries, duplicate/combination guidance, and editor UX after more stack layers exist. |
+| 10 | Later | Ground Surface Runtime State Stub | Revisit runtime wetness, snow depth, compression, footprints, and disturbance after the static visual stack is accepted. |
+| 11 | Later | Footprints / Rain / Puddles / Grass Integration | Build on the runtime state contract only after the visual doctrine is stable. |
+| 12 | Future | Mixed Terrain / Profile Blending | Add explicit support for blended surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
 
 ### Paused runtime roadmap
 

@@ -101,6 +101,134 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        public readonly struct SourceEdgeIndexDebugStatus
+        {
+            public readonly bool Available;
+            public readonly string Diagnostic;
+            public readonly EdgeWearDebugEdgeRecord[] Edges;
+
+            public SourceEdgeIndexDebugStatus(
+                bool available,
+                string diagnostic,
+                EdgeWearDebugEdgeRecord[] edges)
+            {
+                Available = available;
+                Diagnostic = diagnostic ?? string.Empty;
+                Edges = edges ?? Array.Empty<EdgeWearDebugEdgeRecord>();
+            }
+        }
+
+#if UNITY_EDITOR
+        public sealed class EdgeWearBatchAuditCaseResult
+        {
+            public bool Completed;
+            public bool AuditCaptured;
+            public bool PlacementCaptured;
+            public bool CornerSolutionValid;
+            public bool PreviewApplied;
+            public int ShapeSeed;
+            public float EdgeWearWidth;
+            public double TotalMilliseconds;
+            public double PreflightMilliseconds;
+            public int SourceEdgeCount;
+            public int StructuralEligibleCount;
+            public int GeometricEligibleCount;
+            public int CoexistenceEligibleCount;
+            public int CoexistenceIneligibleCount;
+            public int SelectedCount;
+            public int CertifiedCount;
+            public int DeferredCount;
+            public int RejectedCount;
+            public int TrialRejectedCount;
+            public int BoundaryExclusionCount;
+            public int DihedralExclusionCount;
+            public int FootprintExclusionCount;
+            public int LocalityExclusionCount;
+            public int IsolatedRailExclusionCount;
+            public int SupportExclusionCount;
+            public int WidthFractionExclusionCount;
+            public int EndpointSpanExclusionCount;
+            public int OtherExclusionCount;
+            public int SourceVertexStarExclusionCount;
+            public int PlanePairExclusionCount;
+            public int PlaneBandExclusionCount;
+            public int GlobalWidthFloorExclusionCount;
+            public int CandidateConservationExclusionCount;
+            public int CornerWidthMissingExclusionCount;
+            public int CornerWidthInactiveExclusionCount;
+            public int CoexistenceTrialCount;
+            public int CoexistenceCacheUseCount;
+            public int CoexistenceSearchStatesEvaluated;
+            public int CoexistenceSearchStatesDeduplicated;
+            public int CoexistenceSearchMaximumDepth;
+            public int CoexistenceSearchFrontierRemaining;
+            public int CoexistenceSearchWinningDepth;
+            public int CandidateConservationFailureCount;
+            public int SolverPassCount;
+            public int WidthReductionCount;
+            public float MinimumWidthScale = 1f;
+            public int OpenEdgeCount;
+            public int NonManifoldEdgeCount;
+            public int TJunctionCount;
+            public int InvalidFaceCount;
+            public int NonPlanarFaceCount;
+            public int SurfaceRenderValid;
+            public int MeshValid;
+            public int GeometryValid;
+            public int CoverageValid;
+            public int StableFingerprintPrepared;
+            public int LocalityEvaluationCount;
+            public int LocalityConstructionUseCount;
+            public int LocalityCacheMissCount;
+            public int LocalitySolverRecomputationCount;
+            public int PlacementFrameUsesImmutableSource;
+            public int PreviewDerivedPlacementParameters;
+            public int ObjectTransformChanged;
+            public int PreviewUsesCanonicalFrame;
+            public string ExclusionReasonHash = string.Empty;
+            public string SelectedEdgeHash = string.Empty;
+            public string CertifiedEdgeHash = string.Empty;
+            public string GeometryTopologyHash = string.Empty;
+            public string PlacementFrameHash = string.Empty;
+            public string EvaluationHash = string.Empty;
+            public string PrimaryFailure = string.Empty;
+            public string CoexistenceSearchTrace = string.Empty;
+
+            public float CertifiedRatio => CoexistenceEligibleCount > 0
+                ? (float)CertifiedCount / CoexistenceEligibleCount
+                : CertifiedCount == 0 ? 1f : 0f;
+
+            public bool Passed =>
+                Completed &&
+                AuditCaptured &&
+                PlacementCaptured &&
+                CornerSolutionValid &&
+                PreviewApplied &&
+                SelectedCount == CoexistenceEligibleCount &&
+                CertifiedCount == CoexistenceEligibleCount &&
+                MinimumWidthScale + 0.0001f >=
+                    EdgeWearMinimumFeasibleWidthFraction &&
+                DeferredCount == 0 &&
+                RejectedCount == 0 &&
+                TrialRejectedCount == 0 &&
+                CoverageValid == 1 &&
+                GeometryValid == 1 &&
+                MeshValid == 1 &&
+                SurfaceRenderValid == 1 &&
+                StableFingerprintPrepared == 1 &&
+                OpenEdgeCount == 0 &&
+                NonManifoldEdgeCount == 0 &&
+                TJunctionCount == 0 &&
+                InvalidFaceCount == 0 &&
+                NonPlanarFaceCount == 0 &&
+                LocalityCacheMissCount == 0 &&
+                LocalitySolverRecomputationCount == 0 &&
+                ObjectTransformChanged == 0 &&
+                PreviewDerivedPlacementParameters == 0 &&
+                PreviewUsesCanonicalFrame == 1;
+        }
+#endif
+
         public readonly struct UnifiedEdgeWearPreviewStatus
         {
             public readonly bool PreviewApplied;
@@ -149,7 +277,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             PlaneCutPreview,
             LegacyDiagnosticAudit,
             BoundedSingleEdgePreview,
-            UnifiedBoundedPreview
+            UnifiedBoundedPreview,
+            SourceEdgeIndexDebug
         }
 
         private const float PlaneEpsilon = 0.0001f;
@@ -226,6 +355,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
 
 #if UNITY_EDITOR
+        public static SourceEdgeIndexDebugStatus
+            GenerateSourceEdgeIndexDebug(
+                MassRecipe recipe)
+        {
+            GenerateInternal(
+                recipe,
+                null,
+                EdgeWearEvaluationMode.SourceEdgeIndexDebug,
+                -1,
+                out _,
+                out _,
+                out UnifiedEdgeWearPreviewStatus debugStatus);
+            EdgeWearDebugEdgeRecord[] edges =
+                debugStatus.DebugEdges ??
+                    Array.Empty<EdgeWearDebugEdgeRecord>();
+            string diagnostic = edges.Length > 0
+                ? "source topology graph built"
+                : "source-edge indexing is unavailable for this mass archetype";
+            return new SourceEdgeIndexDebugStatus(
+                edges.Length > 0,
+                diagnostic,
+                edges);
+        }
+
         public static MeshData GeneratePlaneCutBevelPreview(
             MassRecipe recipe,
             MassSurfaceFeatureSettings? surfaceFeatures,
@@ -285,6 +438,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 out _,
                 out previewStatus);
         }
+
+        public static EdgeWearBatchAuditCaseResult
+            GenerateUnifiedEdgeWearBatchAuditCase(
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings surfaceFeatures)
+        {
+            if (recipe == null)
+            {
+                throw new ArgumentNullException(nameof(recipe));
+            }
+
+            if (!TryBeginEdgeWearBatchAuditCapture(
+                    recipe.ShapeSeed,
+                    surfaceFeatures.EdgeWearWidth,
+                    out EdgeWearBatchAuditCaseResult immediateFailure))
+            {
+                return immediateFailure;
+            }
+
+            System.Diagnostics.Stopwatch stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            Exception evaluationException = null;
+            try
+            {
+                GenerateInternal(
+                    recipe,
+                    surfaceFeatures,
+                    EdgeWearEvaluationMode.UnifiedBoundedPreview,
+                    -1,
+                    out _,
+                    out _,
+                    out _);
+            }
+            catch (Exception exception)
+            {
+                evaluationException = exception;
+            }
+            finally
+            {
+                stopwatch.Stop();
+            }
+
+            return CompleteEdgeWearBatchAuditCapture(
+                stopwatch.Elapsed.TotalMilliseconds,
+                evaluationException);
+        }
 #endif
 
         private static MeshData GenerateInternal(
@@ -308,9 +507,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 surfaceFeatures,
                 edgeWearEvaluationMode,
                 boundedEdgeOrdinal,
+                out TriangleSoup placementReferenceSoup,
                 out previewStatus,
                 out boundedPreviewStatus,
                 out unifiedPreviewStatus);
+            if (placementReferenceSoup == null)
+            {
+                placementReferenceSoup = soup;
+            }
+            bool usesImmutableSourcePlacementFrame =
+                !ReferenceEquals(soup, placementReferenceSoup);
 
 #if UNITY_EDITOR
             List<Vector3> edgeDebugPositions =
@@ -318,32 +524,73 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     unifiedPreviewStatus.DebugEdges);
 #endif
             ApplyDimensions(soup.Positions, dimensions);
+            if (usesImmutableSourcePlacementFrame)
+            {
+                ApplyDimensions(
+                    placementReferenceSoup.Positions,
+                    dimensions);
+            }
 #if UNITY_EDITOR
             ApplyDimensions(edgeDebugPositions, dimensions);
-            ApplyLeanToDebugPositions(
-                edgeDebugPositions,
-                soup.Positions,
-                recipe.Lean,
-                recipe.ShapeSeed);
+            bool previewApplied =
+                previewStatus.PreviewApplied ||
+                boundedPreviewStatus.PreviewApplied ||
+                unifiedPreviewStatus.PreviewApplied;
+            bool hasLegacyPreviewFrame =
+                usesImmutableSourcePlacementFrame && previewApplied;
+            MassPlacementFrame legacyPreviewFrame = default;
+            if (hasLegacyPreviewFrame)
+            {
+                List<Vector3> legacyPreviewPositions =
+                    new List<Vector3>(soup.Positions);
+                legacyPreviewFrame =
+                    ResolveAndApplyMassPlacementFrame(
+                        legacyPreviewPositions,
+                        recipe.Lean,
+                        recipe.ShapeSeed,
+                        recipe.Grounding);
+            }
 #endif
-            ApplyLean(soup.Positions, recipe.Lean, recipe.ShapeSeed);
+
+            MassPlacementFrame placementFrame;
+            if (usesImmutableSourcePlacementFrame)
+            {
+                placementFrame = ResolveAndApplyMassPlacementFrame(
+                    placementReferenceSoup.Positions,
+                    recipe.Lean,
+                    recipe.ShapeSeed,
+                    recipe.Grounding);
+                ApplyMassPlacementFrame(
+                    soup.Positions,
+                    placementFrame);
+            }
+            else
+            {
+                placementFrame = ResolveAndApplyMassPlacementFrame(
+                    soup.Positions,
+                    recipe.Lean,
+                    recipe.ShapeSeed,
+                    recipe.Grounding);
+            }
 #if UNITY_EDITOR
-            ApplyGroundingToDebugPositions(
+            ApplyMassPlacementFrame(
                 edgeDebugPositions,
-                soup.Positions,
-                recipe.Grounding);
-#endif
-            ApplyGrounding(soup.Positions, recipe.Grounding);
-#if UNITY_EDITOR
-            RecenterDebugPositionsOnGround(
-                edgeDebugPositions,
-                soup.Positions);
-#endif
-            RecenterOnGround(soup.Positions);
-#if UNITY_EDITOR
+                placementFrame);
             ApplyEdgeWearDebugPositions(
                 unifiedPreviewStatus.DebugEdges,
                 edgeDebugPositions);
+            if (edgeWearEvaluationMode ==
+                EdgeWearEvaluationMode.UnifiedBoundedPreview)
+            {
+                AppendMassPlacementFrameTelemetry(
+                    placementFrame,
+                    legacyPreviewFrame,
+                    hasLegacyPreviewFrame,
+                    usesImmutableSourcePlacementFrame,
+                    previewApplied,
+                    soup.Positions.Count,
+                    edgeDebugPositions.Count);
+            }
 #endif
 
             return BuildMeshData(soup, recipe);
@@ -367,147 +614,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 positions.Add(debugEdges[edgeIndex].End);
             }
             return positions;
-        }
-
-        private static void ApplyLeanToDebugPositions(
-            List<Vector3> debugPositions,
-            List<Vector3> referencePositions,
-            LeanStyle lean,
-            int shapeSeed)
-        {
-            if (debugPositions == null ||
-                debugPositions.Count == 0 ||
-                referencePositions == null ||
-                referencePositions.Count == 0)
-            {
-                return;
-            }
-            float leanAmount = lean switch
-            {
-                LeanStyle.None => 0f,
-                LeanStyle.Subtle => 0.055f,
-                LeanStyle.Pronounced => 0.14f,
-                _ => 0f
-            };
-            if (leanAmount <= 0f)
-            {
-                return;
-            }
-            GetVerticalRange(
-                referencePositions,
-                out float minimumY,
-                out float maximumY);
-            float height = Mathf.Max(0.001f, maximumY - minimumY);
-            System.Random random = CreateRandom(shapeSeed, 0x5F3759DF);
-            Vector3 direction = RandomHorizontalDirection(random);
-            Bounds bounds = CalculateBounds(referencePositions);
-            float distance = leanAmount *
-                Mathf.Max(bounds.size.x, bounds.size.z);
-            for (int positionIndex = 0;
-                 positionIndex < debugPositions.Count;
-                 positionIndex++)
-            {
-                Vector3 position = debugPositions[positionIndex];
-                float influence = (position.y - minimumY) / height;
-                position += direction * distance * influence;
-                debugPositions[positionIndex] = position;
-            }
-        }
-
-        private static void ApplyGroundingToDebugPositions(
-            List<Vector3> debugPositions,
-            List<Vector3> referencePositions,
-            GroundingStyle grounding)
-        {
-            if (debugPositions == null ||
-                debugPositions.Count == 0 ||
-                referencePositions == null ||
-                referencePositions.Count == 0)
-            {
-                return;
-            }
-            GetGroundingSettings(
-                grounding,
-                out float bandFraction,
-                out float flatteningStrength,
-                out float broadeningStrength);
-            GetVerticalRange(
-                referencePositions,
-                out float minimumY,
-                out float maximumY);
-            float height = Mathf.Max(0.001f, maximumY - minimumY);
-            float groundingTop = minimumY + height * bandFraction;
-            for (int positionIndex = 0;
-                 positionIndex < debugPositions.Count;
-                 positionIndex++)
-            {
-                Vector3 position = debugPositions[positionIndex];
-                if (position.y >= groundingTop)
-                {
-                    continue;
-                }
-                float influence = 1f - Mathf.InverseLerp(
-                    minimumY,
-                    groundingTop,
-                    position.y);
-                influence = Mathf.SmoothStep(0f, 1f, influence);
-                position.y = Mathf.Lerp(
-                    position.y,
-                    minimumY,
-                    flatteningStrength * influence);
-                float broadening = 1f +
-                    broadeningStrength * influence;
-                position.x *= broadening;
-                position.z *= broadening;
-                debugPositions[positionIndex] = position;
-            }
-        }
-
-        private static void RecenterDebugPositionsOnGround(
-            List<Vector3> debugPositions,
-            List<Vector3> referencePositions)
-        {
-            if (debugPositions == null ||
-                debugPositions.Count == 0 ||
-                referencePositions == null ||
-                referencePositions.Count == 0)
-            {
-                return;
-            }
-            GetVerticalRange(
-                referencePositions,
-                out float minimumY,
-                out float maximumY);
-            float height = Mathf.Max(0.001f, maximumY - minimumY);
-            float contactBand = minimumY + height * 0.08f;
-            Vector2 contactCentre = Vector2.zero;
-            int contactCount = 0;
-            for (int positionIndex = 0;
-                 positionIndex < referencePositions.Count;
-                 positionIndex++)
-            {
-                Vector3 position = referencePositions[positionIndex];
-                if (position.y > contactBand)
-                {
-                    continue;
-                }
-                contactCentre += new Vector2(position.x, position.z);
-                contactCount++;
-            }
-            if (contactCount > 0)
-            {
-                contactCentre /= contactCount;
-            }
-            for (int positionIndex = 0;
-                 positionIndex < debugPositions.Count;
-                 positionIndex++)
-            {
-                Vector3 position = debugPositions[positionIndex];
-                position.x -= contactCentre.x;
-                position.z -= contactCentre.y;
-                position.y -= minimumY;
-                debugPositions[positionIndex] = position;
-            }
         }
 
         private static void ApplyEdgeWearDebugPositions(
@@ -541,24 +647,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MassSurfaceFeatureSettings? surfaceFeatures,
             EdgeWearEvaluationMode edgeWearEvaluationMode,
             int boundedEdgeOrdinal,
+            out TriangleSoup placementReferenceSoup,
             out PlaneCutBevelPreviewStatus previewStatus,
             out BoundedEdgePreviewStatus boundedPreviewStatus,
             out UnifiedEdgeWearPreviewStatus unifiedPreviewStatus)
         {
+            placementReferenceSoup = null;
             previewStatus = default;
             boundedPreviewStatus = default;
             unifiedPreviewStatus = default;
             if (recipe.Archetype == MassArchetype.LayeredStone)
             {
-                return BuildLayeredStoneMass(recipe);
+                TriangleSoup soup = BuildLayeredStoneMass(recipe);
+                placementReferenceSoup = soup;
+                return soup;
             }
             if (recipe.Archetype == MassArchetype.CarvedMarkerStone)
             {
-                return BuildCarvedMarkerMass(recipe);
+                TriangleSoup soup = BuildCarvedMarkerMass(recipe);
+                placementReferenceSoup = soup;
+                return soup;
             }
             if (UsesRadialBuilder(recipe.Archetype))
             {
-                return BuildRadialMass(recipe);
+                TriangleSoup soup = BuildRadialMass(recipe);
+                placementReferenceSoup = soup;
+                return soup;
             }
 
             return BuildPlaneCutMass(
@@ -566,6 +680,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 surfaceFeatures,
                 edgeWearEvaluationMode,
                 boundedEdgeOrdinal,
+                out placementReferenceSoup,
                 out previewStatus,
                 out boundedPreviewStatus,
                 out unifiedPreviewStatus);

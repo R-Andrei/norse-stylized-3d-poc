@@ -50,16 +50,60 @@ float RiverWaterFoamResolveLargestMetresPerPixel(float2 riverPointMetres)
 }
 
 
+struct RiverWaterFoamChipEligibility
+{
+    float visibleSupport;
+    float edgeBand;
+    float interiorRegion;
+};
+
 struct RiverWaterFoamSelectionDiagnostics
 {
     float chipCandidateField;
-    float chipActivatedCandidates;
     float chipEdgeEligibility;
-    float chipPotentialEligibility;
-    float chipFinalSelection;
-    float chipInteriorAuthority;
+    float chipInteriorEligibility;
     float chipProductionSelection;
 };
+
+RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
+    float preChipSoftVisibility,
+    float preChipMask,
+    float edgeWidthPixels)
+{
+    RiverWaterFoamChipEligibility result;
+    result.visibleSupport = RiverWaterFoamResolveBaseCoverage(preChipMask);
+    result.edgeBand = 0.0;
+    result.interiorRegion = result.visibleSupport;
+
+    float widthPixels = max(0.0, edgeWidthPixels);
+    [branch]
+    if (widthPixels <= 0.0001 || result.visibleSupport <= 0.0001)
+    {
+        return result;
+    }
+
+    // softVisibility already follows the complete pre-Chip production path.
+    // Dividing its inward scalar rise by the local screen derivative removes
+    // the previous dependence on how quickly Presence happened to saturate.
+    // This is a local projected edge coordinate, not a global distance field.
+    float edgeSource = saturate(preChipSoftVisibility);
+    float edgeGradientPerPixel = max(
+        fwidth(edgeSource),
+        0.001);
+    static const float VisibleSoftEdgeStart = 0.06;
+    float estimatedInwardPixels = max(
+        0.0,
+        edgeSource - VisibleSoftEdgeStart) / edgeGradientPerPixel;
+    float edgeMembership = 1.0 - smoothstep(
+        widthPixels - 0.5,
+        widthPixels + 0.5,
+        estimatedInwardPixels);
+    edgeMembership = saturate(edgeMembership);
+
+    result.edgeBand = result.visibleSupport * edgeMembership;
+    result.interiorRegion = result.visibleSupport * (1.0 - edgeMembership);
+    return result;
+}
 
 float RiverWaterFoamQuinticSmooth(float value)
 {
@@ -351,23 +395,20 @@ float RiverWaterFoamSoftIrregularChip(
 
 RiverWaterFoamSelectionDiagnostics
 RiverWaterFoamEvaluateSelectionDiagnostics(
-    float materialPattern,
     float storedGlobalDistance,
     float lateralMetres,
-    float materialEdgeDepth,
+    float preChipSoftVisibility,
     float preChipMask,
     float evaluateChipSelection,
     float evaluateChipCandidates,
     float evaluateCandidatesOutsideMaterial,
     float chipActivation,
     float chipCandidateSpacing,
-    float chipDistributionIrregularity,
-    float chipRadiusRatio,
-    float chipSizeIrregularity,
-    float chipShapeIrregularity,
+    float chipSize,
+    float chipIrregularity,
     float chipStableScreenRadiusPixels,
     float chipMaximumViewScale,
-    float chipSelectionDepth,
+    float chipEdgeWidthPixels,
     float chipInteriorAccess,
     float chipDownstreamSpeed,
     float chipFormationTime,
@@ -387,11 +428,8 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
 {
     RiverWaterFoamSelectionDiagnostics result;
     result.chipCandidateField = 0.0;
-    result.chipActivatedCandidates = 0.0;
     result.chipEdgeEligibility = 0.0;
-    result.chipPotentialEligibility = 0.0;
-    result.chipFinalSelection = 0.0;
-    result.chipInteriorAuthority = 0.0;
+    result.chipInteriorEligibility = 0.0;
     result.chipProductionSelection = 0.0;
 
     [branch]
@@ -405,20 +443,24 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
         storedGlobalDistance -
             max(0.0, chipDownstreamSpeed) * evolutionTime,
         lateralMetres);
-    float edgeDepth = saturate(materialEdgeDepth);
-    float edgeDepthAA = max(
-        fwidth(edgeDepth),
-        0.001);
-    float materialBody = smoothstep(
-        0.015 - edgeDepthAA,
-        0.10 + edgeDepthAA,
-        edgeDepth);
-    float visibleSupport = RiverWaterFoamResolveBaseCoverage(preChipMask);
+    RiverWaterFoamChipEligibility chipEligibility =
+        RiverWaterFoamResolveChipEligibility(
+            preChipSoftVisibility,
+            preChipMask,
+            chipEdgeWidthPixels);
+    float activation = saturate(chipActivation);
     float interiorAccess = saturate(chipInteriorAccess);
     float chipInteriorCandidates = 0.0;
+    float productionPermissionEnabled =
+        (max(0.0, chipEdgeWidthPixels) > 0.0001 ||
+            interiorAccess > 0.0001)
+        ? 1.0
+        : 0.0;
     float candidateFieldRequired =
         (evaluateChipCandidates > 0.5 &&
-            (max(materialBody, visibleSupport) > 0.0001 ||
+            activation > 0.0001 &&
+            ((productionPermissionEnabled > 0.5 &&
+                chipEligibility.visibleSupport > 0.0001) ||
                 evaluateCandidatesOutsideMaterial > 0.5))
         ? 1.0
         : 0.0;
@@ -430,12 +472,17 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
             RiverWaterFoamResolveLargestMetresPerPixel(chipPointMetres);
         float antialiasMetres = max(metresPerPixel, 0.0001);
         float spacing = max(0.10, chipCandidateSpacing);
-        float radiusRatio = clamp(chipRadiusRatio, 0.05, 0.65);
+        // Chip Size is one artist-facing bounded control. The internal
+        // radius-to-spacing mapping retains the proven adaptive search budget.
+        float radiusRatio = lerp(
+            0.05,
+            0.65,
+            saturate(chipSize));
         float nominalRadius = spacing * radiusRatio;
         float stableRadiusPixels = clamp(
             chipStableScreenRadiusPixels,
             0.0,
-            4.0);
+            16.0);
         float maximumViewScale = clamp(
             chipMaximumViewScale,
             1.0,
@@ -444,12 +491,12 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
             stableRadiusPixels * metresPerPixel;
         float fullStabilizationRadiusMetres =
             targetStableRadiusMetres * 0.75;
-        float distributionIrregularity = saturate(
-            chipDistributionIrregularity);
-        float sizeIrregularity = saturate(
-            chipSizeIrregularity);
-        float shapeIrregularity = saturate(
-            chipShapeIrregularity);
+        // One static Irregularity control owns deterministic centre jitter,
+        // candidate-to-candidate radius variance, and connected contour shape.
+        float irregularity = saturate(chipIrregularity);
+        float distributionIrregularity = irregularity;
+        float sizeIrregularity = irregularity;
+        float shapeIrregularity = irregularity;
         float lateralAmount = clamp(
             chipLateralMotionAmount,
             0.0,
@@ -459,7 +506,7 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
             0.0,
             0.45);
         float maximumRadiusScale =
-            lerp(1.0, 1.42, sizeIrregularity) *
+            lerp(1.0, 1.40, sizeIrregularity) *
             (1.0 + sizePulseAmount);
         float viewScaleCeiling = stableRadiusPixels > 0.0001
             ? maximumViewScale
@@ -528,8 +575,6 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
                     cell + float2(81.37, 47.59));
                 float activationHash = RiverWaterFoamHash21(
                     cell + float2(53.27, 67.19));
-                float interiorHash = RiverWaterFoamHash21(
-                    cell + float2(11.89, 73.43));
                 float lifecycleHash = RiverWaterFoamHash21(
                     cell + float2(17.41, 59.83));
 
@@ -581,9 +626,12 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
                     cos(angle),
                     sin(angle));
 
+                // D.1C removes the tiny-size tail while retaining clear
+                // candidate-to-candidate variation. The range is deliberately
+                // biased toward medium and large readable bites.
                 float fullRadiusVariation = lerp(
-                    0.58,
-                    1.42,
+                    0.80,
+                    1.40,
                     radiusHash);
                 float candidateSizeMultiplier = lerp(
                     1.0,
@@ -616,6 +664,25 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
                     staticCandidateRadius = min(
                         staticCandidateRadius * candidateViewScale,
                         maximumStaticCandidateRadius);
+                }
+
+                // Readability admission is resolved from the fully formed,
+                // view-stabilized radius before pulse and lifecycle. Candidates
+                // that still cannot approach the authored screen-space target
+                // fade out instead of surviving as distant pixel dirt. Zero
+                // preserves the previous pure world-space behavior exactly.
+                float readabilityVisibility = 1.0;
+                [branch]
+                if (stableRadiusPixels > 0.0001)
+                {
+                    float readableRadiusLowMetres =
+                        targetStableRadiusMetres * 0.65;
+                    readabilityVisibility = smoothstep(
+                        readableRadiusLowMetres,
+                        max(
+                            targetStableRadiusMetres,
+                            readableRadiusLowMetres + 0.000001),
+                        staticCandidateRadius);
                 }
 
                 float radiusPulseScale = 1.0 +
@@ -707,33 +774,34 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
                     0.25,
                     0.75,
                     projectedRadiusPixels);
-                candidate *= subpixelVisibility *
+                candidate *= readabilityVisibility *
+                    subpixelVisibility *
                     step(0.000001, lifecycleScale);
+                float active = step(activationHash, activation);
+                float activeCandidate = candidate * active;
+                // The single retained candidate diagnostic is the exact
+                // activated field used by production before material permission.
                 result.chipCandidateField = max(
                     result.chipCandidateField,
-                    candidate);
-
-                float activation = saturate(chipActivation);
-                float active = activation > 0.0001
-                    ? step(activationHash, activation)
-                    : 0.0;
-                float activeCandidate = candidate * active;
-                result.chipActivatedCandidates = max(
-                    result.chipActivatedCandidates,
                     activeCandidate);
 
-                // Interior Access remains a deterministic candidate-level
-                // decision. Admitted candidates retain their complete connected
-                // contour instead of becoming per-pixel noise.
-                float interiorAdmitted =
-                    step(0.0001, interiorAccess) *
-                    lerp(
+                // Interior Access is commonly zero, so its identity hash and
+                // admission work are skipped entirely unless that optional
+                // permission is authored. Admitted candidates retain their
+                // complete connected contour instead of becoming pixel noise.
+                [branch]
+                if (interiorAccess > 0.0001)
+                {
+                    float interiorHash = RiverWaterFoamHash21(
+                        cell + float2(11.89, 73.43));
+                    float interiorAdmitted = lerp(
                         step(interiorHash, interiorAccess),
                         1.0,
                         step(0.9999, interiorAccess));
-                chipInteriorCandidates = max(
-                    chipInteriorCandidates,
-                    activeCandidate * interiorAdmitted);
+                    chipInteriorCandidates = max(
+                        chipInteriorCandidates,
+                        activeCandidate * interiorAdmitted);
+                }
             }
         }
     }
@@ -741,30 +809,23 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
     [branch]
     if (evaluateChipSelection > 0.5)
     {
-        float chipLimit = saturate(chipSelectionDepth);
-        float chipBand = 1.0 - smoothstep(
-            chipLimit - edgeDepthAA,
-            chipLimit + edgeDepthAA,
-            edgeDepth);
-        float edgeEligibility = saturate(materialBody * chipBand);
         float edgeSelection = saturate(
-            result.chipActivatedCandidates * edgeEligibility);
-        float interiorSelection = saturate(chipInteriorCandidates);
+            result.chipCandidateField * chipEligibility.edgeBand);
+        float interiorSelection = saturate(
+            chipInteriorCandidates * chipEligibility.interiorRegion);
 
-        // Edge Coverage and Interior Access are parallel permissions. Edge
-        // Coverage owns only the Presence-transition fringe. Interior Access
-        // independently admits complete activated candidates to established
-        // visible Foam. Neither path gates or attenuates the other.
+        // One canonical material-permission model owns both territories.
+        // Edge Width defines the projected boundary band; Interior Access may
+        // admit complete deterministic candidates only in its complementary
+        // established-body region. No independent material-depth threshold
+        // remains.
         result.chipEdgeEligibility = saturate(
-            visibleSupport * edgeEligibility);
-        result.chipInteriorAuthority = saturate(
-            visibleSupport * interiorAccess);
-        result.chipPotentialEligibility = saturate(max(
-            result.chipEdgeEligibility,
-            result.chipInteriorAuthority));
-        result.chipFinalSelection = saturate(
-            visibleSupport * max(edgeSelection, interiorSelection));
-        result.chipProductionSelection = result.chipFinalSelection;
+            chipEligibility.edgeBand);
+        result.chipInteriorEligibility = saturate(
+            chipEligibility.interiorRegion * interiorAccess);
+        result.chipProductionSelection = saturate(max(
+            edgeSelection,
+            interiorSelection));
     }
 
 
@@ -821,7 +882,7 @@ RiverWaterFoamPatternFields RiverWaterFoamStablePatternFields(
 
     // Use several differently-oriented layers so the stored ribbon footprint
     // is not simply displayed as long parallel strokes. These coordinates are
-    // storage-space metres, so the breakup rides with the material instead of
+    // storage-space metres, so the pattern rides with the material instead of
     // swimming in screen space. The coherent body uses broad/medium structure.
     float broad = RiverWaterFoamValueNoise(
         p * float2(0.62, 1.75) + seed);
@@ -874,7 +935,6 @@ float RiverWaterFoamPatternedMask(
     float2 projectedMetreFootprint,
     float projectedPatternSeedFootprint,
     out float coherentSoftVisibility,
-    out float materialEdgeDepth,
     out float strandSoftVisibility,
     out float2 strandPattern,
     out float strandResolution)
@@ -1052,10 +1112,6 @@ float RiverWaterFoamPatternedMask(
     strandVisible *= lifeGate;
 
     coherentSoftVisibility = saturate(coherentVisible);
-    // Base material coverage is the no-new-sample edge-depth coordinate for
-    // Chip. Unlike coherent visibility it contains no procedural
-    // morphology valleys, anisotropic banding, or surface-break modulation.
-    materialEdgeDepth = saturate(baseMask);
     strandSoftVisibility = saturate(strandVisible);
     float hardVisible = smoothstep(0.22, 0.58, coherentSoftVisibility);
     float fringe = smoothstep(0.06, 0.34, coherentSoftVisibility) * 0.34;
@@ -1080,7 +1136,7 @@ float RiverWaterFoamHardenSoftVisibility(
 }
 
 
-float RiverWaterFoamResolveStrandChipKeep(
+float RiverWaterFoamResolveStructuralStrandKeep(
     float softShape,
     float chipPattern,
     float strandStrength,
@@ -1124,7 +1180,7 @@ float RiverWaterFoamResolveStrandChipKeep(
     return max(keep, exactCore);
 }
 
-float RiverWaterFoamApplyEdgeBreakup(
+float RiverWaterFoamApplyChipAndStrands(
     float hardenedShape,
     float coherentSoftVisibility,
     float strandSoftVisibility,
@@ -1180,7 +1236,7 @@ float RiverWaterFoamApplyEdgeBreakup(
     // Strands own structural anisotropic lineification after Chipping.
     float resolvedStrandStrength = strand * saturate(strandResolution);
     float strandAA = max(fwidth(strandSoftShape), 0.001);
-    float strandKeep = RiverWaterFoamResolveStrandChipKeep(
+    float strandKeep = RiverWaterFoamResolveStructuralStrandKeep(
         strandSoftShape,
         strandPattern.x,
         resolvedStrandStrength,
@@ -1356,7 +1412,6 @@ float RiverWaterFoamResolveStateMask(
     float2 projectedMetreFootprint,
     float projectedPatternSeedFootprint,
     out float coherentSoftVisibility,
-    out float materialEdgeDepth,
     out float strandSoftVisibility,
     out float presence,
     out float remainingLife,
@@ -1405,7 +1460,6 @@ float RiverWaterFoamResolveStateMask(
         projectedMetreFootprint,
         projectedPatternSeedFootprint,
         coherentSoftVisibility,
-        materialEdgeDepth,
         strandSoftVisibility,
         strandPattern,
         strandResolution);
@@ -1418,7 +1472,6 @@ struct RiverWaterFoamResult
     float materialPattern;
     float mask;
     float softVisibility;
-    float materialEdgeDepth;
     float strandSoftVisibility;
     float surfaceEnergy;
     float2 strandPattern;
@@ -1451,7 +1504,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     result.materialPattern = 0.0;
     result.mask = 0.0;
     result.softVisibility = 0.0;
-    result.materialEdgeDepth = 0.0;
     result.strandSoftVisibility = 0.0;
     result.surfaceEnergy = 0.0;
     result.strandPattern = 0.0;
@@ -1519,7 +1571,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         lerp(1.0, 1.35, surfaceEnergy);
 
     float storedSoftVisibility;
-    float storedMaterialEdgeDepth;
     float storedStrandSoftVisibility;
     float storedPresence;
     float storedRemainingLife;
@@ -1538,7 +1589,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         projectedMetreFootprint,
         projectedPatternSeedFootprint,
         storedSoftVisibility,
-        storedMaterialEdgeDepth,
         storedStrandSoftVisibility,
         storedPresence,
         storedRemainingLife,
@@ -1577,7 +1627,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         blend);
 
     float visualSoftVisibility;
-    float visualMaterialEdgeDepth;
     float visualStrandSoftVisibility;
     float visualPresence;
     float visualRemainingLife;
@@ -1596,7 +1645,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         projectedMetreFootprint,
         projectedPatternSeedFootprint,
         visualSoftVisibility,
-        visualMaterialEdgeDepth,
         visualStrandSoftVisibility,
         visualPresence,
         visualRemainingLife,
@@ -1612,10 +1660,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float coupledSoftVisibility = lerp(
         storedSoftVisibility,
         visualSoftVisibility,
-        surfaceCoupling);
-    float coupledMaterialEdgeDepth = lerp(
-        storedMaterialEdgeDepth,
-        visualMaterialEdgeDepth,
         surfaceCoupling);
     float coupledStrandSoftVisibility = lerp(
         storedStrandSoftVisibility,
@@ -1677,7 +1721,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             blend);
 
         float leadSoftVisibility;
-        float leadMaterialEdgeDepth;
         float leadStrandSoftVisibility;
         float leadPresence;
         float leadLife;
@@ -1696,7 +1739,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             projectedMetreFootprint,
             projectedPatternSeedFootprint,
             leadSoftVisibility,
-            leadMaterialEdgeDepth,
             leadStrandSoftVisibility,
             leadPresence,
             leadLife,
@@ -1704,7 +1746,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             leadStrandPattern,
             leadStrandResolution);
         float trailSoftVisibility;
-        float trailMaterialEdgeDepth;
         float trailStrandSoftVisibility;
         float trailPresence;
         float trailLife;
@@ -1723,7 +1764,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             projectedMetreFootprint,
             projectedPatternSeedFootprint,
             trailSoftVisibility,
-            trailMaterialEdgeDepth,
             trailStrandSoftVisibility,
             trailPresence,
             trailLife,
@@ -1743,25 +1783,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float stretchedSoftVisibility = max(
             coupledSoftVisibility,
             max(leadSoftVisibility, trailSoftVisibility) * stretchScale);
-        float leadScaledSoft = leadSoftVisibility * stretchScale;
-        float trailScaledSoft = trailSoftVisibility * stretchScale;
-        float trailOwnsMaterialStretch = step(
-            leadScaledSoft,
-            trailScaledSoft);
-        float dominantMaterialSoft = max(
-            leadScaledSoft,
-            trailScaledSoft);
-        float dominantMaterialEdgeDepth = lerp(
-            leadMaterialEdgeDepth,
-            trailMaterialEdgeDepth,
-            trailOwnsMaterialStretch);
-        float stretchOwnsMaterial = step(
-            coupledSoftVisibility,
-            dominantMaterialSoft);
-        float stretchedMaterialEdgeDepth = lerp(
-            coupledMaterialEdgeDepth,
-            dominantMaterialEdgeDepth,
-            stretchOwnsMaterial);
         float leadScaledStrandSoft =
             leadStrandSoftVisibility * stretchScale;
         float trailScaledStrandSoft =
@@ -1801,10 +1822,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         coupledSoftVisibility = lerp(
             coupledSoftVisibility,
             stretchedSoftVisibility,
-            stretchWeight);
-        coupledMaterialEdgeDepth = lerp(
-            coupledMaterialEdgeDepth,
-            stretchedMaterialEdgeDepth,
             stretchWeight);
         coupledStrandSoftVisibility = lerp(
             coupledStrandSoftVisibility,
@@ -1851,16 +1868,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         storedMask * storedRetention);
     float retainedStoredSoft =
         storedSoftVisibility * storedRetention;
-    float storedOwnsRetainedMaterial = step(
-        coupledSoftVisibility,
-        retainedStoredSoft);
     coupledSoftVisibility = max(
         coupledSoftVisibility,
         retainedStoredSoft);
-    coupledMaterialEdgeDepth = lerp(
-        coupledMaterialEdgeDepth,
-        storedMaterialEdgeDepth,
-        storedOwnsRetainedMaterial);
     float retainedStoredStrandSoft =
         storedStrandSoftVisibility * storedRetention;
     float storedOwnsRetainedStrand = step(
@@ -1883,7 +1893,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
 
     result.mask = saturate(coupledMask);
     result.softVisibility = saturate(coupledSoftVisibility);
-    result.materialEdgeDepth = saturate(coupledMaterialEdgeDepth);
     result.strandSoftVisibility = saturate(
         coupledStrandSoftVisibility);
     result.strandPattern = saturate(coupledStrandPattern);

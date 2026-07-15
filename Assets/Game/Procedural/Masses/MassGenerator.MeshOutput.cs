@@ -132,11 +132,74 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
-        private static void ApplyLean(
-            List<Vector3> positions,
-            LeanStyle lean,
-            int shapeSeed)
+        private struct MassPlacementFrame
         {
+            public int ReferenceVertexCount;
+            public float LeanMinimumY;
+            public float LeanHeight;
+            public Vector3 LeanDirection;
+            public float LeanDistance;
+            public float GroundingMinimumY;
+            public float GroundingHeight;
+            public float GroundingTop;
+            public float GroundingFlatteningStrength;
+            public float GroundingBroadeningStrength;
+            public float RecenterMinimumY;
+            public float ContactBand;
+            public Vector2 ContactCentre;
+            public Vector3 RecenterOffset;
+        }
+
+        private static MassPlacementFrame ResolveAndApplyMassPlacementFrame(
+            List<Vector3> referencePositions,
+            LeanStyle lean,
+            int shapeSeed,
+            GroundingStyle grounding)
+        {
+            MassPlacementFrame frame = default;
+            frame.ReferenceVertexCount = referencePositions == null
+                ? 0
+                : referencePositions.Count;
+            if (referencePositions == null ||
+                referencePositions.Count == 0)
+            {
+                return frame;
+            }
+
+            ResolveLeanPlacementFrame(
+                referencePositions,
+                lean,
+                shapeSeed,
+                ref frame);
+            ApplyLean(referencePositions, frame);
+
+            ResolveGroundingPlacementFrame(
+                referencePositions,
+                grounding,
+                ref frame);
+            ApplyGrounding(referencePositions, frame);
+
+            ResolveGroundRecenterPlacementFrame(
+                referencePositions,
+                ref frame);
+            ApplyGroundRecenter(referencePositions, frame);
+
+            return frame;
+        }
+
+        private static void ResolveLeanPlacementFrame(
+            List<Vector3> referencePositions,
+            LeanStyle lean,
+            int shapeSeed,
+            ref MassPlacementFrame frame)
+        {
+            GetVerticalRange(
+                referencePositions,
+                out float minimumY,
+                out float maximumY);
+            frame.LeanMinimumY = minimumY;
+            frame.LeanHeight = Mathf.Max(0.001f, maximumY - minimumY);
+
             float leanAmount = lean switch
             {
                 LeanStyle.None => 0f,
@@ -144,121 +207,159 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 LeanStyle.Pronounced => 0.14f,
                 _ => 0f
             };
-
             if (leanAmount <= 0f)
             {
+                frame.LeanDirection = Vector3.zero;
+                frame.LeanDistance = 0f;
                 return;
             }
 
-            GetVerticalRange(
-                positions,
-                out float minimumY,
-                out float maximumY);
-
-            float height = Mathf.Max(0.001f, maximumY - minimumY);
-
             System.Random random =
                 CreateRandom(shapeSeed, 0x5F3759DF);
-
-            Vector3 direction = RandomHorizontalDirection(random);
-            Bounds bounds = CalculateBounds(positions);
-            float distance = leanAmount * Mathf.Max(bounds.size.x, bounds.size.z);
-
-            for (int i = 0; i < positions.Count; i++)
-            {
-                Vector3 position = positions[i];
-                float influence = (position.y - minimumY) / height;
-                position += direction * distance * influence;
-                positions[i] = position;
-            }
+            frame.LeanDirection = RandomHorizontalDirection(random);
+            Bounds bounds = CalculateBounds(referencePositions);
+            frame.LeanDistance = leanAmount *
+                Mathf.Max(bounds.size.x, bounds.size.z);
         }
 
-        private static void ApplyGrounding(
-            List<Vector3> positions,
-            GroundingStyle grounding)
+        private static void ResolveGroundingPlacementFrame(
+            List<Vector3> referencePositions,
+            GroundingStyle grounding,
+            ref MassPlacementFrame frame)
         {
             GetGroundingSettings(
                 grounding,
                 out float bandFraction,
                 out float flatteningStrength,
                 out float broadeningStrength);
-
             GetVerticalRange(
-                positions,
+                referencePositions,
                 out float minimumY,
                 out float maximumY);
 
-            float height = Mathf.Max(0.001f, maximumY - minimumY);
-            float groundingTop = minimumY + height * bandFraction;
-
-            for (int i = 0; i < positions.Count; i++)
-            {
-                Vector3 position = positions[i];
-
-                if (position.y >= groundingTop)
-                {
-                    continue;
-                }
-
-                float influence = 1f - Mathf.InverseLerp(
-                    minimumY,
-                    groundingTop,
-                    position.y);
-
-                influence = Mathf.SmoothStep(0f, 1f, influence);
-
-                position.y = Mathf.Lerp(
-                    position.y,
-                    minimumY,
-                    flatteningStrength * influence);
-
-                float broadening = 1f + broadeningStrength * influence;
-                position.x *= broadening;
-                position.z *= broadening;
-
-                positions[i] = position;
-            }
+            frame.GroundingMinimumY = minimumY;
+            frame.GroundingHeight = Mathf.Max(
+                0.001f,
+                maximumY - minimumY);
+            frame.GroundingTop = minimumY +
+                frame.GroundingHeight * bandFraction;
+            frame.GroundingFlatteningStrength = flatteningStrength;
+            frame.GroundingBroadeningStrength = broadeningStrength;
         }
 
-        private static void RecenterOnGround(List<Vector3> positions)
+        private static void ResolveGroundRecenterPlacementFrame(
+            List<Vector3> referencePositions,
+            ref MassPlacementFrame frame)
         {
             GetVerticalRange(
-                positions,
+                referencePositions,
                 out float minimumY,
                 out float maximumY);
-
             float height = Mathf.Max(0.001f, maximumY - minimumY);
             float contactBand = minimumY + height * 0.08f;
-
             Vector2 contactCentre = Vector2.zero;
             int contactCount = 0;
 
-            for (int i = 0; i < positions.Count; i++)
+            for (int positionIndex = 0;
+                 positionIndex < referencePositions.Count;
+                 positionIndex++)
             {
-                if (positions[i].y > contactBand)
+                Vector3 position = referencePositions[positionIndex];
+                if (position.y > contactBand)
                 {
                     continue;
                 }
-
-                contactCentre += new Vector2(
-                    positions[i].x,
-                    positions[i].z);
-
+                contactCentre += new Vector2(position.x, position.z);
                 contactCount++;
             }
-
             if (contactCount > 0)
             {
                 contactCentre /= contactCount;
             }
 
-            for (int i = 0; i < positions.Count; i++)
+            frame.RecenterMinimumY = minimumY;
+            frame.ContactBand = contactBand;
+            frame.ContactCentre = contactCentre;
+            frame.RecenterOffset = new Vector3(
+                -contactCentre.x,
+                -minimumY,
+                -contactCentre.y);
+        }
+
+        private static void ApplyMassPlacementFrame(
+            List<Vector3> positions,
+            MassPlacementFrame frame)
+        {
+            if (positions == null || positions.Count == 0)
             {
-                Vector3 position = positions[i];
-                position.x -= contactCentre.x;
-                position.z -= contactCentre.y;
-                position.y -= minimumY;
-                positions[i] = position;
+                return;
+            }
+            ApplyLean(positions, frame);
+            ApplyGrounding(positions, frame);
+            ApplyGroundRecenter(positions, frame);
+        }
+
+        private static void ApplyLean(
+            List<Vector3> positions,
+            MassPlacementFrame frame)
+        {
+            if (frame.LeanDistance <= 0f)
+            {
+                return;
+            }
+            for (int positionIndex = 0;
+                 positionIndex < positions.Count;
+                 positionIndex++)
+            {
+                Vector3 position = positions[positionIndex];
+                float influence =
+                    (position.y - frame.LeanMinimumY) /
+                    frame.LeanHeight;
+                position += frame.LeanDirection *
+                    frame.LeanDistance * influence;
+                positions[positionIndex] = position;
+            }
+        }
+
+        private static void ApplyGrounding(
+            List<Vector3> positions,
+            MassPlacementFrame frame)
+        {
+            for (int positionIndex = 0;
+                 positionIndex < positions.Count;
+                 positionIndex++)
+            {
+                Vector3 position = positions[positionIndex];
+                if (position.y >= frame.GroundingTop)
+                {
+                    continue;
+                }
+                float influence = 1f - Mathf.InverseLerp(
+                    frame.GroundingMinimumY,
+                    frame.GroundingTop,
+                    position.y);
+                influence = Mathf.SmoothStep(0f, 1f, influence);
+                position.y = Mathf.Lerp(
+                    position.y,
+                    frame.GroundingMinimumY,
+                    frame.GroundingFlatteningStrength * influence);
+                float broadening = 1f +
+                    frame.GroundingBroadeningStrength * influence;
+                position.x *= broadening;
+                position.z *= broadening;
+                positions[positionIndex] = position;
+            }
+        }
+
+        private static void ApplyGroundRecenter(
+            List<Vector3> positions,
+            MassPlacementFrame frame)
+        {
+            for (int positionIndex = 0;
+                 positionIndex < positions.Count;
+                 positionIndex++)
+            {
+                positions[positionIndex] += frame.RecenterOffset;
             }
         }
 

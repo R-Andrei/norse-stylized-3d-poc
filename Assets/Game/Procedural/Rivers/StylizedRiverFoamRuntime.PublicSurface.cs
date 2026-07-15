@@ -679,7 +679,7 @@ namespace ProgrammaticStylized3D.Rivers
              pendingIsolatedLifeProbe ||
              activeFoamCompositionEventCount > 0 ||
              IsTopologyDebugActive ||
-             IsProgressiveBirthSourceDebugActive ||
+             IsAutomaticBirthSourcesDebugActive ||
              (topologyMetricsLastCompletedAt >= 0.0 &&
               Time.realtimeSinceStartupAsDouble - topologyMetricsLastCompletedAt < 2.0));
         public string LifetimeAuthorityStatus => lifetimeAuthorityStatus;
@@ -725,16 +725,16 @@ namespace ProgrammaticStylized3D.Rivers
         public float FoamCompositionCumulativeCentrelineDistance =>
             foamCompositionCumulativeCentrelineDistance;
 
-        public bool ProgressiveBirthDebugReadbackAvailable =>
-            progressiveBirthDebugReadbackAvailable;
-        public bool ProgressiveBirthDebugReadbackPending =>
-            progressiveBirthDebugReadbackPending;
-        public uint ProgressiveBirthDebugLatestAffectedTexels =>
-            progressiveBirthDebugLatestAffectedTexels;
-        public uint ProgressiveBirthDebugCumulativeAffectedTexels =>
-            progressiveBirthDebugCumulativeAffectedTexels;
-        public bool ProgressiveBirthSourceDebugActive =>
-            IsProgressiveBirthSourceDebugActive;
+        public bool AutomaticBirthDebugReadbackAvailable =>
+            automaticBirthDebugReadbackAvailable;
+        public bool AutomaticBirthDebugReadbackPending =>
+            automaticBirthDebugReadbackPending;
+        public uint AutomaticBirthDebugLatestAffectedTexels =>
+            automaticBirthDebugLatestAffectedTexels;
+        public uint AutomaticBirthDebugCumulativeAffectedTexels =>
+            automaticBirthDebugCumulativeAffectedTexels;
+        public bool AutomaticBirthSourcesDebugActive =>
+            IsAutomaticBirthSourcesDebugActive;
         public string AutomaticShoreBirthStatus => automaticShoreBirthStatus;
         public int AutomaticShoreBirthSubmittedLastUpdate =>
             automaticShoreBirthSubmittedLastUpdate;
@@ -948,7 +948,7 @@ namespace ProgrammaticStylized3D.Rivers
             !TopologyReplacementInProgress &&
             !TopologyTransitionActive &&
             !IsTopologyDebugActive &&
-            !IsProgressiveBirthSourceDebugActive &&
+            !IsAutomaticBirthSourcesDebugActive &&
             !IsMotionFieldDebugActive &&
             !IsShapeProductDebugActive &&
             !materialLifetimeAuthorityActive &&
@@ -965,7 +965,7 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(filmSupportTexture) +
             EstimateTextureBytes(visualOccupancyA) +
             EstimateTextureBytes(visualOccupancyB) +
-            EstimateTextureBytes(progressiveBirthDebugTexture) +
+            EstimateTextureBytes(automaticBirthDebugTexture) +
             EstimateTextureBytes(topologyTexture) +
             EstimateTextureBytes(topologySourcesTexture) +
             EstimateTextureBytes(topologyGeneratedTexture) +
@@ -1084,9 +1084,9 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamDebugView ==
                         StylizedRiverFoamDebugView.FoamShapeDifference ||
                     river.FoamDebugView ==
-                        StylizedRiverFoamDebugView.FoamShaderDetailProbe ||
+                        StylizedRiverFoamDebugView.FoamChipAndStrandProbe ||
                     river.FoamDebugView ==
-                        StylizedRiverFoamDebugView.FoamShaderDetailDifference ||
+                        StylizedRiverFoamDebugView.FoamChipAndStrandDifference ||
                     river.FoamDebugView ==
                         StylizedRiverFoamDebugView.FoamFilmSource ||
                     river.FoamDebugView ==

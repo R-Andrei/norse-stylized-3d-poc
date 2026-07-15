@@ -63,7 +63,8 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundTrampledWearMaskInfluence("Ground Trampled Wear Mask Influence", Range(0, 1)) = 0.5
         [HideInInspector] _GroundTrampledWearDirection("Ground Trampled Wear Direction", Vector) = (1, 0, 0, 0)
         [HideInInspector] _GroundTrampledWearSeed("Ground Trampled Wear Seed", Float) = 0
-        [HideInInspector] _GroundPaintedAccentLineStrength("Ground Painted Accent Line Strength", Range(0, 1)) = 0
+        [HideInInspector] _GroundPaintedAccentLineStrength("Ground Painted Accent Legacy Stroke Strength", Range(0, 1)) = 0
+        [HideInInspector] _GroundPaintedAccentInkOpacity("Ground Painted Accent Ink Opacity", Range(0, 1)) = 1
         [HideInInspector] _GroundPaintedAccentCoverage("Ground Painted Accent Coverage", 2D) = "black" {}
         [HideInInspector] _GroundPaintedAccentCoverageEnabled("Ground Painted Accent Coverage Enabled", Float) = 0
         [HideInInspector] _GroundPaintedAccentCoverageOriginSize("Ground Painted Accent Coverage Origin Size", Vector) = (0, 0, 1, 1)

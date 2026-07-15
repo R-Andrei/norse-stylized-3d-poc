@@ -2919,15 +2919,20 @@ The bevel band is therefore interrupted from both axial ends. Edge `9`-only retr
 - [x] Preserve separate `[Direct Foreign Band-Plane Retreat Search]` and `[Dual-Endpoint Foreign-Plane Retreat Search]` file sections.
 - [x] Add an `activeSearchFailure` record so the current search blocker is reported separately from the historical pass-8 T-junction retained as `primaryFailure`.
 - [x] Preserve the cumulative full-file telemetry as the authoritative diagnostic record.
-- [x] Add an editor-only `Show Source Edge Numbers in Scene` toggle below the one authoritative rebuild button.
-- [x] Draw all source graph edges and their authoritative indices in the Scene view; emphasize the current search neighbourhood and provide `Only Active Search Edges` to reduce clutter.
-- [x] Keep the edge overlay non-serialized, editor-only, component-free, and absent from production geometry/runtime behaviour.
+- [x] Historical R6 implementation: add a bevel-preview-fed source-edge overlay and optional focus-only filtering.
+- [x] R6R3 correction: supersede preview-fed/focus-only ownership with an independent `Source Edge Index Debug` section.
+- [x] Build all source-edge records directly from the current mass recipe and source topology graph without requiring bevel-preview success, edge-wear amount, coverage, or geometry publication.
+- [x] Show all source edges whenever the independent overlay is enabled; current bevel-search edges may be highlighted but never hide unrelated source edges.
+- [x] Keep the source-edge debug feature non-serialized, editor-only, component-free, and absent from production geometry/runtime behaviour.
 - [x] R6R1 usability correction: draw the numbered source edges as an x-ray overlay with dark underlays, endpoint markers, separated callout labels, and a Scene status panel that reports visible/total records and the focused edge IDs.
 - [x] R6R1 inspector evidence: report focused/total overlay record counts and warn when focus-only filtering has no structured focus records.
 - [x] R6R2 callback correction: reject the per-inspector `OnSceneGUI` path after Unity showed populated `4 focused / 44 total` records while drawing neither the Scene panel nor any edge callouts.
 - [x] Register one editor-global `SceneView.duringSceneGui` renderer, keyed to the explicitly enabled Generated Mass instance, so source-edge diagnostics draw independently of bevel-transaction success and custom-editor instance lifecycle.
 - [x] Keep renderer state non-serialized and avoid continuous repaint by repainting only when enabled, filter, or target state changes.
 - [x] Preserve edge `0` as locality-deferred and preserve `EW-B4.1-STABLE` unchanged.
+- [x] R6R3 source-graph ownership correction: add `GenerateSourceEdgeIndexDebug`, `RefreshSourceEdgeIndexDebug`, and a separate non-serialized source-edge record cache.
+- [x] R6R3 inspector correction: replace `Only Active Search Edges` with `Show All Source Edge Numbers in Scene`, optional search highlighting, and an explicit `Refresh Source Edge Graph` action.
+- [x] R6R3 Scene contract: the status panel must report `44 shown / 44 total` for the reference rock; search focus changes colour only and cannot reduce the shown count.
 
 ### Expected reference search
 
@@ -2953,6 +2958,408 @@ A successful outcome remains `certifiedBuilt=39`, clean topology/face quality, o
 - [x] Accepted: edge `8` is a dual-endpoint band interaction; directly evidenced endpoint planes `7/9` are the only R6 width degrees of freedom.
 - [x] Accepted: full file telemetry remains the primary evidence source and is retained cumulatively across direct and dual searches.
 - [x] Accepted: numbered source-edge Scene diagnostics are useful now because solver records use stable source-edge IDs and the active neighbourhood is small.
+- [x] Accepted: source-edge indexing is a standalone topology diagnostic, not a bevel-preview subfeature; all source edges remain visible independently of solver state.
+- [x] Rejected: focus-only filtering as the primary overlay mode because it obscures the complete source graph and confused debug ownership.
 - [x] Rejected: reducing protected edges `8/20` before the dual endpoint planes have been tested independently.
 - [x] Rejected: expanding to incident-star neighbours `10/19/37` without new direct failure evidence.
 - [x] Rejected: serializing the edge-number overlay as an artistic or production setting.
+
+## EW-B4.2R7 — Canonical edge viability preflight
+
+### Purpose
+
+Maximum Coverage now means every **geometrically viable** bevel edge, not every mathematically convex source segment. A source edge must pass one canonical preflight before Coverage, corner solving, conflict reduction, or shell construction may use it.
+
+### Canonical hard gates
+
+- [x] Preserve the existing manifold, finite-normal, numerical-length, and convex structural gates.
+- [x] Require a minimum convex dihedral of `15 degrees`.
+- [x] Require `edgeLength >= requestedWidth * 2 + numericalGuard`.
+- [x] Build and cache one independent-plane locality interval from the immutable source polyhedron:
+  - retain every unrelated source vertex;
+  - retain the solid centre;
+  - remove both source-edge endpoints by the minimum required distance;
+  - reject when the retain floor exceeds the source-removal ceiling.
+- [x] Run one bounded isolated-edge certificate for each edge that survives the cheap gates.
+- [x] Require the isolated shell to pass owner/support clipping, topology, face quality, containment, bounds, retained volume, triangulation, and preview geometry certification.
+- [x] Require the maximum locally feasible width to remain at least `25%` of requested width.
+- [x] Require the isolated endpoint transitions to leave a central span of at least `max(minimumStableEdgeLength, requestedWidth * 0.5)`.
+- [x] Apply all hard gates before Coverage and before the shared corner solver.
+- [x] Keep artistic ranking separate. Maximum Coverage may override artistic ranking, but it may never override geometric viability.
+
+### Cached evidence contract
+
+- [x] Store one `EdgeWearEdgeViabilityRecord` per source edge in the evaluation audit.
+- [x] Map the same record from `EdgeKey` to authoritative source graph edge index once the graph exists.
+- [x] Cache the locality retain floor, removal ceiling, margin, limiting vertex, guard, and minimum source removal.
+- [x] Reuse the cached locality interval during plane construction; do not rescan all source vertices in solver passes.
+- [x] Cache isolated solved width, width fraction, endpoint consumption, remaining span, topology counts, and exact diagnostic.
+- [x] Record locality-evaluation count, isolated-evaluation count, locality-cache use count, and total preflight time in the full telemetry file.
+
+### Lifecycle and coverage semantics
+
+Every source edge ends preflight in exactly one state:
+
+```text
+StructuralIneligible
+GeometricIneligible
+ViableUnselected
+ViableSelected
+```
+
+Only `ViableSelected` edges enter corner solving and the whole-rock shell. Geometrically ineligible edges are not deferred, rejected, trial-rejected, or missing coverage.
+
+At maximum Coverage:
+
+```text
+coverage denominator = geometric eligible edges
+```
+
+A valid maximum-Coverage result requires every geometric-eligible selected edge to certify. Structural and geometric exclusions remain fully reported but do not invalidate materialized coverage.
+
+### Canonical failure reasons
+
+```text
+dihedral-below-bevel-viability
+edge-too-short-for-bevel-footprint
+independent-plane-locality-infeasible
+isolated-rail-solve-failed
+owner-face-support-insufficient
+maximum-feasible-width-below-minimum-scale
+endpoint-star-consumes-edge-span
+isolated-topology-invalid
+isolated-face-quality-invalid
+isolated-containment-invalid
+isolated-volume-or-bounds-invalid
+isolated-construction-invalid
+```
+
+No source-edge ID is encoded in any gate.
+
+### Telemetry
+
+The authoritative file adds:
+
+```text
+[Edge Viability Preflight]
+```
+
+with thresholds, cache-use counters, elapsed preflight time, and one complete record per source edge. Existing lifecycle, conflict, topology, numerical, and final-certification sections remain cumulative.
+
+### EW-B4.2R7 methods decision
+
+- [x] Accepted: viability is a prerequisite to selection, not a solver outcome.
+- [x] Accepted: locality is represented as a cached feasible plane-distance interval and consumed later without repeating the source-vertex scan.
+- [x] Accepted: the proven bounded isolated-edge builder is the authoritative per-edge construction certificate.
+- [x] Accepted: expensive deterministic preflight is dirty-time work and is performed once per physical evaluation; solver retries consume cached records.
+- [x] Accepted: global conflict solving remains necessary only for interactions among individually legitimate bevels.
+- [x] Rejected: Maximum Coverage overriding shortness, shallow-angle, locality, owner-support, isolated-construction, or minimum-width viability.
+- [x] Rejected: deciding inclusion or exclusion from source-edge IDs observed on one reference rock.
+- [x] Rejected: shrinking an intrinsically non-viable edge until it becomes visually or numerically meaningless.
+
+### Source-edge debug depth mode
+
+- [x] Default the independent source-edge overlay to depth-tested visible edges so rear-side source lines do not appear detached from the rendered mass.
+- [x] Retain an explicit `X-Ray Hidden Source Edges` toggle for complete topology inspection.
+- [x] Seed the shared corner solver from the cached maximum locally feasible width, so the bounded isolated width search is not repeated or ignored later in the same evaluation.
+
+## EW-B4.2R7R1 — Immutable source placement frame
+
+### Defect
+
+A certified bevel preview previously resolved dimensions, lean, grounding, and ground recentering from the reconstructed bevel triangle soup. Bevel reconstruction changes triangle count, low-vertex multiplicity, bounds, and sometimes the vertical range. The preview could therefore receive a different lean distance, grounding frame, and contact-centre translation than the unmodified source mass even though the GameObject Transform did not change.
+
+### Canonical placement contract
+
+- [x] Build one immutable pre-bevel source triangle soup from the authored plane-cut faces before any edge-wear transaction begins.
+- [x] Use the ordinary production triangulation inputs: current surface facet density, edge character, and surface seed.
+- [x] Resolve dimensions once and apply them to both the immutable reference and the output soup.
+- [x] Resolve lean parameters once from the dimensioned immutable source reference.
+- [x] Apply that lean frame to the immutable reference, then resolve grounding from the leaned source reference.
+- [x] Apply that grounding frame to the immutable reference, then resolve the ground-contact centre and vertical offset from the grounded source reference.
+- [x] Apply the completed frame unchanged to the bevel output and source-edge debug records.
+- [x] Never derive placement parameters from a reconstructed bevel soup.
+- [x] Preserve the existing output-derived placement path for ordinary non-bevel generation by using the output soup itself as the reference.
+- [x] Keep the cache local to one generation. Recipe or geometry changes create a new immutable source reference on the next explicit rebuild.
+
+### Placement telemetry
+
+The unified rebuild file appends:
+
+```text
+[Canonical Placement Frame]
+```
+
+with frame provenance, build/reuse counts, reference/output vertex counts, lean, grounding, recenter parameters, and the legacy output-derived frame delta that would previously have been applied to a successful preview.
+
+Required successful-preview invariants:
+
+```text
+placementFrameSource=immutable-pre-bevel
+placementFrameBuilds=1
+previewDerivedPlacementParameters=0
+objectTransformChanged=0
+previewUsesCanonicalFrame=1
+```
+
+### EW-B4.2R7R1 methods decision
+
+- [x] Accepted: source mass, successful bevel preview, and independent source-edge records must share one immutable source-derived placement frame.
+- [x] Accepted: the source reference may be triangulated once during the explicit editor rebuild; this is deterministic dirty-time work and is not repeated inside solver trials.
+- [x] Rejected: recomputing lean, grounding, or contact-centre placement from the bevel triangle soup.
+- [x] Rejected: changing the normal production mass placement algorithm as part of this preview alignment correction.
+
+## EW-B4.2R8 — Viability audit integrity
+
+### Purpose
+
+R7R1 established a valid `29/29` maximum-Coverage shell. R8 changes no geometry. It makes the accepted viability evidence deterministic, correctly named, and safe to consume in the upcoming multi-seed audit.
+
+### Isolated-width audit semantics
+
+- [x] Preserve the accepted viability and corner-width decisions unchanged.
+- [x] Distinguish the last attempted isolated width from a width that completed the full isolated geometry certificate.
+- [x] Record `isolatedSucceeded`, `lastAttemptedWidth`, `maximumCertifiedWidth`, and `maximumCertifiedWidthFraction`.
+- [x] When the isolated certificate fails, report `maximumCertifiedWidth=0` and `maximumCertifiedWidthFraction=0`; never label the last failed attempt as a maximum feasible width.
+- [x] Retain the internal accepted width-decision fields for unchanged R7 behavior; R8 changes telemetry semantics only.
+
+### Locality-cache contract
+
+- [x] Count a construction use only when the selected edge has an evaluated, locality-valid cached viability record.
+- [x] Count every missing or incomplete construction record as `localityCacheMissesDuringConstruction`.
+- [x] Fail candidate construction explicitly on a cache miss; never rescan source vertices as a fallback.
+- [x] Report locality evaluations, construction uses, solver recomputations, unused evaluated records, and construction cache misses.
+- [x] Required invariant: `recomputationsDuringSolver=0` and `localityCacheMissesDuringConstruction=0`.
+
+### Viability exclusion summary
+
+- [x] Build generic reason categories from lifecycle reason codes, never source-edge IDs.
+- [x] Report counts and exact ordered IDs for boundary, dihedral, footprint, locality, isolated-rail, owner-support, width-fraction, endpoint-span, and other exclusions.
+- [x] The category counts must reconstruct `source - structural/geometric exclusions = geometric eligible`.
+
+### Retired diagnostics
+
+- [x] Remove the explicit-junction-face coverage heuristic from the active plane-cut evaluation.
+- [x] Remove `legacyJunctionHeuristic`, `[Legacy Junction Heuristic - Non-Authoritative]`, and `legacyLocalJunctionDiagnostic` from Console and file telemetry.
+- [x] Preserve the authoritative local-junction extraction counts, final topology audit, open-edge dossiers, and T-junction dossiers.
+
+### Stable evaluation fingerprint
+
+- [x] Hash ordered exclusion reasons, selected edge IDs, certified edge IDs, exact final polygon topology, and the canonical placement frame.
+- [x] Append `[Stable Evaluation Fingerprint]` after canonical placement is resolved.
+- [x] Record source/structural/geometric/selected/certified counts plus component hashes and one combined evaluation hash.
+- [x] Identical rebuilds with unchanged settings must produce identical fingerprints.
+
+### Explicit non-goals
+
+- [x] Do not change `15 degrees`, `2x footprint`, `25% width`, or endpoint-span thresholds.
+- [x] Do not change selection, corner solving, plane construction, clipping, welding, topology tolerances, rendering, placement, or source-edge Scene debug.
+
+
+## EW-B4.2R9 — Editor-only multi-seed viability matrix
+
+### Purpose
+
+R9 changes no Generated Mass geometry. It executes the accepted R7/R8 viability and edge-plane-shell builder over a deterministic matrix without publishing any intermediate mesh or modifying the selected object.
+
+### Canonical matrix
+
+- [x] Add one inspector action: `Run Edge-Wear Viability Matrix (30 Cases)`.
+- [x] Use ten deterministic stratified shape seeds: `1`, `1112`, `2223`, `3334`, `4445`, `5556`, `6667`, `7778`, `8889`, and `9999`.
+- [x] Evaluate each seed at edge-wear width `0.05` (`minimum`), `1.0` (`default`), and `2.0` (`maximum`).
+- [x] Force maximum Coverage (`2.0`) for every matrix case while preserving the selected mass's other recipe and surface-feature settings.
+- [x] Run exactly one case per `EditorApplication.update` and expose cancellation through both the progress UI and Inspector.
+
+### Immutable evaluation contract
+
+- [x] Serialize the selected `MassRecipe` once and create an isolated clone for every case.
+- [x] Change only the clone's shape seed and the case-local edge-wear width/Coverage values.
+- [x] Call the same authoritative `UnifiedBoundedPreview` generation path used by manual evaluation.
+- [x] Build and discard `MeshData`; never call `MeshBuilder.ApplyToMesh`, bind a collider, or publish a preview.
+- [x] Suppress per-case Console records and per-case `GeneratedMassEdgeWearTelemetry.txt` writes while retaining the exact audit and placement results in memory.
+- [x] Verify after completion that the selected object's recipe JSON, local Transform, and shared mesh reference are unchanged.
+
+### Case pass contract
+
+Every case passes only when:
+
+```text
+completed
+previewApplied
+certifiedBuilt == coexistenceEligible
+coverageValid == 1
+geometryValid == 1
+meshValid == 1
+surfaceRenderValid == 1
+openEdges == 0
+nonManifoldEdges == 0
+tJunctions == 0
+invalidFaces == 0
+nonPlanarFaces == 0
+stableFingerprintPrepared == 1
+localityCacheMissesDuringConstruction == 0
+solverLocalityRecomputations == 0
+objectTransformChanged == 0
+previewDerivedPlacementParameters == 0
+previewUsesCanonicalFrame == 1
+```
+
+### Output contract
+
+- [x] Write `Library/GeneratedMassEdgeWearBatchAudit.txt` with aggregate counts and one compact full-fidelity record per case.
+- [x] Write `Library/GeneratedMassEdgeWearBatchAudit.csv` with one row per completed case.
+- [x] Record seed, width tier/value, eligibility and exclusion counts, certified/deferred/rejected counts, width reductions, topology, face quality, cache counters, timings, all six stable fingerprints, and exact primary failure.
+- [x] Emit one compact final Console summary only.
+- [x] Preserve partial results when the user cancels through the progress UI or Inspector.
+
+### Explicit non-goals
+
+- [x] Do not change viability thresholds, edge selection, corner solving, plane construction, conflict solving, topology tolerances, placement, rendering, or production geometry commit.
+- [x] Do not add serialized fields, components, objects, tags, layers, scenes, prefabs, materials, or runtime work.
+
+## EW-B4.2R10 — Coexistence viability closure
+
+### Evidence and purpose
+
+The R9 matrix completed all 30 coordinates without mutating the selected object, but only 25 cases certified. Three failures were missing source-vertex junctions, one was a near-endpoint T-junction, and one was a strict cached plane-pair intersection failure. Nine nominally successful cases also reduced at least one bevel below the accepted `0.25` meaningful-width fraction. R10 treats these as generic coexistence failures rather than edge-ID exceptions.
+
+### Hard materialized-width floor
+
+- [x] Reuse the canonical `EdgeWearMinimumFeasibleWidthFraction = 0.25` constant for both isolated viability and global conflict solving.
+- [x] Clamp every solver candidate minimum scale to at least `0.25` of requested width.
+- [x] Never report a shell as successful by reducing a bevel below the meaningful-width floor.
+- [x] Require the matrix case pass contract to report `minimumWidthScale >= 0.25`.
+
+### Bounded coexistence closure
+
+- [x] Run coexistence closure only after the complete individually viable candidate set fails authoritative plane construction or shell certification.
+- [x] Derive the implicated local candidate set from structured strict-intersection, open-edge, T-junction, retry-dossier, band-conflict, and source-vertex evidence.
+- [x] Invoke coexistence exclusion only for source-vertex-star, plane-pair/T-junction, or hard width-floor evidence; unrelated construction or face-quality failures remain terminal and cannot be hidden by dropping edges.
+- [x] Initial R10 used deterministic single/pair exclusion trials; R10R2 supersedes that greedy strategy with conflict-directed best-first states.
+- [x] Reuse the exact authoritative plane construction, preparation, band, topology, face-quality, containment, bounds, volume, render, and mesh certificates for every trial.
+- [x] When an intersection-cache entry fails its current owner/cut plane certificate, invalidate it and recompute the exact segment intersection once through the existing two-plane correction path; never loosen tolerance.
+- [x] Cache each retained-edge/scale trial for the physical evaluation; never repeat an identical coexistence trial.
+- [x] Bound closure to 12 exclusions, 128 evaluated states, and ten structured implicated candidates per failure.
+- [x] Select the first fully certified best-first state ordered by exclusion count, removed requested width, removed selection score, retained minimum scale, and stable edge order.
+- [x] Do not hardcode any source-edge IDs.
+
+### Lifecycle and Coverage
+
+- [x] Add `CoexistenceIneligible` after individual geometric viability and before final selection/certification accounting.
+- [x] Record exact generic reasons, including source-vertex-star, plane-pair, plane-band, width-floor, candidate-conservation, and terminal coexistence incompatibility.
+- [x] Remove coexistence-ineligible edges from selected/active state without classifying them as deferred, rejected, or trial-rejected.
+- [x] Maximum Coverage now requires `certified == coexistenceEligible`.
+- [x] Preserve structural and individual geometric counts so the audit can distinguish each denominator transition.
+
+### R9/R10 matrix integrity
+
+- [x] Initial R10 used report contract `EW-B4.2R10`; R10R2 supersedes it with `EW-B4.2R10R2`.
+- [x] Report geometric and coexistence eligibility separately, plus coexistence exclusions, trials, and cache uses.
+- [x] Classify missing-junction, T-junction, strict-intersection, face-quality, placement, width-floor, and other failures from authoritative primary-failure evidence rather than zeroed downstream flags.
+- [x] Preserve the same 30 deterministic cases and selected-object immutability contract.
+
+### Explicit non-goals
+
+- [x] Do not loosen topology, endpoint, plane, welding, or face-quality tolerances.
+- [x] Do not change source generation, individual viability thresholds, placement, rendering, scenes, prefabs, materials, components, tags, layers, or production geometry commit.
+- [x] Do not share caches between seeds or width coordinates.
+
+## EW-B4.2R10R2 — Conflict-directed closure and candidate conservation
+
+### Evidence and correction
+
+The first R10 matrix enforced the `0.25` materialized-width floor and corrected stale exact-intersection recovery, but only `21/30` cases certified. Six remaining failures exposed structured foreign-plane band splits that the closure did not classify, two were missing source-vertex junctions, and one retry dossier retained a T-junction. One trial also exposed a selected-versus-certified mismatch because retained candidates were not certified against the complete pre-closure selected set.
+
+### Conflict-directed best-first search
+
+- [x] Replace greedy permanent progress commits with a bounded best-first frontier.
+- [x] Search states contain the complete explicit exclusion set, retained scale map, authoritative audit, exact failure signature, and per-edge exclusion reasons.
+- [x] Expand only edges implicated by structured source-vertex, T-junction, strict-intersection, retry-dossier, band-victim/foreign, or candidate-conservation evidence.
+- [x] Order states by fewest exclusions, least removed requested width, least removed selection score, greatest retained minimum scale, and stable edge order.
+- [x] Deduplicate exact exclusion/scale states and keep the existing `12`-exclusion, `128`-state, ten-implicated-edge bounds.
+- [x] Commit lifecycle exclusions only after a completely certified winning state is selected; never publish intermediate progress exclusions.
+- [x] Add `plane-band-incompatible` as a structured coexistence reason without parsing diagnostic prose.
+- [x] Normalize retry T-junction and missing-junction evidence into the same generic closure categories.
+
+### Candidate-conservation certificate
+
+- [x] Build the root expected candidate set from pre-closure selected lifecycle records before coexistence closure.
+- [x] For every trial, require the actual retained candidate IDs to equal `rootExpected - explicitExclusions`.
+- [x] Encode explicit exclusions in the trial-cache key so absent upstream candidates cannot alias another search state.
+- [x] Reject any nominally successful geometry trial with missing or unexpected candidates as `candidate-conservation-failed`.
+- [x] Allow missing expected candidates to enter the structured conflict set so they can only disappear through an explicit `candidate-conservation-incompatible` lifecycle exclusion.
+- [x] Record expected, actual, missing, unexpected, and certified candidate evidence plus search-state telemetry.
+
+### Matrix/report integrity
+
+- [x] Update the report contract to `EW-B4.2R10R2`.
+- [x] Add plane-band and candidate-conservation exclusion counts.
+- [x] Record states evaluated/deduplicated, maximum depth, frontier remainder, winning depth, and candidate-conservation failures.
+- [x] Classify retry dossiers containing `t-junctions:` as T-junction failures and classify terminal band-split evidence separately from generic construction failure.
+
+### Explicit non-goals
+
+- [x] Do not loosen plane, topology, endpoint, welding, or face-quality tolerances.
+- [x] Do not change the `15 degree`, `2x`, `0.25`, or endpoint-span viability thresholds.
+- [x] Do not alter source generation, canonical placement, rendering, scenes, prefabs, materials, components, tags, layers, or production geometry commit.
+
+
+## EW-B4.2R10R3 — Structured trial dossiers and winning-state finalization
+
+### Structured failure provenance
+
+- [x] Add a typed coexistence failure dossier for plane-band, strict-intersection, missing-junction, T-junction, open-boundary, face-quality, containment, bounds, surface, and candidate-conservation outcomes.
+- [x] Populate a dossier for the root transaction and every exclusion trial, including failures that exit before band auditing.
+- [x] Preserve the parent dossier when a child exits before producing new structured evidence; never terminate a searchable plane-band or source-vertex-star branch merely because the child blocker is generic.
+- [x] Store immutable source-vertex star membership from the original individually viable candidate set and branch over the still-active members after each exclusion.
+- [x] Route search decisions from typed fields only; human-readable blocker text remains diagnostic.
+
+### Winning-state finalization
+
+- [x] Clear the failed root transaction's diagnostic, retry dossier, open-edge/T-junction stage, and stale conflict provenance after a certified coexistence winner is selected.
+- [x] Apply explicit coexistence exclusions, finalize retained lifecycle records as built, recalculate Coverage, and require exact denominator/count equality before returning success.
+- [x] Reject an internally inconsistent winner as `winning-state-finalization-failed` with all predicate values.
+- [x] Preserve candidate conservation, the `0.25` width floor, unchanged tolerances, and the canonical placement frame.
+
+### Search evidence
+
+- [x] Update the matrix report contract to `EW-B4.2R10R3`.
+- [x] Record stage, source vertex, victim/foreign pair, linked edges, immutable star, implicated edges, candidate counts, width scale, validity, and terminal signature for every processed state.
+- [x] Append per-case `[Case N Coexistence Search]` ledgers to the TXT batch report for every case that invokes closure.
+
+
+## EW-B4.2R10R4 — Corner-width eligibility reconciliation
+
+### Lifecycle correction
+
+- [x] Classify a selected individually viable edge with no shared corner-width entry as `corner-width-missing`.
+- [x] Classify a selected individually viable edge with width at or below `PointMergeDistance` as `corner-width-inactive`.
+- [x] Preserve geometric viability and `WidthInactive` evidence while clearing candidate, selected, active, attempted, built, trial-rejected, deferred, and rejected state.
+- [x] Keep corner-width exclusions distinct from search-time source-star, plane-pair, plane-band, width-floor, and candidate-conservation exclusions.
+
+### Coverage and finalization
+
+- [x] Add `UnresolvedWidthInactiveCount` and require it to be zero for materialized Coverage and committed winning-state finalization.
+- [x] Retain total `WidthInactiveCount` as cumulative evidence instead of clearing it to satisfy certification.
+- [x] Require the expected coexistence set to be selected, active, positive-width, coexistence-eligible, not deferred, and not rejected.
+- [x] Use candidate-ID fallback only when no Coverage audit exists.
+- [x] Publish the union of pre-shell and search-time exclusions after a certified winner.
+
+### Telemetry and reports
+
+- [x] Add dedicated corner-width missing/inactive exclusion counts and edge IDs.
+- [x] Record expected, actual, missing, and unexpected edge-ID sets for every search state.
+- [x] Separate terminal matrix candidate-conservation failures from failed intermediate search states.
+- [x] Update the matrix report contract to `EW-B4.2R10R4`.
+
+### Validation
+
+- [ ] Confirm seed `2223/minimum` reports two pre-shell corner-width exclusions, root candidate conservation `32/32`, and one generic T-junction exclusion.
+- [ ] Confirm the final case reports `coexistenceEligible == selected == certified == 31`, `widthInactive == 2`, and `unresolvedWidthInactive == 0`.
+- [ ] Run the unchanged 30-case matrix twice and require `30/30`, identical fingerprints/exclusion sets, zero topology/face-quality/placement/cache failures, and minimum width scale at least `0.25`.
+
+### Explicit non-goals
+
+- [x] Do not alter topology, endpoint, plane, clipping, welding, or face-quality tolerances.
+- [x] Do not add endpoint snapping or expand search budgets.
+- [x] Do not change source generation, individual viability thresholds, canonical placement, rendering, scenes, prefabs, materials, components, tags, layers, or production geometry commit.

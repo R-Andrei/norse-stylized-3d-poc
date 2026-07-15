@@ -11,14 +11,14 @@ namespace ProgrammaticStylized3D.Rivers
             injectKernel = computeShader.FindKernel("InjectFoam");
             rasterizeFoamSourceEventKernel =
                 computeShader.FindKernel("RasterizeFoamSourceEvent");
+            rasterizeFoamSourceEventDebugKernel =
+                computeShader.FindKernel("RasterizeFoamSourceEventDebug");
             writeIsolatedLifeProbeKernel =
                 computeShader.FindKernel("WriteIsolatedLifeProbe");
-            clearProgressiveBirthDebugAllKernel =
-                computeShader.FindKernel("ClearProgressiveBirthDebugAll");
-            clearProgressiveBirthDebugTransientKernel =
-                computeShader.FindKernel("ClearProgressiveBirthDebugTransient");
-            paintProgressiveBirthDebugSegmentKernel =
-                computeShader.FindKernel("PaintProgressiveBirthDebugSegment");
+            clearAutomaticBirthDebugAllKernel =
+                computeShader.FindKernel("ClearAutomaticBirthDebugAll");
+            clearAutomaticBirthDebugTransientKernel =
+                computeShader.FindKernel("ClearAutomaticBirthDebugTransient");
             buildCurrentShoreEdgesKernel =
                 computeShader.FindKernel("BuildCurrentShoreEdges");
             composeTopologyKernel =

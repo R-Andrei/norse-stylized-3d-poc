@@ -3254,10 +3254,10 @@ MonoBehaviour:
     smoothness: 0.18
     specularStrength: 0.15
   groundSurfaceType: 0
-  snowfieldVariant: 2
+  snowfieldVariant: 1
   surfaceStyleMigrationVersion: 1
   regenerateOnValidate: 1
-  debugView: 28
+  debugView: 0
   showPaintedAccentDistributionOverlay: 1
   showPaintedAccentWeightedProposals: 1
   showPaintedAccentLastAcceptedPositions: 1
@@ -3265,6 +3265,13 @@ MonoBehaviour:
   showPaintedAccentProjectedGlyphDebug: 1
   paintedAccentGlyphFamilyPreview: 0
   paintedAccentPlacementOverlayWeight: 0
+  paintedAccentProductionBakeIdentifier: f29eded2381a4a03b9ef575c3fa71095
+  paintedAccentProductionCoverageTexture: {fileID: 2800000, guid: 8f91ad7f88cd9cd44b1880fc834de310, type: 2}
+  paintedAccentProductionCoverageSignature: bfce06b04e5a602192669b7982c4267b6271352c0da0b4ce4f51797f7d48510c
+  paintedAccentProductionBakeFormatRevision: 1
+  paintedAccentProductionCoverageOriginSize: {x: -20, y: -20, z: 40, w: 40}
+  paintedAccentProductionCoveredTexelCount: 7448
+  paintedAccentProductionCoveredTexelFraction: 0.0017757416
   modifiers:
   - {fileID: 1356653796}
   rivers:
@@ -7730,6 +7737,286 @@ Transform:
   - {fileID: 1865931325}
   m_Father: {fileID: 1493436010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1321270436
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1321270441}
+  - component: {fileID: 1321270440}
+  - component: {fileID: 1321270439}
+  - component: {fileID: 1321270438}
+  - component: {fileID: 1321270437}
+  m_Layer: 0
+  m_Name: Generated Mass Test (3)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1321270437
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1321270436}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a9d6af0b3d05b941a278eca7294e877, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Masses.GeneratedMass
+  recipe:
+    archetype: 0
+    shapeSeed: 5727
+    surfaceSeed: 3778
+    size: 2
+    formComplexity: 2
+    surfaceFacetDensity: 2
+    edgeCharacter: 2
+    shapeDiversity: 1
+    grounding: 1
+    lean: 1
+    fineScale: 1
+    widthBias: 1
+    heightBias: 1
+    depthBias: 1
+    surfaceVariation: 0.225
+  regenerateOnValidate: 1
+  generationBudget: 0
+  customFeatureAtlasResolution: 256
+  featureRecipe: 0
+  stoneSurfaceProfile: 1
+  baseColor: {r: 0.39061943, g: 0.39342293, b: 0.3962264, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0.0517
+  creviceReach: 1.024
+  creviceSmoothness: 0.995
+  creviceBreakup: 1.62
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  exposureResponse: 1.894
+  creviceResponse: 1.24
+  baseResponse: 1.48
+  dirtDepositResponse: 1
+  exposureTint: {r: 0.72, g: 0.76, b: 0.78, a: 1}
+  exposureTintStrength: 0
+  creviceTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  creviceTintStrength: 0.24
+  baseTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  baseTintStrength: 0
+  dirtDepositTint: {r: 0.3490566, g: 0.34521478, b: 0.33753115, a: 1}
+  dirtDepositTintStrength: 0
+  overallRockTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  overallRockTintStrength: 0
+  lightingTintInfluence: 0.8
+  edgeWearAmount: 0.238
+  edgeWearWidth: 0.198
+  edgeWearCoverage: 2
+  edgeWearSoftness: 0.258
+  edgeWearResponseStrength: 1
+  edgeWearBrightnessLift: 1
+  edgeWearTint: {r: 0.7, g: 0.69, b: 0.62, a: 1}
+  edgeWearTintStrength: 0
+  edgeWearMacroVariation: 0
+  edgeWearMicroVariation: 0
+  creaseAmount: 1
+  creaseWidth: 1
+  creaseLength: 1
+  creaseBranching: 1
+  creaseSoftness: 0.35
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
+  riverInteraction:
+    participation: 0
+    staticPressureMode: 0
+    staticPressureStrength: 0.65
+    staticPressureContactSharpness: 2.8
+    staticPressureWaveResponse: 1
+    staticPressureProfileChangeIntervalMin: 0.75
+    staticPressureProfileChangeIntervalMax: 1.75
+    obstructionWakeMode: 0
+    obstructionWakeStrength: 1.5
+    obstructionWakeReach: 1
+    obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
+    responseProfile: 0
+    pressureStrength: 0.55
+    strengthMultiplier: 1
+    geometryAmplitude: 1
+    surfaceDetail: 1
+    responseStiffness: 1
+    wakeLength: 1
+    unsteadiness: 1
+    footprintPadding: 0.12
+    featureModelInitialized: 1
+  recipeInitialized: 1
+  lastAppliedArchetype: 0
+  lastAppliedFeatureRecipe: 0
+  acceptedProductionStateValid: 1
+  acceptedProductionState:
+    ContractVersion: 1
+    Archetype: 0
+    ShapeSeed: 5727
+    SurfaceSeed: 3778
+    Size: 2
+    FormComplexity: 2
+    SurfaceFacetDensity: 2
+    EdgeCharacter: 2
+    ShapeDiversity: 1
+    Grounding: 1
+    Lean: 1
+    FineScale: 1
+    WidthBias: 1
+    HeightBias: 1
+    DepthBias: 1
+    SurfaceVariation: 0.225
+  acceptedFeatureAtlasStateValid: 1
+  acceptedFeatureAtlasState:
+    ContractVersion: 1
+    ProductionState:
+      ContractVersion: 1
+      Archetype: 0
+      ShapeSeed: 5727
+      SurfaceSeed: 3778
+      Size: 2
+      FormComplexity: 2
+      SurfaceFacetDensity: 2
+      EdgeCharacter: 2
+      ShapeDiversity: 1
+      Grounding: 1
+      Lean: 1
+      FineScale: 1
+      WidthBias: 1
+      HeightBias: 1
+      DepthBias: 1
+      SurfaceVariation: 0.225
+    Request: 0
+    Resolution: 0
+    EdgeWearAmount: 0.238
+    EdgeWearWidth: 0.198
+    EdgeWearCoverage: 2
+    EdgeWearSoftness: 0.258
+    CreaseAmount: 1
+    CreaseWidth: 1
+    CreaseLength: 1
+    CreaseBranching: 1
+  acceptedRiverInteractionStateValid: 1
+  acceptedRiverInteractionState:
+    Participation: 0
+    PressureMode: 0
+    PressureStrength: 0.65
+    PressureContactSharpness: 2.8
+    PressureProfileVariation: 1
+    PressureProfileChangeIntervalMin: 0.75
+    PressureProfileChangeIntervalMax: 1.75
+    WakeMode: 0
+    WakeStrength: 1.5
+    WakeReach: 1
+    WakeSpread: 1
+    WakeVariation: 0.35
+    ImpactRippleCollisionMode: 0
+    FootprintPadding: 0.12
+--- !u!64 &1321270438
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1321270436}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 0}
+--- !u!23 &1321270439
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1321270436}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1321270440
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1321270436}
+  m_Mesh: {fileID: 0}
+--- !u!4 &1321270441
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1321270436}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -9.288, y: -0.078, z: -5.585}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1341973651
 GameObject:
   m_ObjectHideFlags: 0
@@ -10688,19 +10975,13 @@ MonoBehaviour:
   foamColour: {r: 0.80544674, g: 0.9031609, b: 0.9433962, a: 0.7882353}
   foamInteriorOpacityFloor: 0.352
   foamEdgeContrast: -0.356
-  foamChipStrength: 0
-  foamFrayStrength: 0
-  foamBreakupScale: 0
   foamChipActivation: 0.6
   foamChipCandidateSpacing: 0.12
-  foamChipDistributionIrregularity: 1
-  foamChipRadius: 0.22
-  foamChipRadiusRatio: 0.16
-  foamChipSizeIrregularity: 0.45
-  foamChipShapeIrregularity: 0.85
+  foamChipSize: 0.3152174
+  foamChipIrregularity: 1
   foamChipStableScreenRadiusPixels: 2.65
   foamChipMaximumViewScale: 2
-  foamChipSelectionDepth: 0.6
+  foamChipEdgeWidthPixels: 4
   foamChipInteriorAccess: 0.3
   foamChipFieldSpeed: 0.12
   foamChipFormationTime: 1.1
@@ -10716,12 +10997,6 @@ MonoBehaviour:
   foamChipShapeChangeAmount: 1
   foamChipShapeChangeSpeed: 0.13
   foamChipShapeTransitionTime: 4
-  foamChipEvolutionRate: 0.18
-  foamChipEvolutionAmount: 0.2
-  foamFraySelectionDepth: 0.68
-  foamFrayWavelength: 0.06
-  foamFrayDepth: 0
-  foamChipFraySelectionTuningVersion: 9
   foamStrandStrength: 0.86
   foamStrandScale: 0.56
   foamStrandDensity: 0.5
@@ -13425,5 +13700,6 @@ SceneRoots:
   - {fileID: 906572523}
   - {fileID: 1374330463}
   - {fileID: 1595308781}
+  - {fileID: 1321270441}
   - {fileID: 799756168}
   - {fileID: 2034979427}

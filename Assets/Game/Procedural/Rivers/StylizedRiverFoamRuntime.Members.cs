@@ -16,7 +16,7 @@ namespace ProgrammaticStylized3D.Rivers
         private ComputeShader computeShader;
         private RenderTexture stateA;
         private RenderTexture stateB;
-        private RenderTexture progressiveBirthDebugTexture;
+        private RenderTexture automaticBirthDebugTexture;
         private RenderTexture previousState;
         private RenderTexture currentState;
         private RenderTexture writeState;
@@ -64,7 +64,7 @@ namespace ProgrammaticStylized3D.Rivers
         private ComputeBuffer obstacleExclusionSampleBuffer;
         private ComputeBuffer topologyMetricsBuffer;
         private ComputeBuffer transportMetricsBuffer;
-        private ComputeBuffer progressiveBirthDebugCounterBuffer;
+        private ComputeBuffer automaticBirthDebugCounterBuffer;
         private ComputeBuffer automaticFoamSourceEventBuffer;
         private ComputeBuffer majorEvolutionBuffer;
         private ComputeBuffer hostedNegativeEvolutionBuffer;
@@ -252,8 +252,8 @@ namespace ProgrammaticStylized3D.Rivers
             new AutomaticFoamSourceEvent[AutomaticFoamSourceEventCapacity];
         private readonly FoamSourceEventGpuData[] automaticFoamSourceEventGpuData =
             new FoamSourceEventGpuData[AutomaticFoamSourceEventCapacity];
-        private readonly uint[] progressiveBirthDebugCounterReadback =
-            new uint[ProgressiveBirthDebugCounterCount];
+        private readonly uint[] automaticBirthDebugCounterReadback =
+            new uint[AutomaticBirthDebugCounterCount];
         private readonly List<RiverFoamStaticObjectSource>
             automaticObjectFoamSources = new();
         private readonly List<MeshFilter> obstacleExclusionMeshFilters = new();
@@ -477,10 +477,10 @@ namespace ProgrammaticStylized3D.Rivers
         private int clearKernel = -1;
         private int injectKernel = -1;
         private int rasterizeFoamSourceEventKernel = -1;
+        private int rasterizeFoamSourceEventDebugKernel = -1;
         private int writeIsolatedLifeProbeKernel = -1;
-        private int clearProgressiveBirthDebugAllKernel = -1;
-        private int clearProgressiveBirthDebugTransientKernel = -1;
-        private int paintProgressiveBirthDebugSegmentKernel = -1;
+        private int clearAutomaticBirthDebugAllKernel = -1;
+        private int clearAutomaticBirthDebugTransientKernel = -1;
         private int buildCurrentShoreEdgesKernel = -1;
         private int composeTopologyKernel = -1;
         private int captureGeneratedTopologyKernel = -1;
@@ -579,13 +579,14 @@ namespace ProgrammaticStylized3D.Rivers
         private int foamCompositionSegmentDispatchAttemptCount;
         private int foamCompositionSegmentDispatchSubmittedCount;
         private float foamCompositionCumulativeCentrelineDistance;
-        private bool progressiveBirthDebugResetPending;
-        private bool progressiveBirthDebugReadbackPending;
-        private bool progressiveBirthDebugReadbackAvailable;
-        private int progressiveBirthDebugResourceGeneration;
-        private int progressiveBirthDebugSessionGeneration;
-        private uint progressiveBirthDebugLatestAffectedTexels;
-        private uint progressiveBirthDebugCumulativeAffectedTexels;
+        private bool automaticBirthDebugResetPending;
+        private bool automaticBirthDebugActiveLastUpdate;
+        private bool automaticBirthDebugReadbackPending;
+        private bool automaticBirthDebugReadbackAvailable;
+        private int automaticBirthDebugResourceGeneration;
+        private int automaticBirthDebugSessionGeneration;
+        private uint automaticBirthDebugLatestAffectedTexels;
+        private uint automaticBirthDebugCumulativeAffectedTexels;
 
         private bool HasQueuedRebuildWork =>
             rebuildPhase != RebuildPhase.Idle ||

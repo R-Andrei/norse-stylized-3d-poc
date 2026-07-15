@@ -89,9 +89,23 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty smoothness;
         private SerializedProperty specularStrength;
 
-        private bool showGroundSurface = true;
+        private bool showGroundOverview = true;
         private bool showResolvedFeatureSummary;
+        private bool showGroundGeometry = true;
+        private bool showPatchDomain = true;
+        private bool showBaseShape = true;
+        private bool showMountainTransition;
+        private bool showSurfaceAppearance = true;
+        private bool showSurfaceResponseProfile = true;
+        private bool showSurfaceFeatures = true;
+        private bool showDirectionalStreaks;
+        private bool showPooledWetness;
+        private bool showTrampledWear;
+        private bool showGroundInteraction;
+        private bool showRegenerationAndCaching;
+        private bool showDebugAndDiagnostics;
         private bool showGroundDebug;
+        private bool showCurrentRegenerationTiming;
         private bool showRegenerationAccounting;
         private bool showPaintedAccentStrokes = true;
         private bool showPaintedAccentBasics = true;
@@ -101,25 +115,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool showPaintedAccentFamilyMix;
         private bool showPaintedAccentGeometry;
         private bool showPaintedAccentProfile;
-        private bool showPaintedAccentInk;
+        private bool showPaintedAccentPreviewAndProduction = true;
         private bool showPaintedAccentPlacementDebug;
         private bool showPaintedAccentPlacementOverlays;
         private bool showPaintedAccentShapeOverlay;
         private bool showPaintedAccentDiagnostics;
-        private bool showGeneration;
-        private bool showPatch;
-        private bool showTransition;
-        private bool showShape;
-        private bool showSurface;
         private bool showSurfaceDiagnostics;
-        private bool showModifiers;
         private bool showMaterialControls;
         private bool showMaterialPalette;
         private bool showMaterialPixelVariation;
         private bool showMaterialSemanticResponse;
         private bool showMaterialWeatherFinish;
         private bool showStyleAssetDetails;
-        private bool showAdvanced;
 
 
         private static bool DrawSectionFoldout(
@@ -363,35 +370,57 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             specularStrength =
                 groundMaterialControls.FindPropertyRelative("specularStrength");
+
+            Undo.undoRedoPerformed += HandleUndoRedo;
+        }
+
+        private void OnDisable()
+        {
+            Undo.undoRedoPerformed -= HandleUndoRedo;
+        }
+
+        private void HandleUndoRedo()
+        {
+            serializedObject.UpdateIfRequiredOrScript();
+
+            GeneratedGround[] grounds =
+                Object.FindObjectsByType<GeneratedGround>(
+                    FindObjectsInactive.Include);
+
+            for (int index = 0; index < grounds.Length; index++)
+            {
+                GeneratedGround ground = grounds[index];
+                if (IsLoadedSceneGround(ground))
+                {
+                    ground.RefreshSurfaceStyleState();
+                }
+            }
+
+            Repaint();
+            SceneView.RepaintAll();
         }
 
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
 
-            DrawGroundSurfaceAuthoringSection();
-            DrawGroundDebugSection();
-            DrawRegenerationAccountingSection();
+            DrawGroundOverviewSection();
+            DrawGroundGeometrySection();
+            DrawSurfaceAppearanceSection();
+            DrawSurfaceFeaturesSection();
             DrawPaintedAccentStrokeControls();
-            DrawGenerationSection();
-            DrawPatchSection();
-            DrawTransitionSection();
-            DrawShapeSection();
-            DrawSurfaceSection();
-            DrawModifierSection();
-            DrawAdvancedSection();
+            DrawGroundInteractionSection();
+            DrawRegenerationAndCachingSection();
+            DrawDebugAndDiagnosticsSection();
 
             serializedObject.ApplyModifiedProperties();
-
-            EditorGUILayout.Space(10f);
-            DrawActionButtons();
         }
 
-        private void DrawGroundSurfaceAuthoringSection()
+        private void DrawGroundOverviewSection()
         {
             if (!DrawSectionFoldout(
-                    ref showGroundSurface,
-                    "Ground Surface",
+                    ref showGroundOverview,
+                    "Ground Overview",
                     0f))
             {
                 return;
@@ -406,6 +435,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     GroundSurfaceStyleProfile;
 
             DrawSurfaceVariantPopup(style);
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Deterministic Identity",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.IntSlider(
+                shapeSeed,
+                GroundRecipe.MinimumSeed,
+                GroundRecipe.MaximumSeed,
+                new GUIContent(
+                    "Shape Seed",
+                    "Deterministic terrain variation seed."));
+            EditorGUILayout.PropertyField(
+                patchCoordinate,
+                new GUIContent(
+                    "Patch Coordinate",
+                    "Stable deterministic noise coordinate used by patch assembly."));
+
             DrawStyleWarnings(style);
             DrawSurfaceProfileOverride(style);
             DrawResolvedFeatureSummary();
@@ -623,13 +670,112 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     $"The selected family contains duplicate variant id '{duplicateId}'. Variant ids must be stable and unique.",
                     MessageType.Warning);
             }
+
+            DrawSelectedVariantFeatureWarnings(style, currentId);
         }
 
-        private void DrawGroundDebugSection()
+        private static void DrawSelectedVariantFeatureWarnings(
+            GroundSurfaceStyleProfile style,
+            string variantId)
         {
-            if (!DrawSectionFoldout(
+            GroundSurfaceVariantRecipe selectedVariant = null;
+
+            for (int index = 0; index < style.Variants.Count; index++)
+            {
+                GroundSurfaceVariantRecipe candidate = style.Variants[index];
+                if (candidate != null && candidate.Id == variantId)
+                {
+                    selectedVariant = candidate;
+                    break;
+                }
+            }
+
+            if (selectedVariant == null || selectedVariant.Features == null)
+            {
+                return;
+            }
+
+            System.Collections.Generic.HashSet<GroundSurfaceFeatureKind>
+                seenRuntimeKinds =
+                    new System.Collections.Generic.HashSet<
+                        GroundSurfaceFeatureKind>();
+
+            for (int index = 0;
+                 index < selectedVariant.Features.Count;
+                 index++)
+            {
+                GroundSurfaceFeatureRecipe feature =
+                    selectedVariant.Features[index];
+
+                if (feature == null)
+                {
+                    EditorGUILayout.HelpBox(
+                        $"Feature entry {index + 1} is missing.",
+                        MessageType.Warning);
+                    continue;
+                }
+
+                if (!feature.Enabled)
+                {
+                    continue;
+                }
+
+                if (feature.Kind == GroundSurfaceFeatureKind.None)
+                {
+                    EditorGUILayout.HelpBox(
+                        $"Feature entry {index + 1} is enabled but has kind None.",
+                        MessageType.Warning);
+                    continue;
+                }
+
+                if (feature.CostClass !=
+                    GroundSurfaceFeatureCostClass.ShaderOnly)
+                {
+                    EditorGUILayout.HelpBox(
+                        $"Enabled feature '{feature.Kind}' uses a reserved non-shader cost class and currently has no rendered output.",
+                        MessageType.Info);
+                    continue;
+                }
+
+                if (!IsCurrentlyRenderableShaderFeature(feature.Kind))
+                {
+                    EditorGUILayout.HelpBox(
+                        $"Enabled feature '{feature.Kind}' is reserved but not currently rendered by the Ground shader feature stack.",
+                        MessageType.Info);
+                    continue;
+                }
+
+                if (feature.Strength <= 0f)
+                {
+                    EditorGUILayout.HelpBox(
+                        $"Enabled feature '{feature.Kind}' has zero Strength and is ignored by runtime resolution.",
+                        MessageType.Info);
+                    continue;
+                }
+
+                if (!seenRuntimeKinds.Add(feature.Kind))
+                {
+                    EditorGUILayout.HelpBox(
+                        $"The selected variant has multiple runtime-applicable '{feature.Kind}' recipes. Runtime uses the first applicable entry and ignores later duplicates.",
+                        MessageType.Warning);
+                }
+            }
+        }
+
+        private static bool IsCurrentlyRenderableShaderFeature(
+            GroundSurfaceFeatureKind kind)
+        {
+            return kind == GroundSurfaceFeatureKind.DirectionalStreaks ||
+                kind == GroundSurfaceFeatureKind.PooledWetness ||
+                kind == GroundSurfaceFeatureKind.PaintedAccentLines ||
+                kind == GroundSurfaceFeatureKind.TrampledWear;
+        }
+
+        private void DrawGroundDebugControls()
+        {
+            if (!DrawSubsectionFoldout(
                     ref showGroundDebug,
-                    "Ground Debug"))
+                    "Ground Material Debug"))
             {
                 return;
             }
@@ -671,9 +817,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             EditorGUI.indentLevel--;
         }
 
-        private void DrawRegenerationAccountingSection()
+        private void DrawCurrentRegenerationTimingControls()
         {
-            if (!DrawSectionFoldout(
+            if (!DrawSubsectionFoldout(
+                    ref showCurrentRegenerationTiming,
+                    "Current Regeneration Timing"))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            if (targets.Length != 1 || target is not GeneratedGround ground)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select one GeneratedGround to inspect its latest regeneration pass.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            EditorGUILayout.HelpBox(
+                ground.LastRegenerationTimingDiagnostics,
+                MessageType.None);
+            if (GUILayout.Button("Copy Current Regeneration Timing"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildRegenerationTimingClipboardReport(ground);
+            }
+
+            EditorGUILayout.LabelField(
+                "Only stages executed by the latest pass are shown. Historical Painted Accent stage telemetry is retained separately below.",
+                EditorStyles.wordWrappedMiniLabel);
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawRegenerationAccountingControls()
+        {
+            if (!DrawSubsectionFoldout(
                     ref showRegenerationAccounting,
                     "Editor Regeneration Accounting"))
             {
@@ -695,12 +875,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 MessageType.None);
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Copy Latest Batch"))
+            if (GUILayout.Button("Copy Latest Accounting Batch"))
             {
                 EditorGUIUtility.systemCopyBuffer =
                     ground.LastEditorRegenerationAccountingReport;
             }
-            if (GUILayout.Button("Clear"))
+            if (GUILayout.Button("Clear Accounting"))
             {
                 ground.ClearEditorRegenerationAccounting();
                 Repaint();
@@ -711,35 +891,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
             EditorGUILayout.EndHorizontal();
 
-            EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
-                "Last Regeneration Stage Timing",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox(
-                ground.LastRegenerationTimingDiagnostics,
-                MessageType.None);
-
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Copy Stage Timing"))
-            {
-                EditorGUIUtility.systemCopyBuffer =
-                    BuildRegenerationTimingClipboardReport(ground);
-            }
-            if (GUILayout.Button("Copy Accounting + Timing"))
-            {
-                EditorGUIUtility.systemCopyBuffer =
-                    BuildCombinedGroundDiagnosticsClipboardReport(ground);
-            }
-            EditorGUILayout.EndHorizontal();
-
-            if (GUILayout.Button("Copy All Ground Reports"))
-            {
-                EditorGUIUtility.systemCopyBuffer =
-                    BuildAllGroundDiagnosticsClipboardReport(ground);
-            }
-
-            EditorGUILayout.LabelField(
-                "The accounting record is Editor-only and observational. The timing report retains the latest regeneration stage breakdown recorded by GeneratedGround.",
+                "Editor-only observational request/pass accounting. It does not change regeneration behavior.",
                 EditorStyles.wordWrappedMiniLabel);
             EditorGUI.indentLevel--;
         }
@@ -748,18 +901,40 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             GeneratedGround ground)
         {
             return
-                "GeneratedGround Full Generation Report\n" +
+                "GeneratedGround Current Regeneration Timing\n" +
                 ground.LastRegenerationTimingDiagnostics;
         }
 
-        private static string BuildCombinedGroundDiagnosticsClipboardReport(
+        private static string BuildSurfaceMaskDiagnosticsClipboardReport(
             GeneratedGround ground)
         {
             return
-                "GeneratedGround regeneration accounting\n" +
-                ground.LastEditorRegenerationAccountingReport +
-                "\n\n" +
-                BuildRegenerationTimingClipboardReport(ground);
+                "GeneratedGround Last Surface Mask Diagnostics\n" +
+                ground.LastSurfaceMaskDiagnostics;
+        }
+
+        private static string BuildPaintedAccentSurfaceStrokeTimingClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                "GeneratedGround Last Completed Painted Accent SurfaceStrokes Timing\n" +
+                ground.LastCompletedPaintedAccentSurfaceStrokeTimingDiagnostics;
+        }
+
+        private static string BuildPaintedAccentProjectedGlyphTimingClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                "GeneratedGround Last Completed Painted Accent ProjectedGlyphs Timing\n" +
+                ground.LastCompletedPaintedAccentProjectedGlyphTimingDiagnostics;
+        }
+
+        private static string BuildPaintedAccentCoverageTimingClipboardReport(
+            GeneratedGround ground)
+        {
+            return
+                "GeneratedGround Last Completed Painted Accent Coverage Timing\n" +
+                ground.LastCompletedPaintedAccentCoverageTimingDiagnostics;
         }
 
         private static string BuildPaintedAccentPlacementClipboardReport(
@@ -790,32 +965,51 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             GeneratedGround ground)
         {
             return
-                BuildRegenerationTimingClipboardReport(ground) +
+                BuildPaintedAccentSurfaceStrokeTimingClipboardReport(ground) +
                 "\n\n" +
                 BuildPaintedAccentPlacementClipboardReport(ground) +
                 "\n\n" +
-                BuildPaintedAccentCoverageClipboardReport(ground) +
+                BuildPaintedAccentProjectedGlyphTimingClipboardReport(ground) +
                 "\n\n" +
-                BuildPaintedAccentProjectedGlyphClipboardReport(ground);
+                BuildPaintedAccentProjectedGlyphClipboardReport(ground) +
+                "\n\n" +
+                BuildPaintedAccentCoverageTimingClipboardReport(ground) +
+                "\n\n" +
+                BuildPaintedAccentCoverageClipboardReport(ground);
         }
 
         private static string BuildAllGroundDiagnosticsClipboardReport(
             GeneratedGround ground)
         {
             return
-                "GeneratedGround regeneration accounting\n" +
-                ground.LastEditorRegenerationAccountingReport +
+                BuildRegenerationTimingClipboardReport(ground) +
                 "\n\n" +
-                BuildPaintedAccentGenerationDiagnosticsClipboardReport(ground);
+                BuildSurfaceMaskDiagnosticsClipboardReport(ground) +
+                "\n\n" +
+                BuildPaintedAccentGenerationDiagnosticsClipboardReport(ground) +
+                "\n\nGeneratedGround Editor Regeneration Accounting\n" +
+                ground.LastEditorRegenerationAccountingReport;
         }
 
         private void DrawPaintedAccentStrokeControls()
         {
             if (targets.Length != 1)
             {
+                if (DrawSectionFoldout(
+                        ref showPaintedAccentStrokes,
+                        "Painted Accents"))
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.HelpBox(
+                        "Shared Painted Accent editing is disabled for multi-object selection. Select one GeneratedGround so the exact shared variant recipe is unambiguous.",
+                        MessageType.Info);
+                    EditorGUI.indentLevel--;
+                }
+
                 return;
             }
 
+            GeneratedGround selectedGround = target as GeneratedGround;
             GroundSurfaceStyleProfile style =
                 surfaceStyleProfile.objectReferenceValue as
                     GroundSurfaceStyleProfile;
@@ -832,13 +1026,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             SerializedProperty feature =
                 FindSelectedPaintedAccentFeatureProperty(
                     styleObject,
-                    surfaceVariantId.stringValue);
+                    style,
+                    surfaceVariantId.stringValue,
+                    out int paintedAccentEntryCount,
+                    out int runtimeApplicableCount,
+                    out int firstPaintedAccentIndex,
+                    out int runtimeFeatureIndex,
+                    out int authoringFeatureIndex);
 
             if (feature == null)
             {
+                if (DrawSectionFoldout(
+                        ref showPaintedAccentStrokes,
+                        "Painted Accents"))
+                {
+                    EditorGUI.indentLevel++;
+                    DrawPaintedAccentResolutionWarnings(
+                        paintedAccentEntryCount,
+                        runtimeApplicableCount,
+                        firstPaintedAccentIndex,
+                        runtimeFeatureIndex,
+                        authoringFeatureIndex);
+                    EditorGUI.indentLevel--;
+                }
+
                 return;
             }
 
+            SerializedProperty enabled =
+                feature.FindPropertyRelative("enabled");
+            SerializedProperty costClass =
+                feature.FindPropertyRelative("costClass");
+            SerializedProperty strength =
+                feature.FindPropertyRelative("strength");
+            SerializedProperty maskInfluence =
+                feature.FindPropertyRelative("maskInfluence");
+            SerializedProperty seedOffset =
+                feature.FindPropertyRelative("seedOffset");
             SerializedProperty strokeWidth =
                 feature.FindPropertyRelative("paintedAccentStrokeWidth");
             SerializedProperty strokeDensity =
@@ -913,8 +1137,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
             SerializedProperty inkColor =
                 feature.FindPropertyRelative("paintedAccentInkColor");
+            SerializedProperty inkOpacity =
+                feature.FindPropertyRelative("paintedAccentInkOpacity");
+            SerializedProperty inkOpacityInitialized =
+                feature.FindPropertyRelative("paintedAccentInkOpacityInitialized");
 
-            if (strokeWidth == null ||
+            if (enabled == null ||
+                costClass == null ||
+                strength == null ||
+                maskInfluence == null ||
+                seedOffset == null ||
+                strokeWidth == null ||
                 strokeDensity == null ||
                 distributionPatchScale == null ||
                 distributionPatchiness == null ||
@@ -950,100 +1183,166 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 crestCrownHeight == null ||
                 foldIrregularity == null ||
                 foldEndTaper == null ||
-                inkColor == null)
+                inkColor == null ||
+                inkOpacity == null ||
+                inkOpacityInitialized == null)
             {
                 return;
             }
 
             bool styleChanged = false;
-
-            if (!horizontalCompanionsInitialized.boolValue)
-            {
-                horizontalCompanionStrength.floatValue = 0f;
-                companionTightness.floatValue = 0.65f;
-                horizontalCompanionsInitialized.boolValue = true;
-                styleChanged = true;
-            }
-
-            if (!companionTripletVerticalityInitialized.boolValue)
-            {
-                companionTripletVerticality.floatValue = 1f;
-                companionTripletVerticalityInitialized.boolValue = true;
-                styleChanged = true;
-            }
-
-            if (!companionQuotaControlsInitialized.boolValue)
-            {
-                companionTripletShare.floatValue = 0.45f;
-                companionAccentBias.floatValue = 0.65f;
-                companionQuotaControlsInitialized.boolValue = true;
-                styleChanged = true;
-            }
-
-            if (!companionLayoutWeightsInitialized.boolValue)
-            {
-                pairSteppedWeight.floatValue = 0.45f;
-                pairShoulderWeight.floatValue = 0.30f;
-                pairOffsetWeight.floatValue = 0.20f;
-                pairShallowWeight.floatValue = 0.05f;
-                tripletSteppedRunWeight.floatValue = 0.40f;
-                tripletCrownRunWeight.floatValue = 0.30f;
-                tripletBrokenTerraceWeight.floatValue = 0.25f;
-                tripletShallowRunWeight.floatValue = 0.05f;
-                companionLayoutWeightsInitialized.boolValue = true;
-                styleChanged = true;
-            }
-
-            if (!familyWeightsInitialized.boolValue)
-            {
-                completeMoundWeight.floatValue = 0.20f;
-                asymmetricMoundWeight.floatValue = 0.30f;
-                singleShoulderWeight.floatValue = 0.30f;
-                shallowCrestWeight.floatValue = 0.20f;
-                familyWeightsInitialized.boolValue = true;
-                styleChanged = true;
-            }
-
-            if (!strokePathWiggleInitialized.boolValue)
-            {
-                strokePathWiggle.floatValue = 0.35f;
-                strokePathWiggleInitialized.boolValue = true;
-                styleChanged = true;
-            }
+            bool paintedAccentAuthoringNeedsInitialization =
+                !horizontalCompanionsInitialized.boolValue ||
+                !companionTripletVerticalityInitialized.boolValue ||
+                !companionQuotaControlsInitialized.boolValue ||
+                !companionLayoutWeightsInitialized.boolValue ||
+                !familyWeightsInitialized.boolValue ||
+                !strokePathWiggleInitialized.boolValue;
 
             bool expanded = DrawSectionFoldout(
                 ref showPaintedAccentStrokes,
-                "Painted Accent Strokes");
+                "Painted Accents");
 
             if (expanded)
             {
                 EditorGUI.indentLevel++;
 
+                GroundSurfaceVariantRecipe selectedVariant =
+                    ResolveSelectedVariant(style, surfaceVariantId.stringValue);
+                DrawSharedVariantAuthoringScope(style, selectedVariant, false);
+
                 EditorGUILayout.HelpBox(
-                    "Edits placement descriptors, projected contour families, horizontal companion composition, and authored ink. Production glyphs remain mesh-free and bake into the shared R8 coverage texture.",
+                    "Edits the first runtime-applicable Painted Accent recipe. If none is currently applicable, it edits the first matching recipe so Enabled, Execution Path, and Stroke Intensity can restore it. Stroke Intensity and shape controls rebuild procedural coverage; Ink Colour and Ink Opacity are material-only.",
                     MessageType.None);
+
+                DrawPaintedAccentResolutionWarnings(
+                    paintedAccentEntryCount,
+                    runtimeApplicableCount,
+                    firstPaintedAccentIndex,
+                    runtimeFeatureIndex,
+                    authoringFeatureIndex);
+
+                if (paintedAccentAuthoringNeedsInitialization)
+                {
+                    EditorGUILayout.HelpBox(
+                        "This recipe still relies on compatibility defaults. The Inspector no longer writes those defaults merely by being drawn. Initialize them explicitly before editing Painted Accent-specific values.",
+                        MessageType.Warning);
+
+                    if (GUILayout.Button(
+                            "Initialize Painted Accent Authoring Values"))
+                    {
+                        Undo.RecordObject(
+                            style,
+                            "Initialize Painted Accent Authoring Values");
+
+                        if (!horizontalCompanionsInitialized.boolValue)
+                        {
+                            horizontalCompanionStrength.floatValue = 0f;
+                            companionTightness.floatValue = 0.65f;
+                            horizontalCompanionsInitialized.boolValue = true;
+                        }
+
+                        if (!companionTripletVerticalityInitialized.boolValue)
+                        {
+                            companionTripletVerticality.floatValue = 1f;
+                            companionTripletVerticalityInitialized.boolValue = true;
+                        }
+
+                        if (!companionQuotaControlsInitialized.boolValue)
+                        {
+                            companionTripletShare.floatValue = 0.45f;
+                            companionAccentBias.floatValue = 0.65f;
+                            companionQuotaControlsInitialized.boolValue = true;
+                        }
+
+                        if (!companionLayoutWeightsInitialized.boolValue)
+                        {
+                            pairSteppedWeight.floatValue = 0.45f;
+                            pairShoulderWeight.floatValue = 0.30f;
+                            pairOffsetWeight.floatValue = 0.20f;
+                            pairShallowWeight.floatValue = 0.05f;
+                            tripletSteppedRunWeight.floatValue = 0.40f;
+                            tripletCrownRunWeight.floatValue = 0.30f;
+                            tripletBrokenTerraceWeight.floatValue = 0.25f;
+                            tripletShallowRunWeight.floatValue = 0.05f;
+                            companionLayoutWeightsInitialized.boolValue = true;
+                        }
+
+                        if (!familyWeightsInitialized.boolValue)
+                        {
+                            completeMoundWeight.floatValue = 0.20f;
+                            asymmetricMoundWeight.floatValue = 0.30f;
+                            singleShoulderWeight.floatValue = 0.30f;
+                            shallowCrestWeight.floatValue = 0.20f;
+                            familyWeightsInitialized.boolValue = true;
+                        }
+
+                        if (!strokePathWiggleInitialized.boolValue)
+                        {
+                            strokePathWiggle.floatValue = 0.35f;
+                            strokePathWiggleInitialized.boolValue = true;
+                        }
+
+                        styleObject.ApplyModifiedProperties();
+                        EditorUtility.SetDirty(style);
+                        paintedAccentPlacementDebugSignature = int.MinValue;
+                        RefreshLoadedGroundsUsingStyleVariant(
+                            style,
+                            surfaceVariantId.stringValue,
+                            true);
+                    }
+
+                    EditorGUI.indentLevel--;
+                    return;
+                }
 
                 if (DrawSubsectionFoldout(
                         ref showPaintedAccentBasics,
-                        "Stroke Basics"))
+                        "Enable and Visibility"))
                 {
                     EditorGUI.indentLevel++;
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.PropertyField(
+                        enabled,
+                        new GUIContent(
+                            "Enable Painted Accents",
+                            "Disables Painted Accents while preserving the shared recipe values."));
+                    EditorGUILayout.PropertyField(
+                        costClass,
+                        new GUIContent(
+                            "Execution Path",
+                            "Shader Only is the current Painted Accent path. Other values are reserved and do not render."));
+                    EditorGUILayout.Slider(
+                        strength,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Stroke Intensity",
+                            "Controls generated per-stroke strength and slight projected-profile amplitude. Zero makes the recipe runtime-inactive. This changes procedural coverage and is not Ink Opacity."));
+                    EditorGUILayout.PropertyField(
+                        inkColor,
+                        new GUIContent(
+                            "Ink Colour",
+                            "Family/variant-authored line colour. Material-only update; does not rebuild placement, projected glyphs, or coverage."));
+                    styleChanged |= EditorGUI.EndChangeCheck();
+                    styleChanged |= DrawPaintedAccentInkOpacityControl(
+                        inkOpacity,
+                        inkOpacityInitialized);
                     EditorGUI.BeginChangeCheck();
                     EditorGUILayout.Slider(
                         strokeWidth,
                         0.002f,
                         0.20f,
                         new GUIContent(
-                            "Stroke Width",
-                            "Visible authored projected-contour width in metres. BodyWidth remains texture/debug support only."));
-                    EditorGUILayout.Slider(
-                        strokeDensity,
-                        0f,
-                        2000f,
-                        new GUIContent(
-                            "Stroke Density",
-                            "Approximate requested stroke proposals per standard 40x40 ground patch. Regional concentration redistributes a fixed average share of this population; physical validation may reduce the final count."));
+                            "Stroke Width (m)",
+                            "Authored projected-contour width in metres. This affects placement validation and coverage, so changing it rebuilds Painted Accents."));
                     styleChanged |= EditorGUI.EndChangeCheck();
+
+                    if (target is GeneratedGround generatedGround)
+                    {
+                        DrawPaintedAccentVisibilityStatus(generatedGround);
+                    }
+
                     EditorGUI.indentLevel--;
                 }
 
@@ -1056,6 +1355,25 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         "Scale controls the size of sparse/dense structure. Contrast controls how strongly the field separates into populated and quiet areas. Cluster Region Bias only decides where the fixed companion quota is concentrated.",
                         MessageType.None);
                     EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.Slider(
+                        maskInfluence,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Surface Suitability Influence",
+                            "How strongly generated semantic Ground masks gate Painted Accent placement."));
+                    EditorGUILayout.PropertyField(
+                        seedOffset,
+                        new GUIContent(
+                            "Pattern Seed Offset",
+                            "Stable Painted Accent seed offset mixed with the Ground seed."));
+                    EditorGUILayout.Slider(
+                        strokeDensity,
+                        0f,
+                        2000f,
+                        new GUIContent(
+                            "Stroke Density",
+                            "Approximate requested stroke proposals per standard 40x40 ground patch. Physical validation may reduce the final count."));
                     EditorGUILayout.Slider(
                         distributionPatchScale,
                         2f,
@@ -1288,28 +1606,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     EditorGUI.indentLevel--;
                 }
 
-                if (DrawSubsectionFoldout(
-                        ref showPaintedAccentInk,
-                        "Authored Ink"))
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUI.BeginChangeCheck();
-                    EditorGUILayout.PropertyField(
-                        inkColor,
-                        new GUIContent(
-                            "Ink Color",
-                            "Family/variant-authored opaque ink colour blended through the generated projected coverage texture into ground albedo."));
-                    styleChanged |= EditorGUI.EndChangeCheck();
-                    EditorGUI.indentLevel--;
-                }
-
                 EditorGUI.indentLevel--;
             }
 
             if (strokeLengthMax.floatValue < strokeLengthMin.floatValue + 0.05f)
             {
-                strokeLengthMax.floatValue = strokeLengthMin.floatValue + 0.05f;
-                styleChanged = true;
+                EditorGUILayout.HelpBox(
+                    "Stroke Length Max is below the minimum valid separation. Runtime currently resolves it to Stroke Length Min + 0.05 m; edit the value explicitly to remove this compatibility correction.",
+                    MessageType.Warning);
             }
 
             if (styleChanged)
@@ -1317,27 +1621,418 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 styleObject.ApplyModifiedProperties();
                 EditorUtility.SetDirty(style);
                 paintedAccentPlacementDebugSignature = int.MinValue;
-                ApplyToTargets(
-                    "Tune Painted Accent Distribution, Companions, Families, Profile, and Ink",
-                    ground => ground.RefreshSurfaceMaterialProperties());
+                RefreshLoadedGroundsUsingStyleVariant(
+                    style,
+                    surfaceVariantId.stringValue,
+                    true);
             }
 
-            DrawPaintedAccentPlacementDebugControls();
+            if (expanded)
+            {
+                EditorGUI.indentLevel++;
+                DrawPaintedAccentPreviewAndProductionControls(
+                    selectedGround);
+                EditorGUI.indentLevel--;
+            }
+        }
+
+        private void DrawPaintedAccentPreviewAndProductionControls(
+            GeneratedGround ground)
+        {
+            if (ground == null ||
+                !DrawSubsectionFoldout(
+                    ref showPaintedAccentPreviewAndProduction,
+                    "Preview and Production"))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            GroundPaintedAccentProductionBakeDiagnostics diagnostics =
+                ground.GetPaintedAccentProductionBakeDiagnostics();
+            bool duplicateIdentifier =
+                GroundPaintedAccentProductionBaker
+                    .HasDuplicateIdentifier(ground);
+            bool ownershipMismatch =
+                GroundPaintedAccentProductionBaker
+                    .HasOwnershipMismatch(ground);
+            GroundPaintedAccentProductionBakeStatus productionStatus =
+                duplicateIdentifier || ownershipMismatch
+                    ? GroundPaintedAccentProductionBakeStatus.Incompatible
+                    : diagnostics.ProductionStatus;
+            if (Application.isPlaying)
+            {
+                EditorGUILayout.LabelField(
+                    "Edit Preview",
+                    "Suspended during Play Mode");
+                EditorGUILayout.LabelField(
+                    "Renderer Source",
+                    "Persistent production coverage (PA-B2)");
+                EditorGUILayout.LabelField(
+                    "Runtime Coverage",
+                    FormatRuntimeCoverageStatus(
+                        ground.PaintedAccentRuntimeCoverageStatus));
+            }
+            else
+            {
+                EditorGUILayout.LabelField(
+                    "Live Preview",
+                    FormatLivePreviewStatus(diagnostics.LivePreviewStatus));
+                EditorGUILayout.LabelField(
+                    "Renderer Source",
+                    "Live procedural preview (Edit Mode)");
+            }
+            EditorGUILayout.LabelField(
+                Application.isPlaying
+                    ? "Production Artifact"
+                    : "Production Bake",
+                Application.isPlaying
+                    ? FormatRuntimeProductionArtifactStatus(productionStatus)
+                    : FormatProductionBakeStatus(productionStatus));
+
+            string assetPath =
+                diagnostics.ProductionTexture != null
+                    ? AssetDatabase.GetAssetPath(
+                        diagnostics.ProductionTexture)
+                    : string.Empty;
+            if (!string.IsNullOrWhiteSpace(assetPath))
+            {
+                EditorGUILayout.LabelField(
+                    "Production Asset",
+                    assetPath,
+                    EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField(
+                    "Production Resolution",
+                    $"{diagnostics.ProductionTexture.width} × " +
+                    $"{diagnostics.ProductionTexture.height} R8");
+                EditorGUILayout.LabelField(
+                    "Covered Texels",
+                    $"{diagnostics.CoveredTexelCount:N0} " +
+                    $"({diagnostics.CoveredTexelFraction * 100f:F3}%)");
+            }
+
+            if (duplicateIdentifier)
+            {
+                EditorGUILayout.HelpBox(
+                    "This Ground shares a generated-output identifier with another loaded Ground, usually because the object was duplicated. The next bake will assign this Ground a new identifier and output asset instead of overwriting the shared texture.",
+                    MessageType.Warning);
+            }
+
+            if (ownershipMismatch)
+            {
+                EditorGUILayout.HelpBox(
+                    "The stored production texture belongs to a different scene or generated-output path. This commonly occurs after copying a scene. Rebake to create an output owned by the current scene without overwriting the original.",
+                    MessageType.Error);
+            }
+
+            switch (productionStatus)
+            {
+                case GroundPaintedAccentProductionBakeStatus.Missing:
+                    EditorGUILayout.HelpBox(
+                        "No persistent Painted Accent production coverage exists yet.",
+                        MessageType.Info);
+                    break;
+
+                case GroundPaintedAccentProductionBakeStatus.Stale:
+                    EditorGUILayout.HelpBox(
+                        "The persistent coverage does not match the current geometry, placement, eligibility, cluster, profile, or coverage inputs. Ink Colour and Ink Opacity do not make this bake stale.",
+                        MessageType.Warning);
+                    break;
+
+                case GroundPaintedAccentProductionBakeStatus.Incompatible:
+                    if (!duplicateIdentifier && !ownershipMismatch)
+                    {
+                        EditorGUILayout.HelpBox(
+                            "The stored production output uses an incompatible bake contract, texture format, or mapping record. Rebake it.",
+                            MessageType.Error);
+                    }
+                    break;
+            }
+
+            if (!Application.isPlaying &&
+                diagnostics.LivePreviewStatus !=
+                    GroundPaintedAccentLivePreviewStatus.Current)
+            {
+                EditorGUILayout.HelpBox(
+                    "Bake will first regenerate the Ground and rebuild the live Painted Accent preview so the persistent output is sourced from current authoritative coverage.",
+                    MessageType.Info);
+            }
+
+            if (Application.isPlaying &&
+                ground.PaintedAccentRuntimeCoverageStatus !=
+                    GroundPaintedAccentRuntimeCoverageStatus.Current &&
+                ground.PaintedAccentRuntimeCoverageStatus !=
+                    GroundPaintedAccentRuntimeCoverageStatus.NotRequired)
+            {
+                EditorGUILayout.HelpBox(
+                    string.IsNullOrWhiteSpace(
+                        ground.PaintedAccentRuntimeCoverageFailureReason)
+                        ? "Runtime production coverage is unavailable. No procedural fallback is active."
+                        : ground.PaintedAccentRuntimeCoverageFailureReason,
+                    MessageType.Error);
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       Application.isPlaying ||
+                       EditorUtility.IsPersistent(ground)))
+            {
+                if (GUILayout.Button("Validate Production Bake"))
+                {
+                    GroundPaintedAccentProductionValidator
+                        .ShowGroundValidationDialog(ground);
+                    serializedObject.Update();
+                    Repaint();
+                }
+
+                if (GUILayout.Button("Bake Painted Accents"))
+                {
+                    bool baked =
+                        GroundPaintedAccentProductionBaker.Bake(
+                            ground,
+                            out string message);
+                    EditorUtility.DisplayDialog(
+                        baked
+                            ? "Painted Accent Bake Complete"
+                            : "Painted Accent Bake Failed",
+                        message,
+                        "OK");
+                    serializedObject.Update();
+                    Repaint();
+                }
+
+                using (new EditorGUI.DisabledScope(
+                           diagnostics.ProductionTexture == null &&
+                           string.IsNullOrWhiteSpace(
+                               diagnostics.BakeIdentifier) &&
+                           string.IsNullOrWhiteSpace(
+                               diagnostics.StoredCoverageSignature) &&
+                           diagnostics.StoredFormatRevision == 0))
+                {
+                    if (GUILayout.Button("Release Production Bake"))
+                    {
+                        bool release = EditorUtility.DisplayDialog(
+                            "Release Painted Accent Production Bake?",
+                            "This clears the Ground's production texture reference, identifier, signature, mapping, and bake metadata. The generated asset is not deleted. Save the scene, then run Audit and Clean Painted Accent Assets to remove it once no project reference remains.",
+                            "Release",
+                            "Cancel");
+                        if (release)
+                        {
+                            Undo.RecordObject(
+                                ground,
+                                "Release Painted Accent Production Bake");
+                            ground
+                                .EditorReleasePaintedAccentProductionBake();
+                            EditorUtility.SetDirty(ground);
+                            serializedObject.Update();
+                            SceneView.RepaintAll();
+                            Repaint();
+                        }
+                    }
+                }
+            }
+
+            EditorGUILayout.HelpBox(
+                "Validate Production Bake refreshes authoritative Edit Mode coverage and compares it without writing an asset. Release Production Bake clears this Ground's serialized ownership but deliberately leaves the generated texture for the project-wide cleanup audit. Player builds render only from the persistent R8 output, and PA-B3 blocks builds when required production coverage is invalid. No procedural runtime fallback is executed.",
+                MessageType.None);
+            EditorGUI.indentLevel--;
+        }
+
+        private static string FormatLivePreviewStatus(
+            GroundPaintedAccentLivePreviewStatus status)
+        {
+            return status switch
+            {
+                GroundPaintedAccentLivePreviewStatus.Current => "Current",
+                GroundPaintedAccentLivePreviewStatus.Stale => "Stale",
+                _ => "Missing"
+            };
+        }
+
+        private static string FormatProductionBakeStatus(
+            GroundPaintedAccentProductionBakeStatus status)
+        {
+            return status switch
+            {
+                GroundPaintedAccentProductionBakeStatus.Current => "Current",
+                GroundPaintedAccentProductionBakeStatus.Stale => "Stale",
+                GroundPaintedAccentProductionBakeStatus.Incompatible =>
+                    "Incompatible",
+                _ => "Missing"
+            };
+        }
+
+        private static string FormatRuntimeProductionArtifactStatus(
+            GroundPaintedAccentProductionBakeStatus status)
+        {
+            return status switch
+            {
+                GroundPaintedAccentProductionBakeStatus.Current =>
+                    "Available (structural validation)",
+                GroundPaintedAccentProductionBakeStatus.Incompatible =>
+                    "Incompatible",
+                GroundPaintedAccentProductionBakeStatus.Stale => "Stale",
+                _ => "Missing"
+            };
+        }
+
+        private static string FormatRuntimeCoverageStatus(
+            GroundPaintedAccentRuntimeCoverageStatus status)
+        {
+            return status switch
+            {
+                GroundPaintedAccentRuntimeCoverageStatus.Current => "Current",
+                GroundPaintedAccentRuntimeCoverageStatus.NotRequired =>
+                    "Not required (feature disabled)",
+                GroundPaintedAccentRuntimeCoverageStatus.Missing => "Missing",
+                GroundPaintedAccentRuntimeCoverageStatus.Incompatible =>
+                    "Incompatible",
+                _ => "Not evaluated"
+            };
+        }
+
+        private static bool DrawPaintedAccentInkOpacityControl(
+            SerializedProperty opacity,
+            SerializedProperty initialized)
+        {
+            float resolvedOpacity =
+                initialized.boolValue
+                    ? Mathf.Clamp01(opacity.floatValue)
+                    : 1f;
+
+            EditorGUI.BeginChangeCheck();
+            float authoredOpacity = EditorGUILayout.Slider(
+                new GUIContent(
+                    "Ink Opacity",
+                    "Material-only albedo blend after coverage generation. Increasing it makes lines more visible without rebuilding placement, projected glyphs, or coverage."),
+                resolvedOpacity,
+                0f,
+                1f);
+            bool changed = EditorGUI.EndChangeCheck();
+
+            if (changed)
+            {
+                opacity.floatValue = authoredOpacity;
+                initialized.boolValue = true;
+            }
+            else if (!initialized.boolValue)
+            {
+                EditorGUILayout.HelpBox(
+                    "This existing recipe uses the GI-A3 compatibility opacity of 1.00. Moving Ink Opacity records an explicit authored value; merely viewing this Inspector does not mutate the asset.",
+                    MessageType.Info);
+            }
+
+            return changed;
+        }
+
+        private static void DrawPaintedAccentVisibilityStatus(
+            GeneratedGround ground)
+        {
+            GroundPaintedAccentVisibilityDiagnostics diagnostics =
+                ground.GetPaintedAccentVisibilityDiagnostics();
+
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField(
+                "Resolved Visibility",
+                EditorStyles.miniBoldLabel);
+
+            if (!diagnostics.HasRuntimeFeature)
+            {
+                EditorGUILayout.HelpBox(
+                    "No runtime-applicable Painted Accent recipe currently resolves. Enable the recipe, select Shader Only, and keep Stroke Intensity above zero.",
+                    MessageType.Warning);
+                return;
+            }
+
+            EditorGUILayout.LabelField(
+                "Coverage",
+                diagnostics.CoverageGenerated
+                    ? $"{diagnostics.TextureWidth} × {diagnostics.TextureHeight} R8"
+                    : "Not generated");
+            EditorGUILayout.LabelField(
+                "Coverage Binding",
+                diagnostics.MaterialBindingCurrent
+                    ? "Current"
+                    : "Stale or incomplete");
+            EditorGUILayout.LabelField(
+                "Coverage Mapping",
+                diagnostics.CoverageMappingMatchesMeshBounds
+                    ? "Matches generated mesh bounds"
+                    : "Does not match generated mesh bounds");
+            EditorGUILayout.LabelField(
+                "World Texel Size",
+                diagnostics.MaximumTexelWorldSize > 0f
+                    ? $"{diagnostics.MaximumTexelWorldSize:F5} m"
+                    : "Unavailable");
+            EditorGUILayout.LabelField(
+                "Authored Width",
+                diagnostics.MaximumTexelWorldSize > 0f
+                    ? $"{diagnostics.AuthoredStrokeWidth:F5} m ({diagnostics.AuthoredWidthInTexels:F2} texels)"
+                    : $"{diagnostics.AuthoredStrokeWidth:F5} m");
+            EditorGUILayout.LabelField(
+                "Ink Opacity",
+                $"{diagnostics.InkOpacity * 100f:F0}%");
+            EditorGUILayout.LabelField(
+                "Estimated Max Palette Contrast",
+                $"{diagnostics.EstimatedMaximumVisibleChannelDifference:F3}");
+
+            if (!diagnostics.CoverageGenerated)
+            {
+                EditorGUILayout.HelpBox(
+                    "Projected coverage has not been generated. Regenerate Ground before judging visibility or binding.",
+                    MessageType.Info);
+            }
+            else if (!diagnostics.CoverageEnabled)
+            {
+                EditorGUILayout.HelpBox(
+                    "Coverage diagnostics exist, but the renderer-local coverage enable state is off.",
+                    MessageType.Error);
+            }
+
+            if (diagnostics.CoverageGenerated &&
+                !diagnostics.MaterialBindingCurrent)
+            {
+                EditorGUILayout.HelpBox(
+                    "The renderer MaterialPropertyBlock does not match the current coverage texture, mapping, ink, or opacity. Regenerate or perform a material refresh before evaluating the visual result.",
+                    MessageType.Error);
+            }
+
+            if (diagnostics.CoverageGenerated &&
+                !diagnostics.CoverageMappingMatchesMeshBounds)
+            {
+                EditorGUILayout.HelpBox(
+                    "Coverage origin or size does not match the generated mesh bounds. Use Raw Coverage Binding debug to distinguish mapping from colour/opacity problems.",
+                    MessageType.Error);
+            }
+
+            if (diagnostics.AuthoredWidthInTexels > 0f &&
+                diagnostics.AuthoredWidthInTexels < 1f)
+            {
+                EditorGUILayout.HelpBox(
+                    "The authored line is narrower than one coverage texel. Partial raster coverage and bilinear filtering can soften it even when Ink Opacity is high.",
+                    MessageType.Warning);
+            }
+
+            if (diagnostics.InkOpacity <= 0.15f ||
+                diagnostics.EstimatedMaximumVisibleChannelDifference < 0.05f)
+            {
+                EditorGUILayout.HelpBox(
+                    "The current ink contribution is likely difficult to see in normal lit rendering. Increase Ink Opacity or choose an Ink Colour with stronger contrast against the Ground palette.",
+                    MessageType.Warning);
+            }
         }
 
         private void DrawPaintedAccentPlacementDebugControls()
         {
-            if (!DrawSectionFoldout(
+            if (!DrawSubsectionFoldout(
                     ref showPaintedAccentPlacementDebug,
-                    "Painted Accent Placement Debug",
-                    4f))
+                    "Painted Accent Scene Debug"))
             {
                 return;
             }
 
             EditorGUI.indentLevel++;
             EditorGUILayout.HelpBox(
-                "Editor-only Scene view overlays and read-only generation diagnostics. These controls do not change production coverage.",
+                "Editor-only Scene view overlays. These controls do not change production coverage or generate report data.",
                 MessageType.None);
 
             bool debugChanged = false;
@@ -1442,162 +2137,432 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     MessageType.Warning);
             }
 
-            if (DrawSubsectionFoldout(
-                    ref showPaintedAccentDiagnostics,
-                    "Last Generation Diagnostics"))
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField(
-                    "Last Regeneration Timing",
-                    EditorStyles.miniBoldLabel);
-                EditorGUILayout.HelpBox(
-                    ground.LastRegenerationTimingDiagnostics,
-                    MessageType.None);
-                if (GUILayout.Button("Copy Regeneration Timing"))
-                {
-                    EditorGUIUtility.systemCopyBuffer =
-                        BuildRegenerationTimingClipboardReport(ground);
-                }
-
-                EditorGUILayout.LabelField(
-                    "Last Generated",
-                    EditorStyles.miniBoldLabel);
-                EditorGUILayout.HelpBox(
-                    ground.GetLastPaintedAccentPlacementStatistics(),
-                    MessageType.None);
-                if (GUILayout.Button("Copy Last Generated"))
-                {
-                    EditorGUIUtility.systemCopyBuffer =
-                        BuildPaintedAccentPlacementClipboardReport(ground);
-                }
-
-                EditorGUILayout.LabelField(
-                    "Projected Coverage Bake",
-                    EditorStyles.miniBoldLabel);
-                EditorGUILayout.HelpBox(
-                    ground.GetLastPaintedAccentCoverageStatistics(),
-                    MessageType.None);
-                if (GUILayout.Button("Copy Projected Coverage Bake"))
-                {
-                    EditorGUIUtility.systemCopyBuffer =
-                        BuildPaintedAccentCoverageClipboardReport(ground);
-                }
-
-                if (showPaintedAccentProjectedGlyphDebug.boolValue)
-                {
-                    EditorGUILayout.LabelField(
-                        "Accepted Projected Baseline",
-                        EditorStyles.miniBoldLabel);
-                    EditorGUILayout.HelpBox(
-                        ground.GetLastPaintedAccentProjectedGlyphStatistics(),
-                        MessageType.None);
-                    if (GUILayout.Button("Copy Accepted Projected Baseline"))
-                    {
-                        EditorGUIUtility.systemCopyBuffer =
-                            BuildPaintedAccentProjectedGlyphClipboardReport(ground);
-                    }
-                }
-
-                if (GUILayout.Button("Copy All Generation Diagnostics"))
-                {
-                    EditorGUIUtility.systemCopyBuffer =
-                        BuildPaintedAccentGenerationDiagnosticsClipboardReport(ground);
-                }
-
-                EditorGUI.indentLevel--;
-            }
-
             EditorGUI.indentLevel--;
         }
 
-        private static SerializedProperty FindSelectedPaintedAccentFeatureProperty(
-            SerializedObject styleObject,
-            string variantId)
+        private void DrawPaintedAccentDiagnosticsControls()
         {
-            SerializedProperty variants =
-                styleObject.FindProperty("variants");
-
-            if (variants == null || !variants.isArray)
-            {
-                return null;
-            }
-
-            for (int variantIndex = 0;
-                 variantIndex < variants.arraySize;
-                 variantIndex++)
-            {
-                SerializedProperty variant =
-                    variants.GetArrayElementAtIndex(variantIndex);
-                SerializedProperty id =
-                    variant.FindPropertyRelative("id");
-
-                if (id == null || id.stringValue != variantId)
-                {
-                    continue;
-                }
-
-                SerializedProperty features =
-                    variant.FindPropertyRelative("features");
-
-                if (features == null || !features.isArray)
-                {
-                    return null;
-                }
-
-                for (int featureIndex = 0;
-                     featureIndex < features.arraySize;
-                     featureIndex++)
-                {
-                    SerializedProperty feature =
-                        features.GetArrayElementAtIndex(featureIndex);
-                    SerializedProperty kind =
-                        feature.FindPropertyRelative("kind");
-
-                    if (kind != null &&
-                        kind.intValue ==
-                        (int)GroundSurfaceFeatureKind.PaintedAccentLines)
-                    {
-                        return feature;
-                    }
-                }
-
-                return null;
-            }
-
-            return null;
-        }
-
-        private void DrawGenerationSection()
-        {
-            if (!DrawSectionFoldout(
-                    ref showGeneration,
-                    "Generation"))
+            if (!DrawSubsectionFoldout(
+                    ref showPaintedAccentDiagnostics,
+                    "Painted Accent Reports"))
             {
                 return;
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.IntSlider(
-                shapeSeed,
-                GroundRecipe.MinimumSeed,
-                GroundRecipe.MaximumSeed,
-                new GUIContent(
-                    "Shape Seed",
-                    "Deterministic terrain variation."));
+            if (targets.Length != 1 || target is not GeneratedGround ground)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select one GeneratedGround to inspect its retained Painted Accent reports.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+                return;
+            }
 
-            EditorGUILayout.PropertyField(
-                regenerateOnValidate,
-                new GUIContent(
-                    "Live Regeneration",
-                    "Regenerate when recipe values change."));
+            EditorGUILayout.LabelField(
+                "Last Completed SurfaceStrokes Timing",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                ground.LastCompletedPaintedAccentSurfaceStrokeTimingDiagnostics,
+                MessageType.None);
+            if (GUILayout.Button("Copy SurfaceStrokes Timing"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildPaintedAccentSurfaceStrokeTimingClipboardReport(ground);
+            }
+
+            EditorGUILayout.LabelField(
+                "Last Placement Result",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                ground.GetLastPaintedAccentPlacementStatistics(),
+                MessageType.None);
+            if (GUILayout.Button("Copy Placement Report"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildPaintedAccentPlacementClipboardReport(ground);
+            }
+
+            EditorGUILayout.LabelField(
+                "Last Completed ProjectedGlyphs Timing",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                ground.LastCompletedPaintedAccentProjectedGlyphTimingDiagnostics,
+                MessageType.None);
+            if (GUILayout.Button("Copy ProjectedGlyphs Timing"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildPaintedAccentProjectedGlyphTimingClipboardReport(ground);
+            }
+
+            EditorGUILayout.LabelField(
+                "Accepted Projected Baseline",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                ground.GetLastPaintedAccentProjectedGlyphStatistics(),
+                MessageType.None);
+            if (GUILayout.Button("Copy Projected Baseline"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildPaintedAccentProjectedGlyphClipboardReport(ground);
+            }
+
+            EditorGUILayout.LabelField(
+                "Last Completed Coverage Timing",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                ground.LastCompletedPaintedAccentCoverageTimingDiagnostics,
+                MessageType.None);
+            if (GUILayout.Button("Copy Coverage Timing"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildPaintedAccentCoverageTimingClipboardReport(ground);
+            }
+
+            EditorGUILayout.LabelField(
+                "Last Coverage Raster",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                ground.GetLastPaintedAccentCoverageStatistics(),
+                MessageType.None);
+            if (GUILayout.Button("Copy Coverage Report"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildPaintedAccentCoverageClipboardReport(ground);
+            }
+
+            if (GUILayout.Button("Copy All Painted Accent Reports"))
+            {
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildPaintedAccentGenerationDiagnosticsClipboardReport(ground);
+            }
+
+            EditorGUILayout.LabelField(
+                "These reports retain the last completed stage result. Merely opening or copying them does not regenerate Painted Accents.",
+                EditorStyles.wordWrappedMiniLabel);
             EditorGUI.indentLevel--;
         }
 
-        private void DrawPatchSection()
+        private static SerializedProperty FindSelectedPaintedAccentFeatureProperty(
+            SerializedObject styleObject,
+            GroundSurfaceStyleProfile style,
+            string variantId,
+            out int paintedAccentEntryCount,
+            out int runtimeApplicableCount,
+            out int firstPaintedAccentIndex,
+            out int runtimeFeatureIndex,
+            out int authoringFeatureIndex)
+        {
+            paintedAccentEntryCount = 0;
+            runtimeApplicableCount = 0;
+            firstPaintedAccentIndex = -1;
+            runtimeFeatureIndex = -1;
+            authoringFeatureIndex = -1;
+
+            if (!TryFindSelectedVariantProperty(
+                    styleObject,
+                    style,
+                    variantId,
+                    out GroundSurfaceVariantRecipe selectedVariant,
+                    out SerializedProperty serializedVariant))
+            {
+                return null;
+            }
+
+            return FindAuthoringFeatureProperty(
+                serializedVariant,
+                selectedVariant,
+                GroundSurfaceFeatureKind.PaintedAccentLines,
+                out paintedAccentEntryCount,
+                out runtimeApplicableCount,
+                out firstPaintedAccentIndex,
+                out runtimeFeatureIndex,
+                out authoringFeatureIndex);
+        }
+
+        private static SerializedProperty FindAuthoringFeatureProperty(
+            SerializedProperty serializedVariant,
+            GroundSurfaceVariantRecipe variant,
+            GroundSurfaceFeatureKind kind,
+            out int matchingEntryCount,
+            out int runtimeApplicableCount,
+            out int firstMatchingIndex,
+            out int runtimeFeatureIndex,
+            out int authoringFeatureIndex)
+        {
+            matchingEntryCount = 0;
+            runtimeApplicableCount = 0;
+            firstMatchingIndex = -1;
+            runtimeFeatureIndex = -1;
+            authoringFeatureIndex = -1;
+
+            if (serializedVariant == null ||
+                variant == null ||
+                variant.Features == null)
+            {
+                return null;
+            }
+
+            variant.TryGetFirstShaderFeature(
+                kind,
+                out GroundSurfaceFeatureRecipe runtimeFeature);
+
+            for (int featureIndex = 0;
+                 featureIndex < variant.Features.Count;
+                 featureIndex++)
+            {
+                GroundSurfaceFeatureRecipe candidate =
+                    variant.Features[featureIndex];
+
+                if (candidate == null || candidate.Kind != kind)
+                {
+                    continue;
+                }
+
+                if (firstMatchingIndex < 0)
+                {
+                    firstMatchingIndex = featureIndex;
+                }
+
+                matchingEntryCount++;
+
+                if (candidate.CanApplyAsShaderOnly)
+                {
+                    runtimeApplicableCount++;
+                }
+
+                if (object.ReferenceEquals(candidate, runtimeFeature))
+                {
+                    runtimeFeatureIndex = featureIndex;
+                }
+            }
+
+            authoringFeatureIndex =
+                runtimeFeatureIndex >= 0
+                    ? runtimeFeatureIndex
+                    : firstMatchingIndex;
+
+            SerializedProperty features =
+                serializedVariant.FindPropertyRelative("features");
+
+            if (features == null ||
+                !features.isArray ||
+                authoringFeatureIndex < 0 ||
+                authoringFeatureIndex >= features.arraySize)
+            {
+                return null;
+            }
+
+            return features.GetArrayElementAtIndex(authoringFeatureIndex);
+        }
+
+        private static void DrawPaintedAccentResolutionWarnings(
+            int paintedAccentEntryCount,
+            int runtimeApplicableCount,
+            int firstPaintedAccentIndex,
+            int runtimeFeatureIndex,
+            int authoringFeatureIndex)
+        {
+            DrawFeatureResolutionWarnings(
+                "Painted Accents",
+                paintedAccentEntryCount,
+                runtimeApplicableCount,
+                firstPaintedAccentIndex,
+                runtimeFeatureIndex,
+                authoringFeatureIndex);
+        }
+
+        private static void DrawFeatureResolutionWarnings(
+            string label,
+            int matchingEntryCount,
+            int runtimeApplicableCount,
+            int firstMatchingIndex,
+            int runtimeFeatureIndex,
+            int authoringFeatureIndex)
+        {
+            if (matchingEntryCount == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    $"The selected variant has no {label} recipe. Use Advanced Style Asset only when adding or restructuring recipe entries; normal tuning remains in this Inspector.",
+                    MessageType.Info);
+                return;
+            }
+
+            if (runtimeApplicableCount == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    $"No {label} entry is currently runtime-applicable. The controls below edit recipe entry {authoringFeatureIndex + 1}; enable it, choose Shader Only, and set its visible intensity above zero to render it.",
+                    MessageType.Warning);
+            }
+
+            if (runtimeApplicableCount > 1)
+            {
+                EditorGUILayout.HelpBox(
+                    $"The selected variant has {runtimeApplicableCount} runtime-applicable {label} recipes. Runtime and this Inspector use the first applicable entry; later duplicates are ignored.",
+                    MessageType.Warning);
+            }
+
+            if (firstMatchingIndex >= 0 &&
+                runtimeFeatureIndex > firstMatchingIndex)
+            {
+                EditorGUILayout.HelpBox(
+                    $"One or more earlier {label} entries are disabled, non-shader, or zero-intensity. They are ignored; the controls below edit the first entry the renderer actually uses.",
+                    MessageType.Info);
+            }
+
+            if (matchingEntryCount > 1)
+            {
+                EditorGUILayout.LabelField(
+                    "Authoring Entry",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.LabelField(
+                    $"Variant entry {authoringFeatureIndex + 1}; {matchingEntryCount} matching recipes",
+                    EditorStyles.miniLabel);
+            }
+        }
+
+        private bool TryGetSingleSelectedVariantContext(
+            out GroundSurfaceStyleProfile style,
+            out GroundSurfaceVariantRecipe variant,
+            out SerializedObject styleObject,
+            out SerializedProperty serializedVariant)
+        {
+            style = null;
+            variant = null;
+            styleObject = null;
+            serializedVariant = null;
+
+            if (targets.Length != 1 ||
+                surfaceStyleProfile.hasMultipleDifferentValues ||
+                surfaceVariantId.hasMultipleDifferentValues)
+            {
+                return false;
+            }
+
+            style = surfaceStyleProfile.objectReferenceValue as
+                GroundSurfaceStyleProfile;
+
+            if (style == null)
+            {
+                return false;
+            }
+
+            styleObject = new SerializedObject(style);
+            styleObject.Update();
+
+            return TryFindSelectedVariantProperty(
+                styleObject,
+                style,
+                surfaceVariantId.stringValue,
+                out variant,
+                out serializedVariant);
+        }
+
+        private static bool TryFindSelectedVariantProperty(
+            SerializedObject styleObject,
+            GroundSurfaceStyleProfile style,
+            string variantId,
+            out GroundSurfaceVariantRecipe variant,
+            out SerializedProperty serializedVariant)
+        {
+            variant = null;
+            serializedVariant = null;
+
+            if (styleObject == null ||
+                style == null ||
+                style.Variants == null)
+            {
+                return false;
+            }
+
+            int selectedVariantIndex = -1;
+
+            for (int variantIndex = 0;
+                 variantIndex < style.Variants.Count;
+                 variantIndex++)
+            {
+                GroundSurfaceVariantRecipe candidate =
+                    style.Variants[variantIndex];
+
+                if (candidate != null && candidate.Id == variantId)
+                {
+                    variant = candidate;
+                    selectedVariantIndex = variantIndex;
+                    break;
+                }
+            }
+
+            SerializedProperty variants =
+                styleObject.FindProperty("variants");
+
+            if (variant == null ||
+                variants == null ||
+                !variants.isArray ||
+                selectedVariantIndex < 0 ||
+                selectedVariantIndex >= variants.arraySize)
+            {
+                return false;
+            }
+
+            serializedVariant =
+                variants.GetArrayElementAtIndex(selectedVariantIndex);
+            return serializedVariant != null;
+        }
+
+        private static GroundSurfaceVariantRecipe ResolveSelectedVariant(
+            GroundSurfaceStyleProfile style,
+            string variantId)
+        {
+            if (style != null &&
+                style.TryGetVariant(
+                    variantId,
+                    out GroundSurfaceVariantRecipe variant))
+            {
+                return variant;
+            }
+
+            return null;
+        }
+
+        private static void DrawSharedVariantAuthoringScope(
+            GroundSurfaceStyleProfile style,
+            GroundSurfaceVariantRecipe variant,
+            bool materialControlsOnly)
+        {
+            string styleName =
+                style != null ? style.DisplayName : "Missing Style";
+            string variantName =
+                variant != null ? variant.DisplayName : "Missing Variant";
+            string consequence = materialControlsOnly
+                ? "Changes affect every GeneratedGround using this style variant without a local material override."
+                : "Changes affect every GeneratedGround using this style variant.";
+
+            EditorGUILayout.HelpBox(
+                $"Editing Shared Style — {styleName} / {variantName}. {consequence}",
+                MessageType.Info);
+        }
+
+        private void DrawGroundGeometrySection()
         {
             if (!DrawSectionFoldout(
-                    ref showPatch,
-                    "Patch"))
+                    ref showGroundGeometry,
+                    "Ground Geometry"))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            DrawPatchDomainControls();
+            DrawBaseShapeControls();
+            DrawMountainTransitionControls();
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawPatchDomainControls()
+        {
+            if (!DrawSubsectionFoldout(
+                    ref showPatchDomain,
+                    "Patch Domain"))
             {
                 return;
             }
@@ -1609,7 +2574,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUILayout.PropertyField(
                 resolution,
-                new GUIContent("Resolution"));
+                new GUIContent("Mesh Resolution"));
 
             GroundPatchSize selectedSize =
                 (GroundPatchSize)patchSize.enumValueIndex;
@@ -1631,10 +2596,56 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             EditorGUI.indentLevel--;
         }
 
-        private void DrawTransitionSection()
+        private void DrawBaseShapeControls()
         {
-            if (!DrawSectionFoldout(
-                    ref showTransition,
+            if (!DrawSubsectionFoldout(
+                    ref showBaseShape,
+                    "Base Shape"))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(
+                profile,
+                new GUIContent("Profile"));
+
+            EditorGUILayout.Slider(
+                broadForm,
+                0f,
+                6f,
+                new GUIContent(
+                    "Broad Form",
+                    "Height contribution in metres."));
+
+            EditorGUILayout.Slider(
+                roughness,
+                0f,
+                1f,
+                new GUIContent(
+                    "Roughness",
+                    "Controls broad and detail noise frequency."));
+
+            EditorGUILayout.Slider(
+                surfaceDetail,
+                0f,
+                1f,
+                new GUIContent(
+                    "Surface Detail",
+                    "Restrained small-scale height variation."));
+
+            EditorGUILayout.PropertyField(
+                edgeBlend,
+                new GUIContent(
+                    "Edge Blend",
+                    "Fades generated variation near patch borders."));
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawMountainTransitionControls()
+        {
+            if (!DrawSubsectionFoldout(
+                    ref showMountainTransition,
                     "Mountain Transition"))
             {
                 return;
@@ -1662,92 +2673,400 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             EditorGUI.indentLevel--;
         }
 
-        private void DrawShapeSection()
+        private void DrawRegenerationAndCachingSection()
         {
             if (!DrawSectionFoldout(
-                    ref showShape,
-                    "Ground Shape"))
+                    ref showRegenerationAndCaching,
+                    "Regeneration and Caching"))
             {
                 return;
             }
 
             EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(
-                profile,
-                new GUIContent("Profile"));
-
-            EditorGUILayout.Slider(
-                broadForm,
-                0f,
-                6f,
+                regenerateOnValidate,
                 new GUIContent(
-                    "Broad Form",
-                    "Height contribution in metres."));
+                    "Live Regeneration",
+                    "Regenerate when authoring values change."));
 
-            EditorGUILayout.Slider(
-                roughness,
-                0f,
-                1f,
-                new GUIContent(
-                    "Roughness",
-                    "Controls broad and detail noise frequency."));
+            EditorGUILayout.Space(4f);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Randomize Shape Seed"))
+                {
+                    ApplyToTargets(
+                        "Randomize Generated Ground Shape Seed",
+                        ground => ground.CreateNewShape());
+                }
 
-            EditorGUILayout.PropertyField(
-                edgeBlend,
-                new GUIContent(
-                    "Edge Blend",
-                    "Fades generated variation near patch borders."));
+                if (GUILayout.Button("Regenerate Ground"))
+                {
+                    ApplyToTargets(
+                        "Regenerate Generated Ground",
+                        ground => ground.Regenerate());
+                }
+            }
+
+            if (GUILayout.Button(
+                    new GUIContent(
+                        "Refresh Modifier and River Links + Regenerate",
+                        "Rediscovers child GroundModifier and StylizedRiver components, then performs a full Ground regeneration.")))
+            {
+                ApplyToTargets(
+                    "Refresh Generated Ground Links",
+                    ground =>
+                    {
+                        ground.RefreshModifiers();
+                        ground.Regenerate();
+                    });
+            }
+
             EditorGUI.indentLevel--;
         }
 
-        private void DrawSurfaceSection()
+        private void DrawSurfaceAppearanceSection()
         {
             if (!DrawSectionFoldout(
-                    ref showSurface,
-                    "Surface"))
+                    ref showSurfaceAppearance,
+                    "Surface Appearance"))
             {
                 return;
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "Shape controls define playable height. The selected surface family and variant resolve visual recipes. This section controls generated material masks and optional local material overrides.",
-                MessageType.None);
-
-            EditorGUILayout.Slider(
-                surfaceDetail,
-                0f,
-                1f,
-                new GUIContent(
-                    "Surface Detail",
-                    "Restrained small-scale height variation."));
-
             EditorGUILayout.Slider(
                 surfaceVariation,
                 0f,
                 1f,
                 new GUIContent(
                     "Material Variation",
-                    "Overall strength of generated tonal variation written to vertex colour red."));
+                    "Overall strength of generated tonal variation written to vertex colour red. This is stored on the selected GeneratedGround."));
 
-            if (targets.Length == 1 &&
-                DrawSubsectionFoldout(
-                    ref showSurfaceDiagnostics,
-                    "Last Surface Mask Diagnostics"))
+            DrawResolvedSurfaceProfileControls();
+            DrawResolvedMaterialControls();
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawResolvedSurfaceProfileControls()
+        {
+            if (!DrawSubsectionFoldout(
+                    ref showSurfaceResponseProfile,
+                    "Surface Response Profile"))
             {
-                GeneratedGround ground = target as GeneratedGround;
-                if (ground != null)
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUILayout.HelpBox(
-                        ground.LastSurfaceMaskDiagnostics,
-                        MessageType.None);
-                    EditorGUI.indentLevel--;
-                }
+                return;
             }
 
-            DrawMaterialOverrideControls();
+            EditorGUI.indentLevel++;
+
+            if (targets.Length != 1)
+            {
+                EditorGUILayout.HelpBox(
+                    "Resolved surface-profile asset editing is disabled for multi-object selection. Select one GeneratedGround so the Inspector can show the exact shared authoring owner.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            GeneratedGround ground = target as GeneratedGround;
+            GroundSurfaceProfile resolvedProfile =
+                ground != null ? ground.SurfaceProfile : null;
+
+            if (resolvedProfile == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "No GroundSurfaceProfile resolves for this Ground. Assign a family default or a profile override in Ground Overview.",
+                    MessageType.Warning);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            string ownership =
+                ground.OverrideSurfaceProfile
+                    ? "Referenced Override Profile"
+                    : "Shared Family Profile";
+
+            EditorGUILayout.HelpBox(
+                $"Editing {ownership} — {resolvedProfile.DisplayName}. Changes affect every loaded GeneratedGround that resolves this profile asset.",
+                MessageType.Info);
+
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.ObjectField(
+                    new GUIContent(
+                        "Profile Asset",
+                        "The GroundSurfaceProfile asset that owns the values below."),
+                    resolvedProfile,
+                    typeof(GroundSurfaceProfile),
+                    false);
+            }
+
+            SerializedObject profileObject =
+                new SerializedObject(resolvedProfile);
+            profileObject.Update();
+
+            SerializedProperty patchScaleProperty =
+                profileObject.FindProperty("patchScale");
+            SerializedProperty patchContrastProperty =
+                profileObject.FindProperty("patchContrast");
+            SerializedProperty patchEdgeSoftnessProperty =
+                profileObject.FindProperty("patchEdgeSoftness");
+            SerializedProperty exposureBiasProperty =
+                profileObject.FindProperty("exposureBias");
+            SerializedProperty dampDepositBiasProperty =
+                profileObject.FindProperty("dampDepositBias");
+            SerializedProperty vegetationSuitabilityProperty =
+                profileObject.FindProperty("vegetationSuitability");
+            SerializedProperty rockyDrySuitabilityProperty =
+                profileObject.FindProperty("rockyDrySuitability");
+            SerializedProperty snowEligibilityProperty =
+                profileObject.FindProperty("snowEligibility");
+            SerializedProperty rainAbsorptionProperty =
+                profileObject.FindProperty("rainAbsorption");
+
+            EditorGUI.BeginChangeCheck();
+
+            EditorGUILayout.LabelField(
+                "Generated Patch Structure",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                patchScaleProperty,
+                new GUIContent(
+                    "Patch Scale (m)",
+                    "Approximate metre scale of broad generated tonal patches. Increasing it creates larger regions. Shared profile edit; may rebuild Ground masks when Live Regeneration is enabled."));
+            EditorGUILayout.PropertyField(
+                patchContrastProperty,
+                new GUIContent(
+                    "Patch Contrast",
+                    "Controls how strongly generated tonal islands separate from neutral. Shared profile edit; may rebuild Ground masks when Live Regeneration is enabled."));
+            EditorGUILayout.PropertyField(
+                patchEdgeSoftnessProperty,
+                new GUIContent(
+                    "Patch Edge Softness",
+                    "Controls how softly broad generated patch values transition. Shared profile edit; may rebuild Ground masks when Live Regeneration is enabled."));
+
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField(
+                "Static Surface Tendencies",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                exposureBiasProperty,
+                new GUIContent(
+                    "Exposure Bias",
+                    "Baseline tendency for exposed and upward-facing places to receive light, frost, or snow response. Shared profile edit; may rebuild Ground masks."));
+            EditorGUILayout.PropertyField(
+                dampDepositBiasProperty,
+                new GUIContent(
+                    "Damp Deposit Bias",
+                    "Baseline tendency for low, flat, and shore-adjacent places to collect dark damp or deposit response. Shared profile edit; may rebuild Ground masks."));
+            EditorGUILayout.PropertyField(
+                vegetationSuitabilityProperty,
+                new GUIContent(
+                    "Vegetation Suitability",
+                    "Baseline vegetation-friendly surface response used by current semantic masks and future vegetation systems. Shared profile edit; may rebuild Ground masks."));
+            EditorGUILayout.PropertyField(
+                rockyDrySuitabilityProperty,
+                new GUIContent(
+                    "Rocky/Dry Suitability",
+                    "Baseline tendency for dry or rocky secondary response. Shared profile edit; may rebuild Ground masks."));
+            EditorGUILayout.PropertyField(
+                snowEligibilityProperty,
+                new GUIContent(
+                    "Snow Eligibility",
+                    "Controls how eligible this surface is for the current snow response and future accumulation systems. Shared profile edit; may rebuild Ground masks."));
+            EditorGUILayout.PropertyField(
+                rainAbsorptionProperty,
+                new GUIContent(
+                    "Rain Absorption",
+                    "Controls the current rain and wetness tendency used by semantic response. Shared profile edit; may rebuild Ground masks."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                profileObject.ApplyModifiedProperties();
+                EditorUtility.SetDirty(resolvedProfile);
+                RefreshLoadedGroundsUsingSurfaceProfile(resolvedProfile);
+            }
+
             EditorGUI.indentLevel--;
+        }
+
+        private void DrawSurfaceFeaturesSection()
+        {
+            if (!DrawSectionFoldout(
+                    ref showSurfaceFeatures,
+                    "Surface Features"))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+
+            if (!TryGetSingleSelectedVariantContext(
+                    out GroundSurfaceStyleProfile style,
+                    out GroundSurfaceVariantRecipe variant,
+                    out SerializedObject styleObject,
+                    out SerializedProperty serializedVariant))
+            {
+                EditorGUILayout.HelpBox(
+                    targets.Length == 1
+                        ? "No valid shared style variant resolves for this Ground."
+                        : "Shared feature editing is disabled for multi-object selection. Select one GeneratedGround so the exact shared variant owner is unambiguous.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            DrawSharedVariantAuthoringScope(style, variant, false);
+
+            bool styleChanged = false;
+            styleChanged |= DrawShaderFeatureControls(
+                ref showDirectionalStreaks,
+                "Directional Streaks",
+                serializedVariant,
+                variant,
+                GroundSurfaceFeatureKind.DirectionalStreaks,
+                true);
+            styleChanged |= DrawShaderFeatureControls(
+                ref showPooledWetness,
+                "Pooled Wetness",
+                serializedVariant,
+                variant,
+                GroundSurfaceFeatureKind.PooledWetness,
+                false);
+            styleChanged |= DrawShaderFeatureControls(
+                ref showTrampledWear,
+                "Trampled Wear",
+                serializedVariant,
+                variant,
+                GroundSurfaceFeatureKind.TrampledWear,
+                false);
+
+            if (styleChanged)
+            {
+                styleObject.ApplyModifiedProperties();
+                EditorUtility.SetDirty(style);
+                RefreshLoadedGroundsUsingStyleVariant(
+                    style,
+                    variant.Id,
+                    true);
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        private static bool DrawShaderFeatureControls(
+            ref bool expanded,
+            string label,
+            SerializedProperty serializedVariant,
+            GroundSurfaceVariantRecipe variant,
+            GroundSurfaceFeatureKind kind,
+            bool drawDirection)
+        {
+            if (!DrawSubsectionFoldout(ref expanded, label))
+            {
+                return false;
+            }
+
+            EditorGUI.indentLevel++;
+
+            SerializedProperty feature = FindAuthoringFeatureProperty(
+                serializedVariant,
+                variant,
+                kind,
+                out int matchingEntryCount,
+                out int runtimeApplicableCount,
+                out int firstMatchingIndex,
+                out int runtimeFeatureIndex,
+                out int authoringFeatureIndex);
+
+            DrawFeatureResolutionWarnings(
+                label,
+                matchingEntryCount,
+                runtimeApplicableCount,
+                firstMatchingIndex,
+                runtimeFeatureIndex,
+                authoringFeatureIndex);
+
+            if (feature == null)
+            {
+                EditorGUI.indentLevel--;
+                return false;
+            }
+
+            SerializedProperty enabled =
+                feature.FindPropertyRelative("enabled");
+            SerializedProperty costClass =
+                feature.FindPropertyRelative("costClass");
+            SerializedProperty strength =
+                feature.FindPropertyRelative("strength");
+            SerializedProperty scale =
+                feature.FindPropertyRelative("scale");
+            SerializedProperty contrast =
+                feature.FindPropertyRelative("contrast");
+            SerializedProperty maskInfluence =
+                feature.FindPropertyRelative("maskInfluence");
+            SerializedProperty direction =
+                feature.FindPropertyRelative("direction");
+            SerializedProperty seedOffset =
+                feature.FindPropertyRelative("seedOffset");
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                enabled,
+                new GUIContent(
+                    $"Enable {label}",
+                    "Disables this feature while preserving its authored values. Shared variant edit; material-only refresh."));
+            EditorGUILayout.PropertyField(
+                costClass,
+                new GUIContent(
+                    "Execution Path",
+                    "Shader Only is the currently rendered path. Other cost classes are reserved and do not produce Ground shader output."));
+            EditorGUILayout.Slider(
+                strength,
+                0f,
+                1f,
+                new GUIContent(
+                    "Intensity",
+                    "Primary visible feature contribution. Zero makes this recipe runtime-inapplicable. Shared variant edit; material-only refresh."));
+            EditorGUILayout.Slider(
+                scale,
+                0.1f,
+                30f,
+                new GUIContent(
+                    "Scale (m)",
+                    "World-space scale of this shader feature."));
+            EditorGUILayout.Slider(
+                contrast,
+                0f,
+                1f,
+                new GUIContent(
+                    "Contrast",
+                    "Shape contrast inside this feature's shader mask."));
+            EditorGUILayout.Slider(
+                maskInfluence,
+                0f,
+                1f,
+                new GUIContent(
+                    "Surface Mask Influence",
+                    "How strongly generated semantic Ground masks gate this feature."));
+
+            if (drawDirection)
+            {
+                EditorGUILayout.PropertyField(
+                    direction,
+                    new GUIContent(
+                        "Direction",
+                        "Stable world X/Z directional bias consumed by Directional Streaks."));
+            }
+
+            EditorGUILayout.PropertyField(
+                seedOffset,
+                new GUIContent(
+                    "Pattern Seed Offset",
+                    "Stable feature-specific seed mixed with the Ground material seed."));
+
+            bool changed = EditorGUI.EndChangeCheck();
+            EditorGUI.indentLevel--;
+            return changed;
         }
 
         private void DrawSurfaceVariantPopup(
@@ -1875,7 +3194,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 overrideSurfaceProfile,
                 new GUIContent(
                     "Override Surface Profile",
-                    "Use a local semantic/mask-generation profile instead of the style profile default."));
+                    "Select a different GroundSurfaceProfile asset for this GeneratedGround instead of the family default. The referenced profile asset may still be shared by other Grounds."));
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -1888,11 +3207,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             if (overrideSurfaceProfile.hasMultipleDifferentValues ||
                 overrideSurfaceProfile.boolValue)
             {
+                EditorGUI.BeginChangeCheck();
                 EditorGUILayout.PropertyField(
                     surfaceProfile,
                     new GUIContent(
                         "Surface Profile Override",
-                        "Local semantic/mask-generation profile used by this generated ground."));
+                        "Profile asset selected by this GeneratedGround. Editing that asset affects every Ground that references it."));
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    ApplyToTargets(
+                        "Change Ground Surface Profile Override",
+                        ground => ground.RefreshSurfaceStyleState());
+                }
+
                 return;
             }
 
@@ -1911,11 +3240,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
         }
 
-        private void DrawMaterialOverrideControls()
+        private void DrawResolvedMaterialControls()
         {
             showMaterialControls = EditorGUILayout.Foldout(
                 showMaterialControls,
-                "Advanced Material Overrides",
+                "Material Controls",
                 true);
 
             if (!showMaterialControls)
@@ -1925,49 +3254,105 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUI.indentLevel++;
 
-            if (overrideMaterialControls.hasMultipleDifferentValues)
-            {
-                EditorGUILayout.PropertyField(
-                    overrideMaterialControls,
-                    new GUIContent("Override Material Controls"));
-            }
-            else
-            {
-                EditorGUI.BeginChangeCheck();
-                bool enabled = EditorGUILayout.Toggle(
-                    new GUIContent(
-                        "Override Material Controls",
-                        "Use a local material-control recipe instead of the selected style variant."),
-                    overrideMaterialControls.boolValue);
-
-                if (EditorGUI.EndChangeCheck())
-                {
-                    serializedObject.ApplyModifiedProperties();
-                    if (enabled)
-                    {
-                        ApplyToTargets(
-                            "Enable Ground Material Override",
-                            ground => ground.EnableMaterialControlOverrideFromResolved());
-                    }
-                    else
-                    {
-                        ApplyToTargets(
-                            "Disable Ground Material Override",
-                            ground => ground.DisableMaterialControlOverride());
-                    }
-                }
-            }
-
-            if (!overrideMaterialControls.hasMultipleDifferentValues &&
-                !overrideMaterialControls.boolValue)
+            if (targets.Length != 1)
             {
                 EditorGUILayout.HelpBox(
-                    "Using the selected style variant recipe. Enable Override Material Controls to create a local custom copy.",
-                    MessageType.None);
+                    "Material ownership can differ across selected Grounds. Select one GeneratedGround to edit its resolved shared variant or create a safe local override.",
+                    MessageType.Info);
                 EditorGUI.indentLevel--;
                 return;
             }
 
+            EditorGUI.BeginChangeCheck();
+            bool enabled = EditorGUILayout.Toggle(
+                new GUIContent(
+                    "Use Local Material Override",
+                    "Copies the currently resolved shared variant material values onto this GeneratedGround, or returns it to shared variant ownership."),
+                overrideMaterialControls.boolValue);
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                if (enabled)
+                {
+                    ApplyToTargets(
+                        "Enable Ground Material Override",
+                        ground => ground.EnableMaterialControlOverrideFromResolved());
+                }
+                else
+                {
+                    ApplyToTargets(
+                        "Disable Ground Material Override",
+                        ground => ground.DisableMaterialControlOverride());
+                }
+            }
+
+            if (overrideMaterialControls.boolValue)
+            {
+                EditorGUILayout.HelpBox(
+                    "Editing Local Material Override — changes affect this GeneratedGround only.",
+                    MessageType.Info);
+
+                bool localMaterialChanged =
+                    DrawLocalMaterialControlGroups();
+
+                if (localMaterialChanged)
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    ApplyToTargets(
+                        "Customize Ground Material Controls",
+                        ground => ground.MarkGroundVisualControlsCustom());
+                }
+
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            if (!TryGetSingleSelectedVariantContext(
+                    out GroundSurfaceStyleProfile style,
+                    out GroundSurfaceVariantRecipe variant,
+                    out SerializedObject styleObject,
+                    out SerializedProperty serializedVariant))
+            {
+                EditorGUILayout.HelpBox(
+                    "No valid shared style variant resolves for these material controls.",
+                    MessageType.Warning);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            DrawSharedVariantAuthoringScope(style, variant, true);
+
+            SerializedProperty materialControls =
+                serializedVariant.FindPropertyRelative("materialControls");
+
+            if (materialControls == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "The selected variant has no serialized material-control data.",
+                    MessageType.Error);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            bool sharedMaterialChanged =
+                DrawSharedMaterialControlGroups(materialControls);
+
+            if (sharedMaterialChanged)
+            {
+                styleObject.ApplyModifiedProperties();
+                EditorUtility.SetDirty(style);
+                RefreshLoadedGroundsUsingStyleVariant(
+                    style,
+                    variant.Id,
+                    false);
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        private bool DrawLocalMaterialControlGroups()
+        {
             bool materialChanged = false;
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialPalette,
@@ -2023,15 +3408,68 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 smoothness,
                 specularStrength);
 
-            if (materialChanged)
-            {
-                serializedObject.ApplyModifiedProperties();
-                ApplyToTargets(
-                    "Customize Ground Material Controls",
-                    ground => ground.MarkGroundVisualControlsCustom());
-            }
+            return materialChanged;
+        }
 
-            EditorGUI.indentLevel--;
+        private bool DrawSharedMaterialControlGroups(
+            SerializedProperty materialControls)
+        {
+            bool materialChanged = false;
+            materialChanged |= DrawMaterialSubsection(
+                ref showMaterialPalette,
+                "Palette",
+                materialControls.FindPropertyRelative("baseColor"),
+                materialControls.FindPropertyRelative("frostColor"),
+                materialControls.FindPropertyRelative("dampTint"),
+                materialControls.FindPropertyRelative("dampTintStrength"),
+                materialControls.FindPropertyRelative("rockyDryTint"),
+                materialControls.FindPropertyRelative("rockyDryTintStrength"),
+                materialControls.FindPropertyRelative("vegetationTint"),
+                materialControls.FindPropertyRelative("vegetationTintStrength"));
+
+            materialChanged |= DrawMaterialSubsection(
+                ref showMaterialPixelVariation,
+                "Pixel and Macro Variation",
+                materialControls.FindPropertyRelative("pixelCellSize"),
+                materialControls.FindPropertyRelative("pixelToneCount"),
+                materialControls.FindPropertyRelative("pixelClusterStrength"),
+                materialControls.FindPropertyRelative("pixelVariation"),
+                materialControls.FindPropertyRelative("broadVariation"),
+                materialControls.FindPropertyRelative("vertexVariation"),
+                materialControls.FindPropertyRelative("pixelEffectStrength"),
+                materialControls.FindPropertyRelative("cellWarpStrength"),
+                materialControls.FindPropertyRelative("groundMacroPatchScale"));
+
+            materialChanged |= DrawMaterialSubsection(
+                ref showMaterialSemanticResponse,
+                "Semantic Response",
+                materialControls.FindPropertyRelative("profileContrastScale"),
+                materialControls.FindPropertyRelative("profilePixelContrastScale"),
+                materialControls.FindPropertyRelative("groundSnowResponseScale"),
+                materialControls.FindPropertyRelative("groundDampResponseScale"),
+                materialControls.FindPropertyRelative("groundVegetationResponseScale"),
+                materialControls.FindPropertyRelative("groundRockyDryResponseScale"),
+                materialControls.FindPropertyRelative("groundShoreDampStrengthScale"),
+                materialControls.FindPropertyRelative("groundPatchBlendStrength"),
+                materialControls.FindPropertyRelative("groundSnowTintStrength"),
+                materialControls.FindPropertyRelative("groundSnowBrightness"),
+                materialControls.FindPropertyRelative("groundDampDarkenStrength"));
+
+            materialChanged |= DrawMaterialSubsection(
+                ref showMaterialWeatherFinish,
+                "Weather and Finish",
+                materialControls.FindPropertyRelative("wetness"),
+                materialControls.FindPropertyRelative("wetDarkenStrength"),
+                materialControls.FindPropertyRelative("wetPixelSoftening"),
+                materialControls.FindPropertyRelative("wetSmoothnessBoost"),
+                materialControls.FindPropertyRelative("frostStrength"),
+                materialControls.FindPropertyRelative("frostContrast"),
+                materialControls.FindPropertyRelative("monolithicFlatten"),
+                materialControls.FindPropertyRelative("monolithicSmoothnessBoost"),
+                materialControls.FindPropertyRelative("smoothness"),
+                materialControls.FindPropertyRelative("specularStrength"));
+
+            return materialChanged;
         }
 
         private static bool DrawMaterialSubsection(
@@ -2066,11 +3504,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             return changed;
         }
 
-        private void DrawModifierSection()
+        private void DrawGroundInteractionSection()
         {
             if (!DrawSectionFoldout(
-                    ref showModifiers,
-                    "Modifiers"))
+                    ref showGroundInteraction,
+                    "Ground and Environment Interaction"))
             {
                 return;
             }
@@ -2095,60 +3533,114 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
 
             EditorGUILayout.HelpBox(
-                "GroundModifier and StylizedRiver components are discovered below this GeneratedGround object in the Hierarchy.",
+                "GroundModifier and StylizedRiver components are discovered below this GeneratedGround object in the Hierarchy. Their own artistic controls remain on those components.",
                 MessageType.Info);
             EditorGUI.indentLevel--;
         }
 
-        private void DrawAdvancedSection()
+        private void DrawDebugAndDiagnosticsSection()
         {
             if (!DrawSectionFoldout(
-                    ref showAdvanced,
-                    "Advanced"))
+                    ref showDebugAndDiagnostics,
+                    "Debug and Diagnostics"))
             {
                 return;
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.PropertyField(
-                patchCoordinate,
-                new GUIContent(
-                    "Patch Coordinate",
-                    "Stable noise coordinate used by future chunk assembly."));
+            DrawGroundDebugControls();
+            DrawCurrentRegenerationTimingControls();
+            DrawSurfaceDiagnosticsControls();
+            DrawPaintedAccentPlacementDebugControls();
+            DrawPaintedAccentDiagnosticsControls();
+            DrawRegenerationAccountingControls();
+
+            EditorGUILayout.Space(4f);
+            using (new EditorGUI.DisabledScope(Application.isPlaying))
+            {
+                if (GUILayout.Button(
+                        "Validate Painted Accent Production in Build Scenes"))
+                {
+                    GroundPaintedAccentProductionValidator
+                        .ShowBuildSceneValidationDialog();
+                }
+
+                EditorGUILayout.Space(4f);
+                if (GUILayout.Button(
+                        "Audit Generated Painted Accent Assets"))
+                {
+                    GroundPaintedAccentGeneratedAssetCleanupWindow
+                        .OpenAndAudit();
+                }
+
+                using (new EditorGUI.DisabledScope(
+                           !GroundPaintedAccentGeneratedAssetCleanup
+                               .HasLastReport))
+                {
+                    if (GUILayout.Button(
+                            "Copy Generated Asset Audit"))
+                    {
+                        GroundPaintedAccentGeneratedAssetCleanup
+                            .CopyLastReport();
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(
+                           !GroundPaintedAccentGeneratedAssetCleanup
+                               .HasLastReport ||
+                           GroundPaintedAccentGeneratedAssetCleanup
+                               .LastReport == null ||
+                           !GroundPaintedAccentGeneratedAssetCleanup
+                               .LastReport.CanDeleteConfirmedOrphans))
+                {
+                    if (GUILayout.Button(
+                            "Delete Confirmed Painted Accent Orphans"))
+                    {
+                        GroundPaintedAccentGeneratedAssetCleanupWindow
+                            .OpenAndPrepareDeletion();
+                    }
+                }
+            }
+
+            if (targets.Length == 1 && target is GeneratedGround ground)
+            {
+                EditorGUILayout.Space(4f);
+                if (GUILayout.Button("Copy All Ground Diagnostics"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        BuildAllGroundDiagnosticsClipboardReport(ground);
+                }
+            }
+
             EditorGUI.indentLevel--;
         }
 
-        private void DrawActionButtons()
+        private void DrawSurfaceDiagnosticsControls()
         {
-            EditorGUILayout.BeginHorizontal();
-
-            if (GUILayout.Button("New Shape"))
+            if (targets.Length != 1 ||
+                !DrawSubsectionFoldout(
+                    ref showSurfaceDiagnostics,
+                    "Last Surface Mask Diagnostics"))
             {
-                ApplyToTargets(
-                    "New Generated Ground Shape",
-                    ground => ground.CreateNewShape());
+                return;
             }
 
-            if (GUILayout.Button("Regenerate"))
+            GeneratedGround ground = target as GeneratedGround;
+            if (ground == null)
             {
-                ApplyToTargets(
-                    "Regenerate Generated Ground",
-                    ground => ground.Regenerate());
+                return;
             }
 
-            EditorGUILayout.EndHorizontal();
-
-            if (GUILayout.Button("Find Modifiers and Rivers"))
+            EditorGUI.indentLevel++;
+            EditorGUILayout.HelpBox(
+                ground.LastSurfaceMaskDiagnostics,
+                MessageType.None);
+            if (GUILayout.Button("Copy Surface Mask Diagnostics"))
             {
-                ApplyToTargets(
-                    "Find Generated Ground Modifiers",
-                    ground =>
-                    {
-                        ground.RefreshModifiers();
-                        ground.Regenerate();
-                    });
+                EditorGUIUtility.systemCopyBuffer =
+                    BuildSurfaceMaskDiagnosticsClipboardReport(ground);
             }
-
+            EditorGUI.indentLevel--;
         }
 
         private void OnSceneGUI()
@@ -3135,6 +4627,75 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
 
             return null;
+        }
+
+        private static void RefreshLoadedGroundsUsingSurfaceProfile(
+            GroundSurfaceProfile profile)
+        {
+            if (profile == null)
+            {
+                return;
+            }
+
+            GeneratedGround[] grounds =
+                Object.FindObjectsByType<GeneratedGround>(
+                    FindObjectsInactive.Include);
+
+            for (int index = 0; index < grounds.Length; index++)
+            {
+                GeneratedGround ground = grounds[index];
+
+                if (!IsLoadedSceneGround(ground) ||
+                    ground.SurfaceProfile != profile)
+                {
+                    continue;
+                }
+
+                ground.RefreshSurfaceStyleState();
+            }
+
+            SceneView.RepaintAll();
+        }
+
+        private static void RefreshLoadedGroundsUsingStyleVariant(
+            GroundSurfaceStyleProfile style,
+            string variantId,
+            bool includeLocalMaterialOverrides)
+        {
+            if (style == null || string.IsNullOrWhiteSpace(variantId))
+            {
+                return;
+            }
+
+            GeneratedGround[] grounds =
+                Object.FindObjectsByType<GeneratedGround>(
+                    FindObjectsInactive.Include);
+
+            for (int index = 0; index < grounds.Length; index++)
+            {
+                GeneratedGround ground = grounds[index];
+
+                if (!IsLoadedSceneGround(ground) ||
+                    ground.SurfaceStyleProfile != style ||
+                    ground.SurfaceVariantId != variantId ||
+                    (!includeLocalMaterialOverrides &&
+                     ground.OverrideMaterialControls))
+                {
+                    continue;
+                }
+
+                ground.RefreshSurfaceMaterialProperties();
+            }
+
+            SceneView.RepaintAll();
+        }
+
+        private static bool IsLoadedSceneGround(GeneratedGround ground)
+        {
+            return ground != null &&
+                !EditorUtility.IsPersistent(ground) &&
+                ground.gameObject.scene.IsValid() &&
+                ground.gameObject.scene.isLoaded;
         }
 
         private void ApplyToTargets(

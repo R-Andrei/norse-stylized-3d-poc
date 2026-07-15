@@ -60,11 +60,6 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            if (activeFoamCompositionEventCount == 0)
-            {
-                ResetProgressiveBirthDiagnosticSession();
-            }
-
             int eventId = ++foamCompositionSequence;
             float startAcross = Mathf.Clamp(acrossNormalized, -1f, 1f);
             float resolvedHalfWidth = Mathf.Clamp(
@@ -126,8 +121,7 @@ namespace ProgrammaticStylized3D.Rivers
                 PreviousGlobalDistance = startGlobalDistance,
                 PreviousAcrossNormalized = startAcross,
                 PreviousRadius = startRadius,
-                PreviousEmissionAmount = 0f,
-                DebugTrajectoryPending = true
+                PreviousEmissionAmount = 0f
             };
 
             materialLifetimeAuthorityActive = true;
@@ -180,8 +174,6 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 foamCompositionEventUpdateCount++;
-                PrepareProgressiveBirthDebugEvent(ref compositionEvent);
-
                 compositionEvent.Elapsed = Mathf.Min(
                     compositionEvent.Duration,
                     compositionEvent.Elapsed + deltaTime);
@@ -243,7 +235,6 @@ namespace ProgrammaticStylized3D.Rivers
                     foamCompositionSegmentDispatchSubmittedCount++;
                     foamCompositionCumulativeCentrelineDistance +=
                         segmentLength;
-                    PaintProgressiveBirthDebugSegment(segment);
                     injectedLastUpdate++;
                     depositedAny = true;
                     emitted = true;
@@ -510,7 +501,7 @@ namespace ProgrammaticStylized3D.Rivers
             latestFoamCompositionPreviousDistanceNormalized = 0f;
             latestFoamCompositionPreviousAcrossNormalized = 0f;
             lastFoamCompositionSegmentLength = 0f;
-            ResetProgressiveBirthDiagnosticSession();
+            ResetAutomaticBirthDiagnosticSession();
         }
 
         private enum AutomaticShoreSourceRecipe
@@ -2588,11 +2579,6 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            if (activeFoamCompositionEventCount == 0)
-            {
-                ResetProgressiveBirthDiagnosticSession();
-            }
-
             int eventId = ++foamCompositionSequence;
             float startAcross = Mathf.Clamp(startAcrossNormalized, -1f, 1f);
             float resolvedRadius = Mathf.Max(0.020f, baseRadius);
@@ -2641,8 +2627,7 @@ namespace ProgrammaticStylized3D.Rivers
                 PreviousAcrossNormalized = startAcross,
                 PreviousRadius = startRadius,
                 PreviousEmissionAmount = Mathf.Clamp01(
-                    resolvedAmount * Mathf.Clamp01(amountEnvelopeFloor)),
-                DebugTrajectoryPending = true
+                    resolvedAmount * Mathf.Clamp01(amountEnvelopeFloor))
             };
 
             materialLifetimeAuthorityActive = true;

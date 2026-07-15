@@ -2,7 +2,7 @@
 
 ## Document status
 
-- **Status:** Active implementation manual. GR-O1 diagnostics are validated; GR-O3A Play-startup coalescing is implemented and awaiting Unity validation.
+- **Status:** Active implementation manual. GR-O1 diagnostics and GR-O3A Play-startup coalescing are Unity-validated and accepted. The Painted Accent persistent-production boundary described below is also accepted.
 - **Scope:** Cross-feature GeneratedGround and StylizedRiver lifecycle, invalidation, build ordering, and future ground-dependent feature integration.
 - **Audited baseline:** Live `fufu` working tree at Git HEAD `04dbc13` on 2026-07-13, including the uncommitted Ground and River changes present during the audit.
 - **Primary implementation sequence:** Candidate 1 is accepted. The user explicitly authorized the bounded GR-O3A Play-startup coalescing slice before Candidate 2 because captured telemetry isolated one safe high-impact lifecycle wave. Candidate 2 remains available if broader transaction decomposition is later required. Candidates 3B/4 remain measurement-gated. Candidate 5 is optional after exact invalidation is accepted.
@@ -40,9 +40,70 @@ This manual defines a staged migration to:
 - coalesced editor lifecycle work without weakening synchronous readiness where it is required;
 - a future contributor/consumer contract that does not become a global arbitrary dependency graph.
 
-## Proven current problem
+## V4 Contact / Edge Accent consumer boundary — 2026-07-15
 
-The current restoration path can execute as follows:
+V4 Contact / Edge Accents is the next active Ground feature milestone. It consumes River structural data but does not become a River owner and must not introduce a Ground↔River regeneration loop.
+
+The accepted dataflow is:
+
+```text
+River authoring
+→ authoritative StylizedRiverGroundSnapshot / River Domain
+
+Ground recipe + modifiers
+→ immutable GroundHeightFieldSnapshot
+
+River snapshot + Ground snapshot + modifier snapshots + eligible generated geometry
+→ editor-time Contact Accent source snapshots
+→ Contact Accent coverage
+→ persistent Ground-owned production texture
+```
+
+The Contact Accent pass may derive left/right visible-bank boundaries from the River snapshot. It must not infer the production bank from the coarse Ground shore mask, rebuild visible River geometry, mutate River Domain, or notify the River merely because contact coverage changed.
+
+A River spline or visible-width change invalidates Contact Accent coverage through the existing Ground/River notification transaction. A Contact Accent material-only change does not invalidate Ground geometry, River Domain, River surface/corridor geometry, Painted Accent placement, or River runtime state. Player runtime binds persistent Contact Accent output only and performs no River snapshot evaluation for this feature.
+
+The detailed V4 contract is recorded in `Ground_Contact_Edge_Accent_Audit_and_Architecture.md`.
+
+## Accepted Painted Accent production boundary — 2026-07-15
+
+GeneratedGround remains the owner of Painted Accent authoring, Edit Mode procedural preview, persistent production coverage, material binding, validation metadata, and generated-output lifecycle.
+
+The processing boundary is:
+
+```text
+Edit Mode authoring transaction
+→ build or reuse SurfaceStrokes
+→ build or reuse ProjectedGlyphs and companion clusters
+→ rasterize transient authoritative preview coverage
+→ optionally persist through the explicit Bake Painted Accents action
+
+Play Mode and Player transaction
+→ validate the serialized persistent R8 artifact structurally
+→ bind persistent coverage and stored local-XZ mapping
+→ render
+```
+
+Play Mode and Player must not execute:
+
+```text
+Painted Accent SurfaceStroke generation
+ProjectedGlyph generation
+pair/triplet cluster solving
+Painted Accent-specific River exclusion snapshot construction
+coverage rasterization
+procedural coverage texture creation or CPU upload
+```
+
+Pre-build validation is the exact stale-output authority. It may regenerate authoritative coverage in isolated Editor preview scenes solely to compare against persistent production data, then closes those scenes without saving. It blocks Missing, Stale, Incompatible, duplicate, shared, or ownership-mismatched output and never rebakes automatically.
+
+Generated-output cleanup is a separate explicit Editor maintenance transaction. The all-project audit inspects loaded and saved scenes, non-build scenes, prefabs, and other asset dependencies. It may delete only reviewed assets classified as **Confirmed orphan**. It never saves scenes or prefabs and never treats exclusion from the active build profile as proof of disuse.
+
+Material-only Painted Accent changes—Ink Colour and Ink Opacity—do not rebuild procedural stages and do not stale persistent coverage. Placement, shape, geometry, modifier, River exclusion, projection, cluster, or raster changes invalidate the preview/bake as required.
+
+## Proven audited-baseline problem
+
+Before the accepted GR-O3A Play-startup coalescing slice, the restoration path could execute as follows:
 
 ```text
 GeneratedGround.OnEnable
@@ -268,9 +329,9 @@ One transaction may publish several categories. Consumers receive only categorie
 | Change | Ground geometry | Ground feature products | River surface | River corridor/collider | River runtimes |
 | --- | --- | --- | --- | --- | --- |
 | Ground material or debug | no | no | no | material only if required | no |
-| Painted Accent color | no | material only | no | no | no |
-| Painted Accent shape | no | projection/coverage | no | no | no |
-| Painted Accent placement | no | placement/projection/coverage | no | no | no |
+| Painted Accent Ink Colour or Ink Opacity | no | material only; persistent bake remains current | no | no | no |
+| Painted Accent shape | no | Edit preview projection/coverage; persistent bake becomes stale | no | no | no Player procedural work |
+| Painted Accent placement | no | Edit preview placement/projection/coverage; persistent bake becomes stale | no | no | no Player procedural work |
 | Ground recipe height/topology | yes | true dependants | normally reuse | yes | boundary update if required |
 | Height modifier change | yes | true dependants | normally reuse | yes | boundary update if required |
 | Pure feature exclusion modifier | no | affected features | no | no | no |
@@ -1198,14 +1259,14 @@ GR-O1 is an observational prerequisite for orchestration changes. It does not su
 - Changing Foam colour produced no new structural accounting batch.
 - Conclusion: the high-value defect is not harmless request count. It is generation of two temporary intermediate Ground states before the final active contributor set is available during Play startup.
 
-### Remaining GR-O1 checks
+### GR-O1 closure checks
 
-- [ ] Exercise Undo/Redo after GR-O3A and confirm accounting remains behaviorally neutral.
-- [ ] Retain the diagnostics through GR-O3A validation; do not remove them until the one-pass startup result is accepted.
+- [x] Undo/Redo and ordinary edit-mode accounting remained behaviorally neutral through GR-O3A validation.
+- [x] Diagnostics were retained and used to confirm the accepted one-pass startup result.
 
 # GR-O3A — Play-startup Ground regeneration coalescing
 
-**Status:** Implemented; awaiting Unity validation.
+**Status:** Unity-validated and accepted.
 
 GR-O3A is the lowest-risk, evidence-backed slice of Candidate 3. It addresses only the measured Editor Play-entry enable wave. It does not yet replace the broader edit-mode, Undo/Redo, disable/removal, or multi-consumer transaction architecture described by full Candidate 3.
 

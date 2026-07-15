@@ -1,6 +1,46 @@
 #ifndef PS3D_PIXELSURFACEGROUNDMASKDEBUG_HLSL
 #define PS3D_PIXELSURFACEGROUNDMASKDEBUG_HLSL
 
+            float ResolveGroundMacroRawShaderDebugValue(
+                Varyings input)
+            {
+                float broadCellSize =
+                    max(_GroundMacroPatchScale, 0.0001);
+                float3 broadCoordinate =
+                    input.positionWS / broadCellSize +
+                    _PixelSeed * 0.013;
+
+                return
+                    PS3D_ValueNoise31(broadCoordinate + 53.29) *
+                    2.0 -
+                    1.0;
+            }
+
+            float ResolveGroundMacroWeightedTonalDebugInfluence(
+                Varyings input)
+            {
+                float pixelProfileContrast =
+                    max(0.0, _ProfilePixelContrast) *
+                    lerp(
+                        1.0,
+                        1.0 - saturate(_WetPixelSoftening),
+                        saturate(_Wetness)) *
+                    lerp(
+                        1.0,
+                        max(0.0, _FrostContrast),
+                        saturate(_FrostStrength)) *
+                    lerp(
+                        1.0,
+                        0.25,
+                        saturate(_MonolithicFlatten));
+
+                return
+                    ResolveGroundMacroRawShaderDebugValue(input) *
+                    _PixelBroadVariation *
+                    pixelProfileContrast *
+                    _PixelEffectStrength;
+            }
+
             half3 ResolveMaskDebugColor(Varyings input)
             {
                 int mode = (int)round(_MaskDebugMode);
@@ -56,6 +96,15 @@
                         ResolveGroundPaintedAccentCoverage(input) *
                         contractMask;
                 }
+                else if (mode == 29)
+                {
+                    float rawCoverage =
+                        ResolveGroundPaintedAccentCoverage(input);
+                    return (half3)lerp(
+                        float3(0.015, 0.025, 0.040),
+                        float3(1.0, 0.0, 0.85),
+                        rawCoverage);
+                }
                 else if (mode == 14)
                 {
                     float exposure = ResolveGroundExposureMask(input);
@@ -70,6 +119,37 @@
                         exposure,
                         damp,
                         vegetationOrDry);
+                }
+                else if (mode == 30)
+                {
+                    float rawMacro =
+                        ResolveGroundMacroRawShaderDebugValue(input) * 0.5 + 0.5;
+                    return (half3)float3(
+                        rawMacro,
+                        rawMacro,
+                        rawMacro);
+                }
+                else if (mode == 31)
+                {
+                    float weightedInfluence =
+                        ResolveGroundMacroWeightedTonalDebugInfluence(input);
+                    float displayMagnitude =
+                        saturate(abs(weightedInfluence) * 20.0);
+                    float3 neutralColor =
+                        float3(0.18, 0.18, 0.18);
+                    float3 negativeColor =
+                        float3(0.05, 0.32, 1.00);
+                    float3 positiveColor =
+                        float3(1.00, 0.28, 0.05);
+                    float3 signedColor =
+                        weightedInfluence < 0.0
+                            ? negativeColor
+                            : positiveColor;
+
+                    return (half3)lerp(
+                        neutralColor,
+                        signedColor,
+                        displayMagnitude);
                 }
                 else
                 {

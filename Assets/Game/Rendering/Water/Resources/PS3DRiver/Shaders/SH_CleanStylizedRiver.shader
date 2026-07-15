@@ -89,7 +89,7 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamFilmSource("Foam Film Source", 2D) = "black" {}
         [HideInInspector] _FoamFilmSupport("Foam Film Support", 2D) = "black" {}
         [HideInInspector] _FoamVisualOccupancy("Foam Visual Occupancy", 2D) = "black" {}
-        [HideInInspector] _FoamBirthDebug("Foam Progressive Birth Debug", 2D) = "black" {}
+        [HideInInspector] _FoamBirthDebug("Foam Automatic Birth Debug", 2D) = "black" {}
         [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
         [HideInInspector] _FoamObstacleExclusion("Foam Obstacle Footprint", 2D) = "black" {}
@@ -108,13 +108,11 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamEdgeContrast("Foam Edge Contrast", Range(-1, 1)) = 0
         [HideInInspector] _FoamChipActivation("Foam Chip Activation", Range(0, 1)) = 0
         [HideInInspector] _FoamChipCandidateSpacing("Foam Chip Candidate Spacing", Float) = 1.15
-        [HideInInspector] _FoamChipDistributionIrregularity("Foam Chip Distribution Irregularity", Range(0, 1)) = 1
-        [HideInInspector] _FoamChipRadiusRatio("Foam Chip Radius Ratio", Range(0.05, 0.65)) = 0.23913043
-        [HideInInspector] _FoamChipSizeIrregularity("Foam Chip Size Irregularity", Range(0, 1)) = 1
-        [HideInInspector] _FoamChipShapeIrregularity("Foam Chip Shape Irregularity", Range(0, 1)) = 1
-        [HideInInspector] _FoamChipStableScreenRadiusPixels("Foam Chip Stable Screen Radius Pixels", Range(0, 4)) = 2
+        [HideInInspector] _FoamChipSize("Foam Chip Size", Range(0, 1)) = 0.3152174
+        [HideInInspector] _FoamChipIrregularity("Foam Chip Irregularity", Range(0, 1)) = 1
+        [HideInInspector] _FoamChipStableScreenRadiusPixels("Foam Chip Stable Screen Radius Pixels", Range(0, 16)) = 2
         [HideInInspector] _FoamChipMaximumViewScale("Foam Chip Maximum View Scale", Range(1, 2.5)) = 1.75
-        [HideInInspector] _FoamChipSelectionDepth("Foam Chip Edge Coverage", Range(0, 1)) = 0.42
+        [HideInInspector] _FoamChipEdgeWidthPixels("Foam Chip Edge Width Pixels", Float) = 4
         [HideInInspector] _FoamChipInteriorAccess("Foam Chip Interior Access", Range(0, 1)) = 0
         [HideInInspector] _FoamChipFieldSpeed("Foam Chip Downstream Speed", Float) = 0
         [HideInInspector] _FoamChipFormationTime("Foam Chip Formation Time", Float) = 2.5
@@ -287,13 +285,11 @@ Shader "PS3D/Stylized River Water"
                 float _FoamEdgeContrast;
                 float _FoamChipActivation;
                 float _FoamChipCandidateSpacing;
-                float _FoamChipDistributionIrregularity;
-                float _FoamChipRadiusRatio;
-                float _FoamChipSizeIrregularity;
-                float _FoamChipShapeIrregularity;
+                float _FoamChipSize;
+                float _FoamChipIrregularity;
                 float _FoamChipStableScreenRadiusPixels;
                 float _FoamChipMaximumViewScale;
-                float _FoamChipSelectionDepth;
+                float _FoamChipEdgeWidthPixels;
                 float _FoamChipInteriorAccess;
                 float _FoamChipFieldSpeed;
                 float _FoamChipFormationTime;
@@ -894,14 +890,11 @@ Shader "PS3D/Stylized River Water"
                     0.0001,
                     _FoamChipActivation);
                 float chipSelectionDebugRequested =
-                    ((foamDebug >= 18 && foamDebug <= 21) ||
-                        foamDebug == 24 || foamDebug == 25 ||
-                        foamDebug == 26)
+                    (foamDebug == 18 || foamDebug == 25 || foamDebug == 26)
                         ? 1.0
                         : 0.0;
                 float chipCandidateDebugRequested =
-                    ((foamDebug >= 18 && foamDebug <= 21) ||
-                        foamDebug == 25)
+                    (foamDebug == 18)
                         ? 1.0
                         : 0.0;
                 float evaluateChipSelection = max(
@@ -911,28 +904,25 @@ Shader "PS3D/Stylized River Water"
                     productionChipEnabled,
                     chipCandidateDebugRequested);
                 float evaluateCandidatesOutsideMaterial =
-                    (foamDebug == 18 || foamDebug == 19)
+                    foamDebug == 18
                         ? 1.0
                         : 0.0;
                 RiverWaterFoamSelectionDiagnostics selectionDiagnostics =
                     RiverWaterFoamEvaluateSelectionDiagnostics(
-                        foam.materialPattern,
                         input.domainData.x,
                         input.domainData.y,
-                        foam.materialEdgeDepth,
+                        foam.softVisibility,
                         foam.mask,
                         evaluateChipSelection,
                         evaluateChipCandidates,
                         evaluateCandidatesOutsideMaterial,
                         _FoamChipActivation,
                         _FoamChipCandidateSpacing,
-                        _FoamChipDistributionIrregularity,
-                        _FoamChipRadiusRatio,
-                        _FoamChipSizeIrregularity,
-                        _FoamChipShapeIrregularity,
+                        _FoamChipSize,
+                        _FoamChipIrregularity,
                         _FoamChipStableScreenRadiusPixels,
                         _FoamChipMaximumViewScale,
-                        _FoamChipSelectionDepth,
+                        _FoamChipEdgeWidthPixels,
                         _FoamChipInteriorAccess,
                         _FoamChipFieldSpeed,
                         _FoamChipFormationTime,
@@ -951,7 +941,7 @@ Shader "PS3D/Stylized River Water"
                         _Time.y);
 
                 float productionChipRemovedMask;
-                float finalFoamMask = RiverWaterFoamApplyEdgeBreakup(
+                float finalFoamMask = RiverWaterFoamApplyChipAndStrands(
                     foam.mask,
                     foam.softVisibility,
                     foam.strandSoftVisibility,
@@ -988,52 +978,14 @@ Shader "PS3D/Stylized River Water"
                     foamComposition.opacity);
                 finalColour = MixFog(finalColour, input.motionData.w);
 
-                if ((foamDebug >= 18 && foamDebug <= 21) ||
-                    (foamDebug >= 24 && foamDebug <= 26))
+                if (foamDebug == 18 || foamDebug == 25 || foamDebug == 26)
                 {
                     if (foamDebug == 18)
                     {
+                        float candidate =
+                            selectionDiagnostics.chipCandidateField;
                         return half4(
-                            selectionDiagnostics.chipCandidateField.xxx,
-                            1.0);
-                    }
-
-                    if (foamDebug == 19)
-                    {
-                        float selected =
-                            selectionDiagnostics.chipActivatedCandidates;
-                        return half4(
-                            float3(selected, selected * 0.78, 0.0),
-                            1.0);
-                    }
-
-                    if (foamDebug == 20)
-                    {
-                        float eligible =
-                            selectionDiagnostics.chipEdgeEligibility;
-                        return half4(
-                            float3(0.0, eligible, eligible),
-                            1.0);
-                    }
-
-                    if (foamDebug == 21)
-                    {
-                        float selected =
-                            selectionDiagnostics.chipFinalSelection;
-                        return half4(
-                            float3(selected, 0.0, selected * 0.82),
-                            1.0);
-                    }
-
-                    if (foamDebug == 24)
-                    {
-                        float interiorAuthority =
-                            selectionDiagnostics.chipInteriorAuthority;
-                        return half4(
-                            float3(
-                                interiorAuthority * 0.16,
-                                interiorAuthority,
-                                interiorAuthority * 0.24),
+                            float3(candidate, candidate * 0.78, 0.0),
                             1.0);
                     }
 
@@ -1048,32 +1000,28 @@ Shader "PS3D/Stylized River Water"
                             1.0);
                     }
 
-                    if (foamDebug == 26)
-                    {
-                        float renderedFoam =
-                            RiverWaterFoamResolveBaseCoverage(foam.mask);
-                        float eligibility = saturate(
-                            selectionDiagnostics.chipPotentialEligibility);
-                        // Potential eligibility is already clipped by the same
-                        // visible support. Do not multiply it by that soft mask
-                        // a second time: yellow intensity must remain the exact
-                        // expected permission authority authored by the three
-                        // eligibility controls.
-                        float supportMembership = step(
-                            0.0001,
-                            renderedFoam);
-                        float overlap =
-                            eligibility * supportMembership;
-                        float renderedOnly =
-                            renderedFoam * (1.0 - eligibility);
-                        float eligibilityOnly =
-                            eligibility * (1.0 - supportMembership);
-                        float3 compositeColour =
-                            renderedOnly * float3(0.18, 0.18, 0.18) +
-                            eligibilityOnly * float3(0.0, 0.72, 0.82) +
-                            overlap * float3(1.0, 0.88, 0.10);
-                        return half4(compositeColour, 1.0);
-                    }
+                    float renderedFoam =
+                        RiverWaterFoamResolveBaseCoverage(foam.mask);
+                    float edgeEligibility = saturate(
+                        selectionDiagnostics.chipEdgeEligibility);
+                    float interiorEligibility = saturate(
+                        selectionDiagnostics.chipInteriorEligibility);
+                    float totalEligibility = saturate(max(
+                        edgeEligibility,
+                        interiorEligibility));
+                    float supportMembership = step(
+                        0.0001,
+                        renderedFoam);
+                    float renderedOnly =
+                        renderedFoam * (1.0 - totalEligibility);
+                    float eligibilityOutsideSupport =
+                        totalEligibility * (1.0 - supportMembership);
+                    float3 compositeColour =
+                        renderedOnly * float3(0.18, 0.18, 0.18) +
+                        edgeEligibility * float3(1.0, 0.88, 0.10) +
+                        interiorEligibility * float3(0.88, 0.12, 0.82) +
+                        eligibilityOutsideSupport * float3(0.0, 0.72, 0.82);
+                    return half4(saturate(compositeColour), 1.0);
                 }
 
                 if (foamDebug == 17)
@@ -1094,7 +1042,7 @@ Shader "PS3D/Stylized River Water"
                         evaluatedShape * evaluatedStrandRatio;
                     float evaluatedChipRemovedMask;
                     float evaluatedPreviewMask =
-                        RiverWaterFoamApplyEdgeBreakup(
+                        RiverWaterFoamApplyChipAndStrands(
                             evaluatedShape,
                             evaluatedShape,
                             evaluatedStrandShape,
@@ -1442,12 +1390,12 @@ Shader "PS3D/Stylized River Water"
                         _FoamBirthDebug.Load(
                             int3(birthDebugCoordinate, 0)));
                     float3 debugColour =
-                        birthDebug.b * float3(0.08, 0.20, 0.75) +
-                        birthDebug.g * float3(0.05, 0.85, 0.15) +
-                        birthDebug.r * float3(1.00, 0.08, 0.03);
+                        birthDebug.r * float3(1.00, 0.84, 0.05) +
+                        birthDebug.g * float3(0.05, 0.90, 1.00) +
+                        birthDebug.b * float3(1.00, 0.05, 0.78);
                     debugColour = lerp(
-                        debugColour,
-                        float3(1.00, 0.95, 0.08),
+                        saturate(debugColour),
+                        1.0.xxx,
                         birthDebug.a);
                     return half4(saturate(debugColour), 1.0);
                 }

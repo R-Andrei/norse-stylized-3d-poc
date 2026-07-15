@@ -626,7 +626,7 @@ Legacy callers continue through `ClipPolygonLegacy`. The authoritative all-edge 
 | `FormatEdgeWearCoverageIdSummary` | Emits exact source-edge ID sets for each omission category. |
 | `AppendEdgeWearCoverageLifecycle` | Writes one detailed but compact line per source edge to `[Edge Lifecycle]`. |
 
-The primary Console record now labels explicit-junction counting as `legacyJunctionHeuristic=nonAuthoritative:1`. Full legacy records remain in the file for historical comparison but are not geometry blockers for a closed manifold shell.
+Historical note: the explicit-junction-face coverage heuristic was retired in EW-B4.2R8. It incorrectly treated every multi-bevel source vertex as requiring a separate junction polygon and contradicted certified closed shells.
 
 
 ## EW-B4.2 conflict-cluster width reduction additions
@@ -653,7 +653,7 @@ The primary Console record now labels explicit-junction counting as `legacyJunct
 
 `FormatPlaneCutEdgeConflictAudit` reports conflict mode, pass count, reduction count, minimum final scale, unresolved count, and legacy deferral evidence. `[Conflict Width Reduction]` contains one compact dossier per retry. The Console record now separates `geometryValid` and `coverageValid`, and maximum-Coverage artistic exclusions are labelled `wouldBeArtisticallyFiltered`.
 
-The local-junction-star text is retained as `legacyLocalJunctionDiagnostic` in the detailed file only; it is not an authoritative primary failure for a closed edge-plane shell.
+Historical note: the legacy local-junction diagnostic text was removed in EW-B4.2R8. The authoritative local-junction extraction counts and final topology dossiers remain.
 
 ## EW-B4.2R1 diagnostic additions
 
@@ -833,9 +833,11 @@ EW-B4.2R5 changes only the topology-triggered retry target selection, bounded fa
 
 | Symbol | Responsibility |
 |---|---|
-| `EdgeWearDebugEdgeRecord` | Editor preview record containing authoritative source-edge index, transformed endpoints, selection state, and current search-focus state. |
+| `EdgeWearDebugEdgeRecord` | Editor diagnostic record containing an authoritative source-edge index, transformed endpoints, structural/manifold state, and optional search-focus state. |
+| `SourceEdgeIndexDebugStatus` | Carries the independent source-topology graph result and diagnostic without requiring a bevel preview. |
+| `GenerateSourceEdgeIndexDebug` | Runs the dedicated source-edge indexing mode and returns transformed source records independently of bevel success or edge-wear settings. |
 | debug transform helpers | Apply the same dimensions, deterministic lean, grounding, and recenter operations to graph-edge endpoints without changing production mesh transforms. |
-| `UnifiedEdgeWearPreviewStatus.DebugEdges` | Carries non-serialized source-edge records from generation to the custom editor. |
+| `UnifiedEdgeWearPreviewStatus.DebugEdges` | Retains search-focus evidence for telemetry highlighting; it is no longer the owner of the complete source-edge overlay. |
 
 ### `MassGenerator.EdgeWear.Orchestration.cs`
 
@@ -843,18 +845,310 @@ EW-B4.2R5 changes only the topology-triggered retry target selection, bounded fa
 
 ### `GeneratedMass.cs`
 
-Stores transformed debug-edge records only in non-serialized `UNITY_EDITOR` preview state and clears them with the existing unified-preview status.
+Stores the complete independently generated source-edge graph in a separate non-serialized `UNITY_EDITOR` cache. `RefreshSourceEdgeIndexDebug` rebuilds that cache directly from the current mass recipe; unified-preview records remain separate and are consulted only for optional search highlighting.
+
+### `MassGenerator.PlaneCut.cs`
+
+`SourceEdgeIndexDebug` captures all source-topology edges immediately after the authored plane cuts and before any bevel evaluation, then continues through the normal unmodified mass triangulation path.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`BuildSourceEdgeIndexDebugEdges` builds records directly from `TryBuildEdgeWearTopologyGraph`; it does not require candidates, selected coverage, width solving, corner solving, or shell certification.
 
 ### `Editor/GeneratedMassEditor.cs`
 
 | Control or method | Responsibility |
 |---|---|
-| `Show Source Edge Numbers in Scene` | Enables graph-edge lines and authoritative source-edge labels. |
-| `Only Active Search Edges` | Filters the overlay to the structured focus neighbourhood. |
-| `RegisterEdgeWearSceneOverlayRenderer` | Registers the editor-global Scene callback once per domain load; it replaces the unreliable per-inspector overlay callback. |
-| `DrawGlobalEdgeWearSceneOverlay` | Resolves the explicitly enabled Generated Mass by instance ID and draws available source-edge records even when the bevel transaction has failed. |
-| `SetEdgeWearSceneOverlayState` | Publishes non-serialized enabled/filter/target state and requests a Scene repaint only when that state changes. |
-| `DrawEdgeWearEdgeNumberOverlay` | Draws transformed source edges and indices as an always-visible x-ray overlay with endpoint markers and separated callout labels, without modifying scene objects or generated geometry. |
-| edge-overlay status evidence | Reports visible/total record counts and focused source-edge IDs in both the inspector and a small Scene panel so an empty or filtered overlay is explicit. |
+| `Source Edge Index Debug` | Separate inspector section with no ownership under the bevel-preview transaction. |
+| `Show All Source Edge Numbers in Scene` | Enables every source graph edge and authoritative index; no focus filter is applied. |
+| `Highlight Active Bevel Search Edges` | Optionally colours current structured search IDs while leaving all other edges visible. |
+| `Refresh Source Edge Graph` | Rebuilds independent records after recipe or shape changes without running the bevel solver. |
+| `RegisterSourceEdgeIndexOverlayRenderer` | Registers the editor-global Scene callback once per domain load. |
+| `DrawGlobalSourceEdgeIndexOverlay` | Draws the selected mass's independent records even when no bevel preview has run or the current bevel transaction failed. |
+| `SetSourceEdgeIndexOverlayState` | Publishes non-serialized enabled/highlight/target state and requests Scene repaint only when that state changes. |
+| `DrawSourceEdgeIndexOverlay` | Draws all transformed source edges and indices depth-tested by default, with optional explicit x-ray mode; search focus changes colour only. |
+| source-overlay status evidence | Reports the complete shown/total count and optional search-highlight IDs in both inspector and Scene panel. |
 
 EW-B4.2R6 changes only bounded topology-recovery search, diagnostic telemetry, and editor visualization. Selection, clipping, welding, preparation, tolerances, surface rendering, edge `0` locality, production geometry, and the one-button rebuild action remain unchanged.
+
+## EW-B4.2R7 canonical viability additions
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `EdgeWearViabilityState` | Separates structural exclusion, geometric exclusion, viable-unselected, and viable-selected lifecycle states. |
+| `EdgeWearEdgeViabilityRecord` | Cached immutable-source evidence for dihedral, footprint, locality interval, isolated construction, feasible width fraction, endpoint span, and exact failure reason. |
+| `EdgeWearCoverageAudit.ViabilityByKey` | Owns one reusable viability record per source `EdgeKey` before graph indexing exists. |
+| `EdgeWearCoverageAudit.ViabilityByGraphEdge` | Maps the same cached records to authoritative graph edge IDs without recalculation. |
+| viability cache counters | Record cheap locality evaluations, bounded isolated evaluations, later locality-cache uses, and total preflight time. |
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| viability constants | Canonical `15 degree`, `2x footprint`, `25% width`, and `0.5x central-span` thresholds. |
+| `BuildEdgeWearBevelCandidates` | Builds structural records, runs cheap generic gates, executes one isolated certificate per survivor, and only then creates the Coverage candidate list. |
+| `BuildEdgeWearViabilitySourceVertexList` | Builds the immutable unique source-vertex set once for locality evaluation. |
+| `EvaluateIndependentPlaneLocalityViability` | Computes and caches the retain-floor/removal-ceiling interval and limiting source vertex. |
+| `RunEdgeWearIsolatedViabilityPreflight` | Runs the existing bounded isolated-edge certificate once per cheap-gate survivor and caches all reusable results. |
+| `ResolveEdgeWearIsolatedViabilityFailure` | Maps exact isolated evidence to the canonical generic exclusion taxonomy. |
+| `MapEdgeWearCoverageAuditSourceIndices` | Maps lifecycle and viability cache records to authoritative source graph indices. |
+| `MapEdgeWearCoverageAuditToGraph` | Applies final viable/unselected/selected lifecycle state without overriding structural or geometric exclusions. |
+
+### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+The isolated audit now exposes endpoint consumption, remaining central span, and the minimum required central span from the already solved rail set. No second rail solve is performed for viability.
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+`TryBuildPlaneCutBevelCandidate` consumes the cached locality interval. The previous per-candidate scan over every source graph vertex is removed from plane construction and therefore cannot repeat in global solver retries.
+
+Maximum-Coverage certification preserves `GeometricEligibleCount` as individual viability evidence, then compares built edges against the R10 `CoexistenceEligibleCount`.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+`[Edge Viability Preflight]` writes thresholds, cache counters, elapsed time, every hard-gate result, locality interval, isolated width and endpoint evidence, topology counts, exact diagnostic, and final generic failure reason. Coverage summaries distinguish structural and geometric eligibility.
+
+### `Editor/GeneratedMassEditor.cs` R7 refinement
+
+`X-Ray Hidden Source Edges` switches the independent overlay between depth-tested `LessEqual` drawing and explicit `Always` x-ray drawing. Visible-only mode is the default; the complete 44-edge record set remains cached in both modes.
+
+`AuditExplicitChamferCornerSolution` caps each selected edge's initial width by the cached `MaximumLocallyFeasibleWidth` before shared corner interaction solving. This consumes the isolated preflight result rather than recomputing local width feasibility.
+
+## EW-B4.2R7R1 immutable placement-frame additions
+
+### `MassGenerator.PlaneCut.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `BuildPlaneCutMass(..., out TriangleSoup placementReferenceSoup, ...)` | Triangulates the immutable authored source faces before edge-wear evaluation and returns that deterministic source soup as the canonical placement reference. |
+
+### `MassGenerator.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `GenerateInternal` placement branch | Applies dimensions to source and output, resolves one placement frame from the immutable source reference, and reuses it for the reconstructed output and debug-edge endpoints. Successful previews no longer derive placement from their own triangle soup. |
+| `BuildMassSoup(..., out TriangleSoup placementReferenceSoup, ...)` | Returns the ordinary output itself as the placement reference for non-plane-cut builders and forwards the immutable plane-cut source reference for edge-wear previews. |
+
+### `MassGenerator.MeshOutput.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `MassPlacementFrame` | Per-generation cached lean, grounding, and recenter parameters resolved from one reference soup. |
+| `ResolveAndApplyMassPlacementFrame` | Resolves each placement stage sequentially from the source reference while applying it to that reference exactly once. |
+| `ApplyMassPlacementFrame` | Reuses the completed frame for bevel output and source-edge debug positions without recalculating bounds or contact-centre statistics. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `AppendMassPlacementFrameTelemetry` | Appends `[Canonical Placement Frame]` provenance, parameters, reuse counters, and the diagnostic legacy-preview frame delta after unified preview placement is complete. |
+
+## EW-B4.2R8 viability audit-integrity additions
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| isolated audit truth fields | Separate `IsolatedLastAttemptedWidth` from `IsolatedMaximumCertifiedWidth` and its certified fraction. |
+| `ViabilityLocalityCacheMissCount` | Counts selected-edge construction attempts that lack a complete cached viability record. |
+| `ViabilityLocalityRecomputationCount` | Contract counter that must remain zero because solver-time source scans are forbidden. |
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`RunEdgeWearIsolatedViabilityPreflight` now records truthful isolated audit semantics. The accepted R7 decision fields remain unchanged; a failed attempt is reported as zero certified width without changing eligibility behavior.
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| construction cache guard | Increments cache use only for evaluated locality-valid records and records an explicit miss otherwise. |
+| retired explicit-junction audit | Removes `PlaneCutJunctionCoverageRecord` and `AuditPlaneCutJunctionCoverage`; final topology and local-loop extraction remain authoritative. |
+| `PrepareEdgeWearStableEvaluationFingerprints` | Hashes ordered exclusion reasons, selected/certified edge IDs, and exact final polygon topology. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `FormatEdgeWearViabilityExclusionSummary` | Reports generic exclusion counts and optional exact edge-ID sets. |
+| `FormatEdgeWearLocalityCacheContract` | Reports evaluations, construction uses, zero recomputations, unused records, and cache misses. |
+| corrected isolated record | Emits success, attempt count, last attempted width, maximum certified width/fraction, and terminal diagnostic. |
+| `CapturePendingEdgeWearStableFingerprint` | Bridges the completed plane-shell component hashes to the later placement-frame append. |
+| `AppendStableEvaluationFingerprint` | Adds placement and combined evaluation hashes after the canonical frame is available. |
+
+Removed telemetry:
+
+```text
+legacyJunctionHeuristic
+legacyLocalJunctionDiagnostic
+[Legacy Junction Heuristic - Non-Authoritative]
+```
+
+No R8 symbol changes bevel geometry, eligibility thresholds, widths, topology tolerances, rendering, or placement.
+
+
+## EW-B4.2R9 editor-only viability-matrix additions
+
+### `MassGenerator.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `EdgeWearBatchAuditCaseResult` | Editor-only immutable-output audit carrier for one non-published matrix evaluation, including viability counts, shell certification, cache contract, placement invariants, timings, and fingerprints. |
+| `GenerateUnifiedEdgeWearBatchAuditCase` | Runs the exact unified edge-wear generation path against a cloned recipe/settings pair, captures diagnostics in memory, returns the case result, and never applies the produced `MeshData` to a Unity mesh. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `EdgeWearBatchAuditCapture` | Short-lived static capture scope for one synchronous editor evaluation. It is cleared before the next matrix case. |
+| `TryBeginEdgeWearBatchAuditCapture` / `CompleteEdgeWearBatchAuditCapture` | Guard non-reentrancy, collect the authoritative plane-shell audit and canonical placement frame, and convert them into the public case result. |
+| `PopulateEdgeWearBatchAuditResult` | Extracts generic exclusion counts, certification, topology, face quality, cache counters, timings, component hashes, and exact failure evidence from the authoritative audit. |
+| `PopulateEdgeWearBatchPlacementFingerprints` | Reproduces the accepted placement/evaluation fingerprint contracts from the captured canonical frame without writing normal manual telemetry. |
+| batch-aware logging guards | Suppress readiness, unified Console, detailed telemetry, and placement append output only while the explicit matrix capture scope is active. Manual rebuild logging remains unchanged. |
+
+### `Editor/GeneratedMassEditor.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `EdgeWearBatchShapeSeeds` | Canonical ten-seed stratified matrix. |
+| `EdgeWearBatchWidths` / `EdgeWearBatchWidthNames` | Canonical minimum/default/maximum width matrix: `0.05`, `1.0`, `2.0`. |
+| `EdgeWearViabilityMatrixJob` | Holds the immutable selected-object snapshot, one cloned-recipe case queue, completed results, and cancellation state. |
+| `AdvanceEdgeWearViabilityMatrix` | Runs one case per editor update through the exact authoritative builder. |
+| `BuildEdgeWearViabilityMatrixAggregate` | Classifies coverage, topology, face-quality, placement, and cache-contract failures and records exact case coordinates. |
+| `WriteEdgeWearViabilityMatrixReports` | Writes one TXT aggregate/detail report and one CSV row set under `Library`. |
+| target-state preservation audit | Compares recipe JSON, local Transform, and shared mesh reference before and after the matrix. |
+
+R9 creates no runtime type, serialized state, scene object, mesh publication path, or production geometry behavior.
+
+## EW-B4.2R10 coexistence-viability additions
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `EdgeWearViabilityState.CoexistenceIneligible` | Separates individually valid but jointly incompatible edges from structural/geometric exclusions and solver deferrals. |
+| coexistence coverage counters | Preserve geometric and coexistence denominators plus star/pair/trial/exclusion evidence. |
+| lifecycle coexistence fields | Store the per-edge eligibility flag and exact generic coexistence reason. |
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`RecalculateEdgeWearCoverageAudit` now computes coexistence-eligible and coexistence-ineligible counts. Initial individual viability marks the record coexistence-eligible; later closure may demote it without changing its individual viability evidence.
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `ResolvePlaneCutCandidateMinimumScale` | Enforces the shared `0.25` minimum materialized-width fraction in global candidate scaling. |
+| `TryResolvePlaneCutCoexistenceByExclusion` | R10R2 runs the bounded conflict-directed best-first frontier and commits only a completely certified candidate-conserving retained set. |
+| `EvaluatePlaneCutCoexistenceExclusionTrial` | Reuses the exact authoritative retreat-trial transaction for one retained candidate set and caches the full outcome. |
+| `BuildPlaneCutCoexistenceConflictEdgeSet` | Collects implicated candidates from source-vertex, T-junction, strict plane-pair, retry, and band-conflict evidence. |
+| `ApplyPlaneCutCoexistenceSuccess` | Publishes the certified retained faces and converts exact excluded lifecycle records to `CoexistenceIneligible`. |
+| coexistence comparison helpers | Tie-break by excluded count, removed width, removed selection score, and stable edge order. |
+
+The current closure is bounded to twelve exclusions, 128 evaluated states, and ten structured implicated candidates per failure. It does not loosen geometry tolerances or encode source-edge IDs.
+
+### `MassGenerator.Polyhedron.cs`
+
+`TryResolveExactPlaneIntersection` now treats an invalid cached intersection as stale evidence rather than an immediate terminal failure. It removes that one cache entry, recomputes the analytical crossing once, applies the existing exact owner/cut two-plane correction when required, and caches the result only after the unchanged strict certificate passes. Numerical telemetry records cache invalidations and successful recomputations.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `FormatEdgeWearCoexistenceSummary` | Writes denominator transition, generic reason counts/IDs, cached trial counters, excluded edges, and minimum committed width scale. |
+| coexistence-aware batch capture | Exposes coexistence eligibility/exclusion counts and trial/cache evidence to the matrix. |
+| evaluation fingerprint v2 | Includes the coexistence denominator and coexistence exclusion states. |
+
+### `MassGenerator.cs`
+
+`EdgeWearBatchAuditCaseResult.Passed` now requires selected/certified counts to match `CoexistenceEligibleCount` and rejects any materialized minimum width below `0.25`.
+
+### `Editor/GeneratedMassEditor.cs`
+
+The initial R10 matrix report contract was `EW-B4.2R10`; R10R2 supersedes it with `EW-B4.2R10R2`. TXT/CSV cases report geometric/coexistence denominators, candidate-conservation evidence, conflict-directed search counters, generic coexistence exclusions, and the hard width-floor result.
+
+## EW-B4.2R10R2 conflict-directed closure additions
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutCoexistenceSearchNode` | Carries one immutable search outcome plus the exact reason assigned to every explicit exclusion on that path. |
+| `PlaneCutCoexistenceSearchStateRecord` | Compact cumulative state evidence for the canonical telemetry file. |
+| `TryResolvePlaneCutCoexistenceByExclusion` | Runs the bounded best-first frontier and commits only the first completely certified state under the canonical exclusion ordering. |
+| `PopulatePlaneCutCandidateConservation` | Compares actual trial candidates against the complete root-selected set minus explicit exclusions. |
+| `BuildPlaneCutExpectedCoexistenceEdgeSet` | Captures the pre-closure selected/active candidate contract from lifecycle records. |
+| `BuildPlaneCutCoexistenceConflictEdgeSet` | Uses structured band victim/foreign, source-vertex, T-junction, retry, strict-intersection, and conservation evidence; it no longer falls back to an arbitrary broad candidate list. |
+| `ResolvePlaneCutCoexistenceExclusionReason` | Adds `plane-band-incompatible`, normalizes retry evidence, and routes candidate-conservation mismatches. |
+| trial-cache key | Includes explicit exclusions as well as retained edge scales, preventing absent-candidate state aliasing. |
+| search telemetry fields | Record state counts, depth, frontier, winning depth, conservation evidence, and per-state dossiers. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `AppendPlaneCutCoexistenceSearchStates` | Writes the complete bounded search-state ledger. |
+| `FormatEdgeWearCoexistenceSummary` | Adds plane-band, candidate-conservation, and search-frontier evidence. |
+| batch capture additions | Expose plane-band/conservation exclusion counts and search counters to the matrix. |
+
+### `MassGenerator.cs`
+
+`EdgeWearBatchAuditCaseResult` now carries plane-band and candidate-conservation exclusion counts plus conflict-directed search counters.
+
+### `Editor/GeneratedMassEditor.cs`
+
+The R10R2 matrix contract was `EW-B4.2R10R2`. TXT/CSV case rows introduced the new exclusion and search fields. Aggregate failure classification recognizes retry T-junction evidence, terminal plane-band splits, and candidate-conservation failures separately.
+
+
+## EW-B4.2R10R3 structured dossier additions
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `PlaneCutCoexistenceFailureDossier` | Typed per-state provenance: category, stage, source vertex, victim/foreign pair, linked edges, immutable star, topology counts, and diagnostic. |
+| `BuildPlaneCutCoexistenceFailureDossier` | Extracts authoritative structured evidence from root and trial audits, including retry dossiers and early trial exits. |
+| `ResolvePlaneCutEffectiveFailureDossier` | Uses newer structured evidence when present; otherwise carries the parent's actionable conflict through the child state. |
+| `BuildPlaneCutImmutableIncidentStar` | Captures the complete source-vertex star from the original individually viable candidate list. |
+| `BuildPlaneCutCoexistenceConflictEdgeSet` | Branches from the effective typed dossier and filters only edges already explicitly excluded. |
+| `IsPlaneCutWinningStateFinalized` | Certifies exact lifecycle, Coverage, candidate, and materialized-width state before closure may return success. |
+| `ApplyPlaneCutCoexistenceSuccess` | Clears stale root failure provenance, commits explicit exclusions, finalizes retained edges, and enforces the winning-state contract. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+`AppendPlaneCutCoexistenceSearchStates` now writes each state's stage, source vertex, victim/foreign pair, linked set, immutable star, implicated set, candidate counts, minimum width scale, final validity, and signature. Batch capture stores the same trace for TXT reporting.
+
+### `MassGenerator.cs` and `Editor/GeneratedMassEditor.cs`
+
+`EdgeWearBatchAuditCaseResult` carries the complete coexistence search trace. The R10R3 matrix report contract was `EW-B4.2R10R3`; its TXT report appended `[Case N Coexistence Search]` sections without expanding Console output or changing the CSV schema.
+
+
+## EW-B4.2R10R4 corner-width eligibility reconciliation
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `ApplyEdgeWearCoverageCornerSolution` | Treats the shared corner-width solve as the pre-shell coexistence boundary and classifies missing or numerically inactive widths before plane construction. |
+| `SetEdgeWearCornerWidthCoexistenceIneligibility` | Applies the complete atomic lifecycle transition for `corner-width-missing` and `corner-width-inactive` while retaining truthful width evidence. |
+| `RecalculateEdgeWearCoverageAudit` | Separates total `WidthInactiveCount` from `UnresolvedWidthInactiveCount` and counts pre-shell corner-width exclusions independently from search exclusions. |
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| plane-candidate assembly | Reuses the corner-width lifecycle transition defensively and synchronizes selected/active denominators before shell construction. |
+| `BuildPlaneCutExpectedCoexistenceEdgeSet` | Requires selected, active, positive-width, coexistence-eligible records; candidate fallback is permitted only when no Coverage audit exists. |
+| `IsEdgeWearCoverageMaterialized` | Requires zero unresolved inactive widths while preserving resolved inactive-width evidence. |
+| `IsPlaneCutWinningStateFinalized` | Applies the same unresolved-width contract to committed coexistence winners and reports total plus unresolved counts on failure. |
+| `SynchronizePlaneCutCoexistenceExclusionEvidence` | Publishes the deterministic union of pre-shell and search-time coexistence exclusions and their exact reasons. |
+| `PlaneCutCoexistenceSearchStateRecord` | Stores exact expected, actual, missing, and unexpected edge-ID sets for every processed search state. |
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+Coexistence telemetry now has dedicated `cornerWidthMissing` and `cornerWidthInactive` categories, reports `preShellExclusions` separately from `searchExclusions`, and labels internal search-state candidate-conservation failures distinctly from terminal matrix failures.
+
+### `MassGenerator.cs` and `Editor/GeneratedMassEditor.cs`
+
+`EdgeWearBatchAuditCaseResult` carries both corner-width exclusion counts. The matrix contract is `EW-B4.2R10R4`; TXT and CSV output include both categories, and terminal candidate-conservation failures are no longer conflated with failed intermediate search states. Unity-side acceptance remains two deterministic `30/30` runs.

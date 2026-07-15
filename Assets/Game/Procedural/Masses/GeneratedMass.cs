@@ -981,6 +981,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private MassGenerator.EdgeWearDebugEdgeRecord[]
             unifiedEdgeWearPreviewDebugEdges =
                 Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+        [NonSerialized]
+        private MassGenerator.EdgeWearDebugEdgeRecord[]
+            sourceEdgeIndexDebugEdges =
+                Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+        [NonSerialized]
+        private string sourceEdgeIndexDebugDiagnostic;
 #endif
 
         public event Action GeometryChanged;
@@ -1097,6 +1103,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             UnifiedEdgeWearPreviewDebugEdges =>
                 unifiedEdgeWearPreviewDebugEdges ??
                     Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+
+        public MassGenerator.EdgeWearDebugEdgeRecord[]
+            SourceEdgeIndexDebugEdges =>
+                sourceEdgeIndexDebugEdges ??
+                    Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+        public string SourceEdgeIndexDebugDiagnostic =>
+            sourceEdgeIndexDebugDiagnostic ?? string.Empty;
+
+        public void RefreshSourceEdgeIndexDebug()
+        {
+            if (Application.isPlaying || recipe == null)
+            {
+                sourceEdgeIndexDebugEdges =
+                    Array.Empty<
+                        MassGenerator.EdgeWearDebugEdgeRecord>();
+                sourceEdgeIndexDebugDiagnostic = recipe == null
+                    ? "no mass recipe is assigned"
+                    : "source-edge debug is unavailable in Play Mode";
+                return;
+            }
+
+            MassGenerator.SourceEdgeIndexDebugStatus status =
+                MassGenerator.GenerateSourceEdgeIndexDebug(recipe);
+            sourceEdgeIndexDebugEdges = status.Edges ??
+                Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+            sourceEdgeIndexDebugDiagnostic = status.Diagnostic;
+        }
+
+        public void ClearSourceEdgeIndexDebug()
+        {
+            sourceEdgeIndexDebugEdges =
+                Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+            sourceEdgeIndexDebugDiagnostic = string.Empty;
+        }
 
         public void EvaluateUnifiedEdgeWearPreview()
         {

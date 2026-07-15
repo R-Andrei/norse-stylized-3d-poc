@@ -69,15 +69,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentDistributionPatchiness = 0.70f;
 
-        [SerializeField, HideInInspector]
-        private float paintedAccentDistributionSparseFloor = 0.18f;
-
-        [SerializeField, HideInInspector]
-        private float paintedAccentCompositionRegionScale = 4f;
-
-        [SerializeField, HideInInspector]
-        private float paintedAccentCompositionDensityContrast = 0.70f;
-
         [Tooltip("Painted Accent Lines only. Authoritative target share of final valid projected marks assigned to complete two- or three-member companion clusters. Zero keeps every mark independent; one assigns every mathematically and geometrically feasible mark to a cluster. The resolved whole-mark quota is reported after generation.")]
         [Range(0f, 1f)]
         [SerializeField]
@@ -227,11 +218,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentFoldEndTaper = 0.65f;
 
-        [Tooltip("Painted Accent Lines only. Family/variant-authored opaque ink colour blended through the generated projected coverage field into ground albedo.")]
+        [Tooltip("Painted Accent Lines only. Family/variant-authored ink colour blended through the generated projected coverage field into ground albedo. Ink Opacity controls the independent material-only blend amount.")]
         [ColorUsage(false, false)]
         [SerializeField]
         private Color paintedAccentInkColor =
             new Color(0.12f, 0.10f, 0.08f, 1f);
+
+        [Tooltip("Painted Accent Lines only. Material-only albedo blend applied after coverage generation. This does not change placement, projected glyphs, or coverage and therefore does not rebuild them.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentInkOpacity = 1f;
+
+        [SerializeField, HideInInspector]
+        private bool paintedAccentInkOpacityInitialized;
 
         public GroundSurfaceFeatureKind Kind => kind;
 
@@ -471,6 +470,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 return value;
             }
         }
+
+        public float PaintedAccentInkOpacity =>
+            paintedAccentInkOpacityInitialized
+                ? Mathf.Clamp01(paintedAccentInkOpacity)
+                : 1f;
+
+        public bool PaintedAccentInkOpacityInitialized =>
+            paintedAccentInkOpacityInitialized;
 
         public bool CanApplyAsShaderOnly =>
             enabled &&

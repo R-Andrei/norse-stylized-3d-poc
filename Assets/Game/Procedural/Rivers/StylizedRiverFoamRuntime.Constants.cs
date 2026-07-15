@@ -28,7 +28,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const int LowFoamCompositionBirthBudgetPerStep = 2;
         private const int MediumFoamCompositionBirthBudgetPerStep = 4;
         private const int HighFoamCompositionBirthBudgetPerStep = 6;
-        private const int ProgressiveBirthDebugCounterCount = 2;
+        private const int AutomaticBirthDebugCounterCount = 2;
         private const float ProgressiveRibbonMinimumDuration = 0.5f;
         private const float ProgressiveRibbonMaximumDuration = 5f;
         private const float ProgressiveRibbonMinimumTravelDistance = 0.5f;
@@ -556,20 +556,16 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamChipActivation");
         private static readonly int FoamChipCandidateSpacingId =
             Shader.PropertyToID("_FoamChipCandidateSpacing");
-        private static readonly int FoamChipDistributionIrregularityId =
-            Shader.PropertyToID("_FoamChipDistributionIrregularity");
-        private static readonly int FoamChipRadiusRatioId =
-            Shader.PropertyToID("_FoamChipRadiusRatio");
-        private static readonly int FoamChipSizeIrregularityId =
-            Shader.PropertyToID("_FoamChipSizeIrregularity");
-        private static readonly int FoamChipShapeIrregularityId =
-            Shader.PropertyToID("_FoamChipShapeIrregularity");
+        private static readonly int FoamChipSizeId =
+            Shader.PropertyToID("_FoamChipSize");
+        private static readonly int FoamChipIrregularityId =
+            Shader.PropertyToID("_FoamChipIrregularity");
         private static readonly int FoamChipStableScreenRadiusPixelsId =
             Shader.PropertyToID("_FoamChipStableScreenRadiusPixels");
         private static readonly int FoamChipMaximumViewScaleId =
             Shader.PropertyToID("_FoamChipMaximumViewScale");
-        private static readonly int FoamChipSelectionDepthId =
-            Shader.PropertyToID("_FoamChipSelectionDepth");
+        private static readonly int FoamChipEdgeWidthPixelsId =
+            Shader.PropertyToID("_FoamChipEdgeWidthPixels");
         private static readonly int FoamChipInteriorAccessId =
             Shader.PropertyToID("_FoamChipInteriorAccess");
         private static readonly int FoamChipFieldSpeedId =
