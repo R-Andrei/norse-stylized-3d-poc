@@ -113,11 +113,16 @@ namespace ProgrammaticStylized3D.Rivers
         private int automaticShoreBirthRejectedLastUpdate;
         private int automaticShoreBirthSubmittedTotal;
         private float automaticObjectBirthAccumulator;
+        private float automaticObjectContactCycleTime;
         private int automaticObjectBirthCursor;
         private int automaticObjectBirthSubmittedLastUpdate;
         private int automaticObjectBirthRejectedLastUpdate;
         private int automaticObjectBirthSubmittedTotal;
         private int automaticObjectBirthAnchorCountLastUpdate;
+        private int automaticObjectContactBuildCount;
+        private int automaticObjectContactHoldCount;
+        private int automaticObjectContactReleaseCount;
+        private int automaticObjectContactRestCount;
         private float automaticFreeWaterBirthAccumulator;
         private int automaticFreeWaterBirthCursor;
         private int automaticFreeWaterBirthSubmittedLastUpdate;
@@ -256,6 +261,10 @@ namespace ProgrammaticStylized3D.Rivers
             new uint[AutomaticBirthDebugCounterCount];
         private readonly List<RiverFoamStaticObjectSource>
             automaticObjectFoamSources = new();
+        private readonly Dictionary<EntityId, AutomaticObjectContactCycleState>
+            automaticObjectContactCycleStates = new();
+        private readonly HashSet<EntityId> automaticObjectContactLiveSourceIds = new();
+        private readonly List<EntityId> automaticObjectContactStaleSourceIds = new();
         private readonly List<MeshFilter> obstacleExclusionMeshFilters = new();
         private readonly List<MeshFilter> topologyCacheFingerprintMeshFilters =
             new();

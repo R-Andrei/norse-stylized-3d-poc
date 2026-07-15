@@ -87,6 +87,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty groundMacroPatchPatternSeed;
         private SerializedProperty groundMacroPatchTransitionSoftness;
         private SerializedProperty groundMacroPatchSeparation;
+        private SerializedProperty reliefShadingStrength;
+        private SerializedProperty relativeHeightContrast;
         private SerializedProperty profileContrastScale;
         private SerializedProperty profilePixelContrastScale;
         private SerializedProperty groundSnowResponseScale;
@@ -144,6 +146,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool showMaterialControls;
         private bool showMaterialPalette;
         private bool showMaterialMacroPatchComposition = true;
+        private bool showMaterialElevationReadability = true;
         private bool showMaterialPixelVariation;
         private bool showMaterialSemanticResponse;
         private bool showMaterialWeatherFinish;
@@ -403,6 +406,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             groundMacroPatchSeparation =
                 groundMaterialControls.FindPropertyRelative(
                     "groundMacroPatchSeparation");
+
+            reliefShadingStrength =
+                groundMaterialControls.FindPropertyRelative(
+                    "reliefShadingStrength");
+
+            relativeHeightContrast =
+                groundMaterialControls.FindPropertyRelative(
+                    "relativeHeightContrast");
 
             profileContrastScale =
                 groundMaterialControls.FindPropertyRelative("profileContrastScale");
@@ -3488,6 +3499,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 groundMacroPatchSeparation);
 
             materialChanged |= DrawMaterialSubsection(
+                ref showMaterialElevationReadability,
+                "Elevation Readability",
+                reliefShadingStrength,
+                relativeHeightContrast);
+
+            materialChanged |= DrawMaterialSubsection(
                 ref showMaterialPalette,
                 "Palette",
                 baseColor,
@@ -3557,6 +3574,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "groundMacroPatchTransitionSoftness"),
                 materialControls.FindPropertyRelative(
                     "groundMacroPatchSeparation"));
+
+            materialChanged |= DrawMaterialSubsection(
+                ref showMaterialElevationReadability,
+                "Elevation Readability",
+                materialControls.FindPropertyRelative(
+                    "reliefShadingStrength"),
+                materialControls.FindPropertyRelative(
+                    "relativeHeightContrast"));
 
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialPalette,

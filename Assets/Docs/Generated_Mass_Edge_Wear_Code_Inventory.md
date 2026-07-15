@@ -1199,21 +1199,48 @@ The editor exposes two independent 30-case audits. The existing topology matrix 
 
 Coverage telemetry preserves raw and canonical source counts, candidate-stage seam-pair count, graph vertex aliases, graph seam-pair count, and the canonical source-edge IDs marked `coincidentSeamReconciled`. Matrix contracts are `EW-B4.2R11B.1-topology` and `EW-B4.2R11B.1-preview`. R11B.1 does not implement micro-junction rail traversal or rendered-normal correction.
 
+## EW-B4.2R11B.1C rollback and collateral-preservation guard
 
-## EW-B4.2R11B.3 micro-feature normalization inventory
+R11B.2 and R11B.3 are rejected recovery experiments. R11B.2's singleton plane-shell fallback evaluated candidates but recovered none. R11B.3 mutated a temporary bevel graph and caused broad owner-face provenance failures, reducing seed `2223/default` from `32` to `19` geometrically eligible edges and seed `5727/default` from `36` to `22`. The authoritative implementation therefore returns to R11B.1 coincident boundary-seam reconciliation.
 
-### `MassGenerator.EdgeWear.Graph.cs`
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
 
-Owns the temporary bevel-graph normalization pass. It identifies conservative internal convex micro-edge chains, solves a regularized common face-plane junction, builds a cloned face view, and accepts a chain only after face-loop and exact topology-delta validation. The source face list is never modified.
+`CaptureEdgeWearCollateralBaseline` snapshots every canonical edge immediately after the unchanged individual geometric viability preflight and before any later recovery or artistic selection stage. `EvaluateEdgeWearCollateralPreservation` compares the current lifecycle against that immutable snapshot on every Coverage recalculation. It records recovered, lost, and changed edge IDs. A changed baseline edge includes source-index, owner-face, classification, length, dihedral, feasible-width, or width-fraction drift.
 
-### `MassGenerator.EdgeWear.Orchestration.cs` and `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+### `MassGenerator.EdgeWear.Types.cs` and `MassGenerator.cs`
 
-Orchestration builds one normalized graph-face view per evaluation. Candidate aggregation, source-index mapping, isolated viability, corner solving, and plane preparation share that view, while all geometry construction and final certification retain the immutable source faces. This prevents candidate/preflight parity drift.
+`EdgeWearCoverageAudit` owns the baseline snapshot and collateral result. `EdgeWearBatchAuditCaseResult.Passed` now requires `CollateralPreservationValid`, zero lost edges, and zero changed edges. A future recovery pass may add newly viable edges, but it cannot pass by making an unrelated baseline edge ineligible or changing its provenance.
 
-### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs` and `Editor/GeneratedMassEditor.cs`
 
-The isolated rail reads endpoint-adjacent boundary coordinates from the normalized topology graph instead of requiring the temporary graph face to have the original polygon vertex count. Original source face normals and plane distances remain authoritative.
+Coverage telemetry reports `collateral=baseline/current/recovered/lost/changed/valid` plus exact ID sets. Both 30-case matrices classify collateral loss separately and fail the affected case. Report contracts are `EW-B4.2R11B.1C-topology` and `EW-B4.2R11B.1C-preview`.
 
-### Telemetry and reports
+## EW-B4.2R11B.1D validation-suite editor additions
 
-Coverage, detailed telemetry, and both matrix formats expose evaluated/normalized/rejected micro-edge counts, normalized components, maximum junction displacement and plane residual, and per-chain edge/vertex evidence. Contracts are `EW-B4.2R11B.3-topology` and `EW-B4.2R11B.3-preview`.
+| Symbol | Responsibility |
+|---|---|
+| `EdgeWearValidationSuiteJob` | Owns one current-preview capture followed by the topology and artistic-preview matrices, and produces one final status. |
+| `StartEdgeWearValidationSuite` | Starts the one-click workflow and captures the selected mass's current preview telemetry before matrix execution. |
+| `FinishEdgeWearValidationSuite` | Finalizes the chained audits, writes the combined report, and emits one compact suite Console summary. |
+| `BuildEdgeWearValidationSuiteReport` | Embeds current preview telemetry and both complete matrix TXT reports into `Library/GeneratedMassEdgeWearValidationSuite.txt`. |
+| `GetEdgeWearLibraryPath` | Centralizes editor-only `Library` report paths for focused and combined audits. |
+| `EdgeWearBatchShapeSeeds` | Eleven-seed canonical set; R11B.1D appends `5727`, producing `33` minimum/default/maximum coordinates per policy. |
+
+The focused topology and artistic-preview buttons remain available. The full-suite Inspector row also exposes clipboard copy and file-reveal actions for the single combined report.
+
+## EW-B4.2R11B.1E recovery retirement and baseline-lock inventory
+
+R11B.4, R11B.4.1, and R11B.4.2 are rejected candidate-local owner-face support experiments. In the final one-click runtime suite, each candidate policy completed all `33/33` construction coordinates with zero topology, face-quality, placement, cache, or collateral failures, but the fallback itself reported `27` evaluations, `126` width attempts, zero virtual corners, zero traversed boundary segments, and zero certified recoveries. Seed `5727/default` likewise remained on the accepted `36` geometrically viable and `34/34` selected/certified result while its three fallback candidates produced zero recoveries.
+
+The active implementation therefore restores the R11B.1D code and report schema. `MassGenerator.EdgeWear.SelectionAndCorners.cs`, `MassGenerator.EdgeWear.Types.cs`, `MassGenerator.EdgeWear.Diagnostics.Logging.cs`, and `MassGenerator.cs` are byte-identical to R11B.1D. All owner-face support interval methods, records, counters, CSV columns, hit classifications, and zero-yield matrix gates are removed.
+
+`Editor/GeneratedMassEditor.cs` retains the eleven-seed, `33`-case-per-policy one-click validation suite, clipboard copy, report reveal, and focused matrix actions. Only the report contracts advance to `EW-B4.2R11B.1E-suite`, `EW-B4.2R11B.1E-topology`, and `EW-B4.2R11B.1E-preview`. Coincident-seam reconciliation and collateral-preservation auditing remain authoritative.
+
+
+## EW-B4.2R12A artistic-selection audit inventory
+
+R12A is telemetry-only. It does not alter geometric eligibility, candidate ordering, Coverage selected-count calculation, corner solving, solved widths, shell construction, or certification. `MassGenerator.EdgeWear.SelectionAndCorners.cs` now records the exact current score inputs—length score, dihedral score, deterministic random term, base suppression, upward-edge boost, and recipe character boost—alongside diagnostic-only context metrics for edge-axis orientation, camera-independent silhouette potential, feasible and solved width fraction, local geometric-edge density measured within the existing `maximumDimension * 0.34` length-score normalization scale, and shared-vertex crowding. The diagnostic-only context metrics carry explicit zero score weight in the report.
+
+`CaptureEdgeWearArtisticSelectionAudit` runs after the unchanged descending score sort and selected-count calculation. It records the actual selection rank, threshold score, and threshold delta without changing the ordered candidate list. `MassGenerator.EdgeWear.Diagnostics.Logging.cs` adds an `[Artistic Selection Audit]` section with filter-reason counts, all/selected/filtered score ranges, and length, dihedral, orientation, silhouette, density, and crowding distributions. Every bin reports `all/selected/artistically-filtered` counts.
+
+`EdgeWearBatchAuditCaseResult` and `Editor/GeneratedMassEditor.cs` project the same audit into both 33-case matrix TXT/CSV reports and the one-click combined report. Matrix pass criteria are unchanged. Report contracts advance to `EW-B4.2R12A-suite`, `EW-B4.2R12A-topology`, and `EW-B4.2R12A-preview`.

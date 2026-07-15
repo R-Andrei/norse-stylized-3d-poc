@@ -4,6 +4,60 @@ D.1C imported, rendered, and passed the user’s functional Unity validation whi
 
 No dedicated cold-compile timing or final GPU comparison was supplied for D.1C. Those measurements remain deferred performance evidence, not a blocker for the accepted visual baseline. This checklist should only become active again for the comprehensive River performance pass or a new shader-iteration regression.
 
+## `4.11C.5.18H.3` compute/C# iteration impact — implemented, Unity validation pending
+
+`5.18H.3` changes Arc/Semi-Arc serialized presentation, CPU event construction and dispatch bounds, runtime event naming/packing, Inspector/debug text, `CS_RiverFoam.Structs.hlsl`, and `CS_RiverFoam.compute`. Import must trigger both a C# compilation and compute-shader reimport.
+
+Required contract checks:
+
+```text
+Wake Arm Length uses the existing serialized metre Length fields;
+legacy normalized Arm Reach fields are hidden and unused;
+FoamSourceEventGpuData remains seven Vector4 lanes on CPU and HLSL;
+shore.y carries straight wake-arm length metres for Arc/Semi-Arc;
+kinematics.z carries the complete arm + front-bridge path length;
+front contact emission is zero at and behind the side axis;
+wake arms are distance-to-segment ribbons parallel to flow;
+no atan2/acos/signed-angle path code is reintroduced;
+no kernel, texture, buffer, dispatch, or shader sample is added.
+```
+
+If Unity reports no script compile and no compute reimport, verify that `StylizedRiver.cs`, `StylizedRiverFoamRuntime.BirthEvents.cs`, `StylizedRiverFoamRuntime.Injection.cs`, `StylizedRiverFoamRuntime.State.cs`, `CS_RiverFoam.Structs.hlsl`, and `CS_RiverFoam.compute` were actually replaced.
+
+## `4.11C.5.18H` / `5.18H.2` compute/C# history — thin width accepted; rear-following geometry superseded by `5.18H.3`
+
+`5.18H` changes serialized Arc/Semi-Arc authoring, CPU event construction and path-length timing, GPU event packing, Inspector/debug text, `CS_RiverFoam.Structs.hlsl`, and `CS_RiverFoam.compute`. Import must therefore trigger both a C# compilation and a compute-shader reimport.
+
+Required contract checks:
+
+```text
+new Arm Reach properties resolve in StylizedRiver and the custom Inspector;
+legacy Arc/Semi-Arc Length/Profile Scale/Offset/Breakup fields are hidden and unused;
+FoamSourceEventGpuData remains seven Vector4 lanes on CPU and HLSL;
+ObjectCentreGlobalDistance, Arm Reach, and open-C path length reach the intended GPU lanes;
+Arc/Semi-Arc evaluators contain no mandatory mantle, breakup, offset, or old profile branch;
+no kernel, texture, buffer, dispatch, or shader sample is added.
+```
+
+If Unity reports no script compile and no compute reimport, verify that `StylizedRiver.cs`, `StylizedRiverFoamRuntime.BirthEvents.cs`, `StylizedRiverFoamRuntime.Injection.cs`, `CS_RiverFoam.Structs.hlsl`, and `CS_RiverFoam.compute` were actually replaced.
+
+## `4.11C.5.18G.1` compute/C# iteration impact — Unity-tested, spatial contract superseded by `5.18H`
+
+`5.18G.1` changes the Arc/Semi-Arc source evaluator, the object-event source-fill contract, and Inspector/debug descriptions. Import must therefore trigger a script compile and `CS_RiverFoam.compute` reimport.
+
+Required contract checks:
+
+```text
+Arc/Semi-Arc SourceFillBlend = 0;
+Contact Fleck SourceFillBlend = accepted stochastic value;
+Arc Build/Hold/Release masks = contiguous accumulated/full/same-order;
+Semi-Arc Build/Hold/Release masks = front-then-extension/full/reverse;
+no moving-frontier or full-profile-only Hold fallback remains;
+no new resource or dispatch is added.
+```
+
+If Unity reports no script compile and no compute reimport, verify that both `StylizedRiverFoamRuntime.BirthEvents.cs` and `CS_RiverFoam.compute` were actually replaced.
+
 ## `4.11C.5.18F.1` compute/C# iteration impact
 
 The original `5.18F` is rejected because its `frontierActive` threshold could remain false across legal Arc/Semi-Arc parameter combinations. `5.18F.1` removes that branch and requires both C# compilation and compute import.

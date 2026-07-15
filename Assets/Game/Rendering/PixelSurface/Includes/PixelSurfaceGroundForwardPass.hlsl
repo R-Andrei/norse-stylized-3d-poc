@@ -439,9 +439,43 @@
                     bottomMask *
                     sideMask *
                     saturate((half)_EdgeDarkenStrength);
+
+                float2 horizontalLightDirection = mainLight.direction.xz;
+                float horizontalLightLengthSquared =
+                    dot(
+                        horizontalLightDirection,
+                        horizontalLightDirection);
+                horizontalLightDirection *=
+                    rsqrt(max(0.0001, horizontalLightLengthSquared));
+
+                float2 groundSlope =
+                    normalWS.xz /
+                    max(0.25, abs((float)normalWS.y));
+                float reliefSignal =
+                    clamp(
+                        dot(groundSlope, horizontalLightDirection),
+                        -1.0,
+                        1.0) *
+                    step(0.0001, horizontalLightLengthSquared);
+                float reliefScale =
+                    max(
+                        0.0,
+                        1.0 +
+                        reliefSignal *
+                        max(0.0, _GroundReliefShadingStrength));
+
+                float relativeHeightScale =
+                    max(
+                        0.0,
+                        1.0 +
+                        input.positionOS.y *
+                        max(0.0, _GroundRelativeHeightContrast));
+
                 half valueScale =
                     highlightScale *
-                    (1.0h - saturate(bottomDarken + broadEdgeDarken));
+                    (1.0h - saturate(bottomDarken + broadEdgeDarken)) *
+                    (half)reliefScale *
+                    (half)relativeHeightScale;
 
                 return albedo * valueScale;
             }

@@ -4,7 +4,7 @@
 
 **Audit state: complete. Implementation has not started.**
 
-This is the canonical audit and architecture record for V4 Contact / Edge Accents. Its architecture remains accepted, but implementation is queued until V3M Broad Macro Patch Completion passes gameplay-camera visual acceptance. V3M is tracked in `Ground_Macro_Patch_Audit_and_Architecture.md`.
+This is the canonical audit and architecture record for V4 Contact / Edge Accents. Its architecture remains accepted. V3M Broad Macro Patch Completion is now accepted through V3M-A1.3.4; V4 implementation is queued only until the small V3R Ground Elevation Readability proof passes gameplay-camera validation.
 
 The broader Ground system is not complete. The accepted completed slice is:
 
@@ -17,7 +17,7 @@ GeneratedGround unified authoring
 + generated-asset cleanup
 ```
 
-The queued post-V3M milestone is:
+The queued post-V3R milestone is:
 
 ```text
 V4 Contact / Edge Accents

@@ -27,6 +27,8 @@
                 float4 _GroundMacroPatchSeedScroll;
                 float _GroundMacroPatchTransitionSoftness;
                 float _GroundMacroPatchSeparation;
+                float _GroundReliefShadingStrength;
+                float _GroundRelativeHeightContrast;
                 float _GroundSnowTintStrength;
                 float _GroundSnowBrightness;
                 float _GroundDampDarkenStrength;

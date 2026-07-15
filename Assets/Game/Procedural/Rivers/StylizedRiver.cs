@@ -1139,11 +1139,15 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Enables deterministic static object/contact Layer C material birth when the selected source preset allows object sources.")]
         [SerializeField] private bool foamAutomaticObjectBirthEnabled = true;
 
-        [Tooltip("How much of the registered static object/contact population can participate in deterministic Object Foam source events over time. This controls object eligibility, not opacity or patch size.")]
+        [Tooltip("How much of the registered static object/contact population can participate in supplemental Contact Fleck events. Arc and Semi-Arc contact-cycle participation is controlled separately below.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectFoamCoverage = 0.45f;
 
-        [Tooltip("How often new static object/contact source events start. Higher values start more full-strength contact arcs or flecks per second.")]
+        [Tooltip("Stable share of registered static object anchors that receive the per-object Build / Hold / Progressive Release / Rest Contact Arc or Contact Semi-Arc cycle. One includes every eligible object anchor.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactCycleCoverage = 1.00f;
+
+        [Tooltip("How often supplemental Contact Fleck events start. Contact Arc and Contact Semi-Arc persistence is owned by the per-object Build / Hold / Progressive Release / Rest cycle below.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectFoamActivity = 0.35f;
 
@@ -1155,7 +1159,31 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamObjectFoamFormationSpeedMetresPerSecond =
             DefaultShoreFoamFormationSpeedMetresPerSecond;
 
-        [Tooltip("Chooses the deterministic object-contact source recipe. Mixed uses the normalized Contact Arc / Contact Semi-Arc / Contact Fleck pattern weights below; the pure modes force one pattern for debugging.")]
+        [Tooltip("Minimum time in seconds that an eligible object's complete Contact Arc or Contact Semi-Arc remains actively replenished after the progressive build finishes.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactHoldDurationMinSeconds = 5.0f;
+
+        [Tooltip("Maximum time in seconds that an eligible object's complete Contact Arc or Contact Semi-Arc remains actively replenished after the progressive build finishes.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactHoldDurationMaxSeconds = 10.0f;
+
+        [Tooltip("Minimum time in seconds for the contact emitter to release progressively in the same spatial order used during build. Earlier-built contact regions stop emitting first.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamObjectContactReleaseDurationMinSeconds = 0.60f;
+
+        [Tooltip("Maximum time in seconds for the contact emitter to release progressively in the same spatial order used during build. Earlier-built contact regions stop emitting first.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamObjectContactReleaseDurationMaxSeconds = 1.40f;
+
+        [Tooltip("Minimum source-off rest time in seconds after progressive release completes before the same object may start another contact cycle.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactRestDurationMinSeconds = 1.0f;
+
+        [Tooltip("Maximum source-off rest time in seconds after progressive release completes before the same object may start another contact cycle.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactRestDurationMaxSeconds = 3.0f;
+
+        [Tooltip("Chooses the deterministic object-contact source recipe. Mixed uses Arc and Semi-Arc weights for per-object contact cycles and the Fleck weight for supplemental stochastic flecks; the pure modes force one pattern for debugging.")]
         [SerializeField] private StylizedRiverFoamObjectPattern foamObjectFoamPattern =
             StylizedRiverFoamObjectPattern.Mixed;
 
@@ -1171,30 +1199,44 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckPatternWeight = 0.20f;
 
-        [Tooltip("Per-pattern multiplier for how fast Object Contact Arc sources reveal along their path.")]
+        [Tooltip("Per-pattern multiplier for how fast Object Contact Arc sources build across the upstream contact bridge and two straight downstream wake arms.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactArcFormationSpeedMultiplier = 1.00f;
 
-        [Tooltip("Minimum authored Object Contact Arc length in metres before deterministic variation is applied.")]
+        [HideInInspector]
+        [Tooltip("Legacy normalized Arc arm reach retained only for scene compatibility. 5.18H.3 no longer reads this field.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactArcArmReachMin = 0.45f;
+
+        [HideInInspector]
+        [Tooltip("Legacy normalized Arc arm reach retained only for scene compatibility. 5.18H.3 no longer reads this field.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactArcArmReachMax = 0.70f;
+
+        [Tooltip("Minimum straight downstream wake-arm length in metres for Object Contact Arcs. The source follows the physical obstacle only across its upstream face, then continues downstream from each side shoulder as a thin ribbon.")]
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactArcLengthMinMetres = 0.45f;
 
-        [Tooltip("Maximum authored Object Contact Arc length in metres before deterministic variation is applied.")]
+        [Tooltip("Maximum straight downstream wake-arm length in metres for Object Contact Arcs. Increasing this extends the two side wakes downstream and never allows the source to wrap around the rear of the obstacle.")]
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactArcLengthMaxMetres = 1.80f;
 
+        [HideInInspector]
         [Tooltip("Minimum Object Contact Arc profile scale in metres before deterministic variation. This shapes early tangential reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactArcWidthMinMetres = 0.035f;
 
+        [HideInInspector]
         [Tooltip("Maximum Object Contact Arc profile scale in metres before deterministic variation. This shapes early tangential reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactArcWidthMaxMetres = 0.120f;
 
+        [HideInInspector]
         [Tooltip("Minimum profile offset from the physical obstacle contact shell for Object Contact Arc sources. This biases profile placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactArcOffsetMinMetres = 0.015f;
 
+        [HideInInspector]
         [Tooltip("Maximum profile offset from the physical obstacle contact shell for Object Contact Arc sources. This biases profile placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactArcOffsetMaxMetres = 0.120f;
@@ -1215,38 +1257,54 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcInitialLifeMax = 1.00f;
 
+        [HideInInspector]
         [Tooltip("Minimum deterministic breakup strength for Object Contact Arc sources.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcBreakupStrengthMin = 0.08f;
 
+        [HideInInspector]
         [Tooltip("Maximum deterministic breakup strength for Object Contact Arc sources.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcBreakupStrengthMax = 0.28f;
 
-        [Tooltip("Per-pattern multiplier for how fast Object Contact Semi-Arc sources reveal along their one-sided path.")]
+        [Tooltip("Per-pattern multiplier for how fast Object Contact Semi-Arc sources build across the upstream contact bridge and asymmetric straight downstream wake arms.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactSemiArcFormationSpeedMultiplier = 1.00f;
 
-        [Tooltip("Minimum authored Object Contact Semi-Arc length in metres before deterministic variation is applied.")]
+        [HideInInspector]
+        [Tooltip("Legacy normalized Semi-Arc arm reach retained only for scene compatibility. 5.18H.3 no longer reads this field.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcArmReachMin = 0.60f;
+
+        [HideInInspector]
+        [Tooltip("Legacy normalized Semi-Arc arm reach retained only for scene compatibility. 5.18H.3 no longer reads this field.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcArmReachMax = 0.90f;
+
+        [Tooltip("Minimum dominant straight downstream wake-arm length in metres for Object Contact Semi-Arcs. Lopsidedness shortens the opposite arm while the complete upstream contact bridge remains present.")]
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactSemiArcLengthMinMetres = 0.35f;
 
-        [Tooltip("Maximum authored Object Contact Semi-Arc length in metres before deterministic variation is applied.")]
+        [Tooltip("Maximum dominant straight downstream wake-arm length in metres for Object Contact Semi-Arcs. Increasing this extends the selected side wake downstream and never allows the source to wrap around the obstacle rear.")]
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactSemiArcLengthMaxMetres = 1.35f;
 
+        [HideInInspector]
         [Tooltip("Minimum Object Contact Semi-Arc profile scale in metres before deterministic variation. This shapes one-sided reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactSemiArcWidthMinMetres = 0.030f;
 
+        [HideInInspector]
         [Tooltip("Maximum Object Contact Semi-Arc profile scale in metres before deterministic variation. This shapes one-sided reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
         [Min(0.005f)]
         [SerializeField] private float foamObjectContactSemiArcWidthMaxMetres = 0.105f;
 
+        [HideInInspector]
         [Tooltip("Minimum profile offset from the physical obstacle contact shell for Object Contact Semi-Arc sources. This biases profile placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactSemiArcOffsetMinMetres = 0.020f;
 
+        [HideInInspector]
         [Tooltip("Maximum profile offset from the physical obstacle contact shell for Object Contact Semi-Arc sources. This biases profile placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactSemiArcOffsetMaxMetres = 0.140f;
@@ -1267,19 +1325,21 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcInitialLifeMax = 1.00f;
 
+        [HideInInspector]
         [Tooltip("Minimum deterministic breakup strength for Object Contact Semi-Arc sources.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcBreakupStrengthMin = 0.08f;
 
+        [HideInInspector]
         [Tooltip("Maximum deterministic breakup strength for Object Contact Semi-Arc sources.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcBreakupStrengthMax = 0.32f;
 
-        [Tooltip("Minimum one-sided bias for Object Contact Semi-Arcs. Higher values push the source farther onto one shoulder of the object contact edge.")]
+        [Tooltip("Minimum one-sided bias for Object Contact Semi-Arcs. Zero keeps both open-C arms equal; higher values shorten the non-dominant arm while preserving the complete upstream bridge.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcLopsidednessMin = 0.45f;
 
-        [Tooltip("Maximum one-sided bias for Object Contact Semi-Arcs. Higher values produce more visibly lopsided contact arcs.")]
+        [Tooltip("Maximum one-sided bias for Object Contact Semi-Arcs. One keeps the dominant arm at its authored reach and reduces the opposite arm to the side shoulder.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcLopsidednessMax = 1.00f;
 
@@ -2458,6 +2518,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         public float FoamObjectFoamCoverage =>
             Mathf.Clamp01(foamObjectFoamCoverage);
+        public float FoamObjectContactCycleCoverage =>
+            Mathf.Clamp01(foamObjectContactCycleCoverage);
         public float FoamObjectFoamActivity =>
             Mathf.Clamp01(foamObjectFoamActivity);
         public float FoamObjectFoamFormationSpeedMetresPerSecond =>
@@ -2465,20 +2527,61 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectFoamFormationSpeedMetresPerSecond,
                 MinimumShoreFoamFormationSpeedMetresPerSecond,
                 MaximumShoreFoamFormationSpeedMetresPerSecond);
+        public float FoamObjectContactHoldDurationMinSeconds =>
+            Mathf.Max(0f, Mathf.Min(
+                foamObjectContactHoldDurationMinSeconds,
+                foamObjectContactHoldDurationMaxSeconds));
+        public float FoamObjectContactHoldDurationMaxSeconds =>
+            Mathf.Max(
+                FoamObjectContactHoldDurationMinSeconds,
+                foamObjectContactHoldDurationMaxSeconds);
+        public float FoamObjectContactReleaseDurationMinSeconds =>
+            Mathf.Max(0.05f, Mathf.Min(
+                foamObjectContactReleaseDurationMinSeconds,
+                foamObjectContactReleaseDurationMaxSeconds));
+        public float FoamObjectContactReleaseDurationMaxSeconds =>
+            Mathf.Max(
+                FoamObjectContactReleaseDurationMinSeconds,
+                foamObjectContactReleaseDurationMaxSeconds);
+        public float FoamObjectContactRestDurationMinSeconds =>
+            Mathf.Max(0f, Mathf.Min(
+                foamObjectContactRestDurationMinSeconds,
+                foamObjectContactRestDurationMaxSeconds));
+        public float FoamObjectContactRestDurationMaxSeconds =>
+            Mathf.Max(
+                FoamObjectContactRestDurationMinSeconds,
+                foamObjectContactRestDurationMaxSeconds);
         public StylizedRiverFoamObjectPattern FoamObjectFoamPattern =>
             foamObjectFoamPattern;
+        public bool FoamObjectContactCyclesEnabled =>
+            foamObjectFoamPattern != StylizedRiverFoamObjectPattern.ContactFlecks &&
+            (foamObjectFoamPattern != StylizedRiverFoamObjectPattern.Mixed ||
+             FoamObjectContactArcPatternWeight +
+             FoamObjectContactSemiArcPatternWeight > 0.0001f);
         public float FoamObjectContactArcPatternWeight =>
             Mathf.Clamp01(foamObjectContactArcPatternWeight);
         public float FoamObjectContactFleckPatternWeight =>
             Mathf.Clamp01(foamObjectContactFleckPatternWeight);
         public float FoamObjectContactArcFormationSpeedMultiplier =>
             Mathf.Clamp(foamObjectContactArcFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamObjectContactArcArmReachMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactArcArmReachMin,
+                foamObjectContactArcArmReachMax));
+        public float FoamObjectContactArcArmReachMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactArcArmReachMin,
+                foamObjectContactArcArmReachMax));
         public float FoamObjectContactArcLengthMinMetres =>
             Mathf.Max(0.05f, Mathf.Min(
                 foamObjectContactArcLengthMinMetres,
                 foamObjectContactArcLengthMaxMetres));
         public float FoamObjectContactArcLengthMaxMetres =>
             Mathf.Max(FoamObjectContactArcLengthMinMetres, foamObjectContactArcLengthMaxMetres);
+        public float FoamObjectContactArcWakeArmLengthMinMetres =>
+            FoamObjectContactArcLengthMinMetres;
+        public float FoamObjectContactArcWakeArmLengthMaxMetres =>
+            FoamObjectContactArcLengthMaxMetres;
         public float FoamObjectContactArcWidthMinMetres =>
             Mathf.Max(0.005f, Mathf.Min(
                 foamObjectContactArcWidthMinMetres,
@@ -2519,12 +2622,24 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamObjectContactSemiArcPatternWeight);
         public float FoamObjectContactSemiArcFormationSpeedMultiplier =>
             Mathf.Clamp(foamObjectContactSemiArcFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamObjectContactSemiArcArmReachMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactSemiArcArmReachMin,
+                foamObjectContactSemiArcArmReachMax));
+        public float FoamObjectContactSemiArcArmReachMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactSemiArcArmReachMin,
+                foamObjectContactSemiArcArmReachMax));
         public float FoamObjectContactSemiArcLengthMinMetres =>
             Mathf.Max(0.05f, Mathf.Min(
                 foamObjectContactSemiArcLengthMinMetres,
                 foamObjectContactSemiArcLengthMaxMetres));
         public float FoamObjectContactSemiArcLengthMaxMetres =>
             Mathf.Max(FoamObjectContactSemiArcLengthMinMetres, foamObjectContactSemiArcLengthMaxMetres);
+        public float FoamObjectContactSemiArcWakeArmLengthMinMetres =>
+            FoamObjectContactSemiArcLengthMinMetres;
+        public float FoamObjectContactSemiArcWakeArmLengthMaxMetres =>
+            FoamObjectContactSemiArcLengthMaxMetres;
         public float FoamObjectContactSemiArcWidthMinMetres =>
             Mathf.Max(0.005f, Mathf.Min(
                 foamObjectContactSemiArcWidthMinMetres,
@@ -3185,7 +3300,21 @@ namespace ProgrammaticStylized3D.Rivers
         private void SanitizeObjectFoamPatternControls()
         {
             foamObjectFoamCoverage = Mathf.Clamp01(foamObjectFoamCoverage);
+            foamObjectContactCycleCoverage = Mathf.Clamp01(
+                foamObjectContactCycleCoverage);
             foamObjectFoamActivity = Mathf.Clamp01(foamObjectFoamActivity);
+            SanitizePositiveRange(
+                ref foamObjectContactHoldDurationMinSeconds,
+                ref foamObjectContactHoldDurationMaxSeconds,
+                0f);
+            SanitizePositiveRange(
+                ref foamObjectContactReleaseDurationMinSeconds,
+                ref foamObjectContactReleaseDurationMaxSeconds,
+                0.05f);
+            SanitizePositiveRange(
+                ref foamObjectContactRestDurationMinSeconds,
+                ref foamObjectContactRestDurationMaxSeconds,
+                0f);
             foamObjectFoamFormationSpeedMetresPerSecond = Mathf.Clamp(
                 foamObjectFoamFormationSpeedMetresPerSecond,
                 MinimumShoreFoamFormationSpeedMetresPerSecond,
@@ -3195,6 +3324,9 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactArcFormationSpeedMultiplier,
                 0.10f,
                 3.00f);
+            SanitizeUnitRange(
+                ref foamObjectContactArcArmReachMin,
+                ref foamObjectContactArcArmReachMax);
             SanitizePositiveRange(
                 ref foamObjectContactArcLengthMinMetres,
                 ref foamObjectContactArcLengthMaxMetres,
@@ -3221,6 +3353,9 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactSemiArcFormationSpeedMultiplier,
                 0.10f,
                 3.00f);
+            SanitizeUnitRange(
+                ref foamObjectContactSemiArcArmReachMin,
+                ref foamObjectContactSemiArcArmReachMax);
             SanitizePositiveRange(
                 ref foamObjectContactSemiArcLengthMinMetres,
                 ref foamObjectContactSemiArcLengthMaxMetres,

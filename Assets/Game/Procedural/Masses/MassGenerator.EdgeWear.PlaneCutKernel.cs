@@ -1642,6 +1642,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 !audit.RequireAllGeometricCandidates ||
                 audit.CoexistenceEligibleCount == audit.SelectedCount;
             return exhaustiveDenominatorValid &&
+                audit.CollateralPreservationValid &&
+                audit.CollateralLostEdgeCount == 0 &&
+                audit.CollateralChangedEdgeCount == 0 &&
                 audit.SelectedCount == audit.ActiveCount &&
                 audit.ActiveCount == audit.AttemptedBuiltCount &&
                 audit.AttemptedBuiltCount == audit.BuiltCount &&
@@ -3947,6 +3950,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     coverage.SelectedCount);
             bool valid = coverage != null &&
                 exhaustiveDenominatorValid &&
+                coverage.CollateralPreservationValid &&
+                coverage.CollateralLostEdgeCount == 0 &&
+                coverage.CollateralChangedEdgeCount == 0 &&
                 coverage.SelectedCount ==
                     coverage.AttemptedBuiltCount &&
                 coverage.AttemptedBuiltCount == coverage.BuiltCount &&
@@ -3978,6 +3984,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ",requireAllGeometricCandidates=" +
                 (coverage != null &&
                  coverage.RequireAllGeometricCandidates ? "1" : "0") +
+                ",collateral=baseline/current/recovered/lost/changed/valid:" +
+                (coverage == null
+                    ? "missing"
+                    : coverage.BaselineGeometricEligibleCount + "/" +
+                        coverage.GeometricEligibleCount + "/" +
+                        coverage.RecoveredGeometricEdgeCount + "/" +
+                        coverage.CollateralLostEdgeCount + "/" +
+                        coverage.CollateralChangedEdgeCount + "/" +
+                        (coverage.CollateralPreservationValid ? "1" : "0")) +
                 ",widthInactive/unresolvedWidthInactive/" +
                     "trialRejected/deferred/rejected/unmapped=" +
                 (coverage == null

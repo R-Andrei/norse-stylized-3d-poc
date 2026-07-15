@@ -1091,6 +1091,146 @@ float4 FoamLoadObjectContactField(int2 coordinate)
     return _FoamObjectContactFieldRead.Load(int3(clamped, 0));
 }
 
+float FoamResolveObjectFrontBridgeShape(
+    float2 localPosition,
+    float2 radii,
+    float contactConfidence,
+    float2 physicalCellSpacing,
+    out float frontT)
+{
+    float2 normalizedPosition = float2(
+        localPosition.x / max(0.001, radii.x),
+        localPosition.y / max(0.001, radii.y));
+    float frontFeather = clamp(
+        physicalCellSpacing.x / max(0.001, radii.x) * 0.35,
+        0.02,
+        0.18);
+    // Follow the physical obstacle only across the upstream half. The gate is
+    // fully zero at and behind the side axis; the straight wake arms own all
+    // downstream source geometry from the two shoulders onward.
+    float frontHalfGate = 1.0 - smoothstep(
+        0.0 - frontFeather,
+        0.0,
+        normalizedPosition.x);
+    frontT = saturate(normalizedPosition.y * 0.5 + 0.5);
+    return saturate(contactConfidence * frontHalfGate);
+}
+
+float FoamResolveObjectWakeArmShape(
+    float2 localPosition,
+    float2 shoulder,
+    float armLength,
+    float2 physicalCellSpacing,
+    out float shoulderToTipT)
+{
+    float resolvedLength = max(0.0, armLength);
+    if (resolvedLength <= 0.001)
+    {
+        shoulderToTipT = 0.0;
+        return 0.0;
+    }
+
+    float2 armTip = shoulder + float2(resolvedLength, 0.0);
+    float distanceToArm = FoamDistanceToSegment(
+        localPosition,
+        shoulder,
+        armTip,
+        shoulderToTipT);
+    // One strong cross-river row with at most one feathered continuity row.
+    // This is a real distance-to-segment ribbon, not Presence attenuation used
+    // to imitate fractional-cell geometry.
+    float rasterWidth = max(
+        0.0015,
+        physicalCellSpacing.y * 0.34);
+    float rasterFeather = max(
+        0.002,
+        physicalCellSpacing.y * 0.20);
+    return 1.0 - smoothstep(
+        rasterWidth,
+        rasterWidth + rasterFeather,
+        distanceToArm);
+}
+
+float FoamResolveAccumulatedSweepBuild(
+    float sweepCoordinate,
+    float progress,
+    float materialStepProgress,
+    float feather01)
+{
+    float effectiveProgress = max(
+        saturate(progress),
+        saturate(materialStepProgress));
+    float threshold = effectiveProgress * (1.0 + feather01 * 2.0);
+    return 1.0 - smoothstep(
+        threshold - feather01,
+        threshold + feather01,
+        sweepCoordinate);
+}
+
+float FoamResolveSameOrderSweepRelease(
+    float sweepCoordinate,
+    float progress,
+    float feather01)
+{
+    float threshold =
+        saturate(progress) * (1.0 + feather01 * 2.0) - feather01;
+    return smoothstep(
+        threshold - feather01,
+        threshold + feather01,
+        sweepCoordinate);
+}
+
+float FoamResolveReverseOrderSweepRelease(
+    float sweepCoordinate,
+    float progress,
+    float feather01)
+{
+    float threshold =
+        (1.0 - saturate(progress)) * (1.0 + feather01 * 2.0) -
+        feather01;
+    return 1.0 - smoothstep(
+        threshold - feather01,
+        threshold + feather01,
+        sweepCoordinate);
+}
+
+float FoamResolveObjectRibbonPhaseMask(
+    float pathT,
+    float progress,
+    float materialStepProgress,
+    float pathLength,
+    float2 physicalCellSpacing,
+    float phase,
+    bool reverseRelease)
+{
+    float phaseFeather01 = clamp(
+        max(physicalCellSpacing.x, physicalCellSpacing.y) /
+        max(0.001, pathLength),
+        0.025,
+        0.18);
+    float buildMask = FoamResolveAccumulatedSweepBuild(
+        pathT,
+        progress,
+        materialStepProgress,
+        phaseFeather01);
+    float releaseMask = reverseRelease
+        ? FoamResolveReverseOrderSweepRelease(
+            pathT,
+            progress,
+            phaseFeather01)
+        : FoamResolveSameOrderSweepRelease(
+            pathT,
+            progress,
+            phaseFeather01);
+    float buildPhase = 1.0 - step(0.5, phase);
+    float holdPhase = step(0.5, phase) * (1.0 - step(1.5, phase));
+    float releasePhase = step(1.5, phase);
+    return saturate(
+        buildMask * buildPhase +
+        holdPhase +
+        releaseMask * releasePhase);
+}
+
 float FoamEvaluateObjectContactArcSource(
     FoamSourceEventData sourceEvent,
     float globalDistance,
@@ -1100,123 +1240,104 @@ float FoamEvaluateObjectContactArcSource(
     out float amountMultiplier)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
-    float localAlong = (globalDistance - sourceEvent.distance.z) * flowDirection;
-    float localAcross = lateralMetres - sourceEvent.objectData.x;
-    float alongHalf = max(0.04, sourceEvent.objectData.y);
-    float acrossHalf = max(0.04, sourceEvent.objectData.z);
-    float contactOffset = max(0.0, sourceEvent.objectData.w);
-    float width = max(0.006, sourceEvent.shore.y);
-    float feather = max(
-        max(0.006, sourceEvent.shore.w * 0.70),
-        max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.38);
-    float progress = saturate(sourceEvent.header.z);
-    float totalLength = max(
+    float2 localPosition = float2(
+        (globalDistance - sourceEvent.distance.z) * flowDirection,
+        lateralMetres - sourceEvent.objectData.x);
+    float sourceLateralCellSpacing = max(
+        0.01,
+        sourceEvent.objectData.w);
+    float2 radii = float2(
+        max(0.04, sourceEvent.objectData.y) +
+            physicalCellSpacing.x * 0.5,
+        max(0.04, sourceEvent.objectData.z) +
+            sourceLateralCellSpacing * 0.5);
+    float wakeArmLength = max(0.05, sourceEvent.shore.y);
+    float frontBridgeLength = 1.57079632679 * (radii.x + radii.y);
+    float totalPathLength = max(
         0.001,
-        abs(sourceEvent.distance.y - sourceEvent.distance.x));
+        wakeArmLength + frontBridgeLength + wakeArmLength);
 
     float4 contact = FoamLoadObjectContactField(coordinate);
-    float contactConfidence = saturate(contact.r);
-    if (contactConfidence <= 0.001)
+    float frontT;
+    float frontShape = FoamResolveObjectFrontBridgeShape(
+        localPosition,
+        radii,
+        saturate(contact.r),
+        physicalCellSpacing,
+        frontT);
+
+    float negativeAcross = 0.0 - radii.y;
+    float2 negativeShoulder = float2(0.0, negativeAcross);
+    float2 positiveShoulder = float2(0.0, radii.y);
+    float negativeArmT;
+    float positiveArmT;
+    float negativeArmShape = FoamResolveObjectWakeArmShape(
+        localPosition,
+        negativeShoulder,
+        wakeArmLength,
+        physicalCellSpacing,
+        negativeArmT);
+    float positiveArmShape = FoamResolveObjectWakeArmShape(
+        localPosition,
+        positiveShoulder,
+        wakeArmLength,
+        physicalCellSpacing,
+        positiveArmT);
+
+    float negativePathT = saturate(
+        wakeArmLength * (1.0 - negativeArmT) /
+        totalPathLength);
+    float frontPathT = saturate(
+        (wakeArmLength + frontT * frontBridgeLength) /
+        totalPathLength);
+    float positivePathT = saturate(
+        (wakeArmLength + frontBridgeLength +
+         positiveArmT * wakeArmLength) /
+        totalPathLength);
+
+    bool reverseSweep = FoamHash11(sourceEvent.header.w + 73.17) < 0.5;
+    if (reverseSweep)
     {
-        amountMultiplier = 0.0;
-        return 0.0;
+        negativePathT = 1.0 - negativePathT;
+        frontPathT = 1.0 - frontPathT;
+        positivePathT = 1.0 - positivePathT;
     }
 
-    float2 normal = contact.gb;
-    float normalLength = length(normal);
-    if (normalLength <= 0.001)
-    {
-        normal = float2(-flowDirection, 0.0);
-    }
-    else
-    {
-        normal /= normalLength;
-    }
-
-    float2 tangent = float2(-normal.y, normal.x);
-    float2 local = float2(localAlong, localAcross);
-    float tangentDistance = dot(local, tangent);
-    float normalDistance = dot(local, normal);
-
-    // 5.18F.1: deposit a finite startup centre plus two continuously moving
-    // reveal frontiers. There is deliberately no full-history fallback.
-    float revealFeather = max(feather, totalLength * 0.08);
-    float initialHalfLength = max(width * 1.4, feather);
-    float maximumHalfLength = max(initialHalfLength, totalLength * 0.5);
-    float growthSpan = max(0.0, maximumHalfLength - initialHalfLength);
-    float tangentCellSpacing = max(
-        0.0001,
-        length(float2(
-            tangent.x * physicalCellSpacing.x,
-            tangent.y * physicalCellSpacing.y)));
+    float progress = saturate(sourceEvent.header.z);
     float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
-    float startupEndProgress = min(
-        0.85,
-        max(0.04, materialStepProgress * 2.25));
-    float startupFadeStart = min(
-        startupEndProgress * 0.72,
-        materialStepProgress * 0.75);
-    float startupEnvelope = 1.0 - smoothstep(
-        startupFadeStart,
-        startupEndProgress,
-        progress);
-    float initialReveal = 1.0 - smoothstep(
-        initialHalfLength,
-        initialHalfLength + revealFeather,
-        abs(tangentDistance));
-    float startupMask = initialReveal * startupEnvelope;
+    float phase = sourceEvent.header.y;
+    float negativePhase = FoamResolveObjectRibbonPhaseMask(
+        negativePathT,
+        progress,
+        materialStepProgress,
+        totalPathLength,
+        physicalCellSpacing,
+        phase,
+        false);
+    float frontPhase = FoamResolveObjectRibbonPhaseMask(
+        frontPathT,
+        progress,
+        materialStepProgress,
+        totalPathLength,
+        physicalCellSpacing,
+        phase,
+        false);
+    float positivePhase = FoamResolveObjectRibbonPhaseMask(
+        positivePathT,
+        progress,
+        materialStepProgress,
+        totalPathLength,
+        physicalCellSpacing,
+        phase,
+        false);
 
-    float minimumGrowthForFrontier = tangentCellSpacing * 2.25;
-    float frontierAvailable = step(minimumGrowthForFrontier, growthSpan);
-    float safeGrowthSpan = max(growthSpan, 0.0001);
-    float requestedTrailProgress =
-        max(sourceEvent.kinematics.y, tangentCellSpacing) / safeGrowthSpan;
-    float minimumTrailProgress = max(
-        materialStepProgress * 1.50,
-        tangentCellSpacing / safeGrowthSpan);
-    float trailProgress = min(
-        0.45,
-        max(requestedTrailProgress, minimumTrailProgress));
-    float previousProgress = max(0.0, progress - trailProgress);
-    float currentHalfLength = initialHalfLength + growthSpan * progress;
-    float previousHalfLength = initialHalfLength + growthSpan * previousProgress;
-    float currentReveal = 1.0 - smoothstep(
-        currentHalfLength,
-        currentHalfLength + revealFeather,
-        abs(tangentDistance));
-    float previousReveal = 1.0 - smoothstep(
-        previousHalfLength,
-        previousHalfLength + revealFeather,
-        abs(tangentDistance));
-    float movingFrontiers = saturate(currentReveal - previousReveal) *
-        frontierAvailable;
-    float lengthMask = max(startupMask, movingFrontiers);
-
-    float coarseAlongGate = 1.0 - smoothstep(
-        alongHalf + contactOffset + totalLength * 0.75,
-        alongHalf + contactOffset + totalLength * 0.75 + feather * 2.0,
-        abs(localAlong));
-    float coarseAcrossGate = 1.0 - smoothstep(
-        acrossHalf + contactOffset + width * 4.0 + feather,
-        acrossHalf + contactOffset + width * 4.0 + feather * 3.0,
-        abs(localAcross));
-    float outwardGate = smoothstep(
-        -feather * 1.5,
-        feather * 0.75,
-        normalDistance + max(contactOffset, width));
-
-    float edgeBand = contactConfidence * contact.a;
-    float breakup = FoamSourceEventBreakup(
-        float2(tangentDistance, normalDistance),
-        sourceEvent.variation.x,
-        sourceEvent.variation.y,
-        sourceEvent.variation.z,
-        physicalCellSpacing);
-    float shape = saturate(edgeBand * lengthMask * coarseAlongGate *
-        coarseAcrossGate * outwardGate * lerp(1.0, breakup, 0.30));
-
-    amountMultiplier = lerp(0.88, 1.0, saturate(contact.a));
-    return shape;
+    float shape = max(
+        frontShape * frontPhase,
+        max(
+            negativeArmShape * negativePhase,
+            positiveArmShape * positivePhase));
+    amountMultiplier = lerp(0.92, 1.0, saturate(contact.a));
+    return saturate(shape);
 }
 
 float FoamEvaluateObjectContactSemiArcSource(
@@ -1228,146 +1349,115 @@ float FoamEvaluateObjectContactSemiArcSource(
     out float amountMultiplier)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
-    float localAlong = (globalDistance - sourceEvent.distance.z) * flowDirection;
-    float localAcross = lateralMetres - sourceEvent.objectData.x;
-    float alongHalf = max(0.04, sourceEvent.objectData.y);
-    float acrossHalf = max(0.04, sourceEvent.objectData.z);
-    float contactOffset = max(0.0, sourceEvent.objectData.w);
-    float width = max(0.006, sourceEvent.shore.y);
-    float feather = max(
-        max(0.006, sourceEvent.shore.w * 0.66),
-        max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.36);
-    float progress = saturate(sourceEvent.header.z);
-    float totalLength = max(
-        0.001,
-        abs(sourceEvent.distance.y - sourceEvent.distance.x));
-
-    float4 contact = FoamLoadObjectContactField(coordinate);
-    float contactConfidence = saturate(contact.r);
-    if (contactConfidence <= 0.001)
-    {
-        amountMultiplier = 0.0;
-        return 0.0;
-    }
-
-    float2 normal = contact.gb;
-    float normalLength = length(normal);
-    if (normalLength <= 0.001)
-    {
-        normal = float2(-flowDirection, 0.0);
-    }
-    else
-    {
-        normal /= normalLength;
-    }
-
-    float2 tangent = float2(-normal.y, normal.x);
-    float2 local = float2(localAlong, localAcross);
-    float tangentDistance = dot(local, tangent);
-    float normalDistance = dot(local, normal);
-
-    float side = sourceEvent.variation.w >= 0.0 ? 1.0 : -1.0;
+    float2 localPosition = float2(
+        (globalDistance - sourceEvent.distance.z) * flowDirection,
+        lateralMetres - sourceEvent.objectData.x);
+    float sourceLateralCellSpacing = max(
+        0.01,
+        sourceEvent.objectData.w);
+    float2 radii = float2(
+        max(0.04, sourceEvent.objectData.y) +
+            physicalCellSpacing.x * 0.5,
+        max(0.04, sourceEvent.objectData.z) +
+            sourceLateralCellSpacing * 0.5);
+    float dominantArmLength = max(0.05, sourceEvent.shore.y);
     float lopsidedness = saturate(abs(sourceEvent.variation.w));
-    float signedTangent = tangentDistance * side;
-    float backReach = totalLength * lerp(0.05, 0.13, 1.0 - lopsidedness);
-    float fullForwardReach = totalLength * lerp(0.34, 0.62, lopsidedness);
+    float shortArmLength = dominantArmLength * (1.0 - lopsidedness);
+    bool dominantPositive = sourceEvent.variation.w >= 0.0;
+    float negativeArmLength = shortArmLength;
+    float positiveArmLength = dominantArmLength;
+    if (!dominantPositive)
+    {
+        negativeArmLength = dominantArmLength;
+        positiveArmLength = shortArmLength;
+    }
 
-    // 5.18F.1: deposit a finite initial shoulder plus one continuously
-    // advancing frontier. Short events become a pulse, never a held source.
-    float revealFeather = max(feather, totalLength * 0.06);
-    float initialForwardReach = max(width * 1.4, feather);
-    float maximumForwardReach = max(initialForwardReach, fullForwardReach);
-    float growthSpan = max(0.0, maximumForwardReach - initialForwardReach);
-    float tangentCellSpacing = max(
-        0.0001,
-        length(float2(
-            tangent.x * physicalCellSpacing.x,
-            tangent.y * physicalCellSpacing.y)));
+    float frontBridgeLength = 1.57079632679 * (radii.x + radii.y);
+    float totalPathLength = max(
+        0.001,
+        negativeArmLength + frontBridgeLength + positiveArmLength);
+    float4 contact = FoamLoadObjectContactField(coordinate);
+    float frontT;
+    float frontShape = FoamResolveObjectFrontBridgeShape(
+        localPosition,
+        radii,
+        saturate(contact.r),
+        physicalCellSpacing,
+        frontT);
+
+    float negativeAcross = 0.0 - radii.y;
+    float2 negativeShoulder = float2(0.0, negativeAcross);
+    float2 positiveShoulder = float2(0.0, radii.y);
+    float negativeArmT;
+    float positiveArmT;
+    float negativeArmShape = FoamResolveObjectWakeArmShape(
+        localPosition,
+        negativeShoulder,
+        negativeArmLength,
+        physicalCellSpacing,
+        negativeArmT);
+    float positiveArmShape = FoamResolveObjectWakeArmShape(
+        localPosition,
+        positiveShoulder,
+        positiveArmLength,
+        physicalCellSpacing,
+        positiveArmT);
+
+    float negativePathT = saturate(
+        negativeArmLength * (1.0 - negativeArmT) /
+        totalPathLength);
+    float frontPathT = saturate(
+        (negativeArmLength + frontT * frontBridgeLength) /
+        totalPathLength);
+    float positivePathT = saturate(
+        (negativeArmLength + frontBridgeLength +
+         positiveArmT * positiveArmLength) /
+        totalPathLength);
+    // The build direction always begins at the short-arm tip and reaches the
+    // dominant arm last. When the dominant side is negative, mirror the
+    // canonical negative-to-positive path coordinate.
+    if (!dominantPositive)
+    {
+        negativePathT = 1.0 - negativePathT;
+        frontPathT = 1.0 - frontPathT;
+        positivePathT = 1.0 - positivePathT;
+    }
+
+    float progress = saturate(sourceEvent.header.z);
     float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
-    float startupEndProgress = min(
-        0.85,
-        max(0.04, materialStepProgress * 2.25));
-    float startupFadeStart = min(
-        startupEndProgress * 0.72,
-        materialStepProgress * 0.75);
-    float startupEnvelope = 1.0 - smoothstep(
-        startupFadeStart,
-        startupEndProgress,
-        progress);
+    float phase = sourceEvent.header.y;
+    float negativePhase = FoamResolveObjectRibbonPhaseMask(
+        negativePathT,
+        progress,
+        materialStepProgress,
+        totalPathLength,
+        physicalCellSpacing,
+        phase,
+        true);
+    float frontPhase = FoamResolveObjectRibbonPhaseMask(
+        frontPathT,
+        progress,
+        materialStepProgress,
+        totalPathLength,
+        physicalCellSpacing,
+        phase,
+        true);
+    float positivePhase = FoamResolveObjectRibbonPhaseMask(
+        positivePathT,
+        progress,
+        materialStepProgress,
+        totalPathLength,
+        physicalCellSpacing,
+        phase,
+        true);
 
-    float startGate = smoothstep(
-        -backReach - feather,
-        -backReach + feather,
-        signedTangent);
-    float initialEndGate = 1.0 - smoothstep(
-        initialForwardReach,
-        initialForwardReach + revealFeather,
-        signedTangent);
-    float initialT = saturate(
-        (signedTangent + backReach) /
-        max(0.001, initialForwardReach + backReach));
-    float initialEndTaper = smoothstep(0.00, 0.16, initialT) *
-        (1.0 - smoothstep(0.84, 1.00, initialT));
-    float startupMask = startGate * initialEndGate *
-        max(0.38, initialEndTaper) * startupEnvelope;
-
-    float minimumGrowthForFrontier = tangentCellSpacing * 2.25;
-    float frontierAvailable = step(minimumGrowthForFrontier, growthSpan);
-    float safeGrowthSpan = max(growthSpan, 0.0001);
-    float requestedTrailProgress =
-        max(sourceEvent.kinematics.y, tangentCellSpacing) / safeGrowthSpan;
-    float minimumTrailProgress = max(
-        materialStepProgress * 1.50,
-        tangentCellSpacing / safeGrowthSpan);
-    float trailProgress = min(
-        0.45,
-        max(requestedTrailProgress, minimumTrailProgress));
-    float previousProgress = max(0.0, progress - trailProgress);
-    float currentForwardReach = initialForwardReach + growthSpan * progress;
-    float previousForwardReach = initialForwardReach +
-        growthSpan * previousProgress;
-    float currentEndGate = 1.0 - smoothstep(
-        currentForwardReach,
-        currentForwardReach + revealFeather,
-        signedTangent);
-    float previousEndGate = 1.0 - smoothstep(
-        previousForwardReach,
-        previousForwardReach + revealFeather,
-        signedTangent);
-    float currentT = saturate(
-        (signedTangent + backReach) /
-        max(0.001, currentForwardReach + backReach));
-    float currentEndTaper = smoothstep(0.00, 0.16, currentT) *
-        (1.0 - smoothstep(0.84, 1.00, currentT));
-    float movingFrontier = saturate(currentEndGate - previousEndGate) *
-        startGate * max(0.38, currentEndTaper) * frontierAvailable;
-    float lengthMask = max(startupMask, movingFrontier);
-
-    float coarseAlongGate = 1.0 - smoothstep(
-        alongHalf + contactOffset + totalLength * 0.80,
-        alongHalf + contactOffset + totalLength * 0.80 + feather * 2.0,
-        abs(localAlong));
-    float coarseAcrossGate = 1.0 - smoothstep(
-        acrossHalf + contactOffset + width * 4.0 + feather,
-        acrossHalf + contactOffset + width * 4.0 + feather * 3.0,
-        abs(localAcross));
-    float outwardGate = smoothstep(
-        -feather * 1.5,
-        feather * 0.75,
-        normalDistance + max(contactOffset, width));
-
-    float edgeBand = contactConfidence * contact.a;
-    float breakup = FoamSourceEventBreakup(
-        float2(tangentDistance, normalDistance),
-        sourceEvent.variation.x,
-        sourceEvent.variation.y,
-        sourceEvent.variation.z,
-        physicalCellSpacing);
-    float shape = saturate(edgeBand * lengthMask * coarseAlongGate *
-        coarseAcrossGate * outwardGate * lerp(1.0, breakup, 0.36));
-
-    amountMultiplier = lerp(0.86, 1.0, saturate(contact.a));
-    return shape;
+    float shape = max(
+        frontShape * frontPhase,
+        max(
+            negativeArmShape * negativePhase,
+            positiveArmShape * positivePhase));
+    amountMultiplier = lerp(0.90, 1.0, saturate(contact.a));
+    return saturate(shape);
 }
 
 float FoamEvaluateObjectContactFleckSource(

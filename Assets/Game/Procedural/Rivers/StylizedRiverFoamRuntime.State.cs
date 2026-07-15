@@ -108,16 +108,28 @@ namespace ProgrammaticStylized3D.Rivers
             FreeWaterCrossLaceConnector = 8
         }
 
+        private struct AutomaticObjectContactCycleState
+        {
+            public int CycleIndex;
+            public float NextStartTime;
+        }
+
         private struct AutomaticFoamSourceEvent
         {
             public bool Active;
             public int EventId;
             public AutomaticFoamSourceEventType Type;
+            public EntityId ObjectSourceId;
             public float SideSign;
             public float StartGlobalDistance;
             public float EndGlobalDistance;
+            public float ObjectCentreGlobalDistance;
             public float Duration;
             public float Elapsed;
+            public float ObjectBuildDuration;
+            public float ObjectHoldDuration;
+            public float ObjectReleaseDuration;
+            public float ObjectRestDuration;
             public float FormationSpeedMetresPerSecond;
             public float HeadTrailMetres;
             public float ShoreInsetMetres;
@@ -139,6 +151,9 @@ namespace ProgrammaticStylized3D.Rivers
             public float ObjectAlongHalfLengthMetres;
             public float ObjectAcrossHalfWidthMetres;
             public float ObjectContactOffsetMetres;
+            public float ObjectSourceLateralCellSpacingMetres;
+            public float ObjectWakeArmLengthMetres;
+            public float ObjectContactPathLengthMetres;
             public float CentreAcrossNormalized;
             public float LateralPaddingMetres;
         }
@@ -146,14 +161,16 @@ namespace ProgrammaticStylized3D.Rivers
         [StructLayout(LayoutKind.Sequential)]
         private struct FoamSourceEventGpuData
         {
-            // x = source type, y = side sign, z = reveal progress,
+            // x = source type, y = side sign except Object Arc/Semi-Arc
+            // phase (0 Build, 1 Hold, 2 Release), z = phase/reveal progress,
             // w = shape seed.
             public Vector4 Header;
             // x = start storage global, y = end storage global,
             // z = centre storage global, w = flow direction.
             public Vector4 Distance;
-            // x = shore inset, y = width metres except Shore Ribbon thickness cells,
-            // z = inward reach, w = feather metres.
+            // x = shore inset, y = width metres except Shore Ribbon thickness cells
+            // and Object Arc/Semi-Arc straight wake-arm length metres, z = inward reach or
+            // Arc/Semi-Arc normalized material-step duration, w = feather metres.
             public Vector4 Shore;
             // x = amount, y = remaining life, z = pattern seed,
             // w = source fill feature size.

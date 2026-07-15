@@ -1310,15 +1310,66 @@ R11B.1 repairs source seams split only by quantization-boundary drift smaller th
 
 The candidate aggregate and topology graph independently apply the same rule and expose separate evidence counts. Acceptance requires candidate seam-pair count and graph seam-pair count to agree, the affected canonical edge to receive two owner faces, and both topology and preview matrices to remain fully certified. This patch does not relax isolated-rail, width-floor, dihedral, or certification constraints.
 
+## EW-B4.2R11B.1C authoritative rollback and collateral contract
 
-## R11B.2 rejected singleton fallback
+R11B.2 and R11B.3 are not part of the accepted architecture. The singleton-shell fallback produced zero recoveries. Bevel-graph micro-feature normalization certified smaller candidate universes by invalidating unrelated owner-face support, so its clean topology output was not valid recovery evidence. The active implementation is R11B.1 seam reconciliation plus the collateral guard below.
 
-Runtime evidence rejected the R11B.2 singleton plane-shell fallback. Across the accepted 30-case preview and topology matrices it evaluated 22 rail-limited candidates over 92 deterministic width attempts and recovered zero. Seed 2223 edge 36 merely advanced from the legacy endpoint-segment blocker to the existing corner-displacement blocker. The fallback added cost and telemetry without changing eligibility, so it is not part of the continuing architecture.
+The immutable collateral baseline is captured after canonical source-edge/seam construction and the normal individual viability preflight, but before any prospective recovery transformation or artistic filtering. Each baseline record preserves its canonical key, source edge ID, owner-face pair, convexity classification, length, dihedral, maximum locally feasible width, width fraction, and geometric-eligibility state.
 
-## R11B.3 bevel-graph micro-feature normalization
+A recovery transaction is acceptable only when:
 
-R11B.3 preserves the R11B.1 coincident seam reconciliation and removes the zero-yield singleton fallback. Before candidate construction, it builds a temporary bevel-graph face view from the immutable source faces. Internal convex edges that are shorter than the current bevel footprint and no longer than the requested width are evaluated as possible micro-feature chains. Only open, non-branching chains with meaningful adjacent continuation are eligible.
+- every baseline geometrically viable edge remains geometrically viable;
+- no baseline viable edge changes identity, owners, classification, or viability geometry;
+- newly viable edges are recorded as recoveries rather than replacing baseline evidence;
+- final coexistence, Coverage, topology, face quality, placement, and stable fingerprint contracts still pass.
 
-Each candidate chain is replaced only in the temporary bevel graph by a least-squares common junction of its incident analytical face planes, regularized toward the original chain centroid. Acceptance requires bounded displacement, bounded plane residual, stable face area and winding, unchanged boundary/non-manifold counts, and an exact graph delta equal to the chain vertices and edges owned by the normalization. The original source polygons, placement frame, scene, prefab, and fallback geometry remain untouched. The normalized graph view is shared by candidate construction, isolated-rail preflight, corner solving, and final plane-shell preparation; final clipping and certification still operate on the immutable source faces.
+The audit publishes baseline/current/recovered/lost/changed counts and exact IDs. `collateralLostEdges` and `collateralChangedEdges` are hard failures in both exhaustive topology and artistic preview parity matrices. This closes the audit hole that allowed R11B.3 to pass `30/30` after shrinking seed `2223/default` to `19` candidates.
 
-Telemetry reports evaluated, normalized, and rejected micro edges, normalized chain records, maximum junction displacement, maximum plane residual, and the first rejection reason. Matrix contracts are `EW-B4.2R11B.3-topology` and `EW-B4.2R11B.3-preview`.
+Current report contracts:
+
+```text
+EW-B4.2R11B.1C-topology
+EW-B4.2R11B.1C-preview
+```
+
+The next recovery architecture must be a local virtual support-chain rail: it may walk an unbranched source-segment chain for one endpoint, but it may not remove graph edges, move shared source vertices, rewrite face loops, or renumber unrelated canonical edges.
+
+R11B.1C runtime validation restored seed `5727/default` to `rawSource/source=44/42`, two reconciled seam pairs, `geometric=36`, and `selected/certified=34/34`, with `collateral=36/36/0/0/0/1`. Both topology and artistic-preview matrices passed `30/30` with zero collateral, topology, face-quality, placement, or cache failures.
+
+## EW-B4.2R11B.1D one-click validation suite
+
+The Inspector now exposes one authoritative **Run Full Edge-Wear Validation Suite (1 Click)** action. It performs the ordinary current-seed preview rebuild first, captures `GeneratedMassEdgeWearTelemetry.txt`, then runs the exhaustive topology matrix and the artistic-preview parity matrix sequentially without requiring additional user interaction. The selected mass remains on the rebuilt current preview; all matrix coordinates remain immutable in-memory evaluations.
+
+The canonical matrix seed set now includes `5727` because it exercises the accepted coincident-boundary seam reconciliation path that the earlier ten-seed set did not cover. Both policies therefore run eleven seeds across minimum/default/maximum width, for `33` cases each. Historical R10R4 acceptance remains the original deterministic `30/30` baseline; R11B.1D adds three regression coordinates without changing those original coordinates.
+
+The suite writes one attachable report:
+
+```text
+Library/GeneratedMassEdgeWearValidationSuite.txt
+```
+
+That report embeds the current preview summary and full telemetry followed by both complete matrix reports. Focused matrix TXT/CSV files continue to be written separately. Inspector actions can copy the full combined report to the clipboard or reveal it in the file browser. Contracts are `EW-B4.2R11B.1D-suite`, `EW-B4.2R11B.1D-topology`, and `EW-B4.2R11B.1D-preview`.
+
+## EW-B4.2R11B.1E authoritative geometry baseline lock
+
+The R11B.4 owner-face support branch is retired. R11B.4 attempted bounded candidate-local boundary traversal, R11B.4.1 corrected line-intersection distance units, and R11B.4.2 added chain-first gathering plus shared-junction classification. The final runtime suite proved the branch had no usable yield: both policies retained all `33/33` ordinary construction cases and zero collateral failures, while the recovery stage itself completed `27` evaluations and `126` width attempts per policy with zero boundary segments examined, zero virtual corners, and zero recovered edges.
+
+The authoritative geometry implementation is now R11B.1 seam reconciliation plus the R11B.1C collateral guard, with the R11B.1D one-click eleven-seed validation suite. R11B.1E removes every R11B.4 runtime path and telemetry field and changes only the suite/report contract labels. The geometry, candidate lifecycle, matrix seeds, thresholds, source graph, owner-face provenance, width floor, topology certification, and placement fingerprints are restored to R11B.1D.
+
+No additional isolated-rail or micro-junction recovery work is authorized without new evidence of a broad production failure that is not already represented as a legitimate geometric exclusion. The next edge-wear work is artistic selection and presentation quality, not expansion of the topology solver. Contracts are `EW-B4.2R11B.1E-suite`, `EW-B4.2R11B.1E-topology`, and `EW-B4.2R11B.1E-preview`.
+
+
+## EW-B4.2R12A artistic-selection evidence architecture
+
+R11B.1E remains the immutable geometry baseline. R12A adds no selection or geometry policy. The current artistic score remains:
+
+```text
+(angleScore * 0.58 + lengthScore * 0.27 + deterministicRandom * 0.15)
+* baseSuppression
+* upwardEdgeBoost
+* edgeCharacterBoost
+```
+
+The audit separately records diagnostic context that does not currently influence that formula: edge-axis verticality, a camera-independent owner-normal silhouette potential, maximum preflight width fraction, final solved-width fraction, local viable-edge density measured within the existing `maximumDimension * 0.34` length-score normalization scale, and shared-vertex crowding. The report marks each of these context weights as zero so later R12B decisions cannot accidentally treat descriptive evidence as an already-active selector.
+
+The selection audit is captured after the unchanged descending score sort and Coverage count resolution. Per-edge evidence includes exact score components, eligibility gates, artistic filter reason, selection rank, selection threshold, and score delta. Aggregate evidence includes filter reasons; score minimum/median/maximum for all, selected, and filtered populations; and four-bin distributions for length, dihedral, edge orientation, silhouette potential, local density, and vertex crowding. Both 33-case policies retain their R11B.1E pass/fail rules. Contracts are `EW-B4.2R12A-suite`, `EW-B4.2R12A-topology`, and `EW-B4.2R12A-preview`.

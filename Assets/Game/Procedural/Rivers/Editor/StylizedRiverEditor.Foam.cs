@@ -1125,25 +1125,54 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.PropertyField(
                     Find("foamObjectFoamCoverage"),
                     new GUIContent(
-                        "Coverage",
-                        "How much of the registered static object/contact population can participate in deterministic source events over time."));
+                        "Fleck Coverage",
+                        "How much of the registered static object/contact population can participate in supplemental Contact Fleck events."));
                 EditorGUILayout.PropertyField(
                     Find("foamObjectFoamActivity"),
                     new GUIContent(
-                        "Activity",
-                        "How often new object-contact source events start."));
+                        "Fleck Activity",
+                        "How often supplemental Contact Fleck events start. Arc and Semi-Arc contact persistence is owned by the per-object emission cycle below."));
                 EditorGUILayout.PropertyField(
                     Find("foamObjectFoamFormationSpeedMetresPerSecond"),
                     new GUIContent(
                         "Global Formation Speed",
-                        "Base source reveal speed in metres per second for Object Foam."));
+                        "Base speed used to resolve Build duration for the side-to-side accumulated Arc/Semi-Arc sweeps, and reveal speed for Contact Flecks."));
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Contact Emission Cycle",
+                    EditorStyles.boldLabel);
+                EditorGUILayout.PropertyField(
+                    Find("foamObjectContactCycleCoverage"),
+                    new GUIContent(
+                        "Anchor Coverage",
+                        "Stable share of registered object anchors that receive the per-object Arc/Semi-Arc cycle. One includes every eligible object."));
+                EditorGUILayout.HelpBox(
+                    "Each eligible object grows one contiguous thin open-C ribbon through the immediate upstream/shoulder contact ring, replenishes that open C during Hold, then releases it contiguously before Rest. Arcs release in Build order; Semi-Arcs retract the dominant arm first and clear the path in reverse order. The downstream rear is never sourced.",
+                    MessageType.None);
+                DrawMinMaxUnitControls(
+                    "Hold Duration (s)",
+                    Find("foamObjectContactHoldDurationMinSeconds"),
+                    Find("foamObjectContactHoldDurationMaxSeconds"),
+                    "How long the complete one-cell open-C contact ribbon remains actively replenished after Build finishes.");
+                DrawMinMaxUnitControls(
+                    "Release Duration (s)",
+                    Find("foamObjectContactReleaseDurationMinSeconds"),
+                    Find("foamObjectContactReleaseDurationMaxSeconds"),
+                    "How long the contiguous emitter takes to turn off. Arcs release in Build order; Semi-Arcs retract the one-sided extension first and then release the face in reverse order. This changes source release, not stored Foam lifetime.");
+                DrawMinMaxUnitControls(
+                    "Rest Duration (s)",
+                    Find("foamObjectContactRestDurationMinSeconds"),
+                    Find("foamObjectContactRestDurationMaxSeconds"),
+                    "How long the same object remains source-off after Release before its next contact cycle may begin.");
+
                 EditorGUILayout.PropertyField(
                     Find("foamObjectFoamPattern"),
                     new GUIContent(
                         "Debug Pattern Mode",
-                        "Mixed uses the normalized pattern weights below. Contact Arcs, Contact Semi-Arcs, and Contact Flecks force one pattern for validation."));
+                        "Mixed uses Arc and Semi-Arc weights for per-object contact cycles and the Fleck weight for supplemental stochastic flecks. The pure modes force one pattern for validation."));
                 EditorGUILayout.HelpBox(
-                    "Object births are clipped to one immediate water-cell shell outside the physical obstacle. Arc and Semi-Arc Profile Scale shape reveal and feathering inside that shell; Fleck Size shapes the fleck capsule. None of these controls can widen contact-normal source thickness, and Static Pressure Front Reach remains independent.",
+                    "Contact Arcs and Semi-Arcs use a one-cell upstream contact bridge plus thin straight downstream wake arms from the two side shoulders. They never follow the obstacle behind the shoulders, use no breakup or source-fill holes, and expose only real path controls. Fleck geometry remains independent, and Static Pressure Front Reach cannot widen any object source.",
                     MessageType.None);
 
                 EditorGUILayout.Space(4f);
@@ -1157,21 +1186,21 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     fleckWeight,
                     new GUIContent(
                         "Contact Arcs",
-                        "Normalized share of Mixed Object Foam events assigned to full contact arcs. Editing this preserves the relative share of the other object patterns."));
+                        "Relative share of Mixed per-object contact cycles assigned to full Contact Arcs. Editing this preserves the normalized three-pattern authoring mix."));
                 DrawNormalizedPatternWeight3(
                     semiArcWeight,
                     arcWeight,
                     fleckWeight,
                     new GUIContent(
                         "Contact Semi-Arcs",
-                        "Normalized share of Mixed Object Foam events assigned to lopsided one-sided contact arcs. Editing this preserves the relative share of the other object patterns."));
+                        "Relative share of Mixed per-object contact cycles assigned to lopsided Contact Semi-Arcs. Editing this preserves the normalized three-pattern authoring mix."));
                 DrawNormalizedPatternWeight3(
                     fleckWeight,
                     arcWeight,
                     semiArcWeight,
                     new GUIContent(
                         "Contact Flecks",
-                        "Normalized share of Mixed Object Foam events assigned to small contact flecks. Editing this preserves the relative share of the other object patterns."));
+                        "Relative strength of supplemental stochastic Contact Flecks in Mixed mode. Fleck Activity owns their global start rate; editing this preserves the normalized three-pattern authoring mix."));
 
                 EditorGUILayout.Space(4f);
                 if (DrawInlineFoldout(
@@ -1185,33 +1214,20 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             "Formation Speed",
                             "Multiplier applied to Object Foam Global Formation Speed for Contact Arc events only."));
                     DrawMinMaxMetreControls(
-                        "Arc Length",
+                        "Wake Arm Length",
                         Find("foamObjectContactArcLengthMinMetres"),
-                        Find("foamObjectContactArcLengthMaxMetres"));
-                    DrawMinMaxMetreControls(
-                        "Profile Scale",
-                        Find("foamObjectContactArcWidthMinMetres"),
-                        Find("foamObjectContactArcWidthMaxMetres"),
-                        "Arc profile scale in metres. It shapes early tangential reveal, feather/profile gating, and local allowance inside the fixed one-cell contact shell; it does not change shell thickness.");
-                    DrawMinMaxMetreControls(
-                        "Contact Offset",
-                        Find("foamObjectContactArcOffsetMinMetres"),
-                        Find("foamObjectContactArcOffsetMaxMetres"));
+                        Find("foamObjectContactArcLengthMaxMetres"),
+                        "Straight downstream distance of both thin wake arms after the source reaches the two side shoulders. This never changes the upstream contact bridge or permits rear wrapping.");
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamObjectContactArcInitialPresenceMin"),
                         Find("foamObjectContactArcInitialPresenceMax"),
-                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
+                        "Peak persistent material deposited across the active thin open-C Arc before immediate-contact and valid-fluid clipping. Arc ribbons use no breakup or patterned source-fill holes.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamObjectContactArcInitialLifeMin"),
                         Find("foamObjectContactArcInitialLifeMax"),
                         "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
-                    DrawMinMaxUnitControls(
-                        "Breakup Strength",
-                        Find("foamObjectContactArcBreakupStrengthMin"),
-                        Find("foamObjectContactArcBreakupStrengthMax"),
-                        "Deterministic edge/source breakup strength for this pattern.");
                     EditorGUI.indentLevel--;
                 }
 
@@ -1226,38 +1242,25 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             "Formation Speed",
                             "Multiplier applied to Object Foam Global Formation Speed for Contact Semi-Arc events only."));
                     DrawMinMaxMetreControls(
-                        "Semi-Arc Length",
+                        "Wake Arm Length",
                         Find("foamObjectContactSemiArcLengthMinMetres"),
-                        Find("foamObjectContactSemiArcLengthMaxMetres"));
-                    DrawMinMaxMetreControls(
-                        "Profile Scale",
-                        Find("foamObjectContactSemiArcWidthMinMetres"),
-                        Find("foamObjectContactSemiArcWidthMaxMetres"),
-                        "Semi-Arc profile scale in metres. It shapes one-sided reveal, feather/profile gating, and local allowance inside the fixed one-cell contact shell; it does not change shell thickness.");
-                    DrawMinMaxMetreControls(
-                        "Contact Offset",
-                        Find("foamObjectContactSemiArcOffsetMinMetres"),
-                        Find("foamObjectContactSemiArcOffsetMaxMetres"));
+                        Find("foamObjectContactSemiArcLengthMaxMetres"),
+                        "Straight downstream distance of the dominant thin wake arm. Lopsidedness shortens the opposite arm; neither arm follows the obstacle behind its side shoulder.");
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamObjectContactSemiArcInitialPresenceMin"),
                         Find("foamObjectContactSemiArcInitialPresenceMax"),
-                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
+                        "Peak persistent material deposited across the active thin open-C Semi-Arc before immediate-contact and valid-fluid clipping. Semi-Arc ribbons use no breakup or patterned source-fill holes.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamObjectContactSemiArcInitialLifeMin"),
                         Find("foamObjectContactSemiArcInitialLifeMax"),
                         "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
                     DrawMinMaxUnitControls(
-                        "Breakup Strength",
-                        Find("foamObjectContactSemiArcBreakupStrengthMin"),
-                        Find("foamObjectContactSemiArcBreakupStrengthMax"),
-                        "Deterministic edge/source breakup strength for this pattern.");
-                    DrawMinMaxUnitControls(
                         "Lopsidedness",
                         Find("foamObjectContactSemiArcLopsidednessMin"),
                         Find("foamObjectContactSemiArcLopsidednessMax"),
-                        "Signed by event seed at runtime. Higher values push the source farther onto one shoulder of the object contact edge.");
+                        "Signed by event seed at runtime. Zero keeps both straight downstream wake arms equal. One retains the dominant arm length and shortens the opposite arm to the side shoulder; the complete upstream bridge remains continuous.");
                     EditorGUI.indentLevel--;
                 }
 
@@ -1298,7 +1301,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Breakup Strength",
                         Find("foamObjectContactFleckBreakupStrengthMin"),
                         Find("foamObjectContactFleckBreakupStrengthMax"),
-                        "Deterministic edge/source breakup strength for this pattern.");
+                        "Deterministic edge/source breakup strength for this Fleck pattern.");
                     EditorGUI.indentLevel--;
                 }
 

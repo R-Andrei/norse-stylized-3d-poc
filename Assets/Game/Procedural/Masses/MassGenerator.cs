@@ -183,17 +183,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int CoincidentBoundarySeamPairCount;
             public int CoincidentGraphVertexReconciliationCount;
             public int CoincidentGraphBoundarySeamPairCount;
-            public int MicroFeatureEvaluatedEdgeCount;
-            public int MicroFeatureNormalizedComponentCount;
-            public int MicroFeatureNormalizedEdgeCount;
-            public int MicroFeatureRejectedEdgeCount;
-            public float MicroFeatureMaximumDisplacement;
-            public float MicroFeatureMaximumPlaneResidual;
+            public int BaselineGeometricEligibleCount;
+            public int RecoveredGeometricEdgeCount;
+            public int CollateralLostEdgeCount;
+            public int CollateralChangedEdgeCount;
+            public int CollateralPreservationValid;
+            public string RecoveredGeometricEdgeIds = string.Empty;
+            public string CollateralLostEdgeIds = string.Empty;
+            public string CollateralChangedEdgeIds = string.Empty;
             public int StructuralEligibleCount;
             public int GeometricEligibleCount;
             public int CoexistenceEligibleCount;
             public int CoexistenceIneligibleCount;
             public int ArtisticEligibleCount;
+            public int ArtisticFilteredCount;
+            public int ArtisticShortFilteredCount;
+            public int ArtisticShallowFilteredCount;
+            public int ArtisticBaseFilteredCount;
+            public int ArtisticOtherFilteredCount;
+            public float ArtisticSelectionThreshold;
+            public float ArtisticScoreMinimum;
+            public float ArtisticScoreMedian;
+            public float ArtisticScoreMaximum;
+            public float ArtisticSelectedScoreMinimum;
+            public float ArtisticSelectedScoreMedian;
+            public float ArtisticSelectedScoreMaximum;
+            public float ArtisticFilteredScoreMinimum;
+            public float ArtisticFilteredScoreMedian;
+            public float ArtisticFilteredScoreMaximum;
+            public string ArtisticLengthBins = string.Empty;
+            public string ArtisticDihedralBins = string.Empty;
+            public string ArtisticOrientationBins = string.Empty;
+            public string ArtisticSilhouetteBins = string.Empty;
+            public string ArtisticLocalDensityBins = string.Empty;
+            public string ArtisticCrowdingBins = string.Empty;
             public int CandidateCount;
             public int SelectedCount;
             public int CertifiedCount;
@@ -291,7 +314,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 LocalitySolverRecomputationCount == 0 &&
                 ObjectTransformChanged == 0 &&
                 PreviewDerivedPlacementParameters == 0 &&
-                PreviewUsesCanonicalFrame == 1;
+                PreviewUsesCanonicalFrame == 1 &&
+                CollateralPreservationValid == 1 &&
+                CollateralLostEdgeCount == 0 &&
+                CollateralChangedEdgeCount == 0;
         }
 #endif
 

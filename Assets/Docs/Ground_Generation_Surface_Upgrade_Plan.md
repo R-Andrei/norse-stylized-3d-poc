@@ -4,7 +4,7 @@
 
 The GeneratedGround Inspector and Painted Accent production workstream is complete, Unity-validated, and accepted through GI-A1–GI-A4 and PA-B1–PA-B4.1. **GeneratedGround and the broader Ground visual roadmap are not complete.**
 
-The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. The active milestone is **V3M — Broad Macro Patch Completion**, audited in `Ground_Macro_Patch_Audit_and_Architecture.md`. Unity validation accepted V3M-A1.3.2's seed variation, controls, occupancy, and final render, but proved that direct large Pattern Seed values progressively quantize the raw macro field because the seed magnitude enters single-precision noise coordinates. V3M-A1.3.3 now hashes the authored integer once on the CPU into a bounded 0–4.5-cell pattern scroll, preserving the four-noise budget and accepted visual architecture while removing seed-magnitude precision loss and all per-pixel raw-seed coordinate arithmetic; Unity validation is pending. **V4 — Contact / Edge Accents** remains architecturally accepted but is queued until V3M passes gameplay-camera visual acceptance.
+The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. **V3M — Broad Macro Patch Completion** is Unity-validated and accepted through V3M-A1.3.4: the shader now provides readable broad regions, authorable scale/seed/intensity/softness/separation, stable occupancy, bounded high-seed precision, meaningful pattern variation, and contour-only secondary distortion that materially reduces repeated circular islands. The active proof milestone is **V3R — Ground Elevation Readability**. V3R-A1 adds cheap value-only hillshading from the real Ground normal plus relative generated-height contrast, with both controls disabled by default and no geometry, collision, texture, generated-mask, or lighting-normal change. **V4 — Contact / Edge Accents** remains architecturally accepted and is queued after V3R gameplay-camera validation.
 
 The accepted current pipeline is:
 
@@ -45,13 +45,32 @@ Ground or scene no longer needs its bake
 
 ## Next work items
 
-1. Treat only the Inspector and Painted Accent production slice as closed.
-2. Unity-validate V3M-A1.3.3 with seeds `0`, `1`, `67`, `2000`, `5727`, `22000`, `52000`, `152000`, `2147483647`, and `-2147483648`.
-3. Confirm that seed magnitude no longer causes blockiness or transition quantization in the raw, weighted, or normal views.
-4. Confirm seed diversity, occupancy, controls, final rendering, and the four-noise budget remain accepted.
-5. Resume V4 Contact / Edge Accents only after broad macro composition is visually accepted from the gameplay camera.
+1. Treat V3M broad macro composition as accepted through V3M-A1.3.4.
+2. Unity-validate V3R-A1 from the gameplay camera with both controls at zero, then with restrained visible values.
+3. Confirm Relief Shading Strength reveals gentle slope direction without changing actual lighting normals or producing outlined bumps.
+4. Confirm Relative Height Contrast distinguishes higher and lower generated terrain without reading as another arbitrary mask.
+5. Resume V4 Contact / Edge Accents after the elevation-readability proof is accepted.
 
 ---
+
+## V3R-A1 — Ground Elevation Readability proof
+
+**Status:** Implemented; Unity validation pending.
+
+Gentle generated Ground elevation can disappear from the intended elevated gameplay camera because the surface normals remain close to vertical and the calm material palette provides few broad form cues. V3R-A1 adds two independent, Material-only value responses under `Material Controls > Elevation Readability`:
+
+- **Relief Shading Strength** exaggerates the signed horizontal slope relationship to the existing main-light direction. It uses the real final Ground normal but does not modify that normal, PBR lighting, geometry, shadows, collision, or River interaction.
+- **Relative Height Contrast** applies a value shift per metre of generated object-space height relative to the undeformed local Ground plane. Positive generated height brightens and negative generated height darkens. It samples the existing vertex position directly; no height texture or generated mask is introduced.
+
+Both controls default to zero so existing styles remain visually unchanged until authored. The response is evaluated in the existing Ground fragment path, uses the already-resolved main light, adds no noise sample, texture sample, CPU field generation, per-frame rebuild, scene object, or serialized component field, and remains a Material-only edit for both shared variants and local overrides.
+
+V3R-A1 validation gate:
+
+1. With both controls at zero, normal rendering remains unchanged.
+2. Relief Shading Strength makes gentle rises and falls readable from the elevated gameplay camera without rings, outlines, or unstable camera-dependent shading.
+3. Relative Height Contrast separates higher and lower terrain while remaining subordinate to macro patches, semantic response, Painted Accents, props, River, and lighting.
+4. Shared and local controls persist through assembly reload and refresh only the Material stage.
+5. No Ground geometry, mesh, collider, River handoff, Painted Accent output, or shader noise budget changes.
 
 ## PA-P4 — Deterministic External-Conflict Index and Incremental Reconciliation
 

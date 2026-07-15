@@ -1919,35 +1919,7 @@ private readonly struct EdgeWearSelectedGraphEdge
                 Candidate = candidate;
             }
         }
-        private sealed class EdgeWearMicroFeatureNormalizationRecord
-        {
-            public readonly List<int> SourceEdgeIndices =
-                new List<int>();
-            public readonly List<int> SourceVertexIndices =
-                new List<int>();
-            public bool Normalized;
-            public Vector3 Junction;
-            public float MaximumDisplacement;
-            public float MaximumPlaneResidual;
-            public string Reason = string.Empty;
-        }
-
-        private sealed class EdgeWearMicroFeatureNormalizationStats
-        {
-            public int RawSourceEdgeCount;
-            public int EvaluatedEdgeCount;
-            public int NormalizedComponentCount;
-            public int NormalizedEdgeCount;
-            public int RejectedEdgeCount;
-            public float MaximumDisplacement;
-            public float MaximumPlaneResidual;
-            public string FirstRejectionReason = string.Empty;
-            public readonly List<EdgeWearMicroFeatureNormalizationRecord>
-                Records =
-                    new List<EdgeWearMicroFeatureNormalizationRecord>();
-        }
-
-        private struct EdgeWearGraphBuildStats
+private struct EdgeWearGraphBuildStats
         {
             public int GraphVertexCount;
             public int GraphEdgeCount;
@@ -2019,6 +1991,39 @@ private readonly struct EdgeWearSelectedGraphEdge
             public string FailureReason = string.Empty;
         }
 
+        private sealed class EdgeWearCollateralBaselineRecord
+        {
+            public readonly EdgeKey Key;
+            public readonly int SourceEdgeIndex;
+            public readonly int FaceA;
+            public readonly int FaceB;
+            public readonly BoundedEdgeClassification Classification;
+            public readonly float Length;
+            public readonly float DihedralDegrees;
+            public readonly float MaximumLocallyFeasibleWidth;
+            public readonly float FeasibleWidthFraction;
+            public readonly bool GeometricEligible;
+
+            public EdgeWearCollateralBaselineRecord(
+                EdgeWearEdgeLifecycleRecord record)
+            {
+                Key = record.Key;
+                SourceEdgeIndex = record.SourceEdgeIndex;
+                FaceA = Mathf.Min(record.FaceA, record.FaceB);
+                FaceB = Mathf.Max(record.FaceA, record.FaceB);
+                Classification = record.Classification;
+                Length = record.Length;
+                DihedralDegrees = record.DihedralDegrees;
+                MaximumLocallyFeasibleWidth = record.Viability == null
+                    ? 0f
+                    : record.Viability.MaximumLocallyFeasibleWidth;
+                FeasibleWidthFraction = record.Viability == null
+                    ? 0f
+                    : record.Viability.FeasibleWidthFraction;
+                GeometricEligible = record.GeometricEligible;
+            }
+        }
+
         private sealed class EdgeWearCoverageAudit
         {
             public readonly bool MaximumCoverageMode;
@@ -2042,16 +2047,22 @@ private readonly struct EdgeWearSelectedGraphEdge
             public int CoincidentBoundarySeamPairCount;
             public int CoincidentGraphVertexReconciliationCount;
             public int CoincidentGraphBoundarySeamPairCount;
-            public int MicroFeatureEvaluatedEdgeCount;
-            public int MicroFeatureNormalizedComponentCount;
-            public int MicroFeatureNormalizedEdgeCount;
-            public int MicroFeatureRejectedEdgeCount;
-            public float MicroFeatureMaximumDisplacement;
-            public float MicroFeatureMaximumPlaneResidual;
-            public string MicroFeatureFirstRejectionReason = string.Empty;
-            public readonly List<EdgeWearMicroFeatureNormalizationRecord>
-                MicroFeatureNormalizationRecords =
-                    new List<EdgeWearMicroFeatureNormalizationRecord>();
+            public bool CollateralBaselineCaptured;
+            public readonly Dictionary<EdgeKey,
+                EdgeWearCollateralBaselineRecord> CollateralBaselineByKey =
+                    new Dictionary<EdgeKey,
+                        EdgeWearCollateralBaselineRecord>();
+            public int BaselineGeometricEligibleCount;
+            public int RecoveredGeometricEdgeCount;
+            public int CollateralLostEdgeCount;
+            public int CollateralChangedEdgeCount;
+            public bool CollateralPreservationValid = true;
+            public readonly List<int> RecoveredGeometricEdgeIndices =
+                new List<int>();
+            public readonly List<int> CollateralLostEdgeIndices =
+                new List<int>();
+            public readonly List<int> CollateralChangedEdgeIndices =
+                new List<int>();
             public int ViabilityLocalityEvaluationCount;
             public int ViabilityIsolatedEvaluationCount;
             public int ViabilityLocalityCacheUseCount;
@@ -2075,6 +2086,9 @@ private readonly struct EdgeWearSelectedGraphEdge
             public int CornerWidthInactiveExclusionCount;
             public int ArtisticEligibleCount;
             public int ArtisticFilteredCount;
+            public bool ArtisticAuditCaptured;
+            public int ArtisticSelectionTargetCount;
+            public float ArtisticSelectionThreshold;
             public int CandidateCount;
             public int SelectedCount;
             public int WidthInactiveCount;
@@ -2112,6 +2126,27 @@ private readonly struct EdgeWearSelectedGraphEdge
             public float DihedralDegrees;
             public float Vertical01;
             public float Score;
+            public float ArtisticMinimumLength;
+            public float ArtisticLengthScore;
+            public float ArtisticAngleScore;
+            public float ArtisticBaseSuppression;
+            public float ArtisticUpwardEdgeBoost = 1f;
+            public float ArtisticCharacterBoost = 1f;
+            public float ArtisticRandomScore;
+            public float ArtisticEdgeAxisVertical01;
+            public float ArtisticSilhouettePotential;
+            public float ArtisticFeasibleWidthFraction;
+            public float ArtisticSolvedWidthFraction;
+            public float ArtisticLocalDensity01;
+            public int ArtisticSharedVertexDegreeA;
+            public int ArtisticSharedVertexDegreeB;
+            public int ArtisticSelectionRank = -1;
+            public float ArtisticSelectionThreshold;
+            public float ArtisticSelectionDelta;
+            public bool ArtisticLengthEligible;
+            public bool ArtisticAngleEligible;
+            public bool ArtisticBaseEligible;
+            public string ArtisticFilterReason = string.Empty;
             public float SolvedWidth;
             public float MaterializedWidth;
             public float MaterializedWidthScale = 1f;

@@ -181,24 +181,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 coverage == null
                     ? 0
                     : coverage.CoincidentGraphBoundarySeamPairCount;
-            result.MicroFeatureEvaluatedEdgeCount = coverage == null
+            result.BaselineGeometricEligibleCount = coverage == null
                 ? 0
-                : coverage.MicroFeatureEvaluatedEdgeCount;
-            result.MicroFeatureNormalizedComponentCount = coverage == null
+                : coverage.BaselineGeometricEligibleCount;
+            result.RecoveredGeometricEdgeCount = coverage == null
                 ? 0
-                : coverage.MicroFeatureNormalizedComponentCount;
-            result.MicroFeatureNormalizedEdgeCount = coverage == null
+                : coverage.RecoveredGeometricEdgeCount;
+            result.CollateralLostEdgeCount = coverage == null
                 ? 0
-                : coverage.MicroFeatureNormalizedEdgeCount;
-            result.MicroFeatureRejectedEdgeCount = coverage == null
+                : coverage.CollateralLostEdgeCount;
+            result.CollateralChangedEdgeCount = coverage == null
                 ? 0
-                : coverage.MicroFeatureRejectedEdgeCount;
-            result.MicroFeatureMaximumDisplacement = coverage == null
-                ? 0f
-                : coverage.MicroFeatureMaximumDisplacement;
-            result.MicroFeatureMaximumPlaneResidual = coverage == null
-                ? 0f
-                : coverage.MicroFeatureMaximumPlaneResidual;
+                : coverage.CollateralChangedEdgeCount;
+            result.CollateralPreservationValid = coverage != null &&
+                coverage.CollateralPreservationValid
+                    ? 1
+                    : 0;
+            result.RecoveredGeometricEdgeIds = coverage == null
+                ? "none"
+                : FormatEdgeWearIndexList(
+                    coverage.RecoveredGeometricEdgeIndices);
+            result.CollateralLostEdgeIds = coverage == null
+                ? "none"
+                : FormatEdgeWearIndexList(
+                    coverage.CollateralLostEdgeIndices);
+            result.CollateralChangedEdgeIds = coverage == null
+                ? "none"
+                : FormatEdgeWearIndexList(
+                    coverage.CollateralChangedEdgeIndices);
             result.StructuralEligibleCount = coverage == null
                 ? 0
                 : coverage.StructuralEligibleCount;
@@ -214,6 +224,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             result.ArtisticEligibleCount = coverage == null
                 ? 0
                 : coverage.ArtisticEligibleCount;
+            PopulateEdgeWearArtisticAuditResult(result, coverage);
             result.CandidateCount = coverage == null
                 ? 0
                 : coverage.CandidateCount;
@@ -294,6 +305,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         audit.Diagnostic)
                     ? "none"
                     : audit.Diagnostic;
+            }
+            if (result.CollateralPreservationValid != 1 ||
+                result.CollateralLostEdgeCount != 0 ||
+                result.CollateralChangedEdgeCount != 0)
+            {
+                string collateralFailure =
+                    "collateral-preservation-failed:" +
+                    "baseline/current/recovered/lost/changed=" +
+                    result.BaselineGeometricEligibleCount + "/" +
+                    result.GeometricEligibleCount + "/" +
+                    result.RecoveredGeometricEdgeCount + "/" +
+                    result.CollateralLostEdgeCount + "/" +
+                    result.CollateralChangedEdgeCount +
+                    ",lost={" + result.CollateralLostEdgeIds + "}" +
+                    ",changed={" +
+                        result.CollateralChangedEdgeIds + "}";
+                result.PrimaryFailure = string.IsNullOrEmpty(
+                        result.PrimaryFailure) ||
+                    string.Equals(
+                        result.PrimaryFailure,
+                        "none",
+                        StringComparison.Ordinal)
+                            ? collateralFailure
+                            : result.PrimaryFailure + "|" +
+                                collateralFailure;
             }
 
             if (coverage == null || coverage.Records == null)
@@ -2267,8 +2303,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.AppendLine(FormatEdgeWearCoverageSummary(
                 audit.CoverageAudit));
             builder.AppendLine();
-            builder.AppendLine("[Bevel Graph Micro-Feature Normalization]");
-            AppendEdgeWearMicroFeatureNormalization(
+            builder.AppendLine("[Artistic Selection Audit]");
+            AppendEdgeWearArtisticSelectionAudit(
                 builder,
                 audit.CoverageAudit);
             builder.AppendLine();
@@ -2499,6 +2535,395 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return builder.ToString();
         }
 
+        private enum EdgeWearArtisticBinMetric
+        {
+            LengthScore,
+            DihedralDegrees,
+            EdgeAxisVertical01,
+            SilhouettePotential,
+            LocalDensity01,
+            SharedVertexCrowding
+        }
+
+        private sealed class EdgeWearArtisticAuditSummary
+        {
+            public int GeometricCount;
+            public int EligibleCount;
+            public int FilteredCount;
+            public int SelectedCount;
+            public int ShortFilteredCount;
+            public int ShallowFilteredCount;
+            public int BaseFilteredCount;
+            public int OtherFilteredCount;
+            public float SelectionThreshold;
+            public float ScoreMinimum;
+            public float ScoreMedian;
+            public float ScoreMaximum;
+            public float SelectedScoreMinimum;
+            public float SelectedScoreMedian;
+            public float SelectedScoreMaximum;
+            public float FilteredScoreMinimum;
+            public float FilteredScoreMedian;
+            public float FilteredScoreMaximum;
+            public string LengthBins = string.Empty;
+            public string DihedralBins = string.Empty;
+            public string OrientationBins = string.Empty;
+            public string SilhouetteBins = string.Empty;
+            public string LocalDensityBins = string.Empty;
+            public string CrowdingBins = string.Empty;
+        }
+
+#if UNITY_EDITOR
+        private static void PopulateEdgeWearArtisticAuditResult(
+            EdgeWearBatchAuditCaseResult result,
+            EdgeWearCoverageAudit coverage)
+        {
+            if (result == null)
+            {
+                return;
+            }
+            EdgeWearArtisticAuditSummary summary =
+                BuildEdgeWearArtisticAuditSummary(coverage);
+            result.ArtisticFilteredCount = summary.FilteredCount;
+            result.ArtisticShortFilteredCount =
+                summary.ShortFilteredCount;
+            result.ArtisticShallowFilteredCount =
+                summary.ShallowFilteredCount;
+            result.ArtisticBaseFilteredCount = summary.BaseFilteredCount;
+            result.ArtisticOtherFilteredCount = summary.OtherFilteredCount;
+            result.ArtisticSelectionThreshold = summary.SelectionThreshold;
+            result.ArtisticScoreMinimum = summary.ScoreMinimum;
+            result.ArtisticScoreMedian = summary.ScoreMedian;
+            result.ArtisticScoreMaximum = summary.ScoreMaximum;
+            result.ArtisticSelectedScoreMinimum =
+                summary.SelectedScoreMinimum;
+            result.ArtisticSelectedScoreMedian =
+                summary.SelectedScoreMedian;
+            result.ArtisticSelectedScoreMaximum =
+                summary.SelectedScoreMaximum;
+            result.ArtisticFilteredScoreMinimum =
+                summary.FilteredScoreMinimum;
+            result.ArtisticFilteredScoreMedian =
+                summary.FilteredScoreMedian;
+            result.ArtisticFilteredScoreMaximum =
+                summary.FilteredScoreMaximum;
+            result.ArtisticLengthBins = summary.LengthBins;
+            result.ArtisticDihedralBins = summary.DihedralBins;
+            result.ArtisticOrientationBins = summary.OrientationBins;
+            result.ArtisticSilhouetteBins = summary.SilhouetteBins;
+            result.ArtisticLocalDensityBins = summary.LocalDensityBins;
+            result.ArtisticCrowdingBins = summary.CrowdingBins;
+        }
+#endif
+
+        private static EdgeWearArtisticAuditSummary
+            BuildEdgeWearArtisticAuditSummary(
+                EdgeWearCoverageAudit audit)
+        {
+            EdgeWearArtisticAuditSummary summary =
+                new EdgeWearArtisticAuditSummary();
+            if (audit == null || audit.Records == null)
+            {
+                return summary;
+            }
+
+            List<EdgeWearEdgeLifecycleRecord> geometric =
+                new List<EdgeWearEdgeLifecycleRecord>();
+            List<float> allScores = new List<float>();
+            List<float> selectedScores = new List<float>();
+            List<float> filteredScores = new List<float>();
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                if (!record.GeometricEligible)
+                {
+                    continue;
+                }
+                geometric.Add(record);
+                allScores.Add(record.Score);
+                if (record.ArtisticEligible)
+                {
+                    summary.EligibleCount++;
+                }
+                else
+                {
+                    summary.FilteredCount++;
+                    filteredScores.Add(record.Score);
+                    switch (record.ArtisticFilterReason)
+                    {
+                        case "artistically-short-edge":
+                            summary.ShortFilteredCount++;
+                            break;
+                        case "artistically-shallow-edge":
+                            summary.ShallowFilteredCount++;
+                            break;
+                        case "artistically-base-suppressed":
+                            summary.BaseFilteredCount++;
+                            break;
+                        default:
+                            summary.OtherFilteredCount++;
+                            break;
+                    }
+                }
+                if (record.Selected)
+                {
+                    summary.SelectedCount++;
+                    selectedScores.Add(record.Score);
+                }
+            }
+
+            summary.GeometricCount = geometric.Count;
+            summary.SelectionThreshold = audit.ArtisticSelectionThreshold;
+            ResolveEdgeWearArtisticScoreRange(
+                allScores,
+                out summary.ScoreMinimum,
+                out summary.ScoreMedian,
+                out summary.ScoreMaximum);
+            ResolveEdgeWearArtisticScoreRange(
+                selectedScores,
+                out summary.SelectedScoreMinimum,
+                out summary.SelectedScoreMedian,
+                out summary.SelectedScoreMaximum);
+            ResolveEdgeWearArtisticScoreRange(
+                filteredScores,
+                out summary.FilteredScoreMinimum,
+                out summary.FilteredScoreMedian,
+                out summary.FilteredScoreMaximum);
+            summary.LengthBins = BuildEdgeWearArtisticBinSummary(
+                geometric,
+                EdgeWearArtisticBinMetric.LengthScore);
+            summary.DihedralBins = BuildEdgeWearArtisticBinSummary(
+                geometric,
+                EdgeWearArtisticBinMetric.DihedralDegrees);
+            summary.OrientationBins = BuildEdgeWearArtisticBinSummary(
+                geometric,
+                EdgeWearArtisticBinMetric.EdgeAxisVertical01);
+            summary.SilhouetteBins = BuildEdgeWearArtisticBinSummary(
+                geometric,
+                EdgeWearArtisticBinMetric.SilhouettePotential);
+            summary.LocalDensityBins = BuildEdgeWearArtisticBinSummary(
+                geometric,
+                EdgeWearArtisticBinMetric.LocalDensity01);
+            summary.CrowdingBins = BuildEdgeWearArtisticBinSummary(
+                geometric,
+                EdgeWearArtisticBinMetric.SharedVertexCrowding);
+            return summary;
+        }
+
+        private static void ResolveEdgeWearArtisticScoreRange(
+            List<float> values,
+            out float minimum,
+            out float median,
+            out float maximum)
+        {
+            minimum = 0f;
+            median = 0f;
+            maximum = 0f;
+            if (values == null || values.Count == 0)
+            {
+                return;
+            }
+            values.Sort();
+            minimum = values[0];
+            maximum = values[values.Count - 1];
+            int middle = values.Count / 2;
+            median = values.Count % 2 == 0
+                ? (values[middle - 1] + values[middle]) * 0.5f
+                : values[middle];
+        }
+
+        private static string BuildEdgeWearArtisticBinSummary(
+            List<EdgeWearEdgeLifecycleRecord> records,
+            EdgeWearArtisticBinMetric metric)
+        {
+            int[,] counts = new int[4, 3];
+            if (records != null)
+            {
+                for (int recordIndex = 0;
+                     recordIndex < records.Count;
+                     recordIndex++)
+                {
+                    EdgeWearEdgeLifecycleRecord record = records[recordIndex];
+                    int bin = ResolveEdgeWearArtisticBin(record, metric);
+                    counts[bin, 0]++;
+                    if (record.Selected)
+                    {
+                        counts[bin, 1]++;
+                    }
+                    if (!record.ArtisticEligible)
+                    {
+                        counts[bin, 2]++;
+                    }
+                }
+            }
+
+            string[] labels = metric switch
+            {
+                EdgeWearArtisticBinMetric.LengthScore =>
+                    new[] { "0-.15", ".15-.35", ".35-.65", ".65-1" },
+                EdgeWearArtisticBinMetric.DihedralDegrees =>
+                    new[] { "15-25", "25-45", "45-70", "70+" },
+                EdgeWearArtisticBinMetric.SharedVertexCrowding =>
+                    new[] { "0", "1", "2", "3+" },
+                _ => new[] { "0-.25", ".25-.5", ".5-.75", ".75-1" }
+            };
+            StringBuilder builder = new StringBuilder();
+            for (int bin = 0; bin < 4; bin++)
+            {
+                if (bin > 0)
+                {
+                    builder.Append(';');
+                }
+                builder.Append(labels[bin]);
+                builder.Append(':');
+                builder.Append(counts[bin, 0]);
+                builder.Append('/');
+                builder.Append(counts[bin, 1]);
+                builder.Append('/');
+                builder.Append(counts[bin, 2]);
+            }
+            return builder.ToString();
+        }
+
+        private static int ResolveEdgeWearArtisticBin(
+            EdgeWearEdgeLifecycleRecord record,
+            EdgeWearArtisticBinMetric metric)
+        {
+            if (metric == EdgeWearArtisticBinMetric.SharedVertexCrowding)
+            {
+                int crowding = Mathf.Max(
+                    record.ArtisticSharedVertexDegreeA,
+                    record.ArtisticSharedVertexDegreeB);
+                return Mathf.Clamp(crowding, 0, 3);
+            }
+
+            float value = metric switch
+            {
+                EdgeWearArtisticBinMetric.LengthScore =>
+                    record.ArtisticLengthScore,
+                EdgeWearArtisticBinMetric.DihedralDegrees =>
+                    record.DihedralDegrees,
+                EdgeWearArtisticBinMetric.EdgeAxisVertical01 =>
+                    record.ArtisticEdgeAxisVertical01,
+                EdgeWearArtisticBinMetric.SilhouettePotential =>
+                    record.ArtisticSilhouettePotential,
+                EdgeWearArtisticBinMetric.LocalDensity01 =>
+                    record.ArtisticLocalDensity01,
+                _ => 0f
+            };
+            if (metric == EdgeWearArtisticBinMetric.DihedralDegrees)
+            {
+                if (value < 25f) return 0;
+                if (value < 45f) return 1;
+                if (value < 70f) return 2;
+                return 3;
+            }
+            if (metric == EdgeWearArtisticBinMetric.LengthScore)
+            {
+                if (value < 0.15f) return 0;
+                if (value < 0.35f) return 1;
+                if (value < 0.65f) return 2;
+                return 3;
+            }
+            if (value < 0.25f) return 0;
+            if (value < 0.5f) return 1;
+            if (value < 0.75f) return 2;
+            return 3;
+        }
+
+        private static void AppendEdgeWearArtisticSelectionAudit(
+            StringBuilder builder,
+            EdgeWearCoverageAudit audit)
+        {
+            if (builder == null)
+            {
+                return;
+            }
+            if (audit == null)
+            {
+                builder.AppendLine("notCaptured");
+                return;
+            }
+            EdgeWearArtisticAuditSummary summary =
+                BuildEdgeWearArtisticAuditSummary(audit);
+            builder.Append("policy=");
+            builder.AppendLine(audit.RequireAllGeometricCandidates
+                ? "all-geometric"
+                : "artistic-preview");
+            builder.Append("captured=");
+            builder.AppendLine(audit.ArtisticAuditCaptured ? "1" : "0");
+            builder.Append("geometric/eligible/filtered/selected/target=");
+            builder.Append(summary.GeometricCount);
+            builder.Append('/');
+            builder.Append(summary.EligibleCount);
+            builder.Append('/');
+            builder.Append(summary.FilteredCount);
+            builder.Append('/');
+            builder.Append(summary.SelectedCount);
+            builder.Append('/');
+            builder.AppendLine(audit.ArtisticSelectionTargetCount.ToString());
+            builder.Append("filters=short/shallow/base/other:");
+            builder.Append(summary.ShortFilteredCount);
+            builder.Append('/');
+            builder.Append(summary.ShallowFilteredCount);
+            builder.Append('/');
+            builder.Append(summary.BaseFilteredCount);
+            builder.Append('/');
+            builder.AppendLine(summary.OtherFilteredCount.ToString());
+            builder.Append("selectionThreshold=");
+            builder.AppendLine(summary.SelectionThreshold.ToString("G9"));
+            builder.Append("scores=all:");
+            AppendEdgeWearArtisticScoreRange(builder,
+                summary.ScoreMinimum,
+                summary.ScoreMedian,
+                summary.ScoreMaximum);
+            builder.Append(",selected:");
+            AppendEdgeWearArtisticScoreRange(builder,
+                summary.SelectedScoreMinimum,
+                summary.SelectedScoreMedian,
+                summary.SelectedScoreMaximum);
+            builder.Append(",filtered:");
+            AppendEdgeWearArtisticScoreRange(builder,
+                summary.FilteredScoreMinimum,
+                summary.FilteredScoreMedian,
+                summary.FilteredScoreMaximum);
+            builder.AppendLine();
+            builder.AppendLine(
+                "scoreFormula=(angle*0.58+length*0.27+random*0.15)*" +
+                "baseSuppression*upwardBoost*characterBoost");
+            builder.AppendLine(
+                "diagnosticOnlyContextWeights=" +
+                "silhouette:0,widthFraction:0,localDensity:0,crowding:0");
+            builder.Append("lengthScoreBins(all/selected/filtered)=");
+            builder.AppendLine(summary.LengthBins);
+            builder.Append("dihedralBins(all/selected/filtered)=");
+            builder.AppendLine(summary.DihedralBins);
+            builder.Append("edgeAxisVerticalBins(all/selected/filtered)=");
+            builder.AppendLine(summary.OrientationBins);
+            builder.Append("silhouettePotentialBins(all/selected/filtered)=");
+            builder.AppendLine(summary.SilhouetteBins);
+            builder.Append("localDensityBins(all/selected/filtered)=");
+            builder.AppendLine(summary.LocalDensityBins);
+            builder.Append("sharedVertexCrowdingBins(all/selected/filtered)=");
+            builder.AppendLine(summary.CrowdingBins);
+        }
+
+        private static void AppendEdgeWearArtisticScoreRange(
+            StringBuilder builder,
+            float minimum,
+            float median,
+            float maximum)
+        {
+            builder.Append(minimum.ToString("G9"));
+            builder.Append('/');
+            builder.Append(median.ToString("G9"));
+            builder.Append('/');
+            builder.Append(maximum.ToString("G9"));
+        }
+
         private static string FormatEdgeWearCoverageSummary(
             EdgeWearCoverageAudit audit)
         {
@@ -2519,18 +2944,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     audit.CoincidentGraphVertexReconciliationCount +
                 ",graphSeamPairs=" +
                     audit.CoincidentGraphBoundarySeamPairCount +
-                ",microFeatures=" +
-                    audit.MicroFeatureEvaluatedEdgeCount +
-                    "/" +
-                    audit.MicroFeatureNormalizedComponentCount +
-                    "/" +
-                    audit.MicroFeatureNormalizedEdgeCount +
-                    "/" +
-                    audit.MicroFeatureRejectedEdgeCount +
-                ",microMaxDisplacement=" +
-                    audit.MicroFeatureMaximumDisplacement.ToString("G9") +
-                ",microMaxPlaneResidual=" +
-                    audit.MicroFeatureMaximumPlaneResidual.ToString("G9") +
+                ",collateral=" +
+                    audit.BaselineGeometricEligibleCount + "/" +
+                    audit.GeometricEligibleCount + "/" +
+                    audit.RecoveredGeometricEdgeCount + "/" +
+                    audit.CollateralLostEdgeCount + "/" +
+                    audit.CollateralChangedEdgeCount + "/" +
+                    (audit.CollateralPreservationValid ? "1" : "0") +
                 ",structural=" + audit.StructuralEligibleCount +
                 ",geometric=" + audit.GeometricEligibleCount +
                 ",geometricIneligible=" +
@@ -2541,6 +2961,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ",artistic=" + audit.ArtisticEligibleCount +
                 ",wouldBeArtisticallyFiltered=" +
                     audit.ArtisticFilteredCount +
+                ",artisticAudit=" +
+                    (audit.ArtisticAuditCaptured ? "1" : "0") + "/" +
+                    audit.ArtisticSelectionTargetCount + "/" +
+                    audit.ArtisticSelectionThreshold.ToString("G9") +
                 ",candidates=" + audit.CandidateCount +
                 ",selected=" + audit.SelectedCount +
                 ",widthInactive=" + audit.WidthInactiveCount +
@@ -2580,6 +3004,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     FormatEdgeWearCoverageIds(
                         audit,
                         "coincident-seam") + "}" +
+                ",recoveredGeometric={" +
+                    FormatEdgeWearIndexList(
+                        audit.RecoveredGeometricEdgeIndices) + "}" +
+                ",collateralLost={" +
+                    FormatEdgeWearIndexList(
+                        audit.CollateralLostEdgeIndices) + "}" +
+                ",collateralChanged={" +
+                    FormatEdgeWearIndexList(
+                        audit.CollateralChangedEdgeIndices) + "}" +
                 ",coexistenceIneligible={" +
                     FormatEdgeWearCoverageIds(
                         audit,
@@ -2604,6 +3037,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     FormatEdgeWearCoverageIds(
                         audit,
                         "rejected") + "}";
+        }
+
+        private static string FormatEdgeWearIndexList(
+            List<int> indices)
+        {
+            if (indices == null || indices.Count == 0)
+            {
+                return "none";
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int index = 0; index < indices.Count; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(indices[index]);
+            }
+            return builder.ToString();
         }
 
         private static string FormatEdgeWearCoverageIds(
@@ -3120,73 +3573,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return 7;
         }
 
-        private static void AppendEdgeWearMicroFeatureNormalization(
-            StringBuilder builder,
-            EdgeWearCoverageAudit audit)
-        {
-            if (builder == null)
-            {
-                return;
-            }
-            if (audit == null)
-            {
-                builder.AppendLine("notCaptured");
-                return;
-            }
-            builder.Append("evaluatedEdges=");
-            builder.Append(audit.MicroFeatureEvaluatedEdgeCount);
-            builder.Append(",normalizedComponents=");
-            builder.Append(audit.MicroFeatureNormalizedComponentCount);
-            builder.Append(",normalizedEdges=");
-            builder.Append(audit.MicroFeatureNormalizedEdgeCount);
-            builder.Append(",rejectedEdges=");
-            builder.Append(audit.MicroFeatureRejectedEdgeCount);
-            builder.Append(",maximumDisplacement=");
-            builder.Append(
-                audit.MicroFeatureMaximumDisplacement.ToString("G9"));
-            builder.Append(",maximumPlaneResidual=");
-            builder.Append(
-                audit.MicroFeatureMaximumPlaneResidual.ToString("G9"));
-            builder.Append(",firstRejection=");
-            builder.AppendLine(string.IsNullOrEmpty(
-                    audit.MicroFeatureFirstRejectionReason)
-                ? "none"
-                : audit.MicroFeatureFirstRejectionReason);
-            if (audit.MicroFeatureNormalizationRecords == null ||
-                audit.MicroFeatureNormalizationRecords.Count == 0)
-            {
-                builder.AppendLine("none");
-                return;
-            }
-            for (int recordIndex = 0;
-                 recordIndex < audit.MicroFeatureNormalizationRecords.Count;
-                 recordIndex++)
-            {
-                EdgeWearMicroFeatureNormalizationRecord record =
-                    audit.MicroFeatureNormalizationRecords[recordIndex];
-                builder.Append("record=");
-                builder.Append(recordIndex + 1);
-                builder.Append(",edges={");
-                builder.Append(FormatPlaneCutEdgeIndexEvidence(
-                    record.SourceEdgeIndices));
-                builder.Append("},vertices={");
-                builder.Append(FormatPlaneCutEdgeIndexEvidence(
-                    record.SourceVertexIndices));
-                builder.Append("},normalized=");
-                builder.Append(record.Normalized ? '1' : '0');
-                builder.Append(",junction=");
-                builder.Append(FormatPlaneCutVector(record.Junction));
-                builder.Append(",maximumDisplacement=");
-                builder.Append(record.MaximumDisplacement.ToString("G9"));
-                builder.Append(",maximumPlaneResidual=");
-                builder.Append(record.MaximumPlaneResidual.ToString("G9"));
-                builder.Append(",reason=");
-                builder.AppendLine(string.IsNullOrEmpty(record.Reason)
-                    ? "none"
-                    : record.Reason);
-            }
-        }
-
         private static string FormatEdgeWearLocalityCacheContract(
             EdgeWearCoverageAudit audit)
         {
@@ -3447,6 +3833,62 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     : record.CandidateReason);
                 builder.Append(",score=");
                 builder.Append(record.Score.ToString("G9"));
+                builder.Append(",artisticInputs={minimumLength:");
+                builder.Append(record.ArtisticMinimumLength.ToString("G9"));
+                builder.Append(",lengthScore:");
+                builder.Append(record.ArtisticLengthScore.ToString("G9"));
+                builder.Append(",angleScore:");
+                builder.Append(record.ArtisticAngleScore.ToString("G9"));
+                builder.Append(",random:");
+                builder.Append(record.ArtisticRandomScore.ToString("G9"));
+                builder.Append(",baseSuppression:");
+                builder.Append(
+                    record.ArtisticBaseSuppression.ToString("G9"));
+                builder.Append(",upwardBoost:");
+                builder.Append(record.ArtisticUpwardEdgeBoost.ToString("G9"));
+                builder.Append(",characterBoost:");
+                builder.Append(
+                    record.ArtisticCharacterBoost.ToString("G9"));
+                builder.Append(",gates:");
+                builder.Append(record.ArtisticLengthEligible ? '1' : '0');
+                builder.Append('/');
+                builder.Append(record.ArtisticAngleEligible ? '1' : '0');
+                builder.Append('/');
+                builder.Append(record.ArtisticBaseEligible ? '1' : '0');
+                builder.Append('}');
+                builder.Append(",artisticContext={edgeAxisVertical01:");
+                builder.Append(
+                    record.ArtisticEdgeAxisVertical01.ToString("G9"));
+                builder.Append(",silhouettePotential:");
+                builder.Append(
+                    record.ArtisticSilhouettePotential.ToString("G9"));
+                builder.Append(",feasibleWidthFraction:");
+                builder.Append(
+                    record.ArtisticFeasibleWidthFraction.ToString("G9"));
+                builder.Append(",solvedWidthFraction:");
+                builder.Append(
+                    record.ArtisticSolvedWidthFraction.ToString("G9"));
+                builder.Append(",localDensity01:");
+                builder.Append(
+                    record.ArtisticLocalDensity01.ToString("G9"));
+                builder.Append(",sharedVertexDegree:");
+                builder.Append(record.ArtisticSharedVertexDegreeA);
+                builder.Append('/');
+                builder.Append(record.ArtisticSharedVertexDegreeB);
+                builder.Append(",scoreWeights:silhouette0/width0/density0/crowding0}");
+                builder.Append(",artisticSelection={rank:");
+                builder.Append(record.ArtisticSelectionRank);
+                builder.Append(",threshold:");
+                builder.Append(
+                    record.ArtisticSelectionThreshold.ToString("G9"));
+                builder.Append(",delta:");
+                builder.Append(record.ArtisticSelectionDelta.ToString("G9"));
+                builder.Append(",filterReason:");
+                builder.Append(string.IsNullOrEmpty(
+                        record.ArtisticFilterReason)
+                    ? "none"
+                    : record.ArtisticFilterReason);
+                builder.Append('}');
                 builder.Append(",selected=");
                 builder.Append(record.Selected ? '1' : '0');
                 builder.Append(",solvedWidth=");

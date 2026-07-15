@@ -449,6 +449,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 DrawReadOnlyRow(
                     new GUIContent("Raw Object Half-Extents"),
                     unavailable);
+                DrawReadOnlyRow(
+                    new GUIContent("Object Contact Cycles"),
+                    unavailable);
                 return;
             }
 
@@ -462,7 +465,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawReadOnlyRow(
                 new GUIContent(
                     "Object Contact Shell",
-                    "Object source occupancy is fixed to immediate water-cell adjacency. The metre size depends on the current Foam grid; Arc/Semi-Arc Profile Scale and Fleck Size cannot widen this shell."),
+                    "Arc and Semi-Arc follow the immediate contact ring only across the upstream face, then continue from the side shoulders as thin straight downstream ribbons. Wake Arm Length changes only downstream extent; Fleck Size remains independent."),
                 $"1 cell | {runtime.FoamLongitudinalCellSpacingMetres:0.###} m along | {lateralCellText}");
 
             if (runtime.TryGetAutomaticObjectRawHalfExtentRanges(
@@ -491,6 +494,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     new GUIContent("Raw Object Half-Extents"),
                     "No active object anchors");
             }
+
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Object Contact Cycles",
+                    "Per-object Arc/Semi-Arc emission phases. Build grows one contiguous open-C source path, Hold replenishes that complete path, Release clears it contiguously, and Rest submits no source. The downstream rear remains unsourced in every phase."),
+                $"{runtime.AutomaticObjectContactBuildCount} build | " +
+                $"{runtime.AutomaticObjectContactHoldCount} hold | " +
+                $"{runtime.AutomaticObjectContactReleaseCount} release | " +
+                $"{runtime.AutomaticObjectContactRestCount} rest");
         }
 
         private int DrawDebugViewSelector(

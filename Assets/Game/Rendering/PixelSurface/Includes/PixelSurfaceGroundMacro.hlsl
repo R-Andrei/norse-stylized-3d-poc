@@ -39,12 +39,19 @@
 
                 float2 regionCoordinate =
                     patternCoordinate + warp * 0.52;
-                float primaryRegion = PS3D_ValueNoise31(
-                    float3(regionCoordinate, seedCoordinate + 37.47));
                 float secondaryRegion = PS3D_ValueNoise31(
                     float3(regionCoordinate * 1.65, seedCoordinate + 53.29));
-                float regionalSource = saturate(
-                    primaryRegion + (secondaryRegion - 0.5) * 0.14);
+                float secondaryCentered = secondaryRegion - 0.5;
+                float2 contourDirection =
+                    float2(
+                        0.34 + warp.y * 0.12,
+                        -0.26 + warp.x * 0.12);
+                float2 primaryCoordinate =
+                    regionCoordinate +
+                    contourDirection * secondaryCentered;
+                float primaryRegion = PS3D_ValueNoise31(
+                    float3(primaryCoordinate, seedCoordinate + 37.47));
+                float regionalSource = primaryRegion;
 
                 float averageSeparation =
                     max(0.0, _GroundMacroPatchSeparation);

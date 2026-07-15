@@ -1,13 +1,15 @@
 
 struct FoamSourceEventData
 {
-    // x = source type, y = side sign, z = reveal progress, w = shape seed.
+    // x = source type, y = side sign except Object Arc/Semi-Arc phase
+    // (0 Build, 1 Hold, 2 Release), z = phase/reveal progress, w = shape seed.
     float4 header;
     // x = start storage global, y = end storage global,
     // z = centre storage global, w = flow direction.
     float4 distance;
-    // x = shore inset, y = width metres except Shore Ribbon thickness cells,
-    // z = inward reach, w = feather metres.
+    // x = shore inset, y = width metres except Shore Ribbon thickness cells
+    // and Object Arc/Semi-Arc straight wake-arm length metres, z = inward reach or
+    // Arc/Semi-Arc normalized material-step duration, w = feather metres.
     float4 shore;
     // x = source amount, y = remaining life, z = material pattern seed,
     // w = source fill feature size.
@@ -19,7 +21,8 @@ struct FoamSourceEventData
     // z = source path length metres, w reserved.
     float4 kinematics;
     // x = object centre lateral metres, y = object along half length,
-    // z = object across half width, w = object contact offset metres.
+    // z = object across half width, w = Fleck contact offset metres or
+    // Arc/Semi-Arc source-local lateral cell spacing metres.
     float4 objectData;
 };
 

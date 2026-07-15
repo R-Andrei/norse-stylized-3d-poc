@@ -16,9 +16,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private const float EdgeWearMinimumCentralSpanWidthMultiplier = 0.5f;
 
         private static List<EdgeWearBevelCandidate> BuildEdgeWearBevelCandidates(
-            List<PolygonFace> sourceFaces,
-            List<PolygonFace> graphFaces,
-            EdgeWearMicroFeatureNormalizationStats microFeatureStats,
+            List<PolygonFace> faces,
             Bounds bounds,
             float maximumDimension,
             MassRecipe recipe,
@@ -42,9 +40,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 new Dictionary<EdgeKey, int>();
             int coincidentBoundarySeamPairCount = 0;
 
-            for (int faceIndex = 0; faceIndex < graphFaces.Count; faceIndex++)
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
             {
-                PolygonFace face = graphFaces[faceIndex];
+                PolygonFace face = faces[faceIndex];
                 if (face.Feature != PolygonFaceFeature.Base)
                 {
                     continue;
@@ -74,37 +72,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
-            coverageAudit.RawSourceEdgeCount = microFeatureStats == null
-                ? edgeIndexByKey.Count
-                : microFeatureStats.RawSourceEdgeCount;
+            coverageAudit.RawSourceEdgeCount = edgeIndexByKey.Count;
             coverageAudit.CoincidentBoundarySeamPairCount =
                 coincidentBoundarySeamPairCount;
-            if (microFeatureStats != null)
-            {
-                coverageAudit.MicroFeatureEvaluatedEdgeCount =
-                    microFeatureStats.EvaluatedEdgeCount;
-                coverageAudit.MicroFeatureNormalizedComponentCount =
-                    microFeatureStats.NormalizedComponentCount;
-                coverageAudit.MicroFeatureNormalizedEdgeCount =
-                    microFeatureStats.NormalizedEdgeCount;
-                coverageAudit.MicroFeatureRejectedEdgeCount =
-                    microFeatureStats.RejectedEdgeCount;
-                coverageAudit.MicroFeatureMaximumDisplacement =
-                    microFeatureStats.MaximumDisplacement;
-                coverageAudit.MicroFeatureMaximumPlaneResidual =
-                    microFeatureStats.MaximumPlaneResidual;
-                coverageAudit.MicroFeatureFirstRejectionReason =
-                    microFeatureStats.FirstRejectionReason ?? string.Empty;
-                coverageAudit.MicroFeatureNormalizationRecords.AddRange(
-                    microFeatureStats.Records);
-            }
 
             List<EdgeWearBevelCandidate> provisionalCandidates =
                 new List<EdgeWearBevelCandidate>(edges.Count);
-            Vector3 solidCentre =
-                CalculatePlaneCutFaceVertexCentre(sourceFaces);
+            Vector3 solidCentre = CalculatePlaneCutFaceVertexCentre(faces);
             List<Vector3> sourceVertices =
-                BuildEdgeWearViabilitySourceVertexList(graphFaces);
+                BuildEdgeWearViabilitySourceVertexList(faces);
             float minimumStableEdgeLength = maximumDimension * 0.0012f;
             float minimumStableFaceArea =
                 maximumDimension * maximumDimension * 0.000001f;
@@ -179,8 +155,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 int faceB = edge.FaceIndices[1];
                 lifecycle.FaceA = faceA;
                 lifecycle.FaceB = faceB;
-                PolygonFace first = graphFaces[faceA];
-                PolygonFace second = graphFaces[faceB];
+                PolygonFace first = faces[faceA];
+                PolygonFace second = faces[faceB];
                 if (first == null || second == null ||
                     !IsFinite(first.Normal) || !IsFinite(second.Normal) ||
                     first.Normal.sqrMagnitude <= MinimumEdgeLengthSqr ||
@@ -217,7 +193,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 if (!TryClassifyEdgeWearStructuralEdge(
-                        graphFaces,
+                        faces,
                         faceA,
                         faceB,
                         edge.Start,
@@ -254,6 +230,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 lifecycle.StructuralEligible = true;
                 Vector3 bevelNormal = normalSum.normalized;
+                Vector3 edgeDirection = (edge.End - edge.Start) / length;
                 float angleScore = Mathf.Clamp01(
                     (1f - Vector3.Dot(first.Normal, second.Normal)) * 0.72f);
                 float baseSuppression = Mathf.SmoothStep(
@@ -264,10 +241,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     length > artisticMinimumLength;
                 bool artisticAngleEligible = angleScore > 0.035f;
                 bool artisticBaseEligible = baseSuppression > 0.001f;
+                lifecycle.ArtisticMinimumLength = artisticMinimumLength;
+                lifecycle.ArtisticAngleScore = angleScore;
+                lifecycle.ArtisticBaseSuppression = baseSuppression;
+                lifecycle.ArtisticEdgeAxisVertical01 = Mathf.Clamp01(
+                    Mathf.Abs(Vector3.Dot(edgeDirection, Vector3.up)));
+                lifecycle.ArtisticSilhouettePotential = Mathf.Clamp01(
+                    Mathf.Max(
+                        new Vector2(first.Normal.x, first.Normal.z).magnitude,
+                        new Vector2(second.Normal.x, second.Normal.z).magnitude));
+                lifecycle.ArtisticLengthEligible = artisticLengthEligible;
+                lifecycle.ArtisticAngleEligible = artisticAngleEligible;
+                lifecycle.ArtisticBaseEligible = artisticBaseEligible;
                 lifecycle.ArtisticEligible =
                     artisticLengthEligible &&
                     artisticAngleEligible &&
                     artisticBaseEligible;
+                lifecycle.ArtisticFilterReason = lifecycle.ArtisticEligible
+                    ? "eligible"
+                    : ResolveEdgeWearArtisticFilterReason(
+                        lifecycle,
+                        artisticMinimumLength);
 
                 viability.DihedralValid =
                     lifecycle.DihedralDegrees + 0.0001f >=
@@ -337,6 +331,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     baseSuppression *
                     upwardEdgeBoost *
                     characterBoost;
+                lifecycle.ArtisticLengthScore = lengthScore;
+                lifecycle.ArtisticUpwardEdgeBoost = upwardEdgeBoost;
+                lifecycle.ArtisticCharacterBoost = characterBoost;
+                lifecycle.ArtisticRandomScore = random;
 
                 float deterministicVariation = Mathf.Lerp(
                     0.90f,
@@ -379,8 +377,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         provisionalCandidates.Count,
                         provisionalCandidates.Count);
                 if (TryBuildChamferTopologyContext(
-                        sourceFaces,
-                        graphFaces,
+                        faces,
                         provisionalCandidates,
                         provisionalCandidates.Count,
                         minimumStableEdgeLength,
@@ -392,7 +389,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         coverageAudit,
                         preflightContext.Graph);
                     RunEdgeWearIsolatedViabilityPreflight(
-                        sourceFaces,
+                        faces,
                         preflightContext,
                         requestedWidth,
                         minimumStableEdgeLength,
@@ -425,6 +422,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
                 }
             }
+
+            PopulateEdgeWearArtisticContextMetrics(
+                coverageAudit,
+                maximumDimension,
+                requestedWidth);
+            CaptureEdgeWearCollateralBaseline(coverageAudit);
 
             List<EdgeWearBevelCandidate> candidates =
                 new List<EdgeWearBevelCandidate>(
@@ -556,6 +559,139 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return baseSuppression <= 0.001f
                 ? "artistically-base-suppressed"
                 : "artistically-filtered";
+        }
+
+        private static void PopulateEdgeWearArtisticContextMetrics(
+            EdgeWearCoverageAudit audit,
+            float maximumDimension,
+            float requestedWidth)
+        {
+            if (audit == null || audit.Records == null)
+            {
+                return;
+            }
+
+            List<EdgeWearEdgeLifecycleRecord> geometric =
+                new List<EdgeWearEdgeLifecycleRecord>();
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                if (record.GeometricEligible)
+                {
+                    geometric.Add(record);
+                }
+            }
+
+            float densityRadius = Mathf.Max(
+                maximumDimension * 0.34f,
+                PointMergeDistance * 16f);
+            float densityRadiusSqr = densityRadius * densityRadius;
+            for (int recordIndex = 0;
+                 recordIndex < geometric.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record = geometric[recordIndex];
+                int degreeA = 0;
+                int degreeB = 0;
+                int nearby = 0;
+                Vector3 midpoint = (record.Start + record.End) * 0.5f;
+                for (int otherIndex = 0;
+                     otherIndex < geometric.Count;
+                     otherIndex++)
+                {
+                    if (otherIndex == recordIndex)
+                    {
+                        continue;
+                    }
+                    EdgeWearEdgeLifecycleRecord other =
+                        geometric[otherIndex];
+                    if (AreSamePoint(record.Start, other.Start) ||
+                        AreSamePoint(record.Start, other.End))
+                    {
+                        degreeA++;
+                    }
+                    if (AreSamePoint(record.End, other.Start) ||
+                        AreSamePoint(record.End, other.End))
+                    {
+                        degreeB++;
+                    }
+                    Vector3 otherMidpoint =
+                        (other.Start + other.End) * 0.5f;
+                    if ((otherMidpoint - midpoint).sqrMagnitude <=
+                        densityRadiusSqr)
+                    {
+                        nearby++;
+                    }
+                }
+
+                record.ArtisticSharedVertexDegreeA = degreeA;
+                record.ArtisticSharedVertexDegreeB = degreeB;
+                record.ArtisticLocalDensity01 = geometric.Count > 1
+                    ? Mathf.Clamp01((float)nearby / (geometric.Count - 1))
+                    : 0f;
+                record.ArtisticFeasibleWidthFraction =
+                    record.Viability == null || requestedWidth <= 0f
+                        ? 0f
+                        : Mathf.Clamp01(
+                            record.Viability.MaximumLocallyFeasibleWidth /
+                            requestedWidth);
+            }
+        }
+
+        private static void CaptureEdgeWearArtisticSelectionAudit(
+            EdgeWearCoverageAudit audit,
+            List<EdgeWearBevelCandidate> orderedCandidates,
+            int selectedCount)
+        {
+            if (audit == null)
+            {
+                return;
+            }
+
+            audit.ArtisticAuditCaptured = true;
+            audit.ArtisticSelectionTargetCount = Mathf.Max(0, selectedCount);
+            audit.ArtisticSelectionThreshold =
+                orderedCandidates != null &&
+                selectedCount > 0 &&
+                selectedCount <= orderedCandidates.Count
+                    ? orderedCandidates[selectedCount - 1].Score
+                    : 0f;
+
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                record.ArtisticSelectionRank = -1;
+                record.ArtisticSelectionThreshold =
+                    audit.ArtisticSelectionThreshold;
+                record.ArtisticSelectionDelta =
+                    record.Score - audit.ArtisticSelectionThreshold;
+            }
+
+            if (orderedCandidates == null)
+            {
+                return;
+            }
+            for (int rank = 0; rank < orderedCandidates.Count; rank++)
+            {
+                EdgeWearBevelCandidate candidate = orderedCandidates[rank];
+                EdgeKey key = new EdgeKey(candidate.Start, candidate.End);
+                if (audit.RecordByKey.TryGetValue(
+                        key,
+                        out EdgeWearEdgeLifecycleRecord record))
+                {
+                    record.ArtisticSelectionRank = rank + 1;
+                    record.ArtisticSelectionThreshold =
+                        audit.ArtisticSelectionThreshold;
+                    record.ArtisticSelectionDelta =
+                        record.Score - audit.ArtisticSelectionThreshold;
+                }
+            }
         }
 
         private static List<Vector3> BuildEdgeWearViabilitySourceVertexList(
@@ -1151,6 +1287,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 record.SolvedWidth = width;
+                record.ArtisticSolvedWidthFraction =
+                    record.Viability == null ||
+                    record.Viability.RequestedWidth <= 0f
+                        ? 0f
+                        : width / record.Viability.RequestedWidth;
                 record.WidthInactive = false;
                 record.Active = true;
                 record.FinalReason = "active";
@@ -1182,6 +1323,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             record.CandidateReason = resolvedReason;
             record.Selected = false;
             record.SolvedWidth = solvedWidth;
+            record.ArtisticSolvedWidthFraction =
+                record.Viability == null ||
+                record.Viability.RequestedWidth <= 0f
+                    ? 0f
+                    : solvedWidth / record.Viability.RequestedWidth;
             record.WidthInactive = true;
             record.Active = false;
             record.AttemptedBuilt = false;
@@ -1205,6 +1351,152 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 audit.RecordByGraphEdge.TryGetValue(
                     graphEdgeIndex,
                     out record);
+        }
+
+        private static void CaptureEdgeWearCollateralBaseline(
+            EdgeWearCoverageAudit audit)
+        {
+            if (audit == null)
+            {
+                return;
+            }
+
+            audit.CollateralBaselineByKey.Clear();
+            audit.BaselineGeometricEligibleCount = 0;
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                EdgeWearCollateralBaselineRecord baseline =
+                    new EdgeWearCollateralBaselineRecord(record);
+                audit.CollateralBaselineByKey[record.Key] = baseline;
+                if (baseline.GeometricEligible)
+                {
+                    audit.BaselineGeometricEligibleCount++;
+                }
+            }
+            audit.CollateralBaselineCaptured = true;
+            EvaluateEdgeWearCollateralPreservation(audit);
+        }
+
+        private static void EvaluateEdgeWearCollateralPreservation(
+            EdgeWearCoverageAudit audit)
+        {
+            if (audit == null)
+            {
+                return;
+            }
+
+            audit.RecoveredGeometricEdgeCount = 0;
+            audit.CollateralLostEdgeCount = 0;
+            audit.CollateralChangedEdgeCount = 0;
+            audit.RecoveredGeometricEdgeIndices.Clear();
+            audit.CollateralLostEdgeIndices.Clear();
+            audit.CollateralChangedEdgeIndices.Clear();
+
+            if (!audit.CollateralBaselineCaptured)
+            {
+                audit.CollateralPreservationValid = false;
+                return;
+            }
+
+            Dictionary<EdgeKey, EdgeWearEdgeLifecycleRecord> currentByKey =
+                new Dictionary<EdgeKey, EdgeWearEdgeLifecycleRecord>();
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                currentByKey[record.Key] = record;
+                if (!record.GeometricEligible)
+                {
+                    continue;
+                }
+
+                if (!audit.CollateralBaselineByKey.TryGetValue(
+                        record.Key,
+                        out EdgeWearCollateralBaselineRecord baseline) ||
+                    !baseline.GeometricEligible)
+                {
+                    audit.RecoveredGeometricEdgeIndices.Add(
+                        record.SourceEdgeIndex);
+                }
+            }
+
+            foreach (KeyValuePair<EdgeKey,
+                         EdgeWearCollateralBaselineRecord> pair in
+                     audit.CollateralBaselineByKey)
+            {
+                EdgeWearCollateralBaselineRecord baseline = pair.Value;
+                if (!baseline.GeometricEligible)
+                {
+                    continue;
+                }
+
+                if (!currentByKey.TryGetValue(
+                        pair.Key,
+                        out EdgeWearEdgeLifecycleRecord current) ||
+                    !current.GeometricEligible)
+                {
+                    audit.CollateralLostEdgeIndices.Add(
+                        baseline.SourceEdgeIndex);
+                    continue;
+                }
+
+                if (HasEdgeWearCollateralStateChanged(
+                        baseline,
+                        current))
+                {
+                    audit.CollateralChangedEdgeIndices.Add(
+                        baseline.SourceEdgeIndex);
+                }
+            }
+
+            audit.RecoveredGeometricEdgeIndices.Sort();
+            audit.CollateralLostEdgeIndices.Sort();
+            audit.CollateralChangedEdgeIndices.Sort();
+            audit.RecoveredGeometricEdgeCount =
+                audit.RecoveredGeometricEdgeIndices.Count;
+            audit.CollateralLostEdgeCount =
+                audit.CollateralLostEdgeIndices.Count;
+            audit.CollateralChangedEdgeCount =
+                audit.CollateralChangedEdgeIndices.Count;
+            audit.CollateralPreservationValid =
+                audit.CollateralLostEdgeCount == 0 &&
+                audit.CollateralChangedEdgeCount == 0;
+        }
+
+        private static bool HasEdgeWearCollateralStateChanged(
+            EdgeWearCollateralBaselineRecord baseline,
+            EdgeWearEdgeLifecycleRecord current)
+        {
+            int currentFaceA = Mathf.Min(current.FaceA, current.FaceB);
+            int currentFaceB = Mathf.Max(current.FaceA, current.FaceB);
+            float currentMaximumWidth = current.Viability == null
+                ? 0f
+                : current.Viability.MaximumLocallyFeasibleWidth;
+            float currentWidthFraction = current.Viability == null
+                ? 0f
+                : current.Viability.FeasibleWidthFraction;
+            return current.SourceEdgeIndex != baseline.SourceEdgeIndex ||
+                currentFaceA != baseline.FaceA ||
+                currentFaceB != baseline.FaceB ||
+                current.Classification != baseline.Classification ||
+                Mathf.Abs(current.Length - baseline.Length) >
+                    PointMergeDistance ||
+                Mathf.Abs(
+                    current.DihedralDegrees -
+                    baseline.DihedralDegrees) > 0.001f ||
+                Mathf.Abs(
+                    currentMaximumWidth -
+                    baseline.MaximumLocallyFeasibleWidth) >
+                    PointMergeDistance ||
+                Mathf.Abs(
+                    currentWidthFraction -
+                    baseline.FeasibleWidthFraction) > 0.0001f;
         }
 
         private static void RecalculateEdgeWearCoverageAudit(
@@ -1347,11 +1639,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
             audit.CoexistenceExclusionCount =
                 audit.CoexistenceIneligibleCount;
+            EvaluateEdgeWearCollateralPreservation(audit);
         }
 
         private static bool TryBuildChamferTopologyContext(
             List<PolygonFace> sourceFaces,
-            List<PolygonFace> graphFaces,
             List<EdgeWearBevelCandidate> candidates,
             int selectedCount,
             float minimumStableEdgeLength,
@@ -1362,7 +1654,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             context = null;
             blocker = string.Empty;
             if (!TryBuildEdgeWearTopologyGraph(
-                    graphFaces,
+                    sourceFaces,
                     out EdgeWearTopologyGraph graph,
                     out EdgeWearGraphBuildStats graphStats))
             {

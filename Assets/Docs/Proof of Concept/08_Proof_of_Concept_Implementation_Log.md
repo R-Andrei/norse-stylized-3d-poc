@@ -1,3 +1,9 @@
+# 2026-07-15 — River Foam `4.11C.5.18H.3` Front Contact Bridge and Straight Wake Arms
+
+Status: implemented in source; Unity compilation and visual validation pending.
+
+`5.18H.2` fixed source width and D3D11 compilation but still interpreted longer Arc/Semi-Arc values as permission to continue around the obstacle contact ring. `5.18H.3` follows the obstacle only across its upstream half, then starts thin straight downstream ribbons from the two side shoulders. The existing serialized metre Length fields are restored as truthful Wake Arm Length controls; normalized Arm Reach, Profile Scale, Contact Offset, and Breakup remain hidden and inert. Arc uses equal arms; Semi-Arc shortens one arm through Lopsidedness. The per-anchor Build/Hold/Progressive Release/Rest scheduler, lifecycle, transport, Flecks, Shore, and Free-Water sources are unchanged. No new texture, buffer, kernel, dispatch, scene, prefab, material, asset, or metadata file is introduced.
+
 # 2026-07-14 — River Foam Chipping baseline accepted and closed
 
 Status: Unity-validated and accepted for the current milestone.
@@ -1993,4 +1999,25 @@ Unity import produced no observable behavior change from `5.18F`. Re-audit prove
 `5.18F.1` removes the activation fallback. Arc and Semi-Arc now deposit a finite startup centre/shoulder and compute later source occupancy as the difference between current and previous continuous reveal positions. A short span that cannot support at least roughly two tangent-projected source cells becomes a finite pulse rather than a held source. The CPU supplies normalized material-step duration through an object-source-only unused GPU lane so the startup pulse covers the first raster update at every accepted cadence.
 
 A min/mid/max sweep across Arc Length, Semi-Arc Length, Profile Scale, feather, Foam-cell anisotropy/orientation, event duration, material cadence, Head Trail, and Semi-Arc lopsidedness covers 78,732 combinations. It proves first-update startup deposition, complete release of historical centre/shoulder territory after startup, live moving-frontier occupancy for viable spans, and zero late source occupancy for finite-pulse spans. Unity C# compile, compute import, and runtime detachment validation remain pending.
+
+## 2026-07-15 — `4.11C.5.18G` Duty-Cycled Object Contact Foam
+
+Unity validation of `5.18F.1` confirmed that moving-frontier Arc/Semi-Arc deposition fixed the obstacle-locked wake, but it also exposed that most rocks remained contact-empty for too much of the simulation between brief stochastic events. `5.18G` replaces global random Arc/Semi-Arc starts with an independent deterministic cycle per eligible registered object anchor.
+
+Each cycle uses four phases: Build retains the accepted `5.18F.1` moving frontier; Hold replenishes the complete immediate one-cell contact Arc or Semi-Arc; Progressive Release turns source occupancy off in the same order used during Build—centre-outward for Arc and shoulder-to-far-end for Semi-Arc; Rest submits no Arc/Semi-Arc source. Per-anchor initial phase staggering prevents synchronized clean windows. New controls expose stable Anchor Coverage and Hold/Release/Rest duration ranges. Default values are `1.00`, `5–10 s`, `0.60–1.40 s`, and `1–3 s`. Global Formation Speed remains Build speed.
+
+Mixed mode uses Arc/Semi-Arc weights to select each contact-cycle recipe. Historical Object Coverage and Activity serialized fields are retained but are now labelled Fleck Coverage and Fleck Activity, and the Fleck weight scales supplemental stochastic Fleck frequency. Contact Fleck geometry and event behavior remain unchanged.
+
+The runtime adds one small CPU timer/cycle record per participating object anchor and reuses the existing event buffer, rasterizer, contact field, compute functions, and dispatches. No new GPU texture, channel, buffer, kernel, dispatch, or sample is added. Canonical velocity, obstacle slowdown, donor transport, lifecycle, Initial Presence/Life, one-cell contact geometry, static wake deformation, Shore Foam, and Free Water Foam remain unchanged. Unity C# compilation, compute import, phase visualization, downstream release, and contact-duty validation are pending.
+
+## 2026-07-15 — `4.11C.5.18G.1` Contiguous Object Face Sweep
+
+Runtime validation of `5.18G` accepted the duty-cycle concept but exposed black stripes and uncovered centre regions inside active Arc/Semi-Arc sources. The defect was structural: Build/Release used thin frontier bands, Hold still inherited authored profile limits, and Arc/Semi-Arc source-fill variation could cut holes through the active source.
+
+`5.18G.1` preserves the per-anchor scheduler and replaces the source masks with contiguous accumulated sweeps. Arc builds side-to-side, holds the complete upstream-facing one-cell mantle, and releases in the same order. Semi-Arc builds from the non-trail side across the complete mantle and then into its one-sided extension; Release retracts the extension first and clears the face in reverse order. Arc/Semi-Arc patterned source fill is disabled, while Contact Fleck remains unchanged. No new GPU resource, kernel, dispatch, persistent state, or serialized control is added. Subsequent hidden-object Unity inspection found that this contiguous mask still selected a near-complete contact ring; `5.18H` supersedes that spatial contract while retaining the `5.18G` scheduler.
+## 2026-07-15 — `4.11C.5.18H` Thin Open-C Object Ribbon Arcs
+
+Hidden-object validation rejected the `5.18G.1` near-ring mantle: Arc/Semi-Arc sources nearly encircled obstacles, injected behind the rear face, and smeared into broad object-width downstream Foam. The legacy Length, Profile Scale, Contact Offset, Breakup, and lopsidedness controls did not meaningfully own occupied source geometry.
+
+`5.18H` retains the accepted per-anchor duty cycle but selects a one-cell-deep open-C interval directly from the immediate object-contact ring. Arc arms are symmetric; Semi-Arc lopsidedness directly shortens one arm; both retain a hard downstream rear opening. Arm Reach replaces the active metre Length controls. Legacy Length/Profile Scale/Offset/Breakup fields remain serialized but hidden and inert. Build duration now derives from an eight-segment obstacle-relative approximation of the selected open-C interval. No new GPU resource, kernel, dispatch, scene, prefab, material, asset, or metadata change is introduced. Unity validation is pending.
 

@@ -2962,22 +2962,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (targetOccurrenceCount != 1 ||
                 targetSourceFace == null ||
                 targetSourceFace.Vertices == null ||
-                targetGraphFace.VertexIndices.Count < 3)
+                targetSourceFace.Vertices.Count !=
+                    targetGraphFace.VertexIndices.Count)
             {
                 blocker =
                     "the isolated rail exact target boundary is inconsistent";
                 return false;
             }
 
-            int boundaryStartVertex =
-                targetGraphFace.VertexIndices[targetLocalEdge];
-            int boundaryEndVertex = targetGraphFace.VertexIndices[
-                (targetLocalEdge + 1) %
-                    targetGraphFace.VertexIndices.Count];
-            Vector3 boundaryStart = context.Graph.Vertices[
-                boundaryStartVertex].Position;
-            Vector3 boundaryEnd = context.Graph.Vertices[
-                boundaryEndVertex].Position;
+            Vector3 boundaryStart =
+                targetSourceFace.Vertices[targetLocalEdge];
+            Vector3 boundaryEnd = targetSourceFace.Vertices[
+                (targetLocalEdge + 1) % targetSourceFace.Vertices.Count];
             Vector3 boundarySegment = boundaryEnd - boundaryStart;
             float boundaryLengthSqr = boundarySegment.sqrMagnitude;
             if (boundaryLengthSqr <= MinimumEdgeLengthSqr)

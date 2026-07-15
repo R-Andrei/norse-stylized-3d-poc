@@ -30,7 +30,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             6667,
             7778,
             8889,
-            9999
+            9999,
+            5727
         };
 
         private static readonly string[] EdgeWearBatchWidthNames =
@@ -55,9 +56,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             ArtisticPreviewParity
         }
 
+        private enum EdgeWearValidationSuiteStage
+        {
+            CurrentPreview,
+            TopologyViability,
+            ArtisticPreviewParity,
+            Complete
+        }
+
         private static EdgeWearViabilityMatrixJob
             activeEdgeWearViabilityMatrixJob;
+        private static EdgeWearValidationSuiteJob
+            activeEdgeWearValidationSuiteJob;
         private static string lastEdgeWearBatchSummary = string.Empty;
+        private static string lastEdgeWearValidationSuiteSummary =
+            string.Empty;
+        private const string EdgeWearValidationSuiteReportFileName =
+            "GeneratedMassEdgeWearValidationSuite.txt";
 
         private const string ColdGreyStoneMaterialPath =
             "Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat";
@@ -209,7 +224,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             SceneView sceneView)
         {
             if (!sourceEdgeIndexOverlayEnabled || Application.isPlaying ||
-                activeEdgeWearViabilityMatrixJob != null)
+                activeEdgeWearViabilityMatrixJob != null ||
+                activeEdgeWearValidationSuiteJob != null)
             {
                 return;
             }
@@ -676,15 +692,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         private void DrawEdgeWearViabilityMatrixControls()
         {
-            bool running = activeEdgeWearViabilityMatrixJob != null;
+            bool matrixRunning =
+                activeEdgeWearViabilityMatrixJob != null;
+            bool suiteRunning =
+                activeEdgeWearValidationSuiteJob != null;
+            int matrixCaseCount = EdgeWearBatchShapeSeeds.Length *
+                EdgeWearBatchWidths.Length;
+
+            EditorGUILayout.HelpBox(
+                "One-click validation rebuilds the current preview, runs " +
+                "both canonical " + matrixCaseCount + "-case matrices, " +
+                "and writes one combined report. The focused matrix " +
+                "buttons remain available when only one audit is needed.",
+                MessageType.None);
+
             using (new EditorGUI.DisabledScope(
                 Application.isPlaying ||
                 serializedObject.isEditingMultipleObjects ||
-                running))
+                matrixRunning ||
+                suiteRunning))
             {
                 if (GUILayout.Button(
-                        "Run Topology Viability Matrix " +
-                        "(30 Exhaustive Cases)"))
+                        "Run Full Edge-Wear Validation Suite (1 Click)"))
+                {
+                    GeneratedMass mass = target as GeneratedMass;
+                    if (mass != null)
+                    {
+                        StartEdgeWearValidationSuite(mass);
+                    }
+                }
+
+                EditorGUILayout.Space(2f);
+                if (GUILayout.Button(
+                        "Run Topology Viability Matrix (" +
+                        matrixCaseCount + " Exhaustive Cases)"))
                 {
                     GeneratedMass mass = target as GeneratedMass;
                     if (mass != null)
@@ -695,7 +736,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     }
                 }
                 if (GUILayout.Button(
-                        "Run Artistic Preview Parity Matrix (30 Cases)"))
+                        "Run Artistic Preview Parity Matrix (" +
+                        matrixCaseCount + " Cases)"))
                 {
                     GeneratedMass mass = target as GeneratedMass;
                     if (mass != null)
@@ -707,7 +749,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 }
             }
 
-            if (running)
+            if (suiteRunning)
+            {
+                EdgeWearValidationSuiteJob suite =
+                    activeEdgeWearValidationSuiteJob;
+                EdgeWearViabilityMatrixJob matrix =
+                    activeEdgeWearViabilityMatrixJob;
+                string progress = suite.StageDisplayName;
+                if (matrix != null)
+                {
+                    progress += ": case " +
+                        (matrix.CompletedCaseCount + 1) + "/" +
+                        matrix.TotalCaseCount;
+                }
+                EditorGUILayout.HelpBox(
+                    "Running full edge-wear validation suite — " +
+                    progress + ". The current preview is rebuilt once; " +
+                    "matrix cases do not modify the selected mass.",
+                    MessageType.Info);
+                if (GUILayout.Button("Cancel Full Validation Suite"))
+                {
+                    suite.CancelRequested = true;
+                    if (matrix != null)
+                    {
+                        matrix.CancelRequested = true;
+                    }
+                }
+            }
+            else if (matrixRunning)
             {
                 EdgeWearViabilityMatrixJob job =
                     activeEdgeWearViabilityMatrixJob;
@@ -722,36 +791,115 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     job.CancelRequested = true;
                 }
             }
-            else if (!string.IsNullOrEmpty(lastEdgeWearBatchSummary))
+            else
             {
-                EditorGUILayout.HelpBox(
-                    lastEdgeWearBatchSummary,
-                    MessageType.None);
+                if (!string.IsNullOrEmpty(
+                        lastEdgeWearValidationSuiteSummary))
+                {
+                    EditorGUILayout.HelpBox(
+                        lastEdgeWearValidationSuiteSummary,
+                        MessageType.None);
+                    string suiteReportPath = GetEdgeWearLibraryPath(
+                        EdgeWearValidationSuiteReportFileName);
+                    using (new EditorGUI.DisabledScope(
+                        !File.Exists(suiteReportPath)))
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        if (GUILayout.Button(
+                                "Copy Full Validation Report"))
+                        {
+                            EditorGUIUtility.systemCopyBuffer =
+                                File.ReadAllText(suiteReportPath);
+                        }
+                        if (GUILayout.Button("Reveal Full Report"))
+                        {
+                            EditorUtility.RevealInFinder(suiteReportPath);
+                        }
+                        EditorGUILayout.EndHorizontal();
+                    }
+                }
+                else if (!string.IsNullOrEmpty(
+                             lastEdgeWearBatchSummary))
+                {
+                    EditorGUILayout.HelpBox(
+                        lastEdgeWearBatchSummary,
+                        MessageType.None);
+                }
             }
 
             if (serializedObject.isEditingMultipleObjects)
             {
                 EditorGUILayout.HelpBox(
-                    "The edge-wear matrices require one selected mass " +
-                    "because each audits one immutable recipe/settings " +
-                    "snapshot.",
+                    "Edge-wear validation requires one selected mass " +
+                    "because every audit uses one immutable " +
+                    "recipe/settings snapshot.",
                     MessageType.None);
+            }
+        }
+
+        private static void StartEdgeWearValidationSuite(
+            GeneratedMass mass)
+        {
+            if (mass == null || mass.Recipe == null ||
+                activeEdgeWearViabilityMatrixJob != null ||
+                activeEdgeWearValidationSuiteJob != null)
+            {
+                return;
+            }
+
+            EdgeWearValidationSuiteJob suite =
+                new EdgeWearValidationSuiteJob(mass);
+            activeEdgeWearValidationSuiteJob = suite;
+            lastEdgeWearBatchSummary = string.Empty;
+            lastEdgeWearValidationSuiteSummary = string.Empty;
+
+            try
+            {
+                suite.Stage = EdgeWearValidationSuiteStage.CurrentPreview;
+                suite.PrepareCurrentPreviewCapture();
+                mass.EvaluateUnifiedEdgeWearPreview();
+                suite.CaptureCurrentPreview();
+                suite.Stage =
+                    EdgeWearValidationSuiteStage.TopologyViability;
+                StartEdgeWearViabilityMatrix(
+                    mass,
+                    EdgeWearMatrixKind.TopologyViability,
+                    true);
+            }
+            catch (Exception exception)
+            {
+                FinishEdgeWearValidationSuite(
+                    suite,
+                    false,
+                    "current preview threw " +
+                    exception.GetType().Name + ":" +
+                    exception.Message);
             }
         }
 
         private static void StartEdgeWearViabilityMatrix(
             GeneratedMass mass,
-            EdgeWearMatrixKind kind)
+            EdgeWearMatrixKind kind,
+            bool suiteOwned = false)
         {
             if (mass == null || mass.Recipe == null ||
-                activeEdgeWearViabilityMatrixJob != null)
+                activeEdgeWearViabilityMatrixJob != null ||
+                (!suiteOwned &&
+                 activeEdgeWearValidationSuiteJob != null))
             {
                 return;
             }
 
             activeEdgeWearViabilityMatrixJob =
-                new EdgeWearViabilityMatrixJob(mass, kind);
+                new EdgeWearViabilityMatrixJob(
+                    mass,
+                    kind,
+                    suiteOwned);
             lastEdgeWearBatchSummary = string.Empty;
+            if (!suiteOwned)
+            {
+                lastEdgeWearValidationSuiteSummary = string.Empty;
+            }
             EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
             EditorApplication.update += AdvanceEdgeWearViabilityMatrix;
         }
@@ -897,7 +1045,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     cancelled,
                     statePreserved,
                     terminalReason);
-            WriteEdgeWearViabilityMatrixReports(job, aggregate);
+            string reportText =
+                BuildEdgeWearViabilityMatrixText(job, aggregate);
+            string reportCsv = BuildEdgeWearViabilityMatrixCsv(job);
+            WriteEdgeWearViabilityMatrixReports(
+                job,
+                reportText,
+                reportCsv);
 
             lastEdgeWearBatchSummary = job.DisplayName + " " +
                 aggregate.Status + ": " + aggregate.CasesPassed + "/" +
@@ -905,6 +1059,50 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 job.ReportTextFileName + " and " +
                 job.ReportCsvFileName;
 
+            EdgeWearValidationSuiteJob suite =
+                activeEdgeWearValidationSuiteJob;
+            if (job.SuiteOwned && suite != null)
+            {
+                suite.RecordMatrix(job, aggregate, reportText);
+                if (cancelled || suite.CancelRequested ||
+                    !statePreserved || suite.Target == null)
+                {
+                    FinishEdgeWearValidationSuite(
+                        suite,
+                        cancelled || suite.CancelRequested,
+                        terminalReason);
+                    return;
+                }
+
+                if (job.Kind == EdgeWearMatrixKind.TopologyViability)
+                {
+                    suite.Stage = EdgeWearValidationSuiteStage
+                        .ArtisticPreviewParity;
+                    StartEdgeWearViabilityMatrix(
+                        suite.Target,
+                        EdgeWearMatrixKind.ArtisticPreviewParity,
+                        true);
+                    return;
+                }
+
+                FinishEdgeWearValidationSuite(
+                    suite,
+                    false,
+                    string.Empty);
+                return;
+            }
+
+            LogEdgeWearViabilityMatrixSummary(
+                job,
+                aggregate,
+                statePreserved);
+        }
+
+        private static void LogEdgeWearViabilityMatrixSummary(
+            EdgeWearViabilityMatrixJob job,
+            EdgeWearViabilityMatrixAggregate aggregate,
+            bool statePreserved)
+        {
             string message =
                 "GeneratedMass edge-wear " + job.ConsoleName + ". " +
                 "status:" + aggregate.Status +
@@ -912,22 +1110,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     aggregate.CasesRun +
                 ",coverageFailures:" +
                     aggregate.CoexistenceCoverageFailures +
-                ",widthFloorFailures:" + aggregate.WidthFloorFailures +
+                ",widthFloorFailures:" +
+                    aggregate.WidthFloorFailures +
                 ",missingJunctionFailures:" +
                     aggregate.MissingJunctionFailures +
-                ",tJunctionFailures:" + aggregate.TJunctionFailures +
+                ",tJunctionFailures:" +
+                    aggregate.TJunctionFailures +
                 ",strictIntersectionFailures:" +
                     aggregate.StrictIntersectionFailures +
-                ",planeBandFailures:" + aggregate.PlaneBandFailures +
+                ",planeBandFailures:" +
+                    aggregate.PlaneBandFailures +
                 ",terminalCandidateConservationFailures:" +
                     aggregate.CandidateConservationFailures +
-                ",topologyFailures:" + aggregate.TopologyFailures +
+                ",topologyFailures:" +
+                    aggregate.TopologyFailures +
                 ",faceQualityFailures:" +
                     aggregate.FaceQualityFailures +
                 ",placementFailures:" +
                     aggregate.PlacementFailures +
                 ",cacheFailures:" +
                     aggregate.CacheContractFailures +
+                ",collateralFailures:" +
+                    aggregate.CollateralPreservationFailures +
                 ",minimumCertifiedRatio:" +
                     aggregate.MinimumCertifiedRatio.ToString(
                         "G9", CultureInfo.InvariantCulture) +
@@ -950,12 +1154,178 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 message);
         }
 
+        private static void FinishEdgeWearValidationSuite(
+            EdgeWearValidationSuiteJob suite,
+            bool cancelled,
+            string terminalReason)
+        {
+            if (suite == null)
+            {
+                return;
+            }
+
+            activeEdgeWearValidationSuiteJob = null;
+            activeEdgeWearViabilityMatrixJob = null;
+            EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
+            EditorUtility.ClearProgressBar();
+            suite.Stage = EdgeWearValidationSuiteStage.Complete;
+            suite.Cancelled = cancelled;
+            suite.TerminalReason = terminalReason ?? string.Empty;
+
+            string status = suite.Status;
+            string report = BuildEdgeWearValidationSuiteReport(suite);
+            bool reportWritten = WriteEdgeWearValidationSuiteReport(
+                report,
+                out string reportDiagnostic);
+            if (!reportWritten)
+            {
+                status = "failed";
+                suite.TerminalReason = string.IsNullOrEmpty(
+                        suite.TerminalReason)
+                    ? reportDiagnostic
+                    : suite.TerminalReason + "; " + reportDiagnostic;
+            }
+
+            lastEdgeWearValidationSuiteSummary =
+                "Full edge-wear validation suite " + status + ": " +
+                "current preview=" +
+                (suite.CurrentPreviewPassed ? "passed" : "failed") +
+                ", topology=" + suite.TopologyCasesPassed + "/" +
+                suite.TopologyCasesRun + ", artistic preview=" +
+                suite.PreviewCasesPassed + "/" +
+                suite.PreviewCasesRun + ". Combined report: Library/" +
+                EdgeWearValidationSuiteReportFileName;
+
+            string message =
+                "GeneratedMass edge-wear full validation suite. " +
+                "status:" + status +
+                ",currentPreview:" +
+                    (suite.CurrentPreviewPassed ? "1" : "0") +
+                ",topology:" + suite.TopologyCasesPassed + "/" +
+                    suite.TopologyCasesRun +
+                ",preview:" + suite.PreviewCasesPassed + "/" +
+                    suite.PreviewCasesRun +
+                ",topologyCollateralFailures:" +
+                    suite.TopologyCollateralFailures +
+                ",previewCollateralFailures:" +
+                    suite.PreviewCollateralFailures +
+                ",report=Library/" +
+                    EdgeWearValidationSuiteReportFileName;
+            Debug.LogFormat(
+                status == "passed" ? LogType.Log : LogType.Warning,
+                LogOption.NoStacktrace,
+                suite.Target,
+                "{0}",
+                message);
+        }
+
+        private static string BuildEdgeWearValidationSuiteReport(
+            EdgeWearValidationSuiteJob suite)
+        {
+            StringBuilder builder = new StringBuilder(262144);
+            builder.AppendLine(
+                "GeneratedMass edge-wear one-click validation suite");
+            builder.AppendLine("contract=EW-B4.2R12A-suite");
+            builder.Append("object=");
+            builder.AppendLine(suite.TargetName);
+            builder.Append("entityId=");
+            builder.AppendLine(suite.TargetEntityId);
+            builder.Append("currentShapeSeed=");
+            builder.AppendLine(suite.CurrentShapeSeed.ToString());
+            builder.Append("matrixSeeds=");
+            builder.AppendLine(string.Join("/", EdgeWearBatchShapeSeeds));
+            builder.Append("matrixCasesPerPolicy=");
+            builder.AppendLine((
+                EdgeWearBatchShapeSeeds.Length *
+                EdgeWearBatchWidths.Length).ToString());
+            builder.Append("status=");
+            builder.AppendLine(suite.Status);
+            builder.Append("currentPreviewPassed=");
+            builder.AppendLine(
+                suite.CurrentPreviewPassed ? "1" : "0");
+            builder.Append("currentPreviewTelemetryAvailable=");
+            builder.AppendLine(
+                suite.CurrentPreviewTelemetryAvailable ? "1" : "0");
+            builder.Append("topologyStatus=");
+            builder.AppendLine(suite.TopologyStatus);
+            builder.Append("topologyCases=");
+            builder.Append(suite.TopologyCasesPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.TopologyCasesRun.ToString());
+            builder.Append("previewStatus=");
+            builder.AppendLine(suite.PreviewStatus);
+            builder.Append("previewCases=");
+            builder.Append(suite.PreviewCasesPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.PreviewCasesRun.ToString());
+            builder.Append("cancelled=");
+            builder.AppendLine(suite.Cancelled ? "1" : "0");
+            builder.Append("terminalReason=");
+            builder.AppendLine(string.IsNullOrEmpty(suite.TerminalReason)
+                ? "none"
+                : suite.TerminalReason);
+
+            builder.AppendLine();
+            builder.AppendLine("[Current Preview Summary]");
+            builder.AppendLine(suite.CurrentPreviewSummary);
+            builder.AppendLine();
+            builder.AppendLine("[Current Preview Telemetry]");
+            builder.AppendLine(suite.CurrentPreviewTelemetryAvailable
+                ? suite.CurrentPreviewTelemetry
+                : "unavailable: " + suite.CurrentPreviewTelemetryDiagnostic);
+            builder.AppendLine();
+            builder.AppendLine("[Topology Viability Matrix]");
+            builder.AppendLine(string.IsNullOrEmpty(suite.TopologyReportText)
+                ? "not run"
+                : suite.TopologyReportText);
+            builder.AppendLine();
+            builder.AppendLine("[Artistic Preview Parity Matrix]");
+            builder.AppendLine(string.IsNullOrEmpty(suite.PreviewReportText)
+                ? "not run"
+                : suite.PreviewReportText);
+            return builder.ToString();
+        }
+
+        private static bool WriteEdgeWearValidationSuiteReport(
+            string report,
+            out string diagnostic)
+        {
+            try
+            {
+                File.WriteAllText(
+                    GetEdgeWearLibraryPath(
+                        EdgeWearValidationSuiteReportFileName),
+                    report ?? string.Empty,
+                    new UTF8Encoding(false));
+                diagnostic = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                diagnostic =
+                    "combined report write failed: " +
+                    exception.GetType().Name + ":" +
+                    exception.Message;
+                return false;
+            }
+        }
+
+        private static string GetEdgeWearLibraryPath(string fileName)
+        {
+            string projectRoot = Path.GetFullPath(
+                Path.Combine(Application.dataPath, ".."));
+            string libraryPath = Path.Combine(projectRoot, "Library");
+            Directory.CreateDirectory(libraryPath);
+            return Path.Combine(libraryPath, fileName);
+        }
+
         private static void
             CancelEdgeWearViabilityMatrixForDomainReload()
         {
             EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
             EditorUtility.ClearProgressBar();
             activeEdgeWearViabilityMatrixJob = null;
+            activeEdgeWearValidationSuiteJob = null;
         }
 
         private static EdgeWearViabilityMatrixAggregate
@@ -1004,6 +1374,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 if (coverageFailure)
                 {
                     aggregate.CoexistenceCoverageFailures++;
+                }
+                bool collateralFailure =
+                    result.CollateralPreservationValid != 1 ||
+                    result.CollateralLostEdgeCount != 0 ||
+                    result.CollateralChangedEdgeCount != 0;
+                if (collateralFailure)
+                {
+                    aggregate.CollateralPreservationFailures++;
                 }
                 bool widthFloorFailure =
                     result.SelectedCount > 0 &&
@@ -1094,7 +1472,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     !planeBand &&
                     !candidateConservation &&
                     !faceQuality &&
-                    !placementFailure)
+                    !placementFailure &&
+                    !collateralFailure)
                 {
                     aggregate.OtherConstructionFailures++;
                 }
@@ -1128,25 +1507,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         private static void WriteEdgeWearViabilityMatrixReports(
             EdgeWearViabilityMatrixJob job,
-            EdgeWearViabilityMatrixAggregate aggregate)
+            string reportText,
+            string reportCsv)
         {
             try
             {
-                string projectRoot = Path.GetFullPath(
-                    Path.Combine(Application.dataPath, ".."));
-                string libraryPath = Path.Combine(projectRoot, "Library");
-                Directory.CreateDirectory(libraryPath);
                 File.WriteAllText(
-                    Path.Combine(
-                        libraryPath,
-                        job.ReportTextFileName),
-                    BuildEdgeWearViabilityMatrixText(job, aggregate),
+                    GetEdgeWearLibraryPath(job.ReportTextFileName),
+                    reportText ?? string.Empty,
                     new UTF8Encoding(false));
                 File.WriteAllText(
-                    Path.Combine(
-                        libraryPath,
-                        job.ReportCsvFileName),
-                    BuildEdgeWearViabilityMatrixCsv(job),
+                    GetEdgeWearLibraryPath(job.ReportCsvFileName),
+                    reportCsv ?? string.Empty,
                     new UTF8Encoding(false));
             }
             catch (Exception exception)
@@ -1211,6 +1583,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append("cacheContractFailures=");
             builder.AppendLine(
                 aggregate.CacheContractFailures.ToString());
+            builder.Append("collateralPreservationFailures=");
+            builder.AppendLine(
+                aggregate.CollateralPreservationFailures.ToString());
             builder.Append("minimumCertifiedRatio=");
             builder.AppendLine(aggregate.MinimumCertifiedRatio.ToString(
                 "G9", CultureInfo.InvariantCulture));
@@ -1266,20 +1641,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append('/');
                 builder.Append(
                     result.CoincidentGraphBoundarySeamPairCount);
-                builder.Append(",microFeatures=evaluated/components/edges/rejected:");
-                builder.Append(result.MicroFeatureEvaluatedEdgeCount);
+                builder.Append(",collateral=baseline/current/recovered/lost/changed/valid:");
+                builder.Append(result.BaselineGeometricEligibleCount);
                 builder.Append('/');
-                builder.Append(result.MicroFeatureNormalizedComponentCount);
+                builder.Append(result.GeometricEligibleCount);
                 builder.Append('/');
-                builder.Append(result.MicroFeatureNormalizedEdgeCount);
+                builder.Append(result.RecoveredGeometricEdgeCount);
                 builder.Append('/');
-                builder.Append(result.MicroFeatureRejectedEdgeCount);
-                builder.Append(",microMaxDisplacement/residual=");
-                builder.Append(result.MicroFeatureMaximumDisplacement.ToString(
-                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(result.CollateralLostEdgeCount);
                 builder.Append('/');
-                builder.Append(result.MicroFeatureMaximumPlaneResidual.ToString(
-                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(result.CollateralChangedEdgeCount);
+                builder.Append('/');
+                builder.Append(result.CollateralPreservationValid);
+                builder.Append(",collateralIds=recovered{");
+                builder.Append(result.RecoveredGeometricEdgeIds);
+                builder.Append("}/lost{");
+                builder.Append(result.CollateralLostEdgeIds);
+                builder.Append("}/changed{");
+                builder.Append(result.CollateralChangedEdgeIds);
+                builder.Append('}');
                 builder.Append(",structural/geometric/coexistence=");
                 builder.Append(result.StructuralEligibleCount);
                 builder.Append('/');
@@ -1292,6 +1672,48 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append(result.CandidateCount);
                 builder.Append('/');
                 builder.Append(result.ExpectedCertificationCount);
+                builder.Append(",artisticFilters=total/short/shallow/base/other:");
+                builder.Append(result.ArtisticFilteredCount);
+                builder.Append('/');
+                builder.Append(result.ArtisticShortFilteredCount);
+                builder.Append('/');
+                builder.Append(result.ArtisticShallowFilteredCount);
+                builder.Append('/');
+                builder.Append(result.ArtisticBaseFilteredCount);
+                builder.Append('/');
+                builder.Append(result.ArtisticOtherFilteredCount);
+                builder.Append(",artisticThreshold=");
+                builder.Append(result.ArtisticSelectionThreshold.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(",artisticScores=all{");
+                AppendArtisticScoreRange(builder,
+                    result.ArtisticScoreMinimum,
+                    result.ArtisticScoreMedian,
+                    result.ArtisticScoreMaximum);
+                builder.Append("}/selected{");
+                AppendArtisticScoreRange(builder,
+                    result.ArtisticSelectedScoreMinimum,
+                    result.ArtisticSelectedScoreMedian,
+                    result.ArtisticSelectedScoreMaximum);
+                builder.Append("}/filtered{");
+                AppendArtisticScoreRange(builder,
+                    result.ArtisticFilteredScoreMinimum,
+                    result.ArtisticFilteredScoreMedian,
+                    result.ArtisticFilteredScoreMaximum);
+                builder.Append('}');
+                builder.Append(",artisticBins=length{");
+                builder.Append(result.ArtisticLengthBins);
+                builder.Append("}|dihedral{");
+                builder.Append(result.ArtisticDihedralBins);
+                builder.Append("}|orientation{");
+                builder.Append(result.ArtisticOrientationBins);
+                builder.Append("}|silhouette{");
+                builder.Append(result.ArtisticSilhouetteBins);
+                builder.Append("}|density{");
+                builder.Append(result.ArtisticLocalDensityBins);
+                builder.Append("}|crowding{");
+                builder.Append(result.ArtisticCrowdingBins);
+                builder.Append('}');
                 builder.Append(",selected/certified/deferred/rejected=");
                 builder.Append(result.SelectedCount);
                 builder.Append('/');
@@ -1418,6 +1840,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             return builder.ToString();
         }
 
+        private static void AppendArtisticScoreRange(
+            StringBuilder builder,
+            float minimum,
+            float median,
+            float maximum)
+        {
+            builder.Append(minimum.ToString(
+                "G9", CultureInfo.InvariantCulture));
+            builder.Append('/');
+            builder.Append(median.ToString(
+                "G9", CultureInfo.InvariantCulture));
+            builder.Append('/');
+            builder.Append(maximum.ToString(
+                "G9", CultureInfo.InvariantCulture));
+        }
+
         private static string BuildEdgeWearViabilityMatrixCsv(
             EdgeWearViabilityMatrixJob job)
         {
@@ -1425,13 +1863,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine(
                 "case,seed,widthTier,width,passed,rawSourceEdges,sourceEdges," +
                 "coincidentBoundarySeamPairs,graphVertexAliases," +
-                "graphBoundarySeamPairs,microFeatureEvaluatedEdges," +
-                "microFeatureNormalizedComponents," +
-                "microFeatureNormalizedEdges,microFeatureRejectedEdges," +
-                "microFeatureMaximumDisplacement," +
-                "microFeatureMaximumPlaneResidual,structuralEligible," +
+                "graphBoundarySeamPairs,baselineGeometricEligible," +
+                "recoveredGeometricEdges,collateralLostEdges," +
+                "collateralChangedEdges,collateralPreservationValid," +
+                "recoveredGeometricEdgeIds,collateralLostEdgeIds," +
+                "collateralChangedEdgeIds,structuralEligible," +
                 "geometricEligible,coexistenceEligible," +
-                "coexistenceIneligible,selected,certified,deferred,rejected," +
+                "coexistenceIneligible,artisticEligible,artisticFiltered," +
+                "artisticShortFiltered,artisticShallowFiltered," +
+                "artisticBaseFiltered,artisticOtherFiltered," +
+                "artisticSelectionThreshold,artisticScoreMinimum," +
+                "artisticScoreMedian,artisticScoreMaximum," +
+                "artisticSelectedScoreMinimum,artisticSelectedScoreMedian," +
+                "artisticSelectedScoreMaximum," +
+                "artisticFilteredScoreMinimum,artisticFilteredScoreMedian," +
+                "artisticFilteredScoreMaximum,artisticLengthBins," +
+                "artisticDihedralBins,artisticOrientationBins," +
+                "artisticSilhouetteBins,artisticLocalDensityBins," +
+                "artisticCrowdingBins,selected,certified,deferred,rejected," +
                 "trialRejected,boundaryExclusions,dihedralExclusions," +
                 "footprintExclusions,localityExclusions," +
                 "isolatedRailExclusions,supportExclusions," +
@@ -1481,19 +1930,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 AppendCsvValue(builder,
                     result.CoincidentGraphBoundarySeamPairCount.ToString());
                 AppendCsvValue(builder,
-                    result.MicroFeatureEvaluatedEdgeCount.ToString());
+                    result.BaselineGeometricEligibleCount.ToString());
                 AppendCsvValue(builder,
-                    result.MicroFeatureNormalizedComponentCount.ToString());
+                    result.RecoveredGeometricEdgeCount.ToString());
                 AppendCsvValue(builder,
-                    result.MicroFeatureNormalizedEdgeCount.ToString());
+                    result.CollateralLostEdgeCount.ToString());
                 AppendCsvValue(builder,
-                    result.MicroFeatureRejectedEdgeCount.ToString());
+                    result.CollateralChangedEdgeCount.ToString());
                 AppendCsvValue(builder,
-                    result.MicroFeatureMaximumDisplacement.ToString(
-                        "G9", CultureInfo.InvariantCulture));
-                AppendCsvValue(builder,
-                    result.MicroFeatureMaximumPlaneResidual.ToString(
-                        "G9", CultureInfo.InvariantCulture));
+                    result.CollateralPreservationValid.ToString());
+                AppendCsvValue(builder, result.RecoveredGeometricEdgeIds);
+                AppendCsvValue(builder, result.CollateralLostEdgeIds);
+                AppendCsvValue(builder, result.CollateralChangedEdgeIds);
                 AppendCsvValue(builder,
                     result.StructuralEligibleCount.ToString());
                 AppendCsvValue(builder,
@@ -1502,6 +1950,54 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     result.CoexistenceEligibleCount.ToString());
                 AppendCsvValue(builder,
                     result.CoexistenceIneligibleCount.ToString());
+                AppendCsvValue(builder,
+                    result.ArtisticEligibleCount.ToString());
+                AppendCsvValue(builder,
+                    result.ArtisticFilteredCount.ToString());
+                AppendCsvValue(builder,
+                    result.ArtisticShortFilteredCount.ToString());
+                AppendCsvValue(builder,
+                    result.ArtisticShallowFilteredCount.ToString());
+                AppendCsvValue(builder,
+                    result.ArtisticBaseFilteredCount.ToString());
+                AppendCsvValue(builder,
+                    result.ArtisticOtherFilteredCount.ToString());
+                AppendCsvValue(builder,
+                    result.ArtisticSelectionThreshold.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.ArtisticScoreMinimum.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.ArtisticScoreMedian.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.ArtisticScoreMaximum.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.ArtisticSelectedScoreMinimum.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.ArtisticSelectedScoreMedian.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.ArtisticSelectedScoreMaximum.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.ArtisticFilteredScoreMinimum.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.ArtisticFilteredScoreMedian.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.ArtisticFilteredScoreMaximum.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder, result.ArtisticLengthBins);
+                AppendCsvValue(builder, result.ArtisticDihedralBins);
+                AppendCsvValue(builder, result.ArtisticOrientationBins);
+                AppendCsvValue(builder, result.ArtisticSilhouetteBins);
+                AppendCsvValue(builder, result.ArtisticLocalDensityBins);
+                AppendCsvValue(builder, result.ArtisticCrowdingBins);
                 AppendCsvValue(builder, result.SelectedCount.ToString());
                 AppendCsvValue(builder, result.CertifiedCount.ToString());
                 AppendCsvValue(builder, result.DeferredCount.ToString());
@@ -1652,6 +2148,223 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
         }
 
+        private sealed class EdgeWearValidationSuiteJob
+        {
+            public readonly GeneratedMass Target;
+            public readonly string TargetName;
+            public readonly string TargetEntityId;
+            public readonly int CurrentShapeSeed;
+            public EdgeWearValidationSuiteStage Stage;
+            public bool CancelRequested;
+            public bool Cancelled;
+            public string TerminalReason = string.Empty;
+            public bool CurrentPreviewPassed;
+            public bool CurrentPreviewTelemetryAvailable;
+            public string CurrentPreviewSummary = string.Empty;
+            public string CurrentPreviewTelemetry = string.Empty;
+            public string CurrentPreviewTelemetryDiagnostic =
+                string.Empty;
+            public EdgeWearViabilityMatrixAggregate TopologyAggregate;
+            public EdgeWearViabilityMatrixAggregate PreviewAggregate;
+            public string TopologyReportText = string.Empty;
+            public string PreviewReportText = string.Empty;
+
+            public EdgeWearValidationSuiteJob(GeneratedMass target)
+            {
+                Target = target;
+                TargetName = target.name;
+                TargetEntityId = target.GetEntityId().ToString();
+                CurrentShapeSeed = target.Recipe != null
+                    ? target.Recipe.ShapeSeed
+                    : 0;
+            }
+
+            public string StageDisplayName
+            {
+                get
+                {
+                    return Stage switch
+                    {
+                        EdgeWearValidationSuiteStage.CurrentPreview =>
+                            "current preview",
+                        EdgeWearValidationSuiteStage.TopologyViability =>
+                            "topology viability matrix",
+                        EdgeWearValidationSuiteStage
+                            .ArtisticPreviewParity =>
+                            "artistic preview parity matrix",
+                        _ => "complete"
+                    };
+                }
+            }
+
+            public string TopologyStatus => TopologyAggregate == null
+                ? "not-run"
+                : TopologyAggregate.Status;
+
+            public string PreviewStatus => PreviewAggregate == null
+                ? "not-run"
+                : PreviewAggregate.Status;
+
+            public int TopologyCasesRun => TopologyAggregate == null
+                ? 0
+                : TopologyAggregate.CasesRun;
+
+            public int TopologyCasesPassed => TopologyAggregate == null
+                ? 0
+                : TopologyAggregate.CasesPassed;
+
+            public int PreviewCasesRun => PreviewAggregate == null
+                ? 0
+                : PreviewAggregate.CasesRun;
+
+            public int PreviewCasesPassed => PreviewAggregate == null
+                ? 0
+                : PreviewAggregate.CasesPassed;
+
+            public int TopologyCollateralFailures =>
+                TopologyAggregate == null
+                    ? 0
+                    : TopologyAggregate
+                        .CollateralPreservationFailures;
+
+            public int PreviewCollateralFailures =>
+                PreviewAggregate == null
+                    ? 0
+                    : PreviewAggregate
+                        .CollateralPreservationFailures;
+
+            public string Status
+            {
+                get
+                {
+                    if (Cancelled)
+                    {
+                        return "cancelled";
+                    }
+                    if (!CurrentPreviewPassed ||
+                        !CurrentPreviewTelemetryAvailable ||
+                        TopologyAggregate == null ||
+                        PreviewAggregate == null ||
+                        TopologyAggregate.Status != "passed" ||
+                        PreviewAggregate.Status != "passed" ||
+                        !string.IsNullOrEmpty(TerminalReason))
+                    {
+                        return "failed";
+                    }
+                    return "passed";
+                }
+            }
+
+            public void PrepareCurrentPreviewCapture()
+            {
+                string telemetryPath = GetEdgeWearLibraryPath(
+                    "GeneratedMassEdgeWearTelemetry.txt");
+                try
+                {
+                    if (File.Exists(telemetryPath))
+                    {
+                        File.Delete(telemetryPath);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    CurrentPreviewTelemetryDiagnostic =
+                        "could not clear previous telemetry: " +
+                        exception.GetType().Name + ":" +
+                        exception.Message;
+                }
+            }
+
+            public void CaptureCurrentPreview()
+            {
+                if (Target == null)
+                {
+                    CurrentPreviewPassed = false;
+                    CurrentPreviewSummary =
+                        "target mass no longer exists";
+                    CurrentPreviewTelemetryDiagnostic =
+                        CurrentPreviewSummary;
+                    return;
+                }
+
+                CurrentPreviewPassed =
+                    Target.UnifiedEdgeWearPreviewApplied &&
+                    !Target.UnifiedEdgeWearPreviewStale;
+                CurrentPreviewSummary =
+                    "seed=" + CurrentShapeSeed +
+                    ",applied=" +
+                        (Target.UnifiedEdgeWearPreviewApplied ? "1" : "0") +
+                    ",stale=" +
+                        (Target.UnifiedEdgeWearPreviewStale ? "1" : "0") +
+                    ",candidates=" +
+                        Target.UnifiedEdgeWearPreviewCandidateCount +
+                    ",active=" +
+                        Target.UnifiedEdgeWearPreviewActiveEdgeCount +
+                    ",deferred=" +
+                        Target.UnifiedEdgeWearPreviewDeferredEdgeCount +
+                    ",rejected=" +
+                        Target.UnifiedEdgeWearPreviewRejectedEdgeCount +
+                    ",diagnostic=" +
+                        (string.IsNullOrEmpty(
+                            Target.UnifiedEdgeWearPreviewDiagnostic)
+                            ? "none"
+                            : Target.UnifiedEdgeWearPreviewDiagnostic);
+
+                string telemetryPath = GetEdgeWearLibraryPath(
+                    "GeneratedMassEdgeWearTelemetry.txt");
+                try
+                {
+                    if (!File.Exists(telemetryPath))
+                    {
+                        CurrentPreviewTelemetryAvailable = false;
+                        string missingDiagnostic =
+                            "Library/GeneratedMassEdgeWearTelemetry.txt " +
+                            "was not written";
+                        CurrentPreviewTelemetryDiagnostic =
+                            string.IsNullOrEmpty(
+                                CurrentPreviewTelemetryDiagnostic)
+                                ? missingDiagnostic
+                                : CurrentPreviewTelemetryDiagnostic + "; " +
+                                    missingDiagnostic;
+                        return;
+                    }
+                    CurrentPreviewTelemetry =
+                        File.ReadAllText(telemetryPath);
+                    CurrentPreviewTelemetryAvailable =
+                        !string.IsNullOrEmpty(CurrentPreviewTelemetry);
+                    CurrentPreviewTelemetryDiagnostic =
+                        CurrentPreviewTelemetryAvailable
+                            ? string.Empty
+                            : "telemetry file was empty";
+                }
+                catch (Exception exception)
+                {
+                    CurrentPreviewTelemetryAvailable = false;
+                    CurrentPreviewTelemetryDiagnostic =
+                        "telemetry read failed: " +
+                        exception.GetType().Name + ":" +
+                        exception.Message;
+                }
+            }
+
+            public void RecordMatrix(
+                EdgeWearViabilityMatrixJob job,
+                EdgeWearViabilityMatrixAggregate aggregate,
+                string reportText)
+            {
+                if (job.Kind == EdgeWearMatrixKind.TopologyViability)
+                {
+                    TopologyAggregate = aggregate;
+                    TopologyReportText = reportText ?? string.Empty;
+                }
+                else
+                {
+                    PreviewAggregate = aggregate;
+                    PreviewReportText = reportText ?? string.Empty;
+                }
+            }
+        }
+
         private sealed class EdgeWearViabilityMatrixJob
         {
             public readonly EdgeWearMatrixKind Kind;
@@ -1669,16 +2382,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public readonly Quaternion LocalRotation;
             public readonly Vector3 LocalScale;
             public readonly Mesh OriginalMesh;
+            public readonly bool SuiteOwned;
             public readonly List<EdgeWearViabilityMatrixCase> Cases =
-                new List<EdgeWearViabilityMatrixCase>(30);
+                new List<EdgeWearViabilityMatrixCase>(
+                    EdgeWearBatchShapeSeeds.Length *
+                    EdgeWearBatchWidths.Length);
             public int CompletedCaseCount;
             public bool CancelRequested;
 
             public EdgeWearViabilityMatrixJob(
                 GeneratedMass target,
-                EdgeWearMatrixKind kind)
+                EdgeWearMatrixKind kind,
+                bool suiteOwned)
             {
                 Kind = kind;
+                SuiteOwned = suiteOwned;
                 Target = target;
                 TargetName = target.name;
                 TargetEntityId = target.GetEntityId().ToString();
@@ -1731,8 +2449,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
-                ? "EW-B4.2R11B.3-topology"
-                : "EW-B4.2R11B.3-preview";
+                ? "EW-B4.2R12A-topology"
+                : "EW-B4.2R12A-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *
@@ -1818,6 +2536,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public int FaceQualityFailures;
             public int PlacementFailures;
             public int CacheContractFailures;
+            public int CollateralPreservationFailures;
             public float MinimumCertifiedRatio;
             public double MaximumPreflightMilliseconds;
             public double MaximumTotalMilliseconds;

@@ -72,6 +72,19 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float groundMacroPatchSeparation = 1f;
 
+    [Header("Elevation Readability")]
+    [InspectorName("Relief Shading Strength")]
+    [Tooltip("Adds a directional value cue from the actual Ground slope without changing lighting normals, geometry, or collision.")]
+    [Range(0f, 0.75f)]
+    [SerializeField]
+    private float reliefShadingStrength;
+
+    [InspectorName("Relative Height Contrast")]
+    [Tooltip("Value shift per metre of generated local height relative to the undeformed Ground plane. Positive heights brighten and negative heights darken.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float relativeHeightContrast;
+
     [Header("Pixel Variation")]
     [Tooltip("World-space size of individual pixel-surface cells.")]
     [Range(0.005f, 0.5f)]
@@ -247,6 +260,10 @@ public sealed class GroundMaterialControls
         Mathf.Clamp01(groundMacroPatchTransitionSoftness);
     public float GroundMacroPatchSeparation =>
         Mathf.Max(0f, groundMacroPatchSeparation);
+    public float ReliefShadingStrength =>
+        Mathf.Clamp(reliefShadingStrength, 0f, 0.75f);
+    public float RelativeHeightContrast =>
+        Mathf.Clamp01(relativeHeightContrast);
     public float ProfileContrastScale => Mathf.Clamp(profileContrastScale, 0f, 2f);
     public float ProfilePixelContrastScale => Mathf.Clamp(profilePixelContrastScale, 0f, 2f);
     public float GroundSnowResponseScale => Mathf.Clamp(groundSnowResponseScale, 0f, 2.5f);
@@ -311,6 +328,8 @@ public sealed class GroundMaterialControls
         groundMacroPatchTransitionSoftness =
             source.groundMacroPatchTransitionSoftness;
         groundMacroPatchSeparation = source.groundMacroPatchSeparation;
+        reliefShadingStrength = source.reliefShadingStrength;
+        relativeHeightContrast = source.relativeHeightContrast;
         profileContrastScale = source.profileContrastScale;
         profilePixelContrastScale = source.profilePixelContrastScale;
         groundSnowResponseScale = source.groundSnowResponseScale;
@@ -378,6 +397,8 @@ public sealed class GroundMaterialControls
         groundMacroPatchPatternSeed = 0;
         groundMacroPatchTransitionSoftness = 0.75f;
         groundMacroPatchSeparation = 1f;
+        reliefShadingStrength = 0f;
+        relativeHeightContrast = 0f;
         profileContrastScale = 0.95f;
         profilePixelContrastScale = 0.92f;
         groundSnowResponseScale = 1.10f;
@@ -423,6 +444,8 @@ public sealed class GroundMaterialControls
         groundMacroPatchPatternSeed = 0;
         groundMacroPatchTransitionSoftness = 0.75f;
         groundMacroPatchSeparation = 1f;
+        reliefShadingStrength = 0f;
+        relativeHeightContrast = 0f;
         profileContrastScale = 1.35f;
         profilePixelContrastScale = 1.16f;
         groundSnowResponseScale = 1.00f;
@@ -468,6 +491,8 @@ public sealed class GroundMaterialControls
         groundMacroPatchPatternSeed = 0;
         groundMacroPatchTransitionSoftness = 0.75f;
         groundMacroPatchSeparation = 1f;
+        reliefShadingStrength = 0f;
+        relativeHeightContrast = 0f;
         profileContrastScale = 1.20f;
         profilePixelContrastScale = 1.02f;
         groundSnowResponseScale = 0.62f;
@@ -513,6 +538,8 @@ public sealed class GroundMaterialControls
         groundMacroPatchPatternSeed = 0;
         groundMacroPatchTransitionSoftness = 0.75f;
         groundMacroPatchSeparation = 1f;
+        reliefShadingStrength = 0f;
+        relativeHeightContrast = 0f;
         profileContrastScale = 0.70f;
         profilePixelContrastScale = 0.70f;
         groundSnowResponseScale = 1.38f;

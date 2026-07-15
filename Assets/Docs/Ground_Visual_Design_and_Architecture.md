@@ -8,6 +8,7 @@ The authoritative static composition goal is:
 
 ```text
 playable terrain shape
+→ elevation / relief readability
 → calm family/variant base material
 → broad macro patch composition
 → semantic surface-mask response
@@ -17,9 +18,37 @@ playable terrain shape
 → runtime surface state later
 ```
 
-The current active milestone is **V3M Broad Macro Patch Completion**. The current macro-related fields are active but do not yet produce deliberate, gameplay-readable broad regions. The audit, slim diagnostic proof, and replacement-field boundary are defined in `Ground_Macro_Patch_Audit_and_Architecture.md`. **V4 Contact / Edge Accents** remains architecturally accepted and queued after V3M. The completed Painted Accent architecture below remains authoritative for that feature only and must not be read as a declaration that the Ground visual stack is finished.
+V3M Broad Macro Patch Completion is accepted through V3M-A1.3.4. The active proof milestone is **V3R Ground Elevation Readability**: preserve the accepted gentle geometry while making its height and slope legible from the elevated gameplay camera through restrained value-only cues. **V4 Contact / Edge Accents** remains architecturally accepted and queued after V3R. The completed Painted Accent architecture below remains authoritative for that feature only and must not be read as a declaration that the Ground visual stack is finished.
 
 Semantic region masks and independent visual macro composition are separate responsibilities. River-, exposure-, damp-, vegetation-, compaction-, rocky-, and standing-water response may bias macro appearance, but none of those semantic fields alone satisfies the broad macro-composition layer.
+
+
+## Current authoritative elevation-readability architecture — V3R-A1
+
+Generated Ground geometry remains the source of truth. V3R does not create a height texture, displace vertices, alter collision, modify the lighting normal, or introduce screen-space derivatives. It adds two cheap value cues after Ground albedo composition and before the existing URP lighting pass:
+
+```text
+actual final Ground normal + main-light horizontal direction
+→ signed slope-facing relief value
+
+actual generated local vertex height relative to local y = 0
+→ higher/lower value shift
+```
+
+The authoring surface is:
+
+```text
+GeneratedGround
+→ Surface Appearance
+→ Material Controls
+→ Elevation Readability
+   - Relief Shading Strength
+   - Relative Height Contrast
+```
+
+Both controls default to zero for compatibility. Relief Shading Strength has a `0–0.75` range and exaggerates slope direction without changing the normal consumed by PBR lighting. Relative Height Contrast has a `0–1` range and represents value response per metre of generated local height. The two cues are independent: slope describes how terrain rises and falls, while relative height distinguishes plateaus or depressions whose local slope may be small.
+
+The response must remain subordinate to terrain family palette, macro composition, semantic masks, Painted Accents, River, props, actors, VFX, and combat readability. It must not become contour bands, ambient occlusion, outlined bumps, or a replacement for actual geometry.
 
 ## Current authoritative Painted Accent architecture — 2026-07-15
 

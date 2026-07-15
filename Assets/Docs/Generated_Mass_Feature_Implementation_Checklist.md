@@ -3437,32 +3437,79 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 - [x] Canonicalize the corresponding graph vertices and graph edge without modifying source faces.
 - [x] Add raw/canonical source counts, seam-pair counts, graph vertex-alias count, graph seam-pair count, and per-edge reconciliation evidence.
 - [x] Advance topology and preview report contracts to `EW-B4.2R11B.1-*`.
-- [ ] Validate seed 5727: the two reversed boundary pairs become canonical two-face edges and are assessed normally.
-- [ ] Run the exhaustive topology matrix and artistic preview parity matrix; require both `30/30`.
+- [x] Validate seed 5727: the two reversed boundary pairs become canonical two-face edges and are assessed normally; runtime result restored `source=42`, `geometric=36`, and `selected/certified=34/34`.
+- [x] Run the exhaustive topology matrix and artistic preview parity matrix; both passed `30/30` with zero topology, face-quality, placement, cache, and collateral failures.
 - [ ] Defer seed 2223 edge 36 micro-junction rail recovery to R11B.2.
 
+## EW-B4.2R11B.1C — Rollback and collateral-preservation guard
 
-## EW-B4.2R11B.2 — Rejected experiment
+### Rollback
 
-- [x] Runtime-audit the singleton certified-plane-shell fallback.
-- [x] Reject it after 22 candidate evaluations and 92 width attempts produced zero recoveries across both accepted matrices.
-- [x] Remove its code and telemetry rather than retaining a permanent zero-yield path.
+- [x] Remove the zero-yield R11B.2 singleton plane-shell fallback.
+- [x] Remove R11B.3 bevel-graph micro-feature normalization and its source/provenance mutations.
+- [x] Restore R11B.1 coincident boundary-seam reconciliation as the active geometry baseline.
+- [x] Preserve R11A.1 artistic-preview and exhaustive-topology denominator contracts.
 
-## EW-B4.2R11B.3 — Bevel-graph micro-feature normalization
+### Collateral audit
 
-- [x] Preserve immutable source faces and R11B.1 coincident boundary-seam reconciliation.
-- [x] Build one temporary normalized face view for candidate construction and topology/corner solving.
-- [x] Evaluate only internal proven-convex sub-footprint edges within the conservative requested-width normalization limit.
-- [x] Require an open, non-branching micro-edge chain with meaningful adjacent continuation.
-- [x] Solve a common incident-plane junction and reject it when displacement or plane residual exceeds existing stability-scale guards.
-- [x] Require every normalized face loop to preserve vertex uniqueness, stable area, and winding.
-- [x] Require the graph delta to equal exactly the vertices and edges owned by the normalized chain, with no new boundary or non-manifold edge.
-- [x] Use normalized graph boundary coordinates in isolated-rail support while retaining original analytical source-face planes.
-- [x] Add compact aggregate and per-chain normalization telemetry.
-- [x] Advance matrix contracts to `EW-B4.2R11B.3-topology` and `EW-B4.2R11B.3-preview`.
-- [ ] Validate that at least one audited case performs a normalization and improves strong-edge geometric eligibility.
-- [ ] Require both 30-case matrices to remain `30/30`, with zero topology, coverage, placement, or cache failures.
+- [x] Capture an immutable individual-viability baseline before any future recovery stage.
+- [x] Record newly recovered, collateral-lost, and collateral-changed edge IDs.
+- [x] Treat source identity, owner faces, classification, length, dihedral, feasible width, and width fraction as protected baseline state.
+- [x] Fail both matrices when any baseline viable edge is lost or changed.
+- [x] Add `collateral=baseline/current/recovered/lost/changed/valid` to compact telemetry and TXT/CSV reports.
+- [x] Advance report contracts to `EW-B4.2R11B.1C-topology` and `EW-B4.2R11B.1C-preview`.
 
-### Explicit non-goals
+### Runtime validation
 
-- [x] Do not mutate source polygons, lower the `0.25` width floor, widen merge tolerances, hardcode seeds or edges, or alter shaders/render normals.
+- [x] Rebuild seed `2223/default`; runtime validation restored the pre-normalization candidate universe with zero collateral loss/change.
+- [x] Rebuild seed `5727/default`; runtime result was `rawSource/source=44/42`, seam pairs `2`, `geometric=36`, `selected/certified=34/34`, and `collateral=36/36/0/0/0/1`.
+- [x] Run both 30-case matrices; both passed `30/30` with `collateralPreservationFailures=0` and no topology, face-quality, placement, or cache failures.
+
+### Next recovery constraint
+
+- [x] Evaluate only a candidate-local virtual support-chain rail that leaves the source graph and unrelated lifecycle records unchanged; R11B.4 through R11B.4.2 were tested and rejected.
+- [x] Reject any recovery patch with zero recovered edges or any collateral lost/changed edge; the final R11B.4.2 suite produced zero recoveries and triggered retirement.
+
+## EW-B4.2R11B.1D — One-click validation suite
+
+- [x] Add one Inspector action that rebuilds the current preview and runs both canonical matrices sequentially.
+- [x] Append seed `5727` to the canonical matrix set so coincident-boundary seam reconciliation is always regression-tested.
+- [x] Expand each matrix from `30` to `33` cases without changing the original ten-seed coordinates.
+- [x] Write one combined report containing current-preview telemetry plus both complete matrix reports.
+- [x] Add Copy Full Validation Report and Reveal Full Report Inspector actions.
+- [x] Keep the two focused matrix buttons available.
+- [x] Unity runtime validation passed under R11B.1D: current seed `5727` rebuilt `34/34`, topology passed `33/33`, artistic preview passed `33/33`, collateral failures were zero, and the combined report was produced.
+
+## EW-B4.2R11B.1E — Recovery retirement and geometry baseline lock
+
+- [x] Remove all R11B.4/R11B.4.1/R11B.4.2 owner-face support interval code.
+- [x] Remove fallback records, counters, hit telemetry, CSV fields, and zero-recovery matrix failure rules.
+- [x] Restore the four geometry/audit source files byte-for-byte to R11B.1D.
+- [x] Retain coincident-boundary seam reconciliation and the collateral-preservation guard.
+- [x] Retain seed `5727`, both `33`-case matrices, and the one-click combined validation report.
+- [x] Advance contracts to `EW-B4.2R11B.1E-suite`, `EW-B4.2R11B.1E-topology`, and `EW-B4.2R11B.1E-preview`.
+- [x] Record the final rejected-branch evidence: `27` evaluations, `126` width attempts, zero virtual corners, zero traversed segments, and zero recoveries per policy.
+- [x] Run the one-click suite once and require suite pass, topology `33/33`, artistic preview `33/33`, seed `5727` selected/certified `34/34`, and zero collateral failures. Runtime validation passed under R11B.1E.
+- [x] After validation, close geometry recovery and proceed to adaptive artistic selection.
+
+
+## EW-B4.2R12A — Artistic-selection telemetry and audit
+
+### Scope
+
+- [x] Preserve R11B.1E geometry, geometric eligibility, score ordering, selected-count calculation, widths, and certification behavior.
+- [x] Record exact current score components: length, dihedral, deterministic random term, base suppression, upward-edge boost, and recipe character boost.
+- [x] Record diagnostic-only edge-axis orientation, silhouette potential, feasible/solved width fraction, local viable-edge density, and shared-vertex crowding with explicit zero score weight.
+- [x] Record each viable edge's artistic gates, filter reason, selection rank, threshold, and threshold delta.
+- [x] Add all/selected/filtered score minimum, median, and maximum values.
+- [x] Add all/selected/filtered distributions for length, dihedral, orientation, silhouette, local density, and crowding.
+- [x] Project the audit into current-preview telemetry, both matrix TXT reports, both matrix CSV reports, and the one-click combined report.
+- [x] Keep matrix pass/fail criteria unchanged.
+- [x] Advance report contracts to `EW-B4.2R12A-suite`, `EW-B4.2R12A-topology`, and `EW-B4.2R12A-preview`.
+
+### Runtime acceptance
+
+- [ ] Compile with zero C# errors.
+- [ ] Run the one-click suite and require current preview pass, topology `33/33`, artistic preview `33/33`, and zero collateral failures.
+- [ ] Confirm `[Artistic Selection Audit]` is present and `captured=1`.
+- [ ] Use the aggregate and per-edge evidence to decide R12B scoring changes; do not retune selection from assumptions.

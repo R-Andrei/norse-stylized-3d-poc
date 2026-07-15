@@ -8,7 +8,7 @@ Painted Accent production is complete and accepted. Ground as a whole is not com
 
 V3M-A0 diagnostic evidence is captured and confirms the audit: the generated tonal mask is active but dominated by an extremely broad soft gradient, the old shader macro source is generic low-frequency noise, and its true weighted tonal influence remains weak even when displayed at `20×` gain.
 
-V3M-A1 Unity evidence confirmed that the replacement evaluator is active and that its shaped signed regions contain genuine neutral space. V3M-A1.1 then made the macro contribution genuinely visible in the normal render, V3M-A1.2 exposed authorable intensity and transition softness, and V3M-A1.3 added independent pattern-seed and locally varying average-separation controls. V3M-A1.3.1 successfully stabilized seed occupancy, but Unity comparison across nine seeds showed that the dominant pattern topology remained too recognizable and mainly wobbled in place. V3M-A1.3.2 is implemented and awaits Unity 6000.5.0f1 validation; it adds deterministic seed-window translation while retaining the existing controls, four-noise budget, world-XZ continuity, and occupancy safeguards. The seed-5727 smoothing artifact remains a separate pending diagnosis using the existing raw and weighted views.
+V3M-A1 Unity evidence confirmed that the replacement evaluator is active and that its shaped signed regions contain genuine neutral space. V3M-A1.1 then made the macro contribution genuinely visible in the normal render, V3M-A1.2 exposed authorable intensity and transition softness, and V3M-A1.3 added independent pattern-seed and locally varying average-separation controls. V3M-A1.3.1 stabilized seed occupancy, V3M-A1.3.2 restored meaningful seed diversity through pattern-window translation, and V3M-A1.3.3 replaced unsafe raw-seed shader coordinates with CPU-hashed bounded scroll; Unity accepted the resulting seed precision, pattern variation, controls, occupancy, and final render. V3M-A1.3.4 is implemented and awaits Unity 6000.5.0f1 validation; it removes the remaining frequent circular-island tendency by converting the higher-frequency secondary field from additive threshold authority to contour-only coordinate distortion while retaining the four-noise budget.
 
 ## Mission
 
@@ -339,6 +339,35 @@ The scroll is calculated only when GeneratedGround reapplies material properties
 4. Seed `0` preserves its accepted arrangement; nonzero seeds retain material pattern diversity and reasonably stable occupancy.
 5. Scale, Intensity, Transition Softness, Average Patch Separation, normal rendering, and the four-noise evaluation budget remain otherwise unchanged.
 
+## V3M-A1.3.4 — Contour-only secondary morphology
+
+Unity validation of V3M-A1.3.3 accepted bounded seed precision, seed variation, authoring controls, occupancy, and final rendering, but gameplay and macro-debug inspection exposed frequent small circular light and dark islands across many seeds. The repeated islands originate in the higher-frequency secondary sample directly adding `±0.07` scalar authority to the primary source. Local secondary extrema can therefore cross the light/dark thresholds independently, and smooth value-noise extrema naturally produce rounded isolated components.
+
+V3M-A1.3.4 retains the same primary and secondary samples but changes the secondary field from scalar contribution to coordinate-only contour distortion:
+
+```hlsl
+secondaryCentered = secondaryRegion - 0.5;
+contourDirection = float2(
+    0.34 + warp.y * 0.12,
+    -0.26 + warp.x * 0.12);
+primaryCoordinate =
+    regionCoordinate +
+    contourDirection * secondaryCentered;
+regionalSource = ValueNoise(primaryCoordinate);
+```
+
+The secondary field can still bend, dent, and locally offset primary-region boundaries, but it no longer has independent authority to create a light or dark island inside otherwise neutral terrain. The varying warp contribution avoids one uniform contour direction. This correction does not guarantee that every naturally closed primary region is non-circular; the acceptance target is a substantial reduction in frequent artificial circles, not a topology-expensive zero-circle guarantee.
+
+The patch retains world-XZ continuity, CPU-hashed bounded seed scroll, Pattern Seed variation, Scale, Intensity, Transition Softness, Average Patch Separation, diagnostics, and the four-value-noise evaluation budget. It adds no control, shader property, texture, generated asset, scene, prefab, profile, style, material edit, CPU rebuild, or per-frame work.
+
+## V3M-A1.3.4 validation gate
+
+1. Unity and shader compilation complete without errors or warnings.
+2. Representative seeds materially reduce frequent small circular light/dark islands in the raw, weighted, and normal views.
+3. Broad connected regions retain irregular silhouettes, dents, protrusions, and useful pattern diversity.
+4. Small, large, negative, and integer-limit seeds remain smooth and free of the pre-A1.3.3 precision artifacts.
+5. Scale, Intensity, Transition Softness, Average Patch Separation, occupancy, and the four-noise evaluation budget remain otherwise accepted.
+
 ## Acceptance criteria
 
 Macro composition is accepted only when:
@@ -373,6 +402,7 @@ Macro composition is accepted only when:
 - V3M-A1.3 pattern and separation authoring: controls and overall appearance accepted, but seed occupancy was inconsistent; superseded by V3M-A1.3.1's occupancy stabilization.
 - V3M-A1.3.1 occupancy stabilization: active coverage became consistent, but major seed layouts remained too similar because the dominant primary realization only deformed in place; superseded by V3M-A1.3.2's seed-window translation.
 - V3M-A1.3.2 seed-window translation: pattern variation, authoring controls, and final rendering accepted, but raw authored seed magnitudes caused increasing single-precision noise-coordinate quantization; superseded by V3M-A1.3.3's CPU-hashed bounded seed scroll.
+- V3M-A1.3.3 bounded seed scroll: high-seed precision, seed diversity, controls, occupancy, and final rendering accepted, but the additive higher-frequency secondary source produced frequent small circular threshold islands; superseded by V3M-A1.3.4's contour-only secondary morphology.
 
 ### Rejected as final fixes
 
@@ -387,8 +417,8 @@ Macro composition is accepted only when:
 
 ## Next work items
 
-1. Unity-validate V3M-A1.3.3 across small, large, negative, and integer-limit Pattern Seed values using the raw, weighted, and normal views.
-2. Confirm seed magnitude no longer affects spatial precision while seed variation and occupancy remain accepted.
-3. Establish final Scale, Pattern Seed, Intensity, Transition Softness, and Average Patch Separation values after the precision correction passes.
+1. Unity-validate V3M-A1.3.4 across representative small, large, negative, and integer-limit Pattern Seed values using the raw, weighted, and normal views.
+2. Confirm frequent isolated circular islands decline materially while broad irregular region diversity and occupancy remain accepted.
+3. Confirm seed magnitude remains precision-safe and all five Macro Patch Composition controls retain their accepted behavior.
 4. Mark V3M macro composition visually accepted if no further blocker appears.
 5. Resume V4 Contact / Edge Accents only after that acceptance.

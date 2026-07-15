@@ -2,7 +2,7 @@
 
 ## Current status
 
-Stage 6 Chipping/Strands and the `5.18E` lifecycle correction are accepted. The original `5.18F` detaching-source attempt is rejected because legal short/wide object events could remain on its full-history fallback. The active replacement is `4.11C.5.18F.1`.
+Stage 6 Chipping/Strands and the `5.18E` lifecycle correction are accepted. The rejected original `5.18F` was replaced by `5.18F.1`, which is now Unity-validated and accepted. The active visual patch is `4.11C.5.18H.3 — Front Contact Bridge and Straight Wake Arms`. The `5.18G` per-anchor scheduler remains accepted; the broad `5.18G.1` near-ring mantle is superseded.
 
 Accepted production sequence:
 
@@ -38,7 +38,149 @@ The current edge territory is accepted as good enough. `D.1D — Coherent Edge-B
 
 Remaining-Life modulation of Chipping or Strands is optional future work only. It is not required for current completion and is not queued.
 
-## Detaching Object Arc deposition replacement — `4.11C.5.18F.1` — implemented, Unity validation pending
+## Front Contact Bridge and Straight Wake Arms — `4.11C.5.18H.3` — implemented, Unity validation pending
+
+Unity validation of `5.18H.2` accepted the narrow source width and D3D11-safe compute path, but long Arc/Semi-Arc lengths still followed the obstacle contact ring into the downstream half and could visually close into an O. `5.18H.3` replaces that rear-following geometry with a hard split:
+
+```text
+upstream half of physical contact ring
+→ left/right side shoulders
+→ thin straight downstream wake arms
+```
+
+The front bridge samples only immediate obstacle-contact cells whose flow-local position is upstream of the side axis. At and behind the side axis, contact-ring emission is structurally zero. Each shoulder then starts a distance-to-segment ribbon parallel to river flow. Wake arms are clipped only by valid fluid, obstacle exclusion, river bounds, and their authored metre length; they never follow obstacle geometry behind the shoulders.
+
+Active Arc/Semi-Arc authoring:
+
+```text
+Formation Speed
+Wake Arm Length Min / Max
+Initial Presence Min / Max
+Initial Life Min / Max
+Semi-Arc Lopsidedness Min / Max
+```
+
+The previously serialized metre Length fields now truthfully own straight downstream Wake Arm Length. The newer normalized Arm Reach fields are hidden and inert. Profile Scale, Contact Offset, and Breakup remain hidden and inert. Arc uses equal wake arms. Semi-Arc uses one dominant arm and shortens the opposite arm directly through Lopsidedness.
+
+The accepted per-anchor `Build → Hold → Progressive Release → Rest` scheduler remains unchanged. Build and Release traverse one composite path: first arm tip → shoulder → upstream bridge → opposite shoulder → second arm tip. Arc Release follows Build order; Semi-Arc Release retracts the dominant arm first.
+
+Width contract:
+
+```text
+front bridge = one immediate contact-cell layer;
+wake arm = one strong cross-river row, with at most one feathered continuity row;
+Presence is not reduced to imitate fractional-cell geometry.
+```
+
+Resource contract:
+
+```text
+new textures/channels/buffers/kernels/dispatches = 0;
+new persistent GPU state = 0;
+Contact Fleck, Shore, Free Water, velocity, transport, lifecycle,
+object-contact construction, static wake deformation, and duty-cycle timing = unchanged;
+scene/prefab/material/asset/meta changes = none.
+```
+
+`5.18H.2` remains the accepted D3D11-safe thin-width baseline but its rear-following path geometry is superseded by `5.18H.3`.
+
+## Superseded geometry — Thin Open-C Object Ribbon Arcs — `4.11C.5.18H` / `5.18H.2`
+
+
+Unity inspection of hidden obstacle renderers proved that `5.18G.1` solved internal source gaps but selected almost the entire immediate contact perimeter. The near-O footprint injected Foam behind the object, smeared into an object-width downstream slab, and made Arc Length, Profile Scale, Contact Offset, Breakup, and Semi-Arc lopsidedness visually ineffective.
+
+`5.18H` keeps the accepted `5.18G` per-anchor Build/Hold/Progressive Release/Rest scheduler and replaces Arc/Semi-Arc geometry and authoring:
+
+```text
+Contact Arc
+  one immediate-water-cell open-C ribbon;
+  symmetric arms stop at a hard maximum of ±140 degrees;
+  at least 80 degrees of downstream rear perimeter remain structurally unsourced;
+  Build and same-order Release traverse one contiguous path.
+
+Contact Semi-Arc
+  the same continuous upstream bridge;
+  one dominant shoulder arm and one lopsidedness-shortened arm;
+  reverse-order Release retracts the dominant arm first;
+  the downstream rear remains structurally open.
+```
+
+The immediate object-contact field is the complete width authority: Arc/Semi-Arc source occupancy is exactly one adjacent water-cell ring, not a multi-cell mantle and not a fractional-Presence approximation. A normalized obstacle-relative angle selects the open-C interval from that ring. No source can be emitted at the downstream rear centre.
+
+Active Arc/Semi-Arc authoring is now deliberately small:
+
+```text
+Formation Speed
+Arm Reach Min / Max
+Initial Presence Min / Max
+Initial Life Min / Max
+Semi-Arc Lopsidedness Min / Max
+```
+
+Legacy metre Length, Profile Scale, Contact Offset, and Breakup fields remain serialized but hidden and inert so existing scene data is not migrated or reinterpreted. Arm Reach changes actual occupied contact texels and the CPU-resolved open-C path length used for Build duration. Presence, life, and lopsidedness use independent deterministic samples rather than the former shared high-biased `eventScale`.
+
+Resource contract:
+
+```text
+new textures/channels/buffers/kernels/dispatches = 0;
+new GPU persistent state = 0;
+Contact Fleck, Shore, Free Water, velocity, transport, lifecycle,
+object-contact construction, static wake deformation, and duty-cycle timing = unchanged;
+scene/prefab/material/asset/meta changes = none.
+```
+
+`5.18G.1` is superseded as a spatial source contract. `5.18G` remains the accepted scheduler foundation.
+
+## Superseded patch — Contiguous Object Face Sweep — `4.11C.5.18G.1`
+
+Unity validation of `5.18G` accepted the per-anchor Build/Hold/Progressive Release/Rest duty cycle, but its source masks remained spatially incomplete: Build and Release used thin frontier bands, the authored Arc/Semi-Arc profile limited Hold coverage, and patterned source-fill variation could cut black stripes through an otherwise active contact region. That defeated the intended contact mantle even while an anchor was actively emitting.
+
+`5.18G.1` preserves the scheduler and replaces only Arc/Semi-Arc spatial emission semantics:
+
+```text
+Contact Arc
+  Build    one contiguous accumulated side-to-side sweep;
+  Hold     complete upstream-facing one-cell physical contact mantle;
+  Release  contiguous same-order clearing, so the first-built side releases first;
+  Rest     no Arc source.
+
+Contact Semi-Arc
+  Build    non-trail side → complete front mantle → one-sided extension;
+  Hold     complete upstream-facing mantle plus the optional one-sided extension;
+  Release  extension retracts first, then the front clears in reverse Build order;
+  Rest     no Semi-Arc source.
+```
+
+The mandatory mantle is every eligible upstream-facing water cell immediately adjacent to the raw physical obstacle. Arc Length, Semi-Arc Length, Profile Scale, breakup, and lopsidedness may alter deposition emphasis or the optional one-sided extension, but cannot remove an active mantle cell. Arc/Semi-Arc `SourceFillBlend` is now zero, so patterned source-fill gaps cannot punch stripes through the contact face. Contact Fleck retains its accepted stochastic fill behavior.
+
+Existing authoring is unchanged:
+
+```text
+Contact Emission Cycle
+  Anchor Coverage       default 1.00
+  Hold Duration         default 5–10 s
+  Release Duration      default 0.60–1.40 s
+  Rest Duration         default 1–3 s
+```
+
+`Global Formation Speed` remains Build speed. No scene/prefab migration or serialized-value change is required.
+
+The existing `Automatic Birth Sources` view must show one connected cyan region during Build, a fully covered upstream face during Hold, a connected shrinking region during Release, and black during Rest. Internal black stripes inside the currently active region are a failure.
+
+Resource contract:
+
+```text
+new GPU textures/channels/buffers/kernels/dispatches = 0;
+new persistent state = 0;
+per-anchor duty-cycle scheduler = unchanged from 5.18G;
+Contact Fleck, Shore, Free Water, velocity, transport, lifecycle,
+contact-shell thickness, and static wake deformation = unchanged;
+scene/prefab/material/asset/meta changes = none.
+```
+
+`5.18G` is retained as the accepted scheduler baseline; the `5.18G.1` near-ring spatial contract is superseded by `5.18H`.
+
+## Detaching Object Arc deposition replacement — `4.11C.5.18F.1` — Unity-validated and accepted
 
 The proven cause remains complete historical repainting by Contact Arc and Semi-Arc. The rejected `5.18F` attempted to gate that history with `frontierActive`, but the gate could remain false for the whole event when initial profile reach plus Head Trail exceeded the available reveal span.
 
@@ -96,7 +238,7 @@ Stage 2 — Water Body                           complete and validated
 Stage 3 — Surface Motion and Coherent Flow     complete and validated
 Stage 4 — Refraction and Optical Distortion    complete and validated
 Stage 5 — Runtime Disturbance and Interaction  accepted for the current milestone
-Stage 6 — Foam                                 lifecycle validation active (`5.18E`)
+Stage 6 — Foam                                 front bridge + straight wake-arm validation active (`5.18H.3`)
 Stage 7 — Secondary Water Effects              complete and validated
 Stage 8 — Reflections and Final Integration    stale/retired roadmap item
 ```
@@ -126,9 +268,9 @@ P4 accounting and the shader compile recovery checklist remain evidence sources 
 
 ## Current active queue
 
-The only active River visual patch is `4.11C.5.18F.1 — Detaching Object Arc Deposition Replacement`. It changes Arc/Semi-Arc source rasterization plus one source-type-local GPU timing lane. Chipping, Remaining-Life erosion, Contact Fleck, reflection, and isolated performance work are not queued.
+The only active River visual patch is `4.11C.5.18H.3 — Front Contact Bridge and Straight Wake Arms`. It preserves the `5.18G` per-anchor schedule and replaces the superseded near-ring mantle with a contiguous one-cell open-C contact path that structurally excludes the downstream rear. Chipping, Remaining-Life erosion, canonical velocity, transport, Contact Fleck geometry, reflection, and isolated performance work are not queued.
 
-After `5.18F.1` validates, stop and reassess the actual object wake. Do not automatically add same-anchor locks, cooldowns, seed changes, static-wake changes, or velocity changes. Those remain unproven and require new evidence.
+After `5.18H.3` validates, reassess Wake Arm Length defaults, downstream tendril width, and clean-face windows before changing defaults. Do not add further wake, velocity, seed, or transport changes unless new evidence requires them.
 
 ## `4.11C.5.18D` import gate
 

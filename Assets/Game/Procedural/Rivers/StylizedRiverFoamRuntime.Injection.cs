@@ -258,6 +258,7 @@ namespace ProgrammaticStylized3D.Rivers
 
                     if (sourceEvent.Elapsed >= sourceEvent.Duration - 0.00001f)
                     {
+                        CompleteAutomaticObjectContactCycle(sourceEvent);
                         automaticFoamSourceEvents[index] = default;
                         automaticFoamSourceEventGpuData[index] = default;
                         activeAutomaticFoamSourceEventCount = Mathf.Max(
@@ -278,21 +279,56 @@ namespace ProgrammaticStylized3D.Rivers
             float endStorageGlobal =
                 WorldGlobalDistanceToFoamStorageGlobalDistance(
                     sourceEvent.EndGlobalDistance);
-            float centreStorageGlobal = (startStorageGlobal + endStorageGlobal) * 0.5f;
-            float progress = Mathf.Clamp01(
-                sourceEvent.Elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
-            bool movingObjectFrontier =
+            bool objectContactCycle =
                 sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
                 sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc;
+            float centreStorageGlobal = objectContactCycle
+                ? WorldGlobalDistanceToFoamStorageGlobalDistance(
+                    sourceEvent.ObjectCentreGlobalDistance)
+                : (startStorageGlobal + endStorageGlobal) * 0.5f;
+            float progress = Mathf.Clamp01(
+                sourceEvent.Elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
+            float phaseCode = sourceEvent.SideSign;
+            if (objectContactCycle)
+            {
+                float buildEnd = Mathf.Max(0.0001f, sourceEvent.ObjectBuildDuration);
+                float holdEnd = buildEnd + Mathf.Max(0f, sourceEvent.ObjectHoldDuration);
+                if (sourceEvent.Elapsed < buildEnd)
+                {
+                    phaseCode = 0f;
+                    progress = Mathf.Clamp01(sourceEvent.Elapsed / buildEnd);
+                }
+                else if (sourceEvent.Elapsed < holdEnd)
+                {
+                    phaseCode = 1f;
+                    progress = sourceEvent.ObjectHoldDuration > 0.0001f
+                        ? Mathf.Clamp01(
+                            (sourceEvent.Elapsed - buildEnd) /
+                            sourceEvent.ObjectHoldDuration)
+                        : 1f;
+                }
+                else
+                {
+                    phaseCode = 2f;
+                    progress = Mathf.Clamp01(
+                        (sourceEvent.Elapsed - holdEnd) /
+                        Mathf.Max(0.0001f, sourceEvent.ObjectReleaseDuration));
+                }
+            }
+
             float materialStepProgress = Mathf.Clamp01(
                 (1f / Mathf.Max(1f, ResolveUpdateRate())) /
-                Mathf.Max(0.0001f, sourceEvent.Duration));
+                Mathf.Max(
+                    0.0001f,
+                    objectContactCycle
+                        ? sourceEvent.ObjectBuildDuration
+                        : sourceEvent.Duration));
 
             return new FoamSourceEventGpuData
             {
                 Header = new Vector4(
                     (float)sourceEvent.Type,
-                    sourceEvent.SideSign,
+                    phaseCode,
                     progress,
                     sourceEvent.ShapeSeed),
                 Distance = new Vector4(
@@ -304,12 +340,14 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceEvent.ShoreInsetMetres,
                     sourceEvent.Type == AutomaticFoamSourceEventType.ShoreRibbon
                         ? sourceEvent.ShoreRibbonThicknessCells
-                        : sourceEvent.WidthMetres,
+                        : (objectContactCycle
+                            ? sourceEvent.ObjectWakeArmLengthMetres
+                            : sourceEvent.WidthMetres),
                     // Arc/Semi-Arc evaluators do not consume inward reach.
                     // Reuse this source-type-local lane for the normalized
-                    // material-step duration so their finite startup pulse
-                    // is guaranteed to cover the first raster update.
-                    movingObjectFrontier
+                    // material-step duration so accumulated Build coverage
+                    // advances by at least the first raster update.
+                    objectContactCycle
                         ? materialStepProgress
                         : sourceEvent.InwardReachMetres,
                     sourceEvent.FeatherMetres),
@@ -326,17 +364,21 @@ namespace ProgrammaticStylized3D.Rivers
                 Kinematics = new Vector4(
                     sourceEvent.FormationSpeedMetresPerSecond,
                     sourceEvent.HeadTrailMetres,
-                    Mathf.Sqrt(
-                        Mathf.Abs(endStorageGlobal - startStorageGlobal) *
-                        Mathf.Abs(endStorageGlobal - startStorageGlobal) +
-                        sourceEvent.InwardReachMetres *
-                        sourceEvent.InwardReachMetres),
+                    objectContactCycle
+                        ? sourceEvent.ObjectContactPathLengthMetres
+                        : Mathf.Sqrt(
+                            Mathf.Abs(endStorageGlobal - startStorageGlobal) *
+                            Mathf.Abs(endStorageGlobal - startStorageGlobal) +
+                            sourceEvent.InwardReachMetres *
+                            sourceEvent.InwardReachMetres),
                     Mathf.Clamp01(sourceEvent.SourceFillBlend)),
                 ObjectData = new Vector4(
                     sourceEvent.ObjectCentreAcrossMetres,
                     sourceEvent.ObjectAlongHalfLengthMetres,
                     sourceEvent.ObjectAcrossHalfWidthMetres,
-                    sourceEvent.ObjectContactOffsetMetres)
+                    objectContactCycle
+                        ? sourceEvent.ObjectSourceLateralCellSpacingMetres
+                        : sourceEvent.ObjectContactOffsetMetres)
             };
         }
 
@@ -355,8 +397,20 @@ namespace ProgrammaticStylized3D.Rivers
                 sourceEvent.FeatherMetres * 2f,
                 Mathf.Max(sourceEvent.WidthMetres, sourceEvent.InwardReachMetres) * 1.25f);
             if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
-                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck ||
                 sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc)
+            {
+                float longitudinalCellSpacing = fieldWidth > 0
+                    ? Mathf.Max(0.01f, fieldLength / fieldWidth)
+                    : 0.01f;
+                // Arc/Semi-Arc start/end bounds already include the complete
+                // upstream bridge and straight downstream wake arms. Keep only
+                // a small raster safety margin instead of re-expanding by the
+                // obstacle half-length on both sides.
+                padding = Mathf.Max(
+                    padding,
+                    longitudinalCellSpacing * 2f);
+            }
+            else if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck)
             {
                 padding = Mathf.Max(
                     padding,

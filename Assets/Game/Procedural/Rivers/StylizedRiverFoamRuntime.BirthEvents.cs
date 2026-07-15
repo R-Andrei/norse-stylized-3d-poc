@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ProgrammaticStylized3D.Rivers
@@ -629,8 +630,10 @@ namespace ProgrammaticStylized3D.Rivers
               river.FoamShoreFoamCoverage > 0.0001f &&
               river.FoamShoreFoamActivity > 0.0001f) ||
              (river.FoamAutomaticObjectBirthActive &&
-              river.FoamObjectFoamCoverage > 0.0001f &&
-              river.FoamObjectFoamActivity > 0.0001f) ||
+              ((river.FoamObjectContactCyclesEnabled &&
+                river.FoamObjectContactCycleCoverage > 0.0001f) ||
+               (river.FoamObjectFoamCoverage > 0.0001f &&
+                river.FoamObjectFoamActivity > 0.0001f))) ||
              (river.FoamAutomaticFreeWaterBirthActive &&
               river.FoamFreeWaterFoamCoverage > 0.0001f &&
               river.FoamFreeWaterFoamActivity > 0.0001f));
@@ -789,6 +792,7 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectBirthSubmittedLastUpdate = 0;
             automaticObjectBirthRejectedLastUpdate = 0;
             automaticObjectBirthAnchorCountLastUpdate = 0;
+            automaticObjectContactCycleTime += Mathf.Max(0f, deltaTime);
 
             if (!ResolveAutomaticObjectSourceProfile(
                     out AutomaticObjectSourceProfile objectProfile,
@@ -796,6 +800,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 automaticObjectBirthAccumulator = 0f;
                 automaticObjectBirthStatus = inactiveStatus;
+                RefreshAutomaticObjectContactCycleDiagnostics();
                 return false;
             }
 
@@ -804,6 +809,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 automaticObjectBirthAccumulator = 0f;
                 automaticObjectBirthStatus = "Waiting for disturbance runtime";
+                RefreshAutomaticObjectContactCycleDiagnostics();
                 return false;
             }
 
@@ -811,54 +817,77 @@ namespace ProgrammaticStylized3D.Rivers
                 automaticObjectFoamSources);
             automaticObjectBirthAnchorCountLastUpdate =
                 automaticObjectFoamSources.Count;
+            SynchronizeAutomaticObjectContactCycleStates();
             if (automaticObjectFoamSources.Count <= 0)
             {
                 automaticObjectBirthAccumulator = 0f;
                 automaticObjectBirthStatus =
                     "No registered static object source anchors";
+                RefreshAutomaticObjectContactCycleDiagnostics();
                 return false;
             }
 
-            automaticObjectBirthAccumulator += Mathf.Max(0f, deltaTime) *
-                objectProfile.EventsPerSecond;
-            if (automaticObjectBirthAccumulator < 1f)
-            {
-                float secondsUntilNext =
-                    (1f - automaticObjectBirthAccumulator) /
-                    Mathf.Max(0.01f, objectProfile.EventsPerSecond);
-                automaticObjectBirthStatus =
-                    $"Armed / {automaticObjectFoamSources.Count} static object source(s) / next object source event in {secondsUntilNext:0.00}s";
-                return false;
-            }
-
-            int startsThisUpdate = 0;
+            int cycleStarts = 0;
+            int fleckStarts = 0;
             int skippedThisUpdate = 0;
-            while (automaticObjectBirthAccumulator >= 1f &&
-                   startsThisUpdate < AutomaticObjectSourceMaximumStartsPerUpdate)
+            if (river.FoamObjectContactCyclesEnabled)
             {
-                if (TryStartAutomaticObjectSourceEvent(
-                        objectProfile,
-                        out int skippedObjects))
+                while (cycleStarts < AutomaticObjectSourceMaximumStartsPerUpdate &&
+                       TryStartAutomaticObjectContactCycle(
+                           objectProfile,
+                           out int skippedObjects))
                 {
-                    automaticObjectBirthAccumulator -= 1f;
-                    startsThisUpdate++;
+                    cycleStarts++;
                     skippedThisUpdate += skippedObjects;
-                    continue;
                 }
-
-                automaticObjectBirthAccumulator = Mathf.Min(
-                    automaticObjectBirthAccumulator,
-                    0.999f);
-                skippedThisUpdate += skippedObjects;
-                break;
             }
 
+            float fleckRateScale = ResolveAutomaticObjectFleckRateScale(
+                objectProfile.Pattern);
+            float fleckEventsPerSecond = objectProfile.EventsPerSecond *
+                fleckRateScale;
+            if (fleckEventsPerSecond > 0.0001f)
+            {
+                automaticObjectBirthAccumulator += Mathf.Max(0f, deltaTime) *
+                    fleckEventsPerSecond;
+                while (automaticObjectBirthAccumulator >= 1f &&
+                       cycleStarts + fleckStarts <
+                           AutomaticObjectSourceMaximumStartsPerUpdate)
+                {
+                    if (TryStartAutomaticObjectFleckEvent(
+                            objectProfile,
+                            out int skippedObjects))
+                    {
+                        automaticObjectBirthAccumulator -= 1f;
+                        fleckStarts++;
+                        skippedThisUpdate += skippedObjects;
+                        continue;
+                    }
+
+                    automaticObjectBirthAccumulator = Mathf.Min(
+                        automaticObjectBirthAccumulator,
+                        0.999f);
+                    skippedThisUpdate += skippedObjects;
+                    break;
+                }
+            }
+            else
+            {
+                automaticObjectBirthAccumulator = 0f;
+            }
+
+            int startsThisUpdate = cycleStarts + fleckStarts;
             automaticObjectBirthSubmittedLastUpdate = startsThisUpdate;
             automaticObjectBirthRejectedLastUpdate = skippedThisUpdate;
             automaticObjectBirthSubmittedTotal += startsThisUpdate;
-            automaticObjectBirthStatus = startsThisUpdate > 0
-                ? $"Started {startsThisUpdate} deterministic object source event(s), skipped {skippedThisUpdate} source(s)"
-                : $"Scanned deterministic object source anchors, started 0, skipped {skippedThisUpdate}";
+            RefreshAutomaticObjectContactCycleDiagnostics();
+            automaticObjectBirthStatus =
+                $"Contact cycles {automaticObjectContactBuildCount} build / " +
+                $"{automaticObjectContactHoldCount} hold / " +
+                $"{automaticObjectContactReleaseCount} release / " +
+                $"{automaticObjectContactRestCount} rest; " +
+                $"started {cycleStarts} cycle(s) + {fleckStarts} fleck(s), " +
+                $"skipped {skippedThisUpdate}";
             return startsThisUpdate > 0;
         }
 
@@ -907,15 +936,12 @@ namespace ProgrammaticStylized3D.Rivers
 
             float coverage = river.FoamObjectFoamCoverage;
             float activity = river.FoamObjectFoamActivity;
-            if (coverage <= 0.0001f)
+            bool contactCyclesEnabled = river.FoamObjectContactCyclesEnabled &&
+                river.FoamObjectContactCycleCoverage > 0.0001f;
+            bool flecksEnabled = coverage > 0.0001f && activity > 0.0001f;
+            if (!contactCyclesEnabled && !flecksEnabled)
             {
-                inactiveStatus = "Object foam coverage is zero";
-                return false;
-            }
-
-            if (activity <= 0.0001f)
-            {
-                inactiveStatus = "Object foam activity is zero";
+                inactiveStatus = "Contact-cycle Anchor Coverage and Fleck population are both zero";
                 return false;
             }
 
@@ -929,7 +955,85 @@ namespace ProgrammaticStylized3D.Rivers
             return profile.Enabled;
         }
 
-        private bool TryStartAutomaticObjectSourceEvent(
+        private bool TryStartAutomaticObjectContactCycle(
+            AutomaticObjectSourceProfile profile,
+            out int skippedObjects)
+        {
+            skippedObjects = 0;
+            int sourceCount = automaticObjectFoamSources.Count;
+            if (river == null || !river.Domain.IsValid || sourceCount <= 0)
+            {
+                return false;
+            }
+
+            int scanBudget = Mathf.Min(
+                Mathf.Max(1, sourceCount),
+                AutomaticObjectSourceMaximumScansPerUpdate);
+            for (int scan = 0; scan < scanBudget; scan++)
+            {
+                int cursor = automaticObjectBirthCursor++;
+                int cyclePermutation = cursor / Mathf.Max(1, sourceCount);
+                int scanIndex = PositiveModulo(cursor, sourceCount);
+                int sourceIndex = ResolvePermutedAutomaticObjectSourceIndex(
+                    scanIndex,
+                    sourceCount,
+                    cyclePermutation);
+                RiverFoamStaticObjectSource source =
+                    automaticObjectFoamSources[sourceIndex];
+                float identitySeed = ResolveAutomaticObjectIdentitySeed(source);
+                if (Hash01(identitySeed + 1.7f) >
+                    river.FoamObjectContactCycleCoverage)
+                {
+                    skippedObjects++;
+                    continue;
+                }
+
+                if (!automaticObjectContactCycleStates.TryGetValue(
+                        source.SourceId,
+                        out AutomaticObjectContactCycleState state))
+                {
+                    state = new AutomaticObjectContactCycleState
+                    {
+                        CycleIndex = 0,
+                        NextStartTime = automaticObjectContactCycleTime +
+                            Hash01(identitySeed + 2.9f) *
+                            river.FoamObjectContactRestDurationMaxSeconds
+                    };
+                    automaticObjectContactCycleStates[source.SourceId] = state;
+                }
+
+                if (HasActiveAutomaticObjectContactCycle(source.SourceId) ||
+                    automaticObjectContactCycleTime + 0.0001f <
+                        state.NextStartTime)
+                {
+                    continue;
+                }
+
+                float cycleSeed = identitySeed + state.CycleIndex * 37.613f;
+                AutomaticObjectSourceRecipe recipe =
+                    ResolveAutomaticObjectContactCycleRecipe(
+                        profile.Pattern,
+                        cycleSeed);
+                if (TryBeginAutomaticObjectSourceEvent(
+                        profile,
+                        recipe,
+                        source,
+                        cycleSeed))
+                {
+                    state.CycleIndex++;
+                    state.NextStartTime = float.PositiveInfinity;
+                    automaticObjectContactCycleStates[source.SourceId] = state;
+                    idleSince = 0.0;
+                    return true;
+                }
+
+                skippedObjects++;
+            }
+
+            return false;
+        }
+
+        private bool TryStartAutomaticObjectFleckEvent(
             AutomaticObjectSourceProfile profile,
             out int skippedObjects)
         {
@@ -954,22 +1058,17 @@ namespace ProgrammaticStylized3D.Rivers
                     cycleIndex);
                 RiverFoamStaticObjectSource source =
                     automaticObjectFoamSources[sourceIndex];
-                float sourceSeed = river.VisualSeed * 0.191f +
-                    source.SourceId.GetHashCode() * 0.017f +
-                    cycleIndex * 37.613f +
-                    source.Phase * 11.0f;
-
+                float sourceSeed = ResolveAutomaticObjectIdentitySeed(source) +
+                    cycleIndex * 53.137f;
                 if (Hash01(sourceSeed + 1.7f) > profile.Coverage)
                 {
                     skippedObjects++;
                     continue;
                 }
 
-                AutomaticObjectSourceRecipe recipe =
-                    ResolveAutomaticObjectRecipe(profile.Pattern, sourceSeed);
                 if (TryBeginAutomaticObjectSourceEvent(
                         profile,
-                        recipe,
+                        AutomaticObjectSourceRecipe.ContactFleck,
                         source,
                         sourceSeed))
                 {
@@ -983,48 +1082,183 @@ namespace ProgrammaticStylized3D.Rivers
             return false;
         }
 
-        private AutomaticObjectSourceRecipe ResolveAutomaticObjectRecipe(
+        private AutomaticObjectSourceRecipe ResolveAutomaticObjectContactCycleRecipe(
             StylizedRiverFoamObjectPattern pattern,
             float seed)
         {
-            switch (pattern)
+            if (pattern == StylizedRiverFoamObjectPattern.ContactArcs)
             {
-                case StylizedRiverFoamObjectPattern.ContactArcs:
-                    return AutomaticObjectSourceRecipe.ContactArc;
-                case StylizedRiverFoamObjectPattern.ContactSemiArcs:
-                    return AutomaticObjectSourceRecipe.ContactSemiArc;
-                case StylizedRiverFoamObjectPattern.ContactFlecks:
-                    return AutomaticObjectSourceRecipe.ContactFleck;
+                return AutomaticObjectSourceRecipe.ContactArc;
+            }
+
+            if (pattern == StylizedRiverFoamObjectPattern.ContactSemiArcs)
+            {
+                return AutomaticObjectSourceRecipe.ContactSemiArc;
             }
 
             float arcWeight = river != null
-                ? river.FoamObjectContactArcPatternWeight
+                ? Mathf.Max(0f, river.FoamObjectContactArcPatternWeight)
                 : 0.45f;
             float semiArcWeight = river != null
-                ? river.FoamObjectContactSemiArcPatternWeight
+                ? Mathf.Max(0f, river.FoamObjectContactSemiArcPatternWeight)
                 : 0.35f;
-            float fleckWeight = river != null
-                ? river.FoamObjectContactFleckPatternWeight
-                : 0.20f;
-            arcWeight = Mathf.Max(0f, arcWeight);
-            semiArcWeight = Mathf.Max(0f, semiArcWeight);
-            fleckWeight = Mathf.Max(0f, fleckWeight);
-            float totalWeight = arcWeight + semiArcWeight + fleckWeight;
+            float totalWeight = arcWeight + semiArcWeight;
             if (totalWeight <= 0.0001f)
             {
                 return AutomaticObjectSourceRecipe.ContactArc;
             }
 
-            float roll = Hash01(seed + 4.1f) * totalWeight;
-            if (roll < arcWeight)
+            return Hash01(seed + 4.1f) * totalWeight < arcWeight
+                ? AutomaticObjectSourceRecipe.ContactArc
+                : AutomaticObjectSourceRecipe.ContactSemiArc;
+        }
+
+        private float ResolveAutomaticObjectFleckRateScale(
+            StylizedRiverFoamObjectPattern pattern)
+        {
+            if (pattern == StylizedRiverFoamObjectPattern.ContactFlecks)
             {
-                return AutomaticObjectSourceRecipe.ContactArc;
+                return 1f;
             }
 
-            roll -= arcWeight;
-            return roll < semiArcWeight
-                ? AutomaticObjectSourceRecipe.ContactSemiArc
-                : AutomaticObjectSourceRecipe.ContactFleck;
+            if (pattern != StylizedRiverFoamObjectPattern.Mixed || river == null)
+            {
+                return 0f;
+            }
+
+            return Mathf.Clamp01(river.FoamObjectContactFleckPatternWeight);
+        }
+
+        private float ResolveAutomaticObjectIdentitySeed(
+            RiverFoamStaticObjectSource source)
+        {
+            return river.VisualSeed * 0.191f +
+                source.SourceId.GetHashCode() * 0.017f +
+                source.Phase * 11.0f;
+        }
+
+        private bool HasActiveAutomaticObjectContactCycle(EntityId sourceId)
+        {
+            for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
+            {
+                AutomaticFoamSourceEvent sourceEvent =
+                    automaticFoamSourceEvents[index];
+                if (!sourceEvent.Active ||
+                    (sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactArc &&
+                     sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactSemiArc))
+                {
+                    continue;
+                }
+
+                if (sourceEvent.ObjectSourceId.Equals(sourceId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void CompleteAutomaticObjectContactCycle(
+            AutomaticFoamSourceEvent sourceEvent)
+        {
+            if (sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactArc &&
+                sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactSemiArc)
+            {
+                return;
+            }
+
+            automaticObjectContactCycleStates.TryGetValue(
+                sourceEvent.ObjectSourceId,
+                out AutomaticObjectContactCycleState state);
+            state.NextStartTime = automaticObjectContactCycleTime +
+                Mathf.Max(0f, sourceEvent.ObjectRestDuration);
+            automaticObjectContactCycleStates[sourceEvent.ObjectSourceId] = state;
+        }
+
+        private void SynchronizeAutomaticObjectContactCycleStates()
+        {
+            automaticObjectContactLiveSourceIds.Clear();
+            for (int index = 0; index < automaticObjectFoamSources.Count; index++)
+            {
+                automaticObjectContactLiveSourceIds.Add(
+                    automaticObjectFoamSources[index].SourceId);
+            }
+
+            for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
+            {
+                AutomaticFoamSourceEvent sourceEvent =
+                    automaticFoamSourceEvents[index];
+                if (sourceEvent.Active &&
+                    (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
+                     sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc))
+                {
+                    automaticObjectContactLiveSourceIds.Add(
+                        sourceEvent.ObjectSourceId);
+                }
+            }
+
+            automaticObjectContactStaleSourceIds.Clear();
+            foreach (KeyValuePair<EntityId, AutomaticObjectContactCycleState> pair
+                     in automaticObjectContactCycleStates)
+            {
+                if (!automaticObjectContactLiveSourceIds.Contains(pair.Key))
+                {
+                    automaticObjectContactStaleSourceIds.Add(pair.Key);
+                }
+            }
+
+            for (int index = 0;
+                 index < automaticObjectContactStaleSourceIds.Count;
+                 index++)
+            {
+                automaticObjectContactCycleStates.Remove(
+                    automaticObjectContactStaleSourceIds[index]);
+            }
+        }
+
+        private void RefreshAutomaticObjectContactCycleDiagnostics()
+        {
+            automaticObjectContactBuildCount = 0;
+            automaticObjectContactHoldCount = 0;
+            automaticObjectContactReleaseCount = 0;
+            for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
+            {
+                AutomaticFoamSourceEvent sourceEvent =
+                    automaticFoamSourceEvents[index];
+                if (!sourceEvent.Active ||
+                    (sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactArc &&
+                     sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactSemiArc))
+                {
+                    continue;
+                }
+
+                if (sourceEvent.Elapsed < sourceEvent.ObjectBuildDuration)
+                {
+                    automaticObjectContactBuildCount++;
+                }
+                else if (sourceEvent.Elapsed <
+                         sourceEvent.ObjectBuildDuration +
+                         sourceEvent.ObjectHoldDuration)
+                {
+                    automaticObjectContactHoldCount++;
+                }
+                else
+                {
+                    automaticObjectContactReleaseCount++;
+                }
+            }
+
+            automaticObjectContactRestCount = 0;
+            foreach (KeyValuePair<EntityId, AutomaticObjectContactCycleState> pair
+                     in automaticObjectContactCycleStates)
+            {
+                if (!HasActiveAutomaticObjectContactCycle(pair.Key) &&
+                    pair.Value.NextStartTime > automaticObjectContactCycleTime)
+                {
+                    automaticObjectContactRestCount++;
+                }
+            }
         }
 
         private bool TryBeginAutomaticObjectSourceEvent(
@@ -1034,10 +1268,6 @@ namespace ProgrammaticStylized3D.Rivers
             float seed)
         {
             float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
-            float eventScale = Mathf.Clamp01(
-                Mathf.Lerp(0.78f, 1.18f, Hash01(seed + 6.5f)));
-            float widthJitter = Mathf.Lerp(0.92f, 1.08f, Hash01(seed + 7.1f));
-            float offsetJitter = Mathf.Lerp(0.85f, 1.15f, Hash01(seed + 8.3f));
             float sourceKey = river.VisualSeed * 0.417f +
                 source.GlobalDistance * 9.731f +
                 source.AcrossMetres * 19.137f +
@@ -1046,17 +1276,27 @@ namespace ProgrammaticStylized3D.Rivers
                     ? 907f
                     : (recipe == AutomaticObjectSourceRecipe.ContactSemiArc ? 809f : 701f));
 
-            float length;
-            float width;
-            float offset;
+            float length = 0f;
+            float width = 0f;
+            float offset = 0f;
             float amount;
             float remainingLife;
-            float breakupScale;
-            float breakupStrength;
+            float breakupScale = 0f;
+            float breakupStrength = 0f;
             float patternFormationSpeedMultiplier;
             float lopsidedness = 0f;
+            float objectWakeArmLengthMetres = 0f;
+            float objectSourceLateralCellSpacingMetres = 0f;
+            float sourcePathDistance;
+            float startGlobalDistance;
+            float endGlobalDistance;
+
             if (recipe == AutomaticObjectSourceRecipe.ContactFleck)
             {
+                float eventScale = Mathf.Clamp01(
+                    Mathf.Lerp(0.78f, 1.18f, Hash01(seed + 6.5f)));
+                float widthJitter = Mathf.Lerp(0.92f, 1.08f, Hash01(seed + 7.1f));
+                float offsetJitter = Mathf.Lerp(0.85f, 1.15f, Hash01(seed + 8.3f));
                 length = Mathf.Lerp(
                     river.FoamObjectContactFleckLengthMinMetres,
                     river.FoamObjectContactFleckLengthMaxMetres,
@@ -1084,100 +1324,134 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamObjectContactFleckInitialPresenceMin,
                     river.FoamObjectContactFleckInitialPresenceMax,
                     eventScale);
-            }
-            else if (recipe == AutomaticObjectSourceRecipe.ContactSemiArc)
-            {
-                length = Mathf.Lerp(
-                    river.FoamObjectContactSemiArcLengthMinMetres,
-                    river.FoamObjectContactSemiArcLengthMaxMetres,
-                    eventScale);
-                width = Mathf.Lerp(
-                    river.FoamObjectContactSemiArcWidthMinMetres,
-                    river.FoamObjectContactSemiArcWidthMaxMetres,
-                    eventScale) * widthJitter;
-                offset = Mathf.Lerp(
-                    river.FoamObjectContactSemiArcOffsetMinMetres,
-                    river.FoamObjectContactSemiArcOffsetMaxMetres,
-                    eventScale) * offsetJitter;
-                remainingLife = Mathf.Lerp(
-                    river.FoamObjectContactSemiArcInitialLifeMin,
-                    river.FoamObjectContactSemiArcInitialLifeMax,
-                    eventScale);
-                breakupScale = Mathf.Lerp(0.12f, 0.38f, Hash01(seed + 9.5f));
-                breakupStrength = Mathf.Lerp(
-                    river.FoamObjectContactSemiArcBreakupStrengthMin,
-                    river.FoamObjectContactSemiArcBreakupStrengthMax,
-                    Hash01(seed + 10.1f));
-                patternFormationSpeedMultiplier =
-                    river.FoamObjectContactSemiArcFormationSpeedMultiplier;
-                amount = Mathf.Lerp(
-                    river.FoamObjectContactSemiArcInitialPresenceMin,
-                    river.FoamObjectContactSemiArcInitialPresenceMax,
-                    eventScale);
-                float side = Hash01(seed + 13.9f) < 0.5f ? -1f : 1f;
-                lopsidedness = side * Mathf.Lerp(
-                    river.FoamObjectContactSemiArcLopsidednessMin,
-                    river.FoamObjectContactSemiArcLopsidednessMax,
-                    Hash01(seed + 14.7f));
+
+                length = Mathf.Clamp(
+                    length,
+                    0.05f,
+                    Mathf.Max(0.05f, source.StaticPressureAcrossHalfWidth * 2.6f));
+                width = Mathf.Clamp(
+                    width,
+                    0.012f,
+                    Mathf.Max(0.020f, length * 0.18f));
+                offset = Mathf.Clamp(
+                    offset,
+                    0.0f,
+                    Mathf.Max(0.01f, source.SurfaceHalfWidth * 0.10f));
+                float halfLength = length * 0.5f;
+                startGlobalDistance = Mathf.Clamp(
+                    source.GlobalDistance - flowDirection * halfLength,
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMaximum);
+                endGlobalDistance = Mathf.Clamp(
+                    source.GlobalDistance + flowDirection * halfLength,
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMaximum);
+                sourcePathDistance = Mathf.Abs(
+                    endGlobalDistance - startGlobalDistance);
             }
             else
             {
-                length = Mathf.Lerp(
-                    river.FoamObjectContactArcLengthMinMetres,
-                    river.FoamObjectContactArcLengthMaxMetres,
-                    eventScale);
-                width = Mathf.Lerp(
-                    river.FoamObjectContactArcWidthMinMetres,
-                    river.FoamObjectContactArcWidthMaxMetres,
-                    eventScale) * widthJitter;
-                offset = Mathf.Lerp(
-                    river.FoamObjectContactArcOffsetMinMetres,
-                    river.FoamObjectContactArcOffsetMaxMetres,
-                    eventScale) * offsetJitter;
-                remainingLife = Mathf.Lerp(
-                    river.FoamObjectContactArcInitialLifeMin,
-                    river.FoamObjectContactArcInitialLifeMax,
-                    eventScale);
-                breakupScale = Mathf.Lerp(0.18f, 0.55f, Hash01(seed + 9.5f));
-                breakupStrength = Mathf.Lerp(
-                    river.FoamObjectContactArcBreakupStrengthMin,
-                    river.FoamObjectContactArcBreakupStrengthMax,
-                    Hash01(seed + 10.1f));
-                patternFormationSpeedMultiplier =
-                    river.FoamObjectContactArcFormationSpeedMultiplier;
+                bool semiArc = recipe == AutomaticObjectSourceRecipe.ContactSemiArc;
+                objectWakeArmLengthMetres = Mathf.Lerp(
+                    semiArc
+                        ? river.FoamObjectContactSemiArcWakeArmLengthMinMetres
+                        : river.FoamObjectContactArcWakeArmLengthMinMetres,
+                    semiArc
+                        ? river.FoamObjectContactSemiArcWakeArmLengthMaxMetres
+                        : river.FoamObjectContactArcWakeArmLengthMaxMetres,
+                    Hash01(seed + 6.5f));
                 amount = Mathf.Lerp(
-                    river.FoamObjectContactArcInitialPresenceMin,
-                    river.FoamObjectContactArcInitialPresenceMax,
-                    eventScale);
+                    semiArc
+                        ? river.FoamObjectContactSemiArcInitialPresenceMin
+                        : river.FoamObjectContactArcInitialPresenceMin,
+                    semiArc
+                        ? river.FoamObjectContactSemiArcInitialPresenceMax
+                        : river.FoamObjectContactArcInitialPresenceMax,
+                    Hash01(seed + 9.1f));
+                remainingLife = Mathf.Lerp(
+                    semiArc
+                        ? river.FoamObjectContactSemiArcInitialLifeMin
+                        : river.FoamObjectContactArcInitialLifeMin,
+                    semiArc
+                        ? river.FoamObjectContactSemiArcInitialLifeMax
+                        : river.FoamObjectContactArcInitialLifeMax,
+                    Hash01(seed + 10.3f));
+                patternFormationSpeedMultiplier = semiArc
+                    ? river.FoamObjectContactSemiArcFormationSpeedMultiplier
+                    : river.FoamObjectContactArcFormationSpeedMultiplier;
+
+                if (semiArc)
+                {
+                    float side = Hash01(seed + 13.9f) < 0.5f ? -1f : 1f;
+                    lopsidedness = side * Mathf.Lerp(
+                        river.FoamObjectContactSemiArcLopsidednessMin,
+                        river.FoamObjectContactSemiArcLopsidednessMax,
+                        Hash01(seed + 14.7f));
+                }
+
+                float domainLength = Mathf.Max(
+                    0.01f,
+                    river.Domain.GlobalDistanceMaximum -
+                    river.Domain.GlobalDistanceMinimum);
+                float longitudinalCellSpacing = domainLength /
+                    Mathf.Max(1, fieldWidth);
+                float crossRiverCellSpacing = Mathf.Max(
+                    0.01f,
+                    source.SurfaceHalfWidth * 2f / Mathf.Max(1, fieldHeight));
+                objectSourceLateralCellSpacingMetres = crossRiverCellSpacing;
+                float alongRadius = Mathf.Max(
+                    0.04f,
+                    source.StaticPressureAlongHalfLength) +
+                    longitudinalCellSpacing * 0.5f;
+                float acrossRadius = Mathf.Max(
+                    0.04f,
+                    source.StaticPressureAcrossHalfWidth) +
+                    crossRiverCellSpacing * 0.5f;
+                float dominantArmLength = Mathf.Max(
+                    0.05f,
+                    objectWakeArmLengthMetres);
+                float shortArmLength = semiArc
+                    ? dominantArmLength * (1f - Mathf.Abs(lopsidedness))
+                    : dominantArmLength;
+                float negativeArmLength;
+                float positiveArmLength;
+                if (semiArc && lopsidedness < 0f)
+                {
+                    negativeArmLength = dominantArmLength;
+                    positiveArmLength = shortArmLength;
+                }
+                else if (semiArc)
+                {
+                    negativeArmLength = shortArmLength;
+                    positiveArmLength = dominantArmLength;
+                }
+                else
+                {
+                    negativeArmLength = dominantArmLength;
+                    positiveArmLength = dominantArmLength;
+                }
+
+                float frontBridgeLength = Mathf.PI * 0.5f *
+                    (alongRadius + acrossRadius);
+                sourcePathDistance = Mathf.Max(
+                    0.001f,
+                    negativeArmLength + frontBridgeLength + positiveArmLength);
+                float maximumArmLength = Mathf.Max(
+                    negativeArmLength,
+                    positiveArmLength);
+                float upstreamExtent = alongRadius + longitudinalCellSpacing;
+                float downstreamExtent = maximumArmLength + longitudinalCellSpacing;
+                startGlobalDistance = Mathf.Clamp(
+                    source.GlobalDistance - flowDirection * upstreamExtent,
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMaximum);
+                endGlobalDistance = Mathf.Clamp(
+                    source.GlobalDistance + flowDirection * downstreamExtent,
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMaximum);
             }
 
-            length = Mathf.Clamp(
-                length,
-                0.05f,
-                Mathf.Max(0.05f, source.StaticPressureAcrossHalfWidth * 2.6f));
-            width = Mathf.Clamp(
-                width,
-                0.012f,
-                Mathf.Max(0.020f, length * 0.18f));
-            offset = Mathf.Clamp(
-                offset,
-                0.0f,
-                Mathf.Max(0.01f, source.SurfaceHalfWidth * 0.10f));
-            float feather = Mathf.Clamp(
-                Mathf.Max(width * 0.65f, source.SurfaceHalfWidth * 0.010f),
-                0.020f,
-                0.110f);
-            float halfLength = length * 0.5f;
-            float startGlobalDistance = Mathf.Clamp(
-                source.GlobalDistance - flowDirection * halfLength,
-                river.Domain.GlobalDistanceMinimum,
-                river.Domain.GlobalDistanceMaximum);
-            float endGlobalDistance = Mathf.Clamp(
-                source.GlobalDistance + flowDirection * halfLength,
-                river.Domain.GlobalDistanceMinimum,
-                river.Domain.GlobalDistanceMaximum);
-            float longitudinalDistance = Mathf.Abs(endGlobalDistance - startGlobalDistance);
-            if (longitudinalDistance <= 0.05f)
+            if (sourcePathDistance <= 0.05f)
             {
                 foamCompositionRejectedCount++;
                 return false;
@@ -1188,25 +1462,55 @@ namespace ProgrammaticStylized3D.Rivers
                 profile.FormationSpeedMetresPerSecond *
                 Mathf.Clamp(patternFormationSpeedMultiplier, 0.10f, 3.00f) *
                 Mathf.Lerp(0.90f, 1.10f, Hash01(seed + 12.5f)));
-            float sourcePathDistance = longitudinalDistance;
-            float duration = Mathf.Clamp(
+            float buildDuration = Mathf.Clamp(
                 sourcePathDistance / formationSpeed,
                 AutomaticObjectSourceMinimumDuration,
                 AutomaticObjectSourceMaximumDuration);
+            bool contactCycle = recipe != AutomaticObjectSourceRecipe.ContactFleck;
+            float holdDuration = contactCycle
+                ? Mathf.Lerp(
+                    river.FoamObjectContactHoldDurationMinSeconds,
+                    river.FoamObjectContactHoldDurationMaxSeconds,
+                    Hash01(seed + 15.7f))
+                : 0f;
+            float releaseDuration = contactCycle
+                ? Mathf.Lerp(
+                    river.FoamObjectContactReleaseDurationMinSeconds,
+                    river.FoamObjectContactReleaseDurationMaxSeconds,
+                    Hash01(seed + 16.9f))
+                : 0f;
+            float restDuration = contactCycle
+                ? Mathf.Lerp(
+                    river.FoamObjectContactRestDurationMinSeconds,
+                    river.FoamObjectContactRestDurationMaxSeconds,
+                    Hash01(seed + 18.1f))
+                : 0f;
             float materialStepDuration = 1f / Mathf.Max(1f, ResolveUpdateRate());
+            float feather = contactCycle
+                ? 0f
+                : Mathf.Clamp(
+                    Mathf.Max(width * 0.65f, source.SurfaceHalfWidth * 0.010f),
+                    0.020f,
+                    0.110f);
             float headTrailMetres = Mathf.Clamp(
                 Mathf.Max(feather * 1.35f, formationSpeed * materialStepDuration * 1.50f),
                 AutomaticObjectSourceMinimumHeadTrailMetres,
                 Mathf.Min(
                     AutomaticObjectSourceMaximumHeadTrailMetres,
-                    Mathf.Max(AutomaticObjectSourceMinimumHeadTrailMetres, sourcePathDistance * 0.30f)));
+                    Mathf.Max(
+                        AutomaticObjectSourceMinimumHeadTrailMetres,
+                        sourcePathDistance * 0.30f)));
 
             return BeginAutomaticObjectFoamSourceEvent(
                 recipe,
                 source,
                 startGlobalDistance,
                 endGlobalDistance,
-                duration,
+                source.GlobalDistance,
+                buildDuration,
+                holdDuration,
+                releaseDuration,
+                restDuration,
                 formationSpeed,
                 headTrailMetres,
                 offset,
@@ -1217,7 +1521,10 @@ namespace ProgrammaticStylized3D.Rivers
                 sourceKey,
                 breakupScale,
                 breakupStrength,
-                lopsidedness);
+                lopsidedness,
+                objectSourceLateralCellSpacingMetres,
+                objectWakeArmLengthMetres,
+                sourcePathDistance);
         }
 
         private bool BeginAutomaticObjectFoamSourceEvent(
@@ -1225,7 +1532,11 @@ namespace ProgrammaticStylized3D.Rivers
             RiverFoamStaticObjectSource source,
             float startGlobalDistance,
             float endGlobalDistance,
-            float duration,
+            float objectCentreGlobalDistance,
+            float buildDuration,
+            float holdDuration,
+            float releaseDuration,
+            float restDuration,
             float formationSpeedMetresPerSecond,
             float headTrailMetres,
             float contactOffsetMetres,
@@ -1236,7 +1547,10 @@ namespace ProgrammaticStylized3D.Rivers
             float sourceKey,
             float breakupScaleMetres,
             float breakupStrength,
-            float lopsidedness)
+            float lopsidedness,
+            float objectSourceLateralCellSpacingMetres,
+            float objectWakeArmLengthMetres,
+            float objectContactPathLengthMetres)
         {
             if (river == null || !river.FoamEnabled ||
                 river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
@@ -1267,41 +1581,76 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
             }
 
+            bool contactCycle =
+                sourceType == AutomaticFoamSourceEventType.ObjectContactArc ||
+                sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
+            float resolvedBuildDuration = Mathf.Max(
+                AutomaticObjectSourceMinimumDuration,
+                buildDuration);
+            float resolvedHoldDuration = contactCycle
+                ? Mathf.Max(0f, holdDuration)
+                : 0f;
+            float resolvedReleaseDuration = contactCycle
+                ? Mathf.Max(0.05f, releaseDuration)
+                : 0f;
+
             automaticFoamSourceEvents[slotIndex] = new AutomaticFoamSourceEvent
             {
                 Active = true,
                 EventId = eventId,
                 Type = sourceType,
+                ObjectSourceId = source.SourceId,
                 SideSign = 1f,
                 StartGlobalDistance = startGlobalDistance,
                 EndGlobalDistance = endGlobalDistance,
-                Duration = Mathf.Max(AutomaticObjectSourceMinimumDuration, duration),
+                ObjectCentreGlobalDistance = objectCentreGlobalDistance,
+                Duration = resolvedBuildDuration +
+                    resolvedHoldDuration + resolvedReleaseDuration,
                 Elapsed = 0f,
+                ObjectBuildDuration = resolvedBuildDuration,
+                ObjectHoldDuration = resolvedHoldDuration,
+                ObjectReleaseDuration = resolvedReleaseDuration,
+                ObjectRestDuration = contactCycle
+                    ? Mathf.Max(0f, restDuration)
+                    : 0f,
                 FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond),
                 HeadTrailMetres = Mathf.Clamp(
                     headTrailMetres,
                     AutomaticObjectSourceMinimumHeadTrailMetres,
                     AutomaticObjectSourceMaximumHeadTrailMetres),
                 ShoreInsetMetres = Mathf.Max(0f, contactOffsetMetres),
-                WidthMetres = Mathf.Max(0.01f, widthMetres),
+                WidthMetres = contactCycle
+                    ? 0f
+                    : Mathf.Max(0.01f, widthMetres),
                 InwardReachMetres = Mathf.Max(
                     0.01f,
                     Mathf.Max(source.StaticPressureAlongHalfLength, source.StaticPressureAcrossHalfWidth)),
-                FeatherMetres = Mathf.Max(0.01f, featherMetres),
+                FeatherMetres = contactCycle
+                    ? 0f
+                    : Mathf.Max(0.01f, featherMetres),
                 SourceAmount = Mathf.Clamp01(amount),
                 RemainingLife = Mathf.Clamp01(remainingLife),
                 PatternSeed = sourceKey + AutomaticObjectBirthPatternSeedSalt,
                 SourceFillSeed = sourceKey + AutomaticObjectBirthSourceFillSeedSalt,
-                SourceFillFeatureSize = Mathf.Max(
-                    SourceFillMinimumFeatureSizeMetres * 0.55f,
-                    Mathf.Max(widthMetres * 1.5f, featherMetres * 1.25f)),
+                SourceFillFeatureSize = contactCycle
+                    ? SourceFillMinimumFeatureSizeMetres
+                    : Mathf.Max(
+                        SourceFillMinimumFeatureSizeMetres * 0.55f,
+                        Mathf.Max(widthMetres * 1.5f, featherMetres * 1.25f)),
                 ShapeSeed = sourceKey + AutomaticObjectBirthShapeSeedSalt,
-                BreakupScaleMetres = Mathf.Max(0.05f, breakupScaleMetres),
-                BreakupStrength = Mathf.Clamp01(breakupStrength),
+                BreakupScaleMetres = contactCycle
+                    ? 0f
+                    : Mathf.Max(0.05f, breakupScaleMetres),
+                BreakupStrength = contactCycle
+                    ? 0f
+                    : Mathf.Clamp01(breakupStrength),
                 Curvature = Mathf.Clamp(lopsidedness, -1f, 1f),
-                SourceFillBlend = sourceType == AutomaticFoamSourceEventType.ObjectContactArc
-                    ? 0.22f
-                    : (sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc ? 0.16f : 0.20f),
+                // Arc/Semi-Arc contact cycles must never receive breakup or patterned
+                // source-fill holes inside their upstream bridge or straight wake arms. Flecks
+                // retain their accepted stochastic fill variation.
+                SourceFillBlend = sourceType == AutomaticFoamSourceEventType.ObjectContactFleck
+                    ? 0.20f
+                    : 0f,
                 ObjectCentreAcrossMetres = source.AcrossMetres,
                 ObjectAlongHalfLengthMetres = Mathf.Max(
                     0.05f,
@@ -1309,7 +1658,18 @@ namespace ProgrammaticStylized3D.Rivers
                 ObjectAcrossHalfWidthMetres = Mathf.Max(
                     0.05f,
                     source.StaticPressureAcrossHalfWidth),
-                ObjectContactOffsetMetres = Mathf.Max(0f, contactOffsetMetres)
+                ObjectContactOffsetMetres = contactCycle
+                    ? 0f
+                    : Mathf.Max(0f, contactOffsetMetres),
+                ObjectSourceLateralCellSpacingMetres = contactCycle
+                    ? Mathf.Max(0.01f, objectSourceLateralCellSpacingMetres)
+                    : 0f,
+                ObjectWakeArmLengthMetres = contactCycle
+                    ? Mathf.Max(0.05f, objectWakeArmLengthMetres)
+                    : 0f,
+                ObjectContactPathLengthMetres = contactCycle
+                    ? Mathf.Max(0.001f, objectContactPathLengthMetres)
+                    : 0f
             };
 
             activeAutomaticFoamSourceEventCount++;
@@ -2503,6 +2863,14 @@ namespace ProgrammaticStylized3D.Rivers
                 automaticFoamSourceEventGpuData.Length);
             activeAutomaticFoamSourceEventCount = 0;
             automaticSourceEventsRasterizedLastUpdate = 0;
+            automaticObjectContactCycleStates.Clear();
+            automaticObjectContactLiveSourceIds.Clear();
+            automaticObjectContactStaleSourceIds.Clear();
+            automaticObjectContactCycleTime = 0f;
+            automaticObjectContactBuildCount = 0;
+            automaticObjectContactHoldCount = 0;
+            automaticObjectContactReleaseCount = 0;
+            automaticObjectContactRestCount = 0;
         }
 
         private int ResolvePermutedAutomaticShoreSlot(
