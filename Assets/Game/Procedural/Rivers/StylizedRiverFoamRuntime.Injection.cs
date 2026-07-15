@@ -296,7 +296,9 @@ namespace ProgrammaticStylized3D.Rivers
                     river != null && river.FlowDirection >= 0f ? 1f : -1f),
                 Shore = new Vector4(
                     sourceEvent.ShoreInsetMetres,
-                    sourceEvent.WidthMetres,
+                    sourceEvent.Type == AutomaticFoamSourceEventType.ShoreRibbon
+                        ? sourceEvent.ShoreRibbonThicknessCells
+                        : sourceEvent.WidthMetres,
                     sourceEvent.InwardReachMetres,
                     sourceEvent.FeatherMetres),
                 Material = new Vector4(

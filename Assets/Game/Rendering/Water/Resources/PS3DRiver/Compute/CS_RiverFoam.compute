@@ -4,7 +4,6 @@
 #pragma kernel RasterizeFoamSourceEventDebug
 #pragma kernel WriteIsolatedLifeProbe
 #pragma kernel ClearAutomaticBirthDebugAll
-#pragma kernel ClearAutomaticBirthDebugTransient
 #pragma kernel BuildCurrentShoreEdges
 #pragma kernel ComposeTopology
 #pragma kernel CaptureGeneratedTopology
@@ -953,10 +952,11 @@ float FoamEvaluateShoreRibbonSource(
         ? lateralMetres - shoreMetres
         : shoreMetres - lateralMetres;
     float centre = sourceEvent.shore.x;
-    float halfWidth = max(0.01, sourceEvent.shore.y * 0.5);
-    float feather = max(
-        max(0.01, sourceEvent.shore.w),
-        max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.85);
+    float crossRiverCellSpacing = max(0.005, physicalCellSpacing.y);
+    float sourceThickness = max(0.5, sourceEvent.shore.y) *
+        crossRiverCellSpacing;
+    float halfWidth = sourceThickness * 0.5;
+    float feather = crossRiverCellSpacing * 0.5;
     float bandDistance = abs(inwardMetres - centre);
     float core = 1.0 - smoothstep(
         halfWidth * 0.62,
@@ -1824,19 +1824,20 @@ void WriteFoamAutomaticSourceDebug(
             : float3(0.0, 0.0, 1.0));
     float4 debugState = _FoamBirthDebugWrite[coordinate];
     uint ignored;
-    if (debugState.a <= 0.001)
+    bool alreadyOccupied =
+        max(debugState.r, max(debugState.g, debugState.b)) >
+        FoamMaterialStateEpsilon;
+    if (!alreadyOccupied)
     {
         InterlockedAdd(_FoamBirthDebugCounters[0], 1, ignored);
-    }
-    if (max(debugState.r, max(debugState.g, debugState.b)) <= 0.001)
-    {
-        InterlockedAdd(_FoamBirthDebugCounters[1], 1, ignored);
     }
 
     debugState.rgb = max(
         debugState.rgb,
         categoryMask * sample.injectedPresence);
-    debugState.a = 1.0;
+    debugState.a = max(
+        debugState.a,
+        alreadyOccupied ? 1.0 : 0.0);
     _FoamBirthDebugWrite[coordinate] = saturate(debugState);
 }
 
@@ -1966,34 +1967,6 @@ void ClearAutomaticBirthDebugAll(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     _FoamBirthDebugWrite[int2(x, y)] = 0.0.xxxx;
-    if (dispatchId.x == 0 && dispatchId.y == 0)
-    {
-        _FoamBirthDebugCounters[0] = 0;
-        _FoamBirthDebugCounters[1] = 0;
-    }
-}
-
-[numthreads(8, 8, 1)]
-void ClearAutomaticBirthDebugTransient(
-    uint3 dispatchId : SV_DispatchThreadID)
-{
-    if (dispatchId.x >= (uint)_FoamRangeCount ||
-        dispatchId.y >= (uint)_FoamDimensions.y)
-    {
-        return;
-    }
-
-    int x = _FoamRangeStart + (int)dispatchId.x;
-    int y = (int)dispatchId.y;
-    if (x < 0 || x >= _FoamDimensions.x)
-    {
-        return;
-    }
-
-    int2 coordinate = int2(x, y);
-    float4 debugState = _FoamBirthDebugWrite[coordinate];
-    debugState.a = 0.0;
-    _FoamBirthDebugWrite[coordinate] = debugState;
     if (dispatchId.x == 0 && dispatchId.y == 0)
     {
         _FoamBirthDebugCounters[0] = 0;
@@ -2168,10 +2141,10 @@ void BuildFoamObjectContactField(uint3 dispatchId : SV_DispatchThreadID)
     float2 gradientToObstacle = float2(0.0, 0.0);
     float contactAccumulation = 0.0;
     [unroll]
-    for (int oy = -2; oy <= 2; oy++)
+    for (int oy = -1; oy <= 1; oy++)
     {
         [unroll]
-        for (int ox = -2; ox <= 2; ox++)
+        for (int ox = -1; ox <= 1; ox++)
         {
             if (ox == 0 && oy == 0)
             {
@@ -2187,13 +2160,10 @@ void BuildFoamObjectContactField(uint3 dispatchId : SV_DispatchThreadID)
             float2 offset = float2(
                 (float)ox * physicalCellSpacing.x,
                 (float)oy * physicalCellSpacing.y);
-            float distanceMetres = max(0.001, length(offset));
-            float reachMetres = max(
-                0.03,
-                max(physicalCellSpacing.x, physicalCellSpacing.y) * 2.55);
-            float radiusWeight = saturate(1.0 - distanceMetres / reachMetres);
-            float weightedSolid = solid * radiusWeight / (1.0 + distanceMetres);
-            gradientToObstacle += offset * weightedSolid;
+            float offsetLength = max(0.001, length(offset));
+            float weightedSolid = solid;
+            gradientToObstacle +=
+                (offset / offsetLength) * weightedSolid;
             contactAccumulation += weightedSolid;
         }
     }
@@ -2227,7 +2197,7 @@ void BuildFoamObjectContactField(uint3 dispatchId : SV_DispatchThreadID)
             saturate(pressurePresence * 0.35)));
     }
 
-    float proximity = saturate(contactAccumulation * 0.90);
+    float proximity = saturate(contactAccumulation);
     float confidence = saturate(proximity * lerp(0.62, 1.0, pressurePresence));
     float upstreamFacing = dot(waterNormal, float2(-_FoamFlowDirection, 0.0));
     float frontSideRelevance = saturate(0.22 + 0.78 * (upstreamFacing * 0.5 + 0.5));

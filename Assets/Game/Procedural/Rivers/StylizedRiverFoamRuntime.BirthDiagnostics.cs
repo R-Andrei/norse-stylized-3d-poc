@@ -12,11 +12,9 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void ResetAutomaticBirthDiagnosticSession()
         {
-            automaticBirthDebugLatestAffectedTexels = 0;
-            automaticBirthDebugCumulativeAffectedTexels = 0;
+            automaticBirthDebugLiveAffectedTexels = 0;
             automaticBirthDebugReadbackAvailable = false;
             automaticBirthDebugSessionGeneration++;
-            automaticBirthDebugResetPending = true;
         }
 
         private void EnsureAutomaticBirthDiagnosticResources()
@@ -36,7 +34,6 @@ namespace ProgrammaticStylized3D.Rivers
                 automaticBirthDebugTexture = CreateFieldTexture(
                     "PS3D_RiverFoam_AutomaticBirthDebug");
                 ClearRenderTexture(automaticBirthDebugTexture);
-                automaticBirthDebugResetPending = true;
             }
 
             if (automaticBirthDebugCounterBuffer == null)
@@ -64,15 +61,8 @@ namespace ProgrammaticStylized3D.Rivers
 
             EnsureAutomaticBirthDiagnosticResources();
             if (automaticBirthDebugTexture == null ||
-                automaticBirthDebugCounterBuffer == null)
-            {
-                return;
-            }
-
-            int kernel = automaticBirthDebugResetPending
-                ? clearAutomaticBirthDebugAllKernel
-                : clearAutomaticBirthDebugTransientKernel;
-            if (kernel < 0)
+                automaticBirthDebugCounterBuffer == null ||
+                clearAutomaticBirthDebugAllKernel < 0)
             {
                 return;
             }
@@ -81,22 +71,19 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInt("_FoamRangeStart", 0);
             computeShader.SetInt("_FoamRangeCount", fieldWidth);
             computeShader.SetTexture(
-                kernel,
+                clearAutomaticBirthDebugAllKernel,
                 "_FoamBirthDebugWrite",
                 automaticBirthDebugTexture);
             computeShader.SetBuffer(
-                kernel,
+                clearAutomaticBirthDebugAllKernel,
                 "_FoamBirthDebugCounters",
                 automaticBirthDebugCounterBuffer);
-            Dispatch(kernel, fieldWidth, fieldHeight);
-
-            if (automaticBirthDebugResetPending)
-            {
-                automaticBirthDebugResetPending = false;
-                automaticBirthDebugLatestAffectedTexels = 0;
-                automaticBirthDebugCumulativeAffectedTexels = 0;
-                automaticBirthDebugReadbackAvailable = false;
-            }
+            Dispatch(
+                clearAutomaticBirthDebugAllKernel,
+                fieldWidth,
+                fieldHeight);
+            automaticBirthDebugLiveAffectedTexels = 0;
+            automaticBirthDebugReadbackAvailable = false;
         }
 
         private void EndAutomaticBirthDebugStep()
@@ -176,8 +163,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            automaticBirthDebugLatestAffectedTexels = data[0];
-            automaticBirthDebugCumulativeAffectedTexels = data[1];
+            automaticBirthDebugLiveAffectedTexels = data[0];
             automaticBirthDebugReadbackAvailable = true;
         }
 
@@ -200,9 +186,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             automaticBirthDebugReadbackPending = false;
             automaticBirthDebugReadbackAvailable = false;
-            automaticBirthDebugLatestAffectedTexels = 0;
-            automaticBirthDebugCumulativeAffectedTexels = 0;
-            automaticBirthDebugResetPending = true;
+            automaticBirthDebugLiveAffectedTexels = 0;
             automaticBirthDebugActiveLastUpdate = false;
         }
     }

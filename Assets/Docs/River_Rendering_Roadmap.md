@@ -18,11 +18,35 @@ Amount, Size, Spacing, Irregularity, Edge Width, Interior Access
 
 There is no active Chipping patch. The next River change is a targeted user-directed Foam adjustment.
 
-## Targeted Stage 7 closure tweak — `4.11C.5.18B` Automatic Birth Sources Debug
+## Targeted Stage 7 closure correction — `4.11C.5.18C` Contact-Attached Pressure and Thin Birth Sources
 
-Implemented; Unity validation pending. Foam debug-view value `2` is now `Automatic Birth Sources`, not the retired manual/test-source progressive view. It displays the exact automatic source-event raster footprint before transport and aging: yellow shore sources, cyan object-contact sources, magenta free-water sources, and white latest-update activity. The debug kernel reuses the production source evaluator and existing debug resources; normal rendering keeps the ordinary source kernel and adds no dispatch or debug write.
+Implemented; Unity validation pending. `5.18C` supersedes the cumulative evidence contract of `5.18B` while retaining its shared automatic-source evaluator and existing debug resources.
 
-After validation, Stage 7 may be marked formally complete.
+```text
+Automatic Birth Sources
+  latest material update only;
+  yellow shore, cyan object, magenta free water, white same-update overlap;
+  one live unique-source-texel counter.
+
+Static Pressure
+  authored Front Reach in metres;
+  requested → longitudinal pressure texels → explicit 0.50-texel raster floor;
+  requested and resolved reach reported;
+  hidden CPU reach inflation and profile-count reach scaling removed.
+
+Object Foam
+  immediate eight-neighbour water shell outside obstacle texels;
+  raw unpadded physical extents retained;
+  Pressure may orient/weight but cannot add shell occupancy.
+
+Shore Ribbon
+  thickness authored in cross-river Foam cells;
+  cross-river spacing only for normal width/feather;
+  base Source Offset plus bounded cell variation;
+  stale Shore Ribbon inward-reach authority removed.
+```
+
+No new texture, channel, buffer, dispatch, persistent material state, or free-water source change is introduced. Object contact checks fall from 24 neighbours to 8. Stage 7 may be marked formally complete only after compute import and the source/pressure/final-render validation gate passes.
 
 # Current River completion state
 
@@ -815,7 +839,7 @@ This is still spawning-only work. Object-contact spawning, free-water spawning, 
 
 - 4.11C.5.15A.2: Object Foam shape refinement through an Object Contact Edge Field. The field is built from obstacle exclusion and static pressure/contact evidence, then sampled by Contact Arc/Fleck source events so object births follow contact edges rather than rectangular object half-extents. This remains Layer C spawning only; no wake-tail, free-water, Layer D, or Final Foam integration was added.
 
-- 4.11C.5.15A.3 / 5.15A.3.4: Object contact field edge-distance correction attempt failed due incomplete compute-resource wiring and was recovered. The stable runtime returns to the broad object-contact field with `_FoamObjectContactFieldRead` correctly declared and bound.
+- 4.11C.5.15A.3 / 5.15A.3.4: Historical object contact edge-distance correction failed due incomplete compute-resource wiring and was recovered to the broad contact field. `5.18C` now supersedes that broad normal-thickness rule with an immediate eight-neighbour shell while preserving `_FoamObjectContactFieldRead` and all existing resources.
 
 - 4.11C.5.15A.4: Object Foam adds `Contact Semi-Arcs` as a third Layer C source pattern. Semi-arcs reuse the existing source-event rasterizer and object-contact field, carry deterministic signed lopsidedness through `Curvature` / `variation.w`, and evaluate a one-sided tangent window instead of the full-arc `abs(tangentDistance)` support. This targets lopsided object shoulder foam without adding free-water spawning, Layer D tuning, Final Foam integration, or new compute resources.
 

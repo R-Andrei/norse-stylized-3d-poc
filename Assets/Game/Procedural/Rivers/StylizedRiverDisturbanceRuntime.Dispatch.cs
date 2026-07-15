@@ -457,15 +457,8 @@ namespace ProgrammaticStylized3D.Rivers
                 alongHalfLength / Mathf.Max(0.001f, cellSizeX);
             float acrossPixels =
                 acrossHalfWidth / Mathf.Max(0.001f, cellSizeY);
-            float pressureDepthMetres = pressurePass
-                ? Mathf.Clamp(
-                    Mathf.Max(
-                        0.22f,
-                        alongHalfLength * 2f * 0.08f,
-                        cellSizeX * 1.15f,
-                        river.ResolvedSurfaceLongitudinalSpacing * 1.50f),
-                    0.22f,
-                    0.48f)
+            float requestedPressureDepthMetres = pressurePass
+                ? river.PressureFrontReachMetres
                 : 0f;
             float pressureInsideOverlapMetres = pressurePass
                 ? Mathf.Clamp(
@@ -474,7 +467,13 @@ namespace ProgrammaticStylized3D.Rivers
                     0.16f)
                 : 0f;
             float pressureDepthPixels = pressurePass
-                ? pressureDepthMetres / Mathf.Max(0.001f, cellSizeX)
+                ? Mathf.Max(
+                    MinimumStaticPressureFrontReachPixels,
+                    requestedPressureDepthMetres /
+                    Mathf.Max(0.001f, cellSizeX))
+                : 0f;
+            float pressureDepthMetres = pressurePass
+                ? pressureDepthPixels * cellSizeX
                 : 0f;
             float pressureInsideOverlapPixels = pressurePass
                 ? pressureInsideOverlapMetres / Mathf.Max(0.001f, cellSizeX)

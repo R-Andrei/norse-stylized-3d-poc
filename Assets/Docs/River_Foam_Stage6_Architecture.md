@@ -49,22 +49,40 @@ all River performance optimization = deferred to one later comprehensive River p
 
 No scene, prefab, material, `.meta`, Ground, or Generated Mass file is part of this documentation reconciliation.
 
-## Automatic Birth Sources debug — `4.11C.5.18B` — implemented, Unity validation pending
+## Contact-attached Pressure and thin automatic birth sources — `4.11C.5.18C` — implemented, Unity validation pending
 
-Foam debug-view value `2` is repurposed from the obsolete manual `Progressive Birth Source` path to `Automatic Birth Sources`. The view now displays the exact accepted automatic Layer C source-event footprint evaluated by the production rasterizer before transport and aging.
+`4.11C.5.18C` keeps the shared production/debug source evaluator introduced by `5.18B`, but supersedes its cumulative diagnostic contract and corrects the actual source/contact geometry revealed by that view.
+
+Automatic Birth Sources debug is now latest-material-update-only:
 
 ```text
-yellow  = Shore Ribbon and Inward Wash history;
-cyan    = Object Contact Arc, Semi-Arc, and Fleck history;
-magenta = Free-Water Lace, Cross-Lace, and Torn Fragment history;
-white   = texels touched during the latest material update.
+yellow  = current Shore Ribbon or Inward Wash source;
+cyan    = current Object Contact Arc, Semi-Arc, or Fleck source;
+magenta = current Free-Water Lace, Cross-Lace, or Torn Fragment source;
+white   = same-update overlap between multiple source events/categories;
+black   = no automatic source written during the latest material update.
 ```
 
-Category history accumulates from entering the view until Foam is cleared or resources are rebuilt. The latest and cumulative unique source-texel counts are exposed beside the view.
+The complete existing debug texture is cleared once at the beginning of each material update. RGB stores only current-update categories; alpha is set only when a later source event writes a texel already occupied during the same update. The cumulative history counter, cumulative readback state, alpha-only transient-clear kernel, and view-entry history reset authority are removed. One live unique-source-texel counter remains. Normal rendering still uses `RasterizeFoamSourceEvent` and pays no debug UAV write.
 
-The normal automatic-source kernel and the debug kernel call one shared source evaluator. Normal rendering keeps the existing production kernel and pays no debug UAV write or extra dispatch. Selecting the debug view reuses the existing birth-debug texture and counter buffer, substitutes the debug raster kernel for the same automatic event dispatch, and performs one additional debug write.
+Static Pressure gains an honest `Front Reach` authoring value in metres. The old hidden `0.22–0.48 m` CPU authority, obstacle-length inflation, surface-spacing inflation, and pressure-profile-count reach scaling are removed. Requested metres are converted to longitudinal pressure texels and resolved against one explicit `0.50`-texel experimental raster floor. Runtime diagnostics report requested reach plus resolved metres/texels. Strength still owns height; Contact Sharpness still owns falloff shape inside the resolved reach. Wake and lee systems are unchanged.
 
-The obsolete manual-only trajectory painter, paint kernel, trajectory-pending state, and manual-source texel readout are removed. The manual injection test tool itself remains available, but it no longer owns this debug view.
+Object Foam contact eligibility is now the immediate eight-neighbour water shell outside obstacle texels. The former `5 × 5` / 24-neighbour dilation and larger-axis `2.55`-cell reach are removed. Pressure may stabilize contact orientation/confidence and choose the upstream-facing side, but it cannot spatially add source cells. The currently named `StaticPressureAlongHalfLength` / `StaticPressureAcrossHalfWidth` values remain in use because source tracing proved they are the zero-padding raw physical obstacle extents; the more general `AlongHalfLength` / `AcrossHalfWidth` values are padded disturbance/wake bounds.
+
+Standard Shore Ribbon normal thickness is now authored as `Source Thickness` in cross-river Foam cells, default `1`. The GPU resolves thickness and its small antialias feather from cross-river spacing only; it no longer uses `max(longitudinal, cross-river spacing)`. `Source Offset` is a base metre value and `Offset Variation` is bounded in cross-river cells. Shore Ribbon's stale pseudo inward-reach contribution is removed. Inward Wash retains its separate metre-based width and genuine inward reach. Free-water source geometry and scheduling are unchanged.
+
+Performance/resource contract:
+
+```text
+new textures/channels/buffers/dispatches = 0;
+object contact neighbour checks = 24 → 8;
+automatic-birth debug counters = 2 → 1;
+normal automatic-source debug write = still absent;
+Static Pressure full-field clear/finalize = unchanged;
+full River performance pass = still deferred.
+```
+
+Unity compute import and visual validation are required before `5.18C` is accepted and Stage 7 is formally closed.
 
 # River Foam Stage 6 Canonical Architecture
 
@@ -3219,7 +3237,7 @@ Debug-view audit from the 5.13B baseline:
 ```text
 0 Final Foam — clean from the Layer D support-source bug; still uses legacy Final Foam.
 1 Foam And Aging Topology — intentionally topology/support-based.
-2 Automatic Birth Sources — exact accepted automatic Layer C source-event footprints; no manual/test-source ownership.
+2 Automatic Birth Sources — latest-material-update-only automatic Layer C source-event footprints; RGB identifies source category and white marks same-update overlap; no manual/test-source ownership.
 3 Material Presence — clean Layer C material truth.
 4 Material Remaining Life — clean Layer C material-life truth.
 5 Foam Motion Field — external motion/routing debug, not topology support.
@@ -3535,7 +3553,7 @@ The reason for the additional recipe is mathematical: full Contact Arcs use a ta
 -backReach < tangentDistance * side < revealedForwardReach
 ```
 
-This keeps the selected performance model intact: no GPU readback, no connected-component extraction, no new textures or buffers, and no new object-contact resource binding. The object-contact field remains the 5.15A.2/5.15A.3.4 stable broad contact authority. Any future sharper edge-distance field correction must be a separate resource-audited patch.
+This keeps the selected performance model intact: no GPU readback, no connected-component extraction, no new textures or buffers, and no new object-contact resource binding. Historical 5.15A.2/5.15A.3.4 used a broad contact authority. `5.18C` supersedes that normal-thickness rule with the immediate eight-neighbour water shell while retaining the same contact texture, source-event rasterizer, and raw physical object bounds.
 
 ### Layer C Free Water Birth — 4.11C.5.15B
 

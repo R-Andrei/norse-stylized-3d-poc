@@ -17,8 +17,6 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("WriteIsolatedLifeProbe");
             clearAutomaticBirthDebugAllKernel =
                 computeShader.FindKernel("ClearAutomaticBirthDebugAll");
-            clearAutomaticBirthDebugTransientKernel =
-                computeShader.FindKernel("ClearAutomaticBirthDebugTransient");
             buildCurrentShoreEdgesKernel =
                 computeShader.FindKernel("BuildCurrentShoreEdges");
             composeTopologyKernel =

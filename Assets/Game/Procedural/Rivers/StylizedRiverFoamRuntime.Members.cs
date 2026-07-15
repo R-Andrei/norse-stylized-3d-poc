@@ -480,7 +480,6 @@ namespace ProgrammaticStylized3D.Rivers
         private int rasterizeFoamSourceEventDebugKernel = -1;
         private int writeIsolatedLifeProbeKernel = -1;
         private int clearAutomaticBirthDebugAllKernel = -1;
-        private int clearAutomaticBirthDebugTransientKernel = -1;
         private int buildCurrentShoreEdgesKernel = -1;
         private int composeTopologyKernel = -1;
         private int captureGeneratedTopologyKernel = -1;
@@ -579,14 +578,12 @@ namespace ProgrammaticStylized3D.Rivers
         private int foamCompositionSegmentDispatchAttemptCount;
         private int foamCompositionSegmentDispatchSubmittedCount;
         private float foamCompositionCumulativeCentrelineDistance;
-        private bool automaticBirthDebugResetPending;
         private bool automaticBirthDebugActiveLastUpdate;
         private bool automaticBirthDebugReadbackPending;
         private bool automaticBirthDebugReadbackAvailable;
         private int automaticBirthDebugResourceGeneration;
         private int automaticBirthDebugSessionGeneration;
-        private uint automaticBirthDebugLatestAffectedTexels;
-        private uint automaticBirthDebugCumulativeAffectedTexels;
+        private uint automaticBirthDebugLiveAffectedTexels;
 
         private bool HasQueuedRebuildWork =>
             rebuildPhase != RebuildPhase.Idle ||

@@ -18,6 +18,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             SerializedProperty presetProperty = Find("disturbancePreset");
             SerializedProperty staticPressureStrengthProperty =
                 Find("staticPressureStrength");
+            SerializedProperty staticPressureFrontReachMetresProperty =
+                Find("staticPressureFrontReachMetres");
             SerializedProperty staticPressureContactSharpnessProperty =
                 Find("staticPressureContactSharpness");
             SerializedProperty staticPressureWaveResponseProperty =
@@ -78,6 +80,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 missingProperties += missingProperties.Length > 0
                     ? ", staticPressureStrength"
                     : "staticPressureStrength";
+            }
+            if (staticPressureFrontReachMetresProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", staticPressureFrontReachMetres"
+                    : "staticPressureFrontReachMetres";
             }
             if (staticPressureContactSharpnessProperty == null)
             {
@@ -286,6 +294,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             "Strength",
                             "Selects a point inside each source's computed safe Pressure-height range. Zero removes attached buildup; one uses the maximum geometry-, support-, and flow-safe height without bypassing rear protection."));
                     }
+                    if (staticPressureFrontReachMetresProperty != null)
+                    {
+                        EditorGUILayout.PropertyField(
+                            staticPressureFrontReachMetresProperty,
+                            new GUIContent(
+                                "Front Reach",
+                                "Requested open-water Pressure distance upstream from physical obstacle contact. The resolved value is limited only by the pressure-grid raster floor and is reported below."));
+                    }
+                    DrawStaticPressureReachResolution();
                     if (staticPressureContactSharpnessProperty != null)
                     {
                         EditorGUILayout.PropertyField(
@@ -483,6 +500,29 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         MarkDisturbancePresetCustomIfChanged(presetProperty);
                     });
             }
+        }
+
+        private void DrawStaticPressureReachResolution()
+        {
+            if (targets.Length != 1 || target is not StylizedRiver selectedRiver)
+            {
+                return;
+            }
+
+            StylizedRiverDisturbanceRuntime runtime =
+                selectedRiver.GetComponent<StylizedRiverDisturbanceRuntime>();
+            DrawReadOnlyRow(
+                new GUIContent("Requested Reach"),
+                selectedRiver.PressureFrontReachMetres.ToString("0.000") + " m");
+            DrawReadOnlyRow(
+                new GUIContent("Resolved Reach"),
+                runtime != null &&
+                runtime.StaticPressureResolvedFrontReachMetres > 0f
+                    ? runtime.StaticPressureResolvedFrontReachMetres.ToString("0.000") +
+                      " m / " +
+                      runtime.StaticPressureResolvedFrontReachPixels.ToString("0.00") +
+                      " texels"
+                    : "Available after Pressure resources allocate");
         }
 
         private void MarkDisturbancePresetCustomIfChanged(

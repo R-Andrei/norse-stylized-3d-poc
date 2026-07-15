@@ -6,7 +6,8 @@ struct FoamSourceEventData
     // x = start storage global, y = end storage global,
     // z = centre storage global, w = flow direction.
     float4 distance;
-    // x = shore inset, y = width, z = inward reach, w = feather.
+    // x = shore inset, y = width metres except Shore Ribbon thickness cells,
+    // z = inward reach, w = feather metres.
     float4 shore;
     // x = source amount, y = remaining life, z = material pattern seed,
     // w = source fill feature size.

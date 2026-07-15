@@ -432,19 +432,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 : "Not in Play Mode";
 
             DrawReadOnlyRow(
-                new GUIContent("Latest Source Texels"),
+                new GUIContent("Live Source Texels"),
                 runtime != null
                     ? runtime.AutomaticBirthDebugReadbackAvailable
-                        ? runtime.AutomaticBirthDebugLatestAffectedTexels.ToString("N0")
-                        : runtime.AutomaticBirthDebugReadbackPending
-                            ? "Awaiting readback"
-                            : "No completed readback"
-                    : unavailable);
-            DrawReadOnlyRow(
-                new GUIContent("Cumulative Source Texels"),
-                runtime != null
-                    ? runtime.AutomaticBirthDebugReadbackAvailable
-                        ? runtime.AutomaticBirthDebugCumulativeAffectedTexels.ToString("N0")
+                        ? runtime.AutomaticBirthDebugLiveAffectedTexels.ToString("N0")
                         : runtime.AutomaticBirthDebugReadbackPending
                             ? "Awaiting readback"
                             : "No completed readback"
@@ -1383,7 +1374,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.AutomaticBirthSources:
                     return
-                        "Exact automatic Layer C birth footprints before transport and aging. Yellow is Shore Ribbon and Inward Wash, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, and white marks source texels touched during the latest material update. Category history accumulates from entering this view until Foam is cleared or resources are rebuilt.";
+                        "Exact automatic Layer C birth footprints from the latest material update before transport and aging. Yellow is Shore Ribbon and Inward Wash, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, white is same-update overlap between multiple source events or categories, and black means no source was written this update.";
 
                 case StylizedRiverFoamDebugView.MaterialPresence:
                     return

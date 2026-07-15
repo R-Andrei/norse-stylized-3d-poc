@@ -729,10 +729,8 @@ namespace ProgrammaticStylized3D.Rivers
             automaticBirthDebugReadbackAvailable;
         public bool AutomaticBirthDebugReadbackPending =>
             automaticBirthDebugReadbackPending;
-        public uint AutomaticBirthDebugLatestAffectedTexels =>
-            automaticBirthDebugLatestAffectedTexels;
-        public uint AutomaticBirthDebugCumulativeAffectedTexels =>
-            automaticBirthDebugCumulativeAffectedTexels;
+        public uint AutomaticBirthDebugLiveAffectedTexels =>
+            automaticBirthDebugLiveAffectedTexels;
         public bool AutomaticBirthSourcesDebugActive =>
             IsAutomaticBirthSourcesDebugActive;
         public string AutomaticShoreBirthStatus => automaticShoreBirthStatus;

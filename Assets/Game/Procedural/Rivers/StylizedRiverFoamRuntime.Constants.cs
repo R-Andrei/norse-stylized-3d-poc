@@ -28,7 +28,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const int LowFoamCompositionBirthBudgetPerStep = 2;
         private const int MediumFoamCompositionBirthBudgetPerStep = 4;
         private const int HighFoamCompositionBirthBudgetPerStep = 6;
-        private const int AutomaticBirthDebugCounterCount = 2;
+        private const int AutomaticBirthDebugCounterCount = 1;
         private const float ProgressiveRibbonMinimumDuration = 0.5f;
         private const float ProgressiveRibbonMaximumDuration = 5f;
         private const float ProgressiveRibbonMinimumTravelDistance = 0.5f;

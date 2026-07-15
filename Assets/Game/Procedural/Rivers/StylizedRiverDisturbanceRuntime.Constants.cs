@@ -19,6 +19,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const float StaticOnlySimulationRate = 12f;
         public const float MaximumStaticPressureHeightMetres = 1.25f;
         private const float MaximumStaticPressureModulation = 1.16f;
+        public const float MinimumStaticPressureFrontReachPixels = 0.5f;
         private const float RippleStabilitySafety = 0.42f;
         private const float RippleInjectionEnvelopeRadius = 1.15f;
         private const int MaximumRippleSubsteps = 32;

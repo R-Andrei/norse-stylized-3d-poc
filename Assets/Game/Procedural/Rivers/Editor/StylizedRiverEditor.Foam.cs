@@ -978,7 +978,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamShoreFoamPatchSize"),
                     new GUIContent(
                         "Global Size Multiplier",
-                        "Broad global scale selector for all shore-source pattern dimensions. Per-pattern length, width, reach, and offset controls below define the actual ranges."));
+                        "Broad global scale selector for shore-source path dimensions. Shore Ribbon contact thickness is authored separately in cross-river cells; Inward Wash retains metre-based width and reach."));
                 EditorGUILayout.PropertyField(
                     Find("foamShoreFoamFormationSpeedMetresPerSecond"),
                     new GUIContent(
@@ -1022,14 +1022,21 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Length",
                         Find("foamShoreRibbonLengthMinMetres"),
                         Find("foamShoreRibbonLengthMaxMetres"));
-                    DrawMinMaxMetreControls(
-                        "Width",
-                        Find("foamShoreRibbonWidthMinMetres"),
-                        Find("foamShoreRibbonWidthMaxMetres"));
-                    DrawMinMaxMetreControls(
-                        "Shore Offset",
-                        Find("foamShoreRibbonOffsetMinMetres"),
-                        Find("foamShoreRibbonOffsetMaxMetres"));
+                    EditorGUILayout.PropertyField(
+                        Find("foamShoreRibbonThicknessCells"),
+                        new GUIContent(
+                            "Source Thickness",
+                            "Bank-normal source thickness measured in cross-river Foam cells. One produces one contact-attached source cell; source amount and activity remain separate controls."));
+                    EditorGUILayout.PropertyField(
+                        Find("foamShoreRibbonOffsetMetres"),
+                        new GUIContent(
+                            "Source Offset",
+                            "Base inward offset from the live shore edge in metres. Keep this close to zero for a contact-attached ribbon."));
+                    EditorGUILayout.PropertyField(
+                        Find("foamShoreRibbonOffsetVariationCells"),
+                        new GUIContent(
+                            "Offset Variation",
+                            "Deterministic event-to-event offset variation measured in cross-river Foam cells. This should not be used to create separated parallel bands."));
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamShoreRibbonInitialLifeMin"),

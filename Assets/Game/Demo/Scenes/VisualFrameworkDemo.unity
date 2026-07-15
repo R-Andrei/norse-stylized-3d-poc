@@ -3267,11 +3267,11 @@ MonoBehaviour:
   paintedAccentPlacementOverlayWeight: 0
   paintedAccentProductionBakeIdentifier: f29eded2381a4a03b9ef575c3fa71095
   paintedAccentProductionCoverageTexture: {fileID: 2800000, guid: 8f91ad7f88cd9cd44b1880fc834de310, type: 2}
-  paintedAccentProductionCoverageSignature: bfce06b04e5a602192669b7982c4267b6271352c0da0b4ce4f51797f7d48510c
+  paintedAccentProductionCoverageSignature: 27705578763cbf695ba346d84c1219dd39d0ab14ee1d4b3a940af6a59ce77f38
   paintedAccentProductionBakeFormatRevision: 1
   paintedAccentProductionCoverageOriginSize: {x: -20, y: -20, z: 40, w: 40}
-  paintedAccentProductionCoveredTexelCount: 7448
-  paintedAccentProductionCoveredTexelFraction: 0.0017757416
+  paintedAccentProductionCoveredTexelCount: 7895
+  paintedAccentProductionCoveredTexelFraction: 0.0018823147
   modifiers:
   - {fileID: 1356653796}
   rivers:
@@ -8011,7 +8011,7 @@ Transform:
   m_GameObject: {fileID: 1321270436}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.288, y: -0.078, z: -5.585}
+  m_LocalPosition: {x: -9.116, y: -0.078, z: -5.004}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -10786,6 +10786,7 @@ MonoBehaviour:
   disturbancePreset: 4
   disturbanceDebugView: 0
   staticPressureStrength: 0.282
+  staticPressureFrontReachMetres: 0.12
   staticPressureContactSharpness: 1.11
   staticPressureWaveResponse: 1.74
   staticPressureProfileChangeIntervalMin: 0.63
@@ -10851,10 +10852,9 @@ MonoBehaviour:
   foamShoreRibbonFormationSpeedMultiplier: 0.6
   foamShoreRibbonLengthMinMetres: 4
   foamShoreRibbonLengthMaxMetres: 9
-  foamShoreRibbonWidthMinMetres: 0.005
-  foamShoreRibbonWidthMaxMetres: 0.005
-  foamShoreRibbonOffsetMinMetres: 0.03
-  foamShoreRibbonOffsetMaxMetres: 0.16
+  foamShoreRibbonThicknessCells: 1
+  foamShoreRibbonOffsetMetres: 0.03
+  foamShoreRibbonOffsetVariationCells: 0.25
   foamShoreRibbonInitialLifeMin: 0.918
   foamShoreRibbonInitialLifeMax: 1
   foamShoreRibbonBreakupStrengthMin: 0.12
@@ -10972,36 +10972,36 @@ MonoBehaviour:
   foamVisualOccupancyReleaseTime: 0.8
   foamMaterialLifecycleTuningVersion: 1
   foamVelocityTuningVersion: 1
-  foamColour: {r: 0.80544674, g: 0.9031609, b: 0.9433962, a: 0.7882353}
+  foamColour: {r: 0.80544674, g: 0.9031609, b: 0.9433962, a: 0.7529412}
   foamInteriorOpacityFloor: 0.352
   foamEdgeContrast: -0.356
-  foamChipActivation: 0.6
-  foamChipCandidateSpacing: 0.12
-  foamChipSize: 0.3152174
+  foamChipActivation: 1
+  foamChipCandidateSpacing: 0.125
+  foamChipSize: 1
   foamChipIrregularity: 1
-  foamChipStableScreenRadiusPixels: 2.65
+  foamChipStableScreenRadiusPixels: 3
   foamChipMaximumViewScale: 2
-  foamChipEdgeWidthPixels: 4
-  foamChipInteriorAccess: 0.3
-  foamChipFieldSpeed: 0.12
-  foamChipFormationTime: 1.1
+  foamChipEdgeWidthPixels: 5
+  foamChipInteriorAccess: 0
+  foamChipFieldSpeed: 0.15
+  foamChipFormationTime: 1
   foamChipStableTime: 1
-  foamChipDissolveTime: 1.1
-  foamChipDormantTime: 4
-  foamChipLateralMotionAmount: 1.1
+  foamChipDissolveTime: 1.2
+  foamChipDormantTime: 2.5
+  foamChipLateralMotionAmount: 1.5
   foamChipLateralMotionSpeed: 0.15
   foamChipRotationAmountDegrees: 175
-  foamChipRotationSpeed: 0.03
-  foamChipSizePulseAmount: 0.2
+  foamChipRotationSpeed: 0.02
+  foamChipSizePulseAmount: 0.45
   foamChipSizePulseSpeed: 0.2
   foamChipShapeChangeAmount: 1
-  foamChipShapeChangeSpeed: 0.13
+  foamChipShapeChangeSpeed: 0.15
   foamChipShapeTransitionTime: 4
   foamStrandStrength: 0.86
   foamStrandScale: 0.56
   foamStrandDensity: 0.5
   foamStrandReach: 0.46
-  foamDebugView: 26
+  foamDebugView: 2
   foamSpawnDistanceNormalized: 0.634
   foamSpawnAcrossNormalized: -0.27
   foamSpawnScale: 0.538

@@ -51,7 +51,7 @@ Stage 7 — Secondary Water Effects              provisionally complete
 Stage 8 — Reflections and Final Integration    stale/retired roadmap item
 ```
 
-Stage 7 has no broad implementation queue. The targeted user-directed tweak is now implemented as `4.11C.5.18B — Automatic Birth Sources Debug` and awaits Unity validation before Stage 7 is formally closed.
+Stage 7 has no broad implementation queue. The targeted closure correction is now implemented as `4.11C.5.18C — Contact-Attached Pressure and Thin Birth Sources` and awaits Unity validation before Stage 7 is formally closed. `5.18C` retains the `5.18B` shared automatic-source evaluator but replaces cumulative source history with latest-update-only evidence, narrows object and Shore Ribbon source footprints, and gives Static Pressure an end-to-end authored Front Reach.
 
 The old Stage 8 plan is not an active production stage. The current River has no visible reflection feature. Any dormant or experimental reflection code must not be treated as a completed system or as required future work. A future reflection feature would require a new explicitly approved scope.
 
@@ -78,7 +78,36 @@ P4 accounting and the shader compile recovery checklist remain evidence sources 
 
 There is no active Chipping, Remaining-Life, reflection, or performance patch.
 
-The only active River item is Unity validation of `4.11C.5.18B`. Debug view `2` now visualizes exact accepted automatic shore, object, and free-water birth footprints by reusing the production automatic source-event evaluator. After acceptance, close Stage 7 formally or select a new explicitly scoped feature.
+The only active River item is Unity validation of `4.11C.5.18C`. Validate latest-update-only Automatic Birth Sources first, then Static Pressure Front Reach, the immediate one-cell object shell, and cross-river-cell Shore Ribbon thickness before judging transported Final Foam. The experimental `0.50`-pressure-texel raster floor, default Front Reach, and any later object Width relabelling remain evidence-gated. After acceptance, close Stage 7 formally or select a new explicitly scoped feature.
+
+## `4.11C.5.18C` validation gate
+
+```text
+Automatic Birth Sources
+  no history trails; black after a material update with no source;
+  yellow/cyan/magenta remain visible on first write;
+  white means same-update overlap only.
+
+Static Pressure Target
+  Front Reach changes total upstream distance monotonically;
+  requested and resolved metres/texels are reported honestly;
+  Strength does not change reach; Contact Sharpness does not change total reach;
+  wake and lee remain unchanged.
+
+Object births
+  cyan is an immediate one-water-cell shell outside obstacles;
+  no obstacle-interior writes; Pressure cannot widen the shell;
+  Arc Length changes tangential extent only.
+
+Shore births
+  Shore Ribbon is approximately one cross-river source cell at default;
+  long longitudinal cells do not widen it;
+  Inward Wash remains the only deliberately inward-reaching shore source.
+
+Regression
+  free-water source geometry, transport, Remaining Life, Chipping, Strands,
+  and Final Foam remain unchanged apart from material born from thinner sources.
+```
 
 ## Reopen conditions
 

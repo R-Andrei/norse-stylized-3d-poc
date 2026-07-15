@@ -1938,5 +1938,28 @@ Replaced the dead manual-only `Progressive Birth Source` debug view with an exac
 
 The automatic production rasterizer was refactored around one shared source evaluator. The ordinary kernel writes only FoamState. The debug kernel is selected only while view `2` is active, writes the same FoamState result, and records source categories into the existing birth-debug texture: yellow shore, cyan object, magenta free water, and white latest-update activity. Existing counter storage now reports unique latest-step and cumulative source texels.
 
+This initial cumulative-history display contract is historical and is superseded by `4.11C.5.18C`; the shared evaluator and debug-view numeric identity remain.
+
 Removed the obsolete manual progressive trajectory painter, paint compute kernel, trajectory-pending state, and manual-action source-texel readout. No new texture, buffer, normal production dispatch, source event, or persistent material authority was added. Unity compute import and visual validation are pending.
+
+## 2026-07-15 — `4.11C.5.18C` Contact-Attached Pressure and Thin Birth Sources
+
+Implemented the evidence-driven correction revealed by `5.18B`. Unity validation remains pending.
+
+Automatic Birth Sources is no longer cumulative. The existing debug texture is fully cleared once per material update, one live unique-texel counter is reset, and all automatic events from that update are rasterized through the shared production evaluator. RGB stores current shore/object/free-water categories; alpha is set only by a subsequent same-update write so white means overlap rather than every current source. The cumulative counter, cumulative state, and alpha-only transient-clear kernel are removed.
+
+Static Pressure now exposes `Front Reach` in metres. The old CPU `0.22–0.48 m` authority, obstacle-length and surface-spacing reach inflation, and HLSL profile-count reach multiplier are removed. Requested reach is converted to longitudinal pressure texels and resolved against an initial `0.50`-texel raster floor. Runtime Inspector diagnostics show requested reach and resolved metres/texels. Strength, Contact Sharpness, wake, and lee responsibilities are unchanged.
+
+Object contact eligibility is reduced from the historical `5 × 5` / 24-neighbour dilation to the eight immediate neighbours of each valid water texel. This creates the intended one-water-cell shell. Pressure remains an orientation/confidence input but cannot expand shell occupancy. The currently named `StaticPressureAlongHalfLength` / `StaticPressureAcrossHalfWidth` values are deliberately retained because the source audit proved they are the raw zero-padding physical obstacle extents; the general extents are padded.
+
+Shore Ribbon replaces metre width min/max with `Source Thickness` in cross-river Foam cells, default `1`. GPU width and feather now derive only from cross-river spacing. A base metre `Source Offset` plus bounded cross-river-cell `Offset Variation` replaces broad offset ranges and hidden multiplicative jitter. The unused Shore Ribbon inward-reach authority is removed; Inward Wash retains genuine metre width/reach. Free-water source geometry is unchanged.
+
+```text
+resource delta: no new texture, channel, buffer, dispatch, or persistent state;
+object contact checks: 24 → 8;
+debug counters: 2 → 1;
+scene/prefab/material/asset/meta changes: none.
+```
+
+Validation order: latest-update-only debug, Static Pressure Target reach sweep, object shell, Shore Ribbon thickness/offset, free-water regression, then Final Foam. The `0.50`-texel pressure floor and any object Width control relabelling remain provisional until visual evidence is captured.
 

@@ -281,6 +281,8 @@ namespace ProgrammaticStylized3D.Rivers
         public const string CompatibleShaderName =
             "PS3D/Stylized River Water";
 
+        public const float MinimumStaticPressureFrontReachMetres = 0.02f;
+        public const float DefaultStaticPressureFrontReachMetres = 0.12f;
         public const float MinimumStaticPressureProfileChangeInterval = 0.5f;
         public const float MaximumStaticPressureProfileChangeInterval = 3f;
         public const float DefaultStaticPressureProfileChangeIntervalMin =
@@ -767,7 +769,13 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float staticPressureStrength = 0.65f;
 
-        [Tooltip("Shapes the short open-water falloff away from the source contact. Lower values make a broader, softer ridge; higher values keep it tighter and steeper. This does not increase the computed crest-height ceiling.")]
+        [Tooltip("Requested open-water Pressure distance upstream from the physical obstacle contact, in metres. The runtime reports the quality-dependent resolved distance after applying the minimum raster floor.")]
+        [Min(MinimumStaticPressureFrontReachMetres)]
+        [SerializeField]
+        private float staticPressureFrontReachMetres =
+            DefaultStaticPressureFrontReachMetres;
+
+        [Tooltip("Shapes the open-water falloff inside Front Reach. Lower values make a softer ridge; higher values keep it steeper. This does not change total reach or the computed crest-height ceiling.")]
         [Range(0.5f, 4f)]
         [SerializeField] private float staticPressureContactSharpness = 2.8f;
 
@@ -1028,21 +1036,17 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.05f)]
         [SerializeField] private float foamShoreRibbonLengthMaxMetres = 7.00f;
 
-        [Tooltip("Minimum authored Shore Ribbon width in metres before global Patch Size and deterministic variation are applied.")]
-        [Min(0.005f)]
-        [SerializeField] private float foamShoreRibbonWidthMinMetres = 0.045f;
+        [Tooltip("Bank-normal Shore Ribbon source thickness measured in cross-river Foam cells. One produces one contact-attached source cell before the small matching antialias feather.")]
+        [Range(0.5f, 4f)]
+        [SerializeField] private float foamShoreRibbonThicknessCells = 1f;
 
-        [Tooltip("Maximum authored Shore Ribbon width in metres before global Patch Size and deterministic variation are applied.")]
-        [Min(0.005f)]
-        [SerializeField] private float foamShoreRibbonWidthMaxMetres = 0.125f;
-
-        [Tooltip("Minimum inward offset from the live shore edge for Shore Ribbon sources.")]
+        [Tooltip("Base inward offset from the live shore edge for Shore Ribbon sources, in metres. Keep this close to zero for contact-attached ribbons.")]
         [Min(0f)]
-        [SerializeField] private float foamShoreRibbonOffsetMinMetres = 0.030f;
+        [SerializeField] private float foamShoreRibbonOffsetMetres = 0.030f;
 
-        [Tooltip("Maximum inward offset from the live shore edge for Shore Ribbon sources.")]
-        [Min(0f)]
-        [SerializeField] private float foamShoreRibbonOffsetMaxMetres = 0.160f;
+        [Tooltip("Deterministic event-to-event Shore Ribbon offset variation measured in cross-river Foam cells. Zero keeps every ribbon at the base Source Offset.")]
+        [Range(0f, 0.5f)]
+        [SerializeField] private float foamShoreRibbonOffsetVariationCells = 0.25f;
 
         [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Shore Ribbon material. One means full authored Foam lifetime.")]
         [Range(0f, 1f)]
@@ -2107,6 +2111,9 @@ namespace ProgrammaticStylized3D.Rivers
         // stationary registry path and the dynamic-emitter path prepare
         // different source data, but both consume these Pressure/Wake rules.
         public float PressureStrength => staticPressureStrength;
+        public float PressureFrontReachMetres => Mathf.Max(
+            MinimumStaticPressureFrontReachMetres,
+            staticPressureFrontReachMetres);
         public float PressureContactSharpness =>
             staticPressureContactSharpness;
         public float PressureProfileVariation =>
@@ -2293,18 +2300,12 @@ namespace ProgrammaticStylized3D.Rivers
                 foamShoreRibbonLengthMaxMetres));
         public float FoamShoreRibbonLengthMaxMetres =>
             Mathf.Max(FoamShoreRibbonLengthMinMetres, foamShoreRibbonLengthMaxMetres);
-        public float FoamShoreRibbonWidthMinMetres =>
-            Mathf.Max(0.005f, Mathf.Min(
-                foamShoreRibbonWidthMinMetres,
-                foamShoreRibbonWidthMaxMetres));
-        public float FoamShoreRibbonWidthMaxMetres =>
-            Mathf.Max(FoamShoreRibbonWidthMinMetres, foamShoreRibbonWidthMaxMetres);
-        public float FoamShoreRibbonOffsetMinMetres =>
-            Mathf.Max(0f, Mathf.Min(
-                foamShoreRibbonOffsetMinMetres,
-                foamShoreRibbonOffsetMaxMetres));
-        public float FoamShoreRibbonOffsetMaxMetres =>
-            Mathf.Max(FoamShoreRibbonOffsetMinMetres, foamShoreRibbonOffsetMaxMetres);
+        public float FoamShoreRibbonThicknessCells =>
+            Mathf.Clamp(foamShoreRibbonThicknessCells, 0.5f, 4f);
+        public float FoamShoreRibbonOffsetMetres =>
+            Mathf.Max(0f, foamShoreRibbonOffsetMetres);
+        public float FoamShoreRibbonOffsetVariationCells =>
+            Mathf.Clamp(foamShoreRibbonOffsetVariationCells, 0f, 0.5f);
         public float FoamShoreRibbonInitialLifeMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamShoreRibbonInitialLifeMin,
@@ -2985,14 +2986,17 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamShoreRibbonLengthMinMetres,
                 ref foamShoreRibbonLengthMaxMetres,
                 0.05f);
-            SanitizePositiveRange(
-                ref foamShoreRibbonWidthMinMetres,
-                ref foamShoreRibbonWidthMaxMetres,
-                0.005f);
-            SanitizePositiveRange(
-                ref foamShoreRibbonOffsetMinMetres,
-                ref foamShoreRibbonOffsetMaxMetres,
-                0f);
+            foamShoreRibbonThicknessCells = Mathf.Clamp(
+                foamShoreRibbonThicknessCells,
+                0.5f,
+                4f);
+            foamShoreRibbonOffsetMetres = Mathf.Max(
+                0f,
+                foamShoreRibbonOffsetMetres);
+            foamShoreRibbonOffsetVariationCells = Mathf.Clamp(
+                foamShoreRibbonOffsetVariationCells,
+                0f,
+                0.5f);
             SanitizeUnitRange(
                 ref foamShoreRibbonInitialLifeMin,
                 ref foamShoreRibbonInitialLifeMax);
@@ -3907,6 +3911,8 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverDisturbancePreset.None:
                     runtimeDisturbances = false;
                     staticPressureStrength = 0f;
+                    staticPressureFrontReachMetres =
+                        DefaultStaticPressureFrontReachMetres;
                     obstructionWakeStrength = 0f;
                     obstructionWakeVariation = 0f;
                     obstructionWakeVariationIntervalMin =
@@ -3926,6 +3932,8 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverDisturbancePreset.Subtle:
                     runtimeDisturbances = true;
                     staticPressureStrength = 0f;
+                    staticPressureFrontReachMetres =
+                        DefaultStaticPressureFrontReachMetres;
                     staticPressureContactSharpness = 2.2f;
                     staticPressureWaveResponse = 0.6f;
                     staticPressureProfileChangeIntervalMin =
@@ -3955,6 +3963,8 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverDisturbancePreset.Balanced:
                     runtimeDisturbances = true;
                     staticPressureStrength = 0.65f;
+                    staticPressureFrontReachMetres =
+                        DefaultStaticPressureFrontReachMetres;
                     staticPressureContactSharpness = 2.8f;
                     staticPressureWaveResponse = 1f;
                     staticPressureProfileChangeIntervalMin =
@@ -3984,6 +3994,7 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverDisturbancePreset.Reactive:
                     runtimeDisturbances = true;
                     staticPressureStrength = 0.90f;
+                    staticPressureFrontReachMetres = 0.16f;
                     staticPressureContactSharpness = 2.8f;
                     staticPressureWaveResponse = 1.35f;
                     staticPressureProfileChangeIntervalMin =
@@ -4665,6 +4676,9 @@ namespace ProgrammaticStylized3D.Rivers
 
             staticPressureStrength = Mathf.Clamp01(
                 staticPressureStrength);
+            staticPressureFrontReachMetres = Mathf.Max(
+                MinimumStaticPressureFrontReachMetres,
+                staticPressureFrontReachMetres);
             staticPressureContactSharpness = Mathf.Clamp(
                 staticPressureContactSharpness,
                 0.5f,

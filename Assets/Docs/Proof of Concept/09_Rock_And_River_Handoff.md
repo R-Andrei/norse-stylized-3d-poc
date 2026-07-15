@@ -1,6 +1,6 @@
 # Current River continuation — post-D.1C milestone closure
 
-The current Chipping baseline is Unity-validated and accepted. Stage 3 shore-wave controls are validated. Stage 7 is provisionally complete; the targeted tweak is implemented as `4.11C.5.18B — Automatic Birth Sources Debug` and awaits Unity validation. The old Stage 8 reflection/final-integration plan is stale and retired; the current River has no visible reflection feature. All performance work is deferred to one future comprehensive River performance pass.
+The current Chipping baseline is Unity-validated and accepted. Stage 3 shore-wave controls are validated. Stage 7 is provisionally complete; the targeted closure correction is implemented as `4.11C.5.18C — Contact-Attached Pressure and Thin Birth Sources` and awaits Unity validation. The old Stage 8 reflection/final-integration plan is stale and retired; the current River has no visible reflection feature. All performance work is deferred to one future comprehensive River performance pass.
 
 ```text
 D.0   dedicated fine-edge/Fray retirement
@@ -11,7 +11,7 @@ D.1C  camera-readable medium/large-biased population
 
 Current controls are Amount, Size, Spacing, Irregularity, Edge Width, and optional Interior Access. `D.1A.1` is rejected and rolled back. `D.1D — Coherent Edge-Bite Admission` is skipped because the current result is good enough. Remaining-Life interaction is deferred as optional future work. The zoom-dependent thin-strip capture remains known deferred technical debt.
 
-Current active direction: validate `4.11C.5.18B`, then either close Stage 7 formally or select a newly scoped feature. Do not infer an active reflection, Remaining-Life, Fray, micro-fragment, or isolated performance queue from older notes.
+Current active direction: validate `4.11C.5.18C` in the fixed order—live-only source debug, Pressure Front Reach, immediate object shell, cell-based Shore Ribbon, free-water/Final Foam regression—then either close Stage 7 formally or select a newly scoped feature. Do not infer an active reflection, Remaining-Life, Fray, micro-fragment, or isolated performance queue from older notes.
 
 B.2K/B.2L geometry and timing remain part of the accepted current baseline; no dedicated B.2L validation task remains.
 
@@ -2272,9 +2272,46 @@ coherent broad left/right movement.
 
 Do not begin Layer D visual history or fracture until this transport path is accepted. Layer D must later consume the same velocity contract.
 
-## Current targeted continuation — `4.11C.5.18B` Automatic Birth Sources Debug
+## Current targeted continuation — `4.11C.5.18C` Contact-Attached Pressure and Thin Birth Sources
 
-Debug-view value `2` no longer visualizes manual progressive test-source trajectories. It now displays the exact accepted automatic source-event footprint evaluated by the production Layer C rasterizer before transport and aging. Yellow identifies shore births, cyan object-contact births, magenta free-water births, and white source texels touched in the latest material update. Category history and unique-texel counters reset on view entry, Foam clear, or resource rebuild.
+`5.18C` is implemented and awaiting Unity validation. It retains `5.18B`'s shared automatic production/debug source evaluator but removes cumulative diagnostic history and corrects the thick source/contact geometry that the debug view exposed.
 
-Normal rendering retains the ordinary automatic-source kernel. The debug kernel is substituted only while the view is active and reuses the same evaluator plus the existing debug texture/counter resources. The obsolete manual trajectory paint code is removed. Unity validation is pending.
+```text
+Automatic Birth Sources
+  latest material update only;
+  yellow shore, cyan object, magenta free water;
+  white same-update overlap; black no source this update;
+  one live unique-source-texel counter.
+
+Static Pressure
+  Front Reach authored in metres;
+  resolved through longitudinal pressure-cell size and a provisional 0.50-texel floor;
+  requested and resolved metres/texels shown in the Inspector;
+  hidden 0.22–0.48 m CPU reach and profile-count reach scaling removed.
+
+Object Foam
+  immediate eight-neighbour water shell outside obstacle cells;
+  24 neighbour checks reduced to 8;
+  Pressure can orient/weight but cannot widen occupancy;
+  `StaticPressure...HalfLength` fields retained because they are raw physical extents.
+
+Shore Ribbon
+  Source Thickness in cross-river cells, default 1;
+  cross-river spacing only for normal width/feather;
+  base Source Offset plus bounded cell variation;
+  stale Ribbon inward-reach authority removed;
+  Inward Wash remains the deliberate inward-reaching source.
+```
+
+No scene, prefab, material, `.asset`, `.meta`, Ground, or GeneratedMass file is changed. No new texture, channel, buffer, dispatch, or persistent state is added. Free-water source geometry, transport, Remaining Life, Chipping, Strands, wakes, and lee are intentionally unchanged.
+
+Validation must occur in this order:
+
+1. `Automatic Birth Sources`: no history; black after an empty material update; white only on same-update overlap.
+2. `Static Pressure Target`: sweep Front Reach across obstacle sizes/quality levels; Strength and Sharpness retain separate responsibilities.
+3. Object sources: cyan one-cell shell, no obstacle-interior writes, Pressure reach does not widen it.
+4. Shore sources: Ribbon approximately one cross-river cell at default; Inward Wash remains distinct.
+5. Free-water source regression, then Final Foam and local cost sanity.
+
+The `0.50`-texel pressure floor, default reach, and final Arc/Semi-Arc Width naming are provisional evidence gates. Do not perform speculative object-control cleanup before the corrected shell is visually proven.
 

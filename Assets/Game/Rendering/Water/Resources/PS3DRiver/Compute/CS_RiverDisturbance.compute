@@ -664,27 +664,27 @@ float EvaluateHeightAwareStaticPressure(
             float modulationCeiling = profileSample.w;
             float crestInsetPixels = 0.50;
             float crestShoulderPixels = 0.05;
-            float pressureDepthScale = 1.0;
             float minimumInsideOverlapPixels = 1.5;
 
             if (_StaticPressureProfileCount >= 64)
             {
                 crestInsetPixels = 0.75;
                 crestShoulderPixels = 0.15;
-                pressureDepthScale = 0.55;
                 minimumInsideOverlapPixels = 3.5;
             }
             else if (_StaticPressureProfileCount >= 32)
             {
                 crestInsetPixels = 0.65;
                 crestShoulderPixels = 0.10;
-                pressureDepthScale = 0.65;
                 minimumInsideOverlapPixels = 2.5;
             }
 
             float pressureDepth = max(
-                0.75,
-                _StaticPressureDepthPixels * pressureDepthScale);
+                0.50,
+                _StaticPressureDepthPixels);
+            float pressureFalloffDepth = max(
+                0.05,
+                pressureDepth - crestShoulderPixels);
             float insideOverlap = max(
                 minimumInsideOverlapPixels,
                 _StaticPressureInsideOverlapPixels);
@@ -752,7 +752,7 @@ float EvaluateHeightAwareStaticPressure(
                     0.0,
                     contactDistance - crestShoulderPixels);
                 float openWater01 = saturate(
-                    1.0 - openWaterDistance / pressureDepth);
+                    1.0 - openWaterDistance / pressureFalloffDepth);
                 float openWaterFalloff = pow(
                     openWater01,
                     max(0.5, _StaticContactSharpness));

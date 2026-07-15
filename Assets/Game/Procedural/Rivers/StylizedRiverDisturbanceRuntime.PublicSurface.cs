@@ -46,8 +46,39 @@ namespace ProgrammaticStylized3D.Rivers
         public Vector2Int StaticPressureTextureDimensions => staticTarget != null
             ? new Vector2Int(staticTarget.width, staticTarget.height)
             : Vector2Int.one;
+        public float StaticPressureRequestedFrontReachMetres => river != null
+            ? river.PressureFrontReachMetres
+            : 0f;
+        public float StaticPressureResolvedFrontReachPixels
+        {
+            get
+            {
+                float cellSize = ResolveStaticPressureLongitudinalCellSize();
+                if (cellSize <= 0f)
+                {
+                    return 0f;
+                }
+
+                return Mathf.Max(
+                    MinimumStaticPressureFrontReachPixels,
+                    StaticPressureRequestedFrontReachMetres / cellSize);
+            }
+        }
+        public float StaticPressureResolvedFrontReachMetres =>
+            StaticPressureResolvedFrontReachPixels *
+            ResolveStaticPressureLongitudinalCellSize();
         public int ActiveWakeChunkCount => CountActiveWakeChunks();
         public int ContinuousSourceCount => continuousSources.Count;
+
+        private float ResolveStaticPressureLongitudinalCellSize()
+        {
+            int width = staticTarget != null
+                ? staticTarget.width
+                : fieldWidth;
+            return width > 0 && fieldLength > 0f
+                ? fieldLength / width
+                : 0f;
+        }
 
         public void CopyStaticObjectFoamSourcesTo(
             List<RiverFoamStaticObjectSource> output)
@@ -93,6 +124,9 @@ namespace ProgrammaticStylized3D.Rivers
                     -1f,
                     1f);
 
+                // Despite their historical names, StaticPressure half extents
+                // are built from the zero-padding raw obstacle footprint. The
+                // general half extents above include disturbance/wake padding.
                 output.Add(new RiverFoamStaticObjectSource(
                     pair.Key,
                     source.OwnerId,

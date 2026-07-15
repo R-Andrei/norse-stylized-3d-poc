@@ -1209,7 +1209,6 @@ namespace ProgrammaticStylized3D.Rivers
             rasterizeFoamSourceEventDebugKernel = -1;
             writeIsolatedLifeProbeKernel = -1;
             clearAutomaticBirthDebugAllKernel = -1;
-            clearAutomaticBirthDebugTransientKernel = -1;
             buildCurrentShoreEdgesKernel = -1;
             composeTopologyKernel = -1;
             captureGeneratedTopologyKernel = -1;

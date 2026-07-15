@@ -4,17 +4,29 @@ D.1C imported, rendered, and passed the user’s functional Unity validation whi
 
 No dedicated cold-compile timing or final GPU comparison was supplied for D.1C. Those measurements remain deferred performance evidence, not a blocker for the accepted visual baseline. This checklist should only become active again for the comprehensive River performance pass or a new shader-iteration regression.
 
-## `4.11C.5.18B` automatic-birth debug impact
+## `4.11C.5.18C` compute/shader iteration impact
 
-The automatic source debug change is debug-isolated. `RasterizeFoamSourceEvent` remains the normal kernel and contains no birth-debug UAV write. Only while Foam debug view `2` is active does the runtime substitute `RasterizeFoamSourceEventDebug` for the same automatic source-event dispatch. Both kernels call the same source evaluator, so the visualization cannot drift from production source shape.
+`5.18C` changes two compute programs and the River C# dispatch/authoring path; it does not modify the production fragment shader or the accepted Chipping candidate loops.
 
 ```text
-normal rendering: no new dispatch, texture sample, buffer, or debug write;
-debug view active: existing debug texture/counter resources plus one UAV write per accepted source texel;
-manual progressive trajectory paint kernel: removed.
+CS_RiverFoam.compute
+  cumulative debug clear/history removed;
+  current-update overlap encoding retained in the existing debug texture;
+  object contact search reduced from 24 neighbours to 8;
+  Shore Ribbon normal thickness uses cross-river spacing only.
+
+CS_RiverDisturbance.compute
+  Static Pressure profile-count reach scaling removed;
+  explicit 0.50-texel minimum raster floor;
+  authored total Front Reach remains constant while crest/falloff shape varies.
+
+resources
+  new textures/channels/buffers/dispatches = 0;
+  debug counters = 2 → 1;
+  normal automatic-source kernel still performs no debug UAV write.
 ```
 
-Unity compute-shader import and runtime validation remain required. This is not a reason to reopen the deferred full River performance pass.
+Required local evidence is Unity C# compilation, compute import, and visual validation of the pressure/source debug views. This patch does not reopen the accepted Chipping shader compile investigation or the deferred comprehensive River performance pass. If compute import fails, recover by checking the removed `ClearAutomaticBirthDebugTransient` kernel lookup/pragma, the one-element counter contract, and CPU/GPU `FoamSourceEventGpuData.shore.y` semantics before changing production behaviour.
 
 ## Canonical log policy
 

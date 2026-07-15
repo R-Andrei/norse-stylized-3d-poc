@@ -2132,6 +2132,10 @@ namespace ProgrammaticStylized3D.Rivers
             float widthJitter = Mathf.Lerp(0.94f, 1.06f, Hash01(seed + 7.1f));
             float reachJitter = Mathf.Lerp(0.92f, 1.08f, Hash01(seed + 7.7f));
             float offsetJitter = Mathf.Lerp(0.85f, 1.15f, Hash01(seed + 8.3f));
+            float approximateCrossCellSpacing = Mathf.Max(
+                0.005f,
+                visibleHalfWidth * 2f / Mathf.Max(1, fieldHeight));
+            float shoreRibbonThicknessCells = 0f;
             float sourceKey = river.VisualSeed * 0.317f +
                 globalDistance * 13.731f +
                 sideSign * 29.137f +
@@ -2197,16 +2201,19 @@ namespace ProgrammaticStylized3D.Rivers
                         river.FoamShoreRibbonLengthMinMetres,
                         river.FoamShoreRibbonLengthMaxMetres,
                         eventScale);
-                    width = Mathf.Lerp(
-                        river.FoamShoreRibbonWidthMinMetres,
-                        river.FoamShoreRibbonWidthMaxMetres,
-                        eventScale) * widthJitter;
-                    shoreInset = Mathf.Lerp(
-                        river.FoamShoreRibbonOffsetMinMetres,
-                        river.FoamShoreRibbonOffsetMaxMetres,
-                        eventScale) * offsetJitter;
-                    width = Mathf.Min(width, Mathf.Max(0.018f, length * 0.040f));
-                    inwardReach = Mathf.Lerp(0.16f, 0.42f, eventScale);
+                    shoreRibbonThicknessCells =
+                        river.FoamShoreRibbonThicknessCells;
+                    width = shoreRibbonThicknessCells *
+                        approximateCrossCellSpacing;
+                    float offsetVariationMetres =
+                        river.FoamShoreRibbonOffsetVariationCells *
+                        approximateCrossCellSpacing;
+                    shoreInset = Mathf.Max(
+                        0f,
+                        river.FoamShoreRibbonOffsetMetres +
+                        (Hash01(seed + 8.3f) * 2f - 1f) *
+                        offsetVariationMetres);
+                    inwardReach = 0f;
                     amount = Mathf.Lerp(0.90f, 1.00f, eventScale);
                     remainingLife = Mathf.Lerp(
                         river.FoamShoreRibbonInitialLifeMin,
@@ -2233,22 +2240,30 @@ namespace ProgrammaticStylized3D.Rivers
             remainingLife = Mathf.Clamp01(remainingLife);
             breakupStrength = Mathf.Clamp01(breakupStrength);
             length = Mathf.Max(0.05f, length);
-            inwardReach = Mathf.Clamp(
-                inwardReach,
-                0.06f,
-                Mathf.Max(0.06f, visibleHalfWidth * 0.45f));
+            bool isShoreRibbon =
+                recipe == AutomaticShoreSourceRecipe.ShoreRibbon;
+            inwardReach = isShoreRibbon
+                ? 0f
+                : Mathf.Clamp(
+                    inwardReach,
+                    0.06f,
+                    Mathf.Max(0.06f, visibleHalfWidth * 0.45f));
             shoreInset = Mathf.Clamp(
                 shoreInset,
-                0.005f,
+                0f,
                 Mathf.Max(0.010f, visibleHalfWidth * 0.30f));
-            width = Mathf.Clamp(
-                width,
-                0.012f,
-                Mathf.Max(0.030f, visibleHalfWidth * 0.20f));
-            feather = Mathf.Clamp(
-                Mathf.Max(width * 0.45f, visibleHalfWidth * 0.012f),
-                0.025f,
-                0.120f);
+            width = isShoreRibbon
+                ? Mathf.Max(0.005f, width)
+                : Mathf.Clamp(
+                    width,
+                    0.012f,
+                    Mathf.Max(0.030f, visibleHalfWidth * 0.20f));
+            feather = isShoreRibbon
+                ? approximateCrossCellSpacing * 0.50f
+                : Mathf.Clamp(
+                    Mathf.Max(width * 0.45f, visibleHalfWidth * 0.012f),
+                    0.025f,
+                    0.120f);
 
             float halfLength = length * 0.5f;
             float startGlobalDistance = Mathf.Clamp(
@@ -2313,6 +2328,7 @@ namespace ProgrammaticStylized3D.Rivers
                 headTrailMetres,
                 shoreInset,
                 width,
+                shoreRibbonThicknessCells,
                 inwardReach,
                 feather,
                 amount,
@@ -2334,6 +2350,7 @@ namespace ProgrammaticStylized3D.Rivers
             float headTrailMetres,
             float shoreInsetMetres,
             float widthMetres,
+            float shoreRibbonThicknessCells,
             float inwardReachMetres,
             float featherMetres,
             float amount,
@@ -2388,9 +2405,16 @@ namespace ProgrammaticStylized3D.Rivers
                     slotMinimumHeadTrailMetres,
                     slotMaximumHeadTrailMetres),
                 ShoreInsetMetres = Mathf.Max(0f, shoreInsetMetres),
-                WidthMetres = Mathf.Max(0.01f, widthMetres),
-                InwardReachMetres = Mathf.Max(0.01f, inwardReachMetres),
-                FeatherMetres = Mathf.Max(0.01f, featherMetres),
+                WidthMetres = Mathf.Max(0.005f, widthMetres),
+                ShoreRibbonThicknessCells = sourceType ==
+                    AutomaticFoamSourceEventType.ShoreRibbon
+                        ? Mathf.Clamp(shoreRibbonThicknessCells, 0.5f, 4f)
+                        : 0f,
+                InwardReachMetres = sourceType ==
+                    AutomaticFoamSourceEventType.ShoreRibbon
+                        ? 0f
+                        : Mathf.Max(0.01f, inwardReachMetres),
+                FeatherMetres = Mathf.Max(0.005f, featherMetres),
                 SourceAmount = Mathf.Clamp01(amount),
                 RemainingLife = Mathf.Clamp01(remainingLife),
                 PatternSeed = sourceKey + AutomaticShoreBirthPatternSeedSalt,
@@ -2399,7 +2423,7 @@ namespace ProgrammaticStylized3D.Rivers
                     SourceFillMinimumFeatureSizeMetres,
                     sourceType == AutomaticFoamSourceEventType.InwardWash
                         ? Mathf.Max(widthMetres * 1.35f, featherMetres * 1.25f)
-                        : Mathf.Max(widthMetres, inwardReachMetres * 0.45f)),
+                        : Mathf.Max(widthMetres, featherMetres * 1.25f)),
                 ShapeSeed = sourceKey + AutomaticShoreBirthShapeSeedSalt,
                 BreakupScaleMetres = Mathf.Max(0.10f, breakupScaleMetres),
                 BreakupStrength = Mathf.Clamp01(breakupStrength),

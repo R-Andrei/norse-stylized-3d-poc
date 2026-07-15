@@ -122,6 +122,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float HeadTrailMetres;
             public float ShoreInsetMetres;
             public float WidthMetres;
+            public float ShoreRibbonThicknessCells;
             public float InwardReachMetres;
             public float FeatherMetres;
             public float SourceAmount;
@@ -151,7 +152,8 @@ namespace ProgrammaticStylized3D.Rivers
             // x = start storage global, y = end storage global,
             // z = centre storage global, w = flow direction.
             public Vector4 Distance;
-            // x = shore inset, y = width, z = inward reach, w = feather.
+            // x = shore inset, y = width metres except Shore Ribbon thickness cells,
+            // z = inward reach, w = feather metres.
             public Vector4 Shore;
             // x = amount, y = remaining life, z = pattern seed,
             // w = source fill feature size.
