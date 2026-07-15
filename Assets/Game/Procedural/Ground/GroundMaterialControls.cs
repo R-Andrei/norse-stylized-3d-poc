@@ -42,7 +42,37 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float vegetationTintStrength = 0.10f;
 
-    [Header("Pixel and Macro Variation")]
+    [Header("Macro Patch Composition")]
+    [InspectorName("Macro Patch Scale")]
+    [Tooltip("Metre scale of broad ground material patches.")]
+    [Range(0.5f, 12f)]
+    [SerializeField]
+    private float groundMacroPatchScale = 4.5f;
+
+    [InspectorName("Macro Patch Pattern Seed")]
+    [Tooltip("Deterministic integer seed that reshuffles macro patch positions and silhouettes independently from the pixel seed. Adjacent Grounds should use the same value when their macro pattern must remain continuous.")]
+    [SerializeField]
+    private int groundMacroPatchPatternSeed;
+
+    [InspectorName("Macro Patch Intensity")]
+    [Tooltip("Visible tonal intensity of shader-side macro patches. This is independent from fine pixel and generated vertex variation.")]
+    [Range(0f, 0.75f)]
+    [SerializeField]
+    private float broadVariation = 0.032f;
+
+    [InspectorName("Macro Patch Transition Softness")]
+    [Tooltip("Softness of the transition between neutral terrain and light or dark macro patches. Zero preserves the current narrow transition; one gives a much broader seamless blend.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float groundMacroPatchTransitionSoftness = 0.75f;
+
+    [InspectorName("Average Patch Separation")]
+    [Tooltip("Average amount of neutral terrain between dark and light macro patches. Zero allows some local contacts while preserving separation elsewhere; higher values make patches increasingly sparse.")]
+    [Min(0f)]
+    [SerializeField]
+    private float groundMacroPatchSeparation = 1f;
+
+    [Header("Pixel Variation")]
     [Tooltip("World-space size of individual pixel-surface cells.")]
     [Range(0.005f, 0.5f)]
     [SerializeField]
@@ -63,18 +93,12 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float pixelVariation = 0.024f;
 
-    [InspectorName("Macro Patch Intensity")]
-    [Tooltip("Visible tonal intensity of shader-side macro patches. This is independent from fine pixel and generated vertex variation.")]
-    [Range(0f, 0.1f)]
-    [SerializeField]
-    private float broadVariation = 0.032f;
-
     [Tooltip("How strongly generated mesh vertex colour variation affects the ground material response.")]
     [Range(0f, 0.25f)]
     [SerializeField]
     private float vertexVariation = 0.2f;
 
-    [Tooltip("Overall multiplier for combined pixel, vertex, and broad variation.")]
+    [Tooltip("Overall multiplier for combined pixel and generated vertex variation.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float pixelEffectStrength = 1f;
@@ -83,17 +107,6 @@ public sealed class GroundMaterialControls
     [Range(0f, 2f)]
     [SerializeField]
     private float cellWarpStrength = 0.08f;
-
-    [Tooltip("Metre scale of broad ground material patches.")]
-    [Range(0.5f, 12f)]
-    [SerializeField]
-    private float groundMacroPatchScale = 4.5f;
-
-    [InspectorName("Macro Patch Transition Softness")]
-    [Tooltip("Softness of the transition between neutral terrain and light or dark macro patches. Zero gives narrow edges; one gives broad seamless blending.")]
-    [Range(0f, 1f)]
-    [SerializeField]
-    private float groundMacroPatchTransitionSoftness = 0.75f;
 
     [Header("Semantic Response")]
     [Tooltip("Multiplier for profile-driven broad response contrast.")]
@@ -224,13 +237,16 @@ public sealed class GroundMaterialControls
     public float PixelToneCount => Mathf.Clamp(pixelToneCount, 2f, 8f);
     public float PixelClusterStrength => Mathf.Clamp01(pixelClusterStrength);
     public float PixelVariation => Mathf.Clamp(pixelVariation, 0f, 0.25f);
-    public float BroadVariation => Mathf.Clamp(broadVariation, 0f, 0.1f);
+    public float BroadVariation => Mathf.Clamp(broadVariation, 0f, 0.75f);
     public float VertexVariation => Mathf.Clamp(vertexVariation, 0f, 0.25f);
     public float PixelEffectStrength => Mathf.Clamp(pixelEffectStrength, 0f, 2f);
     public float CellWarpStrength => Mathf.Clamp(cellWarpStrength, 0f, 2f);
     public float GroundMacroPatchScale => Mathf.Clamp(groundMacroPatchScale, 0.5f, 12f);
+    public int GroundMacroPatchPatternSeed => groundMacroPatchPatternSeed;
     public float GroundMacroPatchTransitionSoftness =>
         Mathf.Clamp01(groundMacroPatchTransitionSoftness);
+    public float GroundMacroPatchSeparation =>
+        Mathf.Max(0f, groundMacroPatchSeparation);
     public float ProfileContrastScale => Mathf.Clamp(profileContrastScale, 0f, 2f);
     public float ProfilePixelContrastScale => Mathf.Clamp(profilePixelContrastScale, 0f, 2f);
     public float GroundSnowResponseScale => Mathf.Clamp(groundSnowResponseScale, 0f, 2.5f);
@@ -291,8 +307,10 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = source.pixelEffectStrength;
         cellWarpStrength = source.cellWarpStrength;
         groundMacroPatchScale = source.groundMacroPatchScale;
+        groundMacroPatchPatternSeed = source.groundMacroPatchPatternSeed;
         groundMacroPatchTransitionSoftness =
             source.groundMacroPatchTransitionSoftness;
+        groundMacroPatchSeparation = source.groundMacroPatchSeparation;
         profileContrastScale = source.profileContrastScale;
         profilePixelContrastScale = source.profilePixelContrastScale;
         groundSnowResponseScale = source.groundSnowResponseScale;
@@ -357,7 +375,9 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = 0.92f;
         cellWarpStrength = 0.08f;
         groundMacroPatchScale = 4.8f;
+        groundMacroPatchPatternSeed = 0;
         groundMacroPatchTransitionSoftness = 0.75f;
+        groundMacroPatchSeparation = 1f;
         profileContrastScale = 0.95f;
         profilePixelContrastScale = 0.92f;
         groundSnowResponseScale = 1.10f;
@@ -400,7 +420,9 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = 1.18f;
         cellWarpStrength = 0.18f;
         groundMacroPatchScale = 3.25f;
+        groundMacroPatchPatternSeed = 0;
         groundMacroPatchTransitionSoftness = 0.75f;
+        groundMacroPatchSeparation = 1f;
         profileContrastScale = 1.35f;
         profilePixelContrastScale = 1.16f;
         groundSnowResponseScale = 1.00f;
@@ -443,7 +465,9 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = 1.08f;
         cellWarpStrength = 0.24f;
         groundMacroPatchScale = 3.1f;
+        groundMacroPatchPatternSeed = 0;
         groundMacroPatchTransitionSoftness = 0.75f;
+        groundMacroPatchSeparation = 1f;
         profileContrastScale = 1.20f;
         profilePixelContrastScale = 1.02f;
         groundSnowResponseScale = 0.62f;
@@ -486,7 +510,9 @@ public sealed class GroundMaterialControls
         pixelEffectStrength = 0.72f;
         cellWarpStrength = 0.035f;
         groundMacroPatchScale = 8.6f;
+        groundMacroPatchPatternSeed = 0;
         groundMacroPatchTransitionSoftness = 0.75f;
+        groundMacroPatchSeparation = 1f;
         profileContrastScale = 0.70f;
         profilePixelContrastScale = 0.70f;
         groundSnowResponseScale = 1.38f;

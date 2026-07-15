@@ -856,7 +856,7 @@ float RiverWaterFoamResolveMeaningfulPresenceFootprint(
     // Match the accepted material diagnostic footprint. Lifecycle-Faithful
     // rendering still requires meaningful material, but it does not require a
     // dense local concentration before Remaining Life can remain visible.
-    return smoothstep(0.02, 0.16, saturate(presence));
+    return smoothstep(0.02, 0.10, saturate(presence));
 }
 
 struct RiverWaterFoamPatternFields

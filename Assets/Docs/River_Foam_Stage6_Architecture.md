@@ -37,19 +37,51 @@ The current edge band is good enough for production continuation. `D.1D — Cohe
 There is no active Chipping patch. Future Chipping work requires a new visual or performance justification rather than continuation of the retired queue.
 
 
-Current closure contract:
+Current milestone contract:
 
 ```text
-Stage 6 Foam and Chipping = complete and validated;
-Remaining-Life morphology progression = optional future experiment, not queued;
+Stage 6 Chipping/Strands visual baseline = complete and validated;
+Foam lifecycle authoring/visible-duration validation = active through 5.18E;
+Remaining-Life erosion formulas = unchanged by 5.18E;
 dedicated Fray/fine-fragment work = retired;
-Layer D evaluated-shape production integration = not required by the accepted Final Foam result;
 all River performance optimization = deferred to one later comprehensive River performance pass.
 ```
 
 No scene, prefab, material, `.meta`, Ground, or Generated Mass file is part of this documentation reconciliation.
 
-## Object Birth Control Semantics and Stage 7 closure — `4.11C.5.18D` — implemented, Unity import pending
+## Initial Presence and lifecycle authority — `4.11C.5.18E` — implemented, Unity validation pending
+
+A runtime lifetime audit showed that the automatic source recipes already authored normalized `Initial Life`, but their peak deposited `Presence` remained hidden as hard-coded per-pattern ranges. `5.18E` exposes those exact existing ranges as `Initial Presence Min/Max`, so importing the patch preserves the prior source result by default while allowing direct tests of presence-limited visible lifetime:
+
+```text
+Shore Ribbon             0.90–1.00
+Inward Wash              0.84–0.98
+Object Contact Arc       0.88–1.00
+Object Contact Semi-Arc  0.84–0.98
+Object Contact Fleck     0.82–0.97
+Free Water Lace          0.78–0.96
+Free Water Cross-Lace    0.78–0.96
+Free Water Fragment      0.76–0.94
+```
+
+`Initial Presence` is the peak persistent material amount before profile, progressive-formation, and valid-fluid masks; it is not opacity and does not replace `Initial Life`. Birth cohort behavior remains unchanged: later-revealed material is younger, and repeated writes over already occupied material do not blindly reset the whole patch.
+
+Lifecycle-Faithful Final Foam now grants full meaningful-footprint participation at Presence `0.10` instead of `0.16`, while retaining the `0.02` disappearance floor and all existing life-driven erosion formulas. Neutral Lifetime and Negative Aging Rate authoring maxima are extended to `20` without changing existing serialized values.
+
+Positive support gains `Full Supported Aging At`, default `0.92`, which exactly reproduces the previous fixed support curve. Lower values let ordinary positive support reach the authored Supported Aging Rate sooner. Negative Aging Pressure retains its accepted fixed `0.08–0.92` shaping and is deliberately not affected by this new control.
+
+Resource contract:
+
+```text
+new textures/channels/buffers/dispatches = 0;
+new automatic-source events = 0;
+source-shape geometry and scheduling = unchanged;
+negative-aging response = unchanged;
+Lifecycle-Faithful presence footprint high edge = 0.16 → 0.10;
+Unity shader/compute import and runtime validation = pending.
+```
+
+## Object Birth Control Semantics and Stage 7 closure — `4.11C.5.18D` — Unity-validated and accepted
 
 The user validated `4.11C.5.18C` in Unity and confirmed that the live-only source view, contact-attached Static Pressure, immediate object shell, and cell-based Shore Ribbon work as intended. Stage 7 Secondary Water Effects is therefore complete and validated for the current milestone.
 

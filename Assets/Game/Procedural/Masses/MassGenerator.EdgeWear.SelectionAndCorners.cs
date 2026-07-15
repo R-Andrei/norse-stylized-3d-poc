@@ -34,8 +34,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             System.Diagnostics.Stopwatch viabilityStopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
 
-            Dictionary<EdgeKey, EdgeWearEdgeAggregate> edges =
-                new Dictionary<EdgeKey, EdgeWearEdgeAggregate>();
+            List<EdgeWearEdgeAggregate> edges =
+                new List<EdgeWearEdgeAggregate>();
+            Dictionary<EdgeKey, int> edgeIndexByKey =
+                new Dictionary<EdgeKey, int>();
+            int coincidentBoundarySeamPairCount = 0;
 
             for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
             {
@@ -57,18 +60,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         continue;
                     }
 
-                    EdgeKey key = new EdgeKey(start, end);
-                    if (!edges.TryGetValue(
-                            key,
-                            out EdgeWearEdgeAggregate edge))
-                    {
-                        edge = new EdgeWearEdgeAggregate(start, end);
-                        edges.Add(key, edge);
-                    }
-
+                    EdgeWearEdgeAggregate edge =
+                        GetOrAddEdgeWearSourceEdgeAggregate(
+                            edges,
+                            edgeIndexByKey,
+                            start,
+                            end,
+                            faceIndex,
+                            ref coincidentBoundarySeamPairCount);
                     edge.AddFace(faceIndex);
                 }
             }
+
+            coverageAudit.RawSourceEdgeCount = edgeIndexByKey.Count;
+            coverageAudit.CoincidentBoundarySeamPairCount =
+                coincidentBoundarySeamPairCount;
 
             List<EdgeWearBevelCandidate> provisionalCandidates =
                 new List<EdgeWearBevelCandidate>(edges.Count);
@@ -92,20 +98,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 minimumStableEdgeLength * 0.01f);
             int provisionalCandidateIndex = 0;
 
-            foreach (KeyValuePair<EdgeKey, EdgeWearEdgeAggregate> pair
-                in edges)
+            for (int edgeIndex = 0; edgeIndex < edges.Count; edgeIndex++)
             {
-                EdgeWearEdgeAggregate edge = pair.Value;
+                EdgeWearEdgeAggregate edge = edges[edgeIndex];
+                EdgeKey edgeKey = new EdgeKey(edge.Start, edge.End);
                 Vector3 midpoint = (edge.Start + edge.End) * 0.5f;
                 float length = (edge.End - edge.Start).magnitude;
                 EdgeWearEdgeLifecycleRecord lifecycle =
                     new EdgeWearEdgeLifecycleRecord
                     {
-                        Key = pair.Key,
+                        Key = edgeKey,
                         Start = edge.Start,
                         End = edge.End,
                         FaceCount = edge.FaceIndices.Count,
                         Length = length,
+                        CoincidentBoundarySeamReconciled =
+                            edge.CoincidentBoundarySeamReconciled,
                         Vertical01 = Mathf.InverseLerp(
                             bounds.min.y,
                             bounds.max.y,
@@ -114,7 +122,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearEdgeViabilityRecord viability =
                     new EdgeWearEdgeViabilityRecord
                     {
-                        Key = pair.Key,
+                        Key = edgeKey,
                         MinimumDihedralDegrees =
                             EdgeWearMinimumViableDihedralDegrees,
                         RequestedWidth = requestedWidth,
@@ -128,8 +136,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     };
                 lifecycle.Viability = viability;
                 coverageAudit.Records.Add(lifecycle);
-                coverageAudit.RecordByKey[pair.Key] = lifecycle;
-                coverageAudit.ViabilityByKey[pair.Key] = viability;
+                coverageAudit.RecordByKey[edgeKey] = lifecycle;
+                coverageAudit.ViabilityByKey[edgeKey] = viability;
 
                 if (edge.FaceIndices.Count != 2)
                 {
@@ -460,6 +468,46 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return candidates;
         }
 
+        private static EdgeWearEdgeAggregate
+            GetOrAddEdgeWearSourceEdgeAggregate(
+                List<EdgeWearEdgeAggregate> edges,
+                Dictionary<EdgeKey, int> edgeIndexByKey,
+                Vector3 start,
+                Vector3 end,
+                int faceIndex,
+                ref int coincidentBoundarySeamPairCount)
+        {
+            EdgeKey key = new EdgeKey(start, end);
+            if (edgeIndexByKey.TryGetValue(key, out int exactIndex))
+            {
+                return edges[exactIndex];
+            }
+
+            for (int edgeIndex = 0; edgeIndex < edges.Count; edgeIndex++)
+            {
+                EdgeWearEdgeAggregate candidate = edges[edgeIndex];
+                if (candidate.FaceIndices.Count != 1 ||
+                    candidate.FaceIndices[0] == faceIndex ||
+                    !AreSamePoint(candidate.Start, end) ||
+                    !AreSamePoint(candidate.End, start))
+                {
+                    continue;
+                }
+
+                edgeIndexByKey.Add(key, edgeIndex);
+                candidate.CoincidentBoundarySeamReconciled = true;
+                coincidentBoundarySeamPairCount++;
+                return candidate;
+            }
+
+            int newIndex = edges.Count;
+            EdgeWearEdgeAggregate created =
+                new EdgeWearEdgeAggregate(start, end);
+            edges.Add(created);
+            edgeIndexByKey.Add(key, newIndex);
+            return created;
+        }
+
         private static string ResolveEdgeWearArtisticFilterReason(
             EdgeWearEdgeLifecycleRecord lifecycle,
             float artisticMinimumLength)
@@ -636,6 +684,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
             audit.RecordByGraphEdge.Clear();
             audit.ViabilityByGraphEdge.Clear();
+            audit.CoincidentGraphVertexReconciliationCount =
+                graph.CoincidentVertexReconciliationCount;
+            audit.CoincidentGraphBoundarySeamPairCount =
+                graph.CoincidentBoundarySeamPairCount;
             for (int recordIndex = 0;
                  recordIndex < audit.Records.Count;
                  recordIndex++)

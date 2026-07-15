@@ -4,7 +4,7 @@
 
 The GeneratedGround Inspector and Painted Accent production workstream is complete, Unity-validated, and accepted through GI-A1–GI-A4 and PA-B1–PA-B4.1. **GeneratedGround and the broader Ground visual roadmap are not complete.**
 
-The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. The active milestone is **V3M — Broad Macro Patch Completion**, audited in `Ground_Macro_Patch_Audit_and_Architecture.md`. V3M-A1.1 made the shaped shader regions genuinely visible, but gameplay-camera evidence showed that their fixed transitions were too hard. V3M-A1.2 now exposes Macro Patch Intensity and Macro Patch Transition Softness, uses a softer default blend, and awaits Unity validation. **V4 — Contact / Edge Accents** remains architecturally accepted but is queued until V3M passes gameplay-camera visual acceptance.
+The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. The active milestone is **V3M — Broad Macro Patch Completion**, audited in `Ground_Macro_Patch_Audit_and_Architecture.md`. Unity validation of V3M-A1.3 confirmed that the authoring set and overall patch appearance are useful, but Pattern Seed changed total active coverage too aggressively and could produce excessive dead space. V3M-A1.3.1 now stabilizes seed occupancy without adding controls, noise samples, assets, or regeneration work; Unity validation is pending. **V4 — Contact / Edge Accents** remains architecturally accepted but is queued until V3M passes gameplay-camera visual acceptance.
 
 The accepted current pipeline is:
 
@@ -46,8 +46,8 @@ Ground or scene no longer needs its bake
 ## Next work items
 
 1. Treat only the Inspector and Painted Accent production slice as closed.
-2. Unity-validate V3M-A1.2's Macro Patch Intensity and Macro Patch Transition Softness controls in Snowfield and Grassland.
-3. Tune intensity and transition softness from the gameplay camera, then decide whether morphology needs any additional refinement.
+2. Unity-validate V3M-A1.3.1 across a representative Pattern Seed set at identical Scale, Intensity, Transition Softness, and Average Patch Separation values.
+3. Confirm seeds still produce distinct layouts while total active-versus-neutral coverage remains within a reasonably narrow range.
 4. Resume V4 Contact / Edge Accents only after broad macro composition is visually accepted from the gameplay camera.
 
 ---

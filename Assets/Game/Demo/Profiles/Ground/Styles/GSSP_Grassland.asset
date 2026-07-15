@@ -18,7 +18,7 @@ MonoBehaviour:
   - id: grassland.clean_meadow
     displayName: Clean Meadow
     materialControls:
-      baseColor: {r: 0.47, g: 0.52, b: 0.34, a: 1}
+      baseColor: {r: 0.49513125, g: 0.58431375, b: 0.38431373, a: 1}
       frostColor: {r: 0.68, g: 0.74, b: 0.7, a: 1}
       dampTint: {r: 0.3, g: 0.34, b: 0.23, a: 1}
       dampTintStrength: 0.2
@@ -26,15 +26,18 @@ MonoBehaviour:
       rockyDryTintStrength: 0.16
       vegetationTint: {r: 0.36, g: 0.49, b: 0.25, a: 1}
       vegetationTintStrength: 0.42
+      groundMacroPatchScale: 5.81
+      groundMacroPatchPatternSeed: -17
+      broadVariation: 0.071
+      groundMacroPatchTransitionSoftness: 0.727
+      groundMacroPatchSeparation: 0.52
       pixelCellSize: 0.065
       pixelToneCount: 5
       pixelClusterStrength: 0.38
       pixelVariation: 0.012
-      broadVariation: 0.036
       vertexVariation: 0.12
       pixelEffectStrength: 0.58
       cellWarpStrength: 0.045
-      groundMacroPatchScale: 6.4
       profileContrastScale: 0.84
       profilePixelContrastScale: 0.7
       groundSnowResponseScale: 0.08
@@ -102,7 +105,7 @@ MonoBehaviour:
       paintedAccentCrestCrownHeight: 0.0349
       paintedAccentFoldIrregularity: 0.771
       paintedAccentFoldEndTaper: 0.702
-      paintedAccentInkColor: {r: 0.18439744, g: 0.21698111, b: 0.18115875, a: 1}
+      paintedAccentInkColor: {r: 0.32080978, g: 0.3773585, b: 0.3008188, a: 1}
       paintedAccentInkOpacity: 1
       paintedAccentInkOpacityInitialized: 0
   - id: grassland.patchy_meadow
@@ -116,15 +119,18 @@ MonoBehaviour:
       rockyDryTintStrength: 0.28
       vegetationTint: {r: 0.34, g: 0.46, b: 0.24, a: 1}
       vegetationTintStrength: 0.36
+      groundMacroPatchScale: 5
+      groundMacroPatchPatternSeed: 0
+      broadVariation: 0.052
+      groundMacroPatchTransitionSoftness: 0.75
+      groundMacroPatchSeparation: 1
       pixelCellSize: 0.06
       pixelToneCount: 4.7
       pixelClusterStrength: 0.44
       pixelVariation: 0.016
-      broadVariation: 0.052
       vertexVariation: 0.145
       pixelEffectStrength: 0.66
       cellWarpStrength: 0.065
-      groundMacroPatchScale: 5
       profileContrastScale: 0.94
       profilePixelContrastScale: 0.76
       groundSnowResponseScale: 0.06
@@ -206,15 +212,18 @@ MonoBehaviour:
       rockyDryTintStrength: 0.16
       vegetationTint: {r: 0.3, g: 0.42, b: 0.24, a: 1}
       vegetationTintStrength: 0.38
+      groundMacroPatchScale: 5.7
+      groundMacroPatchPatternSeed: 0
+      broadVariation: 0.048
+      groundMacroPatchTransitionSoftness: 0.75
+      groundMacroPatchSeparation: 1
       pixelCellSize: 0.065
       pixelToneCount: 4.6
       pixelClusterStrength: 0.42
       pixelVariation: 0.014
-      broadVariation: 0.048
       vertexVariation: 0.13
       pixelEffectStrength: 0.62
       cellWarpStrength: 0.055
-      groundMacroPatchScale: 5.7
       profileContrastScale: 0.9
       profilePixelContrastScale: 0.72
       groundSnowResponseScale: 0.04
@@ -344,15 +353,18 @@ MonoBehaviour:
       rockyDryTintStrength: 0.34
       vegetationTint: {r: 0.31, g: 0.4, b: 0.22, a: 1}
       vegetationTintStrength: 0.24
+      groundMacroPatchScale: 4.7
+      groundMacroPatchPatternSeed: 0
+      broadVariation: 0.058
+      groundMacroPatchTransitionSoftness: 0.75
+      groundMacroPatchSeparation: 1
       pixelCellSize: 0.058
       pixelToneCount: 4.4
       pixelClusterStrength: 0.48
       pixelVariation: 0.018
-      broadVariation: 0.058
       vertexVariation: 0.14
       pixelEffectStrength: 0.68
       cellWarpStrength: 0.075
-      groundMacroPatchScale: 4.7
       profileContrastScale: 0.96
       profilePixelContrastScale: 0.78
       groundSnowResponseScale: 0.04

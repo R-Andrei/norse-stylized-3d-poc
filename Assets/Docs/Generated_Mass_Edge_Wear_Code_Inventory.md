@@ -1189,3 +1189,12 @@ The existing source-edge overlay auto-refreshes when its cached state no longer 
 ### `Editor/GeneratedMassEditor.cs`
 
 The editor exposes two independent 30-case audits. The existing topology matrix remains exhaustive and writes the canonical batch report. The artistic preview parity matrix follows the ordinary preview candidate policy and writes separate TXT/CSV reports. Aggregate coverage failures and certified ratios use each case's explicit expected certification count. Report contracts are `EW-B4.2R11A.1-topology` and `EW-B4.2R11A.1-preview`.
+
+
+## EW-B4.2R11B.1 coincident boundary-seam reconciliation
+
+`MassGenerator.EdgeWear.SelectionAndCorners.cs` now canonicalizes two one-sided source-edge incidences when their endpoints match in reversed order within `PointMergeDistance`, the incidences belong to different faces, and no exact `EdgeKey` match exists. This repairs quantization-boundary splits without changing source faces or broadening the tolerance.
+
+`MassGenerator.EdgeWear.Graph.cs` applies the same policy to topology vertices and graph edges: a missed `VertexKey` may alias an existing vertex only within `PointMergeDistance`, and a missed edge key may reuse only a reversed, currently one-sided graph edge. The graph records vertex-alias and seam-pair counts.
+
+Coverage telemetry preserves raw and canonical source counts, candidate-stage seam-pair count, graph vertex aliases, graph seam-pair count, and the canonical source-edge IDs marked `coincidentSeamReconciled`. Matrix contracts are `EW-B4.2R11B.1-topology` and `EW-B4.2R11B.1-preview`. R11B.1 does not implement micro-junction rail traversal or rendered-normal correction.

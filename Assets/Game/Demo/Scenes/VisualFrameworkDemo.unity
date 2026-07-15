@@ -3209,8 +3209,8 @@ MonoBehaviour:
     edgeBlend: 1
     surfaceVariation: 0.42
     useModifiers: 1
-  surfaceStyleProfile: {fileID: 11400000, guid: 9ba42932860747dfa76b99b97bb289df, type: 2}
-  surfaceVariantId: snowfield.clean
+  surfaceStyleProfile: {fileID: 11400000, guid: 1f5a9dc3b8df4e2b9c9124c8a7f44367, type: 2}
+  surfaceVariantId: grassland.clean_meadow
   overrideSurfaceProfile: 0
   surfaceProfile: {fileID: 11400000, guid: 92d482aa5a37c7f41b644f1390ff89c6, type: 2}
   overrideMaterialControls: 0
@@ -3223,15 +3223,18 @@ MonoBehaviour:
     rockyDryTintStrength: 0.34
     vegetationTint: {r: 0.48, g: 0.56, b: 0.39, a: 1}
     vegetationTintStrength: 0.08
+    groundMacroPatchScale: 3.25
+    groundMacroPatchPatternSeed: 0
+    broadVariation: 0.095
+    groundMacroPatchTransitionSoftness: 0.75
+    groundMacroPatchSeparation: 1
     pixelCellSize: 0.055
     pixelToneCount: 4.2
     pixelClusterStrength: 0.68
     pixelVariation: 0.024
-    broadVariation: 0.095
     vertexVariation: 0.25
     pixelEffectStrength: 1.18
     cellWarpStrength: 0.18
-    groundMacroPatchScale: 3.25
     profileContrastScale: 1.35
     profilePixelContrastScale: 1.16
     groundSnowResponseScale: 1
@@ -3267,37 +3270,37 @@ MonoBehaviour:
   paintedAccentPlacementOverlayWeight: 0
   paintedAccentProductionBakeIdentifier: f29eded2381a4a03b9ef575c3fa71095
   paintedAccentProductionCoverageTexture: {fileID: 2800000, guid: 8f91ad7f88cd9cd44b1880fc834de310, type: 2}
-  paintedAccentProductionCoverageSignature: 27705578763cbf695ba346d84c1219dd39d0ab14ee1d4b3a940af6a59ce77f38
+  paintedAccentProductionCoverageSignature: bfce06b04e5a602192669b7982c4267b6271352c0da0b4ce4f51797f7d48510c
   paintedAccentProductionBakeFormatRevision: 1
   paintedAccentProductionCoverageOriginSize: {x: -20, y: -20, z: 40, w: 40}
-  paintedAccentProductionCoveredTexelCount: 7895
-  paintedAccentProductionCoveredTexelFraction: 0.0018823147
+  paintedAccentProductionCoveredTexelCount: 7448
+  paintedAccentProductionCoveredTexelFraction: 0.0017757416
   modifiers:
   - {fileID: 1356653796}
   rivers:
   - {fileID: 1626776158}
   lastSurfaceMaskDiagnostics: 'Surface masks (min/max/avg/p05/p95)
 
-    Tonal: 0.349/0.603/0.482/0.413/0.556
+    Tonal: 0.350/0.601/0.483/0.412/0.552
 
     Exposure:
-    0.285/0.879/0.523/0.285/0.879
+    0.215/0.764/0.425/0.215/0.764
 
-    DampDeposit: 0.235/0.491/0.352/0.274/0.431
+    DampDeposit: 0.236/0.534/0.368/0.293/0.454
 
     Vegetation:
-    0.104/0.180/0.159/0.130/0.174
+    0.393/0.679/0.609/0.493/0.658
 
     Compaction: 0.000/1.000/0.053/0.000/0.741
 
     Shore:
     0.000/0.279/0.009/0.000/0.032
 
-    RockyDry: 0.092/0.143/0.113/0.098/0.131
+    RockyDry: 0.142/0.221/0.177/0.153/0.204
 
     StandingWater:
     0.000/0.000/0.000/0.000/0.000'
-  lastValidatedGenerationSignature: -1049419497
+  lastValidatedGenerationSignature: -2030999597
 --- !u!64 &593135562
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -10855,6 +10858,8 @@ MonoBehaviour:
   foamShoreRibbonThicknessCells: 1
   foamShoreRibbonOffsetMetres: 0.03
   foamShoreRibbonOffsetVariationCells: 0.25
+  foamShoreRibbonInitialPresenceMin: 0.9
+  foamShoreRibbonInitialPresenceMax: 1
   foamShoreRibbonInitialLifeMin: 0.918
   foamShoreRibbonInitialLifeMax: 1
   foamShoreRibbonBreakupStrengthMin: 0.12
@@ -10868,6 +10873,8 @@ MonoBehaviour:
   foamInwardWashReachMaxMetres: 0.75
   foamInwardWashOffsetMinMetres: 0.006
   foamInwardWashOffsetMaxMetres: 0.04
+  foamInwardWashInitialPresenceMin: 0.2
+  foamInwardWashInitialPresenceMax: 0.5
   foamInwardWashInitialLifeMin: 0.2
   foamInwardWashInitialLifeMax: 0.4
   foamInwardWashBreakupStrengthMin: 0.04
@@ -10887,7 +10894,9 @@ MonoBehaviour:
   foamObjectContactArcWidthMaxMetres: 0.12
   foamObjectContactArcOffsetMinMetres: 0.015
   foamObjectContactArcOffsetMaxMetres: 0.12
-  foamObjectContactArcInitialLifeMin: 0.706
+  foamObjectContactArcInitialPresenceMin: 0.88
+  foamObjectContactArcInitialPresenceMax: 1
+  foamObjectContactArcInitialLifeMin: 0.75
   foamObjectContactArcInitialLifeMax: 1
   foamObjectContactArcBreakupStrengthMin: 0.08
   foamObjectContactArcBreakupStrengthMax: 0.28
@@ -10898,6 +10907,8 @@ MonoBehaviour:
   foamObjectContactSemiArcWidthMaxMetres: 0.105
   foamObjectContactSemiArcOffsetMinMetres: 0.02
   foamObjectContactSemiArcOffsetMaxMetres: 0.14
+  foamObjectContactSemiArcInitialPresenceMin: 0.84
+  foamObjectContactSemiArcInitialPresenceMax: 1
   foamObjectContactSemiArcInitialLifeMin: 0.712
   foamObjectContactSemiArcInitialLifeMax: 1
   foamObjectContactSemiArcBreakupStrengthMin: 0.08
@@ -10911,6 +10922,8 @@ MonoBehaviour:
   foamObjectContactFleckWidthMaxMetres: 0.08
   foamObjectContactFleckOffsetMinMetres: 0.02
   foamObjectContactFleckOffsetMaxMetres: 0.16
+  foamObjectContactFleckInitialPresenceMin: 0.82
+  foamObjectContactFleckInitialPresenceMax: 0.97
   foamObjectContactFleckInitialLifeMin: 0.747
   foamObjectContactFleckInitialLifeMax: 0.948
   foamObjectContactFleckBreakupStrengthMin: 0.18
@@ -10928,6 +10941,8 @@ MonoBehaviour:
   foamFreeWaterLaceLengthMaxMetres: 5.8
   foamFreeWaterLaceWidthMinMetres: 0.005
   foamFreeWaterLaceWidthMaxMetres: 0.03
+  foamFreeWaterLaceInitialPresenceMin: 0.78
+  foamFreeWaterLaceInitialPresenceMax: 1
   foamFreeWaterLaceInitialLifeMin: 0.836
   foamFreeWaterLaceInitialLifeMax: 1
   foamFreeWaterLaceBreakupStrengthMin: 0.22
@@ -10939,6 +10954,8 @@ MonoBehaviour:
   foamFreeWaterCrossLaceLengthMaxMetres: 2.4
   foamFreeWaterCrossLaceWidthMinMetres: 0.005
   foamFreeWaterCrossLaceWidthMaxMetres: 0.01
+  foamFreeWaterCrossLaceInitialPresenceMin: 0.78
+  foamFreeWaterCrossLaceInitialPresenceMax: 1
   foamFreeWaterCrossLaceInitialLifeMin: 0.866
   foamFreeWaterCrossLaceInitialLifeMax: 1
   foamFreeWaterCrossLaceBreakupStrengthMin: 0.2
@@ -10948,14 +10965,17 @@ MonoBehaviour:
   foamFreeWaterFragmentLengthMaxMetres: 1.35
   foamFreeWaterFragmentWidthMinMetres: 0.005
   foamFreeWaterFragmentWidthMaxMetres: 0.05
+  foamFreeWaterFragmentInitialPresenceMin: 0.76
+  foamFreeWaterFragmentInitialPresenceMax: 1
   foamFreeWaterFragmentInitialLifeMin: 0.807
   foamFreeWaterFragmentInitialLifeMax: 1
   foamFreeWaterFragmentBreakupStrengthMin: 0.3
   foamFreeWaterFragmentBreakupStrengthMax: 0.7
   foamShoreFoamStrength: 0.35
   foamShoreFoamPersistence: 0.3
-  foamNeutralLifetime: 7.5
+  foamNeutralLifetime: 10
   foamSupportedAgingRate: 0.07
+  foamFullSupportedAgingAt: 0.9
   foamFinalVisibilityMode: 1
   foamNegativeAgingRate: 7.5
   foamMaterialFlowSpeedMultiplier: 0.45

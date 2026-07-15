@@ -1,6 +1,6 @@
 # Current River continuation — post-D.1C milestone closure
 
-The current Chipping baseline is Unity-validated and accepted. Stage 3 shore-wave controls are validated. The user Unity-validated `4.11C.5.18C — Contact-Attached Pressure and Thin Birth Sources`; Stage 7 Secondary Water Effects is complete and validated. `4.11C.5.18D` records the final truthful Object Foam control semantics without changing accepted geometry or serialized values. The old Stage 8 reflection/final-integration plan is stale and retired; the current River has no visible reflection feature. All performance work is deferred to one future comprehensive River performance pass.
+The current Chipping baseline, Stage 3 shore-wave controls, `4.11C.5.18C`, and `4.11C.5.18D` are Unity-validated and accepted. Stage 7 source/contact geometry remains closed. `4.11C.5.18E — Initial Presence and Lifecycle Authority` is the active targeted Foam lifespan-authoring patch; Unity validation is pending. The old Stage 8 reflection/final-integration plan is stale and retired. All performance work remains deferred to one future comprehensive River performance pass.
 
 ```text
 D.0   dedicated fine-edge/Fray retirement
@@ -11,7 +11,7 @@ D.1C  camera-readable medium/large-biased population
 
 Current controls are Amount, Size, Spacing, Irregularity, Edge Width, and optional Interior Access. `D.1A.1` is rejected and rolled back. `D.1D — Coherent Edge-Bite Admission` is skipped because the current result is good enough. Remaining-Life interaction is deferred as optional future work. The zoom-dependent thin-strip capture remains known deferred technical debt.
 
-Current active direction: import and confirm the behaviour-preserving `4.11C.5.18D` Inspector/diagnostic cleanup, then leave River visual work closed. The next reasonable River project is the separately approved comprehensive performance pass. Do not infer an active reflection, Remaining-Life, Fray, micro-fragment, or isolated performance queue from older notes.
+Current active direction: import and validate `4.11C.5.18E`. Test per-pattern Initial Presence, the Lifecycle-Faithful `0.02–0.10` meaningful-Presence range, extended lifecycle sliders, and `Full Supported Aging At`. Do not change birth cohort behavior, negative-aging shaping, source geometry, Chipping, or Strands during this validation. Performance work remains deferred.
 
 B.2K/B.2L geometry and timing remain part of the accepted current baseline; no dedicated B.2L validation task remains.
 
@@ -2271,6 +2271,12 @@ coherent broad left/right movement.
 ```
 
 Do not begin Layer D visual history or fracture until this transport path is accepted. Layer D must later consume the same velocity contract.
+
+## Active lifecycle-authoring patch — `4.11C.5.18E` Initial Presence and Lifecycle Authority
+
+Every automatic source pattern now exposes `Initial Presence Min/Max` immediately before `Initial Life`. Defaults reproduce the former hard-coded source amounts exactly. Lifecycle-Faithful rendering reaches full meaningful-Presence participation at `0.10` instead of `0.16`; zero/near-zero Presence remains non-rendering. Neutral Lifetime and Negative Aging Rate sliders extend to `20` without retuning existing values.
+
+`Full Supported Aging At` appears in `Foam → Layer C — Persistent Material → Lifecycle`. Its default `0.92` reproduces the old fixed curve; lower values let ordinary positive support receive more of the authored Supported Aging Rate. Negative Aging Pressure keeps the old fixed response and is not controlled by this value.
 
 ## Accepted Stage 7 correction — `4.11C.5.18C` Contact-Attached Pressure and Thin Birth Sources
 

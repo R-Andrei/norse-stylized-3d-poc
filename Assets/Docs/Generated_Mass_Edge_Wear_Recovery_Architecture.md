@@ -1302,3 +1302,10 @@ Artistic Preview Parity Matrix
 ```
 
 The second audit is required because a passing exhaustive matrix alone cannot prove that the ordinary preview path builds. The plane construction, viability thresholds, coexistence search, topology certification, and frozen R10R4 geometry rules remain unchanged.
+
+
+## R11B.1 coincident boundary-seam recovery
+
+R11B.1 repairs source seams split only by quantization-boundary drift smaller than `PointMergeDistance`. Reconciliation is deliberately narrow: the second incidence must reverse-match an existing one-sided incidence, belong to a different face, and leave the canonical edge manifold after the second face is attached. No source face, scene, prefab, or production mesh is rewritten.
+
+The candidate aggregate and topology graph independently apply the same rule and expose separate evidence counts. Acceptance requires candidate seam-pair count and graph seam-pair count to agree, the affected canonical edge to receive two owner faces, and both topology and preview matrices to remain fully certified. This patch does not relax isolated-rail, width-floor, dihedral, or certification constraints.

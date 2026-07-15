@@ -178,7 +178,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float EdgeWearWidth;
             public double TotalMilliseconds;
             public double PreflightMilliseconds;
+            public int RawSourceEdgeCount;
             public int SourceEdgeCount;
+            public int CoincidentBoundarySeamPairCount;
+            public int CoincidentGraphVertexReconciliationCount;
+            public int CoincidentGraphBoundarySeamPairCount;
             public int StructuralEligibleCount;
             public int GeometricEligibleCount;
             public int CoexistenceEligibleCount;

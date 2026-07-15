@@ -164,9 +164,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             PlaneCutBevelAuditResult audit)
         {
             EdgeWearCoverageAudit coverage = audit.CoverageAudit;
+            result.RawSourceEdgeCount = coverage == null
+                ? 0
+                : coverage.RawSourceEdgeCount;
             result.SourceEdgeCount = coverage == null
                 ? 0
                 : coverage.SourceEdgeCount;
+            result.CoincidentBoundarySeamPairCount = coverage == null
+                ? 0
+                : coverage.CoincidentBoundarySeamPairCount;
+            result.CoincidentGraphVertexReconciliationCount =
+                coverage == null
+                    ? 0
+                    : coverage.CoincidentGraphVertexReconciliationCount;
+            result.CoincidentGraphBoundarySeamPairCount =
+                coverage == null
+                    ? 0
+                    : coverage.CoincidentGraphBoundarySeamPairCount;
             result.StructuralEligibleCount = coverage == null
                 ? 0
                 : coverage.StructuralEligibleCount;
@@ -2474,7 +2488,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return "max=" + (audit.MaximumCoverageMode ? "1" : "0") +
                 ",requireAllGeometric=" +
                     (audit.RequireAllGeometricCandidates ? "1" : "0") +
+                ",rawSource=" + audit.RawSourceEdgeCount +
                 ",source=" + audit.SourceEdgeCount +
+                ",coincidentSeamPairs=" +
+                    audit.CoincidentBoundarySeamPairCount +
+                ",graphVertexAliases=" +
+                    audit.CoincidentGraphVertexReconciliationCount +
+                ",graphSeamPairs=" +
+                    audit.CoincidentGraphBoundarySeamPairCount +
                 ",structural=" + audit.StructuralEligibleCount +
                 ",geometric=" + audit.GeometricEligibleCount +
                 ",geometricIneligible=" +
@@ -2520,6 +2541,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     FormatEdgeWearCoverageIds(
                         audit,
                         "geometric-ineligible") + "}" +
+                ",coincidentSeams={" +
+                    FormatEdgeWearCoverageIds(
+                        audit,
+                        "coincident-seam") + "}" +
                 ",coexistenceIneligible={" +
                     FormatEdgeWearCoverageIds(
                         audit,
@@ -2569,6 +2594,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     "geometric-ineligible" =>
                         record.StructuralEligible &&
                         !record.GeometricEligible,
+                    "coincident-seam" =>
+                        record.CoincidentBoundarySeamReconciled,
                     "coexistence-ineligible" =>
                         record.GeometricEligible &&
                         !record.CoexistenceEligible,
@@ -3290,6 +3317,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(record.Vertical01.ToString("G9"));
                 builder.Append(",classification=");
                 builder.Append(record.Classification);
+                builder.Append(",coincidentSeamReconciled=");
+                builder.Append(
+                    record.CoincidentBoundarySeamReconciled ? '1' : '0');
                 builder.Append(",structural=");
                 builder.Append(record.StructuralEligible ? '1' : '0');
                 builder.Append(",geometric=");

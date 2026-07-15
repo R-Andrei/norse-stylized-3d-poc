@@ -90,6 +90,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             stats.GraphVertexCount = graph.Vertices.Count;
             stats.GraphEdgeCount = graph.Edges.Count;
             stats.GraphFaceCount = graph.Faces.Count;
+            stats.CoincidentVertexReconciliationCount =
+                graph.CoincidentVertexReconciliationCount;
+            stats.CoincidentBoundarySeamPairCount =
+                graph.CoincidentBoundarySeamPairCount;
 
             return stats.GraphFaceCount > 0 &&
                 stats.GraphNonManifoldEdgeCount == 0 &&
@@ -154,6 +158,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return index;
             }
 
+            if (TryFindCoincidentEdgeWearGraphVertex(
+                    graph,
+                    position,
+                    out index))
+            {
+                graph.VertexByKey.Add(key, index);
+                graph.CoincidentVertexReconciliationCount++;
+                return index;
+            }
+
             index = graph.Vertices.Count;
             graph.VertexByKey.Add(key, index);
             graph.Vertices.Add(new EdgeWearGraphVertex(position, key));
@@ -173,12 +187,73 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return index;
             }
 
+            if (TryFindReversedCoincidentBoundaryGraphEdge(
+                    graph,
+                    vertexA,
+                    vertexB,
+                    out index))
+            {
+                graph.EdgeByKey.Add(key, index);
+                graph.CoincidentBoundarySeamPairCount++;
+                return index;
+            }
+
             index = graph.Edges.Count;
             graph.EdgeByKey.Add(key, index);
             graph.Edges.Add(new EdgeWearGraphEdge(vertexA, vertexB));
             graph.Vertices[vertexA].AddEdge(index);
             graph.Vertices[vertexB].AddEdge(index);
             return index;
+        }
+
+        private static bool TryFindCoincidentEdgeWearGraphVertex(
+            EdgeWearTopologyGraph graph,
+            Vector3 position,
+            out int vertexIndex)
+        {
+            vertexIndex = -1;
+            float bestDistanceSqr = float.PositiveInfinity;
+            for (int index = 0; index < graph.Vertices.Count; index++)
+            {
+                float distanceSqr =
+                    (graph.Vertices[index].Position - position).sqrMagnitude;
+                if (distanceSqr > PointMergeDistanceSqr ||
+                    distanceSqr >= bestDistanceSqr)
+                {
+                    continue;
+                }
+
+                vertexIndex = index;
+                bestDistanceSqr = distanceSqr;
+            }
+            return vertexIndex >= 0;
+        }
+
+        private static bool TryFindReversedCoincidentBoundaryGraphEdge(
+            EdgeWearTopologyGraph graph,
+            int vertexA,
+            int vertexB,
+            out int edgeIndex)
+        {
+            edgeIndex = -1;
+            List<int> connected = graph.Vertices[vertexA].EdgeIndices;
+            for (int index = 0; index < connected.Count; index++)
+            {
+                int candidateIndex = connected[index];
+                EdgeWearGraphEdge candidate = graph.Edges[candidateIndex];
+                if (candidate.VertexA != vertexB ||
+                    candidate.VertexB != vertexA ||
+                    candidate.FaceA < 0 ||
+                    candidate.FaceB >= 0 ||
+                    candidate.ExtraFaceCount > 0)
+                {
+                    continue;
+                }
+
+                edgeIndex = candidateIndex;
+                return true;
+            }
+            return false;
         }
 
         private static int GetUniqueGraphVertexCount(List<int> vertexIndices)

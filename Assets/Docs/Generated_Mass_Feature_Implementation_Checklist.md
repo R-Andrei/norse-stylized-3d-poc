@@ -3422,8 +3422,21 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 - [ ] Rebuild seed `5727`; require `selected == attempted == certified == 28`, `coverageValid == 1`, and preview applied.
 - [ ] Rebuild seed `2223`; require edge `33` artistic filtering, one generic coexistence exclusion, final `selected == attempted == certified == 30`, and preview applied.
 - [ ] Run the topology matrix; require `30/30` and fingerprints/exclusions unchanged from frozen R10R4.
-- [ ] Run the artistic preview parity matrix; require `30/30` with zero coverage/topology/placement/cache failures.
+- [x] Run the artistic preview parity matrix; runtime result passed `30/30` with zero coverage/topology/placement/cache failures.
 
 ### Explicit non-goals
 
 - [x] Do not change candidate geometry, isolated-rail construction, width floor, topology tolerances, coexistence search, shading normals, shaders, or production commit.
+
+
+## EW-B4.2R11B.1 — Coincident boundary-seam reconciliation
+
+- [x] Preserve R11A.1 ordinary-preview and exhaustive-topology denominator contracts.
+- [x] Detect reversed one-sided source-edge incidences whose endpoints differ by no more than `PointMergeDistance`.
+- [x] Require distinct owner faces and avoid merging same-direction or already two-sided edges.
+- [x] Canonicalize the corresponding graph vertices and graph edge without modifying source faces.
+- [x] Add raw/canonical source counts, seam-pair counts, graph vertex-alias count, graph seam-pair count, and per-edge reconciliation evidence.
+- [x] Advance topology and preview report contracts to `EW-B4.2R11B.1-*`.
+- [ ] Validate seed 5727: the two reversed boundary pairs become canonical two-face edges and are assessed normally.
+- [ ] Run the exhaustive topology matrix and artistic preview parity matrix; require both `30/30`.
+- [ ] Defer seed 2223 edge 36 micro-junction rail recovery to R11B.2.

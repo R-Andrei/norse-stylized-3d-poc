@@ -298,6 +298,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Supported Aging Rate",
                     "Aging-rate multiplier at full positive support. Values below one extend life."));
             EditorGUILayout.PropertyField(
+                Find("foamFullSupportedAgingAt"),
+                new GUIContent(
+                    "Full Supported Aging At",
+                    "Raw combined positive-support value at which Supported Aging Rate is applied fully. Lower values make ordinary support preserve Foam more strongly; 0.92 reproduces the previous fixed curve."));
+            EditorGUILayout.PropertyField(
                 Find("foamNegativeAgingRate"),
                 new GUIContent(
                     "Negative Aging Rate",
@@ -1042,6 +1047,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             "Offset Variation",
                             "Deterministic event-to-event offset variation measured in cross-river Foam cells. This should not be used to create separated parallel bands."));
                     DrawMinMaxUnitControls(
+                        "Initial Presence",
+                        Find("foamShoreRibbonInitialPresenceMin"),
+                        Find("foamShoreRibbonInitialPresenceMax"),
+                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
+                    DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamShoreRibbonInitialLifeMin"),
                         Find("foamShoreRibbonInitialLifeMax"),
@@ -1080,6 +1090,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Shore Start Offset",
                         Find("foamInwardWashOffsetMinMetres"),
                         Find("foamInwardWashOffsetMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Presence",
+                        Find("foamInwardWashInitialPresenceMin"),
+                        Find("foamInwardWashInitialPresenceMax"),
+                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamInwardWashInitialLifeMin"),
@@ -1183,6 +1198,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamObjectContactArcOffsetMinMetres"),
                         Find("foamObjectContactArcOffsetMaxMetres"));
                     DrawMinMaxUnitControls(
+                        "Initial Presence",
+                        Find("foamObjectContactArcInitialPresenceMin"),
+                        Find("foamObjectContactArcInitialPresenceMax"),
+                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
+                    DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamObjectContactArcInitialLifeMin"),
                         Find("foamObjectContactArcInitialLifeMax"),
@@ -1218,6 +1238,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Contact Offset",
                         Find("foamObjectContactSemiArcOffsetMinMetres"),
                         Find("foamObjectContactSemiArcOffsetMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Presence",
+                        Find("foamObjectContactSemiArcInitialPresenceMin"),
+                        Find("foamObjectContactSemiArcInitialPresenceMax"),
+                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamObjectContactSemiArcInitialLifeMin"),
@@ -1259,6 +1284,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Contact Offset",
                         Find("foamObjectContactFleckOffsetMinMetres"),
                         Find("foamObjectContactFleckOffsetMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Presence",
+                        Find("foamObjectContactFleckInitialPresenceMin"),
+                        Find("foamObjectContactFleckInitialPresenceMax"),
+                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamObjectContactFleckInitialLifeMin"),
@@ -1359,6 +1389,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamFreeWaterLaceWidthMinMetres"),
                         Find("foamFreeWaterLaceWidthMaxMetres"));
                     DrawMinMaxUnitControls(
+                        "Initial Presence",
+                        Find("foamFreeWaterLaceInitialPresenceMin"),
+                        Find("foamFreeWaterLaceInitialPresenceMax"),
+                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
+                    DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamFreeWaterLaceInitialLifeMin"),
                         Find("foamFreeWaterLaceInitialLifeMax"),
@@ -1395,6 +1430,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamFreeWaterCrossLaceWidthMinMetres"),
                         Find("foamFreeWaterCrossLaceWidthMaxMetres"));
                     DrawMinMaxUnitControls(
+                        "Initial Presence",
+                        Find("foamFreeWaterCrossLaceInitialPresenceMin"),
+                        Find("foamFreeWaterCrossLaceInitialPresenceMax"),
+                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
+                    DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamFreeWaterCrossLaceInitialLifeMin"),
                         Find("foamFreeWaterCrossLaceInitialLifeMax"),
@@ -1425,6 +1465,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Width",
                         Find("foamFreeWaterFragmentWidthMinMetres"),
                         Find("foamFreeWaterFragmentWidthMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Presence",
+                        Find("foamFreeWaterFragmentInitialPresenceMin"),
+                        Find("foamFreeWaterFragmentInitialPresenceMax"),
+                        "Peak persistent material deposited by this pattern before its profile, formation envelope, and valid-fluid masks. Defaults reproduce the former hidden source amount.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamFreeWaterFragmentInitialLifeMin"),

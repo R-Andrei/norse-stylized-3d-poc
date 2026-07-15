@@ -1080,7 +1080,10 @@ namespace ProgrammaticStylized3D.Rivers
                     Hash01(seed + 10.1f));
                 patternFormationSpeedMultiplier =
                     river.FoamObjectContactFleckFormationSpeedMultiplier;
-                amount = Mathf.Lerp(0.82f, 0.97f, eventScale);
+                amount = Mathf.Lerp(
+                    river.FoamObjectContactFleckInitialPresenceMin,
+                    river.FoamObjectContactFleckInitialPresenceMax,
+                    eventScale);
             }
             else if (recipe == AutomaticObjectSourceRecipe.ContactSemiArc)
             {
@@ -1107,7 +1110,10 @@ namespace ProgrammaticStylized3D.Rivers
                     Hash01(seed + 10.1f));
                 patternFormationSpeedMultiplier =
                     river.FoamObjectContactSemiArcFormationSpeedMultiplier;
-                amount = Mathf.Lerp(0.84f, 0.98f, eventScale);
+                amount = Mathf.Lerp(
+                    river.FoamObjectContactSemiArcInitialPresenceMin,
+                    river.FoamObjectContactSemiArcInitialPresenceMax,
+                    eventScale);
                 float side = Hash01(seed + 13.9f) < 0.5f ? -1f : 1f;
                 lopsidedness = side * Mathf.Lerp(
                     river.FoamObjectContactSemiArcLopsidednessMin,
@@ -1139,7 +1145,10 @@ namespace ProgrammaticStylized3D.Rivers
                     Hash01(seed + 10.1f));
                 patternFormationSpeedMultiplier =
                     river.FoamObjectContactArcFormationSpeedMultiplier;
-                amount = Mathf.Lerp(0.88f, 1.0f, eventScale);
+                amount = Mathf.Lerp(
+                    river.FoamObjectContactArcInitialPresenceMin,
+                    river.FoamObjectContactArcInitialPresenceMax,
+                    eventScale);
             }
 
             length = Mathf.Clamp(
@@ -1668,7 +1677,10 @@ namespace ProgrammaticStylized3D.Rivers
                 patternFormationSpeedMultiplier =
                     river.FoamFreeWaterFragmentFormationSpeedMultiplier;
                 curvature = Mathf.Lerp(-1.0f, 1.0f, Hash01(seed + 11.7f));
-                amount = Mathf.Lerp(0.76f, 0.94f, eventScale);
+                amount = Mathf.Lerp(
+                    river.FoamFreeWaterFragmentInitialPresenceMin,
+                    river.FoamFreeWaterFragmentInitialPresenceMax,
+                    eventScale);
             }
             else if (recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector)
             {
@@ -1692,7 +1704,10 @@ namespace ProgrammaticStylized3D.Rivers
                 patternFormationSpeedMultiplier =
                     river.FoamFreeWaterCrossLaceFormationSpeedMultiplier;
                 curvature = Mathf.Lerp(-1.0f, 1.0f, Hash01(seed + 11.7f));
-                amount = Mathf.Lerp(0.78f, 0.96f, eventScale);
+                amount = Mathf.Lerp(
+                    river.FoamFreeWaterCrossLaceInitialPresenceMin,
+                    river.FoamFreeWaterCrossLaceInitialPresenceMax,
+                    eventScale);
             }
             else
             {
@@ -1720,7 +1735,10 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamFreeWaterLaceCurvatureMin,
                     river.FoamFreeWaterLaceCurvatureMax,
                     Hash01(seed + 12.9f));
-                amount = Mathf.Lerp(0.78f, 0.96f, eventScale);
+                amount = Mathf.Lerp(
+                    river.FoamFreeWaterLaceInitialPresenceMin,
+                    river.FoamFreeWaterLaceInitialPresenceMax,
+                    eventScale);
             }
 
             length = Mathf.Clamp(length, 0.05f, Mathf.Max(0.05f, validFieldLength * 0.38f));
@@ -2178,7 +2196,10 @@ namespace ProgrammaticStylized3D.Rivers
                         inwardReach,
                         Mathf.Max(0.030f, width * 2.0f),
                         Mathf.Max(0.050f, length * 0.45f));
-                    amount = Mathf.Lerp(0.84f, 0.98f, eventScale);
+                    amount = Mathf.Lerp(
+                        river.FoamInwardWashInitialPresenceMin,
+                        river.FoamInwardWashInitialPresenceMax,
+                        eventScale);
                     remainingLife = Mathf.Lerp(
                         river.FoamInwardWashInitialLifeMin,
                         river.FoamInwardWashInitialLifeMax,
@@ -2214,7 +2235,10 @@ namespace ProgrammaticStylized3D.Rivers
                         (Hash01(seed + 8.3f) * 2f - 1f) *
                         offsetVariationMetres);
                     inwardReach = 0f;
-                    amount = Mathf.Lerp(0.90f, 1.00f, eventScale);
+                    amount = Mathf.Lerp(
+                        river.FoamShoreRibbonInitialPresenceMin,
+                        river.FoamShoreRibbonInitialPresenceMax,
+                        eventScale);
                     remainingLife = Mathf.Lerp(
                         river.FoamShoreRibbonInitialLifeMin,
                         river.FoamShoreRibbonInitialLifeMax,

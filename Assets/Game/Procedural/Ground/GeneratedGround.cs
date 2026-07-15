@@ -749,8 +749,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundPatchBlendStrength");
         private static readonly int GroundMacroPatchScaleId =
             Shader.PropertyToID("_GroundMacroPatchScale");
+        private static readonly int GroundMacroPatchPatternSeedId =
+            Shader.PropertyToID("_GroundMacroPatchPatternSeed");
         private static readonly int GroundMacroPatchTransitionSoftnessId =
             Shader.PropertyToID("_GroundMacroPatchTransitionSoftness");
+        private static readonly int GroundMacroPatchSeparationId =
+            Shader.PropertyToID("_GroundMacroPatchSeparation");
         private static readonly int GroundSnowTintStrengthId =
             Shader.PropertyToID("_GroundSnowTintStrength");
         private static readonly int GroundSnowBrightnessId =
@@ -3776,8 +3780,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 GroundMacroPatchScaleId,
                 resolvedMaterialControls.GroundMacroPatchScale);
             materialProperties.SetFloat(
+                GroundMacroPatchPatternSeedId,
+                resolvedMaterialControls.GroundMacroPatchPatternSeed);
+            materialProperties.SetFloat(
                 GroundMacroPatchTransitionSoftnessId,
                 resolvedMaterialControls.GroundMacroPatchTransitionSoftness);
+            materialProperties.SetFloat(
+                GroundMacroPatchSeparationId,
+                resolvedMaterialControls.GroundMacroPatchSeparation);
             materialProperties.SetFloat(
                 GroundSnowTintStrengthId,
                 resolvedMaterialControls.GroundSnowTintStrength);

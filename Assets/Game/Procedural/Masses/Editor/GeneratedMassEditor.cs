@@ -1254,9 +1254,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "G9", CultureInfo.InvariantCulture));
                 builder.Append(",passed=");
                 builder.Append(result.Passed ? '1' : '0');
-                builder.Append(",source/structural/geometric/coexistence=");
+                builder.Append(",rawSource/source/seamPairs/vertexAliases/graphSeamPairs=");
+                builder.Append(result.RawSourceEdgeCount);
+                builder.Append('/');
                 builder.Append(result.SourceEdgeCount);
                 builder.Append('/');
+                builder.Append(result.CoincidentBoundarySeamPairCount);
+                builder.Append('/');
+                builder.Append(
+                    result.CoincidentGraphVertexReconciliationCount);
+                builder.Append('/');
+                builder.Append(
+                    result.CoincidentGraphBoundarySeamPairCount);
+                builder.Append(",structural/geometric/coexistence=");
                 builder.Append(result.StructuralEligibleCount);
                 builder.Append('/');
                 builder.Append(result.GeometricEligibleCount);
@@ -1399,8 +1409,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             StringBuilder builder = new StringBuilder(16384);
             builder.AppendLine(
-                "case,seed,widthTier,width,passed,sourceEdges," +
-                "structuralEligible,geometricEligible,coexistenceEligible," +
+                "case,seed,widthTier,width,passed,rawSourceEdges,sourceEdges," +
+                "coincidentBoundarySeamPairs,graphVertexAliases," +
+                "graphBoundarySeamPairs,structuralEligible," +
+                "geometricEligible,coexistenceEligible," +
                 "coexistenceIneligible,selected,certified,deferred,rejected," +
                 "trialRejected,boundaryExclusions,dihedralExclusions," +
                 "footprintExclusions,localityExclusions," +
@@ -1442,7 +1454,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 AppendCsvValue(builder, matrixCase.Width.ToString(
                     "G9", CultureInfo.InvariantCulture));
                 AppendCsvValue(builder, result.Passed ? "1" : "0");
+                AppendCsvValue(builder, result.RawSourceEdgeCount.ToString());
                 AppendCsvValue(builder, result.SourceEdgeCount.ToString());
+                AppendCsvValue(builder,
+                    result.CoincidentBoundarySeamPairCount.ToString());
+                AppendCsvValue(builder,
+                    result.CoincidentGraphVertexReconciliationCount.ToString());
+                AppendCsvValue(builder,
+                    result.CoincidentGraphBoundarySeamPairCount.ToString());
                 AppendCsvValue(builder,
                     result.StructuralEligibleCount.ToString());
                 AppendCsvValue(builder,
@@ -1680,8 +1699,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
-                ? "EW-B4.2R11A.1-topology"
-                : "EW-B4.2R11A.1-preview";
+                ? "EW-B4.2R11B.1-topology"
+                : "EW-B4.2R11B.1-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *

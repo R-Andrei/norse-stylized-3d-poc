@@ -20,15 +20,20 @@
                 float macroScale = max(_GroundMacroPatchScale, 0.0001);
                 float2 baseCoordinate = positionWS.xz / macroScale;
                 float seedCoordinate = _PixelSeed * 0.013;
+                float patternSeed = _GroundMacroPatchPatternSeed;
 
                 float3 warpCoordinate =
                     float3(baseCoordinate * 0.43, seedCoordinate);
                 float2 warp =
                     float2(
                         PS3D_ValueNoise31(
-                            warpCoordinate + float3(11.17, 29.31, 7.73)),
+                            warpCoordinate +
+                            float3(11.17, 29.31, 7.73) +
+                            patternSeed * float3(17.17, 31.31, 13.73)),
                         PS3D_ValueNoise31(
-                            warpCoordinate + float3(23.31, 17.73, 5.37))) *
+                            warpCoordinate +
+                            float3(23.31, 17.73, 5.37) +
+                            patternSeed * float3(29.31, 11.17, 23.53))) *
                     2.0 -
                     1.0;
 
@@ -37,16 +42,28 @@
                 float primaryRegion = PS3D_ValueNoise31(
                     float3(regionCoordinate, seedCoordinate + 37.47));
                 float secondaryRegion = PS3D_ValueNoise31(
-                    float3(regionCoordinate * 1.65, seedCoordinate + 53.29));
+                    float3(regionCoordinate * 1.65, seedCoordinate + 53.29) +
+                    patternSeed * float3(41.41, 13.13, 31.73));
                 float regionalSource = saturate(
-                    primaryRegion * 0.86 + secondaryRegion * 0.14);
+                    primaryRegion + (secondaryRegion - 0.5) * 0.14);
 
-                float transitionSoftness =
-                    saturate(_GroundMacroPatchTransitionSoftness);
-                float transitionWidth =
-                    lerp(0.06, 0.24, transitionSoftness);
-                float darkNeutralBoundary = 0.36;
-                float lightNeutralBoundary = 0.64;
+                float averageSeparation =
+                    max(0.0, _GroundMacroPatchSeparation);
+                float localSeparationVariation =
+                    warp.x * warp.y * 0.08;
+                float localGap = clamp(
+                    averageSeparation * 0.28 +
+                    localSeparationVariation,
+                    0.0,
+                    0.98);
+                float halfGap = localGap * 0.5;
+                float darkNeutralBoundary = 0.5 - halfGap;
+                float lightNeutralBoundary = 0.5 + halfGap;
+
+                float transitionWidth = lerp(
+                    0.06,
+                    0.35,
+                    saturate(_GroundMacroPatchTransitionSoftness));
                 float darkPlateauBoundary =
                     darkNeutralBoundary - transitionWidth;
                 float lightPlateauBoundary =

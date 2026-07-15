@@ -16,7 +16,39 @@ Amount, Size, Spacing, Irregularity, Edge Width, Interior Access
 
 `D.1A.1` is rejected and rolled back. `D.1D — Coherent Edge-Bite Admission` is skipped because the current result is good enough. Remaining-Life interaction is deferred as optional future enhancement rather than an active dependency. The zoom-dependent thin-strip capture remains known technical debt and is not blocking completion.
 
-There is no active Chipping patch. Stage 7 is complete and validated; no further River visual feature is queued.
+There is no active Chipping patch. Stage 7 source/contact geometry remains complete and validated, but `4.11C.5.18E` is the active targeted Foam lifecycle-authoring and visible-duration validation patch.
+
+## Initial Presence and lifecycle authority — `4.11C.5.18E` — implemented, Unity validation pending
+
+A runtime lifetime audit showed that the automatic source recipes already authored normalized `Initial Life`, but their peak deposited `Presence` remained hidden as hard-coded per-pattern ranges. `5.18E` exposes those exact existing ranges as `Initial Presence Min/Max`, so importing the patch preserves the prior source result by default while allowing direct tests of presence-limited visible lifetime:
+
+```text
+Shore Ribbon             0.90–1.00
+Inward Wash              0.84–0.98
+Object Contact Arc       0.88–1.00
+Object Contact Semi-Arc  0.84–0.98
+Object Contact Fleck     0.82–0.97
+Free Water Lace          0.78–0.96
+Free Water Cross-Lace    0.78–0.96
+Free Water Fragment      0.76–0.94
+```
+
+`Initial Presence` is the peak persistent material amount before profile, progressive-formation, and valid-fluid masks; it is not opacity and does not replace `Initial Life`. Birth cohort behavior remains unchanged: later-revealed material is younger, and repeated writes over already occupied material do not blindly reset the whole patch.
+
+Lifecycle-Faithful Final Foam now grants full meaningful-footprint participation at Presence `0.10` instead of `0.16`, while retaining the `0.02` disappearance floor and all existing life-driven erosion formulas. Neutral Lifetime and Negative Aging Rate authoring maxima are extended to `20` without changing existing serialized values.
+
+Positive support gains `Full Supported Aging At`, default `0.92`, which exactly reproduces the previous fixed support curve. Lower values let ordinary positive support reach the authored Supported Aging Rate sooner. Negative Aging Pressure retains its accepted fixed `0.08–0.92` shaping and is deliberately not affected by this new control.
+
+Resource contract:
+
+```text
+new textures/channels/buffers/dispatches = 0;
+new automatic-source events = 0;
+source-shape geometry and scheduling = unchanged;
+negative-aging response = unchanged;
+Lifecycle-Faithful presence footprint high edge = 0.16 → 0.10;
+Unity shader/compute import and runtime validation = pending.
+```
 
 ## Accepted Stage 7 closure correction — `4.11C.5.18C` Contact-Attached Pressure and Thin Birth Sources
 
@@ -68,7 +100,7 @@ The existing Automatic Birth Sources view gains two compact evidence rows for cu
 
 # Current River completion state
 
-The current fixed-strength Chipping and structural Strand result is accepted. No additional morphology or Remaining-Life patch is required. Stage 3 is fully validated. Stage 7 is complete and validated through `5.18C`; `5.18D` records the final truthful authoring contract. The former Stage 8 reflection/final-integration queue is stale: the current River has no visible reflection feature and no active reflection plan.
+The current fixed-strength Chipping and structural Strand result is accepted. `5.18E` does not add morphology; it is a targeted source-Presence, lifecycle-range, meaningful-Presence threshold, and support-authority pass. Stage 3 is fully validated. Stage 7 is complete and validated through `5.18C`; `5.18D` records the final truthful authoring contract. The former Stage 8 reflection/final-integration queue is stale: the current River has no visible reflection feature and no active reflection plan.
 
 All River performance work is deferred to one later comprehensive pass covering offscreen/empty-field work, cadence, sleeping, shader/runtime cost, diagnostic/readback overhead, chunk policies, and dormant systems together.
 

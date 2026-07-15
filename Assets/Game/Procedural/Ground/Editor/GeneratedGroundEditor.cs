@@ -67,7 +67,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty pixelEffectStrength;
         private SerializedProperty cellWarpStrength;
         private SerializedProperty groundMacroPatchScale;
+        private SerializedProperty groundMacroPatchPatternSeed;
         private SerializedProperty groundMacroPatchTransitionSoftness;
+        private SerializedProperty groundMacroPatchSeparation;
         private SerializedProperty profileContrastScale;
         private SerializedProperty profilePixelContrastScale;
         private SerializedProperty groundSnowResponseScale;
@@ -310,9 +312,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             groundMacroPatchScale =
                 groundMaterialControls.FindPropertyRelative("groundMacroPatchScale");
 
+            groundMacroPatchPatternSeed =
+                groundMaterialControls.FindPropertyRelative(
+                    "groundMacroPatchPatternSeed");
+
             groundMacroPatchTransitionSoftness =
                 groundMaterialControls.FindPropertyRelative(
                     "groundMacroPatchTransitionSoftness");
+
+            groundMacroPatchSeparation =
+                groundMaterialControls.FindPropertyRelative(
+                    "groundMacroPatchSeparation");
 
             profileContrastScale =
                 groundMaterialControls.FindPropertyRelative("profileContrastScale");
@@ -3364,8 +3374,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 ref showMaterialMacroPatchComposition,
                 "Macro Patch Composition",
                 groundMacroPatchScale,
+                groundMacroPatchPatternSeed,
                 broadVariation,
-                groundMacroPatchTransitionSoftness);
+                groundMacroPatchTransitionSoftness,
+                groundMacroPatchSeparation);
 
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialPalette,
@@ -3430,9 +3442,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 ref showMaterialMacroPatchComposition,
                 "Macro Patch Composition",
                 materialControls.FindPropertyRelative("groundMacroPatchScale"),
+                materialControls.FindPropertyRelative(
+                    "groundMacroPatchPatternSeed"),
                 materialControls.FindPropertyRelative("broadVariation"),
                 materialControls.FindPropertyRelative(
-                    "groundMacroPatchTransitionSoftness"));
+                    "groundMacroPatchTransitionSoftness"),
+                materialControls.FindPropertyRelative(
+                    "groundMacroPatchSeparation"));
 
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialPalette,

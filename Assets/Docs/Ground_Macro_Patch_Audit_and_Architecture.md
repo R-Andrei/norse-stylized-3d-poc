@@ -8,7 +8,7 @@ Painted Accent production is complete and accepted. Ground as a whole is not com
 
 V3M-A0 diagnostic evidence is captured and confirms the audit: the generated tonal mask is active but dominated by an extremely broad soft gradient, the old shader macro source is generic low-frequency noise, and its true weighted tonal influence remains weak even when displayed at `20×` gain.
 
-V3M-A1 Unity evidence confirmed that the replacement evaluator is active and that its shaped signed regions contain genuine neutral space. V3M-A1.1 then made the macro contribution genuinely visible in the normal render, but gameplay-camera evidence showed that the fixed transitions were too hard against the calm base terrain. V3M-A1.2 is implemented and awaits Unity 6000.5.0f1 validation; it exposes authorable intensity and transition softness without changing region morphology, generated geometry, collision, profiles, styles, materials, scenes, prefabs, Painted Accent production, or runtime asset lifecycle.
+V3M-A1 Unity evidence confirmed that the replacement evaluator is active and that its shaped signed regions contain genuine neutral space. V3M-A1.1 then made the macro contribution genuinely visible in the normal render, V3M-A1.2 exposed authorable intensity and transition softness, and V3M-A1.3 added independent pattern-seed and locally varying average-separation controls. Unity evidence for V3M-A1.3 found that the resulting layouts looked useful but that seed-to-seed active coverage was highly inconsistent. V3M-A1.3.1 is implemented and awaits Unity 6000.5.0f1 validation; it stabilizes occupancy while retaining the existing controls, four-noise budget, world-XZ continuity, and accepted overall morphology.
 
 ## Mission
 
@@ -206,6 +206,73 @@ The neutral source interval remains fixed at `0.36–0.64`. Softness maps each s
 4. Macro Patch Intensity remains a monotonic zero-to-strong control and the slightly raised authored value remains readable after softening.
 5. Raw and weighted debug views continue to match the production field without new views or regeneration work.
 
+## V3M-A1.3 — Pattern, separation, and expanded calibration authoring
+
+V3M-A1.3 retains the accepted four-noise world-XZ evaluator and the `3.0x` linear tonal calibration while exposing the remaining authoring controls required by gameplay-camera review:
+
+- **Macro Patch Scale** remains the physical metre scale.
+- **Macro Patch Pattern Seed** is an integer independent from the pixel seed. Seed `0` preserves the current underlying sample arrangement; other values offset the two warp samples and the primary/secondary region samples independently, changing positions and silhouettes without additional noise evaluations. Adjacent Grounds should share the same seed when continuity is required.
+- **Macro Patch Intensity** now uses a `0.00–0.75` slider. There is no hidden artistic cap after the slider; extreme values may deliberately overdrive or clip the tonal result.
+- **Macro Patch Transition Softness** remains `0–1`. The transition width now resolves linearly from `0.06` at zero—preserving the accepted hard-edge endpoint—to `0.35` at one. This replaces the previous `0.06–0.24` range without a squared response or extra morphology sample.
+- **Average Patch Separation** is a non-negative float with default `1.0`. It controls the average neutral interval between dark and light regions. Separation is varied locally with the existing warp field rather than applied as a perfectly uniform global threshold.
+
+The local neutral gap is resolved as:
+
+```hlsl
+localGap = clamp(
+    AveragePatchSeparation * 0.28 + macroWarpX * 0.08,
+    0.0,
+    0.98);
+```
+
+At separation `0`, some locations collapse to no finite neutral gap while others retain up to approximately `0.08`; this permits local dark/light contact without forcing contact everywhere. At separation `1`, the gap varies approximately from `0.20` to `0.36`, preserving the previous `0.28` average. Higher values make patches increasingly sparse. Softness only controls transition width; separation only controls the locally varying neutral interval.
+
+No new debug views, texture assets, CPU mask work, scene/prefab edits, or shader noise evaluations are introduced.
+
+## V3M-A1.3 validation gate
+
+1. Unity and shader compilation complete without errors or warnings.
+2. Pattern Seed produces clearly different deterministic layouts; restoring `0` restores the prior underlying arrangement.
+3. Average Patch Separation at `0`, `1`, and `2` produces local contact, current-average spacing, and visibly sparser regions respectively, without becoming globally uniform.
+4. Transition Softness `0` preserves the narrow endpoint while `1` blends materially farther into the terrain than V3M-A1.2.
+5. Macro Patch Intensity remains Material-only and usable across the full `0–0.75` slider range.
+
+## V3M-A1.3.1 — Pattern-seed occupancy stabilization
+
+Unity validation of V3M-A1.3 confirmed that Pattern Seed changed patch arrangement successfully, but some seeds produced far more neutral dead space than others at identical authoring values. Pattern Seed should change positions and silhouettes, not act as an uncontrolled coverage control.
+
+V3M-A1.3.1 changes only the existing evaluator's seed participation and field composition:
+
+- the dominant primary region sample keeps a stable base realization and is reshaped indirectly by the seed-dependent domain warp;
+- the secondary seeded sample becomes centred boundary distortion instead of being averaged with the primary field, preventing it from compressing the source range toward neutral;
+- local separation variation uses the product of both centred warp channels instead of one warp channel, reducing one-sided whole-Ground spacing bias while retaining regional separation differences.
+
+The resolved source and local gap are:
+
+```hlsl
+regionalSource = saturate(
+    primaryRegion + (secondaryRegion - 0.5) * 0.14);
+
+localSeparationVariation =
+    macroWarpX * macroWarpY * 0.08;
+
+localGap = clamp(
+    AveragePatchSeparation * 0.28 +
+    localSeparationVariation,
+    0.0,
+    0.98);
+```
+
+Pattern Seed continues to change both warp fields and the secondary contour field, so layouts remain deterministic and visibly distinct. No control values, defaults, debug modes, generated assets, shader properties, or noise-evaluation counts change.
+
+## V3M-A1.3.1 validation gate
+
+1. Unity and shader compilation complete without errors or warnings.
+2. Seeds `0`, `1`, `2`, `3`, `7`, `13`, `29`, `67`, and `5727` retain visibly different deterministic layouts at identical authoring values.
+3. No tested seed produces dramatically more neutral dead space than the others.
+4. Average Patch Separation still produces local contact at low values and progressively more calm terrain at higher values.
+5. Scale, Intensity, Transition Softness, debug views, and Material-only invalidation behavior remain unchanged.
+
 ## Acceptance criteria
 
 Macro composition is accepted only when:
@@ -236,7 +303,8 @@ Macro composition is accepted only when:
 - Patchier variants: useful diagnostic calibration lanes, not a morphology solution.
 - V3M-A1 shaped field: morphology/occupancy diagnostic passed, but authored-strength normal-render visibility failed.
 - V3M-A1.1 bounded amplitude calibration: made the field visible, but fixed edges were too hard.
-- V3M-A1.2 authorable intensity and transition softness: implemented; Unity visual acceptance pending.
+- V3M-A1.2 authorable intensity and transition softness: superseded by V3M-A1.3 after the user required a wider intensity range, stronger maximum softness, independent pattern selection, and nonuniform separation authoring.
+- V3M-A1.3 pattern and separation authoring: controls and overall appearance accepted, but seed occupancy was inconsistent; superseded by V3M-A1.3.1's occupancy stabilization.
 
 ### Rejected as final fixes
 
@@ -251,7 +319,7 @@ Macro composition is accepted only when:
 
 ## Next work items
 
-1. Unity-validate V3M-A1.2 in Snowfield and Grassland from the same gameplay camera.
-2. Tune only Macro Patch Intensity and Macro Patch Transition Softness until the blend is readable but seamless.
-3. Decide whether the accepted region morphology needs any further shape refinement after the new controls are evaluated.
+1. Unity-validate V3M-A1.3.1 across the representative seed set from the same gameplay camera.
+2. Confirm layout variety remains strong while active-versus-neutral coverage is materially more consistent.
+3. Establish final Scale, Pattern Seed, Intensity, Transition Softness, and Average Patch Separation values without further shader changes if the stabilization passes.
 4. Resume V4 only after macro composition passes gameplay-camera acceptance.

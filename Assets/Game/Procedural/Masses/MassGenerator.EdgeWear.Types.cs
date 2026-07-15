@@ -25,6 +25,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public readonly Vector3 Start;
             public readonly Vector3 End;
             public readonly List<int> FaceIndices = new List<int>(2);
+            public bool CoincidentBoundarySeamReconciled;
 
             public EdgeWearEdgeAggregate(Vector3 start, Vector3 end)
             {
@@ -1809,6 +1810,8 @@ private readonly struct EdgeWearTopologyStats
                 new Dictionary<VertexKey, int>();
             public readonly Dictionary<EdgeKey, int> EdgeByKey =
                 new Dictionary<EdgeKey, int>();
+            public int CoincidentVertexReconciliationCount;
+            public int CoincidentBoundarySeamPairCount;
         }
         private sealed class EdgeWearGraphVertex
         {
@@ -1923,6 +1926,8 @@ private struct EdgeWearGraphBuildStats
             public int GraphFaceCount;
             public int GraphBoundaryEdgeCount;
             public int GraphNonManifoldEdgeCount;
+            public int CoincidentVertexReconciliationCount;
+            public int CoincidentBoundarySeamPairCount;
             public int SelectedGraphEdgeCount;
             public int MissingSelectedGraphEdgeCount;
             public int MismatchedSelectedGraphFaceCount;
@@ -2004,7 +2009,11 @@ private struct EdgeWearGraphBuildStats
             public readonly Dictionary<int, EdgeWearEdgeViabilityRecord>
                 ViabilityByGraphEdge =
                     new Dictionary<int, EdgeWearEdgeViabilityRecord>();
+            public int RawSourceEdgeCount;
             public int SourceEdgeCount;
+            public int CoincidentBoundarySeamPairCount;
+            public int CoincidentGraphVertexReconciliationCount;
+            public int CoincidentGraphBoundarySeamPairCount;
             public int ViabilityLocalityEvaluationCount;
             public int ViabilityIsolatedEvaluationCount;
             public int ViabilityLocalityCacheUseCount;
@@ -2071,6 +2080,7 @@ private struct EdgeWearGraphBuildStats
             public bool WidthReduced;
             public BoundedEdgeClassification Classification =
                 BoundedEdgeClassification.None;
+            public bool CoincidentBoundarySeamReconciled;
             public bool StructuralEligible;
             public bool GeometricEligible;
             public bool CoexistenceEligible;

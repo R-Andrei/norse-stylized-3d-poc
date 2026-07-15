@@ -95,6 +95,9 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamPositiveAgeMultiplier",
                 lastConfiguredFoamPositiveAgeMultiplier);
             computeShader.SetFloat(
+                "_FoamFullSupportedAgingAt",
+                river.FoamFullSupportedAgingAt);
+            computeShader.SetFloat(
                 "_FoamNegativeAgeMultiplier",
                 lastConfiguredFoamNegativeAgeMultiplier);
             computeShader.SetFloat("_FoamTime", river.MotionTime);

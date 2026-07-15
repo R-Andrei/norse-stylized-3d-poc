@@ -44,17 +44,32 @@ float FoamCombinedMaterialSupport(FoamMaterialTopologySample sample)
 }
 
 
-float FoamShapeAgingInfluence(float value)
+float FoamShapeSupportAgingInfluence(float value)
 {
+    float fullSupportedAgingAt =
+        _FoamFullSupportedAgingAt >= 0.15
+            ? min(_FoamFullSupportedAgingAt, 1.0)
+            : 0.92;
+    return smoothstep(
+        0.08,
+        fullSupportedAgingAt,
+        saturate(value));
+}
+
+
+float FoamShapeNegativeAgingInfluence(float value)
+{
+    // Negative Aging Pressure keeps its accepted fixed response. The authored
+    // support-saturation control must not change hostile-water behavior.
     return smoothstep(0.08, 0.92, saturate(value));
 }
 
 
 float FoamResolveLocalAgeRate(FoamMaterialTopologySample materialTopology)
 {
-    float shapedSupport = FoamShapeAgingInfluence(
+    float shapedSupport = FoamShapeSupportAgingInfluence(
         FoamCombinedMaterialSupport(materialTopology));
-    float shapedNegative = FoamShapeAgingInfluence(
+    float shapedNegative = FoamShapeNegativeAgingInfluence(
         materialTopology.negativeAgingPressure);
 
     // Negative Aging Pressure should mean hostile water, not merely a

@@ -165,6 +165,7 @@ float _FoamSimulationLength;
 float _FoamFlowDirection;
 float _FoamNeutralLifetime;
 float _FoamPositiveAgeMultiplier;
+float _FoamFullSupportedAgingAt;
 float _FoamNegativeAgeMultiplier;
 float _FoamTime;
 float _FoamSeed;

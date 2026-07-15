@@ -4,6 +4,24 @@ D.1C imported, rendered, and passed the user’s functional Unity validation whi
 
 No dedicated cold-compile timing or final GPU comparison was supplied for D.1C. Those measurements remain deferred performance evidence, not a blocker for the accepted visual baseline. This checklist should only become active again for the comprehensive River performance pass or a new shader-iteration regression.
 
+## `4.11C.5.18E` compute/shader iteration impact
+
+`5.18E` changes both the Foam compute contract and the Final Foam include:
+
+```text
+CS_RiverFoam.Resources.hlsl
+  adds _FoamFullSupportedAgingAt;
+
+CS_RiverFoam.Topology.hlsl
+  applies the authored threshold only to positive support;
+  retains the fixed negative-aging curve;
+
+RiverWaterFoam.hlsl
+  changes Lifecycle-Faithful meaningful-Presence participation from 0.02–0.16 to 0.02–0.10.
+```
+
+The runtime binds the new support threshold for normal simulation and topology metrics. No kernel, texture, channel, buffer, dispatch, render pass, or shader keyword is added. Unity validation must confirm compute import, shared include compilation, and Final Foam rendering in both visibility modes.
+
 ## `4.11C.5.18D` compute/editor iteration impact
 
 `5.18D` is a behaviour-preserving C# authoring/documentation closure. It does not modify any compute shader, include, fragment shader, kernel, dispatch, or shader resource. C# changes are confined to Inspector labels/tooltips, two compact read-only rows in the existing Automatic Birth Sources view, and public diagnostic accessors over already resident CPU data.

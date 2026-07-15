@@ -1970,3 +1970,10 @@ The existing `Automatic Birth Sources` view gains two compact read-only rows: on
 
 No compute or shader file changes. No scene, prefab, material, `.asset`, `.meta`, texture, channel, buffer, kernel, dispatch, persistent state, or serialized numeric value changes. Stage 7 Secondary Water Effects is formally complete and validated for the current milestone. The next reasonable River effort is the separately approved comprehensive performance pass, not another implicit visual patch.
 
+## 2026-07-15 — `4.11C.5.18E` Initial Presence and Lifecycle Authority
+
+A post-closure lifetime audit established that high Initial Life values did not provide enough direct control over presence-limited visible duration. The automatic source recipes still used hidden peak source-amount ranges. This patch exposes those exact ranges as per-pattern `Initial Presence Min/Max`, preserving the current result by default while making deposited persistent material authorable independently from Formation Speed and Initial Life.
+
+Lifecycle-Faithful meaningful-Presence participation changes from `smoothstep(0.02, 0.16, Presence)` to `smoothstep(0.02, 0.10, Presence)`. All existing life-driven pattern erosion, Chipping, Strands, transport, birth cohort merging, and negative topology behavior remain unchanged. Neutral Lifetime and Negative Aging Rate authoring maxima increase to `20`, with no automatic modification of existing serialized values.
+
+Positive support adds `Full Supported Aging At`, default `0.92`, replacing only the previous fixed positive-support upper edge. The compute path now separates positive-support shaping from negative-aging shaping so lowering the new control cannot accidentally strengthen hostile water. No texture, channel, buffer, kernel, dispatch, or persistent state is added. Unity compile and lifespan validation are pending.

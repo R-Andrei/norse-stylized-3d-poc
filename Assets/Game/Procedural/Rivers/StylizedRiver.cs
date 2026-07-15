@@ -312,13 +312,16 @@ namespace ProgrammaticStylized3D.Rivers
         private const int CurrentFoamMaterialLifecycleTuningVersion = 1;
         private const int CurrentFoamVelocityTuningVersion = 1;
         private const float MinimumFoamNeutralLifetime = 1f;
-        private const float MaximumFoamNeutralLifetime = 10f;
+        private const float MaximumFoamNeutralLifetime = 20f;
         private const float DefaultFoamNeutralLifetime = 4f;
         private const float MinimumFoamSupportedAgingRate = 0.05f;
         private const float MaximumFoamSupportedAgingRate = 1f;
         private const float DefaultFoamSupportedAgingRate = 0.2f;
+        private const float MinimumFoamFullSupportedAgingAt = 0.15f;
+        private const float MaximumFoamFullSupportedAgingAt = 1f;
+        private const float DefaultFoamFullSupportedAgingAt = 0.92f;
         private const float MinimumFoamNegativeAgingRate = 1f;
-        private const float MaximumFoamNegativeAgingRate = 8f;
+        private const float MaximumFoamNegativeAgingRate = 20f;
         private const float DefaultFoamNegativeAgingRate = 4f;
         private const float MinimumFoamDownstreamSpeedRatio = 0f;
         private const float MaximumFoamDownstreamSpeedRatio = 2f;
@@ -1048,6 +1051,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 0.5f)]
         [SerializeField] private float foamShoreRibbonOffsetVariationCells = 0.25f;
 
+        [Tooltip("Minimum peak persistent Presence deposited by Shore Ribbon events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreRibbonInitialPresenceMin = 0.90f;
+
+        [Tooltip("Maximum peak persistent Presence deposited by Shore Ribbon events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreRibbonInitialPresenceMax = 1.00f;
+
         [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Shore Ribbon material. One means full authored Foam lifetime.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonInitialLifeMin = 0.80f;
@@ -1099,6 +1110,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Maximum starting offset from the live shore edge for Inward Wash sources.")]
         [Min(0f)]
         [SerializeField] private float foamInwardWashOffsetMaxMetres = 0.040f;
+
+        [Tooltip("Minimum peak persistent Presence deposited by Inward Wash events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamInwardWashInitialPresenceMin = 0.84f;
+
+        [Tooltip("Maximum peak persistent Presence deposited by Inward Wash events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamInwardWashInitialPresenceMax = 0.98f;
 
         [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Inward Wash material. One means full authored Foam lifetime.")]
         [Range(0f, 1f)]
@@ -1180,6 +1199,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamObjectContactArcOffsetMaxMetres = 0.120f;
 
+        [Tooltip("Minimum peak persistent Presence deposited by Object Contact Arc events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactArcInitialPresenceMin = 0.88f;
+
+        [Tooltip("Maximum peak persistent Presence deposited by Object Contact Arc events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactArcInitialPresenceMax = 1.00f;
+
         [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Object Contact Arc material.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcInitialLifeMin = 0.75f;
@@ -1223,6 +1250,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Maximum profile offset from the physical obstacle contact shell for Object Contact Semi-Arc sources. This biases profile placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactSemiArcOffsetMaxMetres = 0.140f;
+
+        [Tooltip("Minimum peak persistent Presence deposited by Object Contact Semi-Arc events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcInitialPresenceMin = 0.84f;
+
+        [Tooltip("Maximum peak persistent Presence deposited by Object Contact Semi-Arc events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcInitialPresenceMax = 0.98f;
 
         [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Object Contact Semi-Arc material.")]
         [Range(0f, 1f)]
@@ -1275,6 +1310,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Maximum shape offset from the physical obstacle contact shell for Object Contact Fleck sources. This biases fleck placement but cannot widen the fixed shell.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactFleckOffsetMaxMetres = 0.160f;
+
+        [Tooltip("Minimum peak persistent Presence deposited by Object Contact Fleck events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactFleckInitialPresenceMin = 0.82f;
+
+        [Tooltip("Maximum peak persistent Presence deposited by Object Contact Fleck events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactFleckInitialPresenceMax = 0.97f;
 
         [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Object Contact Fleck material.")]
         [Range(0f, 1f)]
@@ -1347,6 +1390,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.005f)]
         [SerializeField] private float foamFreeWaterLaceWidthMaxMetres = 0.115f;
 
+        [Tooltip("Minimum peak persistent Presence deposited by Free Water Lace Connector events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterLaceInitialPresenceMin = 0.78f;
+
+        [Tooltip("Maximum peak persistent Presence deposited by Free Water Lace Connector events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterLaceInitialPresenceMax = 0.96f;
+
         [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Free Water Lace Connector material.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceInitialLifeMin = 0.35f;
@@ -1391,6 +1442,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.005f)]
         [SerializeField] private float foamFreeWaterCrossLaceWidthMaxMetres = 0.120f;
 
+        [Tooltip("Minimum peak persistent Presence deposited by Free Water Cross-Lace Connector events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterCrossLaceInitialPresenceMin = 0.78f;
+
+        [Tooltip("Maximum peak persistent Presence deposited by Free Water Cross-Lace Connector events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterCrossLaceInitialPresenceMax = 0.96f;
+
         [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Free Water Cross-Lace Connector material.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterCrossLaceInitialLifeMin = 0.45f;
@@ -1427,6 +1486,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.005f)]
         [SerializeField] private float foamFreeWaterFragmentWidthMaxMetres = 0.280f;
 
+        [Tooltip("Minimum peak persistent Presence deposited by Free Water Torn Fragment events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterFragmentInitialPresenceMin = 0.76f;
+
+        [Tooltip("Maximum peak persistent Presence deposited by Free Water Torn Fragment events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterFragmentInitialPresenceMax = 0.94f;
+
         [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Free Water Torn Fragment material.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFragmentInitialLifeMin = 0.25f;
@@ -1457,6 +1524,14 @@ namespace ProgrammaticStylized3D.Rivers
             MaximumFoamSupportedAgingRate)]
         [SerializeField]
         private float foamSupportedAgingRate = DefaultFoamSupportedAgingRate;
+
+        [Tooltip("Raw combined positive-support value at which Supported Aging Rate is applied fully. Lower values let ordinary support preserve Foam more strongly. The default 0.92 reproduces the previous fixed support-authority curve.")]
+        [Range(
+            MinimumFoamFullSupportedAgingAt,
+            MaximumFoamFullSupportedAgingAt)]
+        [SerializeField]
+        private float foamFullSupportedAgingAt =
+            DefaultFoamFullSupportedAgingAt;
 
         [Tooltip("Selects how Final Foam converts living persistent material into visible coverage. Concentration + Lifetime preserves the current dense-core renderer, where local Presence concentration and Remaining Life both discard coverage. Lifecycle-Faithful uses Presence only to define a meaningful material footprint, then lets Remaining Life and the stable material pattern control deterioration. This is a render-only A/B control and does not change stored material or lifecycle.")]
         [SerializeField]
@@ -2306,6 +2381,14 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Max(0f, foamShoreRibbonOffsetMetres);
         public float FoamShoreRibbonOffsetVariationCells =>
             Mathf.Clamp(foamShoreRibbonOffsetVariationCells, 0f, 0.5f);
+        public float FoamShoreRibbonInitialPresenceMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamShoreRibbonInitialPresenceMin,
+                foamShoreRibbonInitialPresenceMax));
+        public float FoamShoreRibbonInitialPresenceMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamShoreRibbonInitialPresenceMin,
+                foamShoreRibbonInitialPresenceMax));
         public float FoamShoreRibbonInitialLifeMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamShoreRibbonInitialLifeMin,
@@ -2348,6 +2431,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamInwardWashOffsetMaxMetres));
         public float FoamInwardWashOffsetMaxMetres =>
             Mathf.Max(FoamInwardWashOffsetMinMetres, foamInwardWashOffsetMaxMetres);
+        public float FoamInwardWashInitialPresenceMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamInwardWashInitialPresenceMin,
+                foamInwardWashInitialPresenceMax));
+        public float FoamInwardWashInitialPresenceMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamInwardWashInitialPresenceMin,
+                foamInwardWashInitialPresenceMax));
         public float FoamInwardWashInitialLifeMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamInwardWashInitialLifeMin,
@@ -2400,6 +2491,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactArcOffsetMaxMetres));
         public float FoamObjectContactArcOffsetMaxMetres =>
             Mathf.Max(FoamObjectContactArcOffsetMinMetres, foamObjectContactArcOffsetMaxMetres);
+        public float FoamObjectContactArcInitialPresenceMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactArcInitialPresenceMin,
+                foamObjectContactArcInitialPresenceMax));
+        public float FoamObjectContactArcInitialPresenceMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactArcInitialPresenceMin,
+                foamObjectContactArcInitialPresenceMax));
         public float FoamObjectContactArcInitialLifeMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamObjectContactArcInitialLifeMin,
@@ -2438,6 +2537,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactSemiArcOffsetMaxMetres));
         public float FoamObjectContactSemiArcOffsetMaxMetres =>
             Mathf.Max(FoamObjectContactSemiArcOffsetMinMetres, foamObjectContactSemiArcOffsetMaxMetres);
+        public float FoamObjectContactSemiArcInitialPresenceMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactSemiArcInitialPresenceMin,
+                foamObjectContactSemiArcInitialPresenceMax));
+        public float FoamObjectContactSemiArcInitialPresenceMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactSemiArcInitialPresenceMin,
+                foamObjectContactSemiArcInitialPresenceMax));
         public float FoamObjectContactSemiArcInitialLifeMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamObjectContactSemiArcInitialLifeMin,
@@ -2482,6 +2589,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactFleckOffsetMaxMetres));
         public float FoamObjectContactFleckOffsetMaxMetres =>
             Mathf.Max(FoamObjectContactFleckOffsetMinMetres, foamObjectContactFleckOffsetMaxMetres);
+        public float FoamObjectContactFleckInitialPresenceMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactFleckInitialPresenceMin,
+                foamObjectContactFleckInitialPresenceMax));
+        public float FoamObjectContactFleckInitialPresenceMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactFleckInitialPresenceMin,
+                foamObjectContactFleckInitialPresenceMax));
         public float FoamObjectContactFleckInitialLifeMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamObjectContactFleckInitialLifeMin,
@@ -2530,6 +2645,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamFreeWaterLaceWidthMaxMetres));
         public float FoamFreeWaterLaceWidthMaxMetres =>
             Mathf.Max(FoamFreeWaterLaceWidthMinMetres, foamFreeWaterLaceWidthMaxMetres);
+        public float FoamFreeWaterLaceInitialPresenceMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterLaceInitialPresenceMin,
+                foamFreeWaterLaceInitialPresenceMax));
+        public float FoamFreeWaterLaceInitialPresenceMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterLaceInitialPresenceMin,
+                foamFreeWaterLaceInitialPresenceMax));
         public float FoamFreeWaterLaceInitialLifeMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamFreeWaterLaceInitialLifeMin,
@@ -2568,6 +2691,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamFreeWaterCrossLaceWidthMaxMetres));
         public float FoamFreeWaterCrossLaceWidthMaxMetres =>
             Mathf.Max(FoamFreeWaterCrossLaceWidthMinMetres, foamFreeWaterCrossLaceWidthMaxMetres);
+        public float FoamFreeWaterCrossLaceInitialPresenceMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterCrossLaceInitialPresenceMin,
+                foamFreeWaterCrossLaceInitialPresenceMax));
+        public float FoamFreeWaterCrossLaceInitialPresenceMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterCrossLaceInitialPresenceMin,
+                foamFreeWaterCrossLaceInitialPresenceMax));
         public float FoamFreeWaterCrossLaceInitialLifeMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamFreeWaterCrossLaceInitialLifeMin,
@@ -2598,6 +2729,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamFreeWaterFragmentWidthMaxMetres));
         public float FoamFreeWaterFragmentWidthMaxMetres =>
             Mathf.Max(FoamFreeWaterFragmentWidthMinMetres, foamFreeWaterFragmentWidthMaxMetres);
+        public float FoamFreeWaterFragmentInitialPresenceMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterFragmentInitialPresenceMin,
+                foamFreeWaterFragmentInitialPresenceMax));
+        public float FoamFreeWaterFragmentInitialPresenceMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterFragmentInitialPresenceMin,
+                foamFreeWaterFragmentInitialPresenceMax));
         public float FoamFreeWaterFragmentInitialLifeMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamFreeWaterFragmentInitialLifeMin,
@@ -2628,6 +2767,11 @@ namespace ProgrammaticStylized3D.Rivers
                 foamSupportedAgingRate,
                 MinimumFoamSupportedAgingRate,
                 MaximumFoamSupportedAgingRate);
+        public float FoamFullSupportedAgingAt =>
+            Mathf.Clamp(
+                foamFullSupportedAgingAt,
+                MinimumFoamFullSupportedAgingAt,
+                MaximumFoamFullSupportedAgingAt);
         public StylizedRiverFinalFoamVisibilityMode FoamFinalVisibilityMode =>
             foamFinalVisibilityMode ==
                 StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful
@@ -2998,6 +3142,9 @@ namespace ProgrammaticStylized3D.Rivers
                 0f,
                 0.5f);
             SanitizeUnitRange(
+                ref foamShoreRibbonInitialPresenceMin,
+                ref foamShoreRibbonInitialPresenceMax);
+            SanitizeUnitRange(
                 ref foamShoreRibbonInitialLifeMin,
                 ref foamShoreRibbonInitialLifeMax);
             SanitizeUnitRange(
@@ -3024,6 +3171,9 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamInwardWashOffsetMinMetres,
                 ref foamInwardWashOffsetMaxMetres,
                 0f);
+            SanitizeUnitRange(
+                ref foamInwardWashInitialPresenceMin,
+                ref foamInwardWashInitialPresenceMax);
             SanitizeUnitRange(
                 ref foamInwardWashInitialLifeMin,
                 ref foamInwardWashInitialLifeMax);
@@ -3058,6 +3208,9 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamObjectContactArcOffsetMaxMetres,
                 0f);
             SanitizeUnitRange(
+                ref foamObjectContactArcInitialPresenceMin,
+                ref foamObjectContactArcInitialPresenceMax);
+            SanitizeUnitRange(
                 ref foamObjectContactArcInitialLifeMin,
                 ref foamObjectContactArcInitialLifeMax);
             SanitizeUnitRange(
@@ -3080,6 +3233,9 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamObjectContactSemiArcOffsetMinMetres,
                 ref foamObjectContactSemiArcOffsetMaxMetres,
                 0f);
+            SanitizeUnitRange(
+                ref foamObjectContactSemiArcInitialPresenceMin,
+                ref foamObjectContactSemiArcInitialPresenceMax);
             SanitizeUnitRange(
                 ref foamObjectContactSemiArcInitialLifeMin,
                 ref foamObjectContactSemiArcInitialLifeMax);
@@ -3106,6 +3262,9 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamObjectContactFleckOffsetMinMetres,
                 ref foamObjectContactFleckOffsetMaxMetres,
                 0f);
+            SanitizeUnitRange(
+                ref foamObjectContactFleckInitialPresenceMin,
+                ref foamObjectContactFleckInitialPresenceMax);
             SanitizeUnitRange(
                 ref foamObjectContactFleckInitialLifeMin,
                 ref foamObjectContactFleckInitialLifeMax);
@@ -3137,6 +3296,9 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamFreeWaterLaceWidthMaxMetres,
                 0.005f);
             SanitizeUnitRange(
+                ref foamFreeWaterLaceInitialPresenceMin,
+                ref foamFreeWaterLaceInitialPresenceMax);
+            SanitizeUnitRange(
                 ref foamFreeWaterLaceInitialLifeMin,
                 ref foamFreeWaterLaceInitialLifeMax);
             SanitizeUnitRange(
@@ -3159,6 +3321,9 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamFreeWaterCrossLaceWidthMaxMetres,
                 0.005f);
             SanitizeUnitRange(
+                ref foamFreeWaterCrossLaceInitialPresenceMin,
+                ref foamFreeWaterCrossLaceInitialPresenceMax);
+            SanitizeUnitRange(
                 ref foamFreeWaterCrossLaceInitialLifeMin,
                 ref foamFreeWaterCrossLaceInitialLifeMax);
             SanitizeUnitRange(
@@ -3177,6 +3342,9 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamFreeWaterFragmentWidthMinMetres,
                 ref foamFreeWaterFragmentWidthMaxMetres,
                 0.005f);
+            SanitizeUnitRange(
+                ref foamFreeWaterFragmentInitialPresenceMin,
+                ref foamFreeWaterFragmentInitialPresenceMax);
             SanitizeUnitRange(
                 ref foamFreeWaterFragmentInitialLifeMin,
                 ref foamFreeWaterFragmentInitialLifeMax);
@@ -4897,6 +5065,10 @@ namespace ProgrammaticStylized3D.Rivers
                 foamSupportedAgingRate,
                 MinimumFoamSupportedAgingRate,
                 MaximumFoamSupportedAgingRate);
+            foamFullSupportedAgingAt = Mathf.Clamp(
+                foamFullSupportedAgingAt,
+                MinimumFoamFullSupportedAgingAt,
+                MaximumFoamFullSupportedAgingAt);
             foamFinalVisibilityMode = FoamFinalVisibilityMode;
             foamNegativeAgingRate = Mathf.Clamp(
                 foamNegativeAgingRate,
