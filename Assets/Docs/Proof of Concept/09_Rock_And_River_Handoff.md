@@ -1,6 +1,6 @@
 # Current River continuation — post-D.1C milestone closure
 
-The current Chipping baseline, Stage 3 shore-wave controls, `4.11C.5.18C`, and `4.11C.5.18D` are Unity-validated and accepted. Stage 7 source/contact geometry remains closed. `4.11C.5.18E — Initial Presence and Lifecycle Authority` is the active targeted Foam lifespan-authoring patch; Unity validation is pending. The old Stage 8 reflection/final-integration plan is stale and retired. All performance work remains deferred to one future comprehensive River performance pass.
+The current Chipping baseline, Stage 3 shore-wave controls, `4.11C.5.18C`, `4.11C.5.18D`, and `4.11C.5.18E` are Unity-validated and accepted. `5.18E` fully fixed the short visible-lifetime problem. The original `4.11C.5.18F` is rejected and `4.11C.5.18F.1 — Detaching Object Arc Deposition Replacement` is the active narrow correction: Arc/Semi-Arc source events must stop repainting historical revealed territory so deposited cohorts detach and travel through the existing Layer C transport. The old Stage 8 reflection/final-integration plan is stale and retired. All performance work remains deferred to one future comprehensive River performance pass.
 
 ```text
 D.0   dedicated fine-edge/Fray retirement
@@ -11,7 +11,7 @@ D.1C  camera-readable medium/large-biased population
 
 Current controls are Amount, Size, Spacing, Irregularity, Edge Width, and optional Interior Access. `D.1A.1` is rejected and rolled back. `D.1D — Coherent Edge-Bite Admission` is skipped because the current result is good enough. Remaining-Life interaction is deferred as optional future work. The zoom-dependent thin-strip capture remains known deferred technical debt.
 
-Current active direction: import and validate `4.11C.5.18E`. Test per-pattern Initial Presence, the Lifecycle-Faithful `0.02–0.10` meaningful-Presence range, extended lifecycle sliders, and `Full Supported Aging At`. Do not change birth cohort behavior, negative-aging shaping, source geometry, Chipping, or Strands during this validation. Performance work remains deferred.
+Current active direction: import and validate `4.11C.5.18F.1`. A C# compile and compute reimport are expected. In `Automatic Birth Sources`, Contact Arc should show a brief central pulse followed by two moving cyan frontier bands; Contact Semi-Arc should show a brief shoulder pulse followed by one moving cyan frontier. Minimum/short recipes may show only a brief finite pulse, never a complete source held for the event duration. In `Material Presence`, territory behind those frontiers must detach and advect. Do not change canonical velocity, obstacle slowdown, event overlap, event seeds, Contact Fleck, static wake deformation, lifecycle, Chipping, or Strands unless this isolated correction fails. Performance work remains deferred.
 
 B.2K/B.2L geometry and timing remain part of the accepted current baseline; no dedicated B.2L validation task remains.
 

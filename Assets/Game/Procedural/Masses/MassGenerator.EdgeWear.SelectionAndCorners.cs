@@ -16,7 +16,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private const float EdgeWearMinimumCentralSpanWidthMultiplier = 0.5f;
 
         private static List<EdgeWearBevelCandidate> BuildEdgeWearBevelCandidates(
-            List<PolygonFace> faces,
+            List<PolygonFace> sourceFaces,
+            List<PolygonFace> graphFaces,
+            EdgeWearMicroFeatureNormalizationStats microFeatureStats,
             Bounds bounds,
             float maximumDimension,
             MassRecipe recipe,
@@ -40,9 +42,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 new Dictionary<EdgeKey, int>();
             int coincidentBoundarySeamPairCount = 0;
 
-            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            for (int faceIndex = 0; faceIndex < graphFaces.Count; faceIndex++)
             {
-                PolygonFace face = faces[faceIndex];
+                PolygonFace face = graphFaces[faceIndex];
                 if (face.Feature != PolygonFaceFeature.Base)
                 {
                     continue;
@@ -72,15 +74,37 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
-            coverageAudit.RawSourceEdgeCount = edgeIndexByKey.Count;
+            coverageAudit.RawSourceEdgeCount = microFeatureStats == null
+                ? edgeIndexByKey.Count
+                : microFeatureStats.RawSourceEdgeCount;
             coverageAudit.CoincidentBoundarySeamPairCount =
                 coincidentBoundarySeamPairCount;
+            if (microFeatureStats != null)
+            {
+                coverageAudit.MicroFeatureEvaluatedEdgeCount =
+                    microFeatureStats.EvaluatedEdgeCount;
+                coverageAudit.MicroFeatureNormalizedComponentCount =
+                    microFeatureStats.NormalizedComponentCount;
+                coverageAudit.MicroFeatureNormalizedEdgeCount =
+                    microFeatureStats.NormalizedEdgeCount;
+                coverageAudit.MicroFeatureRejectedEdgeCount =
+                    microFeatureStats.RejectedEdgeCount;
+                coverageAudit.MicroFeatureMaximumDisplacement =
+                    microFeatureStats.MaximumDisplacement;
+                coverageAudit.MicroFeatureMaximumPlaneResidual =
+                    microFeatureStats.MaximumPlaneResidual;
+                coverageAudit.MicroFeatureFirstRejectionReason =
+                    microFeatureStats.FirstRejectionReason ?? string.Empty;
+                coverageAudit.MicroFeatureNormalizationRecords.AddRange(
+                    microFeatureStats.Records);
+            }
 
             List<EdgeWearBevelCandidate> provisionalCandidates =
                 new List<EdgeWearBevelCandidate>(edges.Count);
-            Vector3 solidCentre = CalculatePlaneCutFaceVertexCentre(faces);
+            Vector3 solidCentre =
+                CalculatePlaneCutFaceVertexCentre(sourceFaces);
             List<Vector3> sourceVertices =
-                BuildEdgeWearViabilitySourceVertexList(faces);
+                BuildEdgeWearViabilitySourceVertexList(graphFaces);
             float minimumStableEdgeLength = maximumDimension * 0.0012f;
             float minimumStableFaceArea =
                 maximumDimension * maximumDimension * 0.000001f;
@@ -155,8 +179,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 int faceB = edge.FaceIndices[1];
                 lifecycle.FaceA = faceA;
                 lifecycle.FaceB = faceB;
-                PolygonFace first = faces[faceA];
-                PolygonFace second = faces[faceB];
+                PolygonFace first = graphFaces[faceA];
+                PolygonFace second = graphFaces[faceB];
                 if (first == null || second == null ||
                     !IsFinite(first.Normal) || !IsFinite(second.Normal) ||
                     first.Normal.sqrMagnitude <= MinimumEdgeLengthSqr ||
@@ -193,7 +217,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 if (!TryClassifyEdgeWearStructuralEdge(
-                        faces,
+                        graphFaces,
                         faceA,
                         faceB,
                         edge.Start,
@@ -355,7 +379,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         provisionalCandidates.Count,
                         provisionalCandidates.Count);
                 if (TryBuildChamferTopologyContext(
-                        faces,
+                        sourceFaces,
+                        graphFaces,
                         provisionalCandidates,
                         provisionalCandidates.Count,
                         minimumStableEdgeLength,
@@ -367,7 +392,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         coverageAudit,
                         preflightContext.Graph);
                     RunEdgeWearIsolatedViabilityPreflight(
-                        faces,
+                        sourceFaces,
                         preflightContext,
                         requestedWidth,
                         minimumStableEdgeLength,
@@ -1326,6 +1351,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private static bool TryBuildChamferTopologyContext(
             List<PolygonFace> sourceFaces,
+            List<PolygonFace> graphFaces,
             List<EdgeWearBevelCandidate> candidates,
             int selectedCount,
             float minimumStableEdgeLength,
@@ -1336,7 +1362,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             context = null;
             blocker = string.Empty;
             if (!TryBuildEdgeWearTopologyGraph(
-                    sourceFaces,
+                    graphFaces,
                     out EdgeWearTopologyGraph graph,
                     out EdgeWearGraphBuildStats graphStats))
             {

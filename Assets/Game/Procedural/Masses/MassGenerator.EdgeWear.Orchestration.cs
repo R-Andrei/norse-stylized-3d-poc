@@ -71,9 +71,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float requestedWidth = ResolveGeneratedEdgeWearWidth(
                 maximumDimension,
                 settings.EdgeWearWidth);
+            float minimumStableEdgeLength = maximumDimension * 0.0012f;
+            float minimumStableFaceArea =
+                maximumDimension * maximumDimension * 0.000001f;
+            float footprintGuard = Mathf.Max(
+                PointMergeDistance * 4f,
+                minimumStableEdgeLength * 0.01f);
+            float requiredFootprintLength =
+                requestedWidth *
+                    EdgeWearMinimumFootprintLengthMultiplier +
+                footprintGuard;
+            List<PolygonFace> bevelGraphFaces =
+                BuildEdgeWearMicroFeatureNormalizedFaces(
+                    faces,
+                    requestedWidth,
+                    requiredFootprintLength,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    out EdgeWearMicroFeatureNormalizationStats
+                        microFeatureStats);
             List<EdgeWearBevelCandidate> candidates =
                 BuildEdgeWearBevelCandidates(
                     faces,
+                    bevelGraphFaces,
+                    microFeatureStats,
                     bounds,
                     maximumDimension,
                     recipe,
@@ -133,13 +154,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return null;
             }
 
-            float minimumStableEdgeLength = maximumDimension * 0.0012f;
             ChamferReadinessStats stats = new ChamferReadinessStats(
                 candidates.Count,
                 selectedCount);
 
             bool ready = TryBuildChamferTopologyContext(
                 faces,
+                bevelGraphFaces,
                 candidates,
                 selectedCount,
                 minimumStableEdgeLength,
@@ -189,9 +210,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             if (ready)
             {
-                float minimumStableFaceArea =
-                    maximumDimension * maximumDimension * 0.000001f;
-
                 if (runUnifiedEvaluation)
                 {
                     ChamferCornerStats cornerStats =

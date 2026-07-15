@@ -2,7 +2,7 @@
 
 ## Current status
 
-Stage 6 Chipping/Strands and source geometry are accepted, but Foam lifecycle authoring and visible-duration validation are active through `4.11C.5.18E`.
+Stage 6 Chipping/Strands and the `5.18E` lifecycle correction are accepted. The original `5.18F` detaching-source attempt is rejected because legal short/wide object events could remain on its full-history fallback. The active replacement is `4.11C.5.18F.1`.
 
 Accepted production sequence:
 
@@ -38,7 +38,25 @@ The current edge territory is accepted as good enough. `D.1D — Coherent Edge-B
 
 Remaining-Life modulation of Chipping or Strands is optional future work only. It is not required for current completion and is not queued.
 
-## Initial Presence and lifecycle authority — `4.11C.5.18E` — implemented, Unity validation pending
+## Detaching Object Arc deposition replacement — `4.11C.5.18F.1` — implemented, Unity validation pending
+
+The proven cause remains complete historical repainting by Contact Arc and Semi-Arc. The rejected `5.18F` attempted to gate that history with `frontierActive`, but the gate could remain false for the whole event when initial profile reach plus Head Trail exceeded the available reveal span.
+
+`5.18F.1` removes that fallback completely:
+
+```text
+Contact Arc       finite centre pulse → two continuously moving frontiers;
+Contact Semi-Arc  finite shoulder pulse → one continuously moving frontier;
+short event       finite pulse, never a held full-history source;
+startup timing    normalized material-step duration supplied by the CPU;
+frontier depth    HeadTrailMetres + tangent-cell floor, bounded to release history.
+```
+
+Unchanged: canonical velocity, obstacle slowdown, donor transport, event frequency, same-anchor overlap, seeds, Contact Fleck, static wake rendering, Initial Presence, Initial Life, lifecycle/support aging, and contact-shell geometry.
+
+Validation must prove that cyan occupancy stops in passed territory for minimum, midpoint, and maximum Arc/Semi-Arc settings; Material Presence behind the frontier must detach and advect.
+
+## Initial Presence and lifecycle authority — `4.11C.5.18E` — Unity-validated and accepted
 
 A runtime lifetime audit showed that the automatic source recipes already authored normalized `Initial Life`, but their peak deposited `Presence` remained hidden as hard-coded per-pattern ranges. `5.18E` exposes those exact existing ranges as `Initial Presence Min/Max`, so importing the patch preserves the prior source result by default while allowing direct tests of presence-limited visible lifetime:
 
@@ -67,7 +85,7 @@ new automatic-source events = 0;
 source-shape geometry and scheduling = unchanged;
 negative-aging response = unchanged;
 Lifecycle-Faithful presence footprint high edge = 0.16 → 0.10;
-Unity shader/compute import and runtime validation = pending.
+Unity shader/compute import and runtime validation = passed; the user confirmed the short-lifetime issue is fully fixed.
 ```
 
 ## Stage status
@@ -108,18 +126,9 @@ P4 accounting and the shader compile recovery checklist remain evidence sources 
 
 ## Current active queue
 
-There is no active River visual-feature patch. Chipping, Remaining-Life morphology, reflection, and isolated performance work are not queued.
+The only active River visual patch is `4.11C.5.18F.1 — Detaching Object Arc Deposition Replacement`. It changes Arc/Semi-Arc source rasterization plus one source-type-local GPU timing lane. Chipping, Remaining-Life erosion, Contact Fleck, reflection, and isolated performance work are not queued.
 
-`4.11C.5.18D` is a behaviour-preserving authoring/documentation closure:
-
-```text
-Arc/Semi-Arc Width labels → Profile Scale;
-Fleck Width label → Fleck Size;
-fixed shell and raw extent evidence → two rows in the existing source view;
-serialized backing fields and source arithmetic → unchanged.
-```
-
-After Unity import confirms the Inspector labels and existing debug view, the next sensible River effort is the separately scoped **Full River Performance Pass**. Do not start it implicitly; it requires explicit approval and should audit the whole River rather than produce isolated micro-patches.
+After `5.18F.1` validates, stop and reassess the actual object wake. Do not automatically add same-anchor locks, cooldowns, seed changes, static-wake changes, or velocity changes. Those remain unproven and require new evidence.
 
 ## `4.11C.5.18D` import gate
 

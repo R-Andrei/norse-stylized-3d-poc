@@ -8,7 +8,7 @@ Painted Accent production is complete and accepted. Ground as a whole is not com
 
 V3M-A0 diagnostic evidence is captured and confirms the audit: the generated tonal mask is active but dominated by an extremely broad soft gradient, the old shader macro source is generic low-frequency noise, and its true weighted tonal influence remains weak even when displayed at `20×` gain.
 
-V3M-A1 Unity evidence confirmed that the replacement evaluator is active and that its shaped signed regions contain genuine neutral space. V3M-A1.1 then made the macro contribution genuinely visible in the normal render, V3M-A1.2 exposed authorable intensity and transition softness, and V3M-A1.3 added independent pattern-seed and locally varying average-separation controls. Unity evidence for V3M-A1.3 found that the resulting layouts looked useful but that seed-to-seed active coverage was highly inconsistent. V3M-A1.3.1 is implemented and awaits Unity 6000.5.0f1 validation; it stabilizes occupancy while retaining the existing controls, four-noise budget, world-XZ continuity, and accepted overall morphology.
+V3M-A1 Unity evidence confirmed that the replacement evaluator is active and that its shaped signed regions contain genuine neutral space. V3M-A1.1 then made the macro contribution genuinely visible in the normal render, V3M-A1.2 exposed authorable intensity and transition softness, and V3M-A1.3 added independent pattern-seed and locally varying average-separation controls. V3M-A1.3.1 successfully stabilized seed occupancy, but Unity comparison across nine seeds showed that the dominant pattern topology remained too recognizable and mainly wobbled in place. V3M-A1.3.2 is implemented and awaits Unity 6000.5.0f1 validation; it adds deterministic seed-window translation while retaining the existing controls, four-noise budget, world-XZ continuity, and occupancy safeguards. The seed-5727 smoothing artifact remains a separate pending diagnosis using the existing raw and weighted views.
 
 ## Mission
 
@@ -273,6 +273,72 @@ Pattern Seed continues to change both warp fields and the secondary contour fiel
 4. Average Patch Separation still produces local contact at low values and progressively more calm terrain at higher values.
 5. Scale, Intensity, Transition Softness, debug views, and Material-only invalidation behavior remain unchanged.
 
+## V3M-A1.3.2 — Seed-window pattern translation
+
+Unity validation of V3M-A1.3.1 confirmed the occupancy correction but showed that Pattern Seed retained too much of the same dominant topology. The stable primary realization was only deformed by seeded warp and secondary contours, so major shapes mainly shifted at their boundaries rather than being replaced by a meaningfully different visible arrangement.
+
+V3M-A1.3.2 keeps the stable primary realization and adds a deterministic two-dimensional translation in macro-cell space before all four existing samples are evaluated:
+
+```hlsl
+patternScroll =
+    frac(PatternSeed * float2(0.381966011, 0.707106781)) *
+    4.5;
+
+patternCoordinate =
+    worldXZ / MacroPatchScale + patternScroll;
+```
+
+Seed `0` resolves to zero translation and preserves the current seed-0 field. Other seeds select a different window spanning up to 4.5 macro cells in each axis. The translated coordinate feeds both the seeded domain warp and the stable primary region source; the existing seeded secondary contour source remains active. Pattern Seed therefore changes the visible field through window selection, warp deformation, and contour breakup instead of only wobbling one dominant arrangement.
+
+The translation is measured in macro cells, so its world distance follows Macro Patch Scale automatically. Grounds using the same Pattern Seed remain continuous in world space. No new property, control, debug mode, generated asset, hash/noise sample, scene, prefab, profile, style, or material edit is introduced. The evaluator remains at four value-noise calls.
+
+A source-level replica over a representative 40 m Ground and the nine established validation seeds selected the 4.5-cell translation range because it materially reduced inter-seed field correlation while retaining a representative active-coverage spread below eight percentage points. This numerical check is supporting evidence only; Unity gameplay-camera validation remains authoritative.
+
+The reported seed-5727 smoothing artifact is explicitly outside this patch. It must be retested in the existing raw field, weighted influence, and normal render after pattern translation before its failure stage is classified.
+
+## V3M-A1.3.2 validation gate
+
+1. Unity and shader compilation complete without errors or warnings.
+2. Seeds `0`, `1`, `2`, `3`, `7`, `13`, `29`, `67`, and `5727` produce materially different major patch arrangements, not merely boundary wobble.
+3. No tested seed returns to the pre-A1.3.1 extreme dead-space inconsistency.
+4. Seed `0` preserves the current seed-0 arrangement and all existing Scale, Intensity, Transition Softness, and Average Patch Separation behavior.
+5. Seed `5727` is compared in the raw, weighted, and normal views before any separate smoothing correction is approved.
+
+## V3M-A1.3.3 — Bounded seed-key precision hardening
+
+Unity validation of V3M-A1.3.2 accepted the pattern variation, controls, and final render, but proved a remaining numerical defect: authored Pattern Seed magnitudes around `2000` began producing visible transition stepping, and seeds `22000`, `52000`, and `152000` produced progressively larger rectangular bands directly in the raw macro field. The raw field evidence proves that the failure occurs inside the evaluator rather than final tonal composition.
+
+The cause is the direct use of the authored seed magnitude in spatial noise coordinates. Terms such as `PatternSeed * float3(41.41, 13.13, 31.73)` grow into the millions for large seeds. Single-precision shader coordinates then lose the fractional resolution required by the value-noise `floor`/`frac` interpolation, so the field becomes spatially quantized.
+
+V3M-A1.3.3 keeps the full authored integer seed range but resolves it once on the CPU into a bounded deterministic two-dimensional scroll:
+
+```text
+Authored int Pattern Seed
+→ stable uint avalanche hash
+→ two independent 24-bit unit values
+→ bounded 0–4.5 macro-cell scroll
+```
+
+Seed `0` resolves to zero scroll and preserves the accepted seed-0 pattern. Nonzero seeds select a different bounded window of the same stable world-space primary, warp, and secondary fields:
+
+```hlsl
+patternCoordinate =
+    worldXZ / MacroPatchScale +
+    GroundMacroPatchSeedScroll.xy;
+```
+
+Scroll remains the pattern-selection mechanism that Unity validation already accepted in V3M-A1.3.2. The raw authored seed no longer enters any shader spatial coordinate, warp offset, or secondary contour offset. Pattern translation remains below `4.5` macro cells regardless of whether the authored seed is `2`, `152000`, negative, or near the C# integer limits. Using scroll only also avoids adding bounded contour-offset arithmetic that is unnecessary for the accepted pattern diversity and could widen seed-to-seed occupancy variation.
+
+The scroll is calculated only when GeneratedGround reapplies material properties. Runtime evaluation still uses exactly four value-noise calls, removes the former per-pixel large-seed multiplications, and adds no texture, generated asset, per-frame rebuild, or per-pixel seed hash. Existing Scale, Pattern Seed, Intensity, Transition Softness, Average Patch Separation, diagnostics, and serialized authoring data remain unchanged. Nonzero seeds deterministically select new windows under the hardened mapping; exact historical nonzero-seed layouts are not preserved.
+
+## V3M-A1.3.3 validation gate
+
+1. Unity and shader compilation complete without errors or warnings.
+2. Seeds `0`, `1`, `67`, `2000`, `5727`, `22000`, `52000`, `152000`, `2147483647`, and `-2147483648` all produce smoothly interpolated raw and weighted fields.
+3. Increasing seed magnitude never causes larger blocks, stair steps, rectangular bands, or degraded transition precision.
+4. Seed `0` preserves its accepted arrangement; nonzero seeds retain material pattern diversity and reasonably stable occupancy.
+5. Scale, Intensity, Transition Softness, Average Patch Separation, normal rendering, and the four-noise evaluation budget remain otherwise unchanged.
+
 ## Acceptance criteria
 
 Macro composition is accepted only when:
@@ -305,6 +371,8 @@ Macro composition is accepted only when:
 - V3M-A1.1 bounded amplitude calibration: made the field visible, but fixed edges were too hard.
 - V3M-A1.2 authorable intensity and transition softness: superseded by V3M-A1.3 after the user required a wider intensity range, stronger maximum softness, independent pattern selection, and nonuniform separation authoring.
 - V3M-A1.3 pattern and separation authoring: controls and overall appearance accepted, but seed occupancy was inconsistent; superseded by V3M-A1.3.1's occupancy stabilization.
+- V3M-A1.3.1 occupancy stabilization: active coverage became consistent, but major seed layouts remained too similar because the dominant primary realization only deformed in place; superseded by V3M-A1.3.2's seed-window translation.
+- V3M-A1.3.2 seed-window translation: pattern variation, authoring controls, and final rendering accepted, but raw authored seed magnitudes caused increasing single-precision noise-coordinate quantization; superseded by V3M-A1.3.3's CPU-hashed bounded seed scroll.
 
 ### Rejected as final fixes
 
@@ -319,7 +387,8 @@ Macro composition is accepted only when:
 
 ## Next work items
 
-1. Unity-validate V3M-A1.3.1 across the representative seed set from the same gameplay camera.
-2. Confirm layout variety remains strong while active-versus-neutral coverage is materially more consistent.
-3. Establish final Scale, Pattern Seed, Intensity, Transition Softness, and Average Patch Separation values without further shader changes if the stabilization passes.
-4. Resume V4 only after macro composition passes gameplay-camera acceptance.
+1. Unity-validate V3M-A1.3.3 across small, large, negative, and integer-limit Pattern Seed values using the raw, weighted, and normal views.
+2. Confirm seed magnitude no longer affects spatial precision while seed variation and occupancy remain accepted.
+3. Establish final Scale, Pattern Seed, Intensity, Transition Softness, and Average Patch Separation values after the precision correction passes.
+4. Mark V3M macro composition visually accepted if no further blocker appears.
+5. Resume V4 Contact / Edge Accents only after that acceptance.

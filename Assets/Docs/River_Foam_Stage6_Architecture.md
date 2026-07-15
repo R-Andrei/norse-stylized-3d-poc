@@ -41,15 +41,45 @@ Current milestone contract:
 
 ```text
 Stage 6 Chipping/Strands visual baseline = complete and validated;
-Foam lifecycle authoring/visible-duration validation = active through 5.18E;
-Remaining-Life erosion formulas = unchanged by 5.18E;
+Foam lifecycle authoring/visible-duration correction = Unity-validated through 5.18E;
+Object Arc/Semi-Arc detaching-deposition replacement = active through 5.18F.1;
+Remaining-Life erosion formulas = unchanged by 5.18E and 5.18F.1;
 dedicated Fray/fine-fragment work = retired;
 all River performance optimization = deferred to one later comprehensive River performance pass.
 ```
 
 No scene, prefab, material, `.meta`, Ground, or Generated Mass file is part of this documentation reconciliation.
 
-## Initial Presence and lifecycle authority — `4.11C.5.18E` — implemented, Unity validation pending
+## Detaching Object Arc deposition replacement — `4.11C.5.18F.1` — implemented, Unity validation pending
+
+The original `5.18F` attempt is rejected. Its frontier activated only after the revealed span exceeded `initial reach + HeadTrailMetres`; legal short/wide Arc and Semi-Arc combinations could never satisfy that threshold and silently retained the old full-history repaint behavior.
+
+`5.18F.1` replaces that implementation rather than layering another gate on top:
+
+```text
+Contact Arc
+  finite startup centre pulse;
+  two frontiers advance continuously from initial reach to final reach;
+  historical centre/interior territory cannot fall back to full repainting.
+
+Contact Semi-Arc
+  finite startup shoulder pulse;
+  one frontier advances continuously;
+  short spans become a finite pulse instead of a held source.
+```
+
+The CPU packs normalized material-step duration into an object-source-only GPU lane that Arc/Semi-Arc did not otherwise consume. This guarantees that the startup pulse covers the first raster update at Low/Medium/High material cadence. Frontier depth still uses the existing `HeadTrailMetres`, a tangent-projected cell floor, and a bounded fraction of the available growth span so historical territory is released during every viable event.
+
+Resource contract:
+
+```text
+changed runtime files = StylizedRiverFoamRuntime.Injection.cs + CS_RiverFoam.compute;
+new textures/channels/buffers/kernels/dispatches/state = 0;
+serialized controls and source scheduling = unchanged;
+Unity C# compile, compute import, and detachment validation = pending.
+```
+
+## Initial Presence and lifecycle authority — `4.11C.5.18E` — Unity-validated and accepted
 
 A runtime lifetime audit showed that the automatic source recipes already authored normalized `Initial Life`, but their peak deposited `Presence` remained hidden as hard-coded per-pattern ranges. `5.18E` exposes those exact existing ranges as `Initial Presence Min/Max`, so importing the patch preserves the prior source result by default while allowing direct tests of presence-limited visible lifetime:
 
@@ -78,7 +108,7 @@ new automatic-source events = 0;
 source-shape geometry and scheduling = unchanged;
 negative-aging response = unchanged;
 Lifecycle-Faithful presence footprint high edge = 0.16 → 0.10;
-Unity shader/compute import and runtime validation = pending.
+Unity shader/compute import and runtime validation = passed; the user confirmed the visible-lifetime issue is fully fixed.
 ```
 
 ## Object Birth Control Semantics and Stage 7 closure — `4.11C.5.18D` — Unity-validated and accepted

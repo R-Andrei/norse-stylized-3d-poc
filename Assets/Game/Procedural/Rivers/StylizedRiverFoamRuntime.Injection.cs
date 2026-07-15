@@ -281,6 +281,12 @@ namespace ProgrammaticStylized3D.Rivers
             float centreStorageGlobal = (startStorageGlobal + endStorageGlobal) * 0.5f;
             float progress = Mathf.Clamp01(
                 sourceEvent.Elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
+            bool movingObjectFrontier =
+                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
+                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc;
+            float materialStepProgress = Mathf.Clamp01(
+                (1f / Mathf.Max(1f, ResolveUpdateRate())) /
+                Mathf.Max(0.0001f, sourceEvent.Duration));
 
             return new FoamSourceEventGpuData
             {
@@ -299,7 +305,13 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceEvent.Type == AutomaticFoamSourceEventType.ShoreRibbon
                         ? sourceEvent.ShoreRibbonThicknessCells
                         : sourceEvent.WidthMetres,
-                    sourceEvent.InwardReachMetres,
+                    // Arc/Semi-Arc evaluators do not consume inward reach.
+                    // Reuse this source-type-local lane for the normalized
+                    // material-step duration so their finite startup pulse
+                    // is guaranteed to cover the first raster update.
+                    movingObjectFrontier
+                        ? materialStepProgress
+                        : sourceEvent.InwardReachMetres,
                     sourceEvent.FeatherMetres),
                 Material = new Vector4(
                     sourceEvent.SourceAmount,

@@ -183,6 +183,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int CoincidentBoundarySeamPairCount;
             public int CoincidentGraphVertexReconciliationCount;
             public int CoincidentGraphBoundarySeamPairCount;
+            public int MicroFeatureEvaluatedEdgeCount;
+            public int MicroFeatureNormalizedComponentCount;
+            public int MicroFeatureNormalizedEdgeCount;
+            public int MicroFeatureRejectedEdgeCount;
+            public float MicroFeatureMaximumDisplacement;
+            public float MicroFeatureMaximumPlaneResidual;
             public int StructuralEligibleCount;
             public int GeometricEligibleCount;
             public int CoexistenceEligibleCount;

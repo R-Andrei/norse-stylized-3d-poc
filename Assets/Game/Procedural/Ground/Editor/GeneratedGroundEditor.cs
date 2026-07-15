@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -8,6 +9,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
     [CanEditMultipleObjects]
     public sealed class GeneratedGroundEditor : UnityEditor.Editor
     {
+        private const double SharedStyleSaveDelaySeconds = 0.35;
+
+        private static readonly HashSet<GroundSurfaceStyleProfile>
+            PendingSharedStyleSaves =
+                new HashSet<GroundSurfaceStyleProfile>();
+
+        private static bool sharedStyleSaveUpdateRegistered;
+        private static double sharedStyleSaveDeadline;
+
+        static GeneratedGroundEditor()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload +=
+                FlushPendingSharedStyleSaves;
+            EditorApplication.quitting += FlushPendingSharedStyleSaves;
+        }
+
         private SerializedProperty recipe;
         private SerializedProperty surfaceStyleProfile;
         private SerializedProperty surfaceVariantId;
@@ -132,6 +149,69 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool showMaterialWeatherFinish;
         private bool showStyleAssetDetails;
 
+
+        private static void QueueSharedStyleSave(
+            GroundSurfaceStyleProfile style)
+        {
+            if (style == null || !EditorUtility.IsPersistent(style))
+            {
+                return;
+            }
+
+            PendingSharedStyleSaves.Add(style);
+            sharedStyleSaveDeadline =
+                EditorApplication.timeSinceStartup +
+                SharedStyleSaveDelaySeconds;
+
+            if (sharedStyleSaveUpdateRegistered)
+            {
+                return;
+            }
+
+            sharedStyleSaveUpdateRegistered = true;
+            EditorApplication.update += TryFlushPendingSharedStyleSaves;
+        }
+
+        private static void TryFlushPendingSharedStyleSaves()
+        {
+            if (EditorApplication.timeSinceStartup <
+                sharedStyleSaveDeadline)
+            {
+                return;
+            }
+
+            FlushPendingSharedStyleSaves();
+        }
+
+        private static void FlushPendingSharedStyleSaves()
+        {
+            if (sharedStyleSaveUpdateRegistered)
+            {
+                EditorApplication.update -=
+                    TryFlushPendingSharedStyleSaves;
+                sharedStyleSaveUpdateRegistered = false;
+            }
+
+            foreach (GroundSurfaceStyleProfile style in
+                     PendingSharedStyleSaves)
+            {
+                if (style != null && EditorUtility.IsPersistent(style))
+                {
+                    AssetDatabase.SaveAssetIfDirty(style);
+                }
+            }
+
+            PendingSharedStyleSaves.Clear();
+        }
+
+        private static void DrawMaterialStorageLine(
+            string storage,
+            string tooltip)
+        {
+            EditorGUILayout.LabelField(
+                new GUIContent("Stored In", tooltip),
+                new GUIContent(storage, tooltip));
+        }
 
         private static bool DrawSectionFoldout(
             ref bool expanded,
@@ -3305,6 +3385,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             if (overrideMaterialControls.boolValue)
             {
+                GeneratedGround selectedGround =
+                    target as GeneratedGround;
+                string sceneName =
+                    selectedGround != null &&
+                    selectedGround.gameObject.scene.IsValid() &&
+                    !string.IsNullOrEmpty(
+                        selectedGround.gameObject.scene.name)
+                        ? selectedGround.gameObject.scene.name
+                        : "Unsaved Scene";
+                string objectName =
+                    selectedGround != null
+                        ? selectedGround.name
+                        : "GeneratedGround";
+
+                DrawMaterialStorageLine(
+                    $"Local Scene Override — {sceneName} / {objectName}",
+                    "These values are serialized on this GeneratedGround component. Save the scene to persist them.");
+
                 EditorGUILayout.HelpBox(
                     "Editing Local Material Override — changes affect this GeneratedGround only.",
                     MessageType.Info);
@@ -3339,6 +3437,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             DrawSharedVariantAuthoringScope(style, variant, true);
 
+            string styleAssetPath = AssetDatabase.GetAssetPath(style);
+            DrawMaterialStorageLine(
+                $"Shared Style Asset — {style.name} / {variant.DisplayName}",
+                string.IsNullOrEmpty(styleAssetPath)
+                    ? "These values are serialized in the selected GroundSurfaceStyleProfile asset."
+                    : styleAssetPath);
+
             SerializedProperty materialControls =
                 serializedVariant.FindPropertyRelative("materialControls");
 
@@ -3354,10 +3459,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             bool sharedMaterialChanged =
                 DrawSharedMaterialControlGroups(materialControls);
 
-            if (sharedMaterialChanged)
-            {
+            bool sharedMaterialApplied =
                 styleObject.ApplyModifiedProperties();
+
+            if (sharedMaterialChanged || sharedMaterialApplied)
+            {
                 EditorUtility.SetDirty(style);
+                QueueSharedStyleSave(style);
                 RefreshLoadedGroundsUsingStyleVariant(
                     style,
                     variant.Id,

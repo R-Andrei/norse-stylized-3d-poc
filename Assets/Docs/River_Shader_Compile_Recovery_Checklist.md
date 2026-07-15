@@ -4,6 +4,27 @@ D.1C imported, rendered, and passed the user’s functional Unity validation whi
 
 No dedicated cold-compile timing or final GPU comparison was supplied for D.1C. Those measurements remain deferred performance evidence, not a blocker for the accepted visual baseline. This checklist should only become active again for the comprehensive River performance pass or a new shader-iteration regression.
 
+## `4.11C.5.18F.1` compute/C# iteration impact
+
+The original `5.18F` is rejected because its `frontierActive` threshold could remain false across legal Arc/Semi-Arc parameter combinations. `5.18F.1` removes that branch and requires both C# compilation and compute import.
+
+```text
+StylizedRiverFoamRuntime.Injection.cs
+  packs normalized material-step progress for Arc/Semi-Arc startup timing;
+
+CS_RiverFoam.compute
+  finite startup pulse;
+  continuous current-minus-previous reveal frontier;
+  finite-pulse fallback for spans too short to move;
+  no full-history fallback.
+
+new kernels/dispatches/resources/keywords = 0;
+canonical transport/velocity code = unchanged;
+Contact Fleck and shore/free-water evaluators = unchanged.
+```
+
+Required gates are C# compile, compute import, and runtime proof in `Automatic Birth Sources` that minimum/midpoint/maximum Arc and Semi-Arc recipes release passed cyan territory.
+
 ## `4.11C.5.18E` compute/shader iteration impact
 
 `5.18E` changes both the Foam compute contract and the Final Foam include:
@@ -20,7 +41,7 @@ RiverWaterFoam.hlsl
   changes Lifecycle-Faithful meaningful-Presence participation from 0.02–0.16 to 0.02–0.10.
 ```
 
-The runtime binds the new support threshold for normal simulation and topology metrics. No kernel, texture, channel, buffer, dispatch, render pass, or shader keyword is added. Unity validation must confirm compute import, shared include compilation, and Final Foam rendering in both visibility modes.
+The runtime binds the new support threshold for normal simulation and topology metrics. No kernel, texture, channel, buffer, dispatch, render pass, or shader keyword is added. Unity validation passed; the user confirmed that the short visible-lifetime problem is fully fixed.
 
 ## `4.11C.5.18D` compute/editor iteration impact
 

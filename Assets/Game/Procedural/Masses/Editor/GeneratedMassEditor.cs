@@ -1266,6 +1266,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append('/');
                 builder.Append(
                     result.CoincidentGraphBoundarySeamPairCount);
+                builder.Append(",microFeatures=evaluated/components/edges/rejected:");
+                builder.Append(result.MicroFeatureEvaluatedEdgeCount);
+                builder.Append('/');
+                builder.Append(result.MicroFeatureNormalizedComponentCount);
+                builder.Append('/');
+                builder.Append(result.MicroFeatureNormalizedEdgeCount);
+                builder.Append('/');
+                builder.Append(result.MicroFeatureRejectedEdgeCount);
+                builder.Append(",microMaxDisplacement/residual=");
+                builder.Append(result.MicroFeatureMaximumDisplacement.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                builder.Append('/');
+                builder.Append(result.MicroFeatureMaximumPlaneResidual.ToString(
+                    "G9", CultureInfo.InvariantCulture));
                 builder.Append(",structural/geometric/coexistence=");
                 builder.Append(result.StructuralEligibleCount);
                 builder.Append('/');
@@ -1411,7 +1425,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine(
                 "case,seed,widthTier,width,passed,rawSourceEdges,sourceEdges," +
                 "coincidentBoundarySeamPairs,graphVertexAliases," +
-                "graphBoundarySeamPairs,structuralEligible," +
+                "graphBoundarySeamPairs,microFeatureEvaluatedEdges," +
+                "microFeatureNormalizedComponents," +
+                "microFeatureNormalizedEdges,microFeatureRejectedEdges," +
+                "microFeatureMaximumDisplacement," +
+                "microFeatureMaximumPlaneResidual,structuralEligible," +
                 "geometricEligible,coexistenceEligible," +
                 "coexistenceIneligible,selected,certified,deferred,rejected," +
                 "trialRejected,boundaryExclusions,dihedralExclusions," +
@@ -1462,6 +1480,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     result.CoincidentGraphVertexReconciliationCount.ToString());
                 AppendCsvValue(builder,
                     result.CoincidentGraphBoundarySeamPairCount.ToString());
+                AppendCsvValue(builder,
+                    result.MicroFeatureEvaluatedEdgeCount.ToString());
+                AppendCsvValue(builder,
+                    result.MicroFeatureNormalizedComponentCount.ToString());
+                AppendCsvValue(builder,
+                    result.MicroFeatureNormalizedEdgeCount.ToString());
+                AppendCsvValue(builder,
+                    result.MicroFeatureRejectedEdgeCount.ToString());
+                AppendCsvValue(builder,
+                    result.MicroFeatureMaximumDisplacement.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                AppendCsvValue(builder,
+                    result.MicroFeatureMaximumPlaneResidual.ToString(
+                        "G9", CultureInfo.InvariantCulture));
                 AppendCsvValue(builder,
                     result.StructuralEligibleCount.ToString());
                 AppendCsvValue(builder,
@@ -1699,8 +1731,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
-                ? "EW-B4.2R11B.1-topology"
-                : "EW-B4.2R11B.1-preview";
+                ? "EW-B4.2R11B.3-topology"
+                : "EW-B4.2R11B.3-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *

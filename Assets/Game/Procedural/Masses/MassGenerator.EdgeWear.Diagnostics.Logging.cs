@@ -181,6 +181,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 coverage == null
                     ? 0
                     : coverage.CoincidentGraphBoundarySeamPairCount;
+            result.MicroFeatureEvaluatedEdgeCount = coverage == null
+                ? 0
+                : coverage.MicroFeatureEvaluatedEdgeCount;
+            result.MicroFeatureNormalizedComponentCount = coverage == null
+                ? 0
+                : coverage.MicroFeatureNormalizedComponentCount;
+            result.MicroFeatureNormalizedEdgeCount = coverage == null
+                ? 0
+                : coverage.MicroFeatureNormalizedEdgeCount;
+            result.MicroFeatureRejectedEdgeCount = coverage == null
+                ? 0
+                : coverage.MicroFeatureRejectedEdgeCount;
+            result.MicroFeatureMaximumDisplacement = coverage == null
+                ? 0f
+                : coverage.MicroFeatureMaximumDisplacement;
+            result.MicroFeatureMaximumPlaneResidual = coverage == null
+                ? 0f
+                : coverage.MicroFeatureMaximumPlaneResidual;
             result.StructuralEligibleCount = coverage == null
                 ? 0
                 : coverage.StructuralEligibleCount;
@@ -2249,6 +2267,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.AppendLine(FormatEdgeWearCoverageSummary(
                 audit.CoverageAudit));
             builder.AppendLine();
+            builder.AppendLine("[Bevel Graph Micro-Feature Normalization]");
+            AppendEdgeWearMicroFeatureNormalization(
+                builder,
+                audit.CoverageAudit);
+            builder.AppendLine();
             builder.AppendLine("[Viability Exclusion Summary]");
             builder.AppendLine(FormatEdgeWearViabilityExclusionSummary(
                 audit.CoverageAudit,
@@ -2496,6 +2519,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     audit.CoincidentGraphVertexReconciliationCount +
                 ",graphSeamPairs=" +
                     audit.CoincidentGraphBoundarySeamPairCount +
+                ",microFeatures=" +
+                    audit.MicroFeatureEvaluatedEdgeCount +
+                    "/" +
+                    audit.MicroFeatureNormalizedComponentCount +
+                    "/" +
+                    audit.MicroFeatureNormalizedEdgeCount +
+                    "/" +
+                    audit.MicroFeatureRejectedEdgeCount +
+                ",microMaxDisplacement=" +
+                    audit.MicroFeatureMaximumDisplacement.ToString("G9") +
+                ",microMaxPlaneResidual=" +
+                    audit.MicroFeatureMaximumPlaneResidual.ToString("G9") +
                 ",structural=" + audit.StructuralEligibleCount +
                 ",geometric=" + audit.GeometricEligibleCount +
                 ",geometricIneligible=" +
@@ -3083,6 +3118,73 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return 6;
             }
             return 7;
+        }
+
+        private static void AppendEdgeWearMicroFeatureNormalization(
+            StringBuilder builder,
+            EdgeWearCoverageAudit audit)
+        {
+            if (builder == null)
+            {
+                return;
+            }
+            if (audit == null)
+            {
+                builder.AppendLine("notCaptured");
+                return;
+            }
+            builder.Append("evaluatedEdges=");
+            builder.Append(audit.MicroFeatureEvaluatedEdgeCount);
+            builder.Append(",normalizedComponents=");
+            builder.Append(audit.MicroFeatureNormalizedComponentCount);
+            builder.Append(",normalizedEdges=");
+            builder.Append(audit.MicroFeatureNormalizedEdgeCount);
+            builder.Append(",rejectedEdges=");
+            builder.Append(audit.MicroFeatureRejectedEdgeCount);
+            builder.Append(",maximumDisplacement=");
+            builder.Append(
+                audit.MicroFeatureMaximumDisplacement.ToString("G9"));
+            builder.Append(",maximumPlaneResidual=");
+            builder.Append(
+                audit.MicroFeatureMaximumPlaneResidual.ToString("G9"));
+            builder.Append(",firstRejection=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    audit.MicroFeatureFirstRejectionReason)
+                ? "none"
+                : audit.MicroFeatureFirstRejectionReason);
+            if (audit.MicroFeatureNormalizationRecords == null ||
+                audit.MicroFeatureNormalizationRecords.Count == 0)
+            {
+                builder.AppendLine("none");
+                return;
+            }
+            for (int recordIndex = 0;
+                 recordIndex < audit.MicroFeatureNormalizationRecords.Count;
+                 recordIndex++)
+            {
+                EdgeWearMicroFeatureNormalizationRecord record =
+                    audit.MicroFeatureNormalizationRecords[recordIndex];
+                builder.Append("record=");
+                builder.Append(recordIndex + 1);
+                builder.Append(",edges={");
+                builder.Append(FormatPlaneCutEdgeIndexEvidence(
+                    record.SourceEdgeIndices));
+                builder.Append("},vertices={");
+                builder.Append(FormatPlaneCutEdgeIndexEvidence(
+                    record.SourceVertexIndices));
+                builder.Append("},normalized=");
+                builder.Append(record.Normalized ? '1' : '0');
+                builder.Append(",junction=");
+                builder.Append(FormatPlaneCutVector(record.Junction));
+                builder.Append(",maximumDisplacement=");
+                builder.Append(record.MaximumDisplacement.ToString("G9"));
+                builder.Append(",maximumPlaneResidual=");
+                builder.Append(record.MaximumPlaneResidual.ToString("G9"));
+                builder.Append(",reason=");
+                builder.AppendLine(string.IsNullOrEmpty(record.Reason)
+                    ? "none"
+                    : record.Reason);
+            }
         }
 
         private static string FormatEdgeWearLocalityCacheContract(

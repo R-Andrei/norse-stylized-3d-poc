@@ -28,6 +28,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
         _GroundPatchBlendStrength("Ground Patch Blend Strength", Range(0, 1)) = 0.55
         _GroundMacroPatchScale("Ground Macro Patch Scale", Range(0.5, 12)) = 4.5
         _GroundMacroPatchPatternSeed("Macro Patch Pattern Seed", Float) = 0
+        [HideInInspector] _GroundMacroPatchSeedScroll("Ground Macro Patch Seed Scroll", Vector) = (0, 0, 0, 0)
         _GroundMacroPatchTransitionSoftness("Ground Macro Patch Transition Softness", Range(0, 1)) = 0.75
         _GroundMacroPatchSeparation("Average Patch Separation", Float) = 1
         _GroundSnowTintStrength("Ground Snow Tint Strength", Range(0, 1)) = 0.58

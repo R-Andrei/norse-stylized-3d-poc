@@ -1138,13 +1138,59 @@ float FoamEvaluateObjectContactArcSource(
     float tangentDistance = dot(local, tangent);
     float normalDistance = dot(local, normal);
 
-    float revealedHalfLength = max(
-        width * 1.4,
-        max(feather, totalLength * 0.5 * progress));
-    float lengthMask = 1.0 - smoothstep(
-        revealedHalfLength,
-        revealedHalfLength + max(feather, totalLength * 0.08),
+    // 5.18F.1: deposit a finite startup centre plus two continuously moving
+    // reveal frontiers. There is deliberately no full-history fallback.
+    float revealFeather = max(feather, totalLength * 0.08);
+    float initialHalfLength = max(width * 1.4, feather);
+    float maximumHalfLength = max(initialHalfLength, totalLength * 0.5);
+    float growthSpan = max(0.0, maximumHalfLength - initialHalfLength);
+    float tangentCellSpacing = max(
+        0.0001,
+        length(float2(
+            tangent.x * physicalCellSpacing.x,
+            tangent.y * physicalCellSpacing.y)));
+    float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
+    float startupEndProgress = min(
+        0.85,
+        max(0.04, materialStepProgress * 2.25));
+    float startupFadeStart = min(
+        startupEndProgress * 0.72,
+        materialStepProgress * 0.75);
+    float startupEnvelope = 1.0 - smoothstep(
+        startupFadeStart,
+        startupEndProgress,
+        progress);
+    float initialReveal = 1.0 - smoothstep(
+        initialHalfLength,
+        initialHalfLength + revealFeather,
         abs(tangentDistance));
+    float startupMask = initialReveal * startupEnvelope;
+
+    float minimumGrowthForFrontier = tangentCellSpacing * 2.25;
+    float frontierAvailable = step(minimumGrowthForFrontier, growthSpan);
+    float safeGrowthSpan = max(growthSpan, 0.0001);
+    float requestedTrailProgress =
+        max(sourceEvent.kinematics.y, tangentCellSpacing) / safeGrowthSpan;
+    float minimumTrailProgress = max(
+        materialStepProgress * 1.50,
+        tangentCellSpacing / safeGrowthSpan);
+    float trailProgress = min(
+        0.45,
+        max(requestedTrailProgress, minimumTrailProgress));
+    float previousProgress = max(0.0, progress - trailProgress);
+    float currentHalfLength = initialHalfLength + growthSpan * progress;
+    float previousHalfLength = initialHalfLength + growthSpan * previousProgress;
+    float currentReveal = 1.0 - smoothstep(
+        currentHalfLength,
+        currentHalfLength + revealFeather,
+        abs(tangentDistance));
+    float previousReveal = 1.0 - smoothstep(
+        previousHalfLength,
+        previousHalfLength + revealFeather,
+        abs(tangentDistance));
+    float movingFrontiers = saturate(currentReveal - previousReveal) *
+        frontierAvailable;
+    float lengthMask = max(startupMask, movingFrontiers);
 
     float coarseAlongGate = 1.0 - smoothstep(
         alongHalf + contactOffset + totalLength * 0.75,
@@ -1225,24 +1271,77 @@ float FoamEvaluateObjectContactSemiArcSource(
     float signedTangent = tangentDistance * side;
     float backReach = totalLength * lerp(0.05, 0.13, 1.0 - lopsidedness);
     float fullForwardReach = totalLength * lerp(0.34, 0.62, lopsidedness);
-    float revealedForwardReach = max(
-        width * 1.4,
-        max(feather, fullForwardReach * progress));
+
+    // 5.18F.1: deposit a finite initial shoulder plus one continuously
+    // advancing frontier. Short events become a pulse, never a held source.
+    float revealFeather = max(feather, totalLength * 0.06);
+    float initialForwardReach = max(width * 1.4, feather);
+    float maximumForwardReach = max(initialForwardReach, fullForwardReach);
+    float growthSpan = max(0.0, maximumForwardReach - initialForwardReach);
+    float tangentCellSpacing = max(
+        0.0001,
+        length(float2(
+            tangent.x * physicalCellSpacing.x,
+            tangent.y * physicalCellSpacing.y)));
+    float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
+    float startupEndProgress = min(
+        0.85,
+        max(0.04, materialStepProgress * 2.25));
+    float startupFadeStart = min(
+        startupEndProgress * 0.72,
+        materialStepProgress * 0.75);
+    float startupEnvelope = 1.0 - smoothstep(
+        startupFadeStart,
+        startupEndProgress,
+        progress);
 
     float startGate = smoothstep(
         -backReach - feather,
         -backReach + feather,
         signedTangent);
-    float endGate = 1.0 - smoothstep(
-        revealedForwardReach,
-        revealedForwardReach + max(feather, totalLength * 0.06),
+    float initialEndGate = 1.0 - smoothstep(
+        initialForwardReach,
+        initialForwardReach + revealFeather,
         signedTangent);
-    float semiT = saturate(
+    float initialT = saturate(
         (signedTangent + backReach) /
-        max(0.001, revealedForwardReach + backReach));
-    float endTaper = smoothstep(0.00, 0.16, semiT) *
-        (1.0 - smoothstep(0.84, 1.00, semiT));
-    float lengthMask = startGate * endGate * max(0.38, endTaper);
+        max(0.001, initialForwardReach + backReach));
+    float initialEndTaper = smoothstep(0.00, 0.16, initialT) *
+        (1.0 - smoothstep(0.84, 1.00, initialT));
+    float startupMask = startGate * initialEndGate *
+        max(0.38, initialEndTaper) * startupEnvelope;
+
+    float minimumGrowthForFrontier = tangentCellSpacing * 2.25;
+    float frontierAvailable = step(minimumGrowthForFrontier, growthSpan);
+    float safeGrowthSpan = max(growthSpan, 0.0001);
+    float requestedTrailProgress =
+        max(sourceEvent.kinematics.y, tangentCellSpacing) / safeGrowthSpan;
+    float minimumTrailProgress = max(
+        materialStepProgress * 1.50,
+        tangentCellSpacing / safeGrowthSpan);
+    float trailProgress = min(
+        0.45,
+        max(requestedTrailProgress, minimumTrailProgress));
+    float previousProgress = max(0.0, progress - trailProgress);
+    float currentForwardReach = initialForwardReach + growthSpan * progress;
+    float previousForwardReach = initialForwardReach +
+        growthSpan * previousProgress;
+    float currentEndGate = 1.0 - smoothstep(
+        currentForwardReach,
+        currentForwardReach + revealFeather,
+        signedTangent);
+    float previousEndGate = 1.0 - smoothstep(
+        previousForwardReach,
+        previousForwardReach + revealFeather,
+        signedTangent);
+    float currentT = saturate(
+        (signedTangent + backReach) /
+        max(0.001, currentForwardReach + backReach));
+    float currentEndTaper = smoothstep(0.00, 0.16, currentT) *
+        (1.0 - smoothstep(0.84, 1.00, currentT));
+    float movingFrontier = saturate(currentEndGate - previousEndGate) *
+        startGate * max(0.38, currentEndTaper) * frontierAvailable;
+    float lengthMask = max(startupMask, movingFrontier);
 
     float coarseAlongGate = 1.0 - smoothstep(
         alongHalf + contactOffset + totalLength * 0.80,

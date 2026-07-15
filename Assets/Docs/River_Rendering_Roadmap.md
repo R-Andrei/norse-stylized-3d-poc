@@ -16,9 +16,24 @@ Amount, Size, Spacing, Irregularity, Edge Width, Interior Access
 
 `D.1A.1` is rejected and rolled back. `D.1D — Coherent Edge-Bite Admission` is skipped because the current result is good enough. Remaining-Life interaction is deferred as optional future enhancement rather than an active dependency. The zoom-dependent thin-strip capture remains known technical debt and is not blocking completion.
 
-There is no active Chipping patch. Stage 7 source/contact geometry remains complete and validated, but `4.11C.5.18E` is the active targeted Foam lifecycle-authoring and visible-duration validation patch.
+There is no active Chipping patch. `4.11C.5.18E` is Unity-validated and accepted. The original `5.18F` source-detachment attempt is rejected; `4.11C.5.18F.1` is the active replacement.
 
-## Initial Presence and lifecycle authority — `4.11C.5.18E` — implemented, Unity validation pending
+## Detaching Object Arc deposition replacement — `4.11C.5.18F.1` — implemented, Unity validation pending
+
+The transport audit still identifies full historical Arc/Semi-Arc repainting as the obstacle-locked wake cause. The first `5.18F` implementation did not reliably remove it: its activation threshold could be unreachable for legal short/wide recipes, preserving the old source mask.
+
+The replacement uses no activation fallback:
+
+```text
+Contact Arc       finite centre pulse, then two moving reveal differences;
+Contact Semi-Arc  finite shoulder pulse, then one moving reveal difference;
+insufficient span finite pulse only;
+passed territory  always stops emitting.
+```
+
+No new authoring control or runtime resource is added. C# supplies normalized material-step duration through an object-only unused GPU lane so the initial pulse survives the first dispatch without being held for the event lifetime.
+
+## Initial Presence and lifecycle authority — `4.11C.5.18E` — Unity-validated and accepted
 
 A runtime lifetime audit showed that the automatic source recipes already authored normalized `Initial Life`, but their peak deposited `Presence` remained hidden as hard-coded per-pattern ranges. `5.18E` exposes those exact existing ranges as `Initial Presence Min/Max`, so importing the patch preserves the prior source result by default while allowing direct tests of presence-limited visible lifetime:
 
@@ -47,7 +62,7 @@ new automatic-source events = 0;
 source-shape geometry and scheduling = unchanged;
 negative-aging response = unchanged;
 Lifecycle-Faithful presence footprint high edge = 0.16 → 0.10;
-Unity shader/compute import and runtime validation = pending.
+Unity shader/compute import and runtime validation = passed; the user confirmed the visible-lifetime issue is fully fixed.
 ```
 
 ## Accepted Stage 7 closure correction — `4.11C.5.18C` Contact-Attached Pressure and Thin Birth Sources
@@ -100,7 +115,7 @@ The existing Automatic Birth Sources view gains two compact evidence rows for cu
 
 # Current River completion state
 
-The current fixed-strength Chipping and structural Strand result is accepted. `5.18E` does not add morphology; it is a targeted source-Presence, lifecycle-range, meaningful-Presence threshold, and support-authority pass. Stage 3 is fully validated. Stage 7 is complete and validated through `5.18C`; `5.18D` records the final truthful authoring contract. The former Stage 8 reflection/final-integration queue is stale: the current River has no visible reflection feature and no active reflection plan.
+The current fixed-strength Chipping and structural Strand result is accepted. `5.18E` is validated and fixes the prior lifespan-authoring problem. `5.18F.1` replaces the rejected first detachment attempt and narrowly reopens Object Arc/Semi-Arc formation semantics so deposited cohorts detach instead of being continuously repainted at the obstacle. Stage 3 remains fully validated; all other Stage 7 source/contact geometry remains accepted. The former Stage 8 reflection/final-integration queue is stale: the current River has no visible reflection feature and no active reflection plan.
 
 All River performance work is deferred to one later comprehensive pass covering offscreen/empty-field work, cadence, sleeping, shader/runtime cost, diagnostic/readback overhead, chunk policies, and dormant systems together.
 

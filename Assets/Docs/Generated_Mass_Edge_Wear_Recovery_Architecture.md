@@ -1309,3 +1309,16 @@ The second audit is required because a passing exhaustive matrix alone cannot pr
 R11B.1 repairs source seams split only by quantization-boundary drift smaller than `PointMergeDistance`. Reconciliation is deliberately narrow: the second incidence must reverse-match an existing one-sided incidence, belong to a different face, and leave the canonical edge manifold after the second face is attached. No source face, scene, prefab, or production mesh is rewritten.
 
 The candidate aggregate and topology graph independently apply the same rule and expose separate evidence counts. Acceptance requires candidate seam-pair count and graph seam-pair count to agree, the affected canonical edge to receive two owner faces, and both topology and preview matrices to remain fully certified. This patch does not relax isolated-rail, width-floor, dihedral, or certification constraints.
+
+
+## R11B.2 rejected singleton fallback
+
+Runtime evidence rejected the R11B.2 singleton plane-shell fallback. Across the accepted 30-case preview and topology matrices it evaluated 22 rail-limited candidates over 92 deterministic width attempts and recovered zero. Seed 2223 edge 36 merely advanced from the legacy endpoint-segment blocker to the existing corner-displacement blocker. The fallback added cost and telemetry without changing eligibility, so it is not part of the continuing architecture.
+
+## R11B.3 bevel-graph micro-feature normalization
+
+R11B.3 preserves the R11B.1 coincident seam reconciliation and removes the zero-yield singleton fallback. Before candidate construction, it builds a temporary bevel-graph face view from the immutable source faces. Internal convex edges that are shorter than the current bevel footprint and no longer than the requested width are evaluated as possible micro-feature chains. Only open, non-branching chains with meaningful adjacent continuation are eligible.
+
+Each candidate chain is replaced only in the temporary bevel graph by a least-squares common junction of its incident analytical face planes, regularized toward the original chain centroid. Acceptance requires bounded displacement, bounded plane residual, stable face area and winding, unchanged boundary/non-manifold counts, and an exact graph delta equal to the chain vertices and edges owned by the normalization. The original source polygons, placement frame, scene, prefab, and fallback geometry remain untouched. The normalized graph view is shared by candidate construction, isolated-rail preflight, corner solving, and final plane-shell preparation; final clipping and certification still operate on the immutable source faces.
+
+Telemetry reports evaluated, normalized, and rejected micro edges, normalized chain records, maximum junction displacement, maximum plane residual, and the first rejection reason. Matrix contracts are `EW-B4.2R11B.3-topology` and `EW-B4.2R11B.3-preview`.

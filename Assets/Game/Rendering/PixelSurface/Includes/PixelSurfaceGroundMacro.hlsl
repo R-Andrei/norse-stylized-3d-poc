@@ -20,30 +20,29 @@
                 float macroScale = max(_GroundMacroPatchScale, 0.0001);
                 float2 baseCoordinate = positionWS.xz / macroScale;
                 float seedCoordinate = _PixelSeed * 0.013;
-                float patternSeed = _GroundMacroPatchPatternSeed;
+                float2 patternCoordinate =
+                    baseCoordinate +
+                    _GroundMacroPatchSeedScroll.xy;
 
                 float3 warpCoordinate =
-                    float3(baseCoordinate * 0.43, seedCoordinate);
+                    float3(patternCoordinate * 0.43, seedCoordinate);
                 float2 warp =
                     float2(
                         PS3D_ValueNoise31(
                             warpCoordinate +
-                            float3(11.17, 29.31, 7.73) +
-                            patternSeed * float3(17.17, 31.31, 13.73)),
+                            float3(11.17, 29.31, 7.73)),
                         PS3D_ValueNoise31(
                             warpCoordinate +
-                            float3(23.31, 17.73, 5.37) +
-                            patternSeed * float3(29.31, 11.17, 23.53))) *
+                            float3(23.31, 17.73, 5.37))) *
                     2.0 -
                     1.0;
 
                 float2 regionCoordinate =
-                    baseCoordinate + warp * 0.52;
+                    patternCoordinate + warp * 0.52;
                 float primaryRegion = PS3D_ValueNoise31(
                     float3(regionCoordinate, seedCoordinate + 37.47));
                 float secondaryRegion = PS3D_ValueNoise31(
-                    float3(regionCoordinate * 1.65, seedCoordinate + 53.29) +
-                    patternSeed * float3(41.41, 13.13, 31.73));
+                    float3(regionCoordinate * 1.65, seedCoordinate + 53.29));
                 float regionalSource = saturate(
                     primaryRegion + (secondaryRegion - 0.5) * 0.14);
 

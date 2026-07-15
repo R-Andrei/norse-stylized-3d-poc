@@ -445,6 +445,20 @@ Explicitly not included in GI-A2:
 | Directional/Pooled/Trampled features | selected shared variant | all Grounds using the style/variant | Material |
 | Painted Accent feature values | selected shared variant | all Grounds using the style/variant | signature-driven minimum PA stage plus Material |
 
+### GI-A2.1 correction — shared material persistence and visible storage ownership
+
+The inline shared-variant Material Controls path previously committed its separate `SerializedObject` only when the parent Inspector's immediate GUI change check reported a change. Unity colour-picker updates can arrive through the picker window without that exact parent event reporting the change, leaving an apparently edited palette value unapplied or only dirty in memory. A script compilation or assembly reload could then restore the last value actually stored in the style asset.
+
+GI-A2.1 makes the serialized owner authoritative and explicit:
+
+- the shared style `SerializedObject` is applied after every Material Controls draw; its actual `ApplyModifiedProperties()` result determines refresh work;
+- changed `GroundSurfaceStyleProfile` assets are marked dirty and queued for a coalesced `AssetDatabase.SaveAssetIfDirty` call;
+- pending style saves are flushed before assembly reload, so code changes cannot discard recently authored palette values;
+- the Material Controls section shows a direct **Stored In** line for either the shared style asset and variant or the local scene/component override;
+- local overrides retain their existing scene-serialization contract and still require the scene to be saved.
+
+This correction changes only the GeneratedGround custom editor and this canonical document. It does not modify runtime resolution, shaders, materials, styles, profiles, scenes, prefabs, defaults, or existing serialized values.
+
 ## GI-A3 implementation record
 
 GI-A3 changes the Painted Accent recipe contract, Ground material binding and diagnostics, the Ground shader, both Ground style authoring surfaces, and this canonical document. It does not alter SurfaceStroke placement, ProjectedGlyph composition, cluster solving, coverage rasterization, scenes, prefabs, materials, or style assets.

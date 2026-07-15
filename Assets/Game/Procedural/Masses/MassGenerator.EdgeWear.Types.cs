@@ -1919,7 +1919,35 @@ private readonly struct EdgeWearSelectedGraphEdge
                 Candidate = candidate;
             }
         }
-private struct EdgeWearGraphBuildStats
+        private sealed class EdgeWearMicroFeatureNormalizationRecord
+        {
+            public readonly List<int> SourceEdgeIndices =
+                new List<int>();
+            public readonly List<int> SourceVertexIndices =
+                new List<int>();
+            public bool Normalized;
+            public Vector3 Junction;
+            public float MaximumDisplacement;
+            public float MaximumPlaneResidual;
+            public string Reason = string.Empty;
+        }
+
+        private sealed class EdgeWearMicroFeatureNormalizationStats
+        {
+            public int RawSourceEdgeCount;
+            public int EvaluatedEdgeCount;
+            public int NormalizedComponentCount;
+            public int NormalizedEdgeCount;
+            public int RejectedEdgeCount;
+            public float MaximumDisplacement;
+            public float MaximumPlaneResidual;
+            public string FirstRejectionReason = string.Empty;
+            public readonly List<EdgeWearMicroFeatureNormalizationRecord>
+                Records =
+                    new List<EdgeWearMicroFeatureNormalizationRecord>();
+        }
+
+        private struct EdgeWearGraphBuildStats
         {
             public int GraphVertexCount;
             public int GraphEdgeCount;
@@ -2014,6 +2042,16 @@ private struct EdgeWearGraphBuildStats
             public int CoincidentBoundarySeamPairCount;
             public int CoincidentGraphVertexReconciliationCount;
             public int CoincidentGraphBoundarySeamPairCount;
+            public int MicroFeatureEvaluatedEdgeCount;
+            public int MicroFeatureNormalizedComponentCount;
+            public int MicroFeatureNormalizedEdgeCount;
+            public int MicroFeatureRejectedEdgeCount;
+            public float MicroFeatureMaximumDisplacement;
+            public float MicroFeatureMaximumPlaneResidual;
+            public string MicroFeatureFirstRejectionReason = string.Empty;
+            public readonly List<EdgeWearMicroFeatureNormalizationRecord>
+                MicroFeatureNormalizationRecords =
+                    new List<EdgeWearMicroFeatureNormalizationRecord>();
             public int ViabilityLocalityEvaluationCount;
             public int ViabilityIsolatedEvaluationCount;
             public int ViabilityLocalityCacheUseCount;

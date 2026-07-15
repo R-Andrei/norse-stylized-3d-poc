@@ -3440,3 +3440,29 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 - [ ] Validate seed 5727: the two reversed boundary pairs become canonical two-face edges and are assessed normally.
 - [ ] Run the exhaustive topology matrix and artistic preview parity matrix; require both `30/30`.
 - [ ] Defer seed 2223 edge 36 micro-junction rail recovery to R11B.2.
+
+
+## EW-B4.2R11B.2 — Rejected experiment
+
+- [x] Runtime-audit the singleton certified-plane-shell fallback.
+- [x] Reject it after 22 candidate evaluations and 92 width attempts produced zero recoveries across both accepted matrices.
+- [x] Remove its code and telemetry rather than retaining a permanent zero-yield path.
+
+## EW-B4.2R11B.3 — Bevel-graph micro-feature normalization
+
+- [x] Preserve immutable source faces and R11B.1 coincident boundary-seam reconciliation.
+- [x] Build one temporary normalized face view for candidate construction and topology/corner solving.
+- [x] Evaluate only internal proven-convex sub-footprint edges within the conservative requested-width normalization limit.
+- [x] Require an open, non-branching micro-edge chain with meaningful adjacent continuation.
+- [x] Solve a common incident-plane junction and reject it when displacement or plane residual exceeds existing stability-scale guards.
+- [x] Require every normalized face loop to preserve vertex uniqueness, stable area, and winding.
+- [x] Require the graph delta to equal exactly the vertices and edges owned by the normalized chain, with no new boundary or non-manifold edge.
+- [x] Use normalized graph boundary coordinates in isolated-rail support while retaining original analytical source-face planes.
+- [x] Add compact aggregate and per-chain normalization telemetry.
+- [x] Advance matrix contracts to `EW-B4.2R11B.3-topology` and `EW-B4.2R11B.3-preview`.
+- [ ] Validate that at least one audited case performs a normalization and improves strong-edge geometric eligibility.
+- [ ] Require both 30-case matrices to remain `30/30`, with zero topology, coverage, placement, or cache failures.
+
+### Explicit non-goals
+
+- [x] Do not mutate source polygons, lower the `0.25` width floor, widen merge tolerances, hardcode seeds or edges, or alter shaders/render normals.

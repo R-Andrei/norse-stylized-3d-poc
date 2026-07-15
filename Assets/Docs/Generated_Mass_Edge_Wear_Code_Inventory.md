@@ -1198,3 +1198,22 @@ The editor exposes two independent 30-case audits. The existing topology matrix 
 `MassGenerator.EdgeWear.Graph.cs` applies the same policy to topology vertices and graph edges: a missed `VertexKey` may alias an existing vertex only within `PointMergeDistance`, and a missed edge key may reuse only a reversed, currently one-sided graph edge. The graph records vertex-alias and seam-pair counts.
 
 Coverage telemetry preserves raw and canonical source counts, candidate-stage seam-pair count, graph vertex aliases, graph seam-pair count, and the canonical source-edge IDs marked `coincidentSeamReconciled`. Matrix contracts are `EW-B4.2R11B.1-topology` and `EW-B4.2R11B.1-preview`. R11B.1 does not implement micro-junction rail traversal or rendered-normal correction.
+
+
+## EW-B4.2R11B.3 micro-feature normalization inventory
+
+### `MassGenerator.EdgeWear.Graph.cs`
+
+Owns the temporary bevel-graph normalization pass. It identifies conservative internal convex micro-edge chains, solves a regularized common face-plane junction, builds a cloned face view, and accepts a chain only after face-loop and exact topology-delta validation. The source face list is never modified.
+
+### `MassGenerator.EdgeWear.Orchestration.cs` and `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+Orchestration builds one normalized graph-face view per evaluation. Candidate aggregation, source-index mapping, isolated viability, corner solving, and plane preparation share that view, while all geometry construction and final certification retain the immutable source faces. This prevents candidate/preflight parity drift.
+
+### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+The isolated rail reads endpoint-adjacent boundary coordinates from the normalized topology graph instead of requiring the temporary graph face to have the original polygon vertex count. Original source face normals and plane distances remain authoritative.
+
+### Telemetry and reports
+
+Coverage, detailed telemetry, and both matrix formats expose evaluated/normalized/rejected micro-edge counts, normalized components, maximum junction displacement and plane residual, and per-chain edge/vertex evidence. Contracts are `EW-B4.2R11B.3-topology` and `EW-B4.2R11B.3-preview`.

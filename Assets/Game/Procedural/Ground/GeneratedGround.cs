@@ -751,6 +751,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundMacroPatchScale");
         private static readonly int GroundMacroPatchPatternSeedId =
             Shader.PropertyToID("_GroundMacroPatchPatternSeed");
+        private static readonly int GroundMacroPatchSeedScrollId =
+            Shader.PropertyToID("_GroundMacroPatchSeedScroll");
         private static readonly int GroundMacroPatchTransitionSoftnessId =
             Shader.PropertyToID("_GroundMacroPatchTransitionSoftness");
         private static readonly int GroundMacroPatchSeparationId =
@@ -835,6 +837,50 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 new GroundShaderFeaturePropertyIds("_GroundTrampledWear");
         private static readonly int GroundPaintedAccentLineStrengthId =
             Shader.PropertyToID("_GroundPaintedAccentLineStrength");
+
+        private static uint HashGroundMacroPatchSeed(uint value)
+        {
+            unchecked
+            {
+                value ^= value >> 16;
+                value *= 0x7FEB352Du;
+                value ^= value >> 15;
+                value *= 0x846CA68Bu;
+                value ^= value >> 16;
+                return value;
+            }
+        }
+
+        private static float HashGroundMacroPatchSeedToUnit(uint value)
+        {
+            const float Inverse24BitRange = 1f / 16777216f;
+            return
+                (HashGroundMacroPatchSeed(value) & 0x00FFFFFFu) *
+                Inverse24BitRange;
+        }
+
+        private static Vector4 ResolveGroundMacroPatchSeedScroll(int seed)
+        {
+            if (seed == 0)
+            {
+                return Vector4.zero;
+            }
+
+            unchecked
+            {
+                const float ScrollRangeInMacroCells = 4.5f;
+                uint value = (uint)seed;
+                return new Vector4(
+                    HashGroundMacroPatchSeedToUnit(
+                        value ^ 0xA511E9B3u) *
+                    ScrollRangeInMacroCells,
+                    HashGroundMacroPatchSeedToUnit(
+                        value ^ 0x63D83595u) *
+                    ScrollRangeInMacroCells,
+                    0f,
+                    0f);
+            }
+        }
 
         private struct GroundShaderFeaturePropertyIds
         {
@@ -3782,6 +3828,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             materialProperties.SetFloat(
                 GroundMacroPatchPatternSeedId,
                 resolvedMaterialControls.GroundMacroPatchPatternSeed);
+            materialProperties.SetVector(
+                GroundMacroPatchSeedScrollId,
+                ResolveGroundMacroPatchSeedScroll(
+                    resolvedMaterialControls.GroundMacroPatchPatternSeed));
             materialProperties.SetFloat(
                 GroundMacroPatchTransitionSoftnessId,
                 resolvedMaterialControls.GroundMacroPatchTransitionSoftness);

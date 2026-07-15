@@ -1976,4 +1976,21 @@ A post-closure lifetime audit established that high Initial Life values did not 
 
 Lifecycle-Faithful meaningful-Presence participation changes from `smoothstep(0.02, 0.16, Presence)` to `smoothstep(0.02, 0.10, Presence)`. All existing life-driven pattern erosion, Chipping, Strands, transport, birth cohort merging, and negative topology behavior remain unchanged. Neutral Lifetime and Negative Aging Rate authoring maxima increase to `20`, with no automatic modification of existing serialized values.
 
-Positive support adds `Full Supported Aging At`, default `0.92`, replacing only the previous fixed positive-support upper edge. The compute path now separates positive-support shaping from negative-aging shaping so lowering the new control cannot accidentally strengthen hostile water. No texture, channel, buffer, kernel, dispatch, or persistent state is added. Unity compile and lifespan validation are pending.
+Positive support adds `Full Supported Aging At`, default `0.92`, replacing only the previous fixed positive-support upper edge. The compute path now separates positive-support shaping from negative-aging shaping so lowering the new control cannot accidentally strengthen hostile water. No texture, channel, buffer, kernel, dispatch, or persistent state is added. Unity compile and lifespan validation passed; the user confirmed that the short visible-lifetime issue is fully fixed.
+
+## 2026-07-15 — `4.11C.5.18F` Detaching Object Arc Deposition — rejected, superseded by `5.18F.1`
+
+After `5.18E` was Unity-validated and confirmed to fully fix the short visible-lifetime problem, a new object-wake sequence showed a coherent Foam body remaining obstacle-attached while unrelated Foam travelled past it. The source audit found no object-only transport freeze and no downstream zero-velocity branch. Contact Arc and Semi-Arc source evaluators were instead repainting their complete progressively revealed history on every material update.
+
+`5.18F` changes only those two source masks. Contact Arc writes its initial central section and then deposits through two outward-moving frontier bands. Contact Semi-Arc writes its initial shoulder and then deposits through one advancing frontier band. Historical revealed territory stops emitting after the frontier passes and is released to the normal persistent Layer C transport path. The already packed `HeadTrailMetres` value controls frontier depth and is resolved against one tangent-projected Foam cell to prevent skipped raster cells.
+
+Canonical velocity, obstacle slowdown, donor transport, event frequency, same-anchor overlap, seeds, Contact Fleck, static wake deformation, Initial Presence, Remaining Life, support aging, contact geometry, and serialized authoring remain unchanged. No texture, channel, buffer, kernel, dispatch, persistent state, scene, prefab, material, `.asset`, or `.meta` file is added or modified. Unity compute import and detachment validation are pending.
+
+## 2026-07-15 — `4.11C.5.18F.1` Detaching Object Arc Deposition Replacement
+
+Unity import produced no observable behavior change from `5.18F`. Re-audit proved that its `frontierActive` condition could be unreachable when the initial Profile Scale reach plus Head Trail exceeded the event's available growth span; those legal events retained the old full-history source for their complete duration. `5.18F` is rejected.
+
+`5.18F.1` removes the activation fallback. Arc and Semi-Arc now deposit a finite startup centre/shoulder and compute later source occupancy as the difference between current and previous continuous reveal positions. A short span that cannot support at least roughly two tangent-projected source cells becomes a finite pulse rather than a held source. The CPU supplies normalized material-step duration through an object-source-only unused GPU lane so the startup pulse covers the first raster update at every accepted cadence.
+
+A min/mid/max sweep across Arc Length, Semi-Arc Length, Profile Scale, feather, Foam-cell anisotropy/orientation, event duration, material cadence, Head Trail, and Semi-Arc lopsidedness covers 78,732 combinations. It proves first-update startup deposition, complete release of historical centre/shoulder territory after startup, live moving-frontier occupancy for viable spans, and zero late source occupancy for finite-pulse spans. Unity C# compile, compute import, and runtime detachment validation remain pending.
+

@@ -4,7 +4,7 @@
 
 The GeneratedGround Inspector and Painted Accent production workstream is complete, Unity-validated, and accepted through GI-A1–GI-A4 and PA-B1–PA-B4.1. **GeneratedGround and the broader Ground visual roadmap are not complete.**
 
-The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. The active milestone is **V3M — Broad Macro Patch Completion**, audited in `Ground_Macro_Patch_Audit_and_Architecture.md`. Unity validation of V3M-A1.3 confirmed that the authoring set and overall patch appearance are useful, but Pattern Seed changed total active coverage too aggressively and could produce excessive dead space. V3M-A1.3.1 now stabilizes seed occupancy without adding controls, noise samples, assets, or regeneration work; Unity validation is pending. **V4 — Contact / Edge Accents** remains architecturally accepted but is queued until V3M passes gameplay-camera visual acceptance.
+The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. The active milestone is **V3M — Broad Macro Patch Completion**, audited in `Ground_Macro_Patch_Audit_and_Architecture.md`. Unity validation accepted V3M-A1.3.2's seed variation, controls, occupancy, and final render, but proved that direct large Pattern Seed values progressively quantize the raw macro field because the seed magnitude enters single-precision noise coordinates. V3M-A1.3.3 now hashes the authored integer once on the CPU into a bounded 0–4.5-cell pattern scroll, preserving the four-noise budget and accepted visual architecture while removing seed-magnitude precision loss and all per-pixel raw-seed coordinate arithmetic; Unity validation is pending. **V4 — Contact / Edge Accents** remains architecturally accepted but is queued until V3M passes gameplay-camera visual acceptance.
 
 The accepted current pipeline is:
 
@@ -46,9 +46,10 @@ Ground or scene no longer needs its bake
 ## Next work items
 
 1. Treat only the Inspector and Painted Accent production slice as closed.
-2. Unity-validate V3M-A1.3.1 across a representative Pattern Seed set at identical Scale, Intensity, Transition Softness, and Average Patch Separation values.
-3. Confirm seeds still produce distinct layouts while total active-versus-neutral coverage remains within a reasonably narrow range.
-4. Resume V4 Contact / Edge Accents only after broad macro composition is visually accepted from the gameplay camera.
+2. Unity-validate V3M-A1.3.3 with seeds `0`, `1`, `67`, `2000`, `5727`, `22000`, `52000`, `152000`, `2147483647`, and `-2147483648`.
+3. Confirm that seed magnitude no longer causes blockiness or transition quantization in the raw, weighted, or normal views.
+4. Confirm seed diversity, occupancy, controls, final rendering, and the four-noise budget remain accepted.
+5. Resume V4 Contact / Edge Accents only after broad macro composition is visually accepted from the gameplay camera.
 
 ---
 
