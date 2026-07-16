@@ -27,8 +27,11 @@ MonoBehaviour:
       vegetationTint: {r: 0.36, g: 0.49, b: 0.25, a: 1}
       vegetationTintStrength: 0.42
       bankSurfaceLayer: {fileID: 11400000, guid: b6673354a0024d33b7374b1a24176000, type: 2}
-      riverbedSurfaceLayer: {fileID: 11400000, guid: b6673354a0024d33b7374b1a24176000, type: 2}
+      riverbedSurfaceLayer: {fileID: 0}
+      riverbedSurfaceSource: 2
       shoreHydrologyModifier: {fileID: 11400000, guid: 0993d09f3cc2ac545941e48fab022de0, type: 2}
+      riverbedHydrologySource: 0
+      riverbedHydrologyModifier: {fileID: 0}
       bankMaterialStrength: 1
       bankMaterialReach: 1
       immediateBankExposure: 0.398
@@ -38,6 +41,11 @@ MonoBehaviour:
       outerBankStrength: 1
       outerBankFade: 0.75
       riverbedMaterialStrength: 1
+      riverbedWetnessStrength: 1
+      riverbedToBankWetnessBlendDistance: 0.559
+      riverbedToBankWetnessBlendSoftness: 0.838
+      riverbedWetSmoothnessResponse: 0
+      riverbedWetSpecularResponse: 0
       vegetationRetreatStrength: 0
       snowMeltStrength: 0
       frostRetreatStrength: 0
@@ -48,6 +56,10 @@ MonoBehaviour:
       broadBankSaturation: 0.4
       immediateBankSaturation: 0.25
       waterlineSaturation: 0.265
+      shoreWetHighlightStrength: 2
+      shoreWetHighlightTightness: 1
+      shoreWetHighlightCameraBias: 1
+      shoreWetHighlightVerticalFalloff: 0.886
       groundMacroPatchScale: 4.3
       groundMacroPatchPatternSeed: 69
       broadVariation: 0.05
@@ -145,7 +157,10 @@ MonoBehaviour:
       vegetationTintStrength: 0.36
       bankSurfaceLayer: {fileID: 0}
       riverbedSurfaceLayer: {fileID: 0}
+      riverbedSurfaceSource: 0
       shoreHydrologyModifier: {fileID: 0}
+      riverbedHydrologySource: 0
+      riverbedHydrologyModifier: {fileID: 0}
       bankMaterialStrength: 1
       bankMaterialReach: 0.65
       immediateBankExposure: 0.55
@@ -155,6 +170,11 @@ MonoBehaviour:
       outerBankStrength: 0.5
       outerBankFade: 1
       riverbedMaterialStrength: 1
+      riverbedWetnessStrength: 1
+      riverbedToBankWetnessBlendDistance: 0.2
+      riverbedToBankWetnessBlendSoftness: 0.75
+      riverbedWetSmoothnessResponse: 0
+      riverbedWetSpecularResponse: 0
       vegetationRetreatStrength: 0
       snowMeltStrength: 0
       frostRetreatStrength: 0
@@ -165,6 +185,10 @@ MonoBehaviour:
       broadBankSaturation: 0.45
       immediateBankSaturation: 0.8
       waterlineSaturation: 1
+      shoreWetHighlightStrength: 0.35
+      shoreWetHighlightTightness: 0.8
+      shoreWetHighlightCameraBias: 0.85
+      shoreWetHighlightVerticalFalloff: 0.6
       groundMacroPatchScale: 5
       groundMacroPatchPatternSeed: 0
       broadVariation: 0.052
@@ -262,7 +286,10 @@ MonoBehaviour:
       vegetationTintStrength: 0.38
       bankSurfaceLayer: {fileID: 0}
       riverbedSurfaceLayer: {fileID: 0}
+      riverbedSurfaceSource: 0
       shoreHydrologyModifier: {fileID: 0}
+      riverbedHydrologySource: 0
+      riverbedHydrologyModifier: {fileID: 0}
       bankMaterialStrength: 1
       bankMaterialReach: 0.65
       immediateBankExposure: 0.55
@@ -272,6 +299,11 @@ MonoBehaviour:
       outerBankStrength: 0.5
       outerBankFade: 1
       riverbedMaterialStrength: 1
+      riverbedWetnessStrength: 1
+      riverbedToBankWetnessBlendDistance: 0.2
+      riverbedToBankWetnessBlendSoftness: 0.75
+      riverbedWetSmoothnessResponse: 0
+      riverbedWetSpecularResponse: 0
       vegetationRetreatStrength: 0
       snowMeltStrength: 0
       frostRetreatStrength: 0
@@ -282,6 +314,10 @@ MonoBehaviour:
       broadBankSaturation: 0.45
       immediateBankSaturation: 0.8
       waterlineSaturation: 1
+      shoreWetHighlightStrength: 0.35
+      shoreWetHighlightTightness: 0.8
+      shoreWetHighlightCameraBias: 0.85
+      shoreWetHighlightVerticalFalloff: 0.6
       groundMacroPatchScale: 5.7
       groundMacroPatchPatternSeed: 0
       broadVariation: 0.048
@@ -427,7 +463,10 @@ MonoBehaviour:
       vegetationTintStrength: 0.24
       bankSurfaceLayer: {fileID: 0}
       riverbedSurfaceLayer: {fileID: 0}
+      riverbedSurfaceSource: 0
       shoreHydrologyModifier: {fileID: 0}
+      riverbedHydrologySource: 0
+      riverbedHydrologyModifier: {fileID: 0}
       bankMaterialStrength: 1
       bankMaterialReach: 0.65
       immediateBankExposure: 0.55
@@ -437,6 +476,11 @@ MonoBehaviour:
       outerBankStrength: 0.5
       outerBankFade: 1
       riverbedMaterialStrength: 1
+      riverbedWetnessStrength: 1
+      riverbedToBankWetnessBlendDistance: 0.2
+      riverbedToBankWetnessBlendSoftness: 0.75
+      riverbedWetSmoothnessResponse: 0
+      riverbedWetSpecularResponse: 0
       vegetationRetreatStrength: 0
       snowMeltStrength: 0
       frostRetreatStrength: 0
@@ -447,6 +491,10 @@ MonoBehaviour:
       broadBankSaturation: 0.45
       immediateBankSaturation: 0.8
       waterlineSaturation: 1
+      shoreWetHighlightStrength: 0.35
+      shoreWetHighlightTightness: 0.8
+      shoreWetHighlightCameraBias: 0.85
+      shoreWetHighlightVerticalFalloff: 0.6
       groundMacroPatchScale: 4.7
       groundMacroPatchPatternSeed: 0
       broadVariation: 0.058

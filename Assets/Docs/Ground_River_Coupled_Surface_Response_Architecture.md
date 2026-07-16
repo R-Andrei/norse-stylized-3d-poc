@@ -2,7 +2,7 @@
 
 ## Status — 2026-07-16
 
-**Architecture accepted through V3S-A3B.2. V3S-A0/A1, V3S-A2A, the V3S-A2B material-state proof, V3S-A2C.4, V3S-A3A, V3S-A3B.1, and V3S-A3B.2 are Unity-validated and accepted. The original V3S-A2C ordinary-Ground distance ownership was rejected. V3S-A2C.1 corrected ownership to the River corridor; V3S-A2C.2 failed as an empty-stream migration; V3S-A2C.3 remains an ordinary-Ground mesh-layout integrity invariant. The accepted A2C.4 renderer-role gate, A3A cover-retention response, and A3B independent Shore hydrology are frozen baselines. V3S-A4A — Riverbed Dry Substrate and Submerged-Cover Exclusion is implemented and source-audited in its exact twelve-file approved scope; Unity compilation and visual validation are pending. A4A adds no River mechanics, Riverbed hydrology, geometry, textures, assets, or debug views. V3S-A4B Riverbed hydrology remains separately planned and is not authorized.**
+**Architecture is implemented and source-audited through V3S-A4B.2; Unity compilation and visual validation of A4B.2 are pending. Unity has already validated normalized Bank/Riverbed composition, explicit Riverbed substrate ownership, exact-support Riverbed hydrology, region-oriented Inspector authoring, and submerged Riverbed finish decoupling. A4B.2 transfers most Shore-added smoothness/specular response from the broad URP PBR lobe into a narrow camera-readable stylized Shore highlight, and adds a short wetness-only Riverbed-to-Bank transition using the existing corridor bank distance. It adds no debug view and does not modify River geometry, water rendering, profile schemas/assets, textures, scenes, prefabs, materials, or semantic channels.**
 
 This document is the canonical authority for River-coupled Ground appearance. It supersedes every earlier proposal that placed River banks or riverbeds inside the generic V4 Contact / Edge Accent field.
 
@@ -656,7 +656,7 @@ Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
 Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl
 Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl
 Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
-Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaskDebug.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaskDebug.hlsl  [approved read/compatibility scope; unchanged]
 Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader
 ```
 
@@ -1189,45 +1189,507 @@ No River file, shared mesh core, scene, prefab, material, existing style asset, 
 
 ## V3S-A4A — Riverbed dry substrate and submerged-cover exclusion
 
-**Status:** implemented from the pre-recorded authorized plan and source-audited on 2026-07-16. Unity compilation and visual validation are pending.
+**Status:** installed and Unity-observed. Exact `Ground Riverbed Support`, dry Riverbed profile transport, and submerged-cover exclusion work. A4A is not accepted as a final composition baseline because Unity screenshots show a primary-Ground boundary strip between matching Bank and Riverbed substrates, and the Riverbed remains dry while the adjacent Bank receives Shore hydrology.
 
-**Purpose:** activate the already-authorable Riverbed Surface Layer on exact role-gated `UV3.x` Riverbed Support, while removing terrestrial cover from submerged support. A4A is dry substrate composition only. It does not add Riverbed wetness, smoothness modifiers, hydrology profiles, reach controls, geometry, textures, or debug views.
+### Proven A4A behavior retained
 
-### Approved authoring
+- `Ground Riverbed Support` exactly identifies Centre, FlatBedEdge, and BedSlope on the explicitly authorized River corridor renderer.
+- A selected custom Riverbed Surface Layer supplies its dry palette and finish only on support.
+- Vegetation, snow, frost, and rendered Painted Accent cover are excluded by support independently from the selected dry layer and material strength.
+- River geometry, UV3 X/Y/Z semantics, renderer-role authorization, ordinary-Ground UV3 exclusion, raw Painted Accent coverage, and existing debug-view names remain unchanged.
+
+### Blocking Unity findings — 2026-07-16
+
+1. The forward pass first lerps primary Ground toward Bank and then lerps that result toward Riverbed. When both Bank and Riverbed blends are fractional at the BedSlope/HiddenCover interpolation edge, residual primary Ground remains. For representative `Bank = 0.5` and `Riverbed = 0.5`, sequential blending retains `(1 - 0.5) × (1 - 0.5) = 0.25` primary Ground. This is the observed green transition strip.
+2. `ResolveGroundLocalShoreWetness` multiplies every Shore contribution by `ResolveGroundRiverBankDomain`. That domain explicitly multiplies encoded Bank validity by `(1 - Riverbed Support)`, so exact Riverbed Support receives zero local hydrology. The observed Bank is darker than the matching Riverbed because the Bank is wet and the Riverbed is dry.
+3. The current Inspector separates Surface Layers, Bank Composition, Riverbed Composition, Surface-Cover Response, and Shore Hydrology into five top-level foldouts. The Riverbed selector is distant from its strength and offers only null-as-primary/custom-profile semantics. The user approved two region-oriented foldouts and explicit Riverbed inheritance choices.
+
+## V3S-A4A.1 — Normalized Bank/Riverbed composition and region-oriented authoring
+
+**Status:** implemented exactly from the pre-recorded plan and source/compliance audited. Unity compilation and visual validation are pending.
+
+### Objective
+
+Remove residual primary Ground from the shared Bank/Riverbed transition, add explicit Riverbed substrate-source ownership, and consolidate all River Bank and Riverbed controls into two coherent top-level foldouts. Do not add hydrology behavior in A4A.1; A4B below owns Riverbed wetness.
+
+### Approved serialized authoring
+
+Add an explicit Riverbed substrate source:
 
 ```text
-River-Coupled Ground Response — Riverbed Composition
-    Riverbed Material Strength
+Riverbed Surface Source
+    Primary Ground
+    Inherit Bank Surface Layer
+    Custom Riverbed Surface Layer
 ```
 
-`Riverbed Material Strength` is a `0–1` Material-only control with default `1.00`. `Inherit Primary Ground` keeps the substrate override disabled regardless of this value. Strength `0` preserves the inherited dry substrate but does not restore vegetation, snow, frost, or Painted Accent cover on submerged Riverbed Support.
+Existing serialized data must migrate without scene, prefab, style, or profile-asset edits:
 
-### Resolution order
+- legacy null Riverbed profile resolves to `Primary Ground`;
+- legacy non-null Riverbed profile resolves to `Custom Riverbed Surface Layer`;
+- new controls use explicit source values after the user changes them;
+- `Inherit Bank Surface Layer` resolves the currently selected Bank profile; if the Bank itself inherits primary Ground, the Riverbed also resolves to primary Ground.
+
+`Riverbed Material Strength` remains `0–1`, default `1.00`, and applies only when the effective source resolves a secondary surface profile. Submerged-cover exclusion remains independent from source and strength.
+
+### Normalized substrate-composition contract
+
+Evaluate the existing raw Bank and Riverbed material blends once, then resolve shared weights:
+
+```hlsl
+rawBank = saturate(bankMaterialBlend);
+rawRiverbed = saturate(riverbedMaterialBlend);
+rawTotal = rawBank + rawRiverbed;
+secondaryCoverage = saturate(rawTotal);
+normalization = rawTotal > 0.0001
+    ? secondaryCoverage / rawTotal
+    : 0;
+
+primaryWeight = 1 - secondaryCoverage;
+bankWeight = rawBank * normalization;
+riverbedWeight = rawRiverbed * normalization;
+```
+
+Use the same `primary / bank / riverbed` weights for:
+
+- dry albedo;
+- dry smoothness;
+- dry specular strength.
+
+Do not add a gap-fill slider, boundary-width slider, River geometry change, or new spatial semantic. When Bank and Riverbed use the same profile and both strengths are `1`, the shared edge must contain no primary-Ground colour or finish. Different profiles must transition directly Bank-to-Riverbed.
+
+### Approved Inspector structure
 
 ```text
-ordinary Ground dry material
-→ Bank Surface Layer
-→ Riverbed Surface Layer on exact Riverbed Support
-→ submerged-cover exclusion
-→ accepted independent Shore/global hydrology
-→ lighting
+River-Coupled Ground Response — River Bank
+    Substrate
+        Bank Surface Layer
+        Create / Duplicate
+        collapsed inline Layer Settings
+
+    Material Coverage
+        Bank Material Strength
+        Core Bank
+            Bank Material Reach
+            Immediate Bank Exposure
+            Waterline Material Strength
+            Bank Transition Softness
+        Outer Bank Extension
+            Extension
+            Strength
+            Fade
+
+    Surface Cover
+        Vegetation Retreat Strength
+        Snow Melt Strength
+        Frost Retreat Strength
+        Painted Accent Retreat Strength
+
+    Shore Wetness
+        Shore Hydrology Modifier
+        Create / Duplicate
+        collapsed inline Wetness Character
+        Spatial Application
+            Shore Wetness Strength
+            Shore Wetness Reach
+            Shore Wetness Fade
+            Broad Bank Saturation
+            Immediate Bank Saturation
+            Waterline Saturation
+
+River-Coupled Ground Response — Riverbed
+    Substrate
+        Riverbed Surface Source
+        Custom Riverbed Surface Layer [Custom only]
+        Create / Duplicate [Custom only]
+        collapsed inline Layer Settings [Custom only]
+        Riverbed Material Strength [secondary source only]
+
+    Submerged Cover
+        Vegetation: Excluded
+        Snow: Excluded
+        Frost: Excluded
+        Painted Accents: Excluded
+
+    Wetness
+        implemented by V3S-A4B below
 ```
 
-The Riverbed Surface Layer wins after Bank composition. The existing bank-domain resolver already multiplies corridor validity by `(1 - Riverbed Support)`, so Bank and Riverbed ownership remain complementary at their shared interpolated boundary. Centre, FlatBedEdge, and BedSlope receive Riverbed Support; HiddenCover, OuterBlend, BuriedApron, and ordinary GeneratedGround do not.
+The A3B.1 delayed asset-creation workflow is mandatory. No modal dialog may open inside an active IMGUI layout scope, and no `SerializedProperty` may be retained across editor callbacks.
 
-### Reviewed evidence — 2026-07-16
+### A4A.1 reviewed source evidence
 
-- `GroundMaterialControls.cs` already serializes `riverbedSurfaceLayer` and copies/resets it, but has no Riverbed material-strength control.
-- `GeneratedGround.cs` exposes `RiverbedSurfaceLayer`, but its role-aware MaterialPropertyBlock transport currently publishes only Bank layer dry palette/finish data and Shore hydrology data.
-- `GeneratedGroundEditor.cs` already selects and edits the Riverbed Surface Layer under Surface Layers, but exposes no Riverbed composition foldout or strength control in local or shared-style authoring.
-- `GroundSurfaceLayerProfile.cs` already owns the required dry Base/Dark/Light palette, Macro/Pixel Contrast, Dry Smoothness, and Dry Specular Strength. It requires no schema or asset change for A4A.
-- `PixelSurfaceGroundResponse.hlsl` already resolves exact role-gated Riverbed Support and a complementary Bank domain. No new spatial channel or River calculation is required.
-- `PixelSurfaceGroundForwardPass.hlsl` evaluates macro, pixel, and vertex variation once, composes the Bank dry substrate, then applies accepted cover and hydrology. It has no Riverbed substrate consumer.
-- `StylizedRiverCorridorGeometry.cs` publishes `UV3.x = 1` for Centre, FlatBedEdge, and BedSlope and `0` for HiddenCover, OuterBlend, and BuriedApron, then asserts a four-component `TexCoord3` stream. This producer is read-only and outside A4A.
-- `StylizedRiver.cs` applies Ground properties to every corridor path with `GroundSurfaceRenderRole.RiverCorridor`. It is read-only and outside A4A.
-- The supplied source archive contains no `.git` metadata. Branch, `HEAD`, staged/unstaged state, unrelated repository changes, and comparison with the actual working tree cannot be verified here.
+- `PixelSurfaceGroundForwardPass.hlsl`, `ResolvePixelGroundSurfaceColor`, currently performs `albedo = lerp(albedo, bankLayerAlbedo, bankMaterialBlend)` followed by `albedo = lerp(albedo, riverbedLayerAlbedo, riverbedMaterialBlend)`. `ResolveGroundProfileSmoothness` and `BuildSurfaceData` repeat the same sequential order for finish.
+- `PixelSurfaceGroundResponse.hlsl`, `ResolveGroundRiverBankDomain`, already provides the complementary support/domain semantics required for normalized composition. No River producer change is needed.
+- `GroundMaterialControls.cs` already stores `bankSurfaceLayer`, `riverbedSurfaceLayer`, and `riverbedMaterialStrength`. It lacks explicit Riverbed source ownership.
+- `GeneratedGround.cs`, `ApplySurfaceProfileMaterialProperties`, already resolves and transports Bank and custom Riverbed profiles through one role-aware property block.
+- `GeneratedGroundEditor.cs` currently draws five separate River-coupled foldouts and disables Riverbed strength when the custom Riverbed profile is null.
+- `StylizedRiverCorridorGeometry.cs` and `StylizedRiver.cs` remain read-only. Their exact UV3 contract and `RiverCorridor` property-block role are sufficient.
 
-### Approved implementation files
+### A4A.1 acceptance criteria
+
+- matching Bank and Riverbed profiles show no primary-Ground strip at their shared edge;
+- different profiles transition directly without an unrelated third substrate;
+- albedo, smoothness, and specular use identical normalized weights;
+- `Primary Ground`, `Inherit Bank Surface Layer`, and `Custom Riverbed Surface Layer` resolve exactly as labeled;
+- legacy null/non-null selections preserve their pre-patch behavior without asset migration;
+- `Ground Riverbed Support`, `Ground Bank Material Blend`, `Ground Bank Layer Identity`, and `Ground Outer Bank Extension` remain unchanged;
+- no River file, UV stream, debug view, texture, geometry, renderer, draw call, or per-frame work is added.
+
+### A4A.1 implementation result — 2026-07-16
+
+- `GroundRiverbedSurfaceSource` provides migration-safe `Primary Ground`, `Inherit Bank Surface Layer`, and `Custom Riverbed Surface Layer` ownership. Legacy null/non-null profile data resolves to Primary/Custom without modifying any scene, prefab, style, or profile asset.
+- `ResolveGroundSubstrateCompositionWeights` normalizes existing Bank and Riverbed blends into one primary/Bank/Riverbed weight triplet. The same triplet now composes dry albedo, smoothness, and specular. Sequential Bank-then-Riverbed lerps are removed.
+- The main Inspector now exposes exactly two River-coupled top-level groups: `River-Coupled Ground Response — River Bank` and `River-Coupled Ground Response — Riverbed`. Surface and hydrology profile editors remain collapsed by default, and the A3B.1 delayed create/duplicate path is preserved.
+- No River file, support/domain resolver, UV stream, texture, geometry, renderer, draw call, debug enum, or debug dispatch changed.
+
+## V3S-A4B — Exact-support Riverbed hydrology
+
+**Status:** implemented after the A4A.1 normalized-composition consistency check and source/compliance audited. Unity compilation and visual validation are pending.
+
+### Objective
+
+Apply an independent wetness modifier to exact Riverbed Support after dry Riverbed substrate composition. Riverbed wetness must be at least independently controllable and may inherit the accepted Shore Hydrology Modifier or use a separate existing `GroundHydrologyModifierProfile`.
+
+### Approved serialized authoring
+
+```text
+Riverbed Hydrology Source
+    Inherit Shore Hydrology Modifier
+    Custom Hydrology Modifier
+    Disabled
+
+Custom Riverbed Hydrology Modifier [Custom only]
+Riverbed Wetness Strength          0–1, default 1.00
+```
+
+`Inherit Shore Hydrology Modifier` is the default. If no Shore modifier is selected, inherited Riverbed hydrology resolves disabled. `Custom Hydrology Modifier` uses an independently selected reusable profile. `Disabled` produces no local Riverbed wetness.
+
+No Riverbed reach, fade, broad-bank, immediate-bank, or waterline controls are allowed. Placement is exact existing `Ground Riverbed Support`:
+
+```hlsl
+riverbedWetness =
+    riverbedHydrologyEnabled *
+    saturate(riverbedWetnessStrength) *
+    saturate(riverbedSupport);
+```
+
+### Wetness-composition contract
+
+Keep `Ground Local Shore Wetness` as the Bank-only Shore mask. Update `Ground Effective Wetness` to display the bounded union of:
+
+- global weather Wetness;
+- local Shore wetness;
+- local Riverbed wetness.
+
+Normal rendering must apply Shore and Riverbed modifier character independently after dry substrate and cover composition:
+
+- pixel-pattern softening uses bounded union of global, Shore, and Riverbed contributions;
+- darkening uses bounded union of global, Shore, and Riverbed contributions;
+- smoothness uses bounded union of global, Shore, and Riverbed contributions;
+- specular preserves the existing global multiplier and adds saturated Shore and Riverbed boosts;
+- Shore tint applies from the Shore profile and Riverbed tint applies from the Riverbed profile, with Riverbed applied last as support rises;
+- snow/frost hydrology retention combines both local modifiers, although exact submerged-cover exclusion already removes those covers on full support.
+
+Riverbed wetness is independent from Bank and Riverbed substrate identity. Primary-Ground Riverbed source can still be wet; a custom dry Riverbed layer can be dry only when hydrology is disabled or strength is zero.
+
+### A4B reviewed source evidence
+
+- `ResolveGroundLocalShoreWetness` is correctly Bank-domain-only and must remain so.
+- `ResolveGroundEffectiveWetness`, combined wet response helpers, and final forward composition currently accept only `localShoreWetness`.
+- `GroundHydrologyModifierProfile` already contains every approved wet-character field and requires no schema or asset edit.
+- `GeneratedGround` already transports the Shore modifier character. A4B requires a second resolved modifier transport and one strength property only.
+- Existing `Ground Effective Wetness` can be updated; no new debug mode is required or approved.
+
+### A4B acceptance criteria
+
+- full Riverbed Support receives wetness equal to the selected/inherited modifier multiplied by Riverbed Wetness Strength;
+- the Riverbed is visibly at least as wet as the adjacent matching Bank when Riverbed strength is `1` and Shore wetness is partial;
+- Riverbed wetness works with Primary Ground, inherited Bank, and custom Riverbed substrate sources;
+- Shore Wetness Reach does not move Riverbed wetness, and Riverbed Wetness Strength does not move `Ground Local Shore Wetness`;
+- `Ground Effective Wetness` includes global, Shore, and Riverbed wetness without a new debug view;
+- disabled or missing modifier state produces zero Riverbed wetness;
+- no River file, spatial channel, reach/fade control, texture, geometry, scene, prefab, material, or profile-schema change occurs.
+
+### A4B implementation result — 2026-07-16
+
+- `GroundRiverbedHydrologySource` resolves `Inherit Shore Hydrology Modifier`, `Custom Hydrology Modifier`, or `Disabled`; `Riverbed Wetness Strength` defaults to `1.00`. No Riverbed distance, reach, fade, depth, or additional shape control exists.
+- Riverbed wetness is exact existing `Ground Riverbed Support × modifier enabled × strength`. It is independent from Bank/Riverbed substrate source and Shore Wetness Reach.
+- Global, Shore, and Riverbed wetness now feed the existing bounded darkening, pixel-softening, smoothness, specular, snow-retention, frost-retention, and `Ground Effective Wetness` paths. `Ground Local Shore Wetness` remains Bank-only.
+- The existing `Ground Effective Wetness` debug dispatch consumes the updated resolver; `GeneratedGroundDebugView` and `PixelSurfaceGroundMaskDebug.hlsl` remain byte-identical and no debug view was added.
+
+## V3S-A4B.1 — Submerged Riverbed finish decoupling
+
+**Status:** implemented exactly from the pre-recorded plan and final source/compliance audited. Unity compilation and visual validation are pending.
+
+### Observed Unity evidence
+
+- Unity validation confirms A4A.1/A4B otherwise works as intended: normalized Bank/Riverbed substrate composition, explicit Riverbed source selection, exact-support wetness, and Inspector grouping are accepted.
+- At high Riverbed wetness, the supplied screenshot shows localized bright white highlights on the visible bed beneath the water. The same wetness character is intended to keep tint, darkening, pattern softening, snow melt, and frost melt, but the submerged Ground should not act as the primary reflective interface.
+- Current source applies Riverbed smoothness as `riverbedWetness × _GroundRiverbedHydrologyCharacterA.w` inside `ResolveGroundCombinedWetSmoothnessBoost`, and Riverbed specular as `riverbedWetness × _GroundRiverbedHydrologyCharacterB.x` inside `ResolveGroundRiverbedWetSpecularBoost`. `PixelSurfaceGroundForwardPass.hlsl` adds both results after dry substrate resolution. There is no independent submerged-finish attenuation.
+- `GroundHydrologyModifierProfile` already owns the reusable wetness character. It remains read-only. The correction belongs to Riverbed spatial/application controls, not to the reusable profile schema.
+- The supplied source snapshot contains no `.git` metadata. Branch, `HEAD`, staged/unstaged state, and unrelated repository changes cannot be inspected here and remain an integration prerequisite in the real repository.
+
+### Objective
+
+Preserve exact-support Riverbed hydrology colour, darkening, pixel-pattern softening, and cover interaction while independently controlling the amount of modifier smoothness and specular finish permitted on submerged Ground. Default both new response multipliers to zero so water-surface optics remain the primary reflection owner. Shore hydrology remains unchanged.
+
+### Approved authoring contract
+
+Under the existing Riverbed foldout:
+
+```text
+River-Coupled Ground Response — Riverbed
+└── Wetness
+    ├── Riverbed Hydrology Source
+    ├── Riverbed Wetness Strength
+    └── Submerged Finish
+        ├── Smoothness Response   0–1, default 0
+        └── Specular Response     0–1, default 0
+```
+
+The controls scale only the Riverbed modifier's finish channels:
+
+```hlsl
+riverbedSmoothnessBoost =
+    riverbedWetness *
+    modifierSmoothnessBoost *
+    riverbedSmoothnessResponse;
+
+riverbedSpecularBoost =
+    riverbedWetness *
+    modifierSpecularBoost *
+    riverbedSpecularResponse;
+```
+
+They do not change Riverbed wetness, tint, darkening, pixel softening, snow/frost melt, substrate identity, exact support, Shore wetness, global wetness, or water rendering.
+
+### Approved file scope
+
+```text
+Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+
+Assets/Game/Procedural/Ground/GroundMaterialControls.cs
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl
+Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader
+```
+
+`PixelSurfaceGroundForwardPass.hlsl` is reviewed but should remain unchanged because it already calls the two Riverbed finish resolvers. `GroundHydrologyModifierProfile.cs`, all River/water files, `PixelSurfaceGroundMaskDebug.hlsl`, debug enums, profile assets, scenes, prefabs, materials, geometry, UV streams, textures, and shared mesh utilities are read-only.
+
+### File-by-file implementation sequence
+
+1. Record this plan before implementation; update the Ground roadmap and Inspector plan after the canonical plan exists.
+2. Add two serialized zero-default response multipliers, clamped accessors, null-reset values, and copy behavior to `GroundMaterialControls`.
+3. Add matching Shader property IDs and role-aware MaterialPropertyBlock transport in `GeneratedGround`.
+4. Add both fields to local/shared Inspector property binding and draw them under a compact `Submerged Finish` subsection inside Riverbed Wetness. Preserve the A3B.1 delayed asset-creation workflow and existing region grouping.
+5. Add matching hidden ShaderLab and Ground CBUFFER properties.
+6. Multiply only Riverbed smoothness/specular resolver contributions by the new response values. Preserve tint, darkening, softening, snow/frost retention, exact-support wetness, Shore hydrology, and global wetness formulas byte-for-byte.
+7. Complete exact-scope, full modified-file reread, direct-caller/consumer, C# parser/compiler, malformed-string, line-ending, property-parity, shared-shader, HLSL syntax, no-debug-growth, no-River/water-change, default/migration, performance, documentation, and final baseline-comparison checks.
+
+### Invariants and non-goals
+
+- No new debug view. Existing `Ground Riverbed Support`, `Ground Local Shore Wetness`, and `Ground Effective Wetness` remain unchanged.
+- No River or water shader changes. This patch does not implement water reflection, depth suppression, Fresnel, planar reflection, refraction, or emergence classification.
+- No change to Riverbed wetness placement or strength. Exact `Ground Riverbed Support` remains the only Riverbed wetness field.
+- No change to Shore hydrology smoothness/specular behavior.
+- No `GroundHydrologyModifierProfile` schema or asset edit. The reusable modifier continues to define wetness character; Riverbed application controls define how much finish survives while submerged.
+- No scene, prefab, material, profile asset, texture, geometry, renderer, mesh channel, shader keyword/variant, generated field, collider, draw call, River rebuild, Ground geometry rebuild, or per-frame CPU work.
+- Both controls are Material-only and use the existing role-aware property-block refresh.
+- Existing serialized objects receive zero defaults without automatic scene/prefab/style/profile reserialization by this patch.
+
+### Risks and required checks
+
+- Zero smoothness/specular response must not disable Riverbed tint, darkening, softening, snow melt, or frost melt.
+- Raising either response must restore only its corresponding finish channel and remain saturated by the existing final Ground surface path.
+- `PixelSurfaceGroundResponse.hlsl` is also included by `SH_PixelSurfaceLit.shader`; all new property references must remain inside `PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES`.
+- `GeneratedGroundEditor.cs` uses CRLF and must retain CRLF. Other approved source/doc files retain their existing line endings.
+- Property names must match exactly across C#, CBUFFER, and ShaderLab.
+
+### Acceptance criteria
+
+- At defaults (`Smoothness Response = 0`, `Specular Response = 0`), the bright submerged Ground highlights disappear.
+- Riverbed wet tint, darkening, pixel softening, snow melt, frost melt, exact support, and `Ground Effective Wetness` remain unchanged.
+- Shore wetness keeps its current smoothness and specular response.
+- Raising only Smoothness Response restores only Riverbed smoothness; raising only Specular Response restores only Riverbed specular.
+- No new debug view, River/water change, rebuild, geometry change, or runtime field is introduced.
+- Unity compiles the C# code and both Ground/generic Pixel Surface shaders without errors.
+
+### Unity validation gate
+
+1. Confirm there are no C# errors and both Ground/generic Pixel Surface shaders compile.
+2. With Riverbed wetness enabled and both Submerged Finish responses at `0`, confirm the bright white bed highlights disappear while wet colour/darkening remain visible.
+3. Raise Smoothness Response alone, then Specular Response alone; verify each restores only its named Riverbed finish response.
+4. Confirm Shore wetness appearance is unchanged and `Ground Local Shore Wetness` remains Bank-only.
+5. Confirm `Ground Effective Wetness` and `Ground Riverbed Support` look unchanged from the accepted A4B result.
+6. Refresh material properties once; settings must persist and no River or Ground geometry rebuild should occur.
+
+### A4B.1 implementation and post-change audit — 2026-07-16
+
+- Exactly the nine approved files changed: three canonical documents, `GroundMaterialControls.cs`, `GeneratedGround.cs`, `GeneratedGroundEditor.cs`, `PixelSurfaceGroundMaterialProperties.hlsl`, `PixelSurfaceGroundResponse.hlsl`, and `SH_PixelGroundSurfaceLit.shader`. No file was added or removed.
+- `GroundMaterialControls` adds only `riverbedWetSmoothnessResponse` and `riverbedWetSpecularResponse`, both implicit-zero serialized floats with clamped accessors, null-reset values, and copy behavior. No enum, source mode, profile field, or asset schema changed.
+- `GeneratedGround` transports both values through the existing explicit-role MaterialPropertyBlock path. C#, Ground CBUFFER, and hidden ShaderLab property names match exactly.
+- `GeneratedGroundEditor` exposes the two controls under one `Submerged Finish` subsection inside Riverbed Wetness for local and shared-style authoring. The two existing region foldouts and A3B.1 delayed profile-creation paths remain unchanged. CRLF line endings are preserved.
+- `ResolveGroundCombinedWetSmoothnessBoost` multiplies only the Riverbed smoothness contribution by Smoothness Response. `ResolveGroundRiverbedWetSpecularBoost` multiplies only the Riverbed specular contribution by Specular Response. Riverbed wetness, effective wetness, tint, darkening, pixel softening, snow/frost retention, Shore finish, and global wetness functions remain unchanged. `PixelSurfaceGroundForwardPass.hlsl` is byte-identical.
+- `GroundHydrologyModifierProfile.cs`, `GroundSurfaceLayerProfile.cs`, River code, the Ground debug include and enum, scenes, prefabs, materials, assets, geometry, textures, and shared mesh utilities are unchanged. No debug view was added.
+- The automated contract audit passes `107/107` checks. Tree-sitter parses all three changed C# files without syntax errors and parses the changed response include; malformed multiline-string and line-ending checks pass. Clang 17 library-mode HLSL harnesses for the new CBUFFER and finish expressions emit LLVM IR successfully. `dxv` is unavailable, so DXIL validation/signing and Unity shader compilation are not claimed.
+- Added shader work is two saturated scalar multipliers. No texture/noise sample, derivative, trigonometric operation, keyword/variant, generated field, draw call, renderer, geometry, rebuild, or per-frame process was introduced.
+
+
+## V3S-A4B.2 — Stylized Shore wet-finish shaping and Riverbed/Bank wetness transition
+
+**Status:** implemented exactly from the pre-recorded plan and source/compliance audited. Unity compilation and visual validation are pending.
+
+### Observed Unity evidence
+
+- The supplied editor/game-camera comparison shows the current wet Shore finish becoming broad and nearly white from a near-perpendicular editor view, while the production isometric camera shows only a weak diffuse highlight. The existing Shore wetness mask itself is already validated; the defect is presentation, not spatial classification.
+- The supplied water-hidden screenshot shows exact-support Riverbed wetness meeting lower Bank wetness at a visible hard line. `ResolveGroundRiverbedWetness` currently returns `enabled × strength × Ground Riverbed Support` with no Bank-side transition.
+- `ResolveGroundCombinedWetSmoothnessBoost` and `ResolveGroundLocalShoreWetSpecularBoost` currently apply the Shore modifier's full smoothness/specular contributions to URP PBR. `UniversalFragmentPBR` therefore owns the complete lobe shape, which varies strongly with camera angle and gives no production-camera-centered art direction.
+- `StylizedRiverCorridorGeometry` already publishes `TEXCOORD3.y` as metres outward from the Ground Riverbed Support boundary and `TEXCOORD3.z` as corridor Bank-domain validity. This existing data is sufficient for a short wetness-only transition; no River edit or new field is required.
+- The supplied source snapshot contains no `.git` metadata. Branch, `HEAD`, staged/unstaged state, and unrelated repository changes cannot be inspected here and remain an integration prerequisite in the real repository.
+
+### Objective
+
+Implement both approved corrections in one Material-only Ground patch:
+
+1. Replace most of the broad Shore-added PBR smoothness/specular response with a narrow stylized highlight that remains readable from the production isometric camera and fades vertically away from screen centre.
+2. Extend Riverbed hydrology a short authored distance onto the corridor Bank and smoothly reduce it to zero, removing the hard wetness seam without changing Riverbed substrate/support ownership.
+
+### Approved authoring contract
+
+Under the existing region-oriented Inspector:
+
+```text
+River-Coupled Ground Response — River Bank
+└── Shore Wetness
+    ├── existing modifier and spatial application
+    └── Wet Highlight Shaping
+        ├── Wet Highlight Strength          0–2, default 0.35
+        ├── Wet Highlight Tightness         0–1, default 0.80
+        ├── Camera-Centred Bias             0–1, default 0.85
+        └── Vertical Falloff                 0–1, default 0.60
+
+River-Coupled Ground Response — Riverbed
+└── Wetness
+    ├── existing source / strength
+    ├── Wetness Transition
+    │   ├── Riverbed-to-Bank Blend Distance 0–2 m, default 0.20 m
+    │   └── Riverbed-to-Bank Blend Softness 0–1, default 0.75
+    └── existing Submerged Finish
+```
+
+The Shore controls have these exact meanings:
+
+- `Camera-Centred Bias = 0` preserves the ordinary physical half-vector highlight and the existing Shore-added PBR finish.
+- Increasing Camera-Centred Bias transfers Shore wet smoothness/specular out of the broad PBR path and into a screen-centred stylized highlight. At the default `0.85`, fifteen percent of the old broad Shore finish remains.
+- Wet Highlight Tightness controls the physical half-vector exponent. Vertical Falloff controls how quickly the camera-centred band fades toward the top and bottom of the active camera view.
+- The stylized highlight is multiplied by existing local Shore wetness and current lit visibility. It does not apply to ordinary Ground or Riverbed wetness. Riverbed reflective finish remains owned by the existing zero-default A4B.1 Submerged Finish controls.
+
+The Riverbed transition has this exact contract:
+
+```hlsl
+transition01 = saturate(bankDistance / max(0.0001, blendDistance));
+transitionWeight = lerp(
+    1.0 - transition01,
+    1.0 - transition01 * transition01 * (3.0 - 2.0 * transition01),
+    blendSoftness);
+
+riverbedWetness =
+    modifierEnabled *
+    wetnessStrength *
+    saturate(riverbedSupport + bankDomain * transitionWeight);
+```
+
+A zero Blend Distance preserves exact-support A4B.1 behavior. The transition changes hydrology only; Riverbed substrate, support, cover exclusion, geometry, and Bank material fields remain unchanged.
+
+### Approved file scope
+
+```text
+Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+
+Assets/Game/Procedural/Ground/GroundMaterialControls.cs
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader
+```
+
+Read-only related contracts are `GroundHydrologyModifierProfile.cs`, `GroundSurfaceLayerProfile.cs`, `StylizedRiverCorridorGeometry.cs`, `StylizedRiver.cs`, the water shaders/includes, `PixelSurfaceGroundMaskDebug.hlsl`, and `SH_PixelSurfaceLit.shader`.
+
+### File-by-file implementation sequence
+
+1. Record this canonical plan before implementation; then update the Ground roadmap and Inspector plan to reference the same bounded patch.
+2. Add six serialized controls, exact defaults, clamped accessors, null-reset values, and copy behavior to `GroundMaterialControls`.
+3. Pack Shore highlight shaping into one MaterialPropertyBlock vector and Riverbed transition into one vector in `GeneratedGround`; add exact matching property IDs.
+4. Bind both local and shared-style Inspector paths. Draw the four Shore controls under `Wet Highlight Shaping` and the two Riverbed controls under `Wetness Transition`. Preserve the two region foldouts and delayed profile-creation workflow.
+5. Add matching hidden ShaderLab and Ground CBUFFER vectors.
+6. In `PixelSurfaceGroundResponse.hlsl`, scale only Shore-added PBR wet smoothness/specular by `1 - Camera-Centred Bias`, and extend only Riverbed wetness onto the existing Bank domain using the recorded distance/softness formula.
+7. In `PixelSurfaceGroundForwardPass.hlsl`, add one stylized Shore highlight after the existing neutral/tinted PBR lighting composition and before fog. Use existing Shore wetness, the main-light direction/colour, the active camera's normalized screen-space Y, the physical half-vector lobe, and current lighting visibility. Do not modify Riverbed highlight behavior.
+8. Complete exact-scope, full modified-file reread, direct producer/consumer, property-parity, C# parser/compiler, malformed-string, line-ending, HLSL syntax/shared-include, no-debug-growth, no-River/water-change, no-profile-schema/asset-change, default/migration, performance, documentation, and final baseline-comparison checks.
+
+### Invariants and non-goals
+
+- No new debug view. Existing exact Inspector names remain `Ground Riverbed Support`, `Ground Bank Material Blend`, `Ground Local Shore Wetness`, and `Ground Effective Wetness`.
+- No River or water file changes. This patch does not implement water reflection, Fresnel, depth-based suppression, refraction, planar reflection, emergence classification, or player tracking.
+- No player/component/camera reference is introduced. Camera-centred shaping uses the active rendering camera's existing normalized screen-space position only.
+- No Riverbed highlight is added. A4B.1 Submerged Finish remains the sole control over Riverbed smoothness/specular response.
+- No change to Bank/Riverbed substrate weights, Riverbed support, submerged-cover exclusion, Shore wetness placement, global wetness, hydrology profile schemas, or profile assets.
+- No scene, prefab, material, texture, geometry, renderer, mesh channel, shader keyword/variant, generated field, collider, draw call, River rebuild, Ground geometry rebuild, or per-frame CPU work.
+- Added fragment work is bounded to scalar/vector arithmetic, one physical-lobe `pow`, one screen-band `pow`, and one main-light query on River-coupled Ground-shader draws. No texture/noise sample or derivative is added.
+- All six controls are Material-only and use the existing explicit-role MaterialPropertyBlock refresh.
+
+### Risks and required checks
+
+- Camera-centred shaping must not highlight dry Bank, ordinary Ground, or Riverbed; local Shore wetness is the mandatory mask.
+- High Camera-Centred Bias must reduce the previous broad white Shore response rather than stacking another highlight on top of it.
+- `Camera-Centred Bias = 0` must restore the existing broad PBR finish and physical lobe path.
+- The screen-centred highlight must use the active Game camera in Game view and the Scene camera in Scene view without storing a camera reference.
+- Riverbed transition must use existing metre distance and Bank domain only, stop at the authored distance, and become zero when Blend Distance is zero or Riverbed hydrology is disabled.
+- `PixelSurfaceGroundResponse.hlsl` is shared by the generic Pixel Surface shader; all new property references must remain inside the existing Ground-material-properties guard.
+- `GeneratedGroundEditor.cs` uses CRLF and must retain CRLF. Property names must match exactly across C#, CBUFFER, and ShaderLab.
+
+### Acceptance criteria
+
+- The near-top-down editor view no longer turns most of both Shores white at the default shaping values.
+- The production isometric camera shows a clear stronger Shore highlight around the vertical middle of the camera and a smooth reduction toward the top and bottom.
+- Tightness, strength, camera bias, and vertical falloff each change only their named highlight characteristic.
+- Existing Shore wet tint, darkening, softening, spatial reach, Bank substrate, and cover response remain unchanged.
+- Riverbed wetness remains full on Ground Riverbed Support and fades smoothly into Bank wetness over the authored short transition without changing substrate composition.
+- Zero Blend Distance restores the previous hard exact-support wetness boundary. `Ground Local Shore Wetness` remains unchanged; `Ground Effective Wetness` includes the transition through its existing resolver.
+- No new debug view, River/water change, profile-schema/asset change, geometry/rebuild change, or texture sample is introduced.
+- Unity compiles all changed C# and both Ground/generic Pixel Surface shaders without errors.
+
+### Unity validation gate
+
+1. Confirm there are no C# errors and both Ground/generic Pixel Surface shaders compile.
+2. With the default shaping values, compare the same Scene and Game camera positions: the broad white Shore washout must be reduced, while the Game camera shows a stronger camera-centred band.
+3. Test Wet Highlight Strength, Tightness, Camera-Centred Bias, and Vertical Falloff separately; confirm each affects only the Shore wet highlight and no Riverbed/ordinary Ground pixels.
+4. Set Riverbed-to-Bank Blend Distance to `0`, `0.20`, and `0.50 m`; with the water surface hidden, confirm only the wetness handoff changes and no substrate boundary moves.
+5. Confirm exact debug names `Ground Local Shore Wetness` is unchanged and `Ground Effective Wetness` shows the short Riverbed transition without new debug entries.
+6. Refresh material properties once; settings must persist and no Ground or River geometry regeneration should occur.
+
+### Implementation and final compliance result
+
+- Six serialized controls, defaults, clamped accessors, reset/copy behavior, local/shared Inspector bindings, matching MaterialPropertyBlock vectors, CBUFFER declarations, and hidden ShaderLab properties are present.
+- Shore-added PBR smoothness and specular are scaled only by `1 - Camera-Centred Bias`. The replacement post-lighting lobe is Shore-wetness-only, uses the main-light half-vector, active-camera normalized screen-space Y, one physical-lobe exponent and one vertical-band exponent, and is applied before fog. It exits before the main-light query and exponent work when Shore wetness, highlight strength, or camera bias is zero, so ordinary GeneratedGround does not pay the shaping cost.
+- Riverbed wetness remains full on exact `Ground Riverbed Support` and gains only the approved short Bank-domain transition from existing corridor distance/domain data. Riverbed substrate, cover exclusion, A4B.1 submerged-finish controls, Shore wet tint/darkening/softening, and global wetness are unchanged.
+- The exact ten-file scope passed a `124/124` automated contract audit. Tree-sitter parsed all three changed C# files without syntax errors; malformed-string, NUL, line-ending, property-parity, local/shared binding, no-debug-growth, unchanged River/profile/debug files, and no-new-sample/noise checks passed.
+- Two Clang 17 HLSL library-mode harnesses emitted LLVM IR for the changed Riverbed transition/PBR-transfer expressions and the stylized Shore highlight. This is parser/expression validation, not Unity shader compilation or DXIL signing. `dxv` and the Unity Editor were unavailable.
+- The supplied source snapshot has no `.git` metadata, so branch, `HEAD`, staged/unstaged state, and unrelated repository changes remain unverified until integration into the real repository.
+
+
+
+## Combined approved implementation scope
 
 ```text
 Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md
@@ -1243,88 +1705,42 @@ Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
 Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl
 Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl
 Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaskDebug.hlsl
 Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader
 ```
 
-No River file, `GroundSurfaceLayerProfile` schema, hydrology profile, debug enum/include, shared mesh core, scene, prefab, material, existing style/layer asset, texture, generated field, or starter asset is approved.
+No other file is approved. `GroundSurfaceLayerProfile`, `GroundHydrologyModifierProfile`, all River files, shared mesh utilities, scenes, prefabs, materials, existing assets, textures, and debug enums are read-only.
 
-### File-by-file implementation sequence
+## Combined file-by-file implementation sequence
 
-1. Update this canonical plan and the four affected Ground authoring/lifecycle documents before code or shader edits.
-2. Add `riverbedMaterialStrength` to `GroundMaterialControls` with default `1.00`, clamped accessor, null-source reset, and `CopyFrom` preservation.
-3. Add one local/shared `River-Coupled Ground Response — Riverbed Composition` Inspector foldout immediately after Bank Composition. Disable its strength control when Riverbed Surface Layer is `Inherit Primary Ground`.
-4. Extend `GeneratedGround` with Riverbed dry-layer property IDs and role-aware MaterialPropertyBlock transport. Preserve all A2C.4 role applications and existing Bank/Hydrology transport.
-5. Add matching CBUFFER and hidden ShaderLab properties. Do not add a keyword, variant, texture, or debug property.
-6. Add a shared-safe `ResolveGroundRiverbedMaterialBlend` resolver equal to role-gated Riverbed Support × profile enabled × material strength.
-7. In the Ground forward pass, evaluate Riverbed Support and Riverbed material blend once. Reuse the already-computed macro/pixel/vertex variation to compose Riverbed palette after Bank palette; resolve dry smoothness/specular in ordinary → Bank → Riverbed order; multiply final cover retention by `(1 - Riverbed Support)` before snow, vegetation, frost, and Painted Accent consumers; preserve accepted Shore/global hydrology afterward.
-8. Run exact-scope, C# parser, malformed-string, line-ending, property-contract, shared-shader, HLSL syntax/harness, no-debug-growth, no-River-change, performance, documentation, and final baseline-consistency audits.
+1. Record this plan before implementation and update the four related canonical Ground documents with the same ownership and non-goals.
+2. Add migration-safe Riverbed surface-source and Riverbed hydrology-source serialization, custom Riverbed hydrology reference, strength, accessors, reset, and copy behavior to `GroundMaterialControls`.
+3. Resolve effective Riverbed surface and hydrology profiles in `GeneratedGround`; transport existing dry/wet profile data through the current role-aware MaterialPropertyBlock.
+4. Replace five River-coupled top-level Inspector foldouts with the approved River Bank and Riverbed foldouts for both local and shared-style authoring. Preserve delayed create/duplicate callbacks and asset ownership refresh.
+5. Add matching hidden ShaderLab/CBUFFER properties and shared-safe A4B resolvers. Keep all property-dependent shared-include code inside the Ground material-property guard.
+6. Resolve normalized substrate weights once per fragment and use them for albedo, smoothness, and specular.
+7. Resolve Shore and Riverbed wetness once per fragment and share them across cover, colour, smoothness, specular, and `Ground Effective Wetness`.
+8. Run exact-scope, line-ending, C# parser/compiler, malformed-string, serialized migration, property parity, shared-shader, HLSL syntax, no-debug-growth, no-River-change, performance, documentation, and final baseline-comparison audits.
 
-### Invariants and non-goals
+## Combined invariants and non-goals
 
-- A2C.4 renderer authorization and ordinary-Ground UV3 exclusion remain unchanged.
-- A3A Bank cover retention and A3B Shore hydrology remain unchanged.
-- Riverbed material blend uses only exact role-gated Riverbed Support. It does not use Shore, Bank distance, Bank reach, world height, water depth, or centreline distance.
-- Submerged-cover exclusion uses Riverbed Support directly and is independent from Riverbed layer selection and Riverbed Material Strength.
-- No Riverbed hydrology, wet tint, darkening, smoothness boost, specular boost, or hydrology selector is part of A4A.
-- No new debug view. Existing mode `32 — Ground Riverbed Support` is the only spatial proof required.
-- No texture sample, noise evaluation, generated field, geometry, renderer, draw call, collider work, per-frame CPU work, River rebuild, Ground geometry rebuild, or Painted Accent rebake.
-- All A4A controls are Material-only and refresh existing ordinary-Ground/corridor property blocks through the accepted role-aware path.
-- No scene, prefab, material, style asset, surface-layer asset, or profile schema edit.
-- V3S-A4B Riverbed hydrology is separately planned and not authorized.
+- A2C.4 renderer authorization and ordinary-Ground UV3 integrity remain unchanged.
+- A3A Bank cover retention and A3B Shore mask/character remain unchanged except where combined with the new Riverbed wetness source.
+- Exact Riverbed Support remains the only Riverbed placement field.
+- No new debug view. Use exact Inspector names: `Ground Riverbed Support`, `Ground Bank Material Blend`, `Ground Bank Layer Identity`, `Ground Outer Bank Extension`, `Ground Local Shore Wetness`, and `Ground Effective Wetness`.
+- No profile-schema or existing asset edits.
+- No textures, noise samples, geometry, renderers, draw calls, shader keywords/variants, generated fields, collider work, River rebuild, Ground geometry rebuild, Painted Accent rebake, or per-frame CPU process.
+- Every new control is Material-only and refreshes existing property blocks.
+- The supplied source snapshot has no `.git` metadata; branch, `HEAD`, staged/unstaged state, and unrelated repository changes remain unverified integration prerequisites.
 
-### Acceptance criteria
+## Combined Unity validation gate
 
-- `Inherit Primary Ground` produces no Riverbed substrate override.
-- With a selected profile and strength `1`, the complete visible Centre/FlatBedEdge/BedSlope support receives that profile's dry palette and finish.
-- Strength `0` restores inherited dry substrate while submerged-cover exclusion remains active.
-- HiddenCover, OuterBlend, BuriedApron, Bank-only corridor, and ordinary GeneratedGround receive no Riverbed material.
-- Riverbed substrate resolves after Bank substrate and does not move or alter Bank modes `33`/`35` or Shore wetness modes `38`/`39`.
-- Vegetation, snow, frost, and rendered Painted Accent ink are absent on Riverbed Support; raw Painted Accent coverage and debug modes `28–29` remain unchanged.
-- Existing mode `32` remains unchanged and exactly predicts the material/cover domain.
-- Sandy bank + gravel bed, soil bank + mud bed, and inherited primary Ground + selected bed are possible without code branches or asset duplication.
-- Global weather and accepted Shore hydrology behavior remain unchanged outside Riverbed Support.
-- Unity compiles Ground and generic Pixel Surface shaders and reports no C# errors.
-
-### Risks and required checks
-
-- Riverbed Support interpolates at the BedSlope/HiddenCover boundary. Both substrate blend and cover exclusion must use the same support value to avoid a visible ownership seam.
-- Cover exclusion intentionally applies even with no Riverbed profile or zero material strength. Validate this separately from substrate identity.
-- Riverbed dry smoothness/specular must resolve before accepted local/global hydrology so later A4B can remain an independent modifier.
-- The shared response include is consumed by `SH_PixelSurfaceLit.shader`; Riverbed material-property access must remain inside the Ground-material-property guard.
-- Reusing existing macro/pixel/vertex variation must not add noise or texture evaluations.
-- The implementation must not touch modes `32–39`, their enum values, or `PixelSurfaceGroundMaskDebug.hlsl`.
-
-### Implementation result — 2026-07-16
-
-- `GroundMaterialControls` adds only `Riverbed Material Strength`, clamped `0–1`, default `1.00`, with reset and copy preservation.
-- `GeneratedGroundEditor` adds one local/shared Riverbed Composition foldout immediately after Bank Composition. It exposes only the approved strength and disables it while the layer inherits primary Ground.
-- `GeneratedGround` transports the selected Riverbed profile's existing dry palette, macro/pixel contrast, dry smoothness, dry specular strength, enabled state, and material strength through the existing role-aware MaterialPropertyBlock path.
-- The Ground shader resolves Riverbed material blend as exact role-gated Riverbed Support × layer enabled × material strength. It composes Riverbed palette after Bank palette, resolves dry finish in ordinary → Bank → Riverbed order, and applies accepted Shore/global hydrology afterward.
-- Final surface-cover retention is multiplied by `(1 - Riverbed Support)` before vegetation, snow, frost, and rendered Painted Accent consumers. This exclusion is independent from profile selection and Riverbed Material Strength. Raw Painted Accent coverage remains unchanged.
-- No River file, profile schema/asset, scene, prefab, material, texture, mesh stream, generated field, keyword, variant, debug enum/include, or runtime update path changed.
-
-### Post-implementation consistency and compliance — 2026-07-16
-
-- Final full-snapshot comparison reports exactly the twelve approved files changed and no added/removed file.
-- Tree-sitter C# parsing passes for all three changed C# files. HLSL parsing passes for the changed response and forward includes; the material-property include retains the same standalone macro-context parser limitation as the baseline and passes a dedicated Clang 17 HLSL CBUFFER harness.
-- Dedicated Clang 17 HLSL syntax harnesses pass for the added material-property declarations, Riverbed blend resolver, palette composition, cover exclusion, and dry smoothness/specular ordering. `dxv` is unavailable, so DXIL validation/signing is not claimed.
-- The final contract audit passes `146/146` checks covering exact scope, line endings, malformed C# strings, serialization/copy/reset, local/shared Inspector ordering, property-name parity, role-gated support, composition order, all four cover consumers, shared-shader guarding, no debug growth, no River/profile changes, no Ground UV3 writer, preserved A2C.4 invariants, no added expensive HLSL operation, and document consistency.
-- Unity Editor and Unity shader compilation are unavailable in this environment. The six-step Unity validation gate below remains blocking; A4A must not be marked accepted before that evidence.
-
-### Unity validation gate
-
-1. Confirm C# and both Ground/generic Pixel Surface shaders compile with no errors.
-2. Select an obviously distinct Riverbed Surface Layer and confirm mode `32` is unchanged while normal rendering replaces only Centre, FlatBedEdge, and BedSlope.
-3. Set Riverbed Material Strength to `0`, `0.5`, and `1`; verify only dry substrate blend changes and submerged vegetation/snow/frost/Painted Accent exclusion remains active.
-4. Use a distinct Bank layer and Shore Hydrology Modifier; verify Riverbed wins inside support while Bank modes `33`/`35` and wetness modes `38`/`39` do not move.
-5. Verify ordinary Ground and HiddenCover/OuterBlend/BuriedApron receive no Riverbed material, and raw Painted Accent modes `28–29` remain unchanged.
-6. Refresh material properties and regenerate Ground once; selection/strength persist, no River rebuild is required, and the solved ordinary-Ground spill does not return.
-
-## V3S-A4B — Independent Riverbed hydrology
-
-**Status:** planned only; not authorized.
-
-After A4A is Unity-validated, decide whether Riverbed Support should inherit the accepted Shore Hydrology Modifier or select a separate reusable hydrology modifier. Riverbed hydrology must remain an independent modifier applied after dry Riverbed substrate composition. Exact support supplies placement, so no reach/fade control or River change is expected. A4B must be separately formalized and approved before implementation.
+1. Confirm C# and both Ground/generic Pixel Surface shaders compile without errors.
+2. Set Bank and Riverbed to the same profile and verify no primary-Ground strip remains at the shared edge; repeat with different profiles and verify a direct Bank-to-Riverbed transition.
+3. Validate `Primary Ground`, `Inherit Bank Surface Layer`, and `Custom Riverbed Surface Layer`, including an inherited-primary Bank and one legacy custom Riverbed selection.
+4. Validate `Inherit Shore Hydrology Modifier`, `Custom Hydrology Modifier`, and `Disabled`; verify full `Ground Riverbed Support` is visibly wet at strength `1` and `Ground Local Shore Wetness` remains Bank-only.
+5. Verify `Ground Effective Wetness` includes global, Shore, and Riverbed wetness; confirm Bank controls do not move Riverbed support/wetness and Riverbed controls do not move Bank or Shore masks.
+6. Refresh material properties and regenerate Ground once; confirm persistence, unchanged raw Painted Accent coverage, no ordinary-Ground spill, and no River rebuild requirement.
 
 ## V3S-A5 — Optional profile detail extension
 
@@ -1573,24 +1989,30 @@ Patch 8 — V3S-A4A
     submerged vegetation / snow / frost / Painted Accent exclusion
     no Riverbed hydrology and no new debug view
 
-Patch 9 — V3S-A4B
-    separately approved independent Riverbed hydrology
-    exact-support placement with no reach/fade field
+Patch 9 — V3S-A4A.1
+    normalized primary / Bank / Riverbed dry composition
+    explicit Riverbed substrate source ownership
+    two region-oriented River-coupled Inspector groups
 
-Patch 10 — V3S-A5
+Patch 10 — V3S-A4B
+    independent exact-support Riverbed hydrology
+    inherited / custom / disabled modifier ownership
+    no reach/fade field and no new debug view
+
+Patch 11 — V3S-A5
     optional packed profile detail
 
 
-Patch 11 — V3S-A6
+Patch 12 — V3S-A6
     family tuning and production acceptance
 
-Patch 12 — V4-A1
+Patch 13 — V4-A1
     explicit Contact sources and transient R8 proof
 
-Patch 13 — V4-A2
+Patch 14 — V4-A2
     Contact visual response
 
-Patch 14 — V4-A3
+Patch 15 — V4-A3
     persistent output and production integration
 ```
 
@@ -1609,4 +2031,4 @@ Patch 14 — V4-A3
 
 # Immediate next work item
 
-Implement V3S-A4A exactly from the authorized plan above. Do not add Riverbed hydrology, new debug views, River changes, profile-schema changes, textures, or geometry. After source validation, Unity must prove exact mode-32 substrate ownership, persistent submerged-cover exclusion, unchanged A3A/A3B behavior, and no ordinary-Ground spill. V3S-A4B remains unimplemented until A4A is accepted and a separate plan is approved.
+Unity-validate the implemented V3S-A4B.1 package exactly through the six-step gate above. A4A.1/A4B substrate ownership, normalized composition, exact-support wetness, and Inspector grouping are accepted and must not be reopened. Do not begin V3S-A5 or water-reflection work until the submerged Ground finish is accepted.

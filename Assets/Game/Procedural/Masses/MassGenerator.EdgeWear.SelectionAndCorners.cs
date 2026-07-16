@@ -1043,6 +1043,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     viability.IsolatedMaximumCertifiedWidth +
                         PointMergeDistance >=
                     viability.MinimumRequiredCertifiedWidth;
+                viability.MultiSupportHullRecovery =
+                    isolated.MultiSupportHullPointCount > 0 &&
+                    isolated.GeometryValid == 1;
                 viability.EndpointSpanValid =
                     viability.RemainingCentralSpan +
                         PointMergeDistance >=
@@ -1360,6 +1363,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 if (width <= PointMergeDistance)
                 {
+                    CaptureFinalCornerInactiveRecoveryEvidence(
+                        record,
+                        solution,
+                        selected.GraphEdgeIndex);
                     SetEdgeWearCornerWidthCoexistenceIneligibility(
                         record,
                         width,
@@ -1379,6 +1386,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             RecalculateEdgeWearCoverageAudit(audit);
+        }
+
+
+        private static void CaptureFinalCornerInactiveRecoveryEvidence(
+            EdgeWearEdgeLifecycleRecord record,
+            ChamferCornerSolution solution,
+            int graphEdgeIndex)
+        {
+            if (record == null || solution == null)
+            {
+                return;
+            }
+            for (int conflictIndex = 0;
+                 conflictIndex < solution.Conflicts.Count;
+                 conflictIndex++)
+            {
+                ChamferCornerConflictRecord conflict =
+                    solution.Conflicts[conflictIndex];
+                if (conflict == null ||
+                    !conflict.ParticipatingSelectedEdges.Contains(
+                        graphEdgeIndex))
+                {
+                    continue;
+                }
+                record.CornerRecoveryProvisional = true;
+                record.CornerRecoveryCollapsedSourceEdgeIndex =
+                    conflict.UnselectedSourceEdgeIndex;
+                conflict.ParticipantWidthBeforeScale.TryGetValue(
+                    graphEdgeIndex,
+                    out record.CornerRecoveryLastPositiveWidth);
+                record.CornerRecoveryUniformScale =
+                    conflict.UniformScale;
+                record.CornerRecoveryParticipants =
+                    FormatChamferForcedDeferralKey(
+                        conflict.ParticipatingSelectedEdges);
+                return;
+            }
         }
 
         private static void
@@ -2479,6 +2523,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         orderedParticipants.Sort();
                         conflict.ParticipatingSelectedEdges.AddRange(
                             orderedParticipants);
+                        for (int participantIndex = 0;
+                             participantIndex < orderedParticipants.Count;
+                             participantIndex++)
+                        {
+                            int participantEdge =
+                                orderedParticipants[participantIndex];
+                            conflict.ParticipantWidthBeforeScale[
+                                participantEdge] =
+                                widthByEdge[participantEdge];
+                        }
                         cornerConflicts.Add(conflict);
                     }
 

@@ -200,72 +200,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     ChamferCornerStats cornerStats =
                         new ChamferCornerStats();
-                    bool cornersReady;
-                    ChamferCornerSolution cornerSolution;
-                    string cornerBlocker;
-                    PlaneCutBevelAuditResult allEdgeAudit;
-                    TriangleSoup allEdgePreviewSoup;
-                    if (HasSelectedWidthRecoveryProvisional(
-                            context,
-                            coverageAudit))
-                    {
-                        cornersReady =
-                            TryAuditSingleSearchChamferPlaneSolution(
-                                faces,
-                                context,
-                                recipe,
-                                requestedWidth,
-                                minimumStableEdgeLength,
-                                minimumStableFaceArea,
-                                coverageAudit,
-                                ref cornerStats,
-                                out cornerSolution,
-                                out allEdgeAudit,
-                                out allEdgePreviewSoup,
-                                out cornerBlocker);
-                    }
-                    else
-                    {
-                        cornersReady = AuditExplicitChamferCornerSolution(
+                    bool cornersReady =
+                        TryAuditCertifiedBaselineAugmentation(
                             faces,
                             context,
+                            recipe,
                             requestedWidth,
                             minimumStableEdgeLength,
                             minimumStableFaceArea,
                             coverageAudit,
-                            null,
                             ref cornerStats,
-                            out cornerSolution,
-                            out cornerBlocker);
-                        allEdgeAudit = default;
-                        allEdgePreviewSoup = null;
-                        if (cornersReady)
-                        {
-                            ApplyEdgeWearCoverageCornerSolution(
-                                coverageAudit,
-                                context,
-                                cornerSolution);
-                            allEdgeAudit = AuditPlaneCutBevelKernel(
-                                faces,
-                                context,
-                                cornerSolution,
-                                minimumStableEdgeLength,
-                                minimumStableFaceArea,
-                                coverageAudit,
-                                true,
-                                out allEdgePreviewSoup);
-                        }
-                        else
-                        {
-                            allEdgeAudit.CoverageAudit = coverageAudit;
-                            allEdgeAudit.SelectedEdgeCount =
-                                context.SelectedSourceEdges.Count;
-                            allEdgeAudit.Diagnostic =
-                                string.IsNullOrEmpty(cornerBlocker)
-                                    ? "the shared all-edge corner solution failed"
-                                    : cornerBlocker;
-                        }
-                    }
+                            out ChamferCornerSolution cornerSolution,
+                            out PlaneCutBevelAuditResult allEdgeAudit,
+                            out TriangleSoup allEdgePreviewSoup,
+                            out string cornerBlocker);
+                    EdgeWearCoverageAudit effectiveCoverageAudit =
+                        allEdgeAudit.CoverageAudit ?? coverageAudit;
 
                     if (logUnifiedAudit)
                     {
@@ -293,7 +243,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             allEdgeAudit.Diagnostic,
                             BuildUnifiedEdgeWearDebugEdges(
                                 context,
-                                coverageAudit,
+                                effectiveCoverageAudit,
                                 allEdgeAudit.DebugFocusEdgeIndices));
                     if (previewApplied)
                     {
@@ -997,41 +947,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public readonly SortedSet<int> ForcedDeferredEdges =
                 new SortedSet<int>();
             public ChamferCornerSolution CornerSolution;
+            public ChamferCornerStats CornerStats;
             public PlaneCutBevelAuditResult PlaneAudit;
             public TriangleSoup PreviewSoup;
             public EdgeWearCoverageAudit Coverage;
             public bool CornersReady;
             public bool FullyValid;
+            public int CertifiedCount;
+            public double CertifiedScore;
+            public double CertifiedWidth;
+            public int RecoveredProvisionalCount;
             public string Blocker = string.Empty;
         }
 
-        private static bool HasSelectedWidthRecoveryProvisional(
-            ChamferTopologyContext context,
-            EdgeWearCoverageAudit coverageAudit)
-        {
-            if (context == null || coverageAudit == null)
-            {
-                return false;
-            }
-            for (int selectedIndex = 0;
-                 selectedIndex < context.SelectedEdges.Count;
-                 selectedIndex++)
-            {
-                int graphEdgeIndex =
-                    context.SelectedEdges[selectedIndex].GraphEdgeIndex;
-                if (coverageAudit.ViabilityByGraphEdge.TryGetValue(
-                        graphEdgeIndex,
-                        out EdgeWearEdgeViabilityRecord viability) &&
-                    viability != null &&
-                    viability.WidthRecoveryProvisional)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private static bool TryAuditSingleSearchChamferPlaneSolution(
+        private static bool TryAuditCertifiedBaselineAugmentation(
             List<PolygonFace> sourceFaces,
             ChamferTopologyContext context,
             MassRecipe recipe,
@@ -1046,7 +975,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             out string blocker)
         {
             const int MaximumSearchStates = 128;
-            const int MaximumForcedDeferrals = 10;
+            const int MaximumAdditionalDeferrals = 8;
             const double MaximumSearchMilliseconds = 5000.0;
 
             winningSolution = null;
@@ -1054,15 +983,120 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             winningPreviewSoup = null;
             blocker = string.Empty;
 
+            SortedSet<int> baselineProvisionalEdges =
+                CollectSelectedWidthRecoveryProvisionalEdges(
+                    context,
+                    coverageAudit);
+            SortedSet<int> recoveryEdges =
+                CollectSelectedMultiSupportHullRecoveryEdges(
+                    context,
+                    coverageAudit);
+            baselineProvisionalEdges.UnionWith(recoveryEdges);
+            ChamferPlaneRetentionTrialOutcome baseline =
+                EvaluateChamferPlaneRetentionTrial(
+                    sourceFaces,
+                    context,
+                    recipe,
+                    requestedWidth,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    coverageAudit,
+                    baselineProvisionalEdges,
+                    true,
+                    false);
+            if (!baseline.FullyValid)
+            {
+                blocker = string.IsNullOrEmpty(baseline.Blocker)
+                    ? "the certified edge-wear baseline did not produce a fully certified shell"
+                    : "certified-baseline-failed:" + baseline.Blocker;
+                winningAudit = baseline.PlaneAudit;
+                winningAudit.CoverageAudit = baseline.Coverage;
+                winningAudit.BaselineCertified = 0;
+                winningAudit.BaselineApplied = 0;
+                winningAudit.AugmentationAttempted = 0;
+                winningAudit.AugmentationApplied = 0;
+                winningAudit.AugmentationFailure = blocker;
+                return false;
+            }
+
+            Dictionary<int, SortedSet<int>> cornerRecoveryParticipants =
+                new Dictionary<int, SortedSet<int>>();
+            CollectCornerInactiveRecoveryEdges(
+                context,
+                coverageAudit,
+                baseline.Coverage,
+                baseline.CornerSolution,
+                recoveryEdges,
+                cornerRecoveryParticipants);
+            if (recoveryEdges.Count > 0 &&
+                !TryValidateChamferPlaneRetentionRenderChannels(
+                    baseline,
+                    recipe))
+            {
+                blocker = string.IsNullOrEmpty(baseline.Blocker)
+                    ? "certified-baseline-render-validation-failed"
+                    : "certified-baseline-failed:" + baseline.Blocker;
+                winningAudit = baseline.PlaneAudit;
+                winningAudit.CoverageAudit = baseline.Coverage;
+                winningAudit.BaselineCertified = 0;
+                winningAudit.BaselineApplied = 0;
+                winningAudit.AugmentationAttempted = 0;
+                winningAudit.AugmentationApplied = 0;
+                winningAudit.AugmentationFailure = blocker;
+                return false;
+            }
+            stats = baseline.CornerStats;
+            ApplyCertifiedBaselineAugmentationMetadata(
+                ref baseline.PlaneAudit,
+                baseline,
+                false,
+                false,
+                0,
+                0,
+                0.0,
+                false,
+                false,
+                string.Empty,
+                string.Empty,
+                string.Empty);
+
+            if (recoveryEdges.Count == 0)
+            {
+                winningSolution = baseline.CornerSolution;
+                winningAudit = baseline.PlaneAudit;
+                winningPreviewSoup = baseline.PreviewSoup;
+                return true;
+            }
+
+            SortedSet<int> baselineExclusions =
+                CollectBaselineSelectedExclusions(
+                    context,
+                    baseline.Coverage);
+            foreach (int recoveryEdge in recoveryEdges)
+            {
+                baselineExclusions.Remove(recoveryEdge);
+            }
+
             List<SortedSet<int>> frontier = new List<SortedSet<int>>
             {
-                new SortedSet<int>()
+                new SortedSet<int>(baselineExclusions)
             };
+            foreach (KeyValuePair<int, SortedSet<int>> pair in
+                cornerRecoveryParticipants)
+            {
+                AddCornerRecoveryProtectedStates(
+                    frontier,
+                    baselineExclusions,
+                    pair.Value,
+                    recoveryEdges);
+            }
             HashSet<string> visited = new HashSet<string>();
             ChamferPlaneRetentionTrialOutcome winner = null;
+            ChamferPlaneRetentionTrialOutcome lastOutcome = null;
             int evaluatedStates = 0;
             bool timeBudgetExceeded = false;
             bool cancelled = false;
+            string lastImplicatedEvidence = string.Empty;
             System.Diagnostics.Stopwatch stopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
 
@@ -1104,14 +1138,35 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         minimumStableEdgeLength,
                         minimumStableFaceArea,
                         coverageAudit,
-                        forced);
-                if (outcome.FullyValid)
+                        forced,
+                        false,
+                        true);
+                lastOutcome = outcome;
+                outcome.RecoveredProvisionalCount =
+                    CountRecoveredProvisionalEdges(
+                        recoveryEdges,
+                        baseline.Coverage,
+                        outcome.Coverage);
+                if (outcome.FullyValid &&
+                    outcome.RecoveredProvisionalCount > 0 &&
+                    IsChamferPlaneRetentionTrialAcceptableForRecovery(
+                        outcome,
+                        baseline,
+                        recoveryEdges,
+                        cornerRecoveryParticipants))
                 {
-                    winner = outcome;
-                    break;
+                    if (winner == null ||
+                        IsChamferPlaneRecoveryTrialBetter(
+                            outcome,
+                            winner))
+                    {
+                        winner = outcome;
+                    }
                 }
 
-                if (forced.Count >= MaximumForcedDeferrals)
+                if (forced.Count >=
+                    baselineExclusions.Count +
+                    MaximumAdditionalDeferrals)
                 {
                     continue;
                 }
@@ -1121,12 +1176,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         context,
                         coverageAudit,
                         outcome);
+                lastImplicatedEvidence =
+                    FormatChamferForcedDeferralKey(branchEdges);
                 for (int edgeIndex = 0;
                      edgeIndex < branchEdges.Count;
                      edgeIndex++)
                 {
                     int edgeToDefer = branchEdges[edgeIndex];
-                    if (forced.Contains(edgeToDefer))
+                    if (forced.Contains(edgeToDefer) ||
+                        recoveryEdges.Contains(edgeToDefer))
                     {
                         continue;
                     }
@@ -1144,110 +1202,73 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             stopwatch.Stop();
-            stats.ConflictSearchStatesEvaluated = evaluatedStates;
-            stats.ConflictSearchElapsedMilliseconds =
-                stopwatch.Elapsed.TotalMilliseconds;
-            stats.ConflictSearchTimeBudgetExceeded =
-                timeBudgetExceeded ? 1 : 0;
-            stats.ConflictSearchCancelled = cancelled ? 1 : 0;
-            if (winner == null)
+            if (winner != null)
             {
-                if (cancelled)
-                {
-                    blocker = "conflict-search-cancelled";
-                }
-                else if (timeBudgetExceeded)
-                {
-                    blocker = "conflict-search-time-budget-exceeded" +
-                        " (statesEvaluated=" + evaluatedStates +
-                        ",frontierRemaining=" + frontier.Count + ")";
-                }
-                else if (frontier.Count > 0)
-                {
-                    blocker = "conflict-search-state-budget-exceeded" +
-                        " (statesEvaluated=" + evaluatedStates +
-                        ",frontierRemaining=" + frontier.Count + ")";
-                }
-                else
-                {
-                    blocker = "single conflict-directed search found no " +
-                        "fully certified shell";
-                }
-                return false;
-            }
-
-            HashSet<int> winningForced =
-                new HashSet<int>(winner.ForcedDeferredEdges);
-            stats.ConflictSearchCommittedExclusionCount =
-                winningForced.Count;
-            bool cornersReady = AuditExplicitChamferCornerSolution(
-                sourceFaces,
-                context,
-                requestedWidth,
-                minimumStableEdgeLength,
-                minimumStableFaceArea,
-                coverageAudit,
-                winningForced,
-                ref stats,
-                out winningSolution,
-                out blocker);
-            if (!cornersReady)
-            {
-                return false;
-            }
-
-            ApplyEdgeWearCoverageCornerSolution(
-                coverageAudit,
-                context,
-                winningSolution);
-            try
-            {
-                winningAudit = AuditPlaneCutBevelKernel(
-                    sourceFaces,
-                    context,
-                    winningSolution,
-                    minimumStableEdgeLength,
-                    minimumStableFaceArea,
-                    coverageAudit,
+                stats = winner.CornerStats;
+                ApplyCertifiedBaselineAugmentationMetadata(
+                    ref winner.PlaneAudit,
+                    baseline,
+                    true,
+                    true,
+                    evaluatedStates,
+                    frontier.Count,
+                    stopwatch.Elapsed.TotalMilliseconds,
                     false,
-                    out winningPreviewSoup);
-            }
-            catch (InvalidOperationException exception)
-            {
-                blocker = "the committed single-search state failed " +
-                    "final render-channel validation: " +
-                    exception.Message;
-                winningAudit.CoverageAudit = coverageAudit;
-                winningAudit.Diagnostic = blocker;
-                winningPreviewSoup = null;
-                return false;
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    lastImplicatedEvidence);
+                winningSolution = winner.CornerSolution;
+                winningAudit = winner.PlaneAudit;
+                winningPreviewSoup = winner.PreviewSoup;
+                return true;
             }
 
-            if (winningAudit.GeometryValid == 1 &&
-                winningPreviewSoup != null)
+            string augmentationFailure;
+            if (cancelled)
             {
-                try
-                {
-                    BuildMeshData(winningPreviewSoup, recipe);
-                }
-                catch (InvalidOperationException exception)
-                {
-                    blocker = "the committed single-search state failed " +
-                        "final mesh-data validation: " + exception.Message;
-                    winningAudit.Diagnostic = blocker;
-                    winningPreviewSoup = null;
-                    return false;
-                }
+                augmentationFailure = "augmentation-cancelled";
             }
-
-            if (winningAudit.GeometryValid != 1 ||
-                winningPreviewSoup == null)
+            else if (timeBudgetExceeded)
             {
-                blocker = string.IsNullOrEmpty(winningAudit.Diagnostic)
-                    ? "the committed single-search state did not certify"
-                    : winningAudit.Diagnostic;
-                return false;
+                augmentationFailure =
+                    "augmentation-time-budget-exceeded";
             }
+            else if (frontier.Count > 0)
+            {
+                augmentationFailure =
+                    "augmentation-state-budget-exceeded";
+            }
+            else
+            {
+                augmentationFailure =
+                    "augmentation-found-no-superior-certified-shell";
+            }
+            string lastFailure = lastOutcome == null
+                ? string.Empty
+                : lastOutcome.Blocker;
+            ApplyCertifiedBaselineAugmentationMetadata(
+                ref baseline.PlaneAudit,
+                baseline,
+                true,
+                false,
+                evaluatedStates,
+                frontier.Count,
+                stopwatch.Elapsed.TotalMilliseconds,
+                timeBudgetExceeded,
+                cancelled,
+                augmentationFailure,
+                lastFailure,
+                lastImplicatedEvidence);
+            baseline.PlaneAudit.Diagnostic =
+                AppendEdgeWearDiagnostic(
+                    baseline.PlaneAudit.Diagnostic,
+                    augmentationFailure +
+                    "; certified baseline retained");
+            winningSolution = baseline.CornerSolution;
+            winningAudit = baseline.PlaneAudit;
+            winningPreviewSoup = baseline.PreviewSoup;
+            blocker = string.Empty;
             return true;
         }
 
@@ -1260,16 +1281,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float minimumStableEdgeLength,
                 float minimumStableFaceArea,
                 EdgeWearCoverageAudit sourceCoverage,
-                SortedSet<int> forcedDeferredEdges)
+                ICollection<int> forcedDeferredEdges,
+                bool allowKernelConflictSearch,
+                bool validateRenderChannels)
         {
             ChamferPlaneRetentionTrialOutcome outcome =
                 new ChamferPlaneRetentionTrialOutcome();
-            outcome.ForcedDeferredEdges.UnionWith(
-                forcedDeferredEdges);
+            if (forcedDeferredEdges != null)
+            {
+                outcome.ForcedDeferredEdges.UnionWith(
+                    forcedDeferredEdges);
+            }
             outcome.Coverage = sourceCoverage.CloneForTrial();
-            ChamferCornerStats trialStats = new ChamferCornerStats();
-            HashSet<int> forced = new HashSet<int>(
-                forcedDeferredEdges);
+            HashSet<int> forced = forcedDeferredEdges == null
+                ? null
+                : new HashSet<int>(forcedDeferredEdges);
             outcome.CornersReady = AuditExplicitChamferCornerSolution(
                 sourceFaces,
                 context,
@@ -1278,7 +1304,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 minimumStableFaceArea,
                 outcome.Coverage,
                 forced,
-                ref trialStats,
+                ref outcome.CornerStats,
                 out outcome.CornerSolution,
                 out outcome.Blocker);
             if (!outcome.CornersReady)
@@ -1299,7 +1325,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     outcome.Coverage,
-                    false,
+                    allowKernelConflictSearch,
                     out outcome.PreviewSoup);
             }
             catch (InvalidOperationException exception)
@@ -1309,23 +1335,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return outcome;
             }
 
-            if (outcome.PlaneAudit.GeometryValid == 1 &&
-                outcome.PreviewSoup != null)
-            {
-                try
-                {
-                    BuildMeshData(outcome.PreviewSoup, recipe);
-                }
-                catch (InvalidOperationException exception)
-                {
-                    outcome.Blocker =
-                        "render-channel-validation:" + exception.Message;
-                    outcome.PreviewSoup = null;
-                }
-            }
             outcome.FullyValid =
                 outcome.PlaneAudit.GeometryValid == 1 &&
                 outcome.PreviewSoup != null;
+            if (validateRenderChannels && outcome.FullyValid)
+            {
+                TryValidateChamferPlaneRetentionRenderChannels(
+                    outcome,
+                    recipe);
+            }
             if (outcome.FullyValid)
             {
                 outcome.Blocker = string.Empty;
@@ -1334,7 +1352,519 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 outcome.Blocker = outcome.PlaneAudit.Diagnostic;
             }
+            CalculateChamferPlaneRetentionMetrics(outcome);
             return outcome;
+        }
+
+        private static bool TryValidateChamferPlaneRetentionRenderChannels(
+            ChamferPlaneRetentionTrialOutcome outcome,
+            MassRecipe recipe)
+        {
+            if (outcome == null || !outcome.FullyValid ||
+                outcome.PreviewSoup == null)
+            {
+                return outcome != null && outcome.FullyValid;
+            }
+            try
+            {
+                BuildMeshData(outcome.PreviewSoup, recipe);
+                return true;
+            }
+            catch (InvalidOperationException exception)
+            {
+                outcome.Blocker =
+                    "render-channel-validation:" + exception.Message;
+                outcome.PreviewSoup = null;
+                outcome.FullyValid = false;
+                return false;
+            }
+        }
+
+        private static SortedSet<int>
+            CollectSelectedWidthRecoveryProvisionalEdges(
+                ChamferTopologyContext context,
+                EdgeWearCoverageAudit coverageAudit)
+        {
+            SortedSet<int> result = new SortedSet<int>();
+            if (context == null || coverageAudit == null)
+            {
+                return result;
+            }
+            for (int selectedIndex = 0;
+                 selectedIndex < context.SelectedEdges.Count;
+                 selectedIndex++)
+            {
+                int graphEdgeIndex =
+                    context.SelectedEdges[selectedIndex].GraphEdgeIndex;
+                if (coverageAudit.ViabilityByGraphEdge.TryGetValue(
+                        graphEdgeIndex,
+                        out EdgeWearEdgeViabilityRecord viability) &&
+                    viability != null &&
+                    viability.WidthRecoveryProvisional)
+                {
+                    result.Add(graphEdgeIndex);
+                }
+            }
+            return result;
+        }
+
+        private static SortedSet<int>
+            CollectSelectedMultiSupportHullRecoveryEdges(
+                ChamferTopologyContext context,
+                EdgeWearCoverageAudit coverageAudit)
+        {
+            SortedSet<int> result = new SortedSet<int>();
+            if (context == null || coverageAudit == null)
+            {
+                return result;
+            }
+            for (int selectedIndex = 0;
+                 selectedIndex < context.SelectedEdges.Count;
+                 selectedIndex++)
+            {
+                int graphEdgeIndex =
+                    context.SelectedEdges[selectedIndex].GraphEdgeIndex;
+                if (coverageAudit.ViabilityByGraphEdge.TryGetValue(
+                        graphEdgeIndex,
+                        out EdgeWearEdgeViabilityRecord viability) &&
+                    viability != null &&
+                    viability.MultiSupportHullRecovery)
+                {
+                    result.Add(graphEdgeIndex);
+                }
+            }
+            return result;
+        }
+
+        private static void CollectCornerInactiveRecoveryEdges(
+            ChamferTopologyContext context,
+            EdgeWearCoverageAudit sourceCoverage,
+            EdgeWearCoverageAudit baselineCoverage,
+            ChamferCornerSolution baselineSolution,
+            SortedSet<int> recoveryEdges,
+            Dictionary<int, SortedSet<int>> recoveryParticipants)
+        {
+            if (context == null || baselineCoverage == null ||
+                baselineSolution == null || recoveryEdges == null ||
+                recoveryParticipants == null)
+            {
+                return;
+            }
+            for (int conflictIndex = 0;
+                 conflictIndex < baselineSolution.Conflicts.Count;
+                 conflictIndex++)
+            {
+                ChamferCornerConflictRecord conflict =
+                    baselineSolution.Conflicts[conflictIndex];
+                for (int participantIndex = 0;
+                     participantIndex <
+                         conflict.ParticipatingSelectedEdges.Count;
+                     participantIndex++)
+                {
+                    int edgeIndex =
+                        conflict.ParticipatingSelectedEdges[
+                            participantIndex];
+                    if (!baselineSolution.WidthByEdge.TryGetValue(
+                            edgeIndex,
+                            out float width) ||
+                        width > PointMergeDistance ||
+                        !baselineCoverage.RecordByGraphEdge.TryGetValue(
+                            edgeIndex,
+                            out EdgeWearEdgeLifecycleRecord record) ||
+                        record == null ||
+                        !record.GeometricEligible ||
+                        !record.CornerRecoveryProvisional ||
+                        !string.Equals(
+                            record.FinalReason,
+                            "corner-width-inactive",
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    recoveryEdges.Add(edgeIndex);
+                    if (!recoveryParticipants.TryGetValue(
+                            edgeIndex,
+                            out SortedSet<int> participants))
+                    {
+                        participants = new SortedSet<int>();
+                        recoveryParticipants.Add(edgeIndex, participants);
+                    }
+                    participants.UnionWith(
+                        conflict.ParticipatingSelectedEdges);
+                    participants.Remove(edgeIndex);
+
+                    float lastPositiveWidth =
+                        record.CornerRecoveryLastPositiveWidth;
+                    if (lastPositiveWidth <= PointMergeDistance)
+                    {
+                        conflict.ParticipantWidthBeforeScale.TryGetValue(
+                            edgeIndex,
+                            out lastPositiveWidth);
+                    }
+                    if (lastPositiveWidth <= PointMergeDistance &&
+                        record.Viability != null)
+                    {
+                        lastPositiveWidth = Mathf.Max(
+                            record.Viability.IsolatedMaximumCertifiedWidth,
+                            record.Viability.MaximumLocallyFeasibleWidth);
+                    }
+                    ApplyCornerRecoveryProvisionalEvidence(
+                        record,
+                        conflict,
+                        lastPositiveWidth);
+                    if (sourceCoverage != null &&
+                        sourceCoverage.RecordByGraphEdge.TryGetValue(
+                            edgeIndex,
+                            out EdgeWearEdgeLifecycleRecord sourceRecord) &&
+                        sourceRecord != null &&
+                        !ReferenceEquals(sourceRecord, record))
+                    {
+                        ApplyCornerRecoveryProvisionalEvidence(
+                            sourceRecord,
+                            conflict,
+                            lastPositiveWidth);
+                    }
+                }
+            }
+        }
+
+        private static void AddCornerRecoveryProtectedStates(
+            List<SortedSet<int>> frontier,
+            ICollection<int> baselineExclusions,
+            ICollection<int> conflictParticipants,
+            ICollection<int> recoveryEdges)
+        {
+            const int MaximumEnumeratedParticipants = 6;
+            if (frontier == null || conflictParticipants == null ||
+                conflictParticipants.Count == 0)
+            {
+                return;
+            }
+
+            List<int> neighbours = new List<int>();
+            foreach (int participant in conflictParticipants)
+            {
+                if (recoveryEdges == null ||
+                    !recoveryEdges.Contains(participant))
+                {
+                    neighbours.Add(participant);
+                }
+            }
+            neighbours.Sort();
+            if (neighbours.Count == 0)
+            {
+                return;
+            }
+
+            if (neighbours.Count <= MaximumEnumeratedParticipants)
+            {
+                int stateCount = 1 << neighbours.Count;
+                for (int mask = 1; mask < stateCount; mask++)
+                {
+                    SortedSet<int> state = baselineExclusions == null
+                        ? new SortedSet<int>()
+                        : new SortedSet<int>(baselineExclusions);
+                    for (int participantIndex = 0;
+                         participantIndex < neighbours.Count;
+                         participantIndex++)
+                    {
+                        if ((mask & (1 << participantIndex)) != 0)
+                        {
+                            state.Add(neighbours[participantIndex]);
+                        }
+                    }
+                    frontier.Add(state);
+                }
+                return;
+            }
+
+            for (int participantIndex = 0;
+                 participantIndex < neighbours.Count;
+                 participantIndex++)
+            {
+                SortedSet<int> state = baselineExclusions == null
+                    ? new SortedSet<int>()
+                    : new SortedSet<int>(baselineExclusions);
+                state.Add(neighbours[participantIndex]);
+                frontier.Add(state);
+            }
+            SortedSet<int> allNeighbours = baselineExclusions == null
+                ? new SortedSet<int>()
+                : new SortedSet<int>(baselineExclusions);
+            allNeighbours.UnionWith(neighbours);
+            frontier.Add(allNeighbours);
+        }
+
+        private static void ApplyCornerRecoveryProvisionalEvidence(
+            EdgeWearEdgeLifecycleRecord record,
+            ChamferCornerConflictRecord conflict,
+            float lastPositiveWidth)
+        {
+            if (record == null || conflict == null)
+            {
+                return;
+            }
+            record.CornerRecoveryProvisional = true;
+            record.CornerRecoveryCollapsedSourceEdgeIndex =
+                conflict.UnselectedSourceEdgeIndex;
+            record.CornerRecoveryLastPositiveWidth =
+                Mathf.Max(0f, lastPositiveWidth);
+            record.CornerRecoveryUniformScale =
+                conflict.UniformScale;
+            record.CornerRecoveryParticipants =
+                FormatChamferForcedDeferralKey(
+                    conflict.ParticipatingSelectedEdges);
+        }
+
+        private static SortedSet<int> CollectBaselineSelectedExclusions(
+            ChamferTopologyContext context,
+            EdgeWearCoverageAudit baselineCoverage)
+        {
+            SortedSet<int> exclusions = new SortedSet<int>();
+            if (context == null || baselineCoverage == null)
+            {
+                return exclusions;
+            }
+            for (int selectedIndex = 0;
+                 selectedIndex < context.SelectedEdges.Count;
+                 selectedIndex++)
+            {
+                int graphEdgeIndex =
+                    context.SelectedEdges[selectedIndex].GraphEdgeIndex;
+                if (!baselineCoverage.RecordByGraphEdge.TryGetValue(
+                        graphEdgeIndex,
+                        out EdgeWearEdgeLifecycleRecord record) ||
+                    record == null ||
+                    !record.Built)
+                {
+                    exclusions.Add(graphEdgeIndex);
+                }
+            }
+            return exclusions;
+        }
+
+        private static int CountRecoveredProvisionalEdges(
+            ICollection<int> recoveryEdges,
+            EdgeWearCoverageAudit baselineCoverage,
+            EdgeWearCoverageAudit candidateCoverage)
+        {
+            if (recoveryEdges == null || candidateCoverage == null)
+            {
+                return 0;
+            }
+            int count = 0;
+            foreach (int edgeIndex in recoveryEdges)
+            {
+                bool baselineBuilt = baselineCoverage != null &&
+                    baselineCoverage.RecordByGraphEdge.TryGetValue(
+                        edgeIndex,
+                        out EdgeWearEdgeLifecycleRecord baselineRecord) &&
+                    baselineRecord != null &&
+                    baselineRecord.Built;
+                bool candidateBuilt =
+                    candidateCoverage.RecordByGraphEdge.TryGetValue(
+                        edgeIndex,
+                        out EdgeWearEdgeLifecycleRecord candidateRecord) &&
+                    candidateRecord != null &&
+                    candidateRecord.Built;
+                if (!baselineBuilt && candidateBuilt)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static void CalculateChamferPlaneRetentionMetrics(
+            ChamferPlaneRetentionTrialOutcome outcome)
+        {
+            if (outcome == null || outcome.Coverage == null)
+            {
+                return;
+            }
+            for (int recordIndex = 0;
+                 recordIndex < outcome.Coverage.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    outcome.Coverage.Records[recordIndex];
+                if (!record.Built)
+                {
+                    continue;
+                }
+                outcome.CertifiedCount++;
+                outcome.CertifiedScore += record.Score;
+                outcome.CertifiedWidth += record.MaterializedWidth;
+            }
+        }
+
+        private static bool
+            IsChamferPlaneRetentionTrialAcceptableForRecovery(
+                ChamferPlaneRetentionTrialOutcome candidate,
+                ChamferPlaneRetentionTrialOutcome baseline,
+                ICollection<int> recoveryEdges,
+                Dictionary<int, SortedSet<int>>
+                    cornerRecoveryParticipants)
+        {
+            if (candidate == null || !candidate.FullyValid ||
+                candidate.RecoveredProvisionalCount <= 0 ||
+                (baseline != null && baseline.FullyValid &&
+                 candidate.CertifiedCount < baseline.CertifiedCount))
+            {
+                return false;
+            }
+            if (baseline == null || !baseline.FullyValid ||
+                baseline.Coverage == null || candidate.Coverage == null)
+            {
+                return true;
+            }
+
+            HashSet<int> allowedBaselineLosses = new HashSet<int>();
+            if (recoveryEdges != null &&
+                cornerRecoveryParticipants != null)
+            {
+                foreach (int recoveryEdge in recoveryEdges)
+                {
+                    bool baselineBuilt =
+                        baseline.Coverage.RecordByGraphEdge.TryGetValue(
+                            recoveryEdge,
+                            out EdgeWearEdgeLifecycleRecord baselineRecord) &&
+                        baselineRecord != null && baselineRecord.Built;
+                    bool candidateBuilt =
+                        candidate.Coverage.RecordByGraphEdge.TryGetValue(
+                            recoveryEdge,
+                            out EdgeWearEdgeLifecycleRecord candidateRecord) &&
+                        candidateRecord != null && candidateRecord.Built;
+                    if (!baselineBuilt && candidateBuilt &&
+                        cornerRecoveryParticipants.TryGetValue(
+                            recoveryEdge,
+                            out SortedSet<int> participants))
+                    {
+                        allowedBaselineLosses.UnionWith(participants);
+                    }
+                }
+            }
+
+            foreach (KeyValuePair<int, EdgeWearEdgeLifecycleRecord> pair
+                in baseline.Coverage.RecordByGraphEdge)
+            {
+                int edgeIndex = pair.Key;
+                EdgeWearEdgeLifecycleRecord baselineRecord = pair.Value;
+                if (baselineRecord == null || !baselineRecord.Built)
+                {
+                    continue;
+                }
+                bool candidateBuilt =
+                    candidate.Coverage.RecordByGraphEdge.TryGetValue(
+                        edgeIndex,
+                        out EdgeWearEdgeLifecycleRecord candidateRecord) &&
+                    candidateRecord != null && candidateRecord.Built;
+                if (!candidateBuilt &&
+                    !allowedBaselineLosses.Contains(edgeIndex))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool IsChamferPlaneRecoveryTrialBetter(
+            ChamferPlaneRetentionTrialOutcome candidate,
+            ChamferPlaneRetentionTrialOutcome current)
+        {
+            if (candidate == null || !candidate.FullyValid)
+            {
+                return false;
+            }
+            if (current == null || !current.FullyValid)
+            {
+                return true;
+            }
+            if (candidate.RecoveredProvisionalCount !=
+                current.RecoveredProvisionalCount)
+            {
+                return candidate.RecoveredProvisionalCount >
+                    current.RecoveredProvisionalCount;
+            }
+            return IsChamferPlaneRetentionTrialBetter(
+                candidate,
+                current);
+        }
+
+        private static bool IsChamferPlaneRetentionTrialBetter(
+            ChamferPlaneRetentionTrialOutcome candidate,
+            ChamferPlaneRetentionTrialOutcome baseline)
+        {
+            const double Tolerance = 0.000000001;
+            if (candidate == null || !candidate.FullyValid)
+            {
+                return false;
+            }
+            if (baseline == null || !baseline.FullyValid)
+            {
+                return true;
+            }
+            if (candidate.CertifiedCount != baseline.CertifiedCount)
+            {
+                return candidate.CertifiedCount > baseline.CertifiedCount;
+            }
+            if (candidate.CertifiedScore >
+                baseline.CertifiedScore + Tolerance)
+            {
+                return true;
+            }
+            if (baseline.CertifiedScore >
+                candidate.CertifiedScore + Tolerance)
+            {
+                return false;
+            }
+            return candidate.CertifiedWidth >
+                baseline.CertifiedWidth + Tolerance;
+        }
+
+        private static void ApplyCertifiedBaselineAugmentationMetadata(
+            ref PlaneCutBevelAuditResult audit,
+            ChamferPlaneRetentionTrialOutcome baseline,
+            bool attempted,
+            bool applied,
+            int statesEvaluated,
+            int frontierRemaining,
+            double elapsedMilliseconds,
+            bool timeBudgetExceeded,
+            bool cancelled,
+            string failure,
+            string lastFailure,
+            string implicatedEdges)
+        {
+            audit.BaselineCertified = baseline != null &&
+                baseline.FullyValid ? 1 : 0;
+            audit.BaselineApplied = applied ? 0 : audit.BaselineCertified;
+            audit.AugmentationAttempted = attempted ? 1 : 0;
+            audit.AugmentationApplied = applied ? 1 : 0;
+            audit.AugmentationStatesEvaluated = statesEvaluated;
+            audit.AugmentationFrontierRemaining = frontierRemaining;
+            audit.AugmentationElapsedMilliseconds = elapsedMilliseconds;
+            audit.AugmentationTimeBudgetExceeded =
+                timeBudgetExceeded ? 1 : 0;
+            audit.AugmentationCancelled = cancelled ? 1 : 0;
+            audit.AugmentationFailure = failure ?? string.Empty;
+            audit.AugmentationLastFailure = lastFailure ?? string.Empty;
+            audit.AugmentationImplicatedEdgeEvidence =
+                implicatedEdges ?? string.Empty;
+        }
+
+        private static string AppendEdgeWearDiagnostic(
+            string current,
+            string addition)
+        {
+            if (string.IsNullOrEmpty(addition))
+            {
+                return current ?? string.Empty;
+            }
+            return string.IsNullOrEmpty(current)
+                ? addition
+                : current + "; " + addition;
         }
 
         private static List<int>
@@ -1344,7 +1874,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ChamferPlaneRetentionTrialOutcome outcome)
         {
             SortedSet<int> branchEdges = new SortedSet<int>();
-            if (outcome.CornerSolution != null)
+            if (outcome != null && outcome.CornerSolution != null)
             {
                 List<ChamferCornerConflictRecord> conflicts =
                     outcome.CornerSolution.Conflicts;
@@ -1352,21 +1882,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                      conflictIndex < conflicts.Count;
                      conflictIndex++)
                 {
-                    ChamferCornerConflictRecord conflict =
-                        conflicts[conflictIndex];
-                    for (int participantIndex = 0;
-                         participantIndex <
-                            conflict.ParticipatingSelectedEdges.Count;
-                         participantIndex++)
-                    {
-                        branchEdges.Add(
-                            conflict.ParticipatingSelectedEdges[
-                                participantIndex]);
-                    }
+                    branchEdges.UnionWith(
+                        conflicts[conflictIndex]
+                            .ParticipatingSelectedEdges);
                 }
             }
 
-            if (outcome.CornersReady &&
+            if (outcome != null && outcome.CornersReady &&
                 outcome.PlaneAudit.SelectedEdgeCount > 0)
             {
                 if (outcome.PlaneAudit.EdgeConflictVictimEdgeIndex >= 0)
@@ -1379,10 +1901,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     branchEdges.Add(
                         outcome.PlaneAudit.EdgeConflictForeignEdgeIndex);
                 }
+                if (outcome.PlaneAudit.DebugFocusEdgeIndices != null)
+                {
+                    branchEdges.UnionWith(
+                        outcome.PlaneAudit.DebugFocusEdgeIndices);
+                }
             }
 
-            if (branchEdges.Count == 0 &&
-                coverageAudit != null)
+            if (branchEdges.Count == 0 && coverageAudit != null)
             {
                 for (int selectedIndex = 0;
                      selectedIndex < context.SelectedEdges.Count;
@@ -1395,7 +1921,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             graphEdgeIndex,
                             out EdgeWearEdgeViabilityRecord viability) &&
                         viability != null &&
-                        viability.WidthRecoveryProvisional)
+                        viability.MultiSupportHullRecovery)
                     {
                         branchEdges.Add(graphEdgeIndex);
                     }

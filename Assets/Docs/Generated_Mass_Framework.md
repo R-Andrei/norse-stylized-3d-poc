@@ -190,7 +190,7 @@ Other documents may reference the canonical progress ledger, but must not mainta
 - The scale-correct normal contract is runtime-proven on `Rock_14`, `Rock_18`, seed `8889` ordinary output, and seed `8889` unified bevel-preview output.
 - Representative audits report zero missing, zero, non-finite, or non-unit normals/tangents; the black-triangle and Bloom-orb artifact no longer reproduces.
 - Finite UV-conditioning findings remain explicit warnings when 3D geometry and final render channels are valid.
-- GM-R12B.1E is closed by its ordinary and bevel-preview runtime audits. The current edge-wear regression gate is the R13A.3 one-click suite.
+- GM-R12B.1E is closed by its ordinary and bevel-preview runtime audits. The R13A.4 one-click suite is the stable incomplete safety baseline; active recovery validation advances through R13A.6.
 
 ## Edge-wear conflict-search execution contract
 
@@ -200,4 +200,30 @@ Other documents may reference the canonical progress ledger, but must not mainta
 - A synchronous matrix case must poll the cancelable editor progress callback between search states and clear the transient callback after the case.
 - Priority ordering is fewest exclusions, lowest removed accepted artistic score, lowest removed certified width, then deterministic source-edge order. The first fully certified state is committed; exhaustive post-success optimization is forbidden.
 
-The current edge-wear regression gate is the R13A.3 one-click suite.
+The R13A.4 one-click suite is the stable incomplete safety baseline; active recovery validation advances through R13A.6.
+
+
+## Certified baseline augmentation contract
+
+- Optional edge-wear recovery is an augmentation of a fully certified ordinary shell, never a replacement generator. The baseline corner solution, plane audit, preview geometry, and lifecycle evidence remain immutable fallback state.
+- Selected width-provisional edges are omitted from baseline certification. Corner-inactive recovery participants may be discovered from that baseline's explicit corner-conflict evidence.
+- Augmentation begins from baseline exclusions with only recovery participants re-enabled. It may commit only a fully certified state that recovers an absent participant and is superior by certified count, accepted artistic score, then certified width.
+- Timeout, state exhaustion, cancellation, or no superior augmented state must retain the certified baseline and publish the exact augmentation outcome. These outcomes may not erase a live preview, produce an empty matrix record, or be reported as collateral loss.
+- Baseline evaluation and augmentation may never own nested full-shell search frontiers. Augmentation trials disable kernel coexistence recursion and remain bounded by editor-validation state, time, and cancellation safeguards.
+
+## Retained-point multi-support recovery contract
+
+- R13A.4 is the stable incomplete geometry baseline. R13A.5 sampled split-plane geometry is rejected and is not baseline behavior.
+- Multi-support recovery uses the convex hull of all original source vertices except the two selected-edge endpoints plus the four exact solved rail points.
+- Every emitted new facet must be a global supporting plane of that retained point set. The complete new facet set must form one connected bevel band and preserve all four rails.
+- Both owner faces and only source faces in the selected endpoints' vertex stars may change. Every source face must retain one unique provenance record.
+- Complete topology, strict intersection, containment, convexity, bounds, volume, face-quality, triangulation, and render-channel validation remain mandatory.
+
+## Finalized corner-recovery and augmentation contract
+
+- A corner recovery provisional is captured only at the finalized `corner-width-inactive` transition and records its last positive width, collapsed shared edge, uniform scale, and exact participants.
+- Generic width-provisional edges do not authorize augmentation. Only certified retained-hull recovery and finalized corner-inactive recovery are valid trigger classes.
+- Recovery targets are protected. A candidate may not reduce certified count or remove a baseline-certified edge outside the exact participant set of a recovered corner target.
+- Timeout, cancellation, exhaustion, or no acceptable recovery retains the R13A.4 baseline and its edge identity.
+
+The current edge-wear regression gate is the R13A.6 one-click suite.

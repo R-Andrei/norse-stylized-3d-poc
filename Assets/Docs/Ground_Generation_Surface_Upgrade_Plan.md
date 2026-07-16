@@ -4,7 +4,7 @@
 
 The GeneratedGround Inspector and Painted Accent production workstream is complete, Unity-validated, and accepted through GI-A1–GI-A4 and PA-B1–PA-B4.1. **GeneratedGround and the broader Ground visual roadmap are not complete.**
 
-The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. **V3M — Broad Macro Patch Completion**, **V3R — Ground Elevation Readability**, **V3S-A3A — Bank Surface-Cover Retention and Retreat**, **V3S-A3B.1 — Inspector Asset-Creation GUI-Scope Repair**, and **V3S-A3B.2 — Wet-Response Calibration and Hydrology Inspector Consolidation** are Unity-validated and accepted. The frozen River-coupled isolation baseline remains A2C.4: explicit `OrdinaryGround` / `RiverCorridor` authorization, ordinary-Ground River-data cleanup, and complementary UV-layout invariants. Ground-owned Bank, Riverbed, and Shore Hydrology selections remain authored on the main `GeneratedGround` component. **V3S-A4A — Riverbed Dry Substrate and Submerged-Cover Exclusion** is implemented from its authorized canonical plan and source-audited in the exact twelve-file scope; Unity compilation and visual validation are pending. A4A uses exact existing Riverbed Support, one default-1 Material-only strength, forced submerged vegetation/snow/frost/Painted Accent exclusion, and no Riverbed hydrology or new debug view. **V4 — Contact / Edge Accents** remains queued after V3S and excludes River sources.
+The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. **V3M — Broad Macro Patch Completion**, **V3R — Ground Elevation Readability**, **V3S-A3A — Bank Surface-Cover Retention and Retreat**, **V3S-A3B.1 — Inspector Asset-Creation GUI-Scope Repair**, and **V3S-A3B.2 — Wet-Response Calibration and Hydrology Inspector Consolidation** are Unity-validated and accepted. The frozen River-coupled isolation baseline remains A2C.4. Unity validation confirms **V3S-A4A.1 — Normalized Bank/Riverbed Composition and Region-Oriented Authoring**, **V3S-A4B — Exact-Support Riverbed Hydrology**, and **V3S-A4B.1 — Submerged Riverbed Finish Decoupling** work as intended. **V3S-A4B.2 — Stylized Shore Wet-Finish Shaping and Riverbed/Bank Wetness Transition** is implemented and source-audited; Unity compilation and visual validation are pending. It narrows and strengthens the Shore wet highlight for the production isometric camera by transferring most Shore-added PBR finish into a camera-centred stylized lobe, and adds a short wetness-only Riverbed-to-Bank transition using existing corridor bank distance/domain data. It adds no debug view, River/water edit, profile schema/asset edit, texture, scene, prefab, material, geometry, or runtime field. **V4 — Contact / Edge Accents** remains queued after V3S and excludes River sources.
 
 The accepted current pipeline is:
 
@@ -45,12 +45,12 @@ Ground or scene no longer needs its bake
 
 ## Next work items
 
-1. Unity-compile V3S-A4A and both Ground/generic Pixel Surface shader consumers.
-2. Validate one visibly distinct Riverbed layer against unchanged mode `32` support.
-3. Verify strength `0`, `0.5`, and `1` changes only dry substrate while submerged cover remains excluded.
-4. Verify Bank modes `33`/`35`, Shore wetness modes `38`/`39`, and raw Painted Accent modes `28–29` remain unchanged.
-5. Refresh material properties and regenerate Ground once; no River rebuild or ordinary-Ground spill may occur.
-6. Only after A4A acceptance, formalize A4B separately; Riverbed hydrology remains unauthorized.
+1. Implement A4B.2 exactly from the canonical plan in `Ground_River_Coupled_Surface_Response_Architecture.md`.
+2. Preserve A4B.1 Riverbed finish decoupling; the new stylized highlight is Shore-only.
+3. Validate the camera-centred Shore highlight in both Scene and production Game cameras without adding a camera reference.
+4. Validate the Riverbed-to-Bank wetness transition at `0`, `0.20`, and `0.50 m` with the water surface hidden.
+5. Confirm exact debug names `Ground Local Shore Wetness` and `Ground Effective Wetness` retain their existing entries and no new mode is added.
+6. Do not begin V3S-A5 or water-reflection work until A4B.2 is Unity-accepted.
 
 ---
 
@@ -121,11 +121,11 @@ The implementation now captures Create/Duplicate requests only during Inspector 
 The spatially correct local Shore wetness and effective wetness fields remain unchanged. A3B.2 preserves the existing global-weather coefficients, removes hidden `0.18` and `0.22` attenuation from local modifier darkening and smoothness, applies local specular as an additive absolute contribution after dry substrate resolution, and consolidates modifier definition plus spatial application under one Shore Hydrology foldout. Existing modes `38–39` remain byte-for-byte unchanged; no debug mode was added. The exact six-file implementation passed the canonical `44/44` source contract audit, C# and HLSL parser checks, line-ending checks, and isolated Clang HLSL expression checks. The user subsequently confirmed the calibrated normal-render response and consolidated Inspector behavior; A3B.2 is accepted.
 
 
-## V3S-A4A — Riverbed dry substrate and submerged-cover exclusion
+## V3S-A4A / A4A.1 / A4B — Riverbed composition completion
 
-**Status:** implemented from the canonical plan and source-audited; Unity compilation and visual validation are pending.
+**Status:** A4A is Unity-observed but not accepted as the final composition baseline. A4A.1 and A4B are implemented and source/compliance audited; Unity compilation and visual validation are pending.
 
-A4A activates the existing Riverbed Surface Layer on exact role-gated Riverbed Support with one `Riverbed Material Strength` control defaulting to `1.00`. It composes only dry profile palette/contrast/smoothness/specular after Bank material, then forces vegetation, snow, frost, and rendered Painted Accent retention to zero on Riverbed Support. Cover exclusion remains active when the profile is inherited or strength is zero. Existing mode `32` is the only required spatial proof. A4A adds no Riverbed hydrology, new debug view, River change, texture/noise sample, geometry, renderer, draw call, profile-schema edit, or asset edit. The exact twelve-file scope, evidence, sequence, invariants, implementation result, `146/146` final contract audit, risks, and pending Unity validation gate are canonical in `Ground_River_Coupled_Surface_Response_Architecture.md`.
+A4A proved exact role-gated `Ground Riverbed Support`, dry custom Riverbed profile transport, and submerged vegetation/snow/frost/Painted Accent exclusion. A4A.1 replaces its sequential Bank-then-Riverbed albedo/finish lerps with one normalized primary/Bank/Riverbed weight triplet, adds migration-safe `Primary Ground`, `Inherit Bank Surface Layer`, and `Custom Riverbed Surface Layer` ownership, and consolidates the main Inspector into `River-Coupled Ground Response — River Bank` and `River-Coupled Ground Response — Riverbed`. A4B adds exact-support Riverbed wetness with inherited/custom/disabled hydrology ownership and one `Riverbed Wetness Strength`; no reach/fade/depth mechanic or debug view is added. `Ground Effective Wetness` now includes global, Shore, and Riverbed wetness, while `Ground Local Shore Wetness` remains Bank-only. The exact implementation and validation contract is canonical in `Ground_River_Coupled_Surface_Response_Architecture.md`.
 
 ## V3R-A1 — Ground Elevation Readability proof
 

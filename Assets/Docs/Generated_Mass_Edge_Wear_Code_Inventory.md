@@ -1447,3 +1447,49 @@ The ordinary coexistence search also owns a five-second audit budget and cancell
 `SetEditorEdgeWearAuditCancellationProbe` is a transient, nonserialized editor-validation hook. Matrix evaluation installs a cancelable-progress callback only for the synchronous case generation and clears it in `finally`. A cancellation detected inside a search prevents the partially evaluated case from being appended to the matrix.
 
 Suite and report contracts advance to R13A.3. Owner-face boundary resolution, provisional-width evidence, the five mandatory outlier fixtures, GM-R12B.1E channel guards, and the R12B.1 artistic policy remain unchanged.
+
+
+## EW-B4.2R13A.4 certified-baseline augmentation inventory
+
+R13A.3 runtime validation proved that the single-search execution guard prevented editor lockup, but it returned `31/33` topology, `31/33` artistic-preview, `0/5` outlier recovery, erased the live seed-8889 preview when augmentation failed, and withheld comprehensive evidence because two maximum-width cases returned empty audit records. R13A.4 therefore changes recovery from a replacement solve into an optional augmentation of an already certified baseline.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`TryAuditCertifiedBaselineAugmentation` first evaluates and retains a complete certified baseline with selected width-recovery provisional edges forced off. Corner-inactive recovery participants are then added to the recovery set from the baseline corner-conflict evidence. If no recoverable participant exists, the certified baseline is returned directly.
+
+Optional augmentation starts from the baseline exclusion set with only recovery edges re-enabled. Every trial uses a cloned lifecycle audit and disables kernel coexistence recursion, so only one bounded frontier is active. A candidate may replace the baseline only when it is fully certified, materializes at least one previously absent recovery edge, and is superior by certified count, accepted R12B.1 artistic score, then certified width. Timeout, state exhaustion, cancellation, or no superior state returns the immutable baseline and records explicit augmentation evidence; it never clears a valid preview or matrix record.
+
+`PlaneCutBevelAuditResult` now publishes baseline-certified/applied and augmentation attempted/applied, state/frontier, elapsed-time, timeout/cancellation, last failure, and implicated-edge evidence.
+
+### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+The complete owner-face boundary solver remains authoritative. When the two exact rails at one endpoint resolve through different support faces, `TryBuildBoundedMultiSupportPlaneCutFaces` constructs the endpoint interval with one exact bevel half-space cut rather than requiring one shared support face. The two selected source-edge endpoints are removed while every other source vertex is required to remain, every source face retains provenance, one bounded bevel cap is required, and all four solved rail points are retained on the cap boundary.
+
+The multi-support path records both support-face terminals per endpoint, the exact cut plane, modified support interval count, and boundary-path vertex count. It remains subject to the existing strict intersection, source-provenance, owner/support modification, manifold topology, containment, convexity, bounds, volume, face-intersection, sidedness, triangulation, and render-channel audits. Ordinary same-support endpoint construction remains unchanged.
+
+### Diagnostics, editor, and contracts
+
+`MassGenerator.EdgeWear.Diagnostics.Logging.cs` publishes the baseline/augmentation and multi-support endpoint fields in the existing compact audit records. `GeneratedMassEditor.cs` advances suite, topology, preview, and comprehensive contracts to R13A.4. The five named editor-only outlier fixtures remain mandatory; no production seed or source-edge-ID policy is introduced.
+
+No shared `MeshData`, `MeshBuilder`, shader, material, UV, scene, prefab, artistic-score, Coverage-count, or production generation-contract change is part of R13A.4.
+
+
+## EW-B4.2R13A.6 retained-point hull and finalized corner recovery inventory
+
+R13A.4 remains the stable incomplete runtime baseline. R13A.5 is rejected because its sampled two-plane family recovered `0/5`, changed certified edge identity without recovering a named target, and failed to capture any finalized `corner-width-inactive` participant.
+
+### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+The R13A.4 ordinary and same-support paths remain unchanged. Multi-support recovery now constructs the exact retained point set: every original source vertex except the two selected-edge endpoints, plus the four exact solved rail terminals. The existing bounded convex-hull plane extractor enumerates all non-degenerate point triples, retains only global supporting planes, merges coplanar planes, and emits however many facets the retained point set requires. Source-plane facets retain complete `SourceFace` provenance; all new supporting facets are attributed to the selected bounded bevel.
+
+The retained hull is accepted only when both selected endpoints disappear, all four rails lie on the connected bevel-band boundary, every source face remains uniquely represented, both owner faces and only endpoint-star support faces change, and all existing preparation, topology, strict-intersection, containment, convexity, bounds, volume, face-quality, triangulation, and render-channel checks pass. Compact evidence records point, plane, supporting-triple, bevel-facet, and adjacency counts.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`, `Types.cs`, and `Orchestration.cs`
+
+Corner recovery evidence is captured at the exact finalized transition to `corner-width-inactive`, before lifecycle deactivation. The record retains the last positive width, collapsed shared edge, uniform scale, and exact conflict participants. Recovery no longer requires the target to remain artistically eligible after final corner collapse.
+
+Generic width-provisional edges cannot initiate augmentation. The only production recovery classes are a successfully certified multi-support retained hull and a finalized corner-inactive participant. Every retained-hull edge is removed from the immutable baseline solve even when its certified hull width satisfies the ordinary requested-width fraction; it can enter only through the audited augmentation path. Recovery targets remain protected from branch deferral. An augmented result may replace the R13A.4 baseline only when it certifies at least one recovery target, does not reduce total certified count, and loses no baseline edge outside the exact participant set of a recovered corner target. This forbids unrelated substitutions such as the rejected seed-8889 edge `39` to edge `40` exchange.
+
+### Contracts
+
+Editor suite, topology, preview, and comprehensive contracts advance to `EW-B4.2R13A.6`. No scene, prefab, material, shader, UV, shared mesh builder, artistic-score formula, layer, tag, or production generation-contract change is included.

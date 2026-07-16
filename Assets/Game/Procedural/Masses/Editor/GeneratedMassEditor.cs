@@ -1523,7 +1523,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-B4.2R13A.3-suite");
+            builder.AppendLine("contract=EW-B4.2R13A.6-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -1870,7 +1870,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             reportBuilder.AppendLine(
                 "GeneratedMass comprehensive artistic selection evidence");
             reportBuilder.AppendLine(
-                "contract=EW-B4.2R13A.3-comprehensive");
+                "contract=EW-B4.2R13A.6-comprehensive");
             reportBuilder.Append("cases=");
             reportBuilder.AppendLine(expectedCaseCount.ToString());
             reportBuilder.Append("scenariosPerCase=");
@@ -5958,8 +5958,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
-                ? "EW-B4.2R13A.3-topology"
-                : "EW-B4.2R13A.3-preview";
+                ? "EW-B4.2R13A.6-topology"
+                : "EW-B4.2R13A.6-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *

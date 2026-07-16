@@ -48,15 +48,32 @@ per-object Build/Hold/Progressive Release/Rest scheduling = accepted through 5.1
 thin source width and D3D11-safe Arc/Semi-Arc compute = accepted through 5.18H.2;
 event-owned analytic open-C bridge plus straight downstream wake arms = Unity-validated through 5.18H.4;
 distinct signed contact fit = Unity-observed through 5.18H.5;
-mesh-fitted full Arcs and true one-half Semi-Arcs = implemented through 5.18H.6, Unity validation pending;
-Remaining-Life erosion formulas = unchanged by 5.18E, 5.18F.1, 5.18G, 5.18G.1, 5.18H, 5.18H.4, 5.18H.5, and 5.18H.6;
+mesh-fitted full Arcs and true one-half Semi-Arcs = implemented through 5.18H.6; thin front-persistent Semi-Arc lifecycle correction = implemented through 5.18H.6.2, Unity validation pending;
+Remaining-Life erosion formulas = unchanged by 5.18E, 5.18F.1, 5.18G, 5.18G.1, 5.18H, 5.18H.4, 5.18H.5, 5.18H.6, 5.18H.6.1, and 5.18H.6.2;
 dedicated Fray/fine-fragment work = retired;
 all River performance optimization = deferred to one later comprehensive River performance pass.
 ```
 
 No scene, prefab, material, `.meta`, Ground, or Generated Mass file is part of this documentation reconciliation.
 
-## Mesh-Fitted Arc Paths and True Half-C Semi-Arcs — `4.11C.5.18H.6` — implemented, Unity validation pending
+## Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle — `4.11C.5.18H.6.2` — implemented, Unity validation pending
+
+`5.18H.6.2` restores the exact `5.18H.6` five-point waterline profile and exact `0.34`/`0.38` strong-width/feather contract. The rejected H.6.1 exterior support envelope, event-time clearance expansion, and `0.55` feather are absent.
+
+Semi-Arc lifecycle path coordinates are front-first: the physical front has path coordinate zero, the selected shoulder follows, and the sole downstream arm tip has path coordinate one. Accumulated Build therefore establishes front coverage immediately; reverse Release removes the arm first and front last. Full Arc path order is unchanged. Actual segment-length splits reuse existing object-ribbon lanes and source-fill is disabled for Arc/Semi events.
+
+## Front-Persistent Semi-Arc Release and Exterior Contact Envelope — `4.11C.5.18H.6.1` — Unity-rejected regression; superseded by `5.18H.6.2`
+
+Unity runtime validation of `5.18H.6` accepted the mesh-fitted Arc/Semi-Arc direction but found intermittent Semi-Arc states with a downstream arm and no visible physical-front source. `5.18H.6.1` corrects the two proven causes while preserving the accepted terminal-to-terminal Build order.
+
+- Semi-Arc uses same-order progressive Release. The arm terminal retracts first, then the arm retracts toward its shoulder, and the selected front half remains until the final release interval. Early Build may still begin as an arm-only terminal segment by design.
+- The cached exact waterline contour is reduced to an exterior five-point support envelope rather than interior convex chords. Signed Along-Flow fit translates the complete profile; signed Across-River fit scales it uniformly about the object centre, preserving asymmetry without collapsing one randomly selected half.
+- Event construction applies a cell-aware outward centreline clearance equal to the existing `0.34`-cell strong ribbon radius. Shared miter joints reject out-of-range intersections and remain upstream of both adjacent shifted support lines. The shader strong row remains `0.34` local normal cell; profile feather is `0.55` cell, giving an approximately `0.89`-cell outer radius required by the expanded anisotropic obstacle-equivalent connectivity audit.
+- Actual within-half segment-length splits reuse `variation.x` and `kinematics.w` for Arc/Semi events. The seven-`Vector4` GPU event layout, kernels, textures, buffers, dispatches, and material-update work remain unchanged.
+
+Mechanical validation passed 5,000 randomized convex profiles, 180 anisotropic obstacle-equivalent raster cases, 1,640 Build/Release phase checks, C# parser validation, changed-function HLSL parse/code generation, kernel/resource parity, and unchanged unrelated source evaluators. Unity 6000.5.0f1 C# compilation, D3D11 import, runtime visual validation, and profiler confirmation remain authoritative and pending.
+
+## Mesh-Fitted Arc Paths and True Half-C Semi-Arcs — `4.11C.5.18H.6` — Unity-observed baseline; release/envelope refined by `5.18H.6.1`
 
 Unity validation of `5.18H.5` confirmed that signed contact-fit controls worked, but rejected its remaining geometry assumptions: Semi-Arc still traversed the complete shoulder-to-shoulder connector, and both source types followed a bounds-derived half-ellipse rather than the generated object's waterline shape.
 

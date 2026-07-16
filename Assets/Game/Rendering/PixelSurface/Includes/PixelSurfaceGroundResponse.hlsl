@@ -154,51 +154,100 @@
                     composedWetness);
             }
 
+            float ResolveGroundRiverbedWetness(
+                Varyings input)
+            {
+                float support = ResolveGroundRiverbedSupportMask(input);
+                float blendDistance =
+                    max(0.0, _GroundRiverbedWetnessTransition.x);
+                float blendEnabled = step(0.0001, blendDistance);
+                float distance01 = saturate(
+                    ResolveGroundRiverBankDistance(input) /
+                    max(0.0001, blendDistance));
+                float linearWeight = 1.0 - distance01;
+                float smoothDistance =
+                    distance01 *
+                    distance01 *
+                    (3.0 - 2.0 * distance01);
+                float smoothWeight = 1.0 - smoothDistance;
+                float transitionWeight =
+                    blendEnabled *
+                    ResolveGroundRiverBankDomain(input) *
+                    lerp(
+                        linearWeight,
+                        smoothWeight,
+                        saturate(_GroundRiverbedWetnessTransition.y));
+
+                return saturate(
+                    saturate(_GroundRiverbedHydrologyEnabled) *
+                    saturate(_GroundRiverbedWetnessStrength) *
+                    saturate(support + transitionWeight));
+            }
+
             float ResolveGroundEffectiveWetness(
-                float localShoreWetness)
+                float localShoreWetness,
+                float riverbedWetness)
             {
                 return ResolveGroundBoundedUnion(
-                    saturate(_Wetness),
-                    localShoreWetness);
+                    ResolveGroundBoundedUnion(
+                        saturate(_Wetness),
+                        localShoreWetness),
+                    riverbedWetness);
             }
 
             float ResolveGroundEffectiveWetness(
                 Varyings input)
             {
                 return ResolveGroundEffectiveWetness(
-                    ResolveGroundLocalShoreWetness(input));
+                    ResolveGroundLocalShoreWetness(input),
+                    ResolveGroundRiverbedWetness(input));
             }
 
             float ResolveGroundCombinedWetPixelSoftening(
-                float localShoreWetness)
+                float localShoreWetness,
+                float riverbedWetness)
             {
                 return ResolveGroundBoundedUnion(
-                    saturate(_Wetness) *
-                        saturate(_WetPixelSoftening),
-                    localShoreWetness *
-                        saturate(_GroundShoreHydrologyCharacterA.z));
+                    ResolveGroundBoundedUnion(
+                        saturate(_Wetness) *
+                            saturate(_WetPixelSoftening),
+                        localShoreWetness *
+                            saturate(_GroundShoreHydrologyCharacterA.z)),
+                    riverbedWetness *
+                        saturate(_GroundRiverbedHydrologyCharacterA.z));
             }
 
             float ResolveGroundCombinedWetDarkening(
-                float localShoreWetness)
+                float localShoreWetness,
+                float riverbedWetness)
             {
                 return ResolveGroundBoundedUnion(
-                    saturate(_Wetness) *
-                        saturate(_WetDarkenStrength) *
-                        0.18,
-                    localShoreWetness *
-                        saturate(_GroundShoreHydrologyCharacterA.y));
+                    ResolveGroundBoundedUnion(
+                        saturate(_Wetness) *
+                            saturate(_WetDarkenStrength) *
+                            0.18,
+                        localShoreWetness *
+                            saturate(_GroundShoreHydrologyCharacterA.y)),
+                    riverbedWetness *
+                        saturate(_GroundRiverbedHydrologyCharacterA.y));
             }
 
             float ResolveGroundCombinedWetSmoothnessBoost(
-                float localShoreWetness)
+                float localShoreWetness,
+                float riverbedWetness)
             {
                 return ResolveGroundBoundedUnion(
-                    saturate(_Wetness) *
-                        saturate(_WetSmoothnessBoost) *
-                        0.22,
-                    localShoreWetness *
-                        saturate(_GroundShoreHydrologyCharacterA.w));
+                    ResolveGroundBoundedUnion(
+                        saturate(_Wetness) *
+                            saturate(_WetSmoothnessBoost) *
+                            0.22,
+                        localShoreWetness *
+                            saturate(_GroundShoreHydrologyCharacterA.w) *
+                            (1.0 - saturate(
+                                _GroundShoreWetHighlightShaping.z))),
+                    riverbedWetness *
+                        saturate(_GroundRiverbedHydrologyCharacterA.w) *
+                        saturate(_GroundRiverbedWetSmoothnessResponse));
             }
 
             float ResolveGroundGlobalWetSpecularMultiplier()
@@ -206,30 +255,72 @@
                 return 1.0 + saturate(_Wetness) * 0.025;
             }
 
-            float ResolveGroundLocalWetSpecularBoost(
+            float ResolveGroundLocalShoreWetSpecularBoost(
                 float localShoreWetness)
             {
                 return
                     saturate(localShoreWetness) *
-                    saturate(_GroundShoreHydrologyCharacterB.x);
+                    saturate(_GroundShoreHydrologyCharacterB.x) *
+                    (1.0 - saturate(
+                        _GroundShoreWetHighlightShaping.z));
+            }
+
+            float ResolveGroundRiverbedWetSpecularBoost(
+                float riverbedWetness)
+            {
+                return
+                    saturate(riverbedWetness) *
+                    saturate(_GroundRiverbedHydrologyCharacterB.x) *
+                    saturate(_GroundRiverbedWetSpecularResponse);
             }
 
             float ResolveGroundSnowHydrologyRetention(
-                float localShoreWetness)
+                float localShoreWetness,
+                float riverbedWetness)
             {
-                return saturate(
+                float shoreRetention = saturate(
                     1.0 -
                     localShoreWetness *
                     saturate(_GroundShoreHydrologyCharacterB.y));
+                float riverbedRetention = saturate(
+                    1.0 -
+                    riverbedWetness *
+                    saturate(_GroundRiverbedHydrologyCharacterB.y));
+                return shoreRetention * riverbedRetention;
             }
 
             float ResolveGroundFrostHydrologyRetention(
-                float localShoreWetness)
+                float localShoreWetness,
+                float riverbedWetness)
             {
-                return saturate(
+                float shoreRetention = saturate(
                     1.0 -
                     localShoreWetness *
                     saturate(_GroundShoreHydrologyCharacterB.z));
+                float riverbedRetention = saturate(
+                    1.0 -
+                    riverbedWetness *
+                    saturate(_GroundRiverbedHydrologyCharacterB.z));
+                return shoreRetention * riverbedRetention;
+            }
+
+            float3 ResolveGroundSubstrateCompositionWeights(
+                float bankMaterialBlend,
+                float riverbedMaterialBlend)
+            {
+                float rawBank = saturate(bankMaterialBlend);
+                float rawRiverbed = saturate(riverbedMaterialBlend);
+                float rawTotal = rawBank + rawRiverbed;
+                float secondaryCoverage = saturate(rawTotal);
+                float normalization = rawTotal > 0.0001
+                    ? secondaryCoverage / rawTotal
+                    : 0.0;
+
+                return saturate(
+                    float3(
+                        1.0 - secondaryCoverage,
+                        rawBank * normalization,
+                        rawRiverbed * normalization));
             }
 
             float3 ResolveGroundBankZoneWeights(

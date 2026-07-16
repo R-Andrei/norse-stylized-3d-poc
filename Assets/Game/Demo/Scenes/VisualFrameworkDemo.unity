@@ -15,15 +15,15 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 0
-  m_FogColor: {r: 0.70485145, g: 0.73891, b: 0.7397363, a: 1}
+  m_FogColor: {r: 0.7067114, g: 0.74565244, b: 0.7476412, a: 1}
   m_FogMode: 3
   m_FogDensity: 0
   m_LinearFogStart: 30
   m_LinearFogEnd: 125
-  m_AmbientSkyColor: {r: 0.7036159, g: 0.73106945, b: 0.719512, a: 1}
+  m_AmbientSkyColor: {r: 0.7103583, g: 0.74222934, b: 0.7320668, a: 1}
   m_AmbientEquatorColor: {r: 0.4, g: 0.45490196, b: 0.49019608, a: 1}
   m_AmbientGroundColor: {r: 0.20392157, g: 0.23921569, b: 0.2627451, a: 1}
-  m_AmbientIntensity: 0.53421396
+  m_AmbientIntensity: 0.54014266
   m_AmbientMode: 3
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
   m_SkyboxMaterial: {fileID: 2100000, guid: ccd231bc029a57146a49620e30c9f207, type: 2}
@@ -35,7 +35,7 @@ RenderSettings:
   m_DefaultReflectionMode: 0
   m_DefaultReflectionResolution: 128
   m_ReflectionBounces: 1
-  m_ReflectionIntensity: 0.43421397
+  m_ReflectionIntensity: 0.44014263
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 410087040}
   m_UseRadianceAmbientProbe: 0
@@ -2432,7 +2432,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609313, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: -0.28, y: 22.380001, z: -29.779999}
+  m_LocalPosition: {x: 7.84, y: 22.380001, z: -36.17}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2655,8 +2655,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 1
-  m_Color: {r: 0.9306473, g: 0.9430388, b: 0.86523163, a: 1}
-  m_Intensity: 1.126321
+  m_Color: {r: 0.92576486, g: 0.95117617, b: 0.8819714, a: 1}
+  m_Intensity: 1.135214
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -3225,6 +3225,10 @@ MonoBehaviour:
     vegetationTintStrength: 0.08
     bankSurfaceLayer: {fileID: 0}
     riverbedSurfaceLayer: {fileID: 0}
+    riverbedSurfaceSource: 0
+    shoreHydrologyModifier: {fileID: 0}
+    riverbedHydrologySource: 0
+    riverbedHydrologyModifier: {fileID: 0}
     bankMaterialStrength: 1
     bankMaterialReach: 0.65
     immediateBankExposure: 0.55
@@ -3233,10 +3237,20 @@ MonoBehaviour:
     outerBankExtension: 0
     outerBankStrength: 0.5
     outerBankFade: 1
+    riverbedMaterialStrength: 1
+    riverbedWetnessStrength: 1
+    riverbedWetSmoothnessResponse: 0
+    riverbedWetSpecularResponse: 0
     vegetationRetreatStrength: 0
     snowMeltStrength: 0
     frostRetreatStrength: 0
     paintedAccentRetreatStrength: 0
+    shoreWetnessStrength: 0
+    shoreWetnessReach: 0.5
+    shoreWetnessFade: 0.25
+    broadBankSaturation: 0.45
+    immediateBankSaturation: 0.8
+    waterlineSaturation: 1
     groundMacroPatchScale: 3.25
     groundMacroPatchPatternSeed: 0
     broadVariation: 0.095
@@ -4522,7 +4536,7 @@ Transform:
   m_GameObject: {fileID: 799756163}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.213, y: -0.139, z: -8.506}
+  m_LocalPosition: {x: -9.213, y: -0.13, z: -8.506}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8030,7 +8044,7 @@ Transform:
   m_GameObject: {fileID: 1321270436}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.116, y: -0.016, z: -5.004}
+  m_LocalPosition: {x: -9.116, y: -0.036, z: -5.004}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8794,7 +8808,7 @@ Transform:
   m_GameObject: {fileID: 1374330458}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.98, y: -0.215, z: -2.06}
+  m_LocalPosition: {x: 0.98, y: -0.353, z: -2.06}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9347,7 +9361,7 @@ Transform:
   m_GameObject: {fileID: 1533091818}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609314, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: -0.28, y: 22.380001, z: -29.779999}
+  m_LocalPosition: {x: 7.84, y: 22.380001, z: -36.17}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -10028,7 +10042,7 @@ Transform:
   m_GameObject: {fileID: 1611485499}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.28, y: 1.13, z: -9.78}
+  m_LocalPosition: {x: 7.84, y: 1.13, z: -16.17}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -10915,6 +10929,8 @@ MonoBehaviour:
   foamObjectContactArcArmReachMax: 0.7
   foamObjectContactArcLengthMinMetres: 0.45
   foamObjectContactArcLengthMaxMetres: 1.6
+  foamObjectContactArcAlongFlowContactOffsetMetres: 0
+  foamObjectContactArcAcrossRiverContactOffsetMetres: 0
   foamObjectContactArcWidthMinMetres: 0.035
   foamObjectContactArcWidthMaxMetres: 0.12
   foamObjectContactArcOffsetMinMetres: 0.015
@@ -10930,6 +10946,8 @@ MonoBehaviour:
   foamObjectContactSemiArcArmReachMax: 0.9
   foamObjectContactSemiArcLengthMinMetres: 0.35
   foamObjectContactSemiArcLengthMaxMetres: 1.25
+  foamObjectContactSemiArcAlongFlowContactOffsetMetres: 0
+  foamObjectContactSemiArcAcrossRiverContactOffsetMetres: 0
   foamObjectContactSemiArcWidthMinMetres: 0.03
   foamObjectContactSemiArcWidthMaxMetres: 0.105
   foamObjectContactSemiArcOffsetMinMetres: 0.02
@@ -13002,7 +13020,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1937438535}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7253028, y: -0.026316807, z: 0.36962625, w: 0.5801894}
+  m_LocalRotation: {x: 0.70986664, y: -0.035983477, z: 0.36881068, w: 0.5989768}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -13603,7 +13621,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Lighting.TimeOfDayController
   profile: {fileID: 11400000, guid: a4668add035e46343af10c84cf3f502f, type: 2}
   secondsPerFullDay: 180
-  currentHour: 13.38
+  currentHour: 13.18
   paused: 1
   timeScale: 1
   useUnscaledTime: 1

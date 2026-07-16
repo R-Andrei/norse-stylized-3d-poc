@@ -160,6 +160,8 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector2 ObjectContactPoint3;
             public Vector2 ObjectContactPoint4;
             public float ObjectContactFrontSplit;
+            public float ObjectContactNegativeFirstSegmentSplit;
+            public float ObjectContactPositiveFirstSegmentSplit;
             public float CentreAcrossNormalized;
             public float LateralPaddingMetres;
         }
@@ -184,13 +186,15 @@ namespace ProgrammaticStylized3D.Rivers
             // x = amount, y = remaining life, z = pattern seed,
             // w = source fill feature size.
             public Vector4 Material;
-            // x = source fill seed; y/z = breakup scale/strength except Object
+            // x = source fill seed except Object Arc/Semi-Arc negative-half
+            // first-segment split; y/z = breakup scale/strength except Object
             // Arc/Semi-Arc contact point 2.y / point 3.x; w = curvature,
             // selected Semi-Arc side, or fragment rotation.
             public Vector4 Variation;
             // x/y = formation speed / moving-head trail except Object Arc/Semi-Arc
             // contact point 3.y / point 4.x; z = source path length metres;
-            // w = source fill blend.
+            // w = source fill blend except Object Arc/Semi-Arc positive-half
+            // first-segment split.
             public Vector4 Kinematics;
             // x = object/free-water centre lateral metres; y/z = object half extents
             // except Object Arc/Semi-Arc contact point 4.y / front split;

@@ -597,15 +597,21 @@ namespace ProgrammaticStylized3D.Rivers
                 Point2 = point2;
                 Point3 = point3;
                 Point4 = point4;
+                float negativeFirstLength = Vector2.Distance(point0, point1);
+                float negativeSecondLength = Vector2.Distance(point1, point2);
+                float positiveFirstLength = Vector2.Distance(point2, point3);
+                float positiveSecondLength = Vector2.Distance(point3, point4);
                 NegativeHalfLength =
-                    Vector2.Distance(point0, point1) +
-                    Vector2.Distance(point1, point2);
+                    negativeFirstLength + negativeSecondLength;
                 PositiveHalfLength =
-                    Vector2.Distance(point2, point3) +
-                    Vector2.Distance(point3, point4);
+                    positiveFirstLength + positiveSecondLength;
                 FrontPathLength = NegativeHalfLength + PositiveHalfLength;
                 FrontSplit = NegativeHalfLength /
                     Mathf.Max(0.001f, FrontPathLength);
+                NegativeFirstSegmentSplit = negativeFirstLength /
+                    Mathf.Max(0.001f, NegativeHalfLength);
+                PositiveFirstSegmentSplit = positiveFirstLength /
+                    Mathf.Max(0.001f, PositiveHalfLength);
                 MinimumX = Mathf.Min(
                     point0.x,
                     Mathf.Min(
@@ -634,6 +640,8 @@ namespace ProgrammaticStylized3D.Rivers
             public float PositiveHalfLength { get; }
             public float FrontPathLength { get; }
             public float FrontSplit { get; }
+            public float NegativeFirstSegmentSplit { get; }
+            public float PositiveFirstSegmentSplit { get; }
             public float MinimumX { get; }
             public float MaximumX { get; }
             public float MaximumAbsoluteY { get; }
@@ -1476,14 +1484,6 @@ namespace ProgrammaticStylized3D.Rivers
                 points[index].x = shoulderBaseline - frontDepth * alongScale;
             }
 
-            points[1] = ResolveTwoSegmentMidpoint(
-                points[0],
-                points[1],
-                points[2]);
-            points[3] = ResolveTwoSegmentMidpoint(
-                points[2],
-                points[3],
-                points[4]);
 
             return new ResolvedAutomaticObjectContactProfile(
                 points[0],
@@ -1491,30 +1491,6 @@ namespace ProgrammaticStylized3D.Rivers
                 points[2],
                 points[3],
                 points[4]);
-        }
-
-        private static Vector2 ResolveTwoSegmentMidpoint(
-            Vector2 point0,
-            Vector2 point1,
-            Vector2 point2)
-        {
-            float firstLength = Vector2.Distance(point0, point1);
-            float secondLength = Vector2.Distance(point1, point2);
-            float halfLength = (firstLength + secondLength) * 0.5f;
-            if (halfLength <= firstLength || secondLength <= 0.0001f)
-            {
-                return Vector2.Lerp(
-                    point0,
-                    point1,
-                    firstLength > 0.0001f
-                        ? Mathf.Clamp01(halfLength / firstLength)
-                        : 0f);
-            }
-
-            return Vector2.Lerp(
-                point1,
-                point2,
-                Mathf.Clamp01((halfLength - firstLength) / secondLength));
         }
 
         private bool TryBeginAutomaticObjectSourceEvent(
@@ -2020,6 +1996,18 @@ namespace ProgrammaticStylized3D.Rivers
                     : Vector2.zero,
                 ObjectContactFrontSplit = contactCycle
                     ? Mathf.Clamp(contactProfile.FrontSplit, 0.001f, 0.999f)
+                    : 0.5f,
+                ObjectContactNegativeFirstSegmentSplit = contactCycle
+                    ? Mathf.Clamp(
+                        contactProfile.NegativeFirstSegmentSplit,
+                        0.001f,
+                        0.999f)
+                    : 0.5f,
+                ObjectContactPositiveFirstSegmentSplit = contactCycle
+                    ? Mathf.Clamp(
+                        contactProfile.PositiveFirstSegmentSplit,
+                        0.001f,
+                        0.999f)
                     : 0.5f,
                 CentreAcrossNormalized = contactCycle
                     ? Mathf.Clamp(source.AcrossNormalized, -1f, 1f)

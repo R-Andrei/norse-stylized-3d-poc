@@ -871,6 +871,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     planeCutAudit.TJunctionCount + "/" +
                     planeCutAudit.InvalidFaceCount + "/" +
                     planeCutAudit.GeometryValid +
+                ",augmentation=" +
+                    "baselineCertified:" +
+                        planeCutAudit.BaselineCertified +
+                    ",baselineApplied:" +
+                        planeCutAudit.BaselineApplied +
+                    ",attempted:" +
+                        planeCutAudit.AugmentationAttempted +
+                    ",applied:" +
+                        planeCutAudit.AugmentationApplied +
+                    ",states:" +
+                        planeCutAudit.AugmentationStatesEvaluated +
+                    ",frontier:" +
+                        planeCutAudit.AugmentationFrontierRemaining +
+                    ",elapsedMs:" +
+                        planeCutAudit.AugmentationElapsedMilliseconds
+                            .ToString("G9", CultureInfo.InvariantCulture) +
+                    ",timeBudgetExceeded:" +
+                        planeCutAudit.AugmentationTimeBudgetExceeded +
+                    ",cancelled:" +
+                        planeCutAudit.AugmentationCancelled +
+                    ",failure:{" +
+                        (string.IsNullOrEmpty(
+                                planeCutAudit.AugmentationFailure)
+                            ? "none"
+                            : planeCutAudit.AugmentationFailure) + "}" +
+                    ",lastFailure:{" +
+                        (string.IsNullOrEmpty(
+                                planeCutAudit.AugmentationLastFailure)
+                            ? "none"
+                            : planeCutAudit.AugmentationLastFailure) + "}" +
+                    ",implicated:{" +
+                        (string.IsNullOrEmpty(
+                                planeCutAudit
+                                    .AugmentationImplicatedEdgeEvidence)
+                            ? "none"
+                            : planeCutAudit
+                                .AugmentationImplicatedEdgeEvidence) + "}" +
                 ",planeTransaction=" +
                     "attempted:" +
                         planeCutAudit.AttemptedPlanesBuilt +
@@ -3912,6 +3949,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(",widthRecoveryProvisional:");
                 builder.Append(
                     record.WidthRecoveryProvisional ? '1' : '0');
+                builder.Append(",multiSupportHullRecovery:");
+                builder.Append(
+                    record.MultiSupportHullRecovery ? '1' : '0');
                 builder.Append(",endpointSpan:");
                 builder.Append(record.EndpointSpanValid ? '1' : '0');
                 builder.Append('}');
@@ -4007,6 +4047,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ? "none"
                     : record.IsolatedDiagnostic);
                 builder.Append('}');
+                builder.Append(",cornerRecovery={provisional:");
+                builder.Append(
+                    lifecycle.CornerRecoveryProvisional ? '1' : '0');
+                builder.Append(",lastPositiveWidth:");
+                builder.Append(
+                    lifecycle.CornerRecoveryLastPositiveWidth
+                        .ToString("G9"));
+                builder.Append(",collapsedEdge:");
+                builder.Append(
+                    lifecycle.CornerRecoveryCollapsedSourceEdgeIndex);
+                builder.Append(",uniformScale:");
+                builder.Append(
+                    lifecycle.CornerRecoveryUniformScale.ToString("G9"));
+                builder.Append(",participants:{");
+                builder.Append(string.IsNullOrEmpty(
+                        lifecycle.CornerRecoveryParticipants)
+                    ? "none"
+                    : lifecycle.CornerRecoveryParticipants);
+                builder.Append("}}");
                 builder.Append(",failureReason=");
                 builder.AppendLine(string.IsNullOrEmpty(record.FailureReason)
                     ? "none"
@@ -4729,7 +4788,59 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         audit.EndpointSupportClipAttemptedCount +
                     ",clipped:" + audit.EndpointSupportClipCount +
                     ",faceA:" + audit.EndpointSupportFaceA +
+                    ",additionalFaceA:" +
+                        audit.EndpointSupportAdditionalFaceA +
                     ",faceB:" + audit.EndpointSupportFaceB +
+                    ",additionalFaceB:" +
+                        audit.EndpointSupportAdditionalFaceB +
+                    ",multiFaceEndpoints:" +
+                        audit.EndpointSupportMultiFaceEndpointCount +
+                    ",expectedSupportFacesModified:" +
+                        audit.EndpointSupportModifiedFaceExpectedCount +
+                    ",multiSupportPlaneCut:" +
+                        audit.MultiSupportPlaneCut +
+                    ",multiSupportPlaneCount:" +
+                        audit.MultiSupportPlaneCount +
+                    ",multiSupportCandidates:" +
+                        audit.MultiSupportPlaneChainCandidateCount +
+                    ",multiSupportForeignRejects:" +
+                        audit.MultiSupportPlaneForeignVertexRejectCount +
+                    ",multiSupportFirstForeignVertex:" +
+                        audit.MultiSupportPlaneFirstForeignVertex +
+                    ",multiSupportMaximumForeignDistance:" +
+                        audit.MultiSupportPlaneMaximumForeignDistance
+                            .ToString("G9") +
+                    ",multiSupportSplit:" +
+                        audit.MultiSupportPlaneSplitA.ToString("G9") +
+                        "/" +
+                        audit.MultiSupportPlaneSplitB.ToString("G9") +
+                    ",multiSupportCapAdjacency:" +
+                        audit.MultiSupportPlaneCapAdjacencyCount +
+                    ",multiSupportHullPoints:" +
+                        audit.MultiSupportHullPointCount +
+                    ",multiSupportHullPlanes:" +
+                        audit.MultiSupportHullPlaneCount +
+                    ",multiSupportHullBevelFaces:" +
+                        audit.MultiSupportHullBevelFaceCount +
+                    ",multiSupportHullTriples:" +
+                        audit.MultiSupportHullTriplesTested +
+                    ",multiSupportHullSupportingTriples:" +
+                        audit.MultiSupportHullSupportingTriples +
+                    ",multiSupportHullEvidence:{" +
+                        (audit.MultiSupportHullEvidence ?? string.Empty) +
+                        "}" +
+                    ",multiSupportPlaneNormal:" +
+                        FormatBoundedAuditVector(
+                            audit.MultiSupportPlaneNormal) +
+                    ",multiSupportPlaneDistance:" +
+                        audit.MultiSupportPlaneDistance.ToString("G9") +
+                    ",multiSupportPlaneNormalB:" +
+                        FormatBoundedAuditVector(
+                            audit.MultiSupportPlaneNormalB) +
+                    ",multiSupportPlaneDistanceB:" +
+                        audit.MultiSupportPlaneDistanceB.ToString("G9") +
+                    ",boundaryPathVertices:" +
+                        audit.EndpointSupportBoundaryPathVertexCount +
                     ",graphFaceA:" +
                         audit.EndpointSupportGraphFaceA +
                     ",graphFaceB:" +

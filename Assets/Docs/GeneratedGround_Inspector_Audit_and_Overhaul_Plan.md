@@ -6,6 +6,8 @@
 
 This document closes only the GeneratedGround Inspector overhaul and the Painted Accent authoring, rendering, production-bake, build-validation, and generated-asset lifecycle. It does not declare the Ground visual system complete. V3M Broad Macro Patch Completion and V3R Ground Elevation Readability are accepted. The active Ground milestone is V3S River-Coupled Ground Response, recorded in `Ground_River_Coupled_Surface_Response_Architecture.md`; V4 Contact / Edge Accents remains queued afterward and excludes River sources.
 
+The implemented V3S Inspector correction replaces the five scattered River-coupled foldouts with exactly two region-oriented groups: `River-Coupled Ground Response — River Bank` and `River-Coupled Ground Response — Riverbed`. The Bank group owns Bank substrate, coverage, cover response, and Shore wetness. The Riverbed group owns explicit surface-source inheritance, custom Riverbed profile authoring, submerged-cover status, and exact-support Riverbed hydrology. Unity validation accepts this grouping. V3S-A4B.1 implements one compact `Submerged Finish` subsection under Riverbed Wetness containing only `Smoothness Response` and `Specular Response`, both defaulting to zero; Unity validation is pending. Inline profile editors remain collapsed by default, and the delayed asset-creation workflow introduced by A3B.1 remains mandatory. No new debug view, asset workflow, profile field, or top-level foldout is part of A4B.1.
+
 Accepted implementation status:
 
 - **GI-A1 — Inspector skeleton and authority correction:** Unity-validated and accepted.
@@ -1282,6 +1284,32 @@ CS0103: The name 'StringComparer' does not exist in the current context
 The audit report sorts confirmed orphan paths with `StringComparer.OrdinalIgnoreCase`, but the file did not import `System`. PA-B4.1 adds the missing `using System;` directive. No audit classification, deletion, scene handling, generated-asset ownership, or runtime behavior changed.
 
 Validation for this hotfix also scans the complete PA-B4 editor file set for unqualified `System` framework symbols whose source file lacks the required namespace import. Unity compilation remains the authoritative semantic validation gate.
+
+# V3S-A4B.2 Inspector extension — implemented and source-audited
+
+The two accepted region foldouts remain authoritative. A4B.2 adds only these nested groups:
+
+```text
+River-Coupled Ground Response — River Bank
+└── Shore Wetness
+    └── Wet Highlight Shaping
+        ├── Wet Highlight Strength
+        ├── Wet Highlight Tightness
+        ├── Camera-Centred Bias
+        └── Vertical Falloff
+
+River-Coupled Ground Response — Riverbed
+└── Wetness
+    ├── Wetness Transition
+    │   ├── Riverbed-to-Bank Blend Distance
+    │   └── Riverbed-to-Bank Blend Softness
+    └── Submerged Finish
+```
+
+The modifier selectors, delayed Create/Duplicate workflow, local/shared ownership, substrate controls, cover controls, and all unrelated Ground groups remain unchanged. No top-level foldout or debug control is added. The Riverbed transition controls disable while local Riverbed hydrology is unavailable; a zero distance preserves exact-support behavior.
+
+Implementation verification confirms all six controls are bound in both local-override and shared-style paths, preserve the two accepted region foldouts, and retain the delayed asset-creation workflow. Unity compilation and visual validation remain pending.
+
 
 # Inspector and Painted Accent workstream closure — 2026-07-15
 

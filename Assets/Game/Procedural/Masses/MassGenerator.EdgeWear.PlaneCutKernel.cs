@@ -735,6 +735,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int CoexistenceSearchMaximumDepth;
             public int CoexistenceSearchFrontierRemaining;
             public int CoexistenceSearchWinningDepth;
+            public int BaselineCertified;
+            public int BaselineApplied;
+            public int AugmentationAttempted;
+            public int AugmentationApplied;
+            public int AugmentationStatesEvaluated;
+            public int AugmentationFrontierRemaining;
+            public int AugmentationTimeBudgetExceeded;
+            public int AugmentationCancelled;
+            public double AugmentationElapsedMilliseconds;
+            public string AugmentationFailure;
+            public string AugmentationLastFailure;
+            public string AugmentationImplicatedEdgeEvidence;
             public int CoexistenceCandidateConservationFailureCount;
             public string CoexistenceCandidateExpectedEvidence;
             public string CoexistenceCandidateActualEvidence;

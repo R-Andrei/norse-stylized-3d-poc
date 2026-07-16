@@ -1,3 +1,21 @@
+# 2026-07-16 — River Foam `4.11C.5.18H.6.2` Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle
+
+Status: implemented in source; mechanical validation passed; Unity validation pending.
+
+Unity rejected `5.18H.6.1`: its exterior support envelope plus `0.55`-cell profile feather produced visibly double-thick fronts and still permitted arm-only Semi-Arc Build states. `5.18H.6.2` restores the exact `5.18H.6` five-point mesh-waterline profile and its unchanged `0.34`-cell strong width / `0.38`-cell feather. No exterior support envelope, event-time clearance expansion, or thickness coefficient change remains.
+
+Semi-Arc progression is now front-first during Build and arm-first during Release: physical front → selected face half → shoulder → downstream arm tip, then the reverse removal order. Actual segment lengths are packed through existing Arc/Semi-local event lanes so progression remains distance-faithful without source-fill interference. Full Arc terminal-to-terminal progression is unchanged.
+
+No texture, channel, buffer, GPU-event vector, kernel, dispatch, scene, prefab, material, `.asset`, `.meta`, Ground, GeneratedMass, or RiverCorridor implementation change is introduced. Unity 6000.5.0f1 compilation, D3D11 import, runtime thickness, lifecycle, and profiler confirmation remain authoritative and pending.
+
+# 2026-07-16 — River Foam `4.11C.5.18H.6.1` Front-Persistent Semi-Arc Release and Exterior Contact Envelope
+
+Status: Unity-rejected regression; superseded by `5.18H.6.2`.
+
+Unity runtime validation of `5.18H.6` accepted mesh-fitted Arc geometry but exposed intermittent Semi-Arc arm-only states. The patch changes Semi-Arc Release to remove the arm first and preserve the selected physical-front half until the final interval. Exact waterline samples now form an exterior support envelope, signed fit preserves the complete asymmetric profile, and event construction applies raster-aware outward clearance with stable exterior miter joints. Actual within-half segment splits reuse existing Arc/Semi-local lanes. The profile strong width remains `0.34` cell and continuity feather becomes `0.55` cell.
+
+No texture, channel, buffer, GPU-event vector, kernel, dispatch, material-update mesh scan, scene, prefab, material, `.asset`, `.meta`, Ground, GeneratedMass, or RiverCorridor change is introduced. Mechanical validation passed 5,000 randomized profiles, 180 anisotropic obstacle-equivalent raster cases, and 1,640 phase checks with zero front-coverage, connectivity, exterior-clearance, downstream-centre, or monotonicity failures. Unity 6000.5.0f1 C# compilation, D3D11 import, runtime behavior, and profiler confirmation remain pending.
+
 # 2026-07-16 — River Foam `4.11C.5.18H.6` Mesh-Fitted Arc Paths and True Half-C Semi-Arcs
 
 Status: implemented in source; mechanical validation passed; Unity compilation, D3D11 compute import, runtime visual validation, and profiler confirmation pending.

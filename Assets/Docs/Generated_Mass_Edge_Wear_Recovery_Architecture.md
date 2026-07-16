@@ -1607,3 +1607,79 @@ EW-B4.2R13A.3-topology
 EW-B4.2R13A.3-preview
 EW-B4.2R13A.3-comprehensive
 ```
+
+
+## EW-B4.2R13A.4 — certified baseline plus optional recovery augmentation
+
+R13A.3 established a responsive five-second search boundary, but runtime validation rejected its replacement-solve behavior: seed `1/maximum` and `7778/maximum` returned empty records, the live seed-8889 preview was erased when no augmented shell was found, and all five recovery fixtures remained absent. R13A.4 makes the established certified shell immutable fallback state.
+
+### Baseline-first invariant
+
+1. Evaluate the ordinary selected set with selected provisional recovery edges forced off.
+2. Require a fully certified shell and retain its corner solution, plane audit, preview soup, coverage lifecycle, and certification metrics.
+3. Discover optional recovery participants from width-provisional evidence and baseline corner-collapse evidence.
+4. Search only augmentation states derived from the certified baseline.
+5. Commit an augmented state only when it is fully certified, recovers at least one absent target class, and is superior by certified count, accepted artistic score, then certified width.
+6. On timeout, state exhaustion, cancellation, or no superior state, return the certified baseline unchanged.
+
+Recovery may never erase a valid production preview, emit an empty matrix record, or masquerade as collateral loss. Explicit evidence distinguishes `augmentation-time-budget-exceeded`, `augmentation-state-budget-exceeded`, `augmentation-cancelled`, and `augmentation-found-no-superior-certified-shell`, together with baseline-applied state and the last failure dossier.
+
+### Single-frontier invariant
+
+The baseline may use the established kernel coexistence owner. Augmentation trials disable kernel conflict recursion and use one bounded orchestration frontier. The frontier begins from the baseline exclusion set with recovery participants re-enabled; it does not rediscover an unrelated complete shell. The existing 128-state, eight-additional-deferral, five-second, and cancellation limits remain editor-validation safeguards.
+
+### Exact multi-support endpoint interval
+
+Complete owner-face boundary intersection proved that three named outliers terminate through different support faces at one or both selected-edge endpoints. A shared-support-face requirement is therefore too narrow.
+
+For such an endpoint, the four exact rails already define one finite bevel plane. R13A.4 applies that exact half-space to the complete convex source shell, requires the two selected source-edge endpoints to be removed, every foreign source vertex and the solid centre to remain, and preserves all source-face provenance. The result must contain one bounded bevel cap whose boundary contains all four solved rail terminals. Every modified non-owner source face must belong to the exact plane-intersected support interval.
+
+This path is not a clamp, invented support chain, seed exception, or relaxed topology rule. It is an exact convex plane cut constrained by rail provenance and accepted only after the same strict intersection, manifold, containment, convexity, bounds, volume, face-quality, sidedness, triangulation, and render-channel certification as ordinary bounded bevels.
+
+### R13A.4 promotion gate
+
+```text
+EW-B4.2R13A.4-suite
+EW-B4.2R13A.4-topology
+EW-B4.2R13A.4-preview
+EW-B4.2R13A.4-comprehensive
+```
+
+The safety floor is live preview retained, topology `33/33`, artistic preview `33/33`, comprehensive evidence available, and zero collateral/topology/face-quality/placement/render regression. Only after that floor is met may `5/5` outlier recovery promote the geometry work.
+
+
+## EW-B4.2R13A.6 — exact retained-point hull and finalized corner recovery
+
+R13A.4 remains the immutable stable incomplete baseline. R13A.5 is not a valid successor: its two sampled transition planes recovered no target and could replace a certified baseline edge with an unrelated provisional edge.
+
+### Exact retained-point convex-hull contract
+
+For a multi-support edge, form the finite point set from all original source vertices except the two selected-edge endpoints, then add the four exact solved rail terminals. Enumerate the complete bounded set of non-collinear point triples. A triple contributes a facet only when every retained point lies on one side of its plane. Coplanar supporting planes are merged and their facet boundaries are ordered from the complete supporting-point set.
+
+This construction is accepted only when:
+
+- both selected endpoints are absent from the result;
+- every unrelated original source vertex is retained by construction;
+- all four exact rails occur on the connected new bevel-band boundary;
+- every original source face retains exactly one provenance record;
+- both owner faces and only faces in the two endpoint vertex stars are modified;
+- all existing topology, intersection, containment, convexity, bounds, volume, face-quality, triangulation, and render-channel checks pass.
+
+No sampled selected-edge split, local stitched patch, endpoint clamp, or relaxed foreign-vertex test is authorized.
+
+### Finalized corner-inactive contract
+
+Corner evidence is captured at the exact finalized width deactivation, not in an earlier speculative pass. A provisional record stores the target edge, last positive width, collapsed internal edge, uniform scale, and complete conflict participant set. Augmentation starts from the certified R13A.4 baseline with the target protected and may defer only its recorded neighbours.
+
+A retained-hull edge is always excluded from the immutable baseline solve, including when its hull succeeds at the full requested width; it can enter only as an explicit augmentation target. An augmentation may commit only when it recovers at least one retained-hull or finalized-corner target, does not reduce certified edge count, and removes no certified baseline edge outside the exact participant set of a recovered corner target. Failure, timeout, cancellation, or exhaustion retains the baseline byte-for-byte in geometry ownership and edge identity.
+
+### Regression gate
+
+```text
+EW-B4.2R13A.6-suite
+EW-B4.2R13A.6-topology
+EW-B4.2R13A.6-preview
+EW-B4.2R13A.6-comprehensive
+```
+
+The safety floor remains current preview applied, topology `33/33`, artistic preview `33/33`, comprehensive evidence available, no unrelated baseline-edge substitution, and zero collateral/topology/face-quality/placement/render-channel regression. The intended recovery result remains `5/5`; an exhaustive retained-hull rejection is acceptable only with the R13A.4 baseline unchanged and complete finite evidence preserved.

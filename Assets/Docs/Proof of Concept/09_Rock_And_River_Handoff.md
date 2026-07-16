@@ -1,6 +1,6 @@
 # Current River continuation — post-D.1C milestone closure
 
-The current Chipping baseline, Stage 3 shore-wave controls, `4.11C.5.18C`, `4.11C.5.18D`, `4.11C.5.18E`, and `4.11C.5.18F.1` are Unity-validated and accepted. `5.18E` fully fixed the short visible-lifetime problem, and `5.18F.1` made Arc/Semi-Arc cohorts detach and travel correctly. `4.11C.5.18H.4 — Event-Owned Analytic Open-C Geometry` is Unity-validated as the accepted no-wrap baseline. `4.11C.5.18H.6 — Mesh-Fitted Arc Paths and True Half-C Semi-Arcs` is the active refinement; `5.18H.5` remains only the Unity-observed signed-offset intermediate. It retains the `5.18G` per-anchor Build/Hold/Progressive Release/Rest scheduler, supersedes the oversized `5.18G.1` near-ring mantle, and replaces the bounds-derived `5.18H.4/5.18H.5` connector with one cached mesh-fitted upstream profile plus straight downstream arms. The old Stage 8 reflection/final-integration plan is stale and retired. All performance work remains deferred to one future comprehensive River performance pass.
+The current Chipping baseline, Stage 3 shore-wave controls, `4.11C.5.18C`, `4.11C.5.18D`, `4.11C.5.18E`, and `4.11C.5.18F.1` are Unity-validated and accepted. `5.18E` fully fixed the short visible-lifetime problem, and `5.18F.1` made Arc/Semi-Arc cohorts detach and travel correctly. `4.11C.5.18H.4 — Event-Owned Analytic Open-C Geometry` is Unity-validated as the accepted no-wrap baseline. `4.11C.5.18H.6.2 — Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle` is the active correction; `5.18H.6` is the Unity-observed mesh-fit baseline and `5.18H.6.1` is rejected; `5.18H.5` remains only the Unity-observed signed-offset intermediate. It retains the `5.18G` per-anchor Build/Hold/Progressive Release/Rest scheduler, supersedes the oversized `5.18G.1` near-ring mantle, and replaces the bounds-derived `5.18H.4/5.18H.5` connector with one cached mesh-fitted upstream profile plus straight downstream arms. The old Stage 8 reflection/final-integration plan is stale and retired. All performance work remains deferred to one future comprehensive River performance pass.
 
 ```text
 D.0   dedicated fine-edge/Fray retirement
@@ -11,7 +11,7 @@ D.1C  camera-readable medium/large-biased population
 
 Current controls are Amount, Size, Spacing, Irregularity, Edge Width, and optional Interior Access. `D.1A.1` is rejected and rolled back. `D.1D — Coherent Edge-Bite Admission` is skipped because the current result is good enough. Remaining-Life interaction is deferred as optional future work. The zoom-dependent thin-strip capture remains known deferred technical debt.
 
-Current active direction: import and validate `4.11C.5.18H.6`. A C# compile and compute reimport are expected. In `Automatic Birth Sources`, Arc must follow both halves of the prepared mesh-fitted waterline profile and retain two straight downstream arms. Semi-Arc must follow exactly one profile half from its selected physical shoulder to the physical upstream point and contain exactly one downstream arm. Pattern/mix changes must retire old Arc/Semi emitters without clearing already deposited material. Along-Flow and Across-River Contact Offsets remain signed and support-agnostic, with zero using the physical profile. Contact Fleck, Shore, Free Water, velocity, transport, lifecycle, support, duty-cycle timing, and RiverCorridor/Ground contracts must remain unchanged. The full River performance pass remains deferred; steady-state resources and dispatch count must remain unchanged.
+Current active direction: import and validate `4.11C.5.18H.6.2`. A C# compile and compute reimport are expected. In `Automatic Birth Sources`, Arc must follow both halves of the prepared mesh-fitted waterline profile and retain two straight downstream arms. Semi-Arc must follow exactly one profile half from its selected physical shoulder to the physical upstream point and contain exactly one downstream arm. Pattern/mix changes must retire old Arc/Semi emitters without clearing already deposited material. Along-Flow and Across-River Contact Offsets remain signed and support-agnostic, with zero using the physical profile. Contact Fleck, Shore, Free Water, velocity, transport, lifecycle, support, duty-cycle timing, and RiverCorridor/Ground contracts must remain unchanged. The full River performance pass remains deferred; steady-state resources and dispatch count must remain unchanged.
 
 B.2K/B.2L geometry and timing remain part of the accepted current baseline; no dedicated B.2L validation task remains.
 
@@ -24,7 +24,26 @@ This handoff is historical below the supersession notice. Use `Docs/River_Foam_S
 > This handoff is historical for earlier rock/river refactor context. Any river Foam architecture, static-foam, morphing, lateral motion, or rendering responsibility statement in this document is superseded by `Docs/River_Foam_Stage6_Architecture.md` and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`. Use those documents as the active Foam source of truth.
 
 
-## Mesh-Fitted Arc Paths and True Half-C Semi-Arcs — `4.11C.5.18H.6` — implemented, Unity validation pending
+## Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle — `4.11C.5.18H.6.2` — implemented, Unity validation pending
+
+`5.18H.6.1` is rejected because it broadened the mesh-profile feather from `0.38` to `0.55` cell and replaced the accepted direct five-point waterline profile with an expanded exterior support envelope. The runtime result was visibly double-thick and lower fidelity. `5.18H.6.2` restores the exact H.6 profile producer and exact H.6 raster coefficients.
+
+Semi-Arc Build now begins at the physical front point, progresses across only the selected front half, reaches its shoulder, and then extends to the one downstream arm tip. Reverse Release removes the arm first and preserves the front until the final interval. Full Arc progression remains terminal-to-terminal. Actual within-half segment lengths reuse existing event lanes; Arc/Semi source fill remains forced solid so those lanes cannot create holes.
+
+Performance/resource contract remains zero-new-resource and zero-new-dispatch.
+
+## Front-Persistent Semi-Arc Release and Exterior Contact Envelope — `4.11C.5.18H.6.1` — Unity-rejected regression; superseded by `5.18H.6.2`
+
+Unity runtime validation of `5.18H.6` accepted the mesh-fitted Arc/Semi-Arc direction but found intermittent Semi-Arc states with a downstream arm and no visible physical-front source. `5.18H.6.1` corrects the two proven causes while preserving the accepted terminal-to-terminal Build order.
+
+- Semi-Arc uses same-order progressive Release. The arm terminal retracts first, then the arm retracts toward its shoulder, and the selected front half remains until the final release interval. Early Build may still begin as an arm-only terminal segment by design.
+- The cached exact waterline contour is reduced to an exterior five-point support envelope rather than interior convex chords. Signed Along-Flow fit translates the complete profile; signed Across-River fit scales it uniformly about the object centre, preserving asymmetry without collapsing one randomly selected half.
+- Event construction applies a cell-aware outward centreline clearance equal to the existing `0.34`-cell strong ribbon radius. Shared miter joints reject out-of-range intersections and remain upstream of both adjacent shifted support lines. The shader strong row remains `0.34` local normal cell; profile feather is `0.55` cell, giving an approximately `0.89`-cell outer radius required by the expanded anisotropic obstacle-equivalent connectivity audit.
+- Actual within-half segment-length splits reuse `variation.x` and `kinematics.w` for Arc/Semi events. The seven-`Vector4` GPU event layout, kernels, textures, buffers, dispatches, and material-update work remain unchanged.
+
+Mechanical validation passed 5,000 randomized convex profiles, 180 anisotropic obstacle-equivalent raster cases, 1,640 Build/Release phase checks, C# parser validation, changed-function HLSL parse/code generation, kernel/resource parity, and unchanged unrelated source evaluators. Unity 6000.5.0f1 C# compilation, D3D11 import, runtime visual validation, and profiler confirmation remain authoritative and pending.
+
+## Mesh-Fitted Arc Paths and True Half-C Semi-Arcs — `4.11C.5.18H.6` — Unity-observed baseline; release/envelope refined by `5.18H.6.1`
 
 Unity validation of `5.18H.5` confirmed that signed contact-fit controls worked, but rejected its remaining geometry assumptions: Semi-Arc still traversed the complete shoulder-to-shoulder connector, and both source types followed a bounds-derived half-ellipse rather than the generated object's waterline shape.
 

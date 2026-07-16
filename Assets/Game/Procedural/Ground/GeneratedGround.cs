@@ -797,6 +797,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundRiverbedLayerDrySpecularStrength");
         private static readonly int GroundRiverbedMaterialStrengthId =
             Shader.PropertyToID("_GroundRiverbedMaterialStrength");
+        private static readonly int GroundRiverbedHydrologyEnabledId =
+            Shader.PropertyToID("_GroundRiverbedHydrologyEnabled");
+        private static readonly int GroundRiverbedHydrologyWetTintColorId =
+            Shader.PropertyToID("_GroundRiverbedHydrologyWetTintColor");
+        private static readonly int GroundRiverbedHydrologyCharacterAId =
+            Shader.PropertyToID("_GroundRiverbedHydrologyCharacterA");
+        private static readonly int GroundRiverbedHydrologyCharacterBId =
+            Shader.PropertyToID("_GroundRiverbedHydrologyCharacterB");
+        private static readonly int GroundRiverbedWetnessStrengthId =
+            Shader.PropertyToID("_GroundRiverbedWetnessStrength");
+        private static readonly int GroundRiverbedWetnessTransitionId =
+            Shader.PropertyToID("_GroundRiverbedWetnessTransition");
+        private static readonly int GroundRiverbedWetSmoothnessResponseId =
+            Shader.PropertyToID("_GroundRiverbedWetSmoothnessResponse");
+        private static readonly int GroundRiverbedWetSpecularResponseId =
+            Shader.PropertyToID("_GroundRiverbedWetSpecularResponse");
         private static readonly int GroundShoreHydrologyEnabledId =
             Shader.PropertyToID("_GroundShoreHydrologyEnabled");
         private static readonly int GroundShoreHydrologyWetTintColorId =
@@ -809,6 +825,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundShoreHydrologySpatialA");
         private static readonly int GroundShoreHydrologySpatialBId =
             Shader.PropertyToID("_GroundShoreHydrologySpatialB");
+        private static readonly int GroundShoreWetHighlightShapingId =
+            Shader.PropertyToID("_GroundShoreWetHighlightShaping");
         private static readonly int GroundBankMaterialStrengthId =
             Shader.PropertyToID("_GroundBankMaterialStrength");
         private static readonly int GroundBankMaterialReachId =
@@ -1014,8 +1032,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             ResolveMaterialControls().BankSurfaceLayer;
         public GroundSurfaceLayerProfile RiverbedSurfaceLayer =>
             ResolveMaterialControls().RiverbedSurfaceLayer;
+        public GroundRiverbedSurfaceSource RiverbedSurfaceSource =>
+            ResolveMaterialControls().RiverbedSurfaceSource;
+        public GroundSurfaceLayerProfile ResolvedRiverbedSurfaceLayer =>
+            ResolveMaterialControls().ResolvedRiverbedSurfaceLayer;
         public GroundHydrologyModifierProfile ShoreHydrologyModifier =>
             ResolveMaterialControls().ShoreHydrologyModifier;
+        public GroundRiverbedHydrologySource RiverbedHydrologySource =>
+            ResolveMaterialControls().RiverbedHydrologySource;
+        public GroundHydrologyModifierProfile RiverbedHydrologyModifier =>
+            ResolveMaterialControls().RiverbedHydrologyModifier;
+        public GroundHydrologyModifierProfile ResolvedRiverbedHydrologyModifier =>
+            ResolveMaterialControls().ResolvedRiverbedHydrologyModifier;
         public GroundSurfaceType SurfaceType => groundSurfaceType;
         public GroundSnowfieldVariant SnowfieldVariant => snowfieldVariant;
         public int ModifierCount => modifiers != null ? modifiers.Length : 0;
@@ -3994,7 +4022,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     resolvedMaterialControls.PaintedAccentRetreatStrength));
 
             GroundSurfaceLayerProfile riverbedSurfaceLayer =
-                resolvedMaterialControls.RiverbedSurfaceLayer;
+                resolvedMaterialControls.ResolvedRiverbedSurfaceLayer;
             bool hasRiverbedSurfaceLayer = riverbedSurfaceLayer != null;
 
             materialProperties.SetFloat(
@@ -4038,6 +4066,54 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             materialProperties.SetFloat(
                 GroundRiverbedMaterialStrengthId,
                 resolvedMaterialControls.RiverbedMaterialStrength);
+
+            GroundHydrologyModifierProfile riverbedHydrologyModifier =
+                resolvedMaterialControls.ResolvedRiverbedHydrologyModifier;
+            bool hasRiverbedHydrologyModifier =
+                riverbedHydrologyModifier != null;
+
+            materialProperties.SetFloat(
+                GroundRiverbedHydrologyEnabledId,
+                hasRiverbedHydrologyModifier ? 1f : 0f);
+            materialProperties.SetColor(
+                GroundRiverbedHydrologyWetTintColorId,
+                hasRiverbedHydrologyModifier
+                    ? riverbedHydrologyModifier.WetTintColor
+                    : resolvedMaterialControls.DampTint);
+            materialProperties.SetVector(
+                GroundRiverbedHydrologyCharacterAId,
+                hasRiverbedHydrologyModifier
+                    ? new Vector4(
+                        riverbedHydrologyModifier.WetTintStrength,
+                        riverbedHydrologyModifier.WetDarkening,
+                        riverbedHydrologyModifier.PixelPatternSoftening,
+                        riverbedHydrologyModifier.SmoothnessBoost)
+                    : Vector4.zero);
+            materialProperties.SetVector(
+                GroundRiverbedHydrologyCharacterBId,
+                hasRiverbedHydrologyModifier
+                    ? new Vector4(
+                        riverbedHydrologyModifier.SpecularBoost,
+                        riverbedHydrologyModifier.SnowMeltInfluence,
+                        riverbedHydrologyModifier.FrostMeltInfluence,
+                        0f)
+                    : Vector4.zero);
+            materialProperties.SetFloat(
+                GroundRiverbedWetnessStrengthId,
+                resolvedMaterialControls.RiverbedWetnessStrength);
+            materialProperties.SetVector(
+                GroundRiverbedWetnessTransitionId,
+                new Vector4(
+                    resolvedMaterialControls.RiverbedToBankWetnessBlendDistance,
+                    resolvedMaterialControls.RiverbedToBankWetnessBlendSoftness,
+                    0f,
+                    0f));
+            materialProperties.SetFloat(
+                GroundRiverbedWetSmoothnessResponseId,
+                resolvedMaterialControls.RiverbedWetSmoothnessResponse);
+            materialProperties.SetFloat(
+                GroundRiverbedWetSpecularResponseId,
+                resolvedMaterialControls.RiverbedWetSpecularResponse);
 
             GroundHydrologyModifierProfile shoreHydrologyModifier =
                 resolvedMaterialControls.ShoreHydrologyModifier;
@@ -4084,6 +4160,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     resolvedMaterialControls.WaterlineSaturation,
                     0f,
                     0f));
+            materialProperties.SetVector(
+                GroundShoreWetHighlightShapingId,
+                new Vector4(
+                    resolvedMaterialControls.ShoreWetHighlightStrength,
+                    resolvedMaterialControls.ShoreWetHighlightTightness,
+                    resolvedMaterialControls.ShoreWetHighlightCameraBias,
+                    resolvedMaterialControls.ShoreWetHighlightVerticalFalloff));
 
             materialProperties.SetFloat(
                 GroundBankMaterialStrengthId,

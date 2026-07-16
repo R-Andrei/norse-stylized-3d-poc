@@ -340,7 +340,7 @@ namespace ProgrammaticStylized3D.Rivers
                     materialStepProgress,
                     sourceEvent.ObjectContactPoint2.x);
                 variationData = new Vector4(
-                    sourceEvent.SourceFillSeed,
+                    sourceEvent.ObjectContactNegativeFirstSegmentSplit,
                     sourceEvent.ObjectContactPoint2.y,
                     sourceEvent.ObjectContactPoint3.x,
                     sourceEvent.Curvature);
@@ -348,7 +348,7 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceEvent.ObjectContactPoint3.y,
                     sourceEvent.ObjectContactPoint4.x,
                     sourceEvent.ObjectContactPathLengthMetres,
-                    Mathf.Clamp01(sourceEvent.SourceFillBlend));
+                    sourceEvent.ObjectContactPositiveFirstSegmentSplit);
                 objectData = new Vector4(
                     sourceEvent.ObjectCentreAcrossMetres,
                     sourceEvent.ObjectContactPoint4.y,

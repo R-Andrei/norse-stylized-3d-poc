@@ -46,6 +46,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int EndpointSupportClipCount;
             public int EndpointSupportFaceA;
             public int EndpointSupportFaceB;
+            public int EndpointSupportAdditionalFaceA;
+            public int EndpointSupportAdditionalFaceB;
+            public int EndpointSupportMultiFaceEndpointCount;
+            public int EndpointSupportModifiedFaceExpectedCount;
+            public int EndpointSupportCapFaceCount;
+            public int EndpointSupportBoundaryPathVertexCount;
+            public int MultiSupportPlaneCut;
+            public int MultiSupportPlaneCount;
+            public int MultiSupportPlaneChainCandidateCount;
+            public int MultiSupportPlaneForeignVertexRejectCount;
+            public int MultiSupportPlaneFirstForeignVertex;
+            public float MultiSupportPlaneMaximumForeignDistance;
+            public float MultiSupportPlaneSplitA;
+            public float MultiSupportPlaneSplitB;
+            public int MultiSupportPlaneCapAdjacencyCount;
+            public Vector3 MultiSupportPlaneNormal;
+            public float MultiSupportPlaneDistance;
+            public Vector3 MultiSupportPlaneNormalB;
+            public float MultiSupportPlaneDistanceB;
+            public int MultiSupportHullPointCount;
+            public int MultiSupportHullPlaneCount;
+            public int MultiSupportHullBevelFaceCount;
+            public int MultiSupportHullTriplesTested;
+            public int MultiSupportHullSupportingTriples;
+            public string MultiSupportHullEvidence;
             public int EndpointSupportGraphFaceA;
             public int EndpointSupportGraphFaceB;
             public int EndpointSupportVertexA;
@@ -683,6 +708,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ResultViolatedSourcePlane = -1,
                     EndpointSupportFaceA = -1,
                     EndpointSupportFaceB = -1,
+                    EndpointSupportAdditionalFaceA = -1,
+                    EndpointSupportAdditionalFaceB = -1,
                     EndpointSupportGraphFaceA = -1,
                     EndpointSupportGraphFaceB = -1,
                     EndpointSupportVertexA = -1,
@@ -981,6 +1008,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 auditedFaces,
                 selected.GraphEdgeIndex,
                 ref result);
+            ICollection<int> multiSupportAllowedFaces = null;
+            if (result.MultiSupportPlaneCut == 1)
+            {
+                multiSupportAllowedFaces =
+                    CollectBoundedEndpointSupportSourceFaces(
+                        context,
+                        context.Graph.Edges[selected.GraphEdgeIndex]);
+            }
             BoundedSourceFaceChangeAudit rawSourceChanges =
                 AuditBoundedSourceFaceChanges(
                     attributedSourceFaces,
@@ -988,7 +1023,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     context,
                     selected.GraphEdgeIndex,
                     result.EndpointSupportFaceA,
-                    result.EndpointSupportFaceB);
+                    result.EndpointSupportAdditionalFaceA,
+                    result.EndpointSupportFaceB,
+                    result.EndpointSupportAdditionalFaceB,
+                    result.MultiSupportPlaneCut == 1,
+                    result.MultiSupportPlaneNormal,
+                    result.MultiSupportPlaneDistance,
+                    multiSupportAllowedFaces);
             BoundedSourceFaceChangeAudit preparedSourceChanges =
                 AuditBoundedSourceFaceChanges(
                     preparedSourceFaces,
@@ -996,7 +1037,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     context,
                     selected.GraphEdgeIndex,
                     result.EndpointSupportFaceA,
-                    result.EndpointSupportFaceB);
+                    result.EndpointSupportAdditionalFaceA,
+                    result.EndpointSupportFaceB,
+                    result.EndpointSupportAdditionalFaceB,
+                    result.MultiSupportPlaneCut == 1,
+                    result.MultiSupportPlaneNormal,
+                    result.MultiSupportPlaneDistance,
+                    multiSupportAllowedFaces);
             ApplyBoundedSourceFaceChangeAudits(
                 rawSourceChanges,
                 preparedSourceChanges,
@@ -1135,6 +1182,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float railTolerance = Mathf.Max(
                 PointMergeDistance * 8f,
                 minimumStableEdgeLength * 0.02f);
+            int expectedModifiedSourceFaceCount =
+                2 + result.EndpointSupportModifiedFaceExpectedCount;
+            bool endpointSupportTopologyValid =
+                result.EndpointSupportClipAttemptedCount == 2 &&
+                result.EndpointSupportClipCount == 2 &&
+                result.EndpointSupportRemovedVertexCount == 2 &&
+                result.EndpointSupportRailInsertionCount == 4 &&
+                result.EndpointCapCount ==
+                    result.EndpointSupportCapFaceCount;
+            int expectedBevelFaceCount = result.MultiSupportPlaneCut == 1
+                ? result.MultiSupportPlaneCount
+                : 1;
+            bool railExtentValid =
+                result.MultiSupportPlaneCut == 1 ||
+                result.MaximumExtentBeyondRails <= railTolerance;
             bool shellReadyForTriangulation =
                 result.EdgeClassification ==
                     BoundedEdgeClassification.Convex &&
@@ -1161,13 +1223,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 result.EndpointSupportNonSimpleCount == 0 &&
                 result.EndpointSupportNonConvexCount == 0 &&
                 result.EndpointSupportWindingFailureCount == 0 &&
-                result.EndpointSupportRemovedVertexCount == 2 &&
-                result.EndpointSupportRailInsertionCount == 4 &&
-                result.BevelFaceCount == 1 &&
-                result.EndpointCapCount == 0 &&
-                result.ModifiedSourceFaceCount == 4 &&
+                endpointSupportTopologyValid &&
+                expectedBevelFaceCount > 0 &&
+                result.BevelFaceCount == expectedBevelFaceCount &&
+                result.ModifiedSourceFaceCount ==
+                    expectedModifiedSourceFaceCount &&
                 result.OwnerSourceFaceModifiedCount == 2 &&
-                result.EndpointSupportSourceFaceModifiedCount == 2 &&
+                result.EndpointSupportSourceFaceModifiedCount ==
+                    result.EndpointSupportModifiedFaceExpectedCount &&
                 result.UnexpectedSourceFaceModifiedCount == 0 &&
                 result.BoundaryOnlyUnexpectedSourceFaceCount == 0 &&
                 result.ForeignSourceFaceModifiedCount == 0 &&
@@ -1175,7 +1238,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 result.PreparedSourceChangeComparisonAttempted == 1 &&
                 result.SourceProvenanceCertificationValid == 1 &&
                 result.RailDeviation <= railTolerance &&
-                result.MaximumExtentBeyondRails <= railTolerance &&
+                railExtentValid &&
                 result.OpenEdgeCount == 0 &&
                 result.NonManifoldEdgeCount == 0 &&
                 result.TJunctionCount == 0 &&
@@ -1215,25 +1278,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ref result.Diagnostic,
                     "the bounded edge did not produce two certified owner-face clips");
             }
-            else if (result.EndpointSupportClipCount != 2 ||
-                result.EndpointSupportRemovedVertexCount != 2 ||
-                result.EndpointSupportRailInsertionCount != 4)
+            else if (!endpointSupportTopologyValid)
             {
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
-                    "the bounded edge did not replace both endpoint source corners with exact support-face rail boundaries");
+                    "the bounded edge did not replace both endpoint source corners with four exact rail boundaries");
             }
-            else if (result.BevelFaceCount != 1)
+            else if (expectedBevelFaceCount <= 0 ||
+                result.BevelFaceCount != expectedBevelFaceCount)
             {
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
-                    "the bounded edge does not retain exactly one bevel polygon");
-            }
-            else if (result.EndpointCapCount != 0)
-            {
-                SetBoundedSingleEdgeDiagnostic(
-                    ref result.Diagnostic,
-                    "the bounded edge still contains obsolete endpoint cap polygons");
+                    "the bounded edge does not retain its complete certified bevel-facet chain");
             }
             else if (result.SourceProvenanceCertificationValid != 1)
             {
@@ -1241,9 +1297,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ref result.Diagnostic,
                     "the bounded source baselines do not preserve one complete unique source-face provenance set");
             }
-            else if (result.ModifiedSourceFaceCount != 4 ||
+            else if (result.ModifiedSourceFaceCount !=
+                    expectedModifiedSourceFaceCount ||
                 result.OwnerSourceFaceModifiedCount != 2 ||
-                result.EndpointSupportSourceFaceModifiedCount != 2 ||
+                result.EndpointSupportSourceFaceModifiedCount !=
+                    result.EndpointSupportModifiedFaceExpectedCount ||
                 result.UnexpectedSourceFaceModifiedCount != 0 ||
                 result.BoundaryOnlyUnexpectedSourceFaceCount != 0 ||
                 result.ForeignSourceFaceModifiedCount != 0 ||
@@ -1251,10 +1309,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
-                    "the bounded edge did not modify exactly its two owner faces and two endpoint support faces relative to the prepared source baseline");
+                    "the bounded edge did not modify exactly its two owner faces and certified endpoint-support interval relative to the prepared source baseline");
             }
             else if (result.RailDeviation > railTolerance ||
-                result.MaximumExtentBeyondRails > railTolerance)
+                !railExtentValid)
             {
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
@@ -2570,6 +2628,96 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return;
             }
 
+            if (audit.MultiSupportPlaneCut == 1 &&
+                audit.MultiSupportPlaneCount > 0)
+            {
+                float maximumRailResidual = 0f;
+                float minimumAgreement = 1f;
+                float maximumSolidCentreSide =
+                    float.NegativeInfinity;
+                Vector3 selectedBevelNormal;
+                if (!TryNormalizeMassVector(
+                        selected.Candidate.BevelNormal,
+                        out selectedBevelNormal))
+                {
+                    selectedBevelNormal = Vector3.zero;
+                }
+                int bevelFaceCount = 0;
+                for (int faceIndex = 0;
+                     faceIndex < resultFaces.Count;
+                     faceIndex++)
+                {
+                    PolygonFace face = resultFaces[faceIndex];
+                    if (face.ProvenanceKind !=
+                            PolygonFaceProvenanceKind.BoundedEdgeBevel ||
+                        face.ProvenanceIndex != selected.GraphEdgeIndex ||
+                        face.Vertices.Count == 0)
+                    {
+                        continue;
+                    }
+                    bevelFaceCount++;
+                    float faceDistance = Vector3.Dot(
+                        face.Normal,
+                        face.Vertices[0]);
+                    minimumAgreement = Mathf.Min(
+                        minimumAgreement,
+                        Mathf.Abs(Vector3.Dot(
+                            selectedBevelNormal,
+                            face.Normal)));
+                    for (int railIndex = 0;
+                         railIndex < rails.Length;
+                         railIndex++)
+                    {
+                        float minimumResidual = float.PositiveInfinity;
+                        for (int candidateFaceIndex = 0;
+                             candidateFaceIndex < resultFaces.Count;
+                             candidateFaceIndex++)
+                        {
+                            PolygonFace candidateFace =
+                                resultFaces[candidateFaceIndex];
+                            if (candidateFace.ProvenanceKind !=
+                                    PolygonFaceProvenanceKind.BoundedEdgeBevel ||
+                                candidateFace.ProvenanceIndex !=
+                                    selected.GraphEdgeIndex ||
+                                candidateFace.Vertices.Count == 0)
+                            {
+                                continue;
+                            }
+                            float candidateDistance = Vector3.Dot(
+                                candidateFace.Normal,
+                                candidateFace.Vertices[0]);
+                            minimumResidual = Mathf.Min(
+                                minimumResidual,
+                                Mathf.Abs(Vector3.Dot(
+                                    candidateFace.Normal,
+                                    rails[railIndex].Position) -
+                                    candidateDistance));
+                        }
+                        maximumRailResidual = Mathf.Max(
+                            maximumRailResidual,
+                            minimumResidual);
+                    }
+                    audit.BevelFaceNormal = face.Normal;
+                    maximumSolidCentreSide = Mathf.Max(
+                        maximumSolidCentreSide,
+                        Vector3.Dot(face.Normal, solidCentre) -
+                        faceDistance);
+                }
+                audit.BevelPlaneNormal =
+                    audit.MultiSupportPlaneNormal;
+                audit.BevelPlaneDistance =
+                    audit.MultiSupportPlaneDistance;
+                audit.BevelPlaneNormalAgreement = bevelFaceCount > 0
+                    ? minimumAgreement
+                    : 0f;
+                audit.BevelSolidCentreSide = bevelFaceCount > 0
+                    ? maximumSolidCentreSide
+                    : 0f;
+                audit.BevelRailMaximumPlaneResidual =
+                    maximumRailResidual;
+                return;
+            }
+
             Vector3 normal = selected.Candidate.BevelNormal;
             if (!IsFinite(normal) ||
                 normal.sqrMagnitude <= MinimumEdgeLengthSqr)
@@ -3533,6 +3681,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
 
+            Vector3 solidCentre = CalculatePlaneCutFaceVertexCentre(
+                sourceFaces);
+            bool requiresMultiSupportPlaneCut =
+                isolatedRails[0].TargetSourceFaceIndex !=
+                    isolatedRails[2].TargetSourceFaceIndex ||
+                isolatedRails[1].TargetSourceFaceIndex !=
+                    isolatedRails[3].TargetSourceFaceIndex;
+            if (requiresMultiSupportPlaneCut)
+            {
+                return TryBuildBoundedMultiSupportPlaneCutFaces(
+                    sourceFaces,
+                    context,
+                    selected,
+                    isolatedRails,
+                    bevelNormal,
+                    railPlaneDistance,
+                    solidCentre,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    ref audit,
+                    out boundedFaces,
+                    out boundarySubdivisionCount,
+                    out blocker);
+            }
+
             boundedFaces = ClonePolygonFacesForPlaneCutAudit(
                 sourceFaces,
                 assignSourceFaceProvenance: true);
@@ -3556,6 +3729,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
             audit.TargetBoundaryCount = targetBoundaryCount;
+            audit.EndpointSupportModifiedFaceExpectedCount = 2;
 
             if (!TryClipBoundedOwnerSourceFace(
                     sourceFaces[sourceFaceA],
@@ -3591,8 +3765,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             boundedFaces[sourceFaceA] = replacementA;
             boundedFaces[sourceFaceB] = replacementB;
 
-            Vector3 solidCentre = CalculatePlaneCutFaceVertexCentre(
-                sourceFaces);
             if (!TryCreateBoundedFace(
                     new List<Vector3> { a0, b0, b1, a1 },
                     bevelNormal,
@@ -3609,6 +3781,1075 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             boundedFaces.Add(bevelFace);
+            return true;
+        }
+
+        private static bool TryBuildBoundedMultiSupportPlaneCutFaces(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            EdgeWearSelectedGraphEdge selected,
+            BoundedIsolatedRailPoint[] isolatedRails,
+            Vector3 bevelNormal,
+            float railPlaneDistance,
+            Vector3 solidCentre,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            ref BoundedSingleEdgeAuditResult audit,
+            out List<PolygonFace> boundedFaces,
+            out int boundarySubdivisionCount,
+            out string blocker)
+        {
+            BoundedSingleEdgeAuditResult singlePlaneAudit = audit;
+            if (TryBuildBoundedMultiSupportSinglePlaneCutFaces(
+                    sourceFaces,
+                    context,
+                    selected,
+                    isolatedRails,
+                    bevelNormal,
+                    railPlaneDistance,
+                    solidCentre,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    ref singlePlaneAudit,
+                    out boundedFaces,
+                    out boundarySubdivisionCount,
+                    out blocker))
+            {
+                singlePlaneAudit.MultiSupportPlaneCount = 1;
+                audit = singlePlaneAudit;
+                return true;
+            }
+
+            string singlePlaneBlocker = blocker ?? string.Empty;
+            BoundedSingleEdgeAuditResult retainedHullAudit = audit;
+            if (TryBuildBoundedRetainedPointHullFaces(
+                    sourceFaces,
+                    context,
+                    selected,
+                    isolatedRails,
+                    bevelNormal,
+                    railPlaneDistance,
+                    solidCentre,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    ref retainedHullAudit,
+                    out boundedFaces,
+                    out boundarySubdivisionCount,
+                    out blocker))
+            {
+                retainedHullAudit.MultiSupportHullEvidence =
+                    "singlePlaneFailure:{" + singlePlaneBlocker + "};" +
+                    (retainedHullAudit.MultiSupportHullEvidence ??
+                        string.Empty);
+                audit = retainedHullAudit;
+                return true;
+            }
+
+            retainedHullAudit.MultiSupportHullEvidence =
+                "singlePlaneFailure:{" + singlePlaneBlocker + "};" +
+                (retainedHullAudit.MultiSupportHullEvidence ??
+                    string.Empty);
+            audit = retainedHullAudit;
+            blocker =
+                "single-plane multi-support construction failed: " +
+                singlePlaneBlocker +
+                "; retained-point hull recovery failed: " +
+                (blocker ?? string.Empty);
+            boundedFaces = null;
+            boundarySubdivisionCount = 0;
+            return false;
+        }
+
+        private static bool TryBuildBoundedMultiSupportSinglePlaneCutFaces(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            EdgeWearSelectedGraphEdge selected,
+            BoundedIsolatedRailPoint[] isolatedRails,
+            Vector3 bevelNormal,
+            float railPlaneDistance,
+            Vector3 solidCentre,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            ref BoundedSingleEdgeAuditResult audit,
+            out List<PolygonFace> boundedFaces,
+            out int boundarySubdivisionCount,
+            out string blocker)
+        {
+            boundedFaces = null;
+            boundarySubdivisionCount = 0;
+            blocker = string.Empty;
+            if (sourceFaces == null || context == null ||
+                isolatedRails == null || isolatedRails.Length != 4 ||
+                selected.GraphEdgeIndex < 0 ||
+                selected.GraphEdgeIndex >= context.Graph.Edges.Count)
+            {
+                blocker =
+                    "the multi-support bounded plane cut lacks exact source geometry";
+                return false;
+            }
+
+            EdgeWearGraphEdge sourceEdge =
+                context.Graph.Edges[selected.GraphEdgeIndex];
+            Vector3 sourceA =
+                context.Graph.Vertices[sourceEdge.VertexA].Position;
+            Vector3 sourceB =
+                context.Graph.Vertices[sourceEdge.VertexB].Position;
+            CutPlane plane = new CutPlane(bevelNormal, railPlaneDistance);
+            if (plane.SignedDistance(solidCentre) > 0f)
+            {
+                plane = new CutPlane(-bevelNormal, -railPlaneDistance);
+            }
+
+            float pointTolerance = Mathf.Max(
+                PointMergeDistance * 8f,
+                minimumStableEdgeLength * 0.002f);
+            float minimumRemoval = Mathf.Max(
+                PointMergeDistance * 0.25f,
+                minimumStableEdgeLength * 0.0001f);
+            float sourceRemovalA = plane.SignedDistance(sourceA);
+            float sourceRemovalB = plane.SignedDistance(sourceB);
+            if (sourceRemovalA <= minimumRemoval ||
+                sourceRemovalB <= minimumRemoval ||
+                plane.SignedDistance(solidCentre) >= -pointTolerance)
+            {
+                blocker =
+                    "the multi-support bounded plane does not remove only the selected source edge side";
+                return false;
+            }
+            for (int vertexIndex = 0;
+                 vertexIndex < context.Graph.Vertices.Count;
+                 vertexIndex++)
+            {
+                if (vertexIndex == sourceEdge.VertexA ||
+                    vertexIndex == sourceEdge.VertexB)
+                {
+                    continue;
+                }
+                if (plane.SignedDistance(
+                        context.Graph.Vertices[vertexIndex].Position) >
+                    pointTolerance)
+                {
+                    blocker =
+                        "the multi-support bounded plane would remove a foreign source vertex";
+                    return false;
+                }
+            }
+
+            boundedFaces = ClonePolygonFacesForPlaneCutAudit(
+                sourceFaces,
+                assignSourceFaceProvenance: true);
+            float clipEpsilon = Mathf.Min(
+                PlaneEpsilon,
+                Mathf.Max(
+                    PointMergeDistance * 0.25f,
+                    Mathf.Min(sourceRemovalA, sourceRemovalB) * 0.25f));
+            PlaneCutNumericalRepairTelemetry numericalRepairs =
+                new PlaneCutNumericalRepairTelemetry();
+            ClipPolyhedron(
+                boundedFaces,
+                plane,
+                PolygonFaceFeature.ConvexEdgeWear,
+                selected.Candidate.Strength,
+                true,
+                clipEpsilon,
+                true,
+                PolygonFaceProvenanceKind.BoundedEdgeBevel,
+                selected.GraphEdgeIndex,
+                true,
+                true,
+                numericalRepairs);
+            if (numericalRepairs.ExactConstructionFailureCount > 0)
+            {
+                blocker =
+                    "the exact multi-support bounded plane cut failed strict intersection construction";
+                boundedFaces = null;
+                return false;
+            }
+
+            int capFaceIndex = -1;
+            int capFaceCount = 0;
+            for (int faceIndex = 0;
+                 faceIndex < boundedFaces.Count;
+                 faceIndex++)
+            {
+                PolygonFace face = boundedFaces[faceIndex];
+                if (face.ProvenanceKind ==
+                        PolygonFaceProvenanceKind.BoundedEdgeBevel &&
+                    face.ProvenanceIndex == selected.GraphEdgeIndex)
+                {
+                    capFaceCount++;
+                    capFaceIndex = faceIndex;
+                }
+            }
+            if (capFaceCount != 1 || capFaceIndex < 0)
+            {
+                blocker =
+                    "the multi-support bounded plane cut did not emit one unique bevel cap";
+                boundedFaces = null;
+                return false;
+            }
+
+            PolygonFace capFace = boundedFaces[capFaceIndex];
+            List<Vector3> capVertices =
+                CopyBoundedPolygonPreservingCollinear(capFace.Vertices);
+            for (int railIndex = 0;
+                 railIndex < isolatedRails.Length;
+                 railIndex++)
+            {
+                if (!TryInsertBoundedPointIntoPolygonBoundary(
+                        capVertices,
+                        isolatedRails[railIndex].Position,
+                        pointTolerance,
+                        out _))
+                {
+                    blocker =
+                        "a solved multi-support rail is absent from the exact bevel-cap boundary";
+                    boundedFaces = null;
+                    return false;
+                }
+            }
+            if (!ValidateBoundedPolygon(
+                    capVertices,
+                    capFace.Normal,
+                    minimumStableFaceArea,
+                    requireConvex: true,
+                    out string capBlocker,
+                    out _))
+            {
+                blocker = "multi-support bevel cap failed: " + capBlocker;
+                boundedFaces = null;
+                return false;
+            }
+            boundedFaces[capFaceIndex] = new PolygonFace(
+                capVertices,
+                capFace.Normal,
+                capFace.Feature,
+                capFace.FeatureStrength,
+                capFace.ProvenanceKind,
+                capFace.ProvenanceIndex);
+
+            int ownerSourceFaceA =
+                context.Graph.Faces[sourceEdge.FaceA].SourceFaceIndex;
+            int ownerSourceFaceB =
+                context.Graph.Faces[sourceEdge.FaceB].SourceFaceIndex;
+            int ownerModifiedCount = 0;
+            int supportModifiedCount = 0;
+            for (int sourceFaceIndex = 0;
+                 sourceFaceIndex < sourceFaces.Count;
+                 sourceFaceIndex++)
+            {
+                PolygonFace resultFace = FindBoundedSourceFace(
+                    boundedFaces,
+                    sourceFaceIndex);
+                if (resultFace == null)
+                {
+                    blocker =
+                        "the multi-support bounded plane cut consumed a complete source face";
+                    boundedFaces = null;
+                    return false;
+                }
+                bool equivalent =
+                    AreBoundedPolygonsGeometricallyEquivalent(
+                        sourceFaces[sourceFaceIndex].Vertices,
+                        resultFace.Vertices,
+                        sourceFaces[sourceFaceIndex].Normal,
+                        out bool boundaryOnlyDifference);
+                if (equivalent && !boundaryOnlyDifference)
+                {
+                    continue;
+                }
+                if (sourceFaceIndex == ownerSourceFaceA ||
+                    sourceFaceIndex == ownerSourceFaceB)
+                {
+                    ownerModifiedCount++;
+                }
+                else
+                {
+                    supportModifiedCount++;
+                }
+            }
+            if (ownerModifiedCount != 2 || supportModifiedCount < 2)
+            {
+                blocker =
+                    "the multi-support bounded plane cut did not modify both owners and its exact endpoint-support interval";
+                boundedFaces = null;
+                return false;
+            }
+
+            audit.MultiSupportPlaneCut = 1;
+            audit.MultiSupportPlaneNormal = plane.Normal;
+            audit.MultiSupportPlaneDistance = plane.Distance;
+            audit.OwnerClipAttemptedCount = 2;
+            audit.OwnerClipCount = 2;
+            audit.EndpointSupportClipAttemptedCount = 2;
+            audit.EndpointSupportClipCount = 2;
+            audit.EndpointSupportRemovedVertexCount = 2;
+            audit.EndpointSupportRailInsertionCount = 4;
+            audit.EndpointSupportModifiedFaceExpectedCount =
+                supportModifiedCount;
+            audit.EndpointSupportBoundaryPathVertexCount =
+                capVertices.Count;
+            audit.EndpointSupportFaceA =
+                isolatedRails[0].TargetSourceFaceIndex;
+            audit.EndpointSupportAdditionalFaceA =
+                isolatedRails[2].TargetSourceFaceIndex ==
+                    audit.EndpointSupportFaceA
+                    ? -1
+                    : isolatedRails[2].TargetSourceFaceIndex;
+            audit.EndpointSupportFaceB =
+                isolatedRails[1].TargetSourceFaceIndex;
+            audit.EndpointSupportAdditionalFaceB =
+                isolatedRails[3].TargetSourceFaceIndex ==
+                    audit.EndpointSupportFaceB
+                    ? -1
+                    : isolatedRails[3].TargetSourceFaceIndex;
+            audit.EndpointSupportGraphFaceA =
+                isolatedRails[0].TargetGraphFaceIndex;
+            audit.EndpointSupportGraphFaceB =
+                isolatedRails[1].TargetGraphFaceIndex;
+            audit.EndpointSupportVertexA = sourceEdge.VertexA;
+            audit.EndpointSupportVertexB = sourceEdge.VertexB;
+            audit.EndpointSupportMultiFaceEndpointCount =
+                (isolatedRails[0].TargetSourceFaceIndex !=
+                    isolatedRails[2].TargetSourceFaceIndex ? 1 : 0) +
+                (isolatedRails[1].TargetSourceFaceIndex !=
+                    isolatedRails[3].TargetSourceFaceIndex ? 1 : 0);
+            audit.TargetBoundaryCount = 4;
+            boundarySubdivisionCount = 4;
+            return true;
+        }
+
+        private static bool TryBuildBoundedRetainedPointHullFaces(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            EdgeWearSelectedGraphEdge selected,
+            BoundedIsolatedRailPoint[] isolatedRails,
+            Vector3 bevelNormal,
+            float railPlaneDistance,
+            Vector3 solidCentre,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            ref BoundedSingleEdgeAuditResult audit,
+            out List<PolygonFace> boundedFaces,
+            out int boundarySubdivisionCount,
+            out string blocker)
+        {
+            boundedFaces = null;
+            boundarySubdivisionCount = 0;
+            blocker = string.Empty;
+            audit.MultiSupportPlaneFirstForeignVertex = -1;
+            if (sourceFaces == null || context == null ||
+                isolatedRails == null || isolatedRails.Length != 4 ||
+                selected.GraphEdgeIndex < 0 ||
+                selected.GraphEdgeIndex >= context.Graph.Edges.Count)
+            {
+                blocker =
+                    "the retained-point multi-support hull lacks exact source geometry";
+                return false;
+            }
+
+            EdgeWearGraphEdge sourceEdge =
+                context.Graph.Edges[selected.GraphEdgeIndex];
+            Vector3 sourceA =
+                context.Graph.Vertices[sourceEdge.VertexA].Position;
+            Vector3 sourceB =
+                context.Graph.Vertices[sourceEdge.VertexB].Position;
+            float pointTolerance = Mathf.Max(
+                PointMergeDistance * 8f,
+                minimumStableEdgeLength * 0.002f);
+            float endpointToleranceSqr =
+                pointTolerance * pointTolerance;
+
+            List<Vector3> retainedPoints = new List<Vector3>();
+            Dictionary<VertexKey, int> unique =
+                new Dictionary<VertexKey, int>();
+            for (int railIndex = 0;
+                 railIndex < isolatedRails.Length;
+                 railIndex++)
+            {
+                AddBoundedHullPoint(
+                    isolatedRails[railIndex].Position,
+                    retainedPoints,
+                    unique);
+            }
+            for (int faceIndex = 0;
+                 faceIndex < sourceFaces.Count;
+                 faceIndex++)
+            {
+                PolygonFace sourceFace = sourceFaces[faceIndex];
+                if (sourceFace == null || sourceFace.Vertices == null)
+                {
+                    blocker =
+                        "the retained-point multi-support hull contains a null source face";
+                    return false;
+                }
+                for (int vertexIndex = 0;
+                     vertexIndex < sourceFace.Vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 point = sourceFace.Vertices[vertexIndex];
+                    if ((point - sourceA).sqrMagnitude <=
+                            endpointToleranceSqr ||
+                        (point - sourceB).sqrMagnitude <=
+                            endpointToleranceSqr)
+                    {
+                        continue;
+                    }
+                    AddBoundedHullPoint(point, retainedPoints, unique);
+                }
+            }
+            audit.MultiSupportHullPointCount = retainedPoints.Count;
+            if (retainedPoints.Count < 4)
+            {
+                blocker =
+                    "the retained-point multi-support hull contains fewer than four unique points";
+                return false;
+            }
+
+            BoundedAllEdgesAuditResult hullAudit =
+                new BoundedAllEdgesAuditResult();
+            if (!TryBuildBoundedConvexHullPlanes(
+                    retainedPoints,
+                    solidCentre,
+                    pointTolerance,
+                    hullAudit,
+                    out List<BoundedHullPlane> hullPlanes,
+                    out blocker))
+            {
+                blocker =
+                    "retained-point multi-support hull plane extraction failed: " +
+                    blocker;
+                audit.MultiSupportHullTriplesTested =
+                    hullAudit.HullTriplesTested;
+                audit.MultiSupportHullSupportingTriples =
+                    hullAudit.HullSupportingTriples;
+                audit.MultiSupportHullEvidence =
+                    hullAudit.HullPlaneEvidence ?? string.Empty;
+                return false;
+            }
+            audit.MultiSupportHullTriplesTested =
+                hullAudit.HullTriplesTested;
+            audit.MultiSupportHullSupportingTriples =
+                hullAudit.HullSupportingTriples;
+            audit.MultiSupportHullPlaneCount = hullPlanes.Count;
+            audit.MultiSupportHullEvidence =
+                hullAudit.HullPlaneEvidence ?? string.Empty;
+
+            boundedFaces = new List<PolygonFace>(hullPlanes.Count);
+            List<int> bevelFaceIndices = new List<int>();
+            for (int planeIndex = 0;
+                 planeIndex < hullPlanes.Count;
+                 planeIndex++)
+            {
+                BoundedHullPlane plane = hullPlanes[planeIndex];
+                if (!TryOrderBoundedHullFacet(
+                        retainedPoints,
+                        plane,
+                        out List<Vector3> ordered))
+                {
+                    blocker =
+                        "a retained-point multi-support hull facet could not be ordered";
+                    boundedFaces = null;
+                    return false;
+                }
+                List<Vector3> sanitized =
+                    SanitizePolygon(ordered, plane.Normal);
+                if (sanitized.Count < 3 ||
+                    CalculatePolygonArea(sanitized) <=
+                        minimumStableFaceArea)
+                {
+                    blocker =
+                        "a retained-point multi-support hull facet collapsed during sanitation";
+                    boundedFaces = null;
+                    return false;
+                }
+                Vector3 measuredNormal =
+                    CalculatePolygonNormal(sanitized);
+                if (!IsFinite(measuredNormal) ||
+                    measuredNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+                {
+                    blocker =
+                        "a retained-point multi-support hull facet has an invalid normal";
+                    boundedFaces = null;
+                    return false;
+                }
+                if (Vector3.Dot(measuredNormal, plane.Normal) < 0f)
+                {
+                    sanitized.Reverse();
+                    measuredNormal = -measuredNormal;
+                }
+                if (!ValidateBoundedPolygon(
+                        sanitized,
+                        measuredNormal,
+                        minimumStableFaceArea,
+                        requireConvex: true,
+                        out string facetBlocker,
+                        out _))
+                {
+                    blocker =
+                        "retained-point multi-support hull facet failed: " +
+                        facetBlocker;
+                    boundedFaces = null;
+                    return false;
+                }
+
+                int sourceFaceIndex =
+                    FindBoundedRetainedHullSourceFace(
+                        sourceFaces,
+                        plane.Normal,
+                        plane.Distance,
+                        pointTolerance);
+                if (sourceFaceIndex >= 0)
+                {
+                    PolygonFace sourceFace = sourceFaces[sourceFaceIndex];
+                    boundedFaces.Add(new PolygonFace(
+                        sanitized,
+                        measuredNormal,
+                        sourceFace.Feature,
+                        sourceFace.FeatureStrength,
+                        PolygonFaceProvenanceKind.SourceFace,
+                        sourceFaceIndex));
+                }
+                else
+                {
+                    bevelFaceIndices.Add(boundedFaces.Count);
+                    boundedFaces.Add(new PolygonFace(
+                        sanitized,
+                        measuredNormal,
+                        PolygonFaceFeature.ConvexEdgeWear,
+                        selected.Candidate.Strength,
+                        PolygonFaceProvenanceKind.BoundedEdgeBevel,
+                        selected.GraphEdgeIndex));
+                }
+            }
+
+            if (bevelFaceIndices.Count == 0)
+            {
+                blocker =
+                    "the retained-point multi-support hull emitted no bevel facets";
+                boundedFaces = null;
+                return false;
+            }
+            for (int sourceFaceIndex = 0;
+                 sourceFaceIndex < sourceFaces.Count;
+                 sourceFaceIndex++)
+            {
+                if (FindBoundedSourceFace(
+                        boundedFaces,
+                        sourceFaceIndex) == null)
+                {
+                    blocker =
+                        "the retained-point multi-support hull consumed a complete source face";
+                    boundedFaces = null;
+                    return false;
+                }
+            }
+
+            if (ContainsBoundedHullVertex(
+                    boundedFaces,
+                    sourceA,
+                    pointTolerance) ||
+                ContainsBoundedHullVertex(
+                    boundedFaces,
+                    sourceB,
+                    pointTolerance))
+            {
+                blocker =
+                    "the retained-point multi-support hull did not remove both selected source-edge endpoints";
+                boundedFaces = null;
+                return false;
+            }
+
+            for (int railIndex = 0;
+                 railIndex < isolatedRails.Length;
+                 railIndex++)
+            {
+                if (!TryCanonicalizeBoundedHullRail(
+                        boundedFaces,
+                        bevelFaceIndices,
+                        isolatedRails[railIndex].Position,
+                        pointTolerance,
+                        minimumStableFaceArea))
+                {
+                    blocker =
+                        "an exact solved rail is absent from the retained-point bevel-band boundary";
+                    boundedFaces = null;
+                    return false;
+                }
+            }
+
+            if (!TryAuditConnectedBoundedBevelBand(
+                    boundedFaces,
+                    bevelFaceIndices,
+                    out int bevelAdjacencyCount))
+            {
+                blocker =
+                    "the retained-point multi-support bevel facets do not form one connected band";
+                boundedFaces = null;
+                return false;
+            }
+
+            int ownerSourceFaceA =
+                context.Graph.Faces[sourceEdge.FaceA].SourceFaceIndex;
+            int ownerSourceFaceB =
+                context.Graph.Faces[sourceEdge.FaceB].SourceFaceIndex;
+            if (!DoesBoundedBevelBandShareEdgeWithSourceFace(
+                    boundedFaces,
+                    bevelFaceIndices,
+                    ownerSourceFaceA) ||
+                !DoesBoundedBevelBandShareEdgeWithSourceFace(
+                    boundedFaces,
+                    bevelFaceIndices,
+                    ownerSourceFaceB))
+            {
+                blocker =
+                    "the retained-point multi-support bevel band does not connect both owner faces";
+                boundedFaces = null;
+                return false;
+            }
+            HashSet<int> allowedSupportFaces =
+                CollectBoundedEndpointSupportSourceFaces(
+                    context,
+                    sourceEdge);
+            int ownerModifiedCount = 0;
+            int supportModifiedCount = 0;
+            for (int sourceFaceIndex = 0;
+                 sourceFaceIndex < sourceFaces.Count;
+                 sourceFaceIndex++)
+            {
+                PolygonFace resultFace = FindBoundedSourceFace(
+                    boundedFaces,
+                    sourceFaceIndex);
+                bool equivalent =
+                    AreBoundedPolygonsGeometricallyEquivalent(
+                        sourceFaces[sourceFaceIndex].Vertices,
+                        resultFace.Vertices,
+                        sourceFaces[sourceFaceIndex].Normal,
+                        out bool boundaryOnlyDifference);
+                if (equivalent && !boundaryOnlyDifference)
+                {
+                    continue;
+                }
+                if (sourceFaceIndex == ownerSourceFaceA ||
+                    sourceFaceIndex == ownerSourceFaceB)
+                {
+                    ownerModifiedCount++;
+                }
+                else if (allowedSupportFaces.Contains(sourceFaceIndex))
+                {
+                    supportModifiedCount++;
+                }
+                else
+                {
+                    blocker =
+                        "the retained-point multi-support hull modified a source face outside the selected endpoint stars";
+                    boundedFaces = null;
+                    return false;
+                }
+            }
+            if (ownerModifiedCount != 2 || supportModifiedCount < 1)
+            {
+                blocker =
+                    "the retained-point multi-support hull did not modify both owners and a bounded endpoint-star interval";
+                boundedFaces = null;
+                return false;
+            }
+
+            audit.MultiSupportPlaneCut = 1;
+            audit.MultiSupportPlaneCount = bevelFaceIndices.Count;
+            audit.MultiSupportHullBevelFaceCount =
+                bevelFaceIndices.Count;
+            audit.MultiSupportPlaneCapAdjacencyCount =
+                bevelAdjacencyCount;
+            PolygonFace firstBevel =
+                boundedFaces[bevelFaceIndices[0]];
+            audit.MultiSupportPlaneNormal = firstBevel.Normal;
+            audit.MultiSupportPlaneDistance = Vector3.Dot(
+                firstBevel.Normal,
+                firstBevel.Vertices[0]);
+            if (bevelFaceIndices.Count > 1)
+            {
+                PolygonFace secondBevel =
+                    boundedFaces[bevelFaceIndices[1]];
+                audit.MultiSupportPlaneNormalB = secondBevel.Normal;
+                audit.MultiSupportPlaneDistanceB = Vector3.Dot(
+                    secondBevel.Normal,
+                    secondBevel.Vertices[0]);
+            }
+            audit.MultiSupportPlaneChainCandidateCount =
+                hullPlanes.Count;
+            audit.OwnerClipAttemptedCount = 2;
+            audit.OwnerClipCount = 2;
+            audit.EndpointSupportClipAttemptedCount = 2;
+            audit.EndpointSupportClipCount = 2;
+            audit.EndpointSupportRemovedVertexCount = 2;
+            audit.EndpointSupportRailInsertionCount = 4;
+            audit.EndpointSupportModifiedFaceExpectedCount =
+                supportModifiedCount;
+            audit.EndpointSupportBoundaryPathVertexCount =
+                CountBoundedBevelBandBoundaryVertices(
+                    boundedFaces,
+                    bevelFaceIndices);
+            audit.EndpointSupportFaceA =
+                isolatedRails[0].TargetSourceFaceIndex;
+            audit.EndpointSupportAdditionalFaceA =
+                isolatedRails[2].TargetSourceFaceIndex ==
+                    audit.EndpointSupportFaceA
+                    ? -1
+                    : isolatedRails[2].TargetSourceFaceIndex;
+            audit.EndpointSupportFaceB =
+                isolatedRails[1].TargetSourceFaceIndex;
+            audit.EndpointSupportAdditionalFaceB =
+                isolatedRails[3].TargetSourceFaceIndex ==
+                    audit.EndpointSupportFaceB
+                    ? -1
+                    : isolatedRails[3].TargetSourceFaceIndex;
+            audit.EndpointSupportGraphFaceA =
+                isolatedRails[0].TargetGraphFaceIndex;
+            audit.EndpointSupportGraphFaceB =
+                isolatedRails[1].TargetGraphFaceIndex;
+            audit.EndpointSupportVertexA = sourceEdge.VertexA;
+            audit.EndpointSupportVertexB = sourceEdge.VertexB;
+            audit.EndpointSupportMultiFaceEndpointCount =
+                (isolatedRails[0].TargetSourceFaceIndex !=
+                    isolatedRails[2].TargetSourceFaceIndex ? 1 : 0) +
+                (isolatedRails[1].TargetSourceFaceIndex !=
+                    isolatedRails[3].TargetSourceFaceIndex ? 1 : 0);
+            audit.TargetBoundaryCount = 4;
+            boundarySubdivisionCount = 4;
+            return true;
+        }
+
+        private static int FindBoundedRetainedHullSourceFace(
+            List<PolygonFace> sourceFaces,
+            Vector3 normal,
+            float distance,
+            float tolerance)
+        {
+            const float NormalAgreement = 0.99998f;
+            float distanceTolerance = Mathf.Max(
+                tolerance * 2f,
+                PointMergeDistance * 8f);
+            for (int faceIndex = 0;
+                 faceIndex < sourceFaces.Count;
+                 faceIndex++)
+            {
+                PolygonFace face = sourceFaces[faceIndex];
+                if (face == null || face.Vertices.Count == 0 ||
+                    Vector3.Dot(face.Normal, normal) < NormalAgreement)
+                {
+                    continue;
+                }
+                float sourceDistance = Vector3.Dot(
+                    face.Normal,
+                    face.Vertices[0]);
+                if (Mathf.Abs(sourceDistance - distance) <=
+                    distanceTolerance)
+                {
+                    return faceIndex;
+                }
+            }
+            return -1;
+        }
+
+        private static bool ContainsBoundedHullVertex(
+            List<PolygonFace> faces,
+            Vector3 point,
+            float tolerance)
+        {
+            float toleranceSqr = tolerance * tolerance;
+            for (int faceIndex = 0;
+                 faceIndex < faces.Count;
+                 faceIndex++)
+            {
+                for (int vertexIndex = 0;
+                     vertexIndex < faces[faceIndex].Vertices.Count;
+                     vertexIndex++)
+                {
+                    if ((faces[faceIndex].Vertices[vertexIndex] - point)
+                            .sqrMagnitude <= toleranceSqr)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool TryCanonicalizeBoundedHullRail(
+            List<PolygonFace> faces,
+            List<int> bevelFaceIndices,
+            Vector3 rail,
+            float pointTolerance,
+            float minimumStableFaceArea)
+        {
+            for (int bevelIndex = 0;
+                 bevelIndex < bevelFaceIndices.Count;
+                 bevelIndex++)
+            {
+                int faceIndex = bevelFaceIndices[bevelIndex];
+                PolygonFace face = faces[faceIndex];
+                List<Vector3> vertices =
+                    CopyBoundedPolygonPreservingCollinear(
+                        face.Vertices);
+                if (!TryInsertBoundedPointIntoPolygonBoundary(
+                        vertices,
+                        rail,
+                        pointTolerance,
+                        out _))
+                {
+                    continue;
+                }
+                if (!ValidateBoundedPolygon(
+                        vertices,
+                        face.Normal,
+                        minimumStableFaceArea,
+                        requireConvex: true,
+                        out _,
+                        out _))
+                {
+                    continue;
+                }
+                faces[faceIndex] = new PolygonFace(
+                    vertices,
+                    face.Normal,
+                    face.Feature,
+                    face.FeatureStrength,
+                    face.ProvenanceKind,
+                    face.ProvenanceIndex);
+                return true;
+            }
+            return false;
+        }
+
+        private static bool TryAuditConnectedBoundedBevelBand(
+            List<PolygonFace> faces,
+            List<int> bevelFaceIndices,
+            out int adjacencyCount)
+        {
+            adjacencyCount = 0;
+            if (bevelFaceIndices == null ||
+                bevelFaceIndices.Count == 0)
+            {
+                return false;
+            }
+            bool[] visited = new bool[bevelFaceIndices.Count];
+            Queue<int> queue = new Queue<int>();
+            visited[0] = true;
+            queue.Enqueue(0);
+            int visitedCount = 0;
+            while (queue.Count > 0)
+            {
+                int localIndex = queue.Dequeue();
+                visitedCount++;
+                PolygonFace current =
+                    faces[bevelFaceIndices[localIndex]];
+                for (int otherIndex = 0;
+                     otherIndex < bevelFaceIndices.Count;
+                     otherIndex++)
+                {
+                    if (otherIndex == localIndex)
+                    {
+                        continue;
+                    }
+                    PolygonFace other =
+                        faces[bevelFaceIndices[otherIndex]];
+                    if (CountBoundedPolygonSharedVertices(
+                            current,
+                            other) < 2)
+                    {
+                        continue;
+                    }
+                    if (localIndex < otherIndex)
+                    {
+                        adjacencyCount++;
+                    }
+                    if (!visited[otherIndex])
+                    {
+                        visited[otherIndex] = true;
+                        queue.Enqueue(otherIndex);
+                    }
+                }
+            }
+            return visitedCount == bevelFaceIndices.Count;
+        }
+
+        private static bool
+            DoesBoundedBevelBandShareEdgeWithSourceFace(
+                List<PolygonFace> faces,
+                List<int> bevelFaceIndices,
+                int sourceFaceIndex)
+        {
+            PolygonFace sourceFace = FindBoundedSourceFace(
+                faces,
+                sourceFaceIndex);
+            if (sourceFace == null)
+            {
+                return false;
+            }
+            for (int bevelIndex = 0;
+                 bevelIndex < bevelFaceIndices.Count;
+                 bevelIndex++)
+            {
+                if (CountBoundedPolygonSharedVertices(
+                        sourceFace,
+                        faces[bevelFaceIndices[bevelIndex]]) >= 2)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static int CountBoundedPolygonSharedVertices(
+            PolygonFace first,
+            PolygonFace second)
+        {
+            HashSet<VertexKey> firstKeys = new HashSet<VertexKey>();
+            for (int vertexIndex = 0;
+                 vertexIndex < first.Vertices.Count;
+                 vertexIndex++)
+            {
+                firstKeys.Add(new VertexKey(first.Vertices[vertexIndex]));
+            }
+            int count = 0;
+            HashSet<VertexKey> counted = new HashSet<VertexKey>();
+            for (int vertexIndex = 0;
+                 vertexIndex < second.Vertices.Count;
+                 vertexIndex++)
+            {
+                VertexKey key = new VertexKey(
+                    second.Vertices[vertexIndex]);
+                if (firstKeys.Contains(key) && counted.Add(key))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static int CountBoundedBevelBandBoundaryVertices(
+            List<PolygonFace> faces,
+            List<int> bevelFaceIndices)
+        {
+            HashSet<VertexKey> vertices = new HashSet<VertexKey>();
+            for (int bevelIndex = 0;
+                 bevelIndex < bevelFaceIndices.Count;
+                 bevelIndex++)
+            {
+                PolygonFace face = faces[bevelFaceIndices[bevelIndex]];
+                for (int vertexIndex = 0;
+                     vertexIndex < face.Vertices.Count;
+                     vertexIndex++)
+                {
+                    vertices.Add(new VertexKey(
+                        face.Vertices[vertexIndex]));
+                }
+            }
+            return vertices.Count;
+        }
+
+        private static HashSet<int> CollectBoundedEndpointSupportSourceFaces(
+            ChamferTopologyContext context,
+            EdgeWearGraphEdge sourceEdge)
+        {
+            HashSet<int> result = new HashSet<int>();
+            int[] endpointVertices =
+            {
+                sourceEdge.VertexA,
+                sourceEdge.VertexB
+            };
+            for (int endpointIndex = 0;
+                 endpointIndex < endpointVertices.Length;
+                 endpointIndex++)
+            {
+                EdgeWearGraphVertex vertex =
+                    context.Graph.Vertices[
+                        endpointVertices[endpointIndex]];
+                for (int faceIndex = 0;
+                     faceIndex < vertex.FaceIndices.Count;
+                     faceIndex++)
+                {
+                    int graphFaceIndex =
+                        vertex.FaceIndices[faceIndex];
+                    if (graphFaceIndex < 0 ||
+                        graphFaceIndex >= context.Graph.Faces.Count)
+                    {
+                        continue;
+                    }
+                    result.Add(
+                        context.Graph.Faces[graphFaceIndex]
+                            .SourceFaceIndex);
+                }
+            }
+            return result;
+        }
+
+        private static bool TryInsertBoundedPointIntoPolygonBoundary(
+            List<Vector3> vertices,
+            Vector3 point,
+            float tolerance,
+            out bool inserted)
+        {
+            inserted = false;
+            if (vertices == null || vertices.Count < 3 ||
+                !IsFinite(point) || tolerance <= 0f)
+            {
+                return false;
+            }
+            float toleranceSqr = tolerance * tolerance;
+            for (int vertexIndex = 0;
+                 vertexIndex < vertices.Count;
+                 vertexIndex++)
+            {
+                if ((vertices[vertexIndex] - point).sqrMagnitude <=
+                    toleranceSqr)
+                {
+                    vertices[vertexIndex] = point;
+                    return true;
+                }
+            }
+
+            int insertionIndex = -1;
+            float bestResidual = float.PositiveInfinity;
+            for (int edgeIndex = 0;
+                 edgeIndex < vertices.Count;
+                 edgeIndex++)
+            {
+                Vector3 start = vertices[edgeIndex];
+                Vector3 end = vertices[(edgeIndex + 1) % vertices.Count];
+                Vector3 segment = end - start;
+                float lengthSqr = segment.sqrMagnitude;
+                if (lengthSqr <= MinimumEdgeLengthSqr)
+                {
+                    continue;
+                }
+                float parameter = Vector3.Dot(
+                    point - start,
+                    segment) / lengthSqr;
+                float length = Mathf.Sqrt(lengthSqr);
+                float parameterTolerance = Mathf.Min(
+                    0.25f,
+                    tolerance / length);
+                if (parameter <= parameterTolerance ||
+                    parameter >= 1f - parameterTolerance)
+                {
+                    continue;
+                }
+                Vector3 closest = start + segment * parameter;
+                float residual = Vector3.Distance(point, closest);
+                if (residual <= tolerance && residual < bestResidual)
+                {
+                    bestResidual = residual;
+                    insertionIndex = edgeIndex + 1;
+                }
+            }
+            if (insertionIndex < 0)
+            {
+                return false;
+            }
+            vertices.Insert(insertionIndex, point);
+            inserted = true;
             return true;
         }
 
@@ -5540,7 +6781,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ChamferTopologyContext context,
                 int sourceEdgeIndex,
                 int supportA,
-                int supportB)
+                int additionalSupportA,
+                int supportB,
+                int additionalSupportB,
+                bool classifyExactPlaneSupport,
+                Vector3 supportPlaneNormal,
+                float supportPlaneDistance,
+                ICollection<int> allowedEndpointSupportFaces)
         {
             BoundedSourceFaceChangeAudit audit =
                 new BoundedSourceFaceChangeAudit
@@ -5585,7 +6832,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 bool owner = provenanceIndex == ownerA ||
                     provenanceIndex == ownerB;
                 bool endpointSupport = provenanceIndex == supportA ||
-                    provenanceIndex == supportB;
+                    provenanceIndex == additionalSupportA ||
+                    provenanceIndex == supportB ||
+                    provenanceIndex == additionalSupportB ||
+                    (allowedEndpointSupportFaces != null &&
+                     allowedEndpointSupportFaces.Contains(
+                         provenanceIndex)) ||
+                    (classifyExactPlaneSupport &&
+                     IsBoundedSourceFaceIntersectedByPlane(
+                         baseline,
+                         supportPlaneNormal,
+                         supportPlaneDistance));
                 if (owner)
                 {
                     if (!equivalent)
@@ -5596,7 +6853,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 else if (endpointSupport)
                 {
-                    if (!equivalent)
+                    if (!equivalent || boundaryOnlyDifference)
                     {
                         audit.ModifiedSourceFaceCount++;
                         audit.EndpointSupportSourceFaceModifiedCount++;
@@ -5614,6 +6871,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
             return audit;
+        }
+
+        private static bool IsBoundedSourceFaceIntersectedByPlane(
+            PolygonFace face,
+            Vector3 planeNormal,
+            float planeDistance)
+        {
+            if (face == null || face.Vertices == null ||
+                face.Vertices.Count < 3 || !IsFinite(planeNormal) ||
+                planeNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+            planeNormal.Normalize();
+            float tolerance = PointMergeDistance * 8f;
+            bool hasRetained = false;
+            bool hasRemoved = false;
+            for (int vertexIndex = 0;
+                 vertexIndex < face.Vertices.Count;
+                 vertexIndex++)
+            {
+                float distance = Vector3.Dot(
+                    planeNormal,
+                    face.Vertices[vertexIndex]) - planeDistance;
+                hasRetained |= distance <= tolerance;
+                hasRemoved |= distance > tolerance;
+            }
+            return hasRetained && hasRemoved;
         }
 
         private static void ApplyBoundedSourceFaceChangeAudits(
@@ -5999,7 +7284,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Vector3 b1,
             ref BoundedSingleEdgeAuditResult result)
         {
-            PolygonFace bevelFace = null;
+            List<PolygonFace> bevelFaces = new List<PolygonFace>();
             for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
             {
                 PolygonFace face = faces[faceIndex];
@@ -6007,11 +7292,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         PolygonFaceProvenanceKind.BoundedEdgeBevel &&
                     face.ProvenanceIndex == sourceEdgeIndex)
                 {
-                    bevelFace = face;
-                    break;
+                    bevelFaces.Add(face);
                 }
             }
-            if (bevelFace == null)
+            if (bevelFaces.Count == 0)
             {
                 result.RailDeviation = float.PositiveInfinity;
                 result.MaximumExtentBeyondRails = float.PositiveInfinity;
@@ -6025,21 +7309,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                  expectedIndex++)
             {
                 float minimumDistanceSqr = float.PositiveInfinity;
-                for (int vertexIndex = 0;
-                     vertexIndex < bevelFace.Vertices.Count;
-                     vertexIndex++)
+                for (int faceIndex = 0;
+                     faceIndex < bevelFaces.Count;
+                     faceIndex++)
                 {
-                    minimumDistanceSqr = Mathf.Min(
-                        minimumDistanceSqr,
-                        (bevelFace.Vertices[vertexIndex] -
-                         expected[expectedIndex]).sqrMagnitude);
+                    PolygonFace bevelFace = bevelFaces[faceIndex];
+                    for (int vertexIndex = 0;
+                         vertexIndex < bevelFace.Vertices.Count;
+                         vertexIndex++)
+                    {
+                        minimumDistanceSqr = Mathf.Min(
+                            minimumDistanceSqr,
+                            (bevelFace.Vertices[vertexIndex] -
+                             expected[expectedIndex]).sqrMagnitude);
+                    }
                 }
                 maximumDeviationSqr = Mathf.Max(
                     maximumDeviationSqr,
                     minimumDistanceSqr);
             }
             result.RailDeviation = Mathf.Sqrt(maximumDeviationSqr);
+            if (result.MultiSupportPlaneCut == 1)
+            {
+                result.MaximumExtentBeyondRails = 0f;
+                return;
+            }
 
+            PolygonFace ordinaryBevelFace = bevelFaces[0];
             Vector3 edgeAxis =
                 ((b0 + b1) - (a0 + a1)) * 0.5f;
             Vector3 widthAxis =
@@ -6083,14 +7379,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             float maximumExtent = 0f;
             for (int vertexIndex = 0;
-                 vertexIndex < bevelFace.Vertices.Count;
+                 vertexIndex < ordinaryBevelFace.Vertices.Count;
                  vertexIndex++)
             {
                 float edgeValue = Vector3.Dot(
-                    bevelFace.Vertices[vertexIndex],
+                    ordinaryBevelFace.Vertices[vertexIndex],
                     edgeAxis);
                 float widthValue = Vector3.Dot(
-                    bevelFace.Vertices[vertexIndex],
+                    ordinaryBevelFace.Vertices[vertexIndex],
                     widthAxis);
                 maximumExtent = Mathf.Max(
                     maximumExtent,

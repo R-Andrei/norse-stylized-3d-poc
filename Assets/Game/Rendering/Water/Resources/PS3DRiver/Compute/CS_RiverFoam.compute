@@ -1114,7 +1114,9 @@ void FoamUnpackObjectContactProfile(
     out float2 point2,
     out float2 point3,
     out float2 point4,
-    out float frontSplit)
+    out float frontSplit,
+    out float negativeFirstSegmentSplit,
+    out float positiveFirstSegmentSplit)
 {
     point0 = sourceEvent.distance.xy;
     point1 = float2(sourceEvent.distance.w, sourceEvent.shore.x);
@@ -1122,6 +1124,14 @@ void FoamUnpackObjectContactProfile(
     point3 = float2(sourceEvent.variation.z, sourceEvent.kinematics.x);
     point4 = float2(sourceEvent.kinematics.y, sourceEvent.objectData.y);
     frontSplit = clamp(sourceEvent.objectData.z, 0.001, 0.999);
+    negativeFirstSegmentSplit = clamp(
+        sourceEvent.variation.x,
+        0.001,
+        0.999);
+    positiveFirstSegmentSplit = clamp(
+        sourceEvent.kinematics.w,
+        0.001,
+        0.999);
 }
 
 float FoamResolveObjectProfileRibbonShape(
@@ -1166,6 +1176,8 @@ float FoamResolveObjectFrontProfileShape(
     float2 point3,
     float2 point4,
     float frontSplit,
+    float negativeFirstSegmentSplit,
+    float positiveFirstSegmentSplit,
     float2 physicalCellSpacing,
     out float frontT)
 {
@@ -1178,28 +1190,31 @@ float FoamResolveObjectFrontProfileShape(
         selectedStart = point0;
         selectedEnd = point1;
         pathStart = 0.0;
-        pathSpan = frontSplit * 0.5;
+        pathSpan = frontSplit * negativeFirstSegmentSplit;
     }
     else if (localPosition.y <= point2.y)
     {
         selectedStart = point1;
         selectedEnd = point2;
-        pathStart = frontSplit * 0.5;
-        pathSpan = frontSplit * 0.5;
+        pathStart = frontSplit * negativeFirstSegmentSplit;
+        pathSpan = frontSplit * (1.0 - negativeFirstSegmentSplit);
     }
     else if (localPosition.y <= point3.y)
     {
         selectedStart = point2;
         selectedEnd = point3;
         pathStart = frontSplit;
-        pathSpan = (1.0 - frontSplit) * 0.5;
+        pathSpan =
+            (1.0 - frontSplit) * positiveFirstSegmentSplit;
     }
     else
     {
         selectedStart = point3;
         selectedEnd = point4;
-        pathStart = frontSplit + (1.0 - frontSplit) * 0.5;
-        pathSpan = (1.0 - frontSplit) * 0.5;
+        pathStart = frontSplit +
+            (1.0 - frontSplit) * positiveFirstSegmentSplit;
+        pathSpan =
+            (1.0 - frontSplit) * (1.0 - positiveFirstSegmentSplit);
     }
 
     float selectedSegmentT;
@@ -1222,6 +1237,7 @@ float FoamResolveObjectNegativeHalfProfileShape(
     float2 point0,
     float2 point1,
     float2 point2,
+    float firstSegmentSplit,
     float2 physicalCellSpacing,
     out float halfT)
 {
@@ -1238,7 +1254,7 @@ float FoamResolveObjectNegativeHalfProfileShape(
     {
         selectedStart = point1;
         selectedEnd = point2;
-        pathStart = 0.5;
+        pathStart = firstSegmentSplit;
     }
 
     float selectedSegmentT;
@@ -1247,7 +1263,10 @@ float FoamResolveObjectNegativeHalfProfileShape(
         selectedStart,
         selectedEnd,
         selectedSegmentT);
-    halfT = pathStart + selectedSegmentT * 0.5;
+    float pathSpan = pathStart <= 0.0
+        ? firstSegmentSplit
+        : 1.0 - firstSegmentSplit;
+    halfT = pathStart + selectedSegmentT * pathSpan;
     return FoamResolveObjectProfileRibbonShape(
         localPosition,
         selectedStart,
@@ -1261,6 +1280,7 @@ float FoamResolveObjectPositiveHalfProfileShape(
     float2 point2,
     float2 point3,
     float2 point4,
+    float firstSegmentSplit,
     float2 physicalCellSpacing,
     out float frontToShoulderT)
 {
@@ -1277,7 +1297,7 @@ float FoamResolveObjectPositiveHalfProfileShape(
     {
         selectedStart = point3;
         selectedEnd = point4;
-        pathStart = 0.5;
+        pathStart = firstSegmentSplit;
     }
 
     float selectedSegmentT;
@@ -1286,7 +1306,10 @@ float FoamResolveObjectPositiveHalfProfileShape(
         selectedStart,
         selectedEnd,
         selectedSegmentT);
-    frontToShoulderT = pathStart + selectedSegmentT * 0.5;
+    float pathSpan = pathStart <= 0.0
+        ? firstSegmentSplit
+        : 1.0 - firstSegmentSplit;
+    frontToShoulderT = pathStart + selectedSegmentT * pathSpan;
     return FoamResolveObjectProfileRibbonShape(
         localPosition,
         selectedStart,
@@ -1438,6 +1461,8 @@ float FoamEvaluateObjectContactArcSource(
     float2 point3;
     float2 point4;
     float frontSplit;
+    float negativeFirstSegmentSplit;
+    float positiveFirstSegmentSplit;
     FoamUnpackObjectContactProfile(
         sourceEvent,
         point0,
@@ -1445,7 +1470,9 @@ float FoamEvaluateObjectContactArcSource(
         point2,
         point3,
         point4,
-        frontSplit);
+        frontSplit,
+        negativeFirstSegmentSplit,
+        positiveFirstSegmentSplit);
 
     float wakeArmLength = max(0.05, sourceEvent.shore.y);
     float totalPathLength = max(0.001, sourceEvent.kinematics.z);
@@ -1461,6 +1488,8 @@ float FoamEvaluateObjectContactArcSource(
         point3,
         point4,
         frontSplit,
+        negativeFirstSegmentSplit,
+        positiveFirstSegmentSplit,
         physicalCellSpacing,
         frontT);
 
@@ -1551,6 +1580,8 @@ float FoamEvaluateObjectContactSemiArcSource(
     float2 point3;
     float2 point4;
     float frontSplit;
+    float negativeFirstSegmentSplit;
+    float positiveFirstSegmentSplit;
     FoamUnpackObjectContactProfile(
         sourceEvent,
         point0,
@@ -1558,7 +1589,9 @@ float FoamEvaluateObjectContactSemiArcSource(
         point2,
         point3,
         point4,
-        frontSplit);
+        frontSplit,
+        negativeFirstSegmentSplit,
+        positiveFirstSegmentSplit);
 
     float armLength = max(0.05, sourceEvent.shore.y);
     float totalPathLength = max(0.001, sourceEvent.kinematics.z);
@@ -1584,6 +1617,7 @@ float FoamEvaluateObjectContactSemiArcSource(
             point2,
             point3,
             point4,
+            positiveFirstSegmentSplit,
             physicalCellSpacing,
             frontToShoulderT);
         frontHalfT = 1.0 - frontToShoulderT;
@@ -1601,15 +1635,20 @@ float FoamEvaluateObjectContactSemiArcSource(
             point0,
             point1,
             point2,
+            negativeFirstSegmentSplit,
             physicalCellSpacing,
             frontHalfT);
     }
 
-    float armPathT = saturate(
-        armLength * (1.0 - armT) /
-        totalPathLength);
+    // Semi-Arcs must retain physical-front coverage throughout their active
+    // lifecycle. Build begins at the front point and advances through the
+    // selected face half toward the shoulder and downstream arm tip. Reverse
+    // release removes that arm tip first and preserves the front until last.
     float frontPathT = saturate(
-        (armLength + frontHalfT * selectedFrontLength) /
+        (1.0 - frontHalfT) * selectedFrontLength /
+        totalPathLength);
+    float armPathT = saturate(
+        (selectedFrontLength + armT * armLength) /
         totalPathLength);
     float progress = saturate(sourceEvent.header.z);
     float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
@@ -2122,16 +2161,23 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
         return result;
     }
 
-    float sourceFillBlend = saturate(sourceEvent.kinematics.w);
-    float sourceFill = lerp(
-        1.0,
-        EvaluateFoamSourceFillCoverage(
-            physicalPosition,
-            sourceEvent.material.x,
-            sourceEvent.variation.x,
-            sourceEvent.material.w,
-            physicalCellSpacing),
-        sourceFillBlend);
+    bool objectRibbonSource =
+        (sourceType > 2.5 && sourceType < 3.5) ||
+        (sourceType > 4.5 && sourceType < 5.5);
+    float sourceFill = 1.0;
+    if (!objectRibbonSource)
+    {
+        float sourceFillBlend = saturate(sourceEvent.kinematics.w);
+        sourceFill = lerp(
+            1.0,
+            EvaluateFoamSourceFillCoverage(
+                physicalPosition,
+                sourceEvent.material.x,
+                sourceEvent.variation.x,
+                sourceEvent.material.w,
+                physicalCellSpacing),
+            sourceFillBlend);
+    }
     float injectedPresence = saturate(
         shape * sourceFill * sourceEvent.material.x * amountMultiplier *
         validFluid);

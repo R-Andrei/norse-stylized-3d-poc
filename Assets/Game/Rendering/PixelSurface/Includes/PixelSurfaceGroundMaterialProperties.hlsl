@@ -27,6 +27,7 @@
                 float4 _GroundShoreHydrologyCharacterB;
                 float4 _GroundShoreHydrologySpatialA;
                 float4 _GroundShoreHydrologySpatialB;
+                float4 _GroundShoreWetHighlightShaping;
                 float _GroundBankLayerEnabled;
                 half4 _GroundBankLayerBaseColor;
                 half4 _GroundBankLayerDarkColor;
@@ -46,6 +47,14 @@
                 float _GroundRiverbedLayerDrySmoothness;
                 float _GroundRiverbedLayerDrySpecularStrength;
                 float _GroundRiverbedMaterialStrength;
+                float _GroundRiverbedHydrologyEnabled;
+                half4 _GroundRiverbedHydrologyWetTintColor;
+                float4 _GroundRiverbedHydrologyCharacterA;
+                float4 _GroundRiverbedHydrologyCharacterB;
+                float _GroundRiverbedWetnessStrength;
+                float4 _GroundRiverbedWetnessTransition;
+                float _GroundRiverbedWetSmoothnessResponse;
+                float _GroundRiverbedWetSpecularResponse;
                 float _GroundBankMaterialStrength;
                 float _GroundBankMaterialReach;
                 float _GroundImmediateBankExposure;

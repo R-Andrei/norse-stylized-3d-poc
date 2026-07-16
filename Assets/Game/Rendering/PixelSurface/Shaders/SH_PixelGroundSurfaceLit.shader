@@ -31,6 +31,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundShoreHydrologyCharacterB("Ground Shore Hydrology Character B", Vector) = (0.05, 0.65, 0.75, 0)
         [HideInInspector] _GroundShoreHydrologySpatialA("Ground Shore Hydrology Spatial A", Vector) = (0, 0.50, 0.25, 0.45)
         [HideInInspector] _GroundShoreHydrologySpatialB("Ground Shore Hydrology Spatial B", Vector) = (0.80, 1.00, 0, 0)
+        [HideInInspector] _GroundShoreWetHighlightShaping("Ground Shore Wet Highlight Shaping", Vector) = (0.35, 0.80, 0.85, 0.60)
         _GroundPatchBlendStrength("Ground Patch Blend Strength", Range(0, 1)) = 0.55
         _GroundMacroPatchScale("Ground Macro Patch Scale", Range(0.5, 12)) = 4.5
         _GroundMacroPatchPatternSeed("Macro Patch Pattern Seed", Float) = 0
@@ -67,6 +68,14 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundRiverbedLayerDrySmoothness("Ground Riverbed Layer Dry Smoothness", Range(0, 1)) = 0.15
         [HideInInspector] _GroundRiverbedLayerDrySpecularStrength("Ground Riverbed Layer Dry Specular Strength", Range(0, 1)) = 0.1
         [HideInInspector] _GroundRiverbedMaterialStrength("Ground Riverbed Material Strength", Range(0, 1)) = 1
+        [HideInInspector] _GroundRiverbedHydrologyEnabled("Ground Riverbed Hydrology Enabled", Float) = 0
+        [HideInInspector] _GroundRiverbedHydrologyWetTintColor("Ground Riverbed Hydrology Wet Tint Color", Color) = (0.22, 0.25, 0.24, 1)
+        [HideInInspector] _GroundRiverbedHydrologyCharacterA("Ground Riverbed Hydrology Character A", Vector) = (0.35, 0.30, 0.35, 0.30)
+        [HideInInspector] _GroundRiverbedHydrologyCharacterB("Ground Riverbed Hydrology Character B", Vector) = (0.05, 0.65, 0.75, 0)
+        [HideInInspector] _GroundRiverbedWetnessStrength("Ground Riverbed Wetness Strength", Range(0, 1)) = 1
+        [HideInInspector] _GroundRiverbedWetnessTransition("Ground Riverbed Wetness Transition", Vector) = (0.20, 0.75, 0, 0)
+        [HideInInspector] _GroundRiverbedWetSmoothnessResponse("Ground Riverbed Wet Smoothness Response", Range(0, 1)) = 0
+        [HideInInspector] _GroundRiverbedWetSpecularResponse("Ground Riverbed Wet Specular Response", Range(0, 1)) = 0
         [HideInInspector] _GroundBankMaterialStrength("Ground Bank Material Strength", Range(0, 1)) = 1
         [HideInInspector] _GroundBankMaterialReach("Ground Bank Material Reach", Range(0, 1)) = 0.65
         [HideInInspector] _GroundImmediateBankExposure("Ground Immediate-Bank Exposure", Range(0, 1)) = 0.55

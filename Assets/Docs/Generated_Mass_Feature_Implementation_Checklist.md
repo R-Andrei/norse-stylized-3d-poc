@@ -3782,7 +3782,7 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 
 ## EW-B4.2R13A.3 — single-search execution correction
 
-**Status:** implementation complete; Unity runtime validation pending.
+**Status:** rejected by Unity runtime validation; superseded by EW-B4.2R13A.4.
 
 ### Execution architecture
 
@@ -3805,3 +3805,72 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 - [ ] Artistic-preview matrix passes `33/33`.
 - [ ] Outlier recovery passes `5/5`.
 - [ ] Comprehensive evidence remains available and collateral/topology/face-quality/placement/render failures remain zero.
+
+
+### EW-B4.2R13A.3 runtime result — rejected
+
+- [x] Unity compilation completed after the R13A.3a `System.Globalization` import correction.
+- [x] The suite completed without the former multi-minute editor lockup.
+- [x] Topology matrix returned `31/33`; failures were `seed 1/maximum` and `seed 7778/maximum` at the five-second search boundary.
+- [x] Artistic-preview matrix returned `31/33` at the same coordinates.
+- [x] Outlier recovery returned `0/5`.
+- [x] Current seed `8889` preview was erased (`applied=0`) when the optional recovery search found no certified shell.
+- [x] Comprehensive evidence was unavailable because timed-out cases returned empty artistic records.
+- [x] Reject replacement-solve recovery; retain the single-frontier and cancellation safeguards only.
+
+## EW-B4.2R13A.4 — certified baseline augmentation and multi-support endpoints
+
+**Status:** stable incomplete runtime baseline. Safety floor passed; outlier recovery remained `0/5` and is continued by R13A.6.
+
+### Certified baseline fallback
+
+- [x] Build and fully certify an ordinary baseline with selected provisional recovery edges forced off.
+- [x] Retain baseline corner solution, plane audit, preview soup, lifecycle evidence, and certification metrics as immutable fallback.
+- [x] Discover corner-inactive recovery participants from baseline corner-conflict evidence.
+- [x] Start augmentation from the baseline exclusion set with recovery participants re-enabled.
+- [x] Disable kernel coexistence recursion during augmentation trials so only one frontier is active.
+- [x] Commit augmentation only when it is fully certified, recovers at least one absent participant, and is superior by count, score, then width.
+- [x] On timeout, state exhaustion, cancellation, or no superior shell, retain and report the certified baseline instead of clearing preview or matrix evidence.
+- [x] Publish explicit baseline/applied and augmentation state, elapsed time, frontier, last failure, and implicated-edge evidence.
+
+### Multi-support endpoint construction
+
+- [x] Detect endpoints whose exact owner-boundary rails resolve through different support faces.
+- [x] Use the four exact rails to authorize one selected-edge bevel half-space cut across the convex source shell.
+- [x] Require the solid centre and every foreign source vertex to remain while both selected source-edge endpoints lie on the removed side.
+- [x] Require one unique bounded bevel cap and preserve all four solved rail terminals on its boundary.
+- [x] Preserve complete unique source-face provenance and classify only exact cut-plane support-interval modifications as expected.
+- [x] Keep strict intersection, manifold, containment, convexity, bounds, volume, face-quality, sidedness, triangulation, and render-channel certification mandatory.
+- [x] Keep ordinary same-support endpoint construction unchanged.
+
+### Runtime acceptance
+
+- [x] Compile with zero C# errors.
+- [x] Full suite contract is `EW-B4.2R13A.4-suite`; topology, preview, and comprehensive reports use matching contracts.
+- [x] Current seed `8889` preview remains applied even when optional augmentation fails.
+- [x] Seed `1/maximum` and `7778/maximum` return certified baseline records rather than empty collateral failures.
+- [x] Topology matrix passes `33/33`.
+- [x] Artistic-preview matrix passes `33/33`.
+- [x] Comprehensive evidence is available with valid recorded ranks and score reproduction.
+- [ ] Outlier recovery passes `5/5`.
+- [x] Collateral lost/changed, topology, face-quality, placement, and render-channel failures remain zero.
+- [ ] Representative render audit retains zero invalid normals/tangents and no black-triangle/Bloom regression.
+
+
+## EW-B4.2R13A.6 — baseline restoration, retained-point hull, and finalized corner injection
+
+**Status:** implemented; Unity compilation and runtime suite pending. R13A.4 remains the stable incomplete fallback until every safety gate passes.
+
+- [x] Restore R13A.4 ordinary geometry and corner behavior; do not retain R13A.5 sampled split-plane geometry.
+- [x] Restrict augmentation initiation to certified multi-support retained-hull edges and finalized corner-inactive participants.
+- [x] Build the exact retained point set from all original vertices except the selected endpoints plus four exact rails.
+- [x] Enumerate and merge global supporting hull planes; emit a connected bevel-facet band with complete source provenance.
+- [x] Reject any result that modifies a source face outside the two endpoint stars or loses a source-face provenance record.
+- [x] Capture corner recovery evidence at the final `corner-width-inactive` transition.
+- [x] Protect recovery targets and seed bounded neighbour-deferral subsets from their exact conflict records.
+- [x] Forbid certified baseline-edge loss outside recovered corner participants and forbid any certified-count reduction.
+- [x] Advance suite, topology, preview, and comprehensive contracts to R13A.6.
+- [ ] Unity compiles with zero errors.
+- [ ] Current seed `8889` restores R13A.4 identity: edge `39` active and edge `40` inactive unless a named recovery target is also certified without unrelated loss.
+- [ ] Full suite retains current preview, topology `33/33`, preview `33/33`, and comprehensive evidence.
+- [ ] Outlier recovery reaches `5/5`, or exhaustive hull evidence proves a target infeasible while R13A.4 hashes and edge identity remain unchanged.

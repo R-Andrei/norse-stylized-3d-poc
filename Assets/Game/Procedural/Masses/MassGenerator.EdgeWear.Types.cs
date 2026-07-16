@@ -1588,6 +1588,9 @@ private readonly struct EdgeWearTopologyStats
             public float UniformScale;
             public readonly List<int> ParticipatingSelectedEdges =
                 new List<int>();
+            public readonly Dictionary<int, float>
+                ParticipantWidthBeforeScale =
+                    new Dictionary<int, float>();
         }
 
         private sealed class ChamferCornerSolution
@@ -1974,6 +1977,7 @@ private struct EdgeWearGraphBuildStats
             public bool IsolatedConstructionValid;
             public bool FeasibleWidthFractionValid;
             public bool WidthRecoveryProvisional;
+            public bool MultiSupportHullRecovery;
             public bool EndpointSpanValid;
             public bool Viable;
             public float MinimumDihedralDegrees;
@@ -2329,6 +2333,11 @@ private struct EdgeWearGraphBuildStats
             public bool Candidate;
             public bool Selected;
             public bool WidthInactive;
+            public bool CornerRecoveryProvisional;
+            public int CornerRecoveryCollapsedSourceEdgeIndex = -1;
+            public float CornerRecoveryLastPositiveWidth;
+            public float CornerRecoveryUniformScale;
+            public string CornerRecoveryParticipants = string.Empty;
             public bool Active;
             public bool AttemptedBuilt;
             public bool Built;

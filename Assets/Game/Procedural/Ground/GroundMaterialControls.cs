@@ -3,6 +3,31 @@ using UnityEngine;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
+    public enum GroundRiverbedSurfaceSource
+    {
+        LegacyAuto = 0,
+
+        [InspectorName("Primary Ground")]
+        PrimaryGround = 1,
+
+        [InspectorName("Inherit Bank Surface Layer")]
+        InheritBankSurfaceLayer = 2,
+
+        [InspectorName("Custom Riverbed Surface Layer")]
+        CustomRiverbedSurfaceLayer = 3
+    }
+
+    public enum GroundRiverbedHydrologySource
+    {
+        [InspectorName("Inherit Shore Hydrology Modifier")]
+        InheritShoreHydrologyModifier = 0,
+
+        [InspectorName("Custom Hydrology Modifier")]
+        CustomHydrologyModifier = 1,
+
+        Disabled = 2
+    }
+
 [Serializable]
 public sealed class GroundMaterialControls
 {
@@ -47,13 +72,27 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private GroundSurfaceLayerProfile bankSurfaceLayer;
 
-    [Tooltip("Optional reusable substrate used across the visible submerged River corridor. Null inherits the primary Ground surface.")]
+    [Tooltip("Custom reusable substrate used when Riverbed Surface Source is Custom Riverbed Surface Layer. Legacy non-null values resolve to Custom; legacy null values resolve to Primary Ground.")]
     [SerializeField]
     private GroundSurfaceLayerProfile riverbedSurfaceLayer;
+
+    [HideInInspector]
+    [SerializeField]
+    private GroundRiverbedSurfaceSource riverbedSurfaceSource =
+        GroundRiverbedSurfaceSource.LegacyAuto;
 
     [Tooltip("Optional reusable wetness character applied independently from Bank substrate identity. Null disables local Shore hydrology.")]
     [SerializeField]
     private GroundHydrologyModifierProfile shoreHydrologyModifier;
+
+    [HideInInspector]
+    [SerializeField]
+    private GroundRiverbedHydrologySource riverbedHydrologySource =
+        GroundRiverbedHydrologySource.InheritShoreHydrologyModifier;
+
+    [Tooltip("Custom reusable wetness character used when Riverbed Hydrology Source is Custom Hydrology Modifier.")]
+    [SerializeField]
+    private GroundHydrologyModifierProfile riverbedHydrologyModifier;
 
     [Header("River-Coupled Bank Composition")]
     [InspectorName("Bank Material Strength")]
@@ -110,6 +149,37 @@ public sealed class GroundMaterialControls
     [Range(0f, 1f)]
     [SerializeField]
     private float riverbedMaterialStrength = 1f;
+
+    [Header("River-Coupled Riverbed Hydrology")]
+    [InspectorName("Riverbed Wetness Strength")]
+    [Tooltip("Master exact-support wetness strength for the resolved Riverbed Hydrology Modifier. This has no reach or fade and does not change substrate identity.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float riverbedWetnessStrength = 1f;
+
+    [InspectorName("Riverbed-to-Bank Blend Distance")]
+    [Tooltip("Wetness-only distance in metres that extends the Riverbed Hydrology Modifier from exact Riverbed Support onto the corridor Bank. Zero preserves the exact-support boundary.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float riverbedToBankWetnessBlendDistance = 0.2f;
+
+    [InspectorName("Riverbed-to-Bank Blend Softness")]
+    [Tooltip("Shape of the Riverbed wetness transition across its authored Bank-side distance. Zero is linear; one uses a fully smooth transition.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float riverbedToBankWetnessBlendSoftness = 0.75f;
+
+    [InspectorName("Smoothness Response")]
+    [Tooltip("How much of the Riverbed Hydrology Modifier's smoothness boost is permitted on submerged Ground. Zero keeps wet colour and darkening without adding submerged smoothness.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float riverbedWetSmoothnessResponse;
+
+    [InspectorName("Specular Response")]
+    [Tooltip("How much of the Riverbed Hydrology Modifier's specular boost is permitted on submerged Ground. Zero leaves reflective ownership to the water surface.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float riverbedWetSpecularResponse;
 
     [Header("River-Coupled Surface-Cover Response")]
     [InspectorName("Vegetation Retreat Strength")]
@@ -173,6 +243,30 @@ public sealed class GroundMaterialControls
     [Range(0f, 1f)]
     [SerializeField]
     private float waterlineSaturation = 1f;
+
+    [InspectorName("Wet Highlight Strength")]
+    [Tooltip("Strength of the narrow stylized Shore highlight added after ordinary Ground lighting. The effect remains masked by local Shore wetness.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float shoreWetHighlightStrength = 0.35f;
+
+    [InspectorName("Wet Highlight Tightness")]
+    [Tooltip("Angular tightness of the physical Shore highlight lobe. Higher values produce a narrower response.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float shoreWetHighlightTightness = 0.8f;
+
+    [InspectorName("Camera-Centred Bias")]
+    [Tooltip("Transfers Shore wet finish from the broad physical PBR response into a camera-centred stylized band. Zero preserves the physical response; one uses the camera-centred response.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float shoreWetHighlightCameraBias = 0.85f;
+
+    [InspectorName("Vertical Falloff")]
+    [Tooltip("How quickly the camera-centred Shore highlight fades toward the top and bottom of the active camera view.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float shoreWetHighlightVerticalFalloff = 0.6f;
 
     [Header("Macro Patch Composition")]
     [InspectorName("Macro Patch Scale")]
@@ -381,8 +475,36 @@ public sealed class GroundMaterialControls
     public float VegetationTintStrength => Mathf.Clamp01(vegetationTintStrength);
     public GroundSurfaceLayerProfile BankSurfaceLayer => bankSurfaceLayer;
     public GroundSurfaceLayerProfile RiverbedSurfaceLayer => riverbedSurfaceLayer;
+    public GroundRiverbedSurfaceSource RiverbedSurfaceSource =>
+        riverbedSurfaceSource == GroundRiverbedSurfaceSource.LegacyAuto
+            ? riverbedSurfaceLayer != null
+                ? GroundRiverbedSurfaceSource.CustomRiverbedSurfaceLayer
+                : GroundRiverbedSurfaceSource.PrimaryGround
+            : riverbedSurfaceSource;
+    public GroundSurfaceLayerProfile ResolvedRiverbedSurfaceLayer =>
+        RiverbedSurfaceSource switch
+        {
+            GroundRiverbedSurfaceSource.InheritBankSurfaceLayer =>
+                bankSurfaceLayer,
+            GroundRiverbedSurfaceSource.CustomRiverbedSurfaceLayer =>
+                riverbedSurfaceLayer,
+            _ => null
+        };
     public GroundHydrologyModifierProfile ShoreHydrologyModifier =>
         shoreHydrologyModifier;
+    public GroundRiverbedHydrologySource RiverbedHydrologySource =>
+        riverbedHydrologySource;
+    public GroundHydrologyModifierProfile RiverbedHydrologyModifier =>
+        riverbedHydrologyModifier;
+    public GroundHydrologyModifierProfile ResolvedRiverbedHydrologyModifier =>
+        riverbedHydrologySource switch
+        {
+            GroundRiverbedHydrologySource.InheritShoreHydrologyModifier =>
+                shoreHydrologyModifier,
+            GroundRiverbedHydrologySource.CustomHydrologyModifier =>
+                riverbedHydrologyModifier,
+            _ => null
+        };
     public float BankMaterialStrength => Mathf.Clamp01(bankMaterialStrength);
     public float BankMaterialReach => Mathf.Clamp01(bankMaterialReach);
     public float ImmediateBankExposure => Mathf.Clamp01(immediateBankExposure);
@@ -393,6 +515,16 @@ public sealed class GroundMaterialControls
     public float OuterBankFade => Mathf.Clamp(outerBankFade, 0.05f, 10f);
     public float RiverbedMaterialStrength =>
         Mathf.Clamp01(riverbedMaterialStrength);
+    public float RiverbedWetnessStrength =>
+        Mathf.Clamp01(riverbedWetnessStrength);
+    public float RiverbedToBankWetnessBlendDistance =>
+        Mathf.Clamp(riverbedToBankWetnessBlendDistance, 0f, 2f);
+    public float RiverbedToBankWetnessBlendSoftness =>
+        Mathf.Clamp01(riverbedToBankWetnessBlendSoftness);
+    public float RiverbedWetSmoothnessResponse =>
+        Mathf.Clamp01(riverbedWetSmoothnessResponse);
+    public float RiverbedWetSpecularResponse =>
+        Mathf.Clamp01(riverbedWetSpecularResponse);
     public float VegetationRetreatStrength =>
         Mathf.Clamp01(vegetationRetreatStrength);
     public float SnowMeltStrength => Mathf.Clamp01(snowMeltStrength);
@@ -406,6 +538,14 @@ public sealed class GroundMaterialControls
     public float ImmediateBankSaturation =>
         Mathf.Clamp01(immediateBankSaturation);
     public float WaterlineSaturation => Mathf.Clamp01(waterlineSaturation);
+    public float ShoreWetHighlightStrength =>
+        Mathf.Clamp(shoreWetHighlightStrength, 0f, 2f);
+    public float ShoreWetHighlightTightness =>
+        Mathf.Clamp01(shoreWetHighlightTightness);
+    public float ShoreWetHighlightCameraBias =>
+        Mathf.Clamp01(shoreWetHighlightCameraBias);
+    public float ShoreWetHighlightVerticalFalloff =>
+        Mathf.Clamp01(shoreWetHighlightVerticalFalloff);
     public float PixelCellSize => Mathf.Clamp(pixelCellSize, 0.005f, 0.5f);
     public float PixelToneCount => Mathf.Clamp(pixelToneCount, 2f, 8f);
     public float PixelClusterStrength => Mathf.Clamp01(pixelClusterStrength);
@@ -465,7 +605,12 @@ public sealed class GroundMaterialControls
         {
             bankSurfaceLayer = null;
             riverbedSurfaceLayer = null;
+            riverbedSurfaceSource =
+                GroundRiverbedSurfaceSource.PrimaryGround;
             shoreHydrologyModifier = null;
+            riverbedHydrologySource =
+                GroundRiverbedHydrologySource.InheritShoreHydrologyModifier;
+            riverbedHydrologyModifier = null;
             bankMaterialStrength = 1f;
             bankMaterialReach = 0.65f;
             immediateBankExposure = 0.55f;
@@ -475,6 +620,11 @@ public sealed class GroundMaterialControls
             outerBankStrength = 0.5f;
             outerBankFade = 1f;
             riverbedMaterialStrength = 1f;
+            riverbedWetnessStrength = 1f;
+            riverbedToBankWetnessBlendDistance = 0.2f;
+            riverbedToBankWetnessBlendSoftness = 0.75f;
+            riverbedWetSmoothnessResponse = 0f;
+            riverbedWetSpecularResponse = 0f;
             vegetationRetreatStrength = 0f;
             snowMeltStrength = 0f;
             frostRetreatStrength = 0f;
@@ -485,6 +635,10 @@ public sealed class GroundMaterialControls
             broadBankSaturation = 0.45f;
             immediateBankSaturation = 0.8f;
             waterlineSaturation = 1f;
+            shoreWetHighlightStrength = 0.35f;
+            shoreWetHighlightTightness = 0.8f;
+            shoreWetHighlightCameraBias = 0.85f;
+            shoreWetHighlightVerticalFalloff = 0.6f;
             ApplySnowfieldVariant(GroundSnowfieldVariant.Clean);
             return;
         }
@@ -499,7 +653,10 @@ public sealed class GroundMaterialControls
         vegetationTintStrength = source.vegetationTintStrength;
         bankSurfaceLayer = source.bankSurfaceLayer;
         riverbedSurfaceLayer = source.riverbedSurfaceLayer;
+        riverbedSurfaceSource = source.riverbedSurfaceSource;
         shoreHydrologyModifier = source.shoreHydrologyModifier;
+        riverbedHydrologySource = source.riverbedHydrologySource;
+        riverbedHydrologyModifier = source.riverbedHydrologyModifier;
         bankMaterialStrength = source.bankMaterialStrength;
         bankMaterialReach = source.bankMaterialReach;
         immediateBankExposure = source.immediateBankExposure;
@@ -509,6 +666,15 @@ public sealed class GroundMaterialControls
         outerBankStrength = source.outerBankStrength;
         outerBankFade = source.outerBankFade;
         riverbedMaterialStrength = source.riverbedMaterialStrength;
+        riverbedWetnessStrength = source.riverbedWetnessStrength;
+        riverbedToBankWetnessBlendDistance =
+            source.riverbedToBankWetnessBlendDistance;
+        riverbedToBankWetnessBlendSoftness =
+            source.riverbedToBankWetnessBlendSoftness;
+        riverbedWetSmoothnessResponse =
+            source.riverbedWetSmoothnessResponse;
+        riverbedWetSpecularResponse =
+            source.riverbedWetSpecularResponse;
         vegetationRetreatStrength = source.vegetationRetreatStrength;
         snowMeltStrength = source.snowMeltStrength;
         frostRetreatStrength = source.frostRetreatStrength;
@@ -519,6 +685,11 @@ public sealed class GroundMaterialControls
         broadBankSaturation = source.broadBankSaturation;
         immediateBankSaturation = source.immediateBankSaturation;
         waterlineSaturation = source.waterlineSaturation;
+        shoreWetHighlightStrength = source.shoreWetHighlightStrength;
+        shoreWetHighlightTightness = source.shoreWetHighlightTightness;
+        shoreWetHighlightCameraBias = source.shoreWetHighlightCameraBias;
+        shoreWetHighlightVerticalFalloff =
+            source.shoreWetHighlightVerticalFalloff;
         pixelCellSize = source.pixelCellSize;
         pixelToneCount = source.pixelToneCount;
         pixelClusterStrength = source.pixelClusterStrength;
