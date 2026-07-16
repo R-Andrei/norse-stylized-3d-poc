@@ -3859,18 +3859,66 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 
 ## EW-B4.2R13A.6 — baseline restoration, retained-point hull, and finalized corner injection
 
-**Status:** implemented; Unity compilation and runtime suite pending. R13A.4 remains the stable incomplete fallback until every safety gate passes.
+**Status:** runtime safety validated, recovery incomplete. The one-click suite compiled and preserved current preview, topology `33/33`, artistic preview `33/33`, comprehensive evidence, edge `39` active, and edge `40` inactive, but all five historical fixtures remained unresolved. R13A.7 supersedes the five-certified-only closure gate; R13A.4/R13A.6 remains the stable incomplete safety state.
 
 - [x] Restore R13A.4 ordinary geometry and corner behavior; do not retain R13A.5 sampled split-plane geometry.
 - [x] Restrict augmentation initiation to certified multi-support retained-hull edges and finalized corner-inactive participants.
 - [x] Build the exact retained point set from all original vertices except the selected endpoints plus four exact rails.
 - [x] Enumerate and merge global supporting hull planes; emit a connected bevel-facet band with complete source provenance.
 - [x] Reject any result that modifies a source face outside the two endpoint stars or loses a source-face provenance record.
-- [x] Capture corner recovery evidence at the final `corner-width-inactive` transition.
+- [x] Attempt finalized `corner-width-inactive` capture. Runtime evidence later proved the R13A.6 source incomplete because the forced-deferral zeroing branch emitted no conflict record.
 - [x] Protect recovery targets and seed bounded neighbour-deferral subsets from their exact conflict records.
 - [x] Forbid certified baseline-edge loss outside recovered corner participants and forbid any certified-count reduction.
 - [x] Advance suite, topology, preview, and comprehensive contracts to R13A.6.
-- [ ] Unity compiles with zero errors.
-- [ ] Current seed `8889` restores R13A.4 identity: edge `39` active and edge `40` inactive unless a named recovery target is also certified without unrelated loss.
-- [ ] Full suite retains current preview, topology `33/33`, preview `33/33`, and comprehensive evidence.
-- [ ] Outlier recovery reaches `5/5`, or exhaustive hull evidence proves a target infeasible while R13A.4 hashes and edge identity remain unchanged.
+- [x] Unity compiles with zero errors.
+- [x] Current seed `8889` restores R13A.4 identity: edge `39` active and edge `40` inactive.
+- [x] Full suite retains current preview, topology `33/33`, preview `33/33`, and comprehensive evidence.
+- [x] Runtime result recorded: outlier recovery reached `0/5`. Exact terminal blockers were preserved for the three multi-support fixtures, but the two `2223/13` corner fixtures still lacked zeroing provenance; closure moves to R13A.7.
+
+
+## EW-B4.2R13A.7 — recovery closure, discrete-schedule proof, and edge-40 negative gate
+
+**Status:** implemented and statically validated; Unity compilation and runtime validation pending. R13A.4/R13A.6 remains the stable incomplete safety baseline until the R13A.7 suite passes.
+
+### Objective and acceptance
+
+- [ ] Preserve the R13A.6 safety floor in Unity: current preview applied, topology `33/33`, artistic preview `33/33`, comprehensive evidence available, seed `8889` edge `39` active, and edge `40` inactive.
+- [ ] Resolve each of the five historical fixtures as either a certified recovery or a finite failure under the solver's complete **current discrete admissible-width schedule**.
+- [x] Add an editor-only negative fixture requiring `8889/maximum/40` to remain inactive, uncertified, and unmaterialized.
+- [x] Keep production selection, score weights, geometry invariants, normal/tangent semantics, and serialized assets unchanged.
+
+### Reviewed evidence and corrected plan assumptions
+
+- [x] Verified the supplied `Assets(69).zip` tree already contains the R13A.6 contracts and has no Git metadata; branch, HEAD, and working-tree comparisons are unavailable.
+- [x] Read the current canonical framework, R13 recovery architecture/checklist/inventory, the R13A.6 suite evidence, all ten expected edit files, and direct preview, plane-kernel, mesh-output, and render-validation callers.
+- [x] Confirmed `TrySolveBoundedIsolatedSingleEdgeRails` performs at most twelve `0.75` width-backoff **rail** attempts and stops at the first rail success. `AuditBoundedSingleEdgeBevel` then performs one bounded construction/certification attempt at that solved width.
+- [x] Corrected the handoff assumption: R13A.7 may call a failed construction "complete-schedule infeasible" only when that terminal construction was executed at the minimum admissible width or after the full twelve-attempt rail cap. A failed construction above the floor remains unresolved because narrower constructions were not executed.
+- [x] Confirmed the unrecorded corner-width path: `TrySolveCornerAwareChamferWidths` can force all positive participants to zero in its `!edgeChanged` fallback without adding a `ChamferCornerConflictRecord`; `CaptureFinalCornerInactiveRecoveryEvidence` can therefore see no conflict.
+- [x] Confirmed edge `40` belongs to the width-recovery-provisional class (`feasibleWidthFraction` below the ordinary `0.25` gate) and must not initiate corner augmentation.
+
+### Approved files and implementation sequence
+
+1. [x] `MassGenerator.EdgeWear.Types.cs`: add bounded diagnostic records for rail-width attempts, schedule completion, corner zeroing stage, and corner recovery resolution.
+2. [x] `MassGenerator.EdgeWear.BoundedSingleEdge.cs`: record the already-executed width attempts and terminal construction evidence without adding geometry attempts.
+3. [x] `MassGenerator.EdgeWear.SelectionAndCorners.cs`: record both uniform-scale and forced-deferral zeroing events; preserve ordinary width decisions.
+4. [x] `MassGenerator.EdgeWear.Orchestration.cs`: admit only ordinary feasible-width corner targets, preserve baseline identity, and mark only fully exhausted target-aware searches as proven infeasible.
+5. [x] `MassGenerator.EdgeWear.Diagnostics.Logging.cs`: publish ordered width-attempt, schedule-resolution, corner-stage, and corner-resolution evidence.
+6. [x] `Editor/GeneratedMassEditor.cs`: replace the five-certified-only gate with certified/proven/unresolved resolution counts and add the edge-40 negative fixture.
+7. [x] Update `Generated_Mass_Framework.md`, `Generated_Mass_Edge_Wear_Recovery_Architecture.md`, and `Generated_Mass_Edge_Wear_Code_Inventory.md` after code is final.
+
+### Invariants, non-goals, and performance
+
+- [x] No additional hull, plane, rail, or full-shell attempt is authorized by R13A.7.
+- [x] No continuous-width proof, nested search, state/time-budget increase, seed-specific production branch, generic width-provisional recovery, or score/default change.
+- [x] Active-gameplay cost remains zero; all new work is bounded diagnostic assignment/reporting or existing explicit editor augmentation.
+- [x] Baseline commit rules remain count-, identity-, topology-, geometry-, placement-, and render-channel safe.
+
+### Validation and compliance
+
+- [x] Parsed all `153` project C# files with tree-sitter C# with zero syntax errors; introduced method definitions/calls and overload arities were scanned, including the retained nine-argument `TrySolveBoundedIsolatedSingleEdgeRails` caller.
+- [x] Preserve CRLF, preprocessor balance, and absence of malformed multiline strings, trailing whitespace, and conflict markers.
+- [x] Confirm the final diff contains only the ten approved paths and no serialized/shared-render changes.
+- [ ] Unity compiles with zero introduced errors.
+- [ ] One-click suite retains current preview, topology `33/33`, preview `33/33`, comprehensive evidence, zero collateral/topology/face-quality/placement/render regressions, five resolved positive fixtures, and the edge-40 negative fixture.
+- [x] Static invocation comparison confirms no added rail-at-width, bounded construction, single-plane, retained-hull, plane-kernel, or augmentation-trial geometry call site.
+- [ ] Compare maximum preflight/total case times with R13A.6 and confirm no five-second guard breach in Unity.

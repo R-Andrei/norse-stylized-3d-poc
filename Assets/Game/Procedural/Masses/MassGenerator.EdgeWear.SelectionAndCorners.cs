@@ -984,6 +984,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     isolated.WidthAttemptCount;
                 viability.IsolatedLastAttemptedWidth =
                     isolated.SolvedWidth;
+                viability.IsolatedAttemptScheduleComplete =
+                    isolated.IsolatedAttemptScheduleComplete == 1;
+                viability.IsolatedTerminalConstructionAtMinimum =
+                    isolated.IsolatedTerminalConstructionAtMinimum == 1;
+                viability.IsolatedAttemptScheduleResolution =
+                    isolated.IsolatedAttemptScheduleResolution ??
+                        string.Empty;
+                bool retainWidthAttemptEvidence =
+                    isolated.GeometryValid != 1 ||
+                    isolated.WidthAttemptCount > 1 ||
+                    isolated.MultiSupportSinglePlaneAttempted == 1 ||
+                    isolated.MultiSupportRetainedHullAttempted == 1;
+                viability.IsolatedWidthAttemptEvidence =
+                    retainWidthAttemptEvidence
+                        ? FormatBoundedIsolatedWidthAttemptEvidence(
+                            isolated)
+                        : string.Empty;
                 viability.IsolatedMaximumCertifiedWidth =
                     viability.IsolatedSucceeded
                         ? isolated.SolvedWidth
@@ -1032,6 +1049,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     isolated.InvalidFaceCount;
                 viability.IsolatedDiagnostic =
                     isolated.Diagnostic ?? string.Empty;
+                if (!string.IsNullOrEmpty(
+                        viability.IsolatedWidthAttemptEvidence))
+                {
+                    viability.IsolatedDiagnostic =
+                        string.IsNullOrEmpty(viability.IsolatedDiagnostic)
+                            ? viability.IsolatedWidthAttemptEvidence
+                            : viability.IsolatedDiagnostic + "; " +
+                                viability.IsolatedWidthAttemptEvidence;
+                }
                 viability.IsolatedConstructionValid =
                     isolated.GeometryValid == 1;
                 viability.FeasibleWidthFractionValid =
@@ -1405,7 +1431,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ChamferCornerConflictRecord conflict =
                     solution.Conflicts[conflictIndex];
                 if (conflict == null ||
-                    !conflict.ParticipatingSelectedEdges.Contains(
+                    !conflict.ZeroedSelectedEdges.Contains(
                         graphEdgeIndex))
                 {
                     continue;
@@ -1418,9 +1444,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out record.CornerRecoveryLastPositiveWidth);
                 record.CornerRecoveryUniformScale =
                     conflict.UniformScale;
+                record.CornerRecoveryZeroingStage =
+                    conflict.ZeroingStage;
                 record.CornerRecoveryParticipants =
                     FormatChamferForcedDeferralKey(
                         conflict.ParticipatingSelectedEdges);
+                record.CornerRecoveryZeroedParticipants =
+                    FormatChamferForcedDeferralKey(
+                        conflict.ZeroedSelectedEdges);
                 return;
             }
         }
@@ -2498,45 +2529,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         return false;
                     }
 
-                    bool uniformWouldDeactivate = false;
-                    foreach (int selectedEdgeIndex in participatingEdges)
+                    List<int> orderedParticipants =
+                        new List<int>(participatingEdges);
+                    orderedParticipants.Sort();
+                    Dictionary<int, float> participantWidthsBeforeScale =
+                        new Dictionary<int, float>(
+                            orderedParticipants.Count);
+                    for (int participantIndex = 0;
+                         participantIndex < orderedParticipants.Count;
+                         participantIndex++)
                     {
-                        float scaledWidth =
-                            widthByEdge[selectedEdgeIndex] * solvedScale;
-                        if (scaledWidth < minimumStableEdgeLength)
-                        {
-                            uniformWouldDeactivate = true;
-                            break;
-                        }
-                    }
-                    if (uniformWouldDeactivate &&
-                        cornerConflicts != null)
-                    {
-                        ChamferCornerConflictRecord conflict =
-                            new ChamferCornerConflictRecord
-                            {
-                                UnselectedSourceEdgeIndex = edgeIndex,
-                                UniformScale = solvedScale
-                            };
-                        List<int> orderedParticipants =
-                            new List<int>(participatingEdges);
-                        orderedParticipants.Sort();
-                        conflict.ParticipatingSelectedEdges.AddRange(
-                            orderedParticipants);
-                        for (int participantIndex = 0;
-                             participantIndex < orderedParticipants.Count;
-                             participantIndex++)
-                        {
-                            int participantEdge =
-                                orderedParticipants[participantIndex];
-                            conflict.ParticipantWidthBeforeScale[
-                                participantEdge] =
-                                widthByEdge[participantEdge];
-                        }
-                        cornerConflicts.Add(conflict);
+                        int participantEdge =
+                            orderedParticipants[participantIndex];
+                        participantWidthsBeforeScale[participantEdge] =
+                            widthByEdge[participantEdge];
                     }
 
                     bool edgeChanged = false;
+                    List<int> uniformlyZeroedParticipants =
+                        new List<int>();
                     foreach (int selectedEdgeIndex in participatingEdges)
                     {
                         float oldWidth = widthByEdge[selectedEdgeIndex];
@@ -2551,6 +2562,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                         widthByEdge[selectedEdgeIndex] = newWidth;
                         sharedEdgeClampedEdges.Add(selectedEdgeIndex);
+                        if (oldWidth > PointMergeDistance &&
+                            newWidth <= PointMergeDistance)
+                        {
+                            uniformlyZeroedParticipants.Add(
+                                selectedEdgeIndex);
+                        }
                         float relativeScale = requestedWidth >
                             PointMergeDistance
                                 ? newWidth / requestedWidth
@@ -2561,28 +2578,58 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         edgeChanged = true;
                     }
 
+                    if (uniformlyZeroedParticipants.Count > 0)
+                    {
+                        RecordChamferCornerConflict(
+                            cornerConflicts,
+                            edgeIndex,
+                            solvedScale,
+                            ChamferCornerZeroingStage
+                                .SharedEdgeUniformScale,
+                            orderedParticipants,
+                            uniformlyZeroedParticipants,
+                            participantWidthsBeforeScale);
+                    }
+
                     if (!edgeChanged)
                     {
-                        bool deferredAny = false;
+                        List<int> forcedZeroedParticipants =
+                            new List<int>();
                         foreach (int selectedEdgeIndex in participatingEdges)
                         {
-                            if (!widthByEdge.TryGetValue(
+                            if (widthByEdge.TryGetValue(
                                     selectedEdgeIndex,
-                                    out float currentWidth) ||
-                                currentWidth <= PointMergeDistance)
+                                    out float currentWidth) &&
+                                currentWidth > PointMergeDistance)
                             {
-                                continue;
+                                forcedZeroedParticipants.Add(
+                                    selectedEdgeIndex);
                             }
-
-                            widthByEdge[selectedEdgeIndex] = 0f;
-                            sharedEdgeClampedEdges.Add(selectedEdgeIndex);
-                            deferredAny = true;
                         }
-
-                        if (!deferredAny)
+                        if (forcedZeroedParticipants.Count == 0)
                         {
                             blocker = "an unselected internal edge remains unstable after all participating chamfers were deferred";
                             return false;
+                        }
+
+                        RecordChamferCornerConflict(
+                            cornerConflicts,
+                            edgeIndex,
+                            0f,
+                            ChamferCornerZeroingStage
+                                .SharedEdgeForcedDeferral,
+                            orderedParticipants,
+                            forcedZeroedParticipants,
+                            participantWidthsBeforeScale);
+                        for (int deferredIndex = 0;
+                             deferredIndex <
+                                 forcedZeroedParticipants.Count;
+                             deferredIndex++)
+                        {
+                            int selectedEdgeIndex =
+                                forcedZeroedParticipants[deferredIndex];
+                            widthByEdge[selectedEdgeIndex] = 0f;
+                            sharedEdgeClampedEdges.Add(selectedEdgeIndex);
                         }
                     }
                     changed = true;
@@ -2596,6 +2643,56 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             blocker = "unified corner and shared-edge width solving did not converge";
             return false;
+        }
+
+        private static void RecordChamferCornerConflict(
+            List<ChamferCornerConflictRecord> cornerConflicts,
+            int unselectedSourceEdgeIndex,
+            float uniformScale,
+            ChamferCornerZeroingStage zeroingStage,
+            List<int> orderedParticipants,
+            List<int> zeroedParticipants,
+            Dictionary<int, float> participantWidthsBeforeScale)
+        {
+            if (cornerConflicts == null ||
+                orderedParticipants == null ||
+                orderedParticipants.Count == 0)
+            {
+                return;
+            }
+
+            ChamferCornerConflictRecord conflict =
+                new ChamferCornerConflictRecord
+                {
+                    UnselectedSourceEdgeIndex =
+                        unselectedSourceEdgeIndex,
+                    UniformScale = uniformScale,
+                    ZeroingStage = zeroingStage
+                };
+            conflict.ParticipatingSelectedEdges.AddRange(
+                orderedParticipants);
+            if (zeroedParticipants != null)
+            {
+                zeroedParticipants.Sort();
+                conflict.ZeroedSelectedEdges.AddRange(
+                    zeroedParticipants);
+            }
+            for (int participantIndex = 0;
+                 participantIndex < orderedParticipants.Count;
+                 participantIndex++)
+            {
+                int participantEdge =
+                    orderedParticipants[participantIndex];
+                if (participantWidthsBeforeScale != null &&
+                    participantWidthsBeforeScale.TryGetValue(
+                        participantEdge,
+                        out float participantWidth))
+                {
+                    conflict.ParticipantWidthBeforeScale[
+                        participantEdge] = participantWidth;
+                }
+            }
+            cornerConflicts.Add(conflict);
         }
 
         private static bool TryBuildChamferCornerTable(

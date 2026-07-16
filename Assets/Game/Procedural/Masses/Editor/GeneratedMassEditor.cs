@@ -1499,8 +1499,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     suite.TopologyCasesRun +
                 ",preview:" + suite.PreviewCasesPassed + "/" +
                     suite.PreviewCasesRun +
-                ",outlierRecovery:" + suite.OutlierRecoveryChecksPassed +
-                    "/" + suite.OutlierRecoveryChecksRun +
+                ",outlierResolution:" +
+                    suite.OutlierRecoveryChecksPassed + "/" +
+                    suite.OutlierRecoveryChecksRun +
+                ",negativeExclusion:" +
+                    suite.NegativeExclusionChecksPassed + "/" +
+                    suite.NegativeExclusionChecksRun +
                 ",topologyCollateralFailures:" +
                     suite.TopologyCollateralFailures +
                 ",previewCollateralFailures:" +
@@ -1523,7 +1527,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-B4.2R13A.6-suite");
+            builder.AppendLine("contract=EW-B4.2R13A.7-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -1556,12 +1560,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append(suite.PreviewCasesPassed);
             builder.Append('/');
             builder.AppendLine(suite.PreviewCasesRun.ToString());
-            builder.Append("outlierRecoveryStatus=");
+            builder.Append("outlierResolutionStatus=");
             builder.AppendLine(suite.OutlierRecoveryStatus);
-            builder.Append("outlierRecoveryChecks=");
+            builder.Append("outlierResolutionChecks=");
             builder.Append(suite.OutlierRecoveryChecksPassed);
             builder.Append('/');
             builder.AppendLine(suite.OutlierRecoveryChecksRun.ToString());
+            builder.Append("outlierCertifiedRecoveries=");
+            builder.AppendLine(
+                suite.OutlierCertifiedRecoveries.ToString());
+            builder.Append("outlierProvenInfeasible=");
+            builder.AppendLine(
+                suite.OutlierProvenInfeasible.ToString());
+            builder.Append("outlierUnresolved=");
+            builder.AppendLine(suite.OutlierUnresolved.ToString());
+            builder.Append("negativeExclusionStatus=");
+            builder.AppendLine(suite.NegativeExclusionStatus);
+            builder.Append("negativeExclusionChecks=");
+            builder.Append(suite.NegativeExclusionChecksPassed);
+            builder.Append('/');
+            builder.AppendLine(
+                suite.NegativeExclusionChecksRun.ToString());
             builder.Append("artisticComprehensiveAvailable=");
             builder.AppendLine(
                 suite.ComprehensiveArtisticAvailable ? "1" : "0");
@@ -1599,7 +1618,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 ? "not run"
                 : suite.PreviewReportText);
             builder.AppendLine();
-            builder.AppendLine("[Outlier Recovery Contract]");
+            builder.AppendLine(
+                "[Outlier Resolution and Negative Exclusion Contract]");
             builder.AppendLine(string.IsNullOrEmpty(
                     suite.OutlierRecoveryReport)
                 ? "not evaluated"
@@ -1870,7 +1890,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             reportBuilder.AppendLine(
                 "GeneratedMass comprehensive artistic selection evidence");
             reportBuilder.AppendLine(
-                "contract=EW-B4.2R13A.6-comprehensive");
+                "contract=EW-B4.2R13A.7-comprehensive");
             reportBuilder.Append("cases=");
             reportBuilder.AppendLine(expectedCaseCount.ToString());
             reportBuilder.Append("scenariosPerCase=");
@@ -5522,6 +5542,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 new List<EdgeWearViabilityMatrixCase>();
             public int OutlierRecoveryChecksRun;
             public int OutlierRecoveryChecksPassed;
+            public int OutlierCertifiedRecoveries;
+            public int OutlierProvenInfeasible;
+            public int OutlierUnresolved;
+            public int NegativeExclusionChecksRun;
+            public int NegativeExclusionChecksPassed;
             public string OutlierRecoveryReport = string.Empty;
 
             public EdgeWearValidationSuiteJob(GeneratedMass target)
@@ -5564,7 +5589,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 OutlierRecoveryChecksRun == 0
                     ? "not-run"
                     : OutlierRecoveryChecksPassed ==
-                        OutlierRecoveryChecksRun
+                        OutlierRecoveryChecksRun &&
+                        OutlierUnresolved == 0
+                        ? "passed"
+                        : "failed";
+
+            public string NegativeExclusionStatus =>
+                NegativeExclusionChecksRun == 0
+                    ? "not-run"
+                    : NegativeExclusionChecksPassed ==
+                        NegativeExclusionChecksRun
                         ? "passed"
                         : "failed";
 
@@ -5613,6 +5647,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         OutlierRecoveryChecksRun == 0 ||
                         OutlierRecoveryChecksPassed !=
                             OutlierRecoveryChecksRun ||
+                        OutlierUnresolved != 0 ||
+                        NegativeExclusionChecksRun == 0 ||
+                        NegativeExclusionChecksPassed !=
+                            NegativeExclusionChecksRun ||
                         !ComprehensiveArtisticAvailable ||
                         !string.IsNullOrEmpty(TerminalReason))
                     {
@@ -5740,9 +5778,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             {
                 OutlierRecoveryChecksRun = 0;
                 OutlierRecoveryChecksPassed = 0;
-                StringBuilder builder = new StringBuilder(2048);
+                OutlierCertifiedRecoveries = 0;
+                OutlierProvenInfeasible = 0;
+                OutlierUnresolved = 0;
+                NegativeExclusionChecksRun = 0;
+                NegativeExclusionChecksPassed = 0;
+                StringBuilder builder = new StringBuilder(3072);
                 builder.AppendLine(
-                    "policy=editor-only canonical source-edge fixtures over topology cases");
+                    "policy=editor-only canonical source-edge fixtures over topology cases; positive fixtures resolve as certified or complete-current-discrete-schedule infeasible");
                 EvaluateOutlierRecoveryExpectation(
                     2223,
                     "maximum",
@@ -5767,6 +5810,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     8889,
                     "maximum",
                     23,
+                    builder);
+                EvaluateNegativeEdgeExclusionExpectation(
+                    8889,
+                    "maximum",
+                    40,
                     builder);
                 OutlierRecoveryReport = builder.ToString().TrimEnd();
             }
@@ -5818,13 +5866,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     }
                 }
 
-                bool passed = record != null &&
+                bool certifiedRecovery = record != null &&
                     record.Active != 0 &&
                     record.CertifiedBuilt != 0 &&
                     record.MaterializedWidth > 0f;
+                bool provenInfeasible = record != null &&
+                    (string.Equals(
+                         record.FinalReason,
+                         "corner-recovery-proven-infeasible",
+                         StringComparison.Ordinal) ||
+                     (!string.IsNullOrEmpty(record.IsolatedDiagnostic) &&
+                      (record.IsolatedDiagnostic.Contains(
+                           "scheduleResolution:complete-infeasible") ||
+                       record.IsolatedDiagnostic.Contains(
+                           "scheduleResolution:complete-rail-infeasible"))));
+                bool passed = certifiedRecovery || provenInfeasible;
                 if (passed)
                 {
                     OutlierRecoveryChecksPassed++;
+                    if (certifiedRecovery)
+                    {
+                        OutlierCertifiedRecoveries++;
+                    }
+                    else
+                    {
+                        OutlierProvenInfeasible++;
+                    }
+                }
+                else
+                {
+                    OutlierUnresolved++;
                 }
 
                 builder.Append("seed=");
@@ -5835,6 +5906,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append(sourceEdgeIndex);
                 builder.Append(",passed=");
                 builder.Append(passed ? '1' : '0');
+                builder.Append(",resolution=");
+                builder.Append(certifiedRecovery
+                    ? "certified-recovery"
+                    : provenInfeasible
+                        ? "proven-infeasible"
+                        : "unresolved");
                 builder.Append(",found=");
                 builder.Append(record != null ? '1' : '0');
                 if (record != null)
@@ -5872,6 +5949,103 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 }
                 builder.AppendLine();
             }
+
+            private void EvaluateNegativeEdgeExclusionExpectation(
+                int shapeSeed,
+                string widthName,
+                int sourceEdgeIndex,
+                StringBuilder builder)
+            {
+                NegativeExclusionChecksRun++;
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord record =
+                    FindOutlierFixtureRecord(
+                        shapeSeed,
+                        widthName,
+                        sourceEdgeIndex);
+                bool passed = record != null &&
+                    record.Active == 0 &&
+                    record.CertifiedBuilt == 0 &&
+                    record.MaterializedWidth <= 0f &&
+                    string.Equals(
+                        record.FinalReason,
+                        "corner-width-inactive",
+                        StringComparison.Ordinal);
+                if (passed)
+                {
+                    NegativeExclusionChecksPassed++;
+                }
+
+                builder.Append("negative seed=");
+                builder.Append(shapeSeed);
+                builder.Append(",width=");
+                builder.Append(widthName);
+                builder.Append(",edge=");
+                builder.Append(sourceEdgeIndex);
+                builder.Append(",passed=");
+                builder.Append(passed ? '1' : '0');
+                builder.Append(",found=");
+                builder.Append(record != null ? '1' : '0');
+                if (record != null)
+                {
+                    builder.Append(",active=");
+                    builder.Append(record.Active);
+                    builder.Append(",certified=");
+                    builder.Append(record.CertifiedBuilt);
+                    builder.Append(",materializedWidth=");
+                    builder.Append(record.MaterializedWidth.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture));
+                    builder.Append(",finalReason=");
+                    builder.Append(string.IsNullOrEmpty(record.FinalReason)
+                        ? "none"
+                        : record.FinalReason);
+                }
+                builder.AppendLine();
+            }
+
+            private MassGenerator.EdgeWearArtisticEdgeAuditRecord
+                FindOutlierFixtureRecord(
+                    int shapeSeed,
+                    string widthName,
+                    int sourceEdgeIndex)
+            {
+                for (int caseIndex = 0;
+                     caseIndex < TopologyCases.Count;
+                     caseIndex++)
+                {
+                    EdgeWearViabilityMatrixCase matrixCase =
+                        TopologyCases[caseIndex];
+                    if (matrixCase.ShapeSeed != shapeSeed ||
+                        !string.Equals(
+                            matrixCase.WidthName,
+                            widthName,
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    MassGenerator.EdgeWearArtisticEdgeAuditRecord[] records =
+                        matrixCase.Result.ArtisticEdges;
+                    if (records == null)
+                    {
+                        return null;
+                    }
+                    for (int recordIndex = 0;
+                         recordIndex < records.Length;
+                         recordIndex++)
+                    {
+                        if (records[recordIndex] != null &&
+                            records[recordIndex].SourceEdgeIndex ==
+                                sourceEdgeIndex)
+                        {
+                            return records[recordIndex];
+                        }
+                    }
+                    return null;
+                }
+                return null;
+            }
+
         }
 
         private sealed class EdgeWearViabilityMatrixJob
@@ -5958,8 +6132,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
-                ? "EW-B4.2R13A.6-topology"
-                : "EW-B4.2R13A.6-preview";
+                ? "EW-B4.2R13A.7-topology"
+                : "EW-B4.2R13A.7-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *

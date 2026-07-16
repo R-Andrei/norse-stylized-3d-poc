@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using UnityEngine;
 using ProgrammaticStylized3D.Geometry;
 
@@ -17,6 +18,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int SourceEdgeIndex;
             public int IsolatedRailSolved;
             public int WidthAttemptCount;
+            public float IsolatedMinimumWidth;
+            public int IsolatedAttemptScheduleComplete;
+            public int IsolatedTerminalConstructionAtMinimum;
+            public string IsolatedAttemptScheduleResolution;
+            public List<EdgeWearIsolatedWidthAttemptRecord>
+                IsolatedWidthAttempts;
             public int TargetBoundaryCount;
             public float SolvedWidth;
             public float EndpointConsumptionA;
@@ -53,6 +60,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int EndpointSupportCapFaceCount;
             public int EndpointSupportBoundaryPathVertexCount;
             public int MultiSupportPlaneCut;
+            public int MultiSupportSinglePlaneAttempted;
+            public int MultiSupportSinglePlaneSucceeded;
+            public string MultiSupportSinglePlaneFailure;
+            public int MultiSupportRetainedHullAttempted;
+            public int MultiSupportRetainedHullSucceeded;
+            public string MultiSupportRetainedHullFailure;
             public int MultiSupportPlaneCount;
             public int MultiSupportPlaneChainCandidateCount;
             public int MultiSupportPlaneForeignVertexRejectCount;
@@ -680,6 +693,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     SelectedOrdinal = -1,
                     SourceEdgeIndex = -1,
+                    IsolatedAttemptScheduleResolution = string.Empty,
+                    IsolatedWidthAttempts =
+                        new List<EdgeWearIsolatedWidthAttemptRecord>(),
+                    MultiSupportSinglePlaneFailure = string.Empty,
+                    MultiSupportRetainedHullFailure = string.Empty,
                     MaximumBoundaryDiagnosticRailIndex = -1,
                     MaximumBoundaryOriginalAdjacentEdgeIndex = -1,
                     MaximumBoundaryResolvedEdgeIndex = -1,
@@ -741,7 +759,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
                     "no selected manifold edge is available for bounded evaluation");
-                return result;
+                return FinalizeBoundedSingleEdgeAuditResult(result);
             }
 
             int selectedOrdinal = Mathf.Clamp(
@@ -781,18 +799,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     requestedWidth,
                     minimumStableEdgeLength,
                     out BoundedIsolatedRailPoint[] isolatedRails,
+                    out List<EdgeWearIsolatedWidthAttemptRecord>
+                        widthAttempts,
+                    out float minimumIsolatedWidth,
+                    out bool railScheduleComplete,
                     out int widthAttemptCount,
                     out float solvedWidth,
                     out string railBlocker))
             {
+                result.IsolatedWidthAttempts = widthAttempts;
+                result.IsolatedMinimumWidth = minimumIsolatedWidth;
+                result.IsolatedAttemptScheduleComplete =
+                    railScheduleComplete ? 1 : 0;
                 result.WidthAttemptCount = widthAttemptCount;
                 result.SolvedWidth = solvedWidth;
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
                     railBlocker);
-                return result;
+                return FinalizeBoundedSingleEdgeAuditResult(result);
             }
             result.IsolatedRailSolved = 1;
+            result.IsolatedWidthAttempts = widthAttempts;
+            result.IsolatedMinimumWidth = minimumIsolatedWidth;
+            result.IsolatedAttemptScheduleComplete =
+                railScheduleComplete ? 1 : 0;
             result.WidthAttemptCount = widthAttemptCount;
             result.SolvedWidth = solvedWidth;
             EdgeWearGraphEdge isolatedSourceEdge =
@@ -880,22 +910,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 result.MinimumBoundaryEndpointDistance = 0f;
             }
 
-            if (!TryBuildBoundedSingleEdgeFaces(
-                    sourceFaces,
-                    context,
-                    selected,
-                    isolatedRails,
-                    minimumStableEdgeLength,
-                    minimumStableFaceArea,
-                    ref result,
-                    out List<PolygonFace> boundedFaces,
-                    out int boundarySubdivisionCount,
-                    out string buildBlocker))
+            bool boundedFacesBuilt = TryBuildBoundedSingleEdgeFaces(
+                sourceFaces,
+                context,
+                selected,
+                isolatedRails,
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                ref result,
+                out List<PolygonFace> boundedFaces,
+                out int boundarySubdivisionCount,
+                out string buildBlocker);
+            UpdateBoundedTerminalWidthAttemptConstruction(
+                ref result,
+                boundedFacesBuilt,
+                buildBlocker);
+            if (!boundedFacesBuilt)
             {
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
                     buildBlocker);
-                return result;
+                return FinalizeBoundedSingleEdgeAuditResult(result);
             }
             result.BoundarySubdivisionCount = boundarySubdivisionCount;
 
@@ -927,7 +962,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     string.IsNullOrEmpty(preparationBlocker)
                         ? "the bounded single-edge shell failed preview preparation"
                         : preparationBlocker);
-                return result;
+                return FinalizeBoundedSingleEdgeAuditResult(result);
             }
 
             Vector3 boundedSolidCentre = sourceSolidCentre;
@@ -941,7 +976,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
                     windingBlocker);
-                return result;
+                return FinalizeBoundedSingleEdgeAuditResult(result);
             }
             auditedFaces = outwardFaces;
 
@@ -960,7 +995,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
                     "the attributed raw source baseline failed complete unique source-face provenance certification");
-                return result;
+                return FinalizeBoundedSingleEdgeAuditResult(result);
             }
 
             bool sourcePreparationValid = TryPrepareBoundedFaces(
@@ -979,7 +1014,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     (string.IsNullOrEmpty(sourcePreparationBlocker)
                         ? "preparation failed"
                         : sourcePreparationBlocker));
-                return result;
+                return FinalizeBoundedSingleEdgeAuditResult(result);
             }
 
             result.PreparedSourceProvenance =
@@ -1001,7 +1036,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 SetBoundedSingleEdgeDiagnostic(
                     ref result.Diagnostic,
                     "the prepared source or bounded result failed complete unique source-face provenance certification");
-                return result;
+                return FinalizeBoundedSingleEdgeAuditResult(result);
             }
 
             CountBoundedSingleEdgeFaces(
@@ -1429,7 +1464,175 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
+            return FinalizeBoundedSingleEdgeAuditResult(result);
+        }
+
+        private static void UpdateBoundedTerminalWidthAttemptConstruction(
+            ref BoundedSingleEdgeAuditResult result,
+            bool constructionSucceeded,
+            string blocker)
+        {
+            if (result.IsolatedWidthAttempts == null ||
+                result.IsolatedWidthAttempts.Count == 0)
+            {
+                return;
+            }
+
+            EdgeWearIsolatedWidthAttemptRecord attempt =
+                result.IsolatedWidthAttempts[
+                    result.IsolatedWidthAttempts.Count - 1];
+            attempt.ConstructionAttempted = true;
+            attempt.ConstructionSucceeded = constructionSucceeded;
+            attempt.SinglePlaneAttempted =
+                result.MultiSupportSinglePlaneAttempted == 1;
+            attempt.SinglePlaneSucceeded =
+                result.MultiSupportSinglePlaneSucceeded == 1;
+            attempt.SinglePlaneFailure =
+                result.MultiSupportSinglePlaneFailure ?? string.Empty;
+            attempt.RetainedHullAttempted =
+                result.MultiSupportRetainedHullAttempted == 1;
+            attempt.RetainedHullSucceeded =
+                result.MultiSupportRetainedHullSucceeded == 1;
+            attempt.RetainedHullFailure =
+                result.MultiSupportRetainedHullFailure ?? string.Empty;
+            attempt.FinalFailure = constructionSucceeded
+                ? string.Empty
+                : blocker ?? string.Empty;
+            result.IsolatedTerminalConstructionAtMinimum =
+                attempt.Width <=
+                    result.IsolatedMinimumWidth + PointMergeDistance
+                    ? 1
+                    : 0;
+        }
+
+        private static BoundedSingleEdgeAuditResult
+            FinalizeBoundedSingleEdgeAuditResult(
+                BoundedSingleEdgeAuditResult result)
+        {
+            if (result.IsolatedWidthAttempts == null ||
+                result.IsolatedWidthAttempts.Count == 0)
+            {
+                return result;
+            }
+
+            EdgeWearIsolatedWidthAttemptRecord attempt =
+                result.IsolatedWidthAttempts[
+                    result.IsolatedWidthAttempts.Count - 1];
+            if (attempt.ConstructionAttempted)
+            {
+                attempt.Certified = result.GeometryValid == 1;
+                if (!attempt.Certified &&
+                    string.IsNullOrEmpty(attempt.FinalFailure))
+                {
+                    attempt.FinalFailure =
+                        result.Diagnostic ?? string.Empty;
+                }
+            }
+
+            if (result.GeometryValid == 1)
+            {
+                result.IsolatedAttemptScheduleResolution = "certified";
+            }
+            else if (result.IsolatedAttemptScheduleComplete == 1 &&
+                result.IsolatedRailSolved != 1)
+            {
+                result.IsolatedAttemptScheduleResolution =
+                    "complete-rail-infeasible";
+            }
+            else if (result.IsolatedAttemptScheduleComplete == 1 &&
+                (result.IsolatedTerminalConstructionAtMinimum == 1 ||
+                 result.WidthAttemptCount >= 12) &&
+                attempt.ConstructionAttempted)
+            {
+                result.IsolatedAttemptScheduleResolution =
+                    "complete-infeasible";
+            }
+            else
+            {
+                result.IsolatedAttemptScheduleResolution = "unresolved";
+            }
             return result;
+        }
+
+        private static string FormatBoundedIsolatedWidthAttemptEvidence(
+            BoundedSingleEdgeAuditResult result)
+        {
+            StringBuilder builder = new StringBuilder(512);
+            builder.Append("scheduleResolution:");
+            builder.Append(string.IsNullOrEmpty(
+                    result.IsolatedAttemptScheduleResolution)
+                ? "unresolved"
+                : result.IsolatedAttemptScheduleResolution);
+            builder.Append(",scheduleComplete:");
+            builder.Append(result.IsolatedAttemptScheduleComplete);
+            builder.Append(",minimumWidth:");
+            builder.Append(result.IsolatedMinimumWidth.ToString(
+                "G9", CultureInfo.InvariantCulture));
+            builder.Append(",terminalAtMinimum:");
+            builder.Append(result.IsolatedTerminalConstructionAtMinimum);
+            builder.Append(",attempts:[");
+            if (result.IsolatedWidthAttempts != null)
+            {
+                for (int attemptIndex = 0;
+                     attemptIndex < result.IsolatedWidthAttempts.Count;
+                     attemptIndex++)
+                {
+                    if (attemptIndex > 0)
+                    {
+                        builder.Append('|');
+                    }
+                    EdgeWearIsolatedWidthAttemptRecord attempt =
+                        result.IsolatedWidthAttempts[attemptIndex];
+                    builder.Append(attempt.AttemptIndex);
+                    builder.Append('@');
+                    builder.Append(attempt.Width.ToString(
+                        "G9", CultureInfo.InvariantCulture));
+                    builder.Append(":rail=");
+                    builder.Append(attempt.RailSolved ? '1' : '0');
+                    builder.Append(":construction=");
+                    builder.Append(attempt.ConstructionAttempted
+                        ? (attempt.ConstructionSucceeded ? '1' : '0')
+                        : '-');
+                    builder.Append(":single=");
+                    builder.Append(attempt.SinglePlaneAttempted
+                        ? (attempt.SinglePlaneSucceeded ? '1' : '0')
+                        : '-');
+                    builder.Append(":hull=");
+                    builder.Append(attempt.RetainedHullAttempted
+                        ? (attempt.RetainedHullSucceeded ? '1' : '0')
+                        : '-');
+                    builder.Append(":certified=");
+                    builder.Append(attempt.Certified ? '1' : '0');
+                    if (!string.IsNullOrEmpty(attempt.RailFailure))
+                    {
+                        builder.Append(":railFailure={");
+                        builder.Append(attempt.RailFailure);
+                        builder.Append('}');
+                    }
+                    if (!string.IsNullOrEmpty(
+                            attempt.SinglePlaneFailure))
+                    {
+                        builder.Append(":singleFailure={");
+                        builder.Append(attempt.SinglePlaneFailure);
+                        builder.Append('}');
+                    }
+                    if (!string.IsNullOrEmpty(
+                            attempt.RetainedHullFailure))
+                    {
+                        builder.Append(":hullFailure={");
+                        builder.Append(attempt.RetainedHullFailure);
+                        builder.Append('}');
+                    }
+                    if (!string.IsNullOrEmpty(attempt.FinalFailure))
+                    {
+                        builder.Append(":finalFailure={");
+                        builder.Append(attempt.FinalFailure);
+                        builder.Append('}');
+                    }
+                }
+            }
+            builder.Append(']');
+            return builder.ToString();
         }
 
         private static void AuditBoundedEdgeClassificationPool(
@@ -2902,10 +3105,44 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             out float solvedWidth,
             out string blocker)
         {
+            return TrySolveBoundedIsolatedSingleEdgeRails(
+                sourceFaces,
+                context,
+                selected,
+                requestedWidth,
+                minimumStableEdgeLength,
+                out rails,
+                out _,
+                out _,
+                out _,
+                out widthAttemptCount,
+                out solvedWidth,
+                out blocker);
+        }
+
+        private static bool TrySolveBoundedIsolatedSingleEdgeRails(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            EdgeWearSelectedGraphEdge selected,
+            float requestedWidth,
+            float minimumStableEdgeLength,
+            out BoundedIsolatedRailPoint[] rails,
+            out List<EdgeWearIsolatedWidthAttemptRecord> widthAttempts,
+            out float minimumWidth,
+            out bool scheduleComplete,
+            out int widthAttemptCount,
+            out float solvedWidth,
+            out string blocker)
+        {
             const int maximumWidthAttempts = 12;
             const float widthBackoff = 0.75f;
 
             rails = null;
+            widthAttempts =
+                new List<EdgeWearIsolatedWidthAttemptRecord>(
+                    maximumWidthAttempts);
+            minimumWidth = 0f;
+            scheduleComplete = false;
             widthAttemptCount = 0;
             solvedWidth = 0f;
             blocker = string.Empty;
@@ -2918,7 +3155,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
 
-            float minimumWidth = Mathf.Max(
+            minimumWidth = Mathf.Max(
                 minimumStableEdgeLength,
                 PointMergeDistance * 4f);
             float initialWidth = CalculateChamferEdgeWidth(
@@ -2943,22 +3180,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 widthAttemptCount++;
                 solvedWidth = attemptWidth;
-                if (TrySolveBoundedIsolatedRailsAtWidth(
-                        sourceFaces,
-                        context,
-                        selected,
-                        requestedWidth,
-                        attemptWidth,
-                        minimumStableEdgeLength,
-                        out BoundedIsolatedRailPoint[] candidateRails,
-                        out lastBlocker))
+                EdgeWearIsolatedWidthAttemptRecord attempt =
+                    new EdgeWearIsolatedWidthAttemptRecord
+                    {
+                        AttemptIndex = widthAttemptCount,
+                        Width = attemptWidth
+                    };
+                bool railSolved = TrySolveBoundedIsolatedRailsAtWidth(
+                    sourceFaces,
+                    context,
+                    selected,
+                    requestedWidth,
+                    attemptWidth,
+                    minimumStableEdgeLength,
+                    out BoundedIsolatedRailPoint[] candidateRails,
+                    out lastBlocker);
+                attempt.RailSolved = railSolved;
+                attempt.RailFailure = railSolved
+                    ? string.Empty
+                    : lastBlocker ?? string.Empty;
+                widthAttempts.Add(attempt);
+                if (railSolved)
                 {
                     rails = candidateRails;
+                    scheduleComplete =
+                        attemptWidth <=
+                            minimumWidth + PointMergeDistance ||
+                        widthAttemptCount >= maximumWidthAttempts;
                     return true;
                 }
 
                 if (attemptWidth <= minimumWidth + PointMergeDistance)
                 {
+                    scheduleComplete = true;
                     break;
                 }
 
@@ -2972,6 +3226,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 attemptWidth = nextWidth;
             }
 
+            if (widthAttemptCount >= maximumWidthAttempts)
+            {
+                scheduleComplete = true;
+            }
             blocker = string.IsNullOrEmpty(lastBlocker)
                 ? "the selected edge has no stable isolated rail solution"
                 : lastBlocker;
@@ -3799,6 +4057,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             out int boundarySubdivisionCount,
             out string blocker)
         {
+            audit.MultiSupportSinglePlaneAttempted = 1;
             BoundedSingleEdgeAuditResult singlePlaneAudit = audit;
             if (TryBuildBoundedMultiSupportSinglePlaneCutFaces(
                     sourceFaces,
@@ -3815,12 +4074,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out boundarySubdivisionCount,
                     out blocker))
             {
+                singlePlaneAudit.MultiSupportSinglePlaneSucceeded = 1;
+                singlePlaneAudit.MultiSupportSinglePlaneFailure =
+                    string.Empty;
                 singlePlaneAudit.MultiSupportPlaneCount = 1;
                 audit = singlePlaneAudit;
                 return true;
             }
 
             string singlePlaneBlocker = blocker ?? string.Empty;
+            audit.MultiSupportSinglePlaneFailure = singlePlaneBlocker;
+            audit.MultiSupportRetainedHullAttempted = 1;
             BoundedSingleEdgeAuditResult retainedHullAudit = audit;
             if (TryBuildBoundedRetainedPointHullFaces(
                     sourceFaces,
@@ -3837,6 +4101,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out boundarySubdivisionCount,
                     out blocker))
             {
+                retainedHullAudit.MultiSupportRetainedHullSucceeded = 1;
+                retainedHullAudit.MultiSupportRetainedHullFailure =
+                    string.Empty;
                 retainedHullAudit.MultiSupportHullEvidence =
                     "singlePlaneFailure:{" + singlePlaneBlocker + "};" +
                     (retainedHullAudit.MultiSupportHullEvidence ??
@@ -3845,6 +4112,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return true;
             }
 
+            retainedHullAudit.MultiSupportRetainedHullFailure =
+                blocker ?? string.Empty;
             retainedHullAudit.MultiSupportHullEvidence =
                 "singlePlaneFailure:{" + singlePlaneBlocker + "};" +
                 (retainedHullAudit.MultiSupportHullEvidence ??

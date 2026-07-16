@@ -42,8 +42,8 @@ MonoBehaviour:
       outerBankFade: 0.75
       riverbedMaterialStrength: 1
       riverbedWetnessStrength: 1
-      riverbedToBankWetnessBlendDistance: 0.559
-      riverbedToBankWetnessBlendSoftness: 0.838
+      riverbedToBankWetnessBlendDistance: 0.23
+      riverbedToBankWetnessBlendSoftness: 0.923
       riverbedWetSmoothnessResponse: 0
       riverbedWetSpecularResponse: 0
       vegetationRetreatStrength: 0
@@ -51,15 +51,17 @@ MonoBehaviour:
       frostRetreatStrength: 0
       paintedAccentRetreatStrength: 0
       shoreWetnessStrength: 1
-      shoreWetnessReach: 0.25
-      shoreWetnessFade: 0.55
-      broadBankSaturation: 0.4
-      immediateBankSaturation: 0.25
+      shoreWetnessReach: 0.19
+      shoreWetnessFade: 0.58
+      broadBankSaturation: 0.655
+      immediateBankSaturation: 0.469
       waterlineSaturation: 0.265
-      shoreWetHighlightStrength: 2
+      shoreWetHighlightWidth: 0.398
+      shoreWetHighlightFeather: 1.592
+      shoreWetHighlightStrength: 0.094
       shoreWetHighlightTightness: 1
       shoreWetHighlightCameraBias: 1
-      shoreWetHighlightVerticalFalloff: 0.886
+      shoreWetHighlightVerticalFalloff: 1
       groundMacroPatchScale: 4.3
       groundMacroPatchPatternSeed: 69
       broadVariation: 0.05
@@ -185,6 +187,8 @@ MonoBehaviour:
       broadBankSaturation: 0.45
       immediateBankSaturation: 0.8
       waterlineSaturation: 1
+      shoreWetHighlightWidth: 0.05
+      shoreWetHighlightFeather: 0.05
       shoreWetHighlightStrength: 0.35
       shoreWetHighlightTightness: 0.8
       shoreWetHighlightCameraBias: 0.85
@@ -314,6 +318,8 @@ MonoBehaviour:
       broadBankSaturation: 0.45
       immediateBankSaturation: 0.8
       waterlineSaturation: 1
+      shoreWetHighlightWidth: 0.05
+      shoreWetHighlightFeather: 0.05
       shoreWetHighlightStrength: 0.35
       shoreWetHighlightTightness: 0.8
       shoreWetHighlightCameraBias: 0.85
@@ -491,6 +497,8 @@ MonoBehaviour:
       broadBankSaturation: 0.45
       immediateBankSaturation: 0.8
       waterlineSaturation: 1
+      shoreWetHighlightWidth: 0.05
+      shoreWetHighlightFeather: 0.05
       shoreWetHighlightStrength: 0.35
       shoreWetHighlightTightness: 0.8
       shoreWetHighlightCameraBias: 0.85

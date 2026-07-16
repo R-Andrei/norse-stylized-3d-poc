@@ -157,14 +157,14 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float riverbedWetnessStrength = 1f;
 
-    [InspectorName("Riverbed-to-Bank Blend Distance")]
-    [Tooltip("Wetness-only distance in metres that extends the Riverbed Hydrology Modifier from exact Riverbed Support onto the corridor Bank. Zero preserves the exact-support boundary.")]
+    [InspectorName("Riverbed Edge Transition Distance")]
+    [Tooltip("Distance in metres measured inward from the exact Riverbed Support boundary over which Riverbed wetness transitions from resolved Bank-edge wetness to full Riverbed wetness. Zero preserves the exact-support boundary.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float riverbedToBankWetnessBlendDistance = 0.2f;
 
-    [InspectorName("Riverbed-to-Bank Blend Softness")]
-    [Tooltip("Shape of the Riverbed wetness transition across its authored Bank-side distance. Zero is linear; one uses a fully smooth transition.")]
+    [InspectorName("Riverbed Edge Transition Softness")]
+    [Tooltip("Shape of the inward Riverbed wetness transition. Zero is linear; one uses a fully smooth transition from edge wetness to interior wetness.")]
     [Range(0f, 1f)]
     [SerializeField]
     private float riverbedToBankWetnessBlendSoftness = 0.75f;
@@ -243,6 +243,18 @@ public sealed class GroundMaterialControls
     [Range(0f, 1f)]
     [SerializeField]
     private float waterlineSaturation = 1f;
+
+    [InspectorName("Highlight Width")]
+    [Tooltip("Full-width distance in metres of the stylized Shore highlight measured outward from the exact Riverbed Support edge across the corridor Bank.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float shoreWetHighlightWidth = 0.05f;
+
+    [InspectorName("Highlight Feather")]
+    [Tooltip("Additional fade distance in metres beyond Highlight Width. Lower values keep the highlight tightly pinned to the waterline.")]
+    [Range(0.005f, 2f)]
+    [SerializeField]
+    private float shoreWetHighlightFeather = 0.05f;
 
     [InspectorName("Wet Highlight Strength")]
     [Tooltip("Strength of the narrow stylized Shore highlight added after ordinary Ground lighting. The effect remains masked by local Shore wetness.")]
@@ -538,6 +550,10 @@ public sealed class GroundMaterialControls
     public float ImmediateBankSaturation =>
         Mathf.Clamp01(immediateBankSaturation);
     public float WaterlineSaturation => Mathf.Clamp01(waterlineSaturation);
+    public float ShoreWetHighlightWidth =>
+        Mathf.Clamp(shoreWetHighlightWidth, 0f, 2f);
+    public float ShoreWetHighlightFeather =>
+        Mathf.Clamp(shoreWetHighlightFeather, 0.005f, 2f);
     public float ShoreWetHighlightStrength =>
         Mathf.Clamp(shoreWetHighlightStrength, 0f, 2f);
     public float ShoreWetHighlightTightness =>
@@ -635,6 +651,8 @@ public sealed class GroundMaterialControls
             broadBankSaturation = 0.45f;
             immediateBankSaturation = 0.8f;
             waterlineSaturation = 1f;
+            shoreWetHighlightWidth = 0.05f;
+            shoreWetHighlightFeather = 0.05f;
             shoreWetHighlightStrength = 0.35f;
             shoreWetHighlightTightness = 0.8f;
             shoreWetHighlightCameraBias = 0.85f;
@@ -685,6 +703,8 @@ public sealed class GroundMaterialControls
         broadBankSaturation = source.broadBankSaturation;
         immediateBankSaturation = source.immediateBankSaturation;
         waterlineSaturation = source.waterlineSaturation;
+        shoreWetHighlightWidth = source.shoreWetHighlightWidth;
+        shoreWetHighlightFeather = source.shoreWetHighlightFeather;
         shoreWetHighlightStrength = source.shoreWetHighlightStrength;
         shoreWetHighlightTightness = source.shoreWetHighlightTightness;
         shoreWetHighlightCameraBias = source.shoreWetHighlightCameraBias;

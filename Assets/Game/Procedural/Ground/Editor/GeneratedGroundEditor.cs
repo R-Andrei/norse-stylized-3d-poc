@@ -125,6 +125,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty broadBankSaturation;
         private SerializedProperty immediateBankSaturation;
         private SerializedProperty waterlineSaturation;
+        private SerializedProperty shoreWetHighlightWidth;
+        private SerializedProperty shoreWetHighlightFeather;
         private SerializedProperty shoreWetHighlightStrength;
         private SerializedProperty shoreWetHighlightTightness;
         private SerializedProperty shoreWetHighlightCameraBias;
@@ -598,6 +600,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             waterlineSaturation =
                 groundMaterialControls.FindPropertyRelative(
                     "waterlineSaturation");
+
+            shoreWetHighlightWidth =
+                groundMaterialControls.FindPropertyRelative(
+                    "shoreWetHighlightWidth");
+
+            shoreWetHighlightFeather =
+                groundMaterialControls.FindPropertyRelative(
+                    "shoreWetHighlightFeather");
 
             shoreWetHighlightStrength =
                 groundMaterialControls.FindPropertyRelative(
@@ -3755,6 +3765,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 broadBankSaturation,
                 immediateBankSaturation,
                 waterlineSaturation,
+                shoreWetHighlightWidth,
+                shoreWetHighlightFeather,
                 shoreWetHighlightStrength,
                 shoreWetHighlightTightness,
                 shoreWetHighlightCameraBias,
@@ -3876,6 +3888,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 materialControls.FindPropertyRelative("broadBankSaturation"),
                 materialControls.FindPropertyRelative("immediateBankSaturation"),
                 materialControls.FindPropertyRelative("waterlineSaturation"),
+                materialControls.FindPropertyRelative("shoreWetHighlightWidth"),
+                materialControls.FindPropertyRelative("shoreWetHighlightFeather"),
                 materialControls.FindPropertyRelative("shoreWetHighlightStrength"),
                 materialControls.FindPropertyRelative("shoreWetHighlightTightness"),
                 materialControls.FindPropertyRelative("shoreWetHighlightCameraBias"),
@@ -3997,6 +4011,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             SerializedProperty broadSaturation,
             SerializedProperty immediateSaturation,
             SerializedProperty waterlineSaturationProperty,
+            SerializedProperty wetHighlightWidth,
+            SerializedProperty wetHighlightFeather,
             SerializedProperty wetHighlightStrength,
             SerializedProperty wetHighlightTightness,
             SerializedProperty wetHighlightCameraBias,
@@ -4141,8 +4157,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Wet Highlight Shaping",
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.HelpBox(
-                    "Camera-Centred Bias transfers Shore wet finish from the broad physical PBR response into a narrower active-camera band. The effect remains masked by local Shore wetness and does not apply to the Riverbed.",
+                    "Highlight Width and Highlight Feather confine the stylized Shore highlight to a narrow waterline band. Camera-Centred Bias then transfers Shore wet finish from the broad physical PBR response into that active-camera band. The effect remains masked by local Shore wetness and does not apply to the Riverbed.",
                     MessageType.None);
+                EditorGUILayout.PropertyField(wetHighlightWidth);
+                EditorGUILayout.PropertyField(wetHighlightFeather);
                 EditorGUILayout.PropertyField(wetHighlightStrength);
                 EditorGUILayout.PropertyField(wetHighlightTightness);
                 EditorGUILayout.PropertyField(wetHighlightCameraBias);
@@ -4387,7 +4405,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             else
             {
                 EditorGUILayout.HelpBox(
-                    "Riverbed wetness uses exact Ground Riverbed Support and has no reach or fade controls.",
+                    "Riverbed wetness uses Ground Riverbed Support and can transition inward from resolved Bank-edge wetness to full Riverbed wetness in the interior.",
                     MessageType.None);
             }
 
@@ -4401,7 +4419,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Wetness Transition",
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.HelpBox(
-                    "Extends only the Riverbed Hydrology Modifier onto the corridor Bank and fades it across the existing metre distance from Ground Riverbed Support. Zero distance preserves the exact-support boundary.",
+                    "Transitions Riverbed wetness inward from resolved Bank wetness at the Ground Riverbed Support edge to full Riverbed wetness in the interior. The transition remains entirely inside the Riverbed. Zero distance preserves the hard boundary.",
                     MessageType.None);
                 EditorGUILayout.PropertyField(wetnessBlendDistance);
                 using (new EditorGUI.DisabledScope(

@@ -522,16 +522,22 @@ namespace ProgrammaticStylized3D.Rivers
                             groundSample.ReservedSurfaceMask));
                     float riverBankDomain =
                         ResolveRiverBankDomain(crossPoint);
+                    float riverbedSupport =
+                        ResolveRiverbedSupport(crossPoint);
                     riverMaterialMasks.Add(
                         new Vector4(
-                            ResolveRiverbedSupport(crossPoint),
+                            riverbedSupport,
                             riverBankDomain > 0.5f
                                 ? Mathf.Max(
                                     0f,
                                     acrossDistance - visibleHalfWidth)
                                 : 0f,
                             riverBankDomain,
-                            0f));
+                            riverbedSupport > 0.5f
+                                ? Mathf.Max(
+                                    0f,
+                                    visibleHalfWidth - acrossDistance)
+                                : 0f));
                     terrainIntegrationWeights.Add(
                         terrainIntegrationWeight);
                     sampledGroundNormals.Add(localGroundNormal);

@@ -1582,11 +1582,21 @@ private readonly struct EdgeWearTopologyStats
             }
         }
 
+        private enum ChamferCornerZeroingStage
+        {
+            None,
+            SharedEdgeUniformScale,
+            SharedEdgeForcedDeferral
+        }
+
         private sealed class ChamferCornerConflictRecord
         {
             public int UnselectedSourceEdgeIndex = -1;
             public float UniformScale;
+            public ChamferCornerZeroingStage ZeroingStage;
             public readonly List<int> ParticipatingSelectedEdges =
+                new List<int>();
+            public readonly List<int> ZeroedSelectedEdges =
                 new List<int>();
             public readonly Dictionary<int, float>
                 ParticipantWidthBeforeScale =
@@ -1966,6 +1976,24 @@ private struct EdgeWearGraphBuildStats
             ViableSelected
         }
 
+        private sealed class EdgeWearIsolatedWidthAttemptRecord
+        {
+            public int AttemptIndex;
+            public float Width;
+            public bool RailSolved;
+            public string RailFailure = string.Empty;
+            public bool ConstructionAttempted;
+            public bool ConstructionSucceeded;
+            public bool SinglePlaneAttempted;
+            public bool SinglePlaneSucceeded;
+            public string SinglePlaneFailure = string.Empty;
+            public bool RetainedHullAttempted;
+            public bool RetainedHullSucceeded;
+            public string RetainedHullFailure = string.Empty;
+            public bool Certified;
+            public string FinalFailure = string.Empty;
+        }
+
         private sealed class EdgeWearEdgeViabilityRecord
         {
             public EdgeKey Key;
@@ -2001,6 +2029,11 @@ private struct EdgeWearGraphBuildStats
             public bool IsolatedSucceeded;
             public int IsolatedWidthAttemptCount;
             public float IsolatedLastAttemptedWidth;
+            public bool IsolatedAttemptScheduleComplete;
+            public bool IsolatedTerminalConstructionAtMinimum;
+            public string IsolatedAttemptScheduleResolution =
+                string.Empty;
+            public string IsolatedWidthAttemptEvidence = string.Empty;
             public float IsolatedMaximumCertifiedWidth;
             public float IsolatedMaximumCertifiedWidthFraction;
             public int IsolatedAlternateBoundaryRailCount;
@@ -2337,7 +2370,10 @@ private struct EdgeWearGraphBuildStats
             public int CornerRecoveryCollapsedSourceEdgeIndex = -1;
             public float CornerRecoveryLastPositiveWidth;
             public float CornerRecoveryUniformScale;
+            public ChamferCornerZeroingStage CornerRecoveryZeroingStage;
             public string CornerRecoveryParticipants = string.Empty;
+            public string CornerRecoveryZeroedParticipants = string.Empty;
+            public string CornerRecoveryResolution = string.Empty;
             public bool Active;
             public bool AttemptedBuilt;
             public bool Built;

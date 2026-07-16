@@ -24,7 +24,7 @@
                 float3 positionOS : TEXCOORD4;
                 float4 materialMasks : TEXCOORD5;
                 half3 normalOS : TEXCOORD6;
-                half3 riverCoupledMasks : TEXCOORD7;
+                half4 riverCoupledMasks : TEXCOORD7;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -51,7 +51,7 @@
                 output.materialMasks = input.uv2;
                 output.normalOS = normalize(input.normalOS);
                 output.riverCoupledMasks =
-                    (half3)input.riverMaterialMasks.xyz;
+                    (half4)input.riverMaterialMasks;
                 return output;
             }
 #endif // PS3D_PIXELSURFACEGROUNDFORWARDTYPES_HLSL

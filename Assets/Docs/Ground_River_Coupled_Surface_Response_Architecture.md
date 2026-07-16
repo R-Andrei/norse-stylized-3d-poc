@@ -1,12 +1,108 @@
 # Ground River-Coupled Surface Response Architecture and Implementation Plan
 
-## Status — 2026-07-16
+## Status — 2026-07-17
 
-**Architecture is implemented and source-audited through V3S-A4B.2; Unity compilation and visual validation of A4B.2 are pending. Unity has already validated normalized Bank/Riverbed composition, explicit Riverbed substrate ownership, exact-support Riverbed hydrology, region-oriented Inspector authoring, and submerged Riverbed finish decoupling. A4B.2 transfers most Shore-added smoothness/specular response from the broad URP PBR lobe into a narrow camera-readable stylized Shore highlight, and adds a short wetness-only Riverbed-to-Bank transition using the existing corridor bank distance. It adds no debug view and does not modify River geometry, water rendering, profile schemas/assets, textures, scenes, prefabs, materials, or semantic channels.**
+**V3S-A4B.3 — Waterline Highlight Band and Inward Riverbed Wetness Transition is Unity-validated, visually accepted, and frozen as the current River-coupled Ground-response baseline. The accepted result preserves normalized Bank/Riverbed substrate composition, explicit Riverbed substrate ownership, independent Shore and Riverbed hydrology, submerged Riverbed finish suppression, a thin metre-authored Shore highlight band, and an inward Riverbed-edge wetness transition that remains inside `Ground Riverbed Support`. No further River-coupled mechanic is authorized by this freeze. Family-recipe tuning is paused until the user-requested updates to the existing Ground surfaces are separately specified, audited, planned, and accepted.**
 
 This document is the canonical authority for River-coupled Ground appearance. It supersedes every earlier proposal that placed River banks or riverbeds inside the generic V4 Contact / Edge Accent field.
 
 The latest project source overrides this document when they conflict.
+
+
+## V3S-A4B.3 — Waterline Highlight Band and Inward Riverbed Wetness Transition
+
+**Status: Unity-validated, visually accepted, and frozen on 2026-07-17.**
+
+### Objective
+
+1. Restrict the stylized Shore wet highlight to a thin metre-authored band immediately outside the exact `Ground Riverbed Support` edge while preserving the broader Shore wetness field.
+2. Replace the superseded outward Riverbed-to-Bank wetness extension with a transition that remains entirely inside Riverbed Support and moves from resolved Bank-edge wetness at the boundary to authored Riverbed wetness in the interior.
+
+### Approved files
+
+- `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+- `Assets/Game/Procedural/Ground/GroundMaterialControls.cs`
+- `Assets/Game/Procedural/Ground/GeneratedGround.cs`
+- `Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverCorridorGeometry.cs`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardTypes.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader`
+
+### Pre-implementation reviewed evidence
+
+- Before A4B.3, `StylizedRiverCorridorGeometry.cs` wrote a four-component `TexCoord3` stream but reserved `.w` as zero.
+- Before the corrected A4B.3 package, `PixelSurfaceGroundForwardTypes.hlsl` truncated `riverMaterialMasks` to `half3 riverCoupledMasks`; the final implementation preserves all four components through the vertex-to-fragment contract.
+- Before A4B.3, `PixelSurfaceGroundForwardPass.hlsl` masked the stylized highlight only by the full `localShoreWetness`; the final implementation adds an independent waterline-band mask from Bank distance.
+- A4B.2 extended Riverbed wetness outward using Bank distance/domain; A4B.3 removes that behavior and uses inward Riverbed distance stored in `TexCoord3.w`.
+
+### Implementation contract
+
+- `TexCoord3.x`: exact Riverbed Support, unchanged.
+- `TexCoord3.y`: outward Bank distance, unchanged.
+- `TexCoord3.z`: Bank-domain authorization, unchanged.
+- `TexCoord3.w`: inward Riverbed distance in metres from the exact Riverbed Support boundary.
+- Add `Highlight Width` and `Highlight Feather` controls; these affect only the stylized Shore highlight, not Shore wetness.
+- Reinterpret the existing serialized Riverbed transition fields as `Riverbed Edge Transition Distance` and `Riverbed Edge Transition Softness`; no serialized field rename or migration is permitted.
+- At the Riverbed edge, Riverbed wetness resolves toward the current Bank-edge wetness; moving inward transitions to the authored Riverbed wetness strength.
+- No Riverbed wetness may be added outside Riverbed Support.
+- Preserve A4B.1 Riverbed smoothness/specular suppression and all accepted substrate, cover, hydrology-source, and debug behavior.
+
+### Non-goals
+
+- No new debug views.
+- No River shape, vertex-count, collider, topology, or water-rendering change.
+- No profile-schema or profile-asset change.
+- No scene, prefab, material, texture, layer, tag, renderer, or draw-call change.
+
+### Validation requirements
+
+- Verify the package contains only the existing plural path `Assets/Game/Procedural/Rivers/StylizedRiverCorridorGeometry.cs`; no singular `Procedural/River` path may exist.
+- Parse every changed C# file and scan introduced shader/C# references for complete declarations and imports.
+- Verify `Attributes.riverMaterialMasks`, `Varyings.riverCoupledMasks`, and the vertex assignment remain four-component end-to-end.
+- Verify C#, CBUFFER, and ShaderLab property parity for the highlight-band property.
+- Verify no outward Riverbed wetness term remains in the final response resolver.
+- Verify exact file scope and preserve existing line endings.
+- Unity compilation and corridor regeneration remain mandatory final validation.
+
+### Post-implementation consistency and compliance result
+
+- Final scope matches the twelve approved files. The River producer is packaged only at `Assets/Game/Procedural/Rivers/StylizedRiverCorridorGeometry.cs`; no singular `Procedural/River` path exists.
+- `TexCoord3` is four-component from mesh producer through `Attributes`, `Varyings`, and fragment response. `.w` is read only as inward Riverbed distance.
+- The old outward Riverbed wetness extension is removed. Riverbed wetness returns zero outside Riverbed Support and transitions from Bank-edge wetness to interior Riverbed wetness only inside support.
+- `Highlight Width` and `Highlight Feather` affect only the stylized Shore highlight band; the broader Shore wetness field remains unchanged.
+- A4B.1 submerged Riverbed smoothness/specular response controls remain unchanged. No debug view, water shader, profile schema/asset, scene, prefab, material, texture, geometry topology, collider, renderer, or draw-call change was introduced.
+- Tree-sitter C# parsing passed for all four changed C# files. Full `PixelSurfaceGroundMaterialProperties.hlsl` plus `PixelSurfaceGroundResponse.hlsl` compiled in a Clang 17 HLSL library harness; the exact changed Shore-highlight function and four-component varying contract compiled in separate Clang 17 harnesses. `dxv` was unavailable, so generated DXIL was not signed or validated.
+- C#/CBUFFER/ShaderLab property parity, HLSL delimiter/preprocessor balance, package path checks, line-ending preservation, and exact producer/varying/consumer contract checks passed.
+- Unity compilation succeeded in the user project after the corrected package restored the existing plural `Procedural/Rivers` source path and carried `TexCoord3.w` through the four-component shader varying contract.
+- User visual validation confirmed the thin Shore highlight band and inward Riverbed wetness transition work as intended. The subsequently questioned dark edge was verified by the user to be expected Shore waterline darkening, not a defect.
+- A4B.3 is frozen. Reopening its geometry stream, Bank/Riverbed ownership, wetness placement, highlight-band placement, or submerged-finish behavior requires new evidence and explicit approval.
+
+## Frozen A4B.3 baseline contract — 2026-07-17
+
+The following contract is accepted and must be preserved until the user explicitly reopens it:
+
+```text
+TexCoord3.x = exact Ground Riverbed Support
+TexCoord3.y = outward Bank distance in metres
+TexCoord3.z = Bank-domain authorization
+TexCoord3.w = inward Riverbed distance in metres
+```
+
+- Ordinary GeneratedGround remains unauthorized for River-coupled response.
+- Bank and Riverbed substrates use normalized three-surface composition, preventing primary-Ground leakage between matching secondary surfaces.
+- Shore wetness remains independent from Bank substrate reach.
+- Riverbed wetness remains independent from Riverbed substrate identity.
+- Riverbed wetness transitions only inside Riverbed Support, from resolved Bank-edge wetness to interior Riverbed wetness.
+- The stylized Shore highlight uses its own `Highlight Width` and `Highlight Feather`; broad Shore wetness is not narrowed by those controls.
+- Riverbed `Smoothness Response` and `Specular Response` default to zero so reflective-interface ownership remains with the water surface.
+- No new debug view was added; existing exact names remain `Ground Riverbed Support`, `Ground Bank Material Blend`, `Ground Local Shore Wetness`, and `Ground Effective Wetness`.
+- The corrected producer path is `Assets/Game/Procedural/Rivers/StylizedRiverCorridorGeometry.cs`. A singular `Assets/Game/Procedural/River/` copy is prohibited because it creates duplicate type definitions.
+- The next Ground task is not family-recipe tuning yet. The receiving chat must first obtain and plan the user's requested updates to the existing Ground surfaces.
 
 ## Mission
 

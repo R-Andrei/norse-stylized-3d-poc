@@ -733,11 +733,16 @@
             }
 
             half3 ResolveGroundStylizedShoreWetHighlight(
+                Varyings input,
                 InputData inputData,
                 float localShoreWetness,
                 half lightingLuma)
             {
                 float wetness = saturate(localShoreWetness);
+                float highlightWidth =
+                    max(0.0, _GroundShoreWetHighlightBand.x);
+                float highlightFeather =
+                    max(0.005, _GroundShoreWetHighlightBand.y);
                 float strength =
                     max(0.0, _GroundShoreWetHighlightShaping.x);
                 float tightness =
@@ -746,8 +751,14 @@
                     saturate(_GroundShoreWetHighlightShaping.z);
                 float verticalFalloff =
                     saturate(_GroundShoreWetHighlightShaping.w);
+                float bandMask =
+                    ResolveGroundRiverBankDomain(input) *
+                    (1.0 - smoothstep(
+                        highlightWidth,
+                        highlightWidth + highlightFeather,
+                        ResolveGroundRiverBankDistance(input)));
                 float activeStrength =
-                    wetness * strength * cameraBias;
+                    wetness * bandMask * strength * cameraBias;
                 if (activeStrength <= 0.0001)
                 {
                     return half3(0.0h, 0.0h, 0.0h);
@@ -877,6 +888,7 @@
                         pbrColor.rgb,
                         lightingTintInfluence);
                 finalRgb += ResolveGroundStylizedShoreWetHighlight(
+                    input,
                     inputData,
                     localShoreWetness,
                     lightingLuma);

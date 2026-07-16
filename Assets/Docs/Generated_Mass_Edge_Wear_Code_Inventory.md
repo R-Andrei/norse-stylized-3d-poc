@@ -1493,3 +1493,32 @@ Generic width-provisional edges cannot initiate augmentation. The only productio
 ### Contracts
 
 Editor suite, topology, preview, and comprehensive contracts advance to `EW-B4.2R13A.6`. No scene, prefab, material, shader, UV, shared mesh builder, artistic-score formula, layer, tag, or production generation-contract change is included.
+
+
+## EW-B4.2R13A.7 recovery-closure inventory
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+`EdgeWearIsolatedWidthAttemptRecord` is a bounded diagnostic record for the already-executed isolated rail schedule and its one terminal construction. `EdgeWearEdgeViabilityRecord` retains schedule completion, terminal-at-minimum state, resolution, and compact ordered evidence. `ChamferCornerZeroingStage` distinguishes uniform-scale deactivation from the no-progress forced-deferral fallback. Each conflict separately retains all participants and the exact subset actually transitioned to zero; lifecycle records retain the matching stage, full participant set, exact zeroed subset, and final recovery resolution.
+
+### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+The twelve-step `0.75` rail schedule is unchanged. The solver records each existing attempt and preserves the original nine-argument overload for `MassGenerator.EdgeWear.BoundedAllEdges.cs`. `AuditBoundedSingleEdgeBevel` annotates the terminal construction with exact single-plane and retained-hull outcomes. `FinalizeBoundedSingleEdgeAuditResult` reports `certified`, `complete-rail-infeasible`, `complete-infeasible`, or `unresolved` without issuing any additional geometry call.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`RecordChamferCornerConflict` captures exact participant widths and the exact zeroed-edge subset for both zeroing stages. The former unrecorded `!edgeChanged` fallback now emits `SharedEdgeForcedDeferral` evidence before setting widths to zero. Final inactive capture accepts only the event that actually zeroed the target. Isolated viability retains compact width-attempt evidence only for failed, repeated, or multi-support evaluations.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`CollectCornerInactiveRecoveryEdges` rejects width-recovery-provisional and ordinary width-fraction-ineligible edges. `ApplyCornerRecoveryResolution` marks a target certified only when the winning coverage built it, marks complete frontier exhaustion as proven infeasible, and preserves unresolved status for cancellation, time, or state-budget termination. The existing certified-baseline commit guards are unchanged.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+The lifecycle and bounded audit records now include schedule completion/resolution, ordered per-width evidence, single-plane and retained-hull terminal outcomes, corner zeroing stage, full participant set, exact zeroed subset, and corner recovery resolution. Complete evidence remains in the existing explicit editor telemetry/report surfaces.
+
+### `Editor/GeneratedMassEditor.cs`
+
+Suite semantics now report positive fixture resolution as certified, proven infeasible, or unresolved. The suite adds `8889 / maximum / edge 40` as an editor-only negative exclusion fixture and advances all R13 contracts to R13A.7. No production seed/source-edge policy is introduced.
+
+No changes are made to `MassGenerator.cs`, `GeneratedMass.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.MeshOutput.cs`, shared procedural mesh types, serialized assets, materials, or shaders.

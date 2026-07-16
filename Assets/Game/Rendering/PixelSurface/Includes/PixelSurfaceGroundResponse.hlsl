@@ -102,6 +102,17 @@
 #endif
             }
 
+            float ResolveGroundRiverbedInwardDistance(Varyings input)
+            {
+#if defined(PS3D_GROUND_HAS_RIVERBED_SUPPORT)
+                return
+                    ResolveGroundRiverCoupledEnabled() *
+                    max(0.0, (float)input.riverCoupledMasks.w);
+#else
+                return 0.0;
+#endif
+            }
+
 #if defined(PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES)
             float ResolveGroundBoundedUnion(
                 float firstContribution,
@@ -112,8 +123,10 @@
                 return 1.0 - (1.0 - first) * (1.0 - second);
             }
 
-            float ResolveGroundLocalShoreWetness(
-                Varyings input)
+            float ResolveGroundComposedShoreWetness(
+                float domainWeight,
+                float distance,
+                float shore)
             {
                 float profileEnabled =
                     saturate(_GroundShoreHydrologyEnabled);
@@ -123,25 +136,24 @@
                     max(0.0, _GroundShoreHydrologySpatialA.y);
                 float fade =
                     max(0.05, _GroundShoreHydrologySpatialA.z);
-                float bankDomain =
-                    ResolveGroundRiverBankDomain(input);
-                float distance =
-                    ResolveGroundRiverBankDistance(input);
-                float shore = ResolveGroundShoreMask(input);
+                float domain = saturate(domainWeight);
                 float distanceWeight =
-                    (1.0 - smoothstep(reach, reach + fade, distance)) *
-                    bankDomain;
+                    (1.0 - smoothstep(
+                        reach,
+                        reach + fade,
+                        max(0.0, distance))) *
+                    domain;
                 float broadContribution =
                     distanceWeight *
                     saturate(_GroundShoreHydrologySpatialA.w);
                 float immediateContribution =
                     smoothstep(0.17, 0.30, shore) *
                     saturate(_GroundShoreHydrologySpatialB.x) *
-                    bankDomain;
+                    domain;
                 float waterlineContribution =
                     smoothstep(0.31, 0.40, shore) *
                     saturate(_GroundShoreHydrologySpatialB.y) *
-                    bankDomain;
+                    domain;
                 float composedWetness = ResolveGroundBoundedUnion(
                     ResolveGroundBoundedUnion(
                         broadContribution,
@@ -154,34 +166,57 @@
                     composedWetness);
             }
 
+            float ResolveGroundLocalShoreWetness(
+                Varyings input)
+            {
+                return ResolveGroundComposedShoreWetness(
+                    ResolveGroundRiverBankDomain(input),
+                    ResolveGroundRiverBankDistance(input),
+                    ResolveGroundShoreMask(input));
+            }
+
+            float ResolveGroundBankEdgeWetness(Varyings input)
+            {
+                return ResolveGroundComposedShoreWetness(
+                    1.0,
+                    0.0,
+                    ResolveGroundShoreMask(input));
+            }
+
             float ResolveGroundRiverbedWetness(
                 Varyings input)
             {
                 float support = ResolveGroundRiverbedSupportMask(input);
-                float blendDistance =
+                float baseWetness =
+                    saturate(_GroundRiverbedHydrologyEnabled) *
+                    saturate(_GroundRiverbedWetnessStrength) *
+                    support;
+                float transitionDistance =
                     max(0.0, _GroundRiverbedWetnessTransition.x);
-                float blendEnabled = step(0.0001, blendDistance);
+                if (support <= 0.0001 || transitionDistance <= 0.0001)
+                {
+                    return saturate(baseWetness);
+                }
+
                 float distance01 = saturate(
-                    ResolveGroundRiverBankDistance(input) /
-                    max(0.0001, blendDistance));
-                float linearWeight = 1.0 - distance01;
+                    ResolveGroundRiverbedInwardDistance(input) /
+                    max(0.0001, transitionDistance));
                 float smoothDistance =
                     distance01 *
                     distance01 *
                     (3.0 - 2.0 * distance01);
-                float smoothWeight = 1.0 - smoothDistance;
-                float transitionWeight =
-                    blendEnabled *
-                    ResolveGroundRiverBankDomain(input) *
-                    lerp(
-                        linearWeight,
-                        smoothWeight,
-                        saturate(_GroundRiverbedWetnessTransition.y));
+                float interiorWeight = lerp(
+                    distance01,
+                    smoothDistance,
+                    saturate(_GroundRiverbedWetnessTransition.y));
+                float edgeWetness =
+                    ResolveGroundBankEdgeWetness(input) * support;
 
                 return saturate(
-                    saturate(_GroundRiverbedHydrologyEnabled) *
-                    saturate(_GroundRiverbedWetnessStrength) *
-                    saturate(support + transitionWeight));
+                    lerp(
+                        edgeWetness,
+                        baseWetness,
+                        interiorWeight));
             }
 
             float ResolveGroundEffectiveWetness(

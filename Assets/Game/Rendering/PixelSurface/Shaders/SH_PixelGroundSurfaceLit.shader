@@ -31,6 +31,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundShoreHydrologyCharacterB("Ground Shore Hydrology Character B", Vector) = (0.05, 0.65, 0.75, 0)
         [HideInInspector] _GroundShoreHydrologySpatialA("Ground Shore Hydrology Spatial A", Vector) = (0, 0.50, 0.25, 0.45)
         [HideInInspector] _GroundShoreHydrologySpatialB("Ground Shore Hydrology Spatial B", Vector) = (0.80, 1.00, 0, 0)
+        [HideInInspector] _GroundShoreWetHighlightBand("Ground Shore Wet Highlight Band", Vector) = (0.05, 0.05, 0, 0)
         [HideInInspector] _GroundShoreWetHighlightShaping("Ground Shore Wet Highlight Shaping", Vector) = (0.35, 0.80, 0.85, 0.60)
         _GroundPatchBlendStrength("Ground Patch Blend Strength", Range(0, 1)) = 0.55
         _GroundMacroPatchScale("Ground Macro Patch Scale", Range(0.5, 12)) = 4.5

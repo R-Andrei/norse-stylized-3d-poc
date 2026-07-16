@@ -148,6 +148,14 @@ Every geometry implementation patch requires:
 6. Visual inspection before any production promotion.
 7. Vertex-budget inspection after production promotion.
 
+## Edge-wear recovery closure contract
+
+- Historical editor fixtures may resolve as either a certified materialized bevel or a finite infeasibility result under the solver's complete current discrete admissible-width schedule. A discrete result must not be described as a continuous mathematical proof.
+- No recovery diagnostic may add geometry attempts unless a separately approved method change declares the performance impact.
+- Finalized corner recovery may use only exact recorded zeroing participants and their last positive widths. Width-recovery-provisional edges are not valid corner-augmentation initiators.
+- Negative artistic fixtures are first-class regression gates. Seed `8889`, maximum width, source edge `40` is intentionally excluded and must remain inactive, uncertified, and unmaterialized. This fixture is editor-only and may not create a seed-specific production branch.
+- Optional recovery remains subordinate to the immutable certified baseline. It may not reduce certified count, replace unrelated baseline identity, weaken topology/geometry/render guards, or erase a valid preview.
+
 ## Documentation ownership
 
 | Document | Sole responsibility |
@@ -190,7 +198,7 @@ Other documents may reference the canonical progress ledger, but must not mainta
 - The scale-correct normal contract is runtime-proven on `Rock_14`, `Rock_18`, seed `8889` ordinary output, and seed `8889` unified bevel-preview output.
 - Representative audits report zero missing, zero, non-finite, or non-unit normals/tangents; the black-triangle and Bloom-orb artifact no longer reproduces.
 - Finite UV-conditioning findings remain explicit warnings when 3D geometry and final render channels are valid.
-- GM-R12B.1E is closed by its ordinary and bevel-preview runtime audits. The R13A.4 one-click suite is the stable incomplete safety baseline; active recovery validation advances through R13A.6.
+- GM-R12B.1E is closed by its ordinary and bevel-preview runtime audits. R13A.6 is the latest runtime-validated safety state over the immutable R13A.4 baseline; active recovery-closure validation advances through R13A.7.
 
 ## Edge-wear conflict-search execution contract
 
@@ -200,7 +208,7 @@ Other documents may reference the canonical progress ledger, but must not mainta
 - A synchronous matrix case must poll the cancelable editor progress callback between search states and clear the transient callback after the case.
 - Priority ordering is fewest exclusions, lowest removed accepted artistic score, lowest removed certified width, then deterministic source-edge order. The first fully certified state is committed; exhaustive post-success optimization is forbidden.
 
-The R13A.4 one-click suite is the stable incomplete safety baseline; active recovery validation advances through R13A.6.
+R13A.6 is the latest runtime-validated safety state over the immutable R13A.4 baseline; active recovery-closure validation advances through R13A.7.
 
 
 ## Certified baseline augmentation contract
@@ -221,9 +229,9 @@ The R13A.4 one-click suite is the stable incomplete safety baseline; active reco
 
 ## Finalized corner-recovery and augmentation contract
 
-- A corner recovery provisional is captured only at the finalized `corner-width-inactive` transition and records its last positive width, collapsed shared edge, uniform scale, and exact participants.
+- A corner recovery provisional is captured only from the exact conflict event that actually transitioned that edge to zero at the finalized `corner-width-inactive` state. It records the last positive width, collapsed shared edge, zeroing stage, uniform scale, the complete participant set, and the exact zeroed-edge set.
 - Generic width-provisional edges do not authorize augmentation. Only certified retained-hull recovery and finalized corner-inactive recovery are valid trigger classes.
 - Recovery targets are protected. A candidate may not reduce certified count or remove a baseline-certified edge outside the exact participant set of a recovered corner target.
 - Timeout, cancellation, exhaustion, or no acceptable recovery retains the R13A.4 baseline and its edge identity.
 
-The current edge-wear regression gate is the R13A.6 one-click suite.
+The current implementation gate is the R13A.7 one-click suite. R13A.6 remains the latest runtime-validated safety state until R13A.7 passes Unity compilation and the complete suite.

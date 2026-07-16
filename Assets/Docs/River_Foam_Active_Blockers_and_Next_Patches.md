@@ -1,6 +1,28 @@
 # River Foam Active Blockers and Next Patches
 
-## Active implementation plan — `4.11C.5.18H.6.2 — Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle`
+## Active implementation program — `RG-METRIC-P0/P1 — Fixed-Metric Grid Baseline Review and Scope Lock`
+
+### Current objective
+
+Prepare the River Foam fixed-metric coordinate migration without changing runtime behavior. The accepted direction is a centreline-relative metric lattice with a shared lateral phase and integer global-Y indices. The first contiguous field must be one strip using the final coordinate semantics; it must not be an allocation-only resolution change.
+
+Authoritative documents:
+
+- `River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+- `River_Foam_Fixed_Metric_Dependency_Register.md`
+
+### Documentation patch 01 status
+
+- `RG-METRIC-P1` is complete: both canonical documents are installed and this queue is reconciled.
+- The static portion of `RG-METRIC-P0` is complete for all 94 registered source paths in the supplied snapshot.
+- `RG-METRIC-P0` remains blocked because the supplied archive contains no Git metadata, runnable project root, current `Editor.log`, profiler capture, cache status, or immutable Unity visual baseline.
+- No C#, HLSL, compute, shader, scene, prefab, material, generated cache, or generated asset was modified.
+
+### Required next gate
+
+Complete the live-workspace portion of `RG-METRIC-P0`: record branch/HEAD/upstream/status/diffs/history, preserve an immutable rollback reference, and capture the required Unity baseline for every automatic source family and relevant debug/performance view. Do not begin `RG-METRIC-P2` until that evidence is recorded in the canonical plan.
+
+## Preserved pre-migration Arc/Semi-Arc baseline — `4.11C.5.18H.6.2 — Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle`
 
 ### Mission
 
@@ -415,9 +437,18 @@ P4 accounting and the retained shader-compile recovery entries in the canonical 
 
 ## Current active queue
 
-The only active River visual patch is `4.11C.5.18H.4 — Event-Owned Analytic Open-C Geometry`. It preserves the `5.18G` per-anchor schedule, retains the straight wake arms from `5.18H.3`, and replaces that patch's unowned global-contact bridge with an event-owned upstream half-ellipse that structurally excludes the downstream rear centre. Chipping, Remaining-Life erosion, canonical velocity, transport, Contact Fleck geometry, reflection, and isolated performance work are not queued.
+The active River Foam program is `RG-METRIC-P0/P1 — Fixed-Metric Grid Baseline Review and Scope Lock`.
 
-After `5.18H.4` validates, reassess Wake Arm Length defaults, downstream tendril width, and clean-face windows before changing defaults. Do not add further wake, velocity, seed, or transport changes unless new evidence requires them.
+Current queue state:
+
+1. `RG-METRIC-P1` documentation reconciliation is complete.
+2. The supplied-snapshot static review portion of `RG-METRIC-P0` is complete.
+3. The live Git and Unity baseline portions of `RG-METRIC-P0` remain blocked and are the only permitted next work.
+4. `RG-METRIC-P2` and every runtime implementation phase remain `NOT STARTED`.
+
+`4.11C.5.18H.6.2` is the preserved pre-migration Arc/Semi-Arc source baseline. Its source contract is recorded, but its final Unity acceptance state cannot be established from the supplied archive. Before the grid coordinate changes, capture its Automatic Birth Source and rendered lifecycle baseline through Build, Hold, Release, and Rest for both Arc and mirrored Semi-Arc sides.
+
+Do not alter Arc/Semi-Arc width coefficients, source geometry, wake-arm behavior, lifecycle scheduling, Contact Flecks, Shore sources, Free Water sources, transport, rendering, or quality defaults during the baseline/scope-lock gate. Any such change requires a separately recorded plan item and approval.
 
 ## `4.11C.5.18D` import gate
 

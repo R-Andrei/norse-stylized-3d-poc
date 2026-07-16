@@ -27,6 +27,7 @@
                 float4 _GroundShoreHydrologyCharacterB;
                 float4 _GroundShoreHydrologySpatialA;
                 float4 _GroundShoreHydrologySpatialB;
+                float4 _GroundShoreWetHighlightBand;
                 float4 _GroundShoreWetHighlightShaping;
                 float _GroundBankLayerEnabled;
                 half4 _GroundBankLayerBaseColor;

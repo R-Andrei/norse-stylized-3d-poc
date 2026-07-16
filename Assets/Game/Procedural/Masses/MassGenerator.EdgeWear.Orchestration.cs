@@ -1218,8 +1218,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     string.Empty,
                     string.Empty,
                     lastImplicatedEvidence);
+                ApplyCornerRecoveryResolution(
+                    winner.Coverage,
+                    cornerRecoveryParticipants.Keys,
+                    "certified-recovery",
+                    string.Empty);
                 winningSolution = winner.CornerSolution;
                 winningAudit = winner.PlaneAudit;
+                winningAudit.CoverageAudit = winner.Coverage;
                 winningPreviewSoup = winner.PreviewSoup;
                 return true;
             }
@@ -1247,6 +1253,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             string lastFailure = lastOutcome == null
                 ? string.Empty
                 : lastOutcome.Blocker;
+            bool cornerSearchExhausted = !cancelled &&
+                !timeBudgetExceeded &&
+                frontier.Count == 0;
+            if (cornerSearchExhausted)
+            {
+                ApplyCornerRecoveryResolution(
+                    baseline.Coverage,
+                    cornerRecoveryParticipants.Keys,
+                    "proven-infeasible",
+                    string.IsNullOrEmpty(lastFailure)
+                        ? augmentationFailure
+                        : augmentationFailure + ":" + lastFailure);
+            }
+            else
+            {
+                ApplyCornerRecoveryResolution(
+                    baseline.Coverage,
+                    cornerRecoveryParticipants.Keys,
+                    "unresolved",
+                    string.IsNullOrEmpty(lastFailure)
+                        ? augmentationFailure
+                        : augmentationFailure + ":" + lastFailure);
+            }
             ApplyCertifiedBaselineAugmentationMetadata(
                 ref baseline.PlaneAudit,
                 baseline,
@@ -1267,6 +1296,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     "; certified baseline retained");
             winningSolution = baseline.CornerSolution;
             winningAudit = baseline.PlaneAudit;
+            winningAudit.CoverageAudit = baseline.Coverage;
             winningPreviewSoup = baseline.PreviewSoup;
             blocker = string.Empty;
             return true;
@@ -1456,14 +1486,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 ChamferCornerConflictRecord conflict =
                     baselineSolution.Conflicts[conflictIndex];
-                for (int participantIndex = 0;
-                     participantIndex <
-                         conflict.ParticipatingSelectedEdges.Count;
-                     participantIndex++)
+                for (int zeroedIndex = 0;
+                     zeroedIndex < conflict.ZeroedSelectedEdges.Count;
+                     zeroedIndex++)
                 {
                     int edgeIndex =
-                        conflict.ParticipatingSelectedEdges[
-                            participantIndex];
+                        conflict.ZeroedSelectedEdges[zeroedIndex];
                     if (!baselineSolution.WidthByEdge.TryGetValue(
                             edgeIndex,
                             out float width) ||
@@ -1473,6 +1501,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             out EdgeWearEdgeLifecycleRecord record) ||
                         record == null ||
                         !record.GeometricEligible ||
+                        record.Viability == null ||
+                        !record.Viability.FeasibleWidthFractionValid ||
+                        record.Viability.WidthRecoveryProvisional ||
                         !record.CornerRecoveryProvisional ||
                         !string.Equals(
                             record.FinalReason,
@@ -1612,9 +1643,62 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Mathf.Max(0f, lastPositiveWidth);
             record.CornerRecoveryUniformScale =
                 conflict.UniformScale;
+            record.CornerRecoveryZeroingStage =
+                conflict.ZeroingStage;
             record.CornerRecoveryParticipants =
                 FormatChamferForcedDeferralKey(
                     conflict.ParticipatingSelectedEdges);
+            record.CornerRecoveryZeroedParticipants =
+                FormatChamferForcedDeferralKey(
+                    conflict.ZeroedSelectedEdges);
+        }
+
+        private static void ApplyCornerRecoveryResolution(
+            EdgeWearCoverageAudit coverage,
+            ICollection<int> recoveryEdges,
+            string resolution,
+            string evidence)
+        {
+            if (coverage == null || recoveryEdges == null)
+            {
+                return;
+            }
+
+            foreach (int recoveryEdge in recoveryEdges)
+            {
+                if (!coverage.RecordByGraphEdge.TryGetValue(
+                        recoveryEdge,
+                        out EdgeWearEdgeLifecycleRecord record) ||
+                    record == null ||
+                    !record.CornerRecoveryProvisional)
+                {
+                    continue;
+                }
+
+                record.CornerRecoveryResolution =
+                    string.IsNullOrEmpty(evidence)
+                        ? resolution ?? string.Empty
+                        : (resolution ?? string.Empty) + ":" + evidence;
+                if (string.Equals(
+                        resolution,
+                        "certified-recovery",
+                        StringComparison.Ordinal))
+                {
+                    record.CornerRecoveryResolution = record.Built
+                        ? "certified-recovery"
+                        : "unresolved:not-recovered-by-winning-augmentation";
+                }
+                else if (string.Equals(
+                        resolution,
+                        "proven-infeasible",
+                        StringComparison.Ordinal))
+                {
+                    record.FinalReason =
+                        "corner-recovery-proven-infeasible";
+                    record.CoexistenceFailureReason =
+                        record.FinalReason;
+                }
+            }
         }
 
         private static SortedSet<int> CollectBaselineSelectedExclusions(

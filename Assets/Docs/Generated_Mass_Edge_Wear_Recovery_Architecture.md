@@ -1683,3 +1683,46 @@ EW-B4.2R13A.6-comprehensive
 ```
 
 The safety floor remains current preview applied, topology `33/33`, artistic preview `33/33`, comprehensive evidence available, no unrelated baseline-edge substitution, and zero collateral/topology/face-quality/placement/render-channel regression. The intended recovery result remains `5/5`; an exhaustive retained-hull rejection is acceptable only with the R13A.4 baseline unchanged and complete finite evidence preserved.
+
+
+## EW-B4.2R13A.7 — evidence-based recovery closure
+
+R13A.6 is the current safe runtime state: the live preview remains applied, both 33-case matrices pass, comprehensive artistic evidence is available, seed `8889` edge `39` remains active, and tiny edge `40` remains inactive. The remaining failure is fixture semantics: the five historical coordinates are still reported only as missing recoveries even when the bounded solver has reached an exact terminal geometric blocker.
+
+### Current discrete-width proof boundary
+
+`TrySolveBoundedIsolatedSingleEdgeRails` owns a finite schedule of at most twelve widths, beginning at the locally admissible width and applying a `0.75` backoff down to `max(minimumStableEdgeLength, PointMergeDistance * 4)`. It stops at the first rail success. The bounded constructor then executes once at that solved width.
+
+R13A.7 records every rail attempt already executed and the terminal single-plane, retained-hull, construction, and certification evidence. It adds no rail, hull, plane, or full-shell evaluation. A failed construction is classified as `complete-infeasible` only when the terminal construction ran at the minimum admissible width or at the twelfth and final scheduled rail attempt. A failure above that boundary is `unresolved`; it is not represented as a continuous or interval proof.
+
+### Complete corner zeroing provenance
+
+The R13A.6 capture read only `ChamferCornerSolution.Conflicts`, but `TrySolveCornerAwareChamferWidths` had a second zeroing mechanism: when the solved shared-edge scale produced no numerically material width change, the fallback deferred all still-positive participants to zero without creating a conflict record. R13A.7 records both actual zeroing stages:
+
+- `SharedEdgeUniformScale` when the solved uniform scale directly drives one or more participants below the stable-width floor;
+- `SharedEdgeForcedDeferral` when the no-progress fallback explicitly drives the remaining positive participants to zero.
+
+Each record preserves the collapsed unselected edge, stage, scale, ordered participants, the exact subset actually transitioned to zero, and each participant's positive width before the event. Final inactive capture and augmentation consume only a conflict whose exact zeroed subset contains the target, preventing attribution to an earlier conflict that merely involved the same edge. Geometry and ordinary width decisions are unchanged.
+
+### Recovery-target and negative-exclusion policy
+
+Finalized corner recovery admits only geometrically eligible edges that pass the ordinary requested-width-fraction gate. Width-recovery-provisional edges cannot initiate corner augmentation. This general policy excludes marginal edge `40` without introducing any seed or source-edge branch in production code.
+
+A corner target is `certified-recovery` only when the winning augmented coverage actually builds that target. If the existing bounded target-aware frontier is completely exhausted without cancellation, time-budget exhaustion, or remaining states, the target is `corner-recovery-proven-infeasible`; otherwise it remains unresolved. Baseline count, identity, topology, geometry, placement, and render-channel commit guards remain authoritative.
+
+The editor suite keeps the five historical positive fixtures and adds the negative fixture `8889 / maximum / edge 40`. Positive fixtures pass as either certified recoveries or complete-current-discrete-schedule infeasible results. The negative fixture requires edge `40` to remain inactive, uncertified, unmaterialized, and finalized as `corner-width-inactive`.
+
+### Performance and scope
+
+All R13A.7 work remains explicit preview/audit-only. The patch adds bounded diagnostic records and report formatting around already-executed operations. It does not alter production score weights, selected-count policy, generation contracts, shared mesh infrastructure, normals, tangents, scenes, prefabs, materials, shaders, layers, or tags.
+
+Contracts advance to:
+
+```text
+EW-B4.2R13A.7-suite
+EW-B4.2R13A.7-topology
+EW-B4.2R13A.7-preview
+EW-B4.2R13A.7-comprehensive
+```
+
+Unity compilation and one-click runtime validation remain required before R13A.7 can replace the R13A.4/R13A.6 stable incomplete baseline.

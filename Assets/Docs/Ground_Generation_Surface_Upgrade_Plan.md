@@ -1,10 +1,10 @@
 # Ground Generation and Surface Upgrade Plan
 
-## Current authoritative status — 2026-07-16
+## Current authoritative status — 2026-07-17
 
 The GeneratedGround Inspector and Painted Accent production workstream is complete, Unity-validated, and accepted through GI-A1–GI-A4 and PA-B1–PA-B4.1. **GeneratedGround and the broader Ground visual roadmap are not complete.**
 
-The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. **V3M — Broad Macro Patch Completion**, **V3R — Ground Elevation Readability**, **V3S-A3A — Bank Surface-Cover Retention and Retreat**, **V3S-A3B.1 — Inspector Asset-Creation GUI-Scope Repair**, and **V3S-A3B.2 — Wet-Response Calibration and Hydrology Inspector Consolidation** are Unity-validated and accepted. The frozen River-coupled isolation baseline remains A2C.4. Unity validation confirms **V3S-A4A.1 — Normalized Bank/Riverbed Composition and Region-Oriented Authoring**, **V3S-A4B — Exact-Support Riverbed Hydrology**, and **V3S-A4B.1 — Submerged Riverbed Finish Decoupling** work as intended. **V3S-A4B.2 — Stylized Shore Wet-Finish Shaping and Riverbed/Bank Wetness Transition** is implemented and source-audited; Unity compilation and visual validation are pending. It narrows and strengthens the Shore wet highlight for the production isometric camera by transferring most Shore-added PBR finish into a camera-centred stylized lobe, and adds a short wetness-only Riverbed-to-Bank transition using existing corridor bank distance/domain data. It adds no debug view, River/water edit, profile schema/asset edit, texture, scene, prefab, material, geometry, or runtime field. **V4 — Contact / Edge Accents** remains queued after V3S and excludes River sources.
+The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. **V3M — Broad Macro Patch Completion**, **V3R — Ground Elevation Readability**, **V3S-A3A — Bank Surface-Cover Retention and Retreat**, **V3S-A3B.1 — Inspector Asset-Creation GUI-Scope Repair**, **V3S-A3B.2 — Wet-Response Calibration and Hydrology Inspector Consolidation**, **V3S-A4A.1 — Normalized Bank/Riverbed Composition and Region-Oriented Authoring**, **V3S-A4B — Riverbed Hydrology**, **V3S-A4B.1 — Submerged Riverbed Finish Decoupling**, **V3S-A4B.2 — Stylized Shore Wet-Finish Shaping**, and **V3S-A4B.3 — Waterline Highlight Band and Inward Riverbed Wetness Transition** are Unity-validated and accepted. A2C.4 remains the frozen River-coupled renderer-isolation baseline, and A4B.3 is now the frozen complete River-coupled appearance baseline. **Do not begin family-recipe tuning yet.** The user has requested updates to the existing Ground surfaces first; the exact request must be supplied and audited in the next conversation before implementation scope is chosen. **V3S-A5 — Optional Profile Detail Extension** remains deferred, and **V4 — Contact / Edge Accents** remains queued after V3S and excludes River sources.
 
 The accepted current pipeline is:
 
@@ -30,6 +30,11 @@ Key production rules:
 
 The detailed sections below are the historical implementation ledger. Their patch-local “pending” or “next” language records the state at the time of that patch and does not override this final status. The canonical final ownership and maintenance contract is recorded in `GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`.
 
+
+### Frozen River-coupled baseline — V3S-A4B.3
+
+A4B.3 is Unity-validated, visually accepted, and frozen. It replaces A4B.2's incorrect outward Riverbed wetness extension with an inward transition contained entirely inside `Ground Riverbed Support`, and restricts the stylized Shore highlight to an independently authored waterline band. The accepted four-component corridor contract is `TexCoord3.x = Riverbed Support`, `.y = outward Bank distance`, `.z = Bank-domain authorization`, and `.w = inward Riverbed distance`; `PixelSurfaceGroundForwardTypes.hlsl` must continue carrying all four components. The corrected River producer remains at the existing plural path `Assets/Game/Procedural/Rivers/StylizedRiverCorridorGeometry.cs`. The exact architecture and validation evidence are recorded in `Ground_River_Coupled_Surface_Response_Architecture.md`.
+
 ## Maintenance workflow
 
 ```text
@@ -45,12 +50,12 @@ Ground or scene no longer needs its bake
 
 ## Next work items
 
-1. Implement A4B.2 exactly from the canonical plan in `Ground_River_Coupled_Surface_Response_Architecture.md`.
-2. Preserve A4B.1 Riverbed finish decoupling; the new stylized highlight is Shore-only.
-3. Validate the camera-centred Shore highlight in both Scene and production Game cameras without adding a camera reference.
-4. Validate the Riverbed-to-Bank wetness transition at `0`, `0.20`, and `0.50 m` with the water surface hidden.
-5. Confirm exact debug names `Ground Local Shore Wetness` and `Ground Effective Wetness` retain their existing entries and no new mode is added.
-6. Do not begin V3S-A5 or water-reflection work until A4B.2 is Unity-accepted.
+1. Preserve V3S-A4B.3 as the accepted River-coupled baseline; do not reopen it without new evidence and explicit approval.
+2. In the next conversation, obtain the user's exact request for updates to the existing Ground surfaces and perform a read-only architecture/feature audit before proposing implementation.
+3. Declare exact expected affected files and update the canonical plan before any Ground-surface implementation edit.
+4. Preserve existing family recipes and postpone family-level tuning until the underlying Ground-surface updates are accepted.
+5. Keep V3S-A5 optional profile-detail texturing deferred unless a production-camera deficiency proves it necessary.
+6. Begin V4 Contact / Edge Accents only after the existing-surface update and later family-tuning phase close V3S.
 
 ---
 

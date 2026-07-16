@@ -3983,6 +3983,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(",lastAttemptedWidth:");
                 builder.Append(
                     record.IsolatedLastAttemptedWidth.ToString("G9"));
+                builder.Append(",scheduleComplete:");
+                builder.Append(
+                    record.IsolatedAttemptScheduleComplete ? '1' : '0');
+                builder.Append(",terminalAtMinimum:");
+                builder.Append(
+                    record.IsolatedTerminalConstructionAtMinimum
+                        ? '1'
+                        : '0');
+                builder.Append(",scheduleResolution:");
+                builder.Append(string.IsNullOrEmpty(
+                        record.IsolatedAttemptScheduleResolution)
+                    ? "none"
+                    : record.IsolatedAttemptScheduleResolution);
+                builder.Append(",attemptEvidence:{");
+                builder.Append(string.IsNullOrEmpty(
+                        record.IsolatedWidthAttemptEvidence)
+                    ? "none"
+                    : record.IsolatedWidthAttemptEvidence);
+                builder.Append('}');
                 builder.Append(",maximumCertifiedWidth:");
                 builder.Append(
                     record.IsolatedMaximumCertifiedWidth.ToString("G9"));
@@ -4060,11 +4079,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(",uniformScale:");
                 builder.Append(
                     lifecycle.CornerRecoveryUniformScale.ToString("G9"));
+                builder.Append(",zeroingStage:");
+                builder.Append(
+                    lifecycle.CornerRecoveryZeroingStage);
                 builder.Append(",participants:{");
                 builder.Append(string.IsNullOrEmpty(
                         lifecycle.CornerRecoveryParticipants)
                     ? "none"
                     : lifecycle.CornerRecoveryParticipants);
+                builder.Append("},zeroed:{");
+                builder.Append(string.IsNullOrEmpty(
+                        lifecycle.CornerRecoveryZeroedParticipants)
+                    ? "none"
+                    : lifecycle.CornerRecoveryZeroedParticipants);
+                builder.Append("},resolution:{");
+                builder.Append(string.IsNullOrEmpty(
+                        lifecycle.CornerRecoveryResolution)
+                    ? "none"
+                    : lifecycle.CornerRecoveryResolution);
                 builder.Append("}}");
                 builder.Append(",failureReason=");
                 builder.AppendLine(string.IsNullOrEmpty(record.FailureReason)
@@ -4691,6 +4723,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ",isolatedRailSolved:" +
                         audit.IsolatedRailSolved +
                     ",widthAttempts:" + audit.WidthAttemptCount +
+                    ",scheduleComplete:" +
+                        audit.IsolatedAttemptScheduleComplete +
+                    ",terminalAtMinimum:" +
+                        audit.IsolatedTerminalConstructionAtMinimum +
+                    ",scheduleResolution:" +
+                        (audit.IsolatedAttemptScheduleResolution ??
+                            string.Empty) +
                     ",solvedWidth:" +
                         audit.SolvedWidth.ToString("G6") +
                     ",canonicalRails:" +
@@ -4799,6 +4838,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         audit.EndpointSupportModifiedFaceExpectedCount +
                     ",multiSupportPlaneCut:" +
                         audit.MultiSupportPlaneCut +
+                    ",isolatedWidthAttempts:{" +
+                        FormatBoundedIsolatedWidthAttemptEvidence(audit) +
+                        "}" +
+                    ",singlePlaneAttempted/succeeded:" +
+                        audit.MultiSupportSinglePlaneAttempted + "/" +
+                        audit.MultiSupportSinglePlaneSucceeded +
+                    ",singlePlaneFailure:{" +
+                        (audit.MultiSupportSinglePlaneFailure ??
+                            string.Empty) + "}" +
+                    ",retainedHullAttempted/succeeded:" +
+                        audit.MultiSupportRetainedHullAttempted + "/" +
+                        audit.MultiSupportRetainedHullSucceeded +
+                    ",retainedHullFailure:{" +
+                        (audit.MultiSupportRetainedHullFailure ??
+                            string.Empty) + "}" +
                     ",multiSupportPlaneCount:" +
                         audit.MultiSupportPlaneCount +
                     ",multiSupportCandidates:" +

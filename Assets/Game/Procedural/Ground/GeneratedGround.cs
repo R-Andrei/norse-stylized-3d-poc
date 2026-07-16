@@ -825,6 +825,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundShoreHydrologySpatialA");
         private static readonly int GroundShoreHydrologySpatialBId =
             Shader.PropertyToID("_GroundShoreHydrologySpatialB");
+        private static readonly int GroundShoreWetHighlightBandId =
+            Shader.PropertyToID("_GroundShoreWetHighlightBand");
         private static readonly int GroundShoreWetHighlightShapingId =
             Shader.PropertyToID("_GroundShoreWetHighlightShaping");
         private static readonly int GroundBankMaterialStrengthId =
@@ -4158,6 +4160,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 new Vector4(
                     resolvedMaterialControls.ImmediateBankSaturation,
                     resolvedMaterialControls.WaterlineSaturation,
+                    0f,
+                    0f));
+            materialProperties.SetVector(
+                GroundShoreWetHighlightBandId,
+                new Vector4(
+                    resolvedMaterialControls.ShoreWetHighlightWidth,
+                    resolvedMaterialControls.ShoreWetHighlightFeather,
                     0f,
                     0f));
             materialProperties.SetVector(

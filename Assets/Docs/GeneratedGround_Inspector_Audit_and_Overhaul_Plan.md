@@ -6,7 +6,7 @@
 
 This document closes only the GeneratedGround Inspector overhaul and the Painted Accent authoring, rendering, production-bake, build-validation, and generated-asset lifecycle. It does not declare the Ground visual system complete. V3M Broad Macro Patch Completion and V3R Ground Elevation Readability are accepted. The active Ground milestone is V3S River-Coupled Ground Response, recorded in `Ground_River_Coupled_Surface_Response_Architecture.md`; V4 Contact / Edge Accents remains queued afterward and excludes River sources.
 
-The implemented V3S Inspector correction replaces the five scattered River-coupled foldouts with exactly two region-oriented groups: `River-Coupled Ground Response — River Bank` and `River-Coupled Ground Response — Riverbed`. The Bank group owns Bank substrate, coverage, cover response, and Shore wetness. The Riverbed group owns explicit surface-source inheritance, custom Riverbed profile authoring, submerged-cover status, and exact-support Riverbed hydrology. Unity validation accepts this grouping. V3S-A4B.1 implements one compact `Submerged Finish` subsection under Riverbed Wetness containing only `Smoothness Response` and `Specular Response`, both defaulting to zero; Unity validation is pending. Inline profile editors remain collapsed by default, and the delayed asset-creation workflow introduced by A3B.1 remains mandatory. No new debug view, asset workflow, profile field, or top-level foldout is part of A4B.1.
+The implemented V3S Inspector correction replaces the five scattered River-coupled foldouts with exactly two region-oriented groups: `River-Coupled Ground Response — River Bank` and `River-Coupled Ground Response — Riverbed`. The Bank group owns Bank substrate, coverage, cover response, Shore wetness, and the metre-authored Shore highlight band. The Riverbed group owns explicit surface-source inheritance, custom Riverbed profile authoring, submerged-cover status, Riverbed hydrology, inward edge transition, and submerged-finish suppression. Unity validation accepts this grouping through V3S-A4B.3. Inline profile editors remain collapsed by default, and the delayed asset-creation workflow introduced by A3B.1 remains mandatory. No new top-level foldout, debug view, profile schema, or asset workflow was added by A4B.3.
 
 Accepted implementation status:
 
@@ -20,6 +20,11 @@ Accepted implementation status:
 - **PA-B4 / PA-B4.1 — Project-wide generated-asset audit, conservative orphan cleanup, and compile correction:** Unity-validated and accepted.
 
 The latest project source is authoritative if it conflicts with this document. Patch-local status and “Next work items” sections later in this file are retained as historical sequencing evidence and are superseded by this final status.
+
+
+### V3S-A4B.3 Inspector contract — frozen
+
+The existing two region-oriented top-level groups remain unchanged. Under `River Bank > Shore Wetness > Wet Highlight Shaping`, A4B.3 adds only `Highlight Width` and `Highlight Feather` before the existing strength/tightness/camera controls. Under `Riverbed > Wetness > Wetness Transition`, the existing serialized transition fields are displayed as `Riverbed Edge Transition Distance` and `Riverbed Edge Transition Softness`; their behavior is an inward Riverbed-only transition. The implementation preserves local and shared-style bindings and the existing delayed asset workflow. Unity validation and user visual acceptance are complete. No new top-level foldout, debug view, profile editor, profile schema, or asset workflow was added. This Inspector contract is frozen with the A4B.3 baseline.
 
 ## Final accepted production contract
 
