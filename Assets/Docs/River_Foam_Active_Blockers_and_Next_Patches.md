@@ -1,8 +1,106 @@
 # River Foam Current Status and Deferred Work
 
+## Active implementation plan — `4.11C.5.18H.6 — Mesh-Fitted Arc Paths and True Half-C Semi-Arcs`
+
+**Status:** implementation and mechanical validation complete; Unity 6000.5.0f1 compilation, D3D11 import, runtime visual validation, and profiler confirmation pending.
+
+### Objective
+
+Replace the `5.18H.5` bounds-derived analytic half-ellipse with one compact, per-object, exact-waterline front profile while preserving the accepted downstream-open C topology, terminal-to-terminal progressive cycle, signed visual-fit controls, and zero-new-runtime-resource contract. A Contact Arc must use both halves of the prepared upstream profile and two straight downstream arms. A Contact Semi-Arc must use only one prepared profile half and one straight downstream arm, terminating at the physical front point on the arm-free side.
+
+### Reviewed evidence
+
+- `Assets/Game/Procedural/Rivers/RiverDisturbanceFootprintResolver.cs` — `TryResolve` already scans readable mesh triangles at the river plane and produces an ordered convex contour of at most 16 source-local points; `TryResolveBoundsOnly` is the current generated-source fast path.
+- `Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.GeneratedSources.cs` — `ProcessGeneratedGeometrySource` currently registers padded and zero-padding bounds footprints only. Generated-source refresh is staged at one source per frame.
+- `Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.ContinuousSources.cs`, `.State.cs`, `.Contracts.cs`, and `.PublicSurface.cs` — static source registration, cached source ownership, and the `RiverFoamStaticObjectSource` snapshot currently expose only centre and half-extents. `TryClaimContinuousSourceOwner` already enforces one authoritative source per owner; no additional owner-deduplication architecture is required.
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs` — `5.18H.5` computes Arc/Semi-Arc paths from the raw bounds half-extents. Semi-Arc sets one arm to zero but still assigns the complete shoulder-to-shoulder connector. Pattern/weight changes do not retire active Arc/Semi-Arc events.
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`, `.State.cs`, and `CS_RiverFoam.Structs.hlsl` — the existing seven-`Vector4` event layout has eleven Arc/Semi-Arc-local lanes not required by their generic material contract. Ten lanes can carry five `Vector2` profile points and one lane can carry the front split ratio without adding a buffer, event vector, kernel, texture, or dispatch.
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute` — `FoamResolveObjectFrontBridgeShape` is explicitly an ellipse; `FoamEvaluateObjectContactSemiArcSource` evaluates the complete connector. Generic material application still requires `material.*`, `variation.x`, and `kinematics.w`; those lanes must remain unchanged.
+- Current archive contains no `.git` metadata, so branch, commit SHA, and repository-history comparisons are unavailable. The working base is `Assets(68)` overlaid with the reconciled `5.18H.4` package and accepted `5.18H.5` package.
+
+### Invariants and non-goals
+
+- No scene, prefab, material, `.asset`, `.meta`, Ground, GeneratedMass, corridor, transport, lifecycle, velocity, Fleck, Shore, or Free-Water behavior changes.
+- No new textures, channels, buffers, kernels, dispatches, GPU-event vectors, per-frame mesh scans, support-field queries, or topology debug views.
+- Exact mesh work is allowed only during the existing staged static-source preparation/dirty refresh. Runtime material updates consume only cached five-point profiles.
+- Existing signed Along-Flow and Across-River Contact Offset controls remain support-agnostic and independently authored for Arc and Semi-Arc.
+- The aggregate object-contact field remains owned by Contact Flecks only.
+- Existing one-source-per-owner enforcement remains authoritative.
+
+### Approved files and implementation sequence
+
+1. **Plan and contracts — complete**
+   - `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+   - `Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.Contracts.cs`
+   - Add an immutable five-point Foam contact-profile contract with front split, front path length, validity, and bounds-fallback evidence; expose it through `RiverFoamStaticObjectSource`.
+
+2. **Prepared exact profile — complete**
+   - `Assets/Game/Procedural/Rivers/RiverDisturbanceFootprintResolver.cs`
+   - Add deterministic extraction of the upstream contour chain from negative lateral shoulder through the physical upstream point to positive lateral shoulder, with two equal-distance half-chain samples. Reconstruct contour vertices through the footprint world basis and project them into authoritative river global-distance/across coordinates relative to the registered source centre.
+   - `Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.GeneratedSources.cs`
+   - Resolve the zero-padding exact waterline footprint once during staged generated-source refresh; fall back to the existing zero-padding bounds footprint when exact resolution/profile extraction fails.
+   - `Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.ContinuousSources.cs`
+   - `Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.State.cs`
+   - Cache the prepared profile without changing pressure, wake, ripple, or obstacle-exclusion contracts.
+   - `Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.PublicSurface.cs`
+   - Publish the cached profile in the Foam source snapshot.
+
+3. **CPU event construction and truthful authoring — complete**
+   - `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+   - `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+   - `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+   - Update existing offset tooltips and debug guidance so zero means the prepared physical waterline profile rather than the superseded `5.18H.4` ellipse; no serialized field or layout change.
+   - `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+   - Add five event-local profile points and the front split ratio.
+   - `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+   - Apply signed offsets to the cached profile once per event, preserving shoulder anchors for Along-Flow fit and proportionally expanding/contracting each lateral half for Across-River fit. Compute exact polyline lengths, Arc/Semi-Arc path length, source bounds, and lateral dispatch extent from the adjusted points.
+   - Make Semi-Arc use one selected profile half plus one arm. Retire active Arc/Semi-Arc emitters when Object Pattern or Arc/Semi/Fleck mix weights change; preserve already deposited material.
+   - `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+   - Store only the compact pattern-authority signature needed for that retirement behavior.
+
+4. **Existing-lane GPU packing — complete**
+   - `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+   - `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl`
+   - Pack five points plus front split through Arc/Semi-Arc-local lanes. Preserve material amount/life/pattern, source-fill seed, selected-side/reverse seed, material-step progress, path length, centre lateral coordinate, lateral cell spacing, and source-fill blend.
+
+5. **Mesh-fitted raster evaluation — complete**
+   - `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+   - Replace ellipse distance with distance to one lateral-position-selected segment of the four-segment prepared polyline. The profile contract is monotonic across-river, and each half is resampled into two equal-length segments, so one segment projection per texel is sufficient and path progress uses the packed front split without per-thread segment-length reconstruction.
+   - Arc: first arm → all four front segments → second arm.
+   - Semi-Arc: selected arm → selected two-segment front half → physical front point; opposite half and arm are structurally zero.
+
+6. **Canonical documentation — complete**
+   - `Assets/Docs/River_Foam_Stage6_Architecture.md`
+   - `Assets/Docs/River_Rendering_Roadmap.md`
+   - `Assets/Docs/Proof of Concept/08_Proof_of_Concept_Implementation_Log.md`
+   - `Assets/Docs/Proof of Concept/09_Rock_And_River_Handoff.md`
+   - Mark `5.18H.5` as the accepted signed-offset/one-arm intermediate whose ellipse and full Semi-Arc connector are superseded; record `5.18H.6` as implemented with Unity validation pending.
+
+### Acceptance and validation gates
+
+- Exact-profile extraction is deterministic, finite, ordered negative-shoulder → front → positive-shoulder, and falls back safely when mesh data is unavailable.
+- Arc uses both front halves and exactly two arms; Semi-Arc uses exactly one front half and one arm for both deterministic side selections.
+- No source occupies a rear-centre connector; no absent Semi-Arc half or arm emits during Build, Hold, or Release.
+- Signed offsets change only the prepared profile fit and preserve point ordering and non-degenerate segments under legal/extreme authored values.
+- CPU and GPU path coordinates/lengths agree; Build grows monotonically and Release retracts monotonically without disconnected internal pieces.
+- Pattern/mix changes retire active Arc/Semi-Arc emitters without clearing persistent Foam material.
+- C# files pass an actual parser and malformed multiline-string scan; changed HLSL passes structural checks plus available Clang HLSL parse/code generation. Unity 6000.5.0f1 C# compilation, D3D11 import, runtime visual validation, and profiler confirmation remain pending until run by the user.
+- Final package contains approved files only and no forbidden Unity serialized assets.
+
+### Post-implementation consistency and compliance audit
+
+**Status:** passed for available non-Unity checks; Unity validation pending.
+
+- Final authority chain verified: exact/bounds waterline resolver → cached static-source profile → Foam source snapshot → event-local adjusted profile → existing-lane GPU packing → Arc/full-profile or Semi/selected-half evaluator.
+- Final geometry differs from `5.18H.5` only where planned: ellipse authority removed; Semi-Arc opposite front half removed; old active Arc/Semi events retire on pattern-authority changes. Signed controls, scheduler, material persistence, Flecks, Shore, Free Water, transport, lifecycle, velocity, and corridor contracts remain unchanged.
+- Actual tree-sitter C# parsing and malformed multiline-string scanning passed all 13 changed C# files. Changed-function Clang HLSL syntax and LLVM generation passed; `dxv` was unavailable. Full-file tree-sitter HLSL retains the same 35 unsupported-grammar nodes as the base and is used only as structural parity evidence.
+- Mechanical validation passed 5,000 randomized analytical cases, 336 representative raster cases, existing-lane round trips, both Semi-Arc side selections, absent-half and rear-centre exclusion, path-length parity, raster connectivity, and phase monotonicity with zero failures.
+- Compute kernel list remains 22/22 identical, GPU event remains seven `Vector4` values, and texture/buffer/resource declarations are unchanged. No scene, prefab, material, `.asset`, `.meta`, Ground, GeneratedMass, or RiverCorridor implementation file is changed.
+- Known pending authority: Unity 6000.5.0f1 C# compilation, Unity D3D11 compute import, actual object-profile visual fit, pattern-change behavior in Play Mode, and CPU/GPU profiler measurements.
+
 ## Current status
 
-Stage 6 Chipping/Strands and the `5.18E` lifecycle correction are accepted. The rejected original `5.18F` was replaced by `5.18F.1`, which is now Unity-validated and accepted. The active visual patch is `4.11C.5.18H.3 — Front Contact Bridge and Straight Wake Arms`. The `5.18G` per-anchor scheduler remains accepted; the broad `5.18G.1` near-ring mantle is superseded.
+Stage 6 Chipping/Strands and the `5.18E` lifecycle correction are accepted. The rejected original `5.18F` was replaced by `5.18F.1`, which is now Unity-validated and accepted. The active visual patch is `4.11C.5.18H.6 — Mesh-Fitted Arc Paths and True Half-C Semi-Arcs`. `5.18H.4` is Unity-validated as the accepted no-wrap open-C baseline. The `5.18G` per-anchor scheduler remains accepted; the broad `5.18G.1` near-ring mantle is superseded.
 
 Accepted production sequence:
 
@@ -38,7 +136,153 @@ The current edge territory is accepted as good enough. `D.1D — Coherent Edge-B
 
 Remaining-Life modulation of Chipping or Strands is optional future work only. It is not required for current completion and is not queued.
 
-## Front Contact Bridge and Straight Wake Arms — `4.11C.5.18H.3` — implemented, Unity validation pending
+## Mesh-Fitted Arc Paths and True Half-C Semi-Arcs — `4.11C.5.18H.6` — implemented, Unity validation pending
+
+Unity validation of `5.18H.5` confirmed that signed contact-fit controls worked, but rejected its remaining geometry assumptions: Semi-Arc still traversed the complete shoulder-to-shoulder connector, and both source types followed a bounds-derived half-ellipse rather than the generated object's waterline shape.
+
+`5.18H.6` prepares one compact five-point profile from each static object's actual zero-padding waterline contour during the existing staged generated-source refresh:
+
+```text
+point 0 = negative-lateral physical shoulder
+point 1 = half-distance sample on the first front half
+point 2 = physical upstream/front point
+point 3 = half-distance sample on the second front half
+point 4 = positive-lateral physical shoulder
+```
+
+The resolver reconstructs the exact contour through its captured world basis, projects it into authoritative river `GlobalDistance/across` coordinates relative to the registered source centre, selects the upstream shoulder-to-shoulder chain, and samples each half by cumulative path distance. Readable generated meshes use their convex waterline contour; unavailable or degenerate exact geometry falls back first to the zero-padding bounds contour and finally to the former analytic five-point profile. The exact mesh scan occurs only during static-source preparation or dirty refresh, one source per existing staged refresh budget; material updates consume only the cached five points.
+
+Pattern topology is now structurally distinct:
+
+```text
+Contact Arc
+  downstream terminal A
+  → arm A
+  → both mesh-fitted front halves
+  → arm B
+  → downstream terminal B;
+
+Contact Semi-Arc
+  selected downstream terminal
+  → selected arm
+  → selected physical shoulder
+  → only that mesh-fitted front half
+  → physical upstream/front point.
+```
+
+The opposite Semi-Arc front half and arm are never evaluated. Deterministic side selection remains in the existing `variation.w` lane. Object Pattern or Arc/Semi/Fleck weight changes retire active Arc/Semi emitter events immediately while preserving already deposited persistent Foam, so the current pattern authority is visible without waiting for the former cycle to expire.
+
+Signed Along-Flow and Across-River Contact Offsets remain independent, support-agnostic visual-fit controls. Zero uses the prepared physical profile. Across-River fit expands or contracts each shoulder-to-front lateral span independently; Along-Flow fit scales upstream depth relative to the physical shoulder chord while retaining the shoulder anchors. Negative values may deliberately pull source beneath the rendered silhouette. Only a small numerical scale floor prevents profile inversion.
+
+The five points and front split reuse Arc/Semi-local lanes in the existing seven-`Vector4` event. No texture, channel, buffer, GPU-event vector, kernel, or dispatch is added. Arc/Semi no longer read the aggregate contact texture. Each evaluated texel selects one monotonic profile segment by lateral position; Arc additionally evaluates two straight arms and Semi-Arc one. The strong profile row remains `0.34` local normal cell; the outer feather is approximately `0.72` cell so diagonal sampled segments remain 8-connected without broadening the strong row.
+
+Performance/resource contract:
+
+```text
+new textures/channels/buffers/kernels/dispatches = 0;
+new GPU-event vectors = 0; existing seven Vector4 lanes retained;
+per-material-update mesh scans/support queries = 0;
+static/dirty preparation = one exact waterline scan per refreshed source;
+Arc front work = one selected line-segment evaluation per texel;
+Semi-Arc front work = one selected line-segment evaluation per texel;
+Contact Fleck, Shore, Free Water, transport, lifecycle, velocity,
+duty-cycle timing, RiverCorridor/Ground, scene/prefab/material/asset/meta = unchanged.
+```
+
+Mechanical validation covers exact-lane round trips, both Semi-Arc sides, absent-half exclusion, downstream-centre exclusion, signed offset extremes, CPU/GPU path-length parity, Build/Release monotonicity, representative anisotropic raster connectivity, unchanged kernels/resources, actual C# parsing, malformed multiline-string scanning, and changed-function HLSL parse/code generation. Unity 6000.5.0f1 C# compilation, D3D11 import, runtime visual validation, and profiler confirmation remain authoritative and pending.
+
+## Distinct Single-Arm Semi-Arcs and Signed Contact Fit — `4.11C.5.18H.5` — Unity-observed intermediate; superseded by `5.18H.6`
+
+Unity validation accepted `5.18H.4` as a properly oriented event-owned open-C source with no rear wrap. `5.18H.5` added signed contact-fit controls and removed the second straight Semi-Arc arm. Unity then confirmed the offsets worked but rejected the remaining geometry: Semi-Arc still traversed the complete connector and therefore remained nearly a full Arc, while both patterns followed a bounds-derived half-ellipse instead of the generated mesh waterline. `5.18H.6` supersedes those assumptions.
+
+`5.18H.5` preserves the accepted terminal-to-terminal open-C topology and makes the patterns structurally distinct:
+
+```text
+Contact Arc
+  complete upstream connector
+  + two equal straight downstream arms;
+
+Contact Semi-Arc
+  complete upstream connector
+  + exactly one deterministic selected-side downstream arm;
+  opposite side terminates at its face shoulder.
+```
+
+The legacy Semi-Arc Lopsidedness range remains serialized but is hidden and inert. The existing `variation.w` lane now carries only the deterministic selected-side sign, so no GPU event-layout or resource change is required.
+
+Each pattern gains two independent signed visual-fit controls in metres:
+
+```text
+Along-Flow Contact Offset
+Across-River Contact Offset
+```
+
+Zero preserves `5.18H.4`. Negative values shrink the corresponding analytic radius and may deliberately pull the source beneath the rendered object silhouette. Positive values detach it farther. These controls are support-agnostic: they do not sample, infer, or compensate for negative support zones. Only a `0.005 m` numerical radius floor prevents invalid geometry. Offsets are resolved once during CPU event construction, then reuse the existing `objectData.y/z` half-extent lanes; CPU path length, dispatch bounds, and GPU geometry all consume the same adjusted extents.
+
+Performance/resource contract:
+
+```text
+new textures/channels/buffers/kernels/dispatches = 0;
+new GPU event lanes or persistent state = 0;
+per-frame support or contour queries = 0;
+Arc GPU work = unchanged;
+Semi-Arc GPU work = marginally reduced by omitting the second arm;
+Contact Fleck, Shore, Free Water, transport, lifecycle, duty-cycle timing,
+and RiverCorridor/Ground interaction contracts = unchanged;
+scene/prefab/material/asset/meta changes = none.
+```
+
+Mechanical validation must prove exact one-arm Semi-Arc topology for both selected sides, signed offset authority and numerical-floor behavior, CPU/GPU path-length parity, contiguous Build/Hold/Release masks, preserved downstream opening, unchanged kernels/resources, actual C# parser success, and HLSL parse/code generation. Unity 6000.5.0f1 C# compilation, D3D11 import, visual tuning, and profiler confirmation remain authoritative.
+
+## Event-Owned Analytic Open-C Geometry — `4.11C.5.18H.4` — Unity-validated no-wrap baseline; refined by `5.18H.5`
+
+Runtime inspection of `5.18H.3` rejected its Arc/Semi-Arc bridge authority. The straight wake arms were correct, but the bridge still sampled the single global all-obstacle contact field. That field has no per-object identity, so an event could admit rear or foreign contact cells and produce an O/near-O around a rock even though its own arms were straight.
+
+`5.18H.4` removes the global object-contact field from Arc/Semi-Arc geometry. Every event now owns one analytic open C built from its explicit centre and zero-padding physical half-extents:
+
+```text
+terminal A
+→ straight downstream arm to shoulder A
+→ analytic upstream half-ellipse
+→ shoulder B
+→ straight downstream arm to terminal B
+```
+
+The bridge is exactly zero at and behind the shoulder plane. Only the two arms may occupy downstream territory, and their inner edges are capped so they cannot merge across the downstream centre on coarse or anisotropic Foam grids. Build and Release retain the accepted terminal-to-terminal composite path; either downstream terminal may be the first visible source without creating a rear-centre connector. Arc uses equal arms. Semi-Arc retains one dominant arm and a Lopsidedness-shortened opposite arm.
+
+Active Arc/Semi-Arc authoring remains:
+
+```text
+Formation Speed
+Wake Arm Length Min / Max
+Initial Presence Min / Max
+Initial Life Min / Max
+Semi-Arc Lopsidedness Min / Max
+```
+
+The global object-contact field remains available to Contact Flecks only. It is now built only when an active Fleck requires it. Arc/Semi-Arc remove that texture read, use tightly bounded local X/Y raster rectangles, and use the existing CPU-resolved composite path length already packed in `kinematics.z`.
+
+Performance/resource contract:
+
+```text
+new textures/channels/buffers/kernels/dispatches = 0;
+new persistent CPU/GPU state = 0;
+Arc/Semi-Arc contact-field texture reads = removed;
+Arc/Semi-Arc-only updates skip the full-field object-contact build;
+Arc/Semi-Arc raster rectangles = reduced in X and Y;
+Contact Fleck geometry and contact-field semantics = unchanged;
+Shore, Free Water, velocity, transport, lifecycle, static wake deformation,
+and duty-cycle timing = unchanged;
+scene/prefab/material/asset/meta changes = none.
+```
+
+Mechanical validation covers the event-owned no-wrap contract, terminal-to-terminal path coordinates, normal/reversed flow orientation, Arc/Semi-Arc authority, anisotropic raster connectivity, unchanged kernel/resource declarations, actual C# parser validation, and HLSL parsing/code generation of the exact changed functions. Unity 6000.5.0f1 C# compilation, D3D11 compute import, runtime geometry, and profiler confirmation remain pending.
+
+### Current-base reconciliation — `Assets(68)` — complete
+
+Read-only comparison against the previous `Assets(64)` source found that all three `5.18H.4` production files remain byte-identical in the current base. The only current River code changes are the explicit `RiverCorridor` ground-render role in `StylizedRiver.cs` and UV3 bank-distance/validity publication plus a TexCoord3 contract check in `StylizedRiverCorridorGeometry.cs`; neither file nor contract is consumed by Arc/Semi-Arc source construction. `River_Rendering_Roadmap.md` contains a newer corridor-material-mask contract and is three-way merged with this patch. The current archive no longer contains `River_Shader_Compile_Recovery_Checklist.md`, so the reconciled package preserves that removal rather than recreating the document; references are updated to the retained compile-recovery evidence in the canonical River documents. The production implementation remains byte-identical to the previously mechanically validated `5.18H.4` source.
+
+## Superseded patch — Front Contact Bridge and Straight Wake Arms — `4.11C.5.18H.3` — runtime geometry rejected and replaced by `5.18H.4`
 
 Unity validation of `5.18H.2` accepted the narrow source width and D3D11-safe compute path, but long Arc/Semi-Arc lengths still followed the obstacle contact ring into the downstream half and could visually close into an O. `5.18H.3` replaces that rear-following geometry with a hard split:
 
@@ -238,7 +482,7 @@ Stage 2 — Water Body                           complete and validated
 Stage 3 — Surface Motion and Coherent Flow     complete and validated
 Stage 4 — Refraction and Optical Distortion    complete and validated
 Stage 5 — Runtime Disturbance and Interaction  accepted for the current milestone
-Stage 6 — Foam                                 front bridge + straight wake-arm validation active (`5.18H.3`)
+Stage 6 — Foam                                 event-owned analytic open-C validation active (`5.18H.4`)
 Stage 7 — Secondary Water Effects              complete and validated
 Stage 8 — Reflections and Final Integration    stale/retired roadmap item
 ```
@@ -264,13 +508,13 @@ dormant or unwired systems that may create hidden cost;
 River ↔ Ground regeneration interactions where separately authorized.
 ```
 
-P4 accounting and the shader compile recovery checklist remain evidence sources for that future pass. They are not active patch queues.
+P4 accounting and the retained shader-compile recovery entries in the canonical River documents remain evidence sources for that future pass. They are not active patch queues.
 
 ## Current active queue
 
-The only active River visual patch is `4.11C.5.18H.3 — Front Contact Bridge and Straight Wake Arms`. It preserves the `5.18G` per-anchor schedule and replaces the superseded near-ring mantle with a contiguous one-cell open-C contact path that structurally excludes the downstream rear. Chipping, Remaining-Life erosion, canonical velocity, transport, Contact Fleck geometry, reflection, and isolated performance work are not queued.
+The only active River visual patch is `4.11C.5.18H.4 — Event-Owned Analytic Open-C Geometry`. It preserves the `5.18G` per-anchor schedule, retains the straight wake arms from `5.18H.3`, and replaces that patch's unowned global-contact bridge with an event-owned upstream half-ellipse that structurally excludes the downstream rear centre. Chipping, Remaining-Life erosion, canonical velocity, transport, Contact Fleck geometry, reflection, and isolated performance work are not queued.
 
-After `5.18H.3` validates, reassess Wake Arm Length defaults, downstream tendril width, and clean-face windows before changing defaults. Do not add further wake, velocity, seed, or transport changes unless new evidence requires them.
+After `5.18H.4` validates, reassess Wake Arm Length defaults, downstream tendril width, and clean-face windows before changing defaults. Do not add further wake, velocity, seed, or transport changes unless new evidence requires them.
 
 ## `4.11C.5.18D` import gate
 

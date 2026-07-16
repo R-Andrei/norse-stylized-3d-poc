@@ -139,6 +139,11 @@ private readonly struct EdgeWearTopologyStats
             public float InitialMaximumCornerDisplacement;
             public float FinalMaximumCornerDisplacement;
             public float MinimumSharedEdgeWidthScale;
+            public int ConflictSearchStatesEvaluated;
+            public int ConflictSearchCommittedExclusionCount;
+            public int ConflictSearchTimeBudgetExceeded;
+            public int ConflictSearchCancelled;
+            public double ConflictSearchElapsedMilliseconds;
             public int ReplacementFaceAreaFailureCount;
             public int ReplacementFaceWindingFailureCount;
             public int ReplacementEdgeCollapseFailureCount;
@@ -1577,20 +1582,32 @@ private readonly struct EdgeWearTopologyStats
             }
         }
 
+        private sealed class ChamferCornerConflictRecord
+        {
+            public int UnselectedSourceEdgeIndex = -1;
+            public float UniformScale;
+            public readonly List<int> ParticipatingSelectedEdges =
+                new List<int>();
+        }
+
         private sealed class ChamferCornerSolution
         {
             public readonly Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> Corners;
             public readonly Dictionary<int, float> WidthByEdge;
             public readonly Dictionary<int, ChamferSharedEdgeSpan> SharedSpans;
+            public readonly List<ChamferCornerConflictRecord> Conflicts;
 
             public ChamferCornerSolution(
                 Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
                 Dictionary<int, float> widthByEdge,
-                Dictionary<int, ChamferSharedEdgeSpan> sharedSpans)
+                Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
+                List<ChamferCornerConflictRecord> conflicts)
             {
                 Corners = corners;
                 WidthByEdge = widthByEdge;
                 SharedSpans = sharedSpans;
+                Conflicts = conflicts ??
+                    new List<ChamferCornerConflictRecord>();
             }
         }
 
@@ -1956,6 +1973,7 @@ private struct EdgeWearGraphBuildStats
             public bool LocalityValid;
             public bool IsolatedConstructionValid;
             public bool FeasibleWidthFractionValid;
+            public bool WidthRecoveryProvisional;
             public bool EndpointSpanValid;
             public bool Viable;
             public float MinimumDihedralDegrees;
@@ -1973,12 +1991,24 @@ private struct EdgeWearGraphBuildStats
             // Internal viability values retained for unchanged geometry decisions.
             public float MaximumLocallyFeasibleWidth;
             public float FeasibleWidthFraction;
+            public float MinimumStyleWidth;
+            public float MinimumRequiredCertifiedWidth;
             // Truthful audit semantics: failed attempts are not certified widths.
             public bool IsolatedSucceeded;
             public int IsolatedWidthAttemptCount;
             public float IsolatedLastAttemptedWidth;
             public float IsolatedMaximumCertifiedWidth;
             public float IsolatedMaximumCertifiedWidthFraction;
+            public int IsolatedAlternateBoundaryRailCount;
+            public int IsolatedMaximumBoundaryCandidateCount;
+            public float IsolatedMaximumBoundarySnapDistance;
+            public float IsolatedMaximumBoundaryPointTolerance;
+            public int IsolatedMaximumBoundaryDiagnosticRailIndex;
+            public int IsolatedMaximumBoundaryOriginalAdjacentEdgeIndex;
+            public int IsolatedMaximumBoundaryResolvedEdgeIndex;
+            public float IsolatedMaximumBoundaryOriginalRawParameter;
+            public float IsolatedMaximumBoundaryOriginalSegmentDistance;
+            public float IsolatedMinimumBoundaryEndpointDistance;
             public float EndpointConsumptionA;
             public float EndpointConsumptionB;
             public float RemainingCentralSpan;
@@ -2110,6 +2140,131 @@ private struct EdgeWearGraphBuildStats
                 RequireAllGeometricCandidates =
                     requireAllGeometricCandidates;
             }
+
+            public EdgeWearCoverageAudit CloneForTrial()
+            {
+                EdgeWearCoverageAudit clone = new EdgeWearCoverageAudit(
+                    MaximumCoverageMode,
+                    RequireAllGeometricCandidates)
+                {
+                    RawSourceEdgeCount = RawSourceEdgeCount,
+                    SourceEdgeCount = SourceEdgeCount,
+                    CoincidentBoundarySeamPairCount =
+                        CoincidentBoundarySeamPairCount,
+                    CoincidentGraphVertexReconciliationCount =
+                        CoincidentGraphVertexReconciliationCount,
+                    CoincidentGraphBoundarySeamPairCount =
+                        CoincidentGraphBoundarySeamPairCount,
+                    CollateralBaselineCaptured =
+                        CollateralBaselineCaptured,
+                    BaselineGeometricEligibleCount =
+                        BaselineGeometricEligibleCount,
+                    RecoveredGeometricEdgeCount =
+                        RecoveredGeometricEdgeCount,
+                    CollateralLostEdgeCount = CollateralLostEdgeCount,
+                    CollateralChangedEdgeCount =
+                        CollateralChangedEdgeCount,
+                    CollateralPreservationValid =
+                        CollateralPreservationValid,
+                    ViabilityLocalityEvaluationCount =
+                        ViabilityLocalityEvaluationCount,
+                    ViabilityIsolatedEvaluationCount =
+                        ViabilityIsolatedEvaluationCount,
+                    ViabilityLocalityCacheUseCount =
+                        ViabilityLocalityCacheUseCount,
+                    ViabilityLocalityCacheMissCount =
+                        ViabilityLocalityCacheMissCount,
+                    ViabilityLocalityRecomputationCount =
+                        ViabilityLocalityRecomputationCount,
+                    ViabilityPreflightMilliseconds =
+                        ViabilityPreflightMilliseconds,
+                    StructuralEligibleCount = StructuralEligibleCount,
+                    GeometricEligibleCount = GeometricEligibleCount,
+                    GeometricIneligibleCount = GeometricIneligibleCount,
+                    CoexistenceEligibleCount = CoexistenceEligibleCount,
+                    CoexistenceIneligibleCount =
+                        CoexistenceIneligibleCount,
+                    CoexistenceStarEvaluationCount =
+                        CoexistenceStarEvaluationCount,
+                    CoexistenceStarCacheUseCount =
+                        CoexistenceStarCacheUseCount,
+                    CoexistencePairEvaluationCount =
+                        CoexistencePairEvaluationCount,
+                    CoexistencePairCacheUseCount =
+                        CoexistencePairCacheUseCount,
+                    CoexistenceTrialCount = CoexistenceTrialCount,
+                    CoexistenceExclusionCount =
+                        CoexistenceExclusionCount,
+                    CoexistencePreShellExclusionCount =
+                        CoexistencePreShellExclusionCount,
+                    CoexistenceSearchExclusionCount =
+                        CoexistenceSearchExclusionCount,
+                    CornerWidthMissingExclusionCount =
+                        CornerWidthMissingExclusionCount,
+                    CornerWidthInactiveExclusionCount =
+                        CornerWidthInactiveExclusionCount,
+                    ArtisticEligibleCount = ArtisticEligibleCount,
+                    ArtisticFilteredCount = ArtisticFilteredCount,
+                    ArtisticAuditCaptured = ArtisticAuditCaptured,
+                    ArtisticSelectionTargetCount =
+                        ArtisticSelectionTargetCount,
+                    ArtisticSelectionThreshold =
+                        ArtisticSelectionThreshold,
+                    CandidateCount = CandidateCount,
+                    SelectedCount = SelectedCount,
+                    WidthInactiveCount = WidthInactiveCount,
+                    UnresolvedWidthInactiveCount =
+                        UnresolvedWidthInactiveCount,
+                    WidthReducedCount = WidthReducedCount,
+                    ActiveCount = ActiveCount,
+                    AttemptedBuiltCount = AttemptedBuiltCount,
+                    BuiltCount = BuiltCount,
+                    TrialRejectedCount = TrialRejectedCount,
+                    DeferredCount = DeferredCount,
+                    RejectedCount = RejectedCount,
+                    UnmappedCount = UnmappedCount
+                };
+
+                for (int recordIndex = 0;
+                     recordIndex < Records.Count;
+                     recordIndex++)
+                {
+                    EdgeWearEdgeLifecycleRecord copiedRecord =
+                        Records[recordIndex].CloneForTrial();
+                    clone.Records.Add(copiedRecord);
+                    clone.RecordByKey[copiedRecord.Key] = copiedRecord;
+                    if (copiedRecord.SourceEdgeIndex >= 0)
+                    {
+                        clone.RecordByGraphEdge[
+                            copiedRecord.SourceEdgeIndex] = copiedRecord;
+                    }
+                    if (copiedRecord.Viability != null)
+                    {
+                        clone.ViabilityByKey[copiedRecord.Key] =
+                            copiedRecord.Viability;
+                        if (copiedRecord.SourceEdgeIndex >= 0)
+                        {
+                            clone.ViabilityByGraphEdge[
+                                copiedRecord.SourceEdgeIndex] =
+                                    copiedRecord.Viability;
+                        }
+                    }
+                }
+
+                foreach (KeyValuePair<EdgeKey,
+                    EdgeWearCollateralBaselineRecord> pair in
+                    CollateralBaselineByKey)
+                {
+                    clone.CollateralBaselineByKey[pair.Key] = pair.Value;
+                }
+                clone.RecoveredGeometricEdgeIndices.AddRange(
+                    RecoveredGeometricEdgeIndices);
+                clone.CollateralLostEdgeIndices.AddRange(
+                    CollateralLostEdgeIndices);
+                clone.CollateralChangedEdgeIndices.AddRange(
+                    CollateralChangedEdgeIndices);
+                return clone;
+            }
         }
 
         private sealed class EdgeWearEdgeLifecycleRecord
@@ -2183,6 +2338,11 @@ private struct EdgeWearGraphBuildStats
             public string CandidateReason = string.Empty;
             public string CoexistenceFailureReason = string.Empty;
             public string FinalReason = string.Empty;
+
+            public EdgeWearEdgeLifecycleRecord CloneForTrial()
+            {
+                return (EdgeWearEdgeLifecycleRecord)MemberwiseClone();
+            }
         }
 
 private readonly struct EdgeWearBevelCandidate

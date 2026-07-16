@@ -62,7 +62,6 @@
             float ResolveGroundPooledWetnessFeature(
                 Varyings input,
                 float dampDepositMask,
-                float shoreMask,
                 float rockyDryMask,
                 float contractMask)
             {
@@ -88,8 +87,7 @@
                 float contrast = lerp(0.65, 2.40, saturate(_GroundPooledWetnessContrast));
                 float poolShape = saturate((combined - 0.48) * contrast + 0.5);
                 float semanticGate = saturate(
-                    dampDepositMask * 0.70 +
-                    shoreMask * 0.45 +
+                    dampDepositMask * 0.82 +
                     (1.0 - rockyDryMask) * 0.18);
                 float maskGate = lerp(
                     1.0,
@@ -155,7 +153,12 @@
                     contractMask);
             }
 
-            half3 ResolvePixelGroundSurfaceColor(Varyings input)
+            half3 ResolvePixelGroundSurfaceColor(
+                Varyings input,
+                float localShoreWetness,
+                float bankMaterialBlend,
+                float riverbedMaterialBlend,
+                float4 surfaceCoverRetention)
             {
                 half4 baseSample =
                     SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
@@ -191,15 +194,15 @@
                             (float)input.color.b));
                 float vertexVariation =
                     ((float)input.color.r - 0.5) * 2.0 * contractMask;
-                float bankMaterialBlend =
-                    ResolveGroundBankMaterialBlend(input);
-                float4 bankCoverRetention =
-                    ResolveGroundBankCoverRetention(bankMaterialBlend);
                 float effectiveFrostStrength =
-                    saturate(_FrostStrength) * bankCoverRetention.z;
+                    saturate(_FrostStrength) *
+                    surfaceCoverRetention.z *
+                    ResolveGroundFrostHydrologyRetention(
+                        localShoreWetness);
                 float pixelProfileContrast =
                     max(0.0, _ProfilePixelContrast) *
-                    lerp(1.0, 1.0 - saturate(_WetPixelSoftening), saturate(_Wetness)) *
+                    (1.0 - ResolveGroundCombinedWetPixelSoftening(
+                        localShoreWetness)) *
                     lerp(1.0, max(0.0, _FrostContrast), effectiveFrostStrength) *
                     lerp(1.0, 0.25, saturate(_MonolithicFlatten));
                 float fineTonalOffset =
@@ -229,20 +232,22 @@
                 float groundVegetation = ResolveGroundVegetationMask(input);
                 float groundCompaction = ResolveGroundCompactionMask(input);
                 float groundDampVisual = saturate(
-                    (groundDampDeposit * 0.84 +
-                     groundShore * 0.34 * max(0.0, _GroundShoreDampStrength)) *
+                    groundDampDeposit *
+                    0.84 *
                     max(0.0, _GroundDampResponse));
                 float groundSnowVisual = saturate(
                     pow(saturate(exposureMask), 0.82) *
                     max(0.0, _GroundSnowResponse) *
                     (1.0 - groundDampVisual * 0.36) *
-                    bankCoverRetention.y);
+                    surfaceCoverRetention.y *
+                    ResolveGroundSnowHydrologyRetention(
+                        localShoreWetness));
                 float groundRockyDryVisual = saturate(
                     groundRockyDry * max(0.0, _GroundRockyDryResponse));
                 float groundVegetationVisual = saturate(
                     groundVegetation *
                     max(0.0, _GroundVegetationResponse) *
-                    bankCoverRetention.x);
+                    surfaceCoverRetention.x);
                 float directionalFeature = ResolveGroundDirectionalStreakFeature(
                     input,
                     exposureMask,
@@ -252,7 +257,6 @@
                 float pooledWetnessFeature = ResolveGroundPooledWetnessFeature(
                     input,
                     groundDampDeposit,
-                    groundShore,
                     groundRockyDry,
                     contractMask);
                 float trampledWearFeature = ResolveGroundTrampledWearFeature(
@@ -263,7 +267,7 @@
                     contractMask);
                 float paintedAccentCoverage =
                     ResolveGroundPaintedAccentCoverage(input) *
-                    bankCoverRetention.w *
+                    surfaceCoverRetention.w *
                     contractMask *
                     saturate(_GroundPaintedAccentInkOpacity);
 
@@ -325,6 +329,35 @@
                     albedo,
                     bankLayerAlbedo,
                     (half)bankMaterialBlend);
+
+                float riverbedLayerSignedVariation = clamp(
+                    broadValue *
+                        max(0.0, _GroundRiverbedLayerMacroContrast) *
+                        0.72 +
+                    pixelVariation *
+                        max(0.0, _GroundRiverbedLayerPixelContrast) *
+                        0.20 +
+                    vertexVariation *
+                        max(0.0, _GroundRiverbedLayerPixelContrast) *
+                        0.08,
+                    -1.0,
+                    1.0);
+                half3 riverbedLayerPalette =
+                    riverbedLayerSignedVariation < 0.0
+                        ? lerp(
+                            _GroundRiverbedLayerBaseColor.rgb,
+                            _GroundRiverbedLayerDarkColor.rgb,
+                            (half)(-riverbedLayerSignedVariation))
+                        : lerp(
+                            _GroundRiverbedLayerBaseColor.rgb,
+                            _GroundRiverbedLayerLightColor.rgb,
+                            (half)riverbedLayerSignedVariation);
+                half3 riverbedLayerAlbedo =
+                    baseSample.rgb * riverbedLayerPalette;
+                albedo = lerp(
+                    albedo,
+                    riverbedLayerAlbedo,
+                    (half)riverbedMaterialBlend);
 
                 // Separate snow value lift from snow hue. Ground Snow Brightness
                 // now controls luminance, while Ground Snow Tint Strength controls
@@ -414,11 +447,6 @@
                     trampledWearTarget,
                     (half)(trampledWearFeature * 0.55));
 
-                float wetness = saturate(_Wetness);
-                float wetGlobalDarken =
-                    wetness * saturate(_WetDarkenStrength) * 0.18;
-                albedo *= (half)max(0.0, 1.0 - wetGlobalDarken);
-
                 float exposureVisual =
                     pow(saturate(exposureMask), 0.72);
                 float monolithicRelief =
@@ -443,6 +471,18 @@
                     albedo,
                     (half3)_GroundPaintedAccentInkColor.rgb,
                     inkBlend);
+
+                float combinedWetDarkening =
+                    ResolveGroundCombinedWetDarkening(
+                        localShoreWetness);
+                albedo *=
+                    (half)max(0.0, 1.0 - combinedWetDarkening);
+
+                albedo = PS3D_ApplyValuePreservingTint(
+                    albedo,
+                    (half3)_GroundShoreHydrologyWetTintColor.rgb,
+                    localShoreWetness *
+                        saturate(_GroundShoreHydrologyCharacterA.x));
 
                 return albedo;
             }
@@ -519,7 +559,12 @@
                 return albedo * valueScale;
             }
 
-            half ResolveGroundProfileSmoothness(Varyings input)
+            half ResolveGroundProfileSmoothness(
+                Varyings input,
+                float localShoreWetness,
+                float bankMaterialBlend,
+                float riverbedMaterialBlend,
+                float4 surfaceCoverRetention)
             {
                 float contractMask =
                     1.0 -
@@ -528,16 +573,14 @@
                         min(
                             min((float)input.color.r, (float)input.color.g),
                             (float)input.color.b));
-                float bankMaterialBlend =
-                    ResolveGroundBankMaterialBlend(input);
-                float4 bankCoverRetention =
-                    ResolveGroundBankCoverRetention(bankMaterialBlend);
                 float effectiveFrostStrength =
-                    saturate(_FrostStrength) * bankCoverRetention.z;
+                    saturate(_FrostStrength) *
+                    surfaceCoverRetention.z *
+                    ResolveGroundFrostHydrologyRetention(
+                        localShoreWetness);
                 float pooledWetnessFeature = ResolveGroundPooledWetnessFeature(
                     input,
                     ResolveGroundDampDepositMask(input),
-                    ResolveGroundShoreMask(input),
                     ResolveGroundRockyDryMask(input),
                     contractMask);
                 float trampledWearFeature = ResolveGroundTrampledWearFeature(
@@ -555,22 +598,28 @@
                     ResolveGroundShoreMask(input),
                     ResolveGroundRockyDryMask(input),
                     contractMask,
-                    bankCoverRetention.w);
+                    surfaceCoverRetention.w);
 
-                half ordinarySmoothness = saturate(
+                half ordinaryDrySmoothness = saturate(
                     (half)_Smoothness +
-                    (half)_Wetness * (half)_WetSmoothnessBoost * 0.22h +
                     (half)pooledWetnessFeature * 0.025h -
                     (half)trampledWearFeature * 0.030h -
                     (half)paintedAccentLinesFeature * 0.012h +
                     (half)_MonolithicFlatten *
                     (half)_MonolithicSmoothnessBoost -
                     (half)effectiveFrostStrength * 0.06h);
+                half bankResolvedDrySmoothness = lerp(
+                    ordinaryDrySmoothness,
+                    (half)_GroundBankLayerDrySmoothness,
+                    (half)bankMaterialBlend);
+                half resolvedDrySmoothness = lerp(
+                    bankResolvedDrySmoothness,
+                    (half)_GroundRiverbedLayerDrySmoothness,
+                    (half)riverbedMaterialBlend);
                 return saturate(
-                    lerp(
-                        ordinarySmoothness,
-                        (half)_GroundBankLayerDrySmoothness,
-                        (half)bankMaterialBlend));
+                    resolvedDrySmoothness +
+                    (half)ResolveGroundCombinedWetSmoothnessBoost(
+                        localShoreWetness));
             }
 
             InputData BuildInputData(Varyings input, half3 normalWS)
@@ -592,7 +641,13 @@
                 return inputData;
             }
 
-            SurfaceData BuildSurfaceData(half3 albedo, Varyings input)
+            SurfaceData BuildSurfaceData(
+                half3 albedo,
+                Varyings input,
+                float localShoreWetness,
+                float bankMaterialBlend,
+                float riverbedMaterialBlend,
+                float4 surfaceCoverRetention)
             {
                 float contractMask =
                     1.0 -
@@ -601,14 +656,9 @@
                         min(
                             min((float)input.color.r, (float)input.color.g),
                             (float)input.color.b));
-                float bankMaterialBlend =
-                    ResolveGroundBankMaterialBlend(input);
-                float4 bankCoverRetention =
-                    ResolveGroundBankCoverRetention(bankMaterialBlend);
                 float pooledWetnessFeature = ResolveGroundPooledWetnessFeature(
                     input,
                     ResolveGroundDampDepositMask(input),
-                    ResolveGroundShoreMask(input),
                     ResolveGroundRockyDryMask(input),
                     contractMask);
                 float trampledWearFeature = ResolveGroundTrampledWearFeature(
@@ -626,16 +676,12 @@
                     ResolveGroundShoreMask(input),
                     ResolveGroundRockyDryMask(input),
                     contractMask,
-                    bankCoverRetention.w);
+                    surfaceCoverRetention.w);
 
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.albedo = albedo;
-                surfaceData.specular =
+                half3 ordinaryDrySpecular =
                     (half3)_SpecularStrength *
-                    lerp(
-                        1.0h,
-                        1.025h,
-                        saturate((half)_Wetness)) *
                     lerp(
                         1.0h,
                         1.035h,
@@ -652,12 +698,26 @@
                         1.0h,
                         0.94h,
                         saturate((half)paintedAccentLinesFeature));
-                surfaceData.specular = lerp(
-                    surfaceData.specular,
+                half3 bankResolvedDrySpecular = lerp(
+                    ordinaryDrySpecular,
                     (half3)_GroundBankLayerDrySpecularStrength,
                     (half)bankMaterialBlend);
+                half3 resolvedDrySpecular = lerp(
+                    bankResolvedDrySpecular,
+                    (half3)_GroundRiverbedLayerDrySpecularStrength,
+                    (half)riverbedMaterialBlend);
+                surfaceData.specular = saturate(
+                    resolvedDrySpecular *
+                        (half)ResolveGroundGlobalWetSpecularMultiplier() +
+                    (half3)ResolveGroundLocalWetSpecularBoost(
+                        localShoreWetness));
                 surfaceData.metallic = 0.0h;
-                surfaceData.smoothness = ResolveGroundProfileSmoothness(input);
+                surfaceData.smoothness = ResolveGroundProfileSmoothness(
+                    input,
+                    localShoreWetness,
+                    bankMaterialBlend,
+                    riverbedMaterialBlend,
+                    surfaceCoverRetention);
                 surfaceData.normalTS = half3(0.0h, 0.0h, 1.0h);
                 surfaceData.emission = half3(0.0h, 0.0h, 0.0h);
                 surfaceData.occlusion = 1.0h;
@@ -699,14 +759,36 @@
                     return half4(debugColor, 1.0h);
                 }
 
-                half3 albedo = ResolvePixelGroundSurfaceColor(input);
+                float localShoreWetness =
+                    ResolveGroundLocalShoreWetness(input);
+                float bankMaterialBlend =
+                    ResolveGroundBankMaterialBlend(input);
+                float riverbedSupport =
+                    ResolveGroundRiverbedSupportMask(input);
+                float riverbedMaterialBlend =
+                    ResolveGroundRiverbedMaterialBlend(riverbedSupport);
+                float4 surfaceCoverRetention =
+                    ResolveGroundBankCoverRetention(bankMaterialBlend) *
+                    (1.0 - saturate(riverbedSupport));
+                half3 albedo = ResolvePixelGroundSurfaceColor(
+                    input,
+                    localShoreWetness,
+                    bankMaterialBlend,
+                    riverbedMaterialBlend,
+                    surfaceCoverRetention);
                 albedo = ApplyGroundStylizedValueShaping(
                     albedo,
                     input,
                     normalWS);
 
                 InputData inputData = BuildInputData(input, normalWS);
-                SurfaceData surfaceData = BuildSurfaceData(albedo, input);
+                SurfaceData surfaceData = BuildSurfaceData(
+                    albedo,
+                    input,
+                    localShoreWetness,
+                    bankMaterialBlend,
+                    riverbedMaterialBlend,
+                    surfaceCoverRetention);
                 half4 pbrColor = UniversalFragmentPBR(inputData, surfaceData);
 
                 half3 safeAlbedo = max(albedo, half3(0.001h, 0.001h, 0.001h));

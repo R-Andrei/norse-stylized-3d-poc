@@ -29,6 +29,7 @@ namespace ProgrammaticStylized3D.Rivers
             float pressureAlongHalfLength = -1f,
             IReadOnlyList<Vector2> pressureContour = null,
             RiverDisturbancePressureBakeProfile pressureProfile = default,
+            RiverFoamStaticContactProfile foamContactProfile = default,
             MeshFilter obstacleExclusionMeshFilter = null,
             bool deferStaticTargetRebuild = false,
             float wakeSpreadMultiplier = 1f,
@@ -154,6 +155,7 @@ namespace ProgrammaticStylized3D.Rivers
                         : Mathf.Max(0.05f, alongHalfLength),
                     StaticPressureContour = CopyStaticContour(
                         pressureContour ?? contour),
+                    FoamContactProfile = foamContactProfile,
                     StaticPressureProfile = animatedPressureProfile,
                     StaticPressureBaseProfile = basePressureProfile,
                     ObstacleExclusionMeshFilter =

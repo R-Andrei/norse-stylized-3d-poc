@@ -25,6 +25,21 @@ Canonical amendment plan — per-update affected-file declarations (2026-07-16)
 - Validation [complete]: targeted search found the mandatory protocol and all planned propagation points; the file contains one H1, seven numbered specification sections, all 20 A–T headings, and one matched HTML-comment pair; the prior supplied-file and no-clone rules remain present; `git diff --check -- Assets/Docs/handoff.md` returned `0` with only the repository LF-to-CRLF warning; file-specific status lists only `M Assets/Docs/handoff.md`; the `.meta` working and `HEAD` blobs both equal `89c480a97b425e738fb9957e805b3dceb076fd3a`; all 522 pre-record-update lines were reread in three contiguous chunks; no Unity validation applies to a Markdown-only change.
 - Affected-file reconciliation [complete]: expected `Modify: Assets/Docs/handoff.md`; expected unchanged companion `Assets/Docs/handoff.md.meta`; actually modified `Assets/Docs/handoff.md`; no file was created, deleted, moved, generated, or unexpectedly affected; the companion `.meta` remained byte-identical to `HEAD`.
 - Post-change audit [complete]: the amendment intentionally adds a mandatory pre-write expected-file declaration, exact operation categories, zero-file reporting, prohibition on vague or open-ended paths, stop-and-replan behavior for newly required or unexpected files, post-update actual-file reconciliation, update identifiers, and repeated enforcement throughout the generated handoff. The prior expanded-handoff and supplied-archive requirements remain intact. No caller, code, serialized asset, `.meta`, architecture, layer, tag, component, folder, dependency, or unrelated working-tree file changed. All plan items and acceptance criteria are satisfied; no blocker or pending validation remains.
+
+Canonical amendment plan — performance-first solution analysis (2026-07-16, `HANDOFF-PERF-PRIORITY-01`)
+
+- Objective [complete]: make performance a top-priority design criterion and require every offered solution to include detailed local and overall performance-impact analysis.
+- Acceptance [complete]: define the priority order as active-gameplay runtime compute > dirty-triggered or change-triggered runtime compute > memory usage >> storage space; require the lowest practical performance cost within correctness, scope, and acceptance constraints; clearly label and justify exceptions; analyze impact per relevant step, phase, function, file, and change plus aggregate system impact; require evidence, uncertainty labels, measurement plans, budgets, scaling behavior, allocation behavior, frequency, and regressions.
+- Approved file [complete]: `Assets/Docs/handoff.md` only; preserve all current prompt requirements, prior amendments, `.meta`, and unrelated working-tree changes.
+- Reviewed evidence [complete]: complete current `AGENTS.md`, `Assets/AGENTS.md`, and all 523 lines of the clean `Assets/Docs/handoff.md`; current performance coverage is limited to user preferences at line 158, performance-sensitive paths and budgets at line 209, per-change consequences at line 277, measurements at line 368, budget constraints at line 383, and an anti-vagueness example at line 489; no top-level performance rule, priority hierarchy, exception protocol, or mandatory per-solution/per-unit and overall analysis exists; repository Markdown search found no caller or reproduced copy; current `HEAD` and relevant accepted version are commit `3a57fdafe1abee5557d9a6d473b98283da7d8ff4`; older history includes `b0d9e9db1354cc7270bc9a2cf0d24948e11e8ec4` and `faa60fef827d475b53383d647f96acb346bdb939`; file-specific diff was clean before this amendment; companion `.meta` matches `HEAD` blob `89c480a97b425e738fb9957e805b3dceb076fd3a`.
+- Invariants and non-goals [complete]: performance priority does not authorize incorrect behavior, missed acceptance criteria, unsafe changes, or scope expansion; do not claim measured costs without measurements; distinguish measured results, analytical estimates, inference, and unknowns; a higher-priority cost is not traded for a lower-priority benefit without explicit justification; no code, asset, metadata, architecture, or unrelated documentation changes.
+- Sequence [complete]: added a dedicated top-level performance section and renumbered following numbered sections; integrated performance requirements into sections B, C, F, I, L, M, N, O, S, T, anti-compression rules, and final audit; reread the complete final file; compared it with the pre-amendment working version, `HEAD`, history, approved scope, and all amendment plans; ran targeted hierarchy, coverage, structure, whitespace, metadata, and file-scope checks.
+- Related modules [complete]: none found; `Assets/Docs/handoff.md.meta` is the only direct companion and will remain unchanged.
+- Risks [complete]: “dirty runtime compute” was ambiguous and is now defined as work triggered only when runtime inputs or state become dirty, distinct from continuous gameplay work. “Minimum cost” could encourage unsupported claims or premature optimization; the prompt requires evidence, alternatives, explicit unknowns, and validation. Local optimizations can shift cost elsewhere; the prompt requires both per-unit and aggregate analysis. Performance can conflict with correctness or user requirements; these remain hard constraints and the higher-cost choice must be labeled as an exception.
+- Validation [complete]: targeted searches found the exact hierarchy, definitions, mandatory per-solution and per-unit/overall analysis, `PERFORMANCE EXCEPTION` protocol, required conclusion, and every planned propagation point; the file contains one H1, eight sequential numbered specification sections, all 20 A–T headings, and one matched HTML-comment pair; prior supplied-file/no-clone and per-update affected-file rules remain present; `git diff --check -- Assets/Docs/handoff.md` returned `0` with only the repository LF-to-CRLF warning; file-specific status lists only `M Assets/Docs/handoff.md`; the `.meta` working and `HEAD` blobs both equal `89c480a97b425e738fb9957e805b3dceb076fd3a`; all 646 pre-record-update lines were reread in four contiguous chunks; no Unity validation applies to a Markdown-only change.
+- Affected-file reconciliation [complete]: expected `Modify: Assets/Docs/handoff.md`; expected unchanged companion `Assets/Docs/handoff.md.meta`; actually modified `Assets/Docs/handoff.md`; no file was created, deleted, moved, generated, or unexpectedly affected; the companion `.meta` remained byte-identical to `HEAD`.
+- Performance impact [complete]: repository search found no caller or reproduced copy, so no active-gameplay or dirty-triggered runtime execution path is known; runtime impact is unmeasured and expected to be none because the change is Markdown-only. Unity may perform a one-time editor import when the document becomes dirty; that editor-time cost is unmeasured. Persistent project storage increased from 43,574 to 62,407 bytes, an exact increase of 18,833 bytes. No runtime memory allocation or player-build-size change is established by available evidence. Overall impact is confined to documentation storage and possible editor import; no `PERFORMANCE EXCEPTION` applies.
+- Post-change audit [complete]: the amendment intentionally adds performance as a top-priority criterion, the exact cost hierarchy, definitions, tradeoff rules, mandatory 15-point analysis for every solution, per-step/phase/function/file/change and aggregate evaluation, evidence and measurement rules, an explicit exception protocol, required conclusions, and repeated enforcement throughout the A–T handoff. All prior expanded-handoff, supplied-archive, and affected-file requirements remain intact except the intentional renumbering from seven to eight top-level specification sections. No caller, code, serialized asset, `.meta`, architecture, layer, tag, component, folder, dependency, or unrelated working-tree file changed. All plan items and acceptance criteria are satisfied; no blocker or pending validation remains.
 -->
 
 # Produce an Exhaustive Continuation Handoff
@@ -112,7 +127,97 @@ Attach evidence to technical claims at the point where the claim is made.
 
 Use short excerpts only when the precise text matters. Prefer exact references plus explanation over pasting large source files into the handoff.
 
-## 4. Required handoff structure
+## 4. Performance-first solution requirements
+
+Performance is a **top-priority design and implementation criterion**. The default recommendation must be the correct solution with the lowest practical performance cost that satisfies approved behavior, quality, scope, architecture, safety, and acceptance criteria. Do not treat performance as optional polish to assess after selecting an implementation.
+
+Correctness and explicit user requirements remain hard constraints. When the lowest-cost option cannot satisfy them, recommend the lowest-cost option that can and identify the additional cost explicitly. Any selected solution that is materially more expensive than a viable alternative must be presented as a performance exception under the protocol below.
+
+### Performance priority order
+
+Use this order when evaluating and trading costs:
+
+1. **Active-gameplay runtime compute — highest priority.** This includes CPU and GPU work performed continuously or frequently during active play: per-frame, per-render, per-physics-tick, per-AI-tick, per-input, per-visible-object, per-particle, per-pixel, per-vertex, hot-loop, synchronization, dispatch, draw, culling, animation, and other latency-sensitive work. Frame-time spikes, stalls, garbage collection, synchronization points, memory-bandwidth pressure, and work multiplied by active instance count belong here when they affect gameplay execution.
+2. **Dirty-triggered or change-triggered runtime compute.** This is runtime work performed only when inputs, configuration, content, topology, state, or cached data becomes dirty and must be rebuilt, regenerated, uploaded, rebound, or recomputed. Assess trigger frequency, burst size, worst-case spike, amortization, invalidation breadth, and whether the work can occur during active play. Work that becomes frequent enough to behave like continuous gameplay work must be reclassified into the first category.
+3. **Memory usage.** This includes persistent and peak CPU memory, GPU memory, managed and native allocations, transient allocations, retained caches, duplicated data, buffer capacity, fragmentation risk, allocation churn, and garbage-collection pressure not already counted as active runtime compute.
+4. **Storage space — lowest priority and substantially below memory.** This includes repository size, source-asset size, generated-data size, cache size on disk, build size, installed size, and saved-data size. Runtime I/O latency, decompression work, streaming stalls, and upload work are not merely storage-space costs; classify them under active or dirty-triggered runtime compute as appropriate.
+
+The intended weighting is:
+
+`active-gameplay runtime compute > dirty-triggered runtime compute > memory usage >> storage space`
+
+Apply the hierarchy directly:
+
+- Do not save storage space by increasing active-gameplay compute unless a hard storage constraint requires it and the tradeoff is explicitly approved.
+- Prefer precomputation, caching, baked data, and additional storage when they materially reduce higher-priority runtime work, provided their memory, invalidation, loading, correctness, and workflow costs remain acceptable.
+- Do not reduce memory by moving equivalent or greater work into a frequent active-gameplay path without explicit evidence that the tradeoff improves the stated priorities.
+- A lower-priority improvement does not compensate automatically for a higher-priority regression. State both costs separately rather than combining them into an unsupported overall claim.
+- Consider the aggregate cost at realistic and worst-case scale. A small per-instance, per-frame, per-pixel, or per-event cost may dominate when multiplied across the game.
+
+### Mandatory performance analysis for every offered solution
+
+Every offered solution, including the recommended solution and each serious alternative, must contain a performance-impact analysis. The analysis must be proportional to the solution's complexity but may not be omitted because a change appears small, editor-only, data-only, or obviously inexpensive.
+
+Analyze performance at every level that materially exists:
+
+- **Per step or phase:** discovery, generation, build, initialization, loading, dirty rebuild, active update, rendering, teardown, serialization, and validation phases.
+- **Per function or execution path:** relevant methods, loops, callbacks, jobs, compute kernels, shader passes, allocations, uploads, synchronization points, and event handlers.
+- **Per file or asset:** the performance role of each affected implementation file, shader, include, configuration, serialized asset, generated artifact, and cache.
+- **Per change:** the incremental cost introduced, removed, moved, cached, amortized, or transferred by that exact change.
+- **Overall:** combined end-to-end cost across all changed paths, realistic instance counts, affected subsystems, platforms, and expected usage patterns.
+
+For each solution, state all applicable items:
+
+1. current baseline behavior and cost, with evidence or an explicit statement that the baseline is unmeasured;
+2. when the cost executes: editor-time, build-time, load-time, initialization, dirty-triggered runtime, active gameplay, rendering, teardown, or storage-only;
+3. execution frequency and trigger: per frame, tick, camera, object, element, vertex, pixel, dispatch, event, dirty transition, load, save, build, or session;
+4. CPU cost, GPU cost, synchronization or stall risk, memory-bandwidth impact, and I/O or upload work;
+5. algorithmic time and space complexity using the actual scaling variables, plus expected typical and worst-case scale;
+6. managed, native, and GPU allocations; persistent, peak, and transient memory; cache size; allocation lifetime; garbage-collection implications;
+7. dirty-state invalidation breadth, rebuild frequency, burst cost, whether work is amortized, and whether it can interrupt active gameplay;
+8. storage impact, including source, generated, build, installed, cache, and saved-data size where applicable;
+9. local impact for each relevant step, phase, function, file, and change;
+10. aggregate impact after multiplying recurring costs by realistic and worst-case counts and composing all affected paths;
+11. costs transferred between priority categories, such as exchanging storage or memory for lower runtime compute;
+12. performance risks, regressions, platform sensitivities, scalability limits, and failure modes;
+13. lower-cost alternatives considered and the evidence-based reason the recommendation is preferable;
+14. measurement status: measured, analytically derived, estimated, inferred, or unknown;
+15. exact profiling, benchmark, instrumentation, or stress-test procedure required to validate the claim, including baseline, workload, metrics, pass thresholds, and comparison method.
+
+Use quantitative evidence when available: CPU time, GPU time, frame time, call count, dispatch count, draw count, allocation bytes, garbage-collection allocations, resident memory, peak memory, buffer size, bandwidth, load time, rebuild time, file size, build size, or another directly relevant metric. Identify the environment, platform, scene, content scale, configuration, warm-up, sample duration, and tool used. Do not present numbers from a different workload as proof for the current one.
+
+When measurements are unavailable, do not invent precision. Label the statement as an estimate, inference, or unknown; show the cost model or reasoning; identify the variables most likely to change the result; and give the concrete measurement that would verify or falsify it. Terms such as “free,” “zero cost,” “negligible,” “cheap,” “lightweight,” “optimized,” or “no performance impact” require supporting evidence and a defined scale.
+
+### Performance exception protocol
+
+Clearly mark any solution or change that does not minimize practical performance cost, regresses a higher-priority category, or accepts a material cost for correctness, visual quality, maintainability, compatibility, schedule, workflow, or another requirement.
+
+Use the explicit label `PERFORMANCE EXCEPTION` and state:
+
+- the exact solution, step, phase, function, file, and change affected;
+- which priority category regresses;
+- measured or estimated magnitude, frequency, scaling behavior, and worst-case impact;
+- why the higher cost is necessary;
+- the lower-cost alternatives considered and why they are not acceptable;
+- mitigation, containment, budgets, feature gates, caching, amortization, quality tiers, or fallback behavior;
+- the evidence and validation required;
+- whether the exception has user or architecture approval, or whether approval remains required.
+
+Do not hide an exception in a general tradeoff paragraph. Do not call a higher-cost solution “preferred” without identifying the performance exception. A handoff must make every active and proposed performance exception easy for the receiving model to find.
+
+### Required performance conclusion
+
+For every solution comparison and every implementation update, end the performance analysis with:
+
+- the recommended option under the stated priority hierarchy;
+- the local performance effect per relevant unit of work;
+- the overall performance effect at realistic and worst-case scale;
+- the highest-priority cost changed;
+- the evidence confidence and outstanding measurements;
+- any `PERFORMANCE EXCEPTION`;
+- the exact performance validation that must pass before the work can be considered verified.
+
+## 5. Required handoff structure
 
 Use the following top-level sections in this order. Preserve all sections. If a section is genuinely not applicable, write `Not applicable`, explain why, and provide the evidence supporting that conclusion.
 
@@ -141,6 +246,7 @@ Start the substantive handoff with a dense but complete operational summary. In 
 - any current blocker that changes what can happen next.
 - whether supplied game files or an archive exist, whether they are the active source, and confirmation that no replacement Git clone was used.
 - the stable identifier and exact expected affected-file list for the next update, or `None` with a reason when the next action is read-only.
+- the recommended solution's highest-priority performance impact, overall expected impact, evidence status, and any `PERFORMANCE EXCEPTION`.
 
 This section is an orientation layer, not a substitute for the detailed sections that follow.
 
@@ -156,6 +262,7 @@ Record the user's request in operational terms. Include:
 - actions that require additional approval;
 - assumptions that were allowed and assumptions that must not be made;
 - any user preferences about design, behavior, performance, visuals, workflow, or communication;
+- explicit performance acceptance criteria, budgets, target platforms, workloads, scaling assumptions, and the active-gameplay > dirty-triggered > memory >> storage priority order;
 - requests that were superseded, rejected, narrowed, or deferred, with the reason and evidence.
 
 Quote the user's exact wording only when precision is necessary. Otherwise provide a faithful, detailed paraphrase.
@@ -207,6 +314,7 @@ Explain the relevant system deeply enough that the next model can reason about c
 - lifecycle ordering and event sequencing;
 - shader, rendering, geometry, asset, scene, prefab, or profile interactions;
 - performance-sensitive paths and accepted budgets;
+- current performance baselines, execution frequencies, scaling variables, allocation behavior, dirty-trigger boundaries, aggregate instance counts, and unmeasured performance assumptions;
 - failure modes, fallbacks, compatibility paths, and diagnostics;
 - cross-subsystem dependencies and shared resources;
 - architecture invariants that the pending work must preserve.
@@ -275,6 +383,8 @@ Describe every completed change in enough detail for review and debugging. For e
 - intentional behavior differences;
 - behavior intended to remain unchanged;
 - compatibility, migration, serialization, performance, or visual consequences;
+- detailed local performance impact per relevant step, phase, function, file, and change, plus the combined overall impact under realistic and worst-case scale;
+- the measurement status, evidence, comparison with baseline, and any `PERFORMANCE EXCEPTION`;
 - validation already performed and its result;
 - any residual concern.
 
@@ -320,6 +430,7 @@ Enumerate all unfinished work. For every item, provide:
 - acceptance criteria;
 - validation method;
 - risk and likely failure modes;
+- expected local and aggregate performance impact under the required hierarchy, including measurement gaps and exception status;
 - whether the item is in the approved scope;
 - reason it remains unfinished.
 
@@ -336,12 +447,13 @@ Write a step-by-step execution plan detailed enough for the next model to follow
 5. intended change and rationale;
 6. invariants and behaviors to preserve;
 7. dependencies and sequencing constraints;
-8. expected intermediate result;
-9. validation command or manual check;
-10. pass criteria;
-11. failure response or rollback strategy;
-12. required post-update `Actually affected files` reconciliation;
-13. plan/documentation update required before moving on.
+8. detailed expected performance impact per relevant step, phase, function, file, and change, plus overall impact and exception status;
+9. expected intermediate result;
+10. validation command or manual check, including performance measurement when applicable;
+11. functional and performance pass criteria;
+12. failure response or rollback strategy;
+13. required post-update `Actually affected files` reconciliation;
+14. plan/documentation update required before moving on.
 
 Include concrete commands when known and safe. Mark example commands as examples. Do not prescribe destructive commands, broad resets, blind formatting, raw serialized-asset edits, scope expansion, or external side effects unless explicitly authorized and required.
 
@@ -367,6 +479,8 @@ Create a table or structured list for every validation activity. Include:
 
 Cover all applicable compilation, automated tests, static checks, formatting checks, diff checks, editor validation, runtime validation, visual review, performance measurements, serialization checks, and documentation consistency checks.
 
+For performance validation, record the baseline and candidate under the same workload, environment, platform, configuration, scale, warm-up, sampling method, and profiler or measurement tool. Include the metrics and thresholds associated with active-gameplay compute, dirty-triggered compute, memory, and storage. State which priority categories remain unmeasured and the exact next measurement required.
+
 For unavailable validation, use `Pending` rather than `Passed`. State why it is unavailable and give the concrete next action. For failed validation, preserve the failure rather than summarizing it away.
 
 ### O. Constraints, invariants, and do-not-do list
@@ -378,6 +492,7 @@ Collect the constraints that are most likely to be violated during continuation.
 - user-owned changes to preserve;
 - supplied game-file and archive precedence, including the prohibition on cloning or remotely replacing those files;
 - the mandatory pre-update expected-file declaration and post-update actual-file reconciliation for every update;
+- performance as a top-priority criterion, the required priority hierarchy, mandatory detailed impact analysis for every solution, and explicit `PERFORMANCE EXCEPTION` handling;
 - architecture and API contracts;
 - serialization and metadata requirements;
 - performance and geometry budgets;
@@ -440,6 +555,9 @@ End the technical body with a compact matrix mapping each objective or plan item
 - exact expected affected files and operations;
 - exact actual affected files and operations;
 - file-list discrepancy status;
+- local performance impact by relevant unit of work;
+- overall performance impact at realistic and worst-case scale;
+- highest-priority cost affected, evidence status, performance-validation status, and exception status;
 - scope status;
 - implementation status;
 - review status;
@@ -460,11 +578,11 @@ Provide a short ordered checklist that the receiving model can execute at the be
 3. if supplied game files exist, confirm they are the active source, preserve the originals, and do not clone or replace them from Git;
 4. confirm branch, `HEAD`, working tree, and relevant file contents have not drifted when local Git metadata exists; otherwise mark those Git fields unavailable;
 5. preserve unrelated changes and compare current reality with the handoff, recording deviations;
-6. confirm authorization and scope, announce the next update's stable identifier and exact expected affected files, then continue and reconcile the actual affected files before any later update.
+6. confirm authorization and scope, announce the next update's stable identifier and exact expected affected files, review its detailed local and overall performance impact under the required hierarchy, then continue and reconcile the actual affected files and measured performance before any later update.
 
 This checklist is an entry point, not a replacement for the exact continuation procedure.
 
-## 5. Required writing quality
+## 6. Required writing quality
 
 - State outcomes before background while retaining the full background later.
 - Use direct, technically precise language.
@@ -478,7 +596,7 @@ This checklist is an entry point, not a replacement for the exact continuation p
 - Do not assume that the next model can access this chat, tool outputs that are not saved, transient screenshots, or unstated user intent.
 - Do not paste massive logs or complete source files when a precise excerpt and durable location are sufficient. Preserve complete logs only when the exact output is material and no durable reference exists.
 
-## 6. Anti-compression rules
+## 7. Anti-compression rules
 
 The following are specifically prohibited because they create handoffs that look complete but are not operationally complete:
 
@@ -487,6 +605,9 @@ The following are specifically prohibited because they create handoffs that look
 - replacing validation evidence with “tests pass”;
 - replacing next steps with task names lacking procedure and pass criteria;
 - replacing rationale with “for maintainability,” “for performance,” or another generic benefit;
+- describing a solution as performant, cheap, negligible, optimized, or free without local and aggregate analysis, scale, evidence status, and a validation method;
+- omitting a material performance regression or failing to label a higher-cost selection as `PERFORMANCE EXCEPTION`;
+- reporting only overall performance while hiding per-step, per-phase, per-function, per-file, or per-change costs, or reporting only local costs while omitting their aggregate effect;
 - omitting pre-existing working-tree changes;
 - omitting supplied-file provenance or silently substituting a Git clone for provided game files;
 - providing only a task-wide, directory-level, wildcard, or “related files” list instead of exact expected and actual paths for every update;
@@ -499,7 +620,7 @@ The following are specifically prohibited because they create handoffs that look
 - relying on the receiving model to infer scope or authorization;
 - reducing detail merely to fit a normal response length.
 
-## 7. Final completeness audit
+## 8. Final completeness audit
 
 Before sending the handoff, perform and include a brief self-audit. Confirm each item with evidence or mark the handoff incomplete:
 
@@ -508,6 +629,9 @@ Before sending the handoff, perform and include a brief self-audit. Confirm each
 - the current user objective, scope, authorization state, and acceptance criteria are explicit;
 - every in-scope changed file has a per-file delta and status;
 - every completed, active, and planned update has a stable identifier, an exact expected affected-file declaration, an exact actual-file reconciliation where applicable, and a resolved explanation for every discrepancy;
+- every offered solution and update includes detailed performance impact per relevant step, phase, function, file, and change plus overall realistic and worst-case impact;
+- performance recommendations follow `active-gameplay runtime compute > dirty-triggered runtime compute > memory usage >> storage space`, with baselines, frequency, scaling, allocations, evidence status, measurements, and validation criteria stated;
+- every material higher-cost choice is visibly labeled `PERFORMANCE EXCEPTION`, justified against lower-cost alternatives, mitigated where possible, and assigned an approval status;
 - relevant callers, consumers, producers, contracts, tests, documents, and history are covered;
 - working-tree ownership and unrelated changes are distinguishable;
 - supplied game files and archives were inventoried, their provenance and extraction state are recorded, the supplied source was used, and no prohibited Git clone or remote replacement occurred;

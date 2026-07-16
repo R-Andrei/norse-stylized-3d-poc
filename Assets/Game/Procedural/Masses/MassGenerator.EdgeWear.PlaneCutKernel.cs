@@ -728,6 +728,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int CoexistenceTrialCacheUseCount;
             public int CoexistenceExclusionCount;
             public int CoexistenceSearchStatesEvaluated;
+            public int CoexistenceSearchTimeBudgetExceeded;
+            public int CoexistenceSearchCancelled;
+            public double CoexistenceSearchElapsedMilliseconds;
             public int CoexistenceSearchStatesDeduplicated;
             public int CoexistenceSearchMaximumDepth;
             public int CoexistenceSearchFrontierRemaining;
@@ -850,6 +853,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             EdgeWearCoverageAudit coverageAudit,
+            bool allowCoexistenceSearch,
             out TriangleSoup previewSoup)
         {
             previewSoup = null;
@@ -1068,6 +1072,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     localityDeferredCount,
                     coverageAudit != null &&
                         coverageAudit.MaximumCoverageMode,
+                    allowCoexistenceSearch,
                     ref result,
                     out List<PlaneCutBevelCandidate> retainedCandidates,
                     out List<PolygonFace> edgeOnlyFaces,
@@ -1771,6 +1776,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStableFaceArea,
             int localityDeferredCount,
             bool maximumCoverageMode,
+            bool allowCoexistenceSearch,
             ref PlaneCutBevelAuditResult result,
             out List<PlaneCutBevelCandidate> retainedCandidates,
             out List<PolygonFace> preparedFaces,
@@ -1786,6 +1792,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     localityDeferredCount,
+                    allowCoexistenceSearch,
                     ref result,
                     out retainedCandidates,
                     out preparedFaces,
@@ -1815,6 +1822,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float minimumStableEdgeLength,
                 float minimumStableFaceArea,
                 int localityDeferredCount,
+                bool allowCoexistenceSearch,
                 ref PlaneCutBevelAuditResult result,
                 out List<PlaneCutBevelCandidate> retainedCandidates,
                 out List<PolygonFace> preparedFaces,
@@ -1891,6 +1899,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     result.TrialRejectedEdgeEvidence =
                         result.AttemptedEdgeEvidence;
                     result.PlanesDeferred = localityDeferredCount;
+                    if (!allowCoexistenceSearch)
+                    {
+                        return false;
+                    }
                     if (TryResolvePlaneCutCoexistenceByExclusion(
                             sourceFaces,
                             context,
@@ -1968,6 +1980,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     result.TrialRejectedEdgeEvidence =
                         result.AttemptedEdgeEvidence;
                     result.PlanesDeferred = localityDeferredCount;
+                    if (!allowCoexistenceSearch)
+                    {
+                        return false;
+                    }
                     if (TryResolvePlaneCutCoexistenceByExclusion(
                             sourceFaces,
                             context,
@@ -2633,6 +2649,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumStableEdgeLength,
                     ref result);
             }
+            if (!allowCoexistenceSearch)
+            {
+                return false;
+            }
             if (TryResolvePlaneCutCoexistenceByExclusion(
                     sourceFaces,
                     context,
@@ -2679,6 +2699,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             const int maximumExclusions = 12;
             const int maximumEvaluatedStates = 128;
             const int maximumConflictCandidates = 10;
+            const double maximumSearchMilliseconds = 5000.0;
 
             retainedCandidates = new List<PlaneCutBevelCandidate>();
             preparedFaces = null;
@@ -2768,10 +2789,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Bounds sourceBounds = CalculateFaceBounds(sourceFaces);
             double sourceVolume = CalculatePlaneCutPolyhedronVolume(
                 sourceFaces);
+            bool searchCancelled = false;
+            bool searchTimeBudgetExceeded = false;
+            System.Diagnostics.Stopwatch searchStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
 
             while (frontier.Count > 0 &&
                 processedStates < maximumEvaluatedStates)
             {
+                if (IsEdgeWearAuditCancellationRequested())
+                {
+                    searchCancelled = true;
+                    break;
+                }
+                if (searchStopwatch.Elapsed.TotalMilliseconds >=
+                    maximumSearchMilliseconds)
+                {
+                    searchTimeBudgetExceeded = true;
+                    break;
+                }
+
                 frontier.Sort((left, right) =>
                     ComparePlaneCutCoexistenceSearchNodes(
                         left,
@@ -2787,6 +2824,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 if (outcome.FullyValid)
                 {
+                    searchStopwatch.Stop();
+                    result.CoexistenceSearchElapsedMilliseconds =
+                        searchStopwatch.Elapsed.TotalMilliseconds;
+                    result.CoexistenceSearchTimeBudgetExceeded = 0;
+                    result.CoexistenceSearchCancelled = 0;
                     RecordPlaneCutCoexistenceSearchState(
                         processedStates,
                         "none",
@@ -2951,17 +2993,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
+            searchStopwatch.Stop();
             result.CoexistenceTrialCount = trialOrdinal;
+            result.CoexistenceSearchElapsedMilliseconds =
+                searchStopwatch.Elapsed.TotalMilliseconds;
+            result.CoexistenceSearchTimeBudgetExceeded =
+                searchTimeBudgetExceeded ? 1 : 0;
+            result.CoexistenceSearchCancelled =
+                searchCancelled ? 1 : 0;
             result.CoexistenceSearchStatesEvaluated = processedStates;
             result.CoexistenceSearchStatesDeduplicated = deduplicatedStates;
             result.CoexistenceSearchMaximumDepth = maximumDepth;
             result.CoexistenceSearchFrontierRemaining = frontier.Count;
             result.CoexistenceSearchWinningDepth = -1;
-            blocker = frontier.Count > 0
-                ? "coexistence closure exhausted its bounded state budget"
-                : string.IsNullOrEmpty(lastFailure)
-                    ? "coexistence closure exhausted its conflict-directed frontier"
-                    : lastFailure;
+            blocker = searchCancelled
+                ? "coexistence-search-cancelled"
+                : searchTimeBudgetExceeded
+                    ? "coexistence-search-time-budget-exceeded" +
+                        " (statesEvaluated=" + processedStates +
+                        ",frontierRemaining=" + frontier.Count + ")"
+                    : frontier.Count > 0
+                        ? "coexistence closure exhausted its bounded state budget"
+                        : string.IsNullOrEmpty(lastFailure)
+                            ? "coexistence closure exhausted its conflict-directed frontier"
+                            : lastFailure;
             return false;
         }
 
@@ -7031,6 +7086,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 source.BandMaximumJunctionInfluenceRatio;
             destination.BandMaximumSharedAxisSpanRatio =
                 source.BandMaximumSharedAxisSpanRatio;
+            if (destination.EdgeConflictVictimEdgeIndex < 0 &&
+                source.EdgeConflictVictimEdgeIndex >= 0)
+            {
+                CapturePlaneCutEdgeConflict(
+                    ref destination,
+                    source,
+                    source.EdgeConflictVertexIndex);
+            }
         }
 
         private static void CapturePlaneCutEdgeConflict(

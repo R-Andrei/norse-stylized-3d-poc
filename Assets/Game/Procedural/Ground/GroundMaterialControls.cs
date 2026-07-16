@@ -51,6 +51,10 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private GroundSurfaceLayerProfile riverbedSurfaceLayer;
 
+    [Tooltip("Optional reusable wetness character applied independently from Bank substrate identity. Null disables local Shore hydrology.")]
+    [SerializeField]
+    private GroundHydrologyModifierProfile shoreHydrologyModifier;
+
     [Header("River-Coupled Bank Composition")]
     [InspectorName("Bank Material Strength")]
     [Tooltip("Master amount of the selected Bank Surface Layer. Zero preserves the ordinary Ground surface everywhere.")]
@@ -100,6 +104,13 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float outerBankFade = 1f;
 
+    [Header("River-Coupled Riverbed Composition")]
+    [InspectorName("Riverbed Material Strength")]
+    [Tooltip("Master amount of the selected dry Riverbed Surface Layer on exact Riverbed Support. This does not control submerged-cover exclusion or wetness.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float riverbedMaterialStrength = 1f;
+
     [Header("River-Coupled Surface-Cover Response")]
     [InspectorName("Vegetation Retreat Strength")]
     [Tooltip("How strongly the selected Bank Surface Layer's vegetation-retention value suppresses the ordinary vegetation response. Zero preserves current rendering.")]
@@ -124,6 +135,44 @@ public sealed class GroundMaterialControls
     [Range(0f, 1f)]
     [SerializeField]
     private float paintedAccentRetreatStrength;
+
+
+    [Header("River-Coupled Shore Hydrology")]
+    [InspectorName("Shore Wetness Strength")]
+    [Tooltip("Master strength of the selected Shore Hydrology Modifier. Zero preserves the dry A3A baseline.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float shoreWetnessStrength;
+
+    [InspectorName("Shore Wetness Reach")]
+    [Tooltip("Distance in metres from the exact Riverbed Support boundary across the corridor bank. This is independent from Bank Surface Layer reach.")]
+    [Range(0f, 20f)]
+    [SerializeField]
+    private float shoreWetnessReach = 0.5f;
+
+    [InspectorName("Shore Wetness Fade")]
+    [Tooltip("Fade distance in metres beyond Shore Wetness Reach across the corridor bank.")]
+    [Range(0.05f, 10f)]
+    [SerializeField]
+    private float shoreWetnessFade = 0.25f;
+
+    [InspectorName("Broad-Bank Saturation")]
+    [Tooltip("Baseline wetness contribution across the metre-based Shore Wetness Reach.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float broadBankSaturation = 0.45f;
+
+    [InspectorName("Immediate-Bank Saturation")]
+    [Tooltip("Additional wetness contribution across the stronger immediate-bank Shore semantic.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float immediateBankSaturation = 0.8f;
+
+    [InspectorName("Waterline Saturation")]
+    [Tooltip("Additional wetness contribution at the strongest waterline Shore semantic.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float waterlineSaturation = 1f;
 
     [Header("Macro Patch Composition")]
     [InspectorName("Macro Patch Scale")]
@@ -235,7 +284,8 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float groundRockyDryResponseScale = 1f;
 
-    [Tooltip("Multiplier for shore dampening inherited from the surface profile.")]
+    [HideInInspector]
+    [Tooltip("Legacy Shore damp scale retained for serialized compatibility. Active Shore wetness is owned by the independent hydrology modifier.")]
     [Range(0f, 2.5f)]
     [SerializeField]
     private float groundShoreDampStrengthScale = 1f;
@@ -331,6 +381,8 @@ public sealed class GroundMaterialControls
     public float VegetationTintStrength => Mathf.Clamp01(vegetationTintStrength);
     public GroundSurfaceLayerProfile BankSurfaceLayer => bankSurfaceLayer;
     public GroundSurfaceLayerProfile RiverbedSurfaceLayer => riverbedSurfaceLayer;
+    public GroundHydrologyModifierProfile ShoreHydrologyModifier =>
+        shoreHydrologyModifier;
     public float BankMaterialStrength => Mathf.Clamp01(bankMaterialStrength);
     public float BankMaterialReach => Mathf.Clamp01(bankMaterialReach);
     public float ImmediateBankExposure => Mathf.Clamp01(immediateBankExposure);
@@ -339,12 +391,21 @@ public sealed class GroundMaterialControls
     public float OuterBankExtension => Mathf.Clamp(outerBankExtension, 0f, 20f);
     public float OuterBankStrength => Mathf.Clamp01(outerBankStrength);
     public float OuterBankFade => Mathf.Clamp(outerBankFade, 0.05f, 10f);
+    public float RiverbedMaterialStrength =>
+        Mathf.Clamp01(riverbedMaterialStrength);
     public float VegetationRetreatStrength =>
         Mathf.Clamp01(vegetationRetreatStrength);
     public float SnowMeltStrength => Mathf.Clamp01(snowMeltStrength);
     public float FrostRetreatStrength => Mathf.Clamp01(frostRetreatStrength);
     public float PaintedAccentRetreatStrength =>
         Mathf.Clamp01(paintedAccentRetreatStrength);
+    public float ShoreWetnessStrength => Mathf.Clamp01(shoreWetnessStrength);
+    public float ShoreWetnessReach => Mathf.Clamp(shoreWetnessReach, 0f, 20f);
+    public float ShoreWetnessFade => Mathf.Clamp(shoreWetnessFade, 0.05f, 10f);
+    public float BroadBankSaturation => Mathf.Clamp01(broadBankSaturation);
+    public float ImmediateBankSaturation =>
+        Mathf.Clamp01(immediateBankSaturation);
+    public float WaterlineSaturation => Mathf.Clamp01(waterlineSaturation);
     public float PixelCellSize => Mathf.Clamp(pixelCellSize, 0.005f, 0.5f);
     public float PixelToneCount => Mathf.Clamp(pixelToneCount, 2f, 8f);
     public float PixelClusterStrength => Mathf.Clamp01(pixelClusterStrength);
@@ -404,6 +465,7 @@ public sealed class GroundMaterialControls
         {
             bankSurfaceLayer = null;
             riverbedSurfaceLayer = null;
+            shoreHydrologyModifier = null;
             bankMaterialStrength = 1f;
             bankMaterialReach = 0.65f;
             immediateBankExposure = 0.55f;
@@ -412,10 +474,17 @@ public sealed class GroundMaterialControls
             outerBankExtension = 0f;
             outerBankStrength = 0.5f;
             outerBankFade = 1f;
+            riverbedMaterialStrength = 1f;
             vegetationRetreatStrength = 0f;
             snowMeltStrength = 0f;
             frostRetreatStrength = 0f;
             paintedAccentRetreatStrength = 0f;
+            shoreWetnessStrength = 0f;
+            shoreWetnessReach = 0.5f;
+            shoreWetnessFade = 0.25f;
+            broadBankSaturation = 0.45f;
+            immediateBankSaturation = 0.8f;
+            waterlineSaturation = 1f;
             ApplySnowfieldVariant(GroundSnowfieldVariant.Clean);
             return;
         }
@@ -430,6 +499,7 @@ public sealed class GroundMaterialControls
         vegetationTintStrength = source.vegetationTintStrength;
         bankSurfaceLayer = source.bankSurfaceLayer;
         riverbedSurfaceLayer = source.riverbedSurfaceLayer;
+        shoreHydrologyModifier = source.shoreHydrologyModifier;
         bankMaterialStrength = source.bankMaterialStrength;
         bankMaterialReach = source.bankMaterialReach;
         immediateBankExposure = source.immediateBankExposure;
@@ -438,10 +508,17 @@ public sealed class GroundMaterialControls
         outerBankExtension = source.outerBankExtension;
         outerBankStrength = source.outerBankStrength;
         outerBankFade = source.outerBankFade;
+        riverbedMaterialStrength = source.riverbedMaterialStrength;
         vegetationRetreatStrength = source.vegetationRetreatStrength;
         snowMeltStrength = source.snowMeltStrength;
         frostRetreatStrength = source.frostRetreatStrength;
         paintedAccentRetreatStrength = source.paintedAccentRetreatStrength;
+        shoreWetnessStrength = source.shoreWetnessStrength;
+        shoreWetnessReach = source.shoreWetnessReach;
+        shoreWetnessFade = source.shoreWetnessFade;
+        broadBankSaturation = source.broadBankSaturation;
+        immediateBankSaturation = source.immediateBankSaturation;
+        waterlineSaturation = source.waterlineSaturation;
         pixelCellSize = source.pixelCellSize;
         pixelToneCount = source.pixelToneCount;
         pixelClusterStrength = source.pixelClusterStrength;

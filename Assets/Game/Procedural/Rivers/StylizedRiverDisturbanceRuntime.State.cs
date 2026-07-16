@@ -87,6 +87,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float StaticPressureAcrossHalfWidth;
             public float StaticPressureAlongHalfLength;
             public Vector2[] StaticPressureContour;
+            public RiverFoamStaticContactProfile FoamContactProfile;
             public RiverDisturbancePressureBakeProfile StaticPressureProfile;
             public RiverDisturbancePressureBakeProfile StaticPressureBaseProfile;
             // Exact generated mesh retained for staged pre-gameplay obstacle

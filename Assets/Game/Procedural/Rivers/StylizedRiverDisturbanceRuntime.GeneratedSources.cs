@@ -458,6 +458,47 @@ namespace ProgrammaticStylized3D.Rivers
                 collisionFootprint = rawFootprint;
             }
 
+            RiverFoamStaticContactProfile foamContactProfile;
+            string foamContactStatus;
+            if (RiverDisturbanceFootprintResolver.TryResolve(
+                    river,
+                    meshFilter,
+                    0f,
+                    out RiverDisturbanceFootprint exactFoamFootprint,
+                    out string exactFoamFootprintStatus) &&
+                RiverDisturbanceFootprintResolver.TryBuildFoamContactProfile(
+                    river,
+                    exactFoamFootprint,
+                    footprint.WorldPosition,
+                    out foamContactProfile,
+                    out foamContactStatus))
+            {
+                foamContactStatus =
+                    exactFoamFootprintStatus + " " + foamContactStatus;
+            }
+            else if (RiverDisturbanceFootprintResolver
+                         .TryBuildFoamContactProfile(
+                             river,
+                             pressureFootprint,
+                             footprint.WorldPosition,
+                             out foamContactProfile,
+                             out foamContactStatus))
+            {
+                foamContactStatus =
+                    "Exact Foam waterline resolution was unavailable; " +
+                    foamContactStatus;
+            }
+            else
+            {
+                foamContactProfile = RiverDisturbanceFootprintResolver
+                    .BuildFallbackFoamContactProfile(
+                        pressureFootprint.AlongHalfLength,
+                        pressureFootprint.AcrossHalfWidth);
+                foamContactStatus =
+                    "Exact and bounds-contour Foam profiles were unavailable; " +
+                    "using the analytic five-point fallback.";
+            }
+
             RiverDisturbancePressureBakeProfile pressureProfile = default;
             float waveAllowance = 0f;
             float representativeSupportHeight = 0f;
@@ -527,6 +568,7 @@ namespace ProgrammaticStylized3D.Rivers
                     pressureFootprint.AlongHalfLength,
                     pressureFootprint.Contour,
                     pressureProfile,
+                    foamContactProfile,
                     meshFilter,
                     true,
                     interaction.ObstructionWakeSpread,
@@ -572,6 +614,7 @@ namespace ProgrammaticStylized3D.Rivers
                     interaction.ObstructionWakeSpread,
                     interaction.ObstructionWakeVariation,
                     footprintStatus + " " + pressureStatus + " " +
+                    foamContactStatus + " " +
                     $"Contour {footprint.Contour.Length} points; " +
                     $"blockage {blockageRatio:P0}; " +
                     $"pressure strength {interaction.StaticPressureStrength:P0}; " +

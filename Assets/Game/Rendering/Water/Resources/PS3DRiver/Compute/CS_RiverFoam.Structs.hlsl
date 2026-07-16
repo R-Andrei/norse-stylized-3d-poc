@@ -4,24 +4,24 @@ struct FoamSourceEventData
     // x = source type, y = side sign except Object Arc/Semi-Arc phase
     // (0 Build, 1 Hold, 2 Release), z = phase/reveal progress, w = shape seed.
     float4 header;
-    // x = start storage global, y = end storage global,
-    // z = centre storage global, w = flow direction.
+    // x/y = start/end storage global except Object Arc/Semi-Arc point 0;
+    // z = centre storage global; w = flow direction except Object Arc/Semi-Arc point 1.x.
     float4 distance;
-    // x = shore inset, y = width metres except Shore Ribbon thickness cells
-    // and Object Arc/Semi-Arc straight wake-arm length metres, z = inward reach or
-    // Arc/Semi-Arc normalized material-step duration, w = feather metres.
+    // x = shore inset except Object Arc/Semi-Arc point 1.y; y = width metres
+    // except Shore Ribbon thickness cells and Object Arc/Semi-Arc wake-arm length;
+    // z = inward reach or Arc/Semi-Arc material-step duration; w = feather or point 2.x.
     float4 shore;
     // x = source amount, y = remaining life, z = material pattern seed,
     // w = source fill feature size.
     float4 material;
-    // x = source fill seed, y = breakup scale,
-    // z = breakup strength, w = curvature / signed object semi-arc lopsidedness.
+    // x = source fill seed; y/z = breakup scale/strength except Object
+    // Arc/Semi-Arc point 2.y / point 3.x; w = curvature or selected Semi-Arc side.
     float4 variation;
-    // x = formation speed metres/second, y = moving-head trail metres,
-    // z = source path length metres, w reserved.
+    // x/y = formation speed / moving-head trail except Object Arc/Semi-Arc
+    // point 3.y / point 4.x; z = source path length metres; w = source fill blend.
     float4 kinematics;
-    // x = object centre lateral metres, y = object along half length,
-    // z = object across half width, w = Fleck contact offset metres or
+    // x = object centre lateral metres; y/z = object half extents except
+    // Object Arc/Semi-Arc point 4.y / front split; w = Fleck contact offset or
     // Arc/Semi-Arc source-local lateral cell spacing metres.
     float4 objectData;
 };

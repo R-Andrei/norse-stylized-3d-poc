@@ -1187,6 +1187,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     shapeSeed,
                     widthName,
                     width);
+            if (job.CancelRequested)
+            {
+                FinishEdgeWearViabilityMatrix(
+                    job,
+                    true,
+                    "cancelled by user");
+                return;
+            }
             job.Cases.Add(matrixCase);
             job.CompletedCaseCount++;
 
@@ -1233,8 +1241,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     job.CreaseWidth,
                     job.CreaseLength,
                     job.CreaseBranching);
-            MassGenerator.EdgeWearBatchAuditCaseResult result =
-                job.RequireAllGeometricCandidates
+            MassGenerator.EdgeWearBatchAuditCaseResult result;
+            MassGenerator.SetEditorEdgeWearAuditCancellationProbe(() =>
+            {
+                if (job.CancelRequested)
+                {
+                    return true;
+                }
+
+                float progress = (float)job.CompletedCaseCount /
+                    job.TotalCaseCount;
+                if (!EditorUtility.DisplayCancelableProgressBar(
+                        job.ProgressTitle,
+                        "Seed " + shapeSeed + ", " + widthName +
+                        " width — bounded conflict search",
+                        progress))
+                {
+                    return false;
+                }
+
+                job.CancelRequested = true;
+                return true;
+            });
+            try
+            {
+                result = job.RequireAllGeometricCandidates
                     ? MassGenerator.GenerateUnifiedEdgeWearBatchAuditCase(
                         caseRecipe,
                         settings)
@@ -1242,6 +1273,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         .GenerateUnifiedEdgeWearPreviewParityAuditCase(
                             caseRecipe,
                             settings);
+            }
+            finally
+            {
+                MassGenerator.SetEditorEdgeWearAuditCancellationProbe(null);
+            }
             return new EdgeWearViabilityMatrixCase(
                 shapeSeed,
                 widthName,
@@ -1463,6 +1499,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     suite.TopologyCasesRun +
                 ",preview:" + suite.PreviewCasesPassed + "/" +
                     suite.PreviewCasesRun +
+                ",outlierRecovery:" + suite.OutlierRecoveryChecksPassed +
+                    "/" + suite.OutlierRecoveryChecksRun +
                 ",topologyCollateralFailures:" +
                     suite.TopologyCollateralFailures +
                 ",previewCollateralFailures:" +
@@ -1485,7 +1523,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-B4.2R12B.1-suite");
+            builder.AppendLine("contract=EW-B4.2R13A.3-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -1518,6 +1556,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append(suite.PreviewCasesPassed);
             builder.Append('/');
             builder.AppendLine(suite.PreviewCasesRun.ToString());
+            builder.Append("outlierRecoveryStatus=");
+            builder.AppendLine(suite.OutlierRecoveryStatus);
+            builder.Append("outlierRecoveryChecks=");
+            builder.Append(suite.OutlierRecoveryChecksPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.OutlierRecoveryChecksRun.ToString());
             builder.Append("artisticComprehensiveAvailable=");
             builder.AppendLine(
                 suite.ComprehensiveArtisticAvailable ? "1" : "0");
@@ -1554,6 +1598,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine(string.IsNullOrEmpty(suite.PreviewReportText)
                 ? "not run"
                 : suite.PreviewReportText);
+            builder.AppendLine();
+            builder.AppendLine("[Outlier Recovery Contract]");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    suite.OutlierRecoveryReport)
+                ? "not evaluated"
+                : suite.OutlierRecoveryReport);
             builder.AppendLine();
             builder.AppendLine(
                 "[Comprehensive Artistic Selection Evidence]");
@@ -1820,7 +1870,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             reportBuilder.AppendLine(
                 "GeneratedMass comprehensive artistic selection evidence");
             reportBuilder.AppendLine(
-                "contract=EW-B4.2R12B.1-comprehensive");
+                "contract=EW-B4.2R13A.3-comprehensive");
             reportBuilder.Append("cases=");
             reportBuilder.AppendLine(expectedCaseCount.ToString());
             reportBuilder.Append("scenariosPerCase=");
@@ -5466,8 +5516,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public bool ComprehensiveArtisticAvailable;
             public string ComprehensiveArtisticReport = string.Empty;
             public string ComprehensiveArtisticDiagnostic = string.Empty;
+            public readonly List<EdgeWearViabilityMatrixCase> TopologyCases =
+                new List<EdgeWearViabilityMatrixCase>();
             public readonly List<EdgeWearViabilityMatrixCase> PreviewCases =
                 new List<EdgeWearViabilityMatrixCase>();
+            public int OutlierRecoveryChecksRun;
+            public int OutlierRecoveryChecksPassed;
+            public string OutlierRecoveryReport = string.Empty;
 
             public EdgeWearValidationSuiteJob(GeneratedMass target)
             {
@@ -5504,6 +5559,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public string PreviewStatus => PreviewAggregate == null
                 ? "not-run"
                 : PreviewAggregate.Status;
+
+            public string OutlierRecoveryStatus =>
+                OutlierRecoveryChecksRun == 0
+                    ? "not-run"
+                    : OutlierRecoveryChecksPassed ==
+                        OutlierRecoveryChecksRun
+                        ? "passed"
+                        : "failed";
 
             public int TopologyCasesRun => TopologyAggregate == null
                 ? 0
@@ -5547,6 +5610,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         PreviewAggregate == null ||
                         TopologyAggregate.Status != "passed" ||
                         PreviewAggregate.Status != "passed" ||
+                        OutlierRecoveryChecksRun == 0 ||
+                        OutlierRecoveryChecksPassed !=
+                            OutlierRecoveryChecksRun ||
                         !ComprehensiveArtisticAvailable ||
                         !string.IsNullOrEmpty(TerminalReason))
                     {
@@ -5657,6 +5723,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 {
                     TopologyAggregate = aggregate;
                     TopologyReportText = reportText ?? string.Empty;
+                    TopologyCases.Clear();
+                    TopologyCases.AddRange(job.Cases);
                 }
                 else
                 {
@@ -5664,7 +5732,145 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     PreviewReportText = reportText ?? string.Empty;
                     PreviewCases.Clear();
                     PreviewCases.AddRange(job.Cases);
+                    EvaluateOutlierRecoveryContract();
                 }
+            }
+
+            private void EvaluateOutlierRecoveryContract()
+            {
+                OutlierRecoveryChecksRun = 0;
+                OutlierRecoveryChecksPassed = 0;
+                StringBuilder builder = new StringBuilder(2048);
+                builder.AppendLine(
+                    "policy=editor-only canonical source-edge fixtures over topology cases");
+                EvaluateOutlierRecoveryExpectation(
+                    2223,
+                    "maximum",
+                    36,
+                    builder);
+                EvaluateOutlierRecoveryExpectation(
+                    2223,
+                    "default",
+                    13,
+                    builder);
+                EvaluateOutlierRecoveryExpectation(
+                    2223,
+                    "maximum",
+                    13,
+                    builder);
+                EvaluateOutlierRecoveryExpectation(
+                    8889,
+                    "maximum",
+                    13,
+                    builder);
+                EvaluateOutlierRecoveryExpectation(
+                    8889,
+                    "maximum",
+                    23,
+                    builder);
+                OutlierRecoveryReport = builder.ToString().TrimEnd();
+            }
+
+            private void EvaluateOutlierRecoveryExpectation(
+                int shapeSeed,
+                string widthName,
+                int sourceEdgeIndex,
+                StringBuilder builder)
+            {
+                OutlierRecoveryChecksRun++;
+                EdgeWearViabilityMatrixCase? matchingCase = null;
+                for (int caseIndex = 0;
+                     caseIndex < TopologyCases.Count;
+                     caseIndex++)
+                {
+                    EdgeWearViabilityMatrixCase matrixCase =
+                        TopologyCases[caseIndex];
+                    if (matrixCase.ShapeSeed == shapeSeed &&
+                        string.Equals(
+                            matrixCase.WidthName,
+                            widthName,
+                            StringComparison.Ordinal))
+                    {
+                        matchingCase = matrixCase;
+                        break;
+                    }
+                }
+
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord record = null;
+                if (matchingCase.HasValue)
+                {
+                    MassGenerator.EdgeWearArtisticEdgeAuditRecord[] records =
+                        matchingCase.Value.Result.ArtisticEdges;
+                    if (records != null)
+                    {
+                        for (int recordIndex = 0;
+                             recordIndex < records.Length;
+                             recordIndex++)
+                        {
+                            if (records[recordIndex] != null &&
+                                records[recordIndex].SourceEdgeIndex ==
+                                    sourceEdgeIndex)
+                            {
+                                record = records[recordIndex];
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                bool passed = record != null &&
+                    record.Active != 0 &&
+                    record.CertifiedBuilt != 0 &&
+                    record.MaterializedWidth > 0f;
+                if (passed)
+                {
+                    OutlierRecoveryChecksPassed++;
+                }
+
+                builder.Append("seed=");
+                builder.Append(shapeSeed);
+                builder.Append(",width=");
+                builder.Append(widthName);
+                builder.Append(",edge=");
+                builder.Append(sourceEdgeIndex);
+                builder.Append(",passed=");
+                builder.Append(passed ? '1' : '0');
+                builder.Append(",found=");
+                builder.Append(record != null ? '1' : '0');
+                if (record != null)
+                {
+                    builder.Append(",geometric=");
+                    builder.Append(record.GeometricEligible);
+                    builder.Append(",coexistence=");
+                    builder.Append(record.CoexistenceEligible);
+                    builder.Append(",candidate=");
+                    builder.Append(record.Candidate);
+                    builder.Append(",selected=");
+                    builder.Append(record.Selected);
+                    builder.Append(",active=");
+                    builder.Append(record.Active);
+                    builder.Append(",certified=");
+                    builder.Append(record.CertifiedBuilt);
+                    builder.Append(",materializedWidth=");
+                    builder.Append(record.MaterializedWidth.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture));
+                    builder.Append(",viabilityFailure=");
+                    builder.Append(string.IsNullOrEmpty(
+                            record.ViabilityFailureReason)
+                        ? "none"
+                        : record.ViabilityFailureReason);
+                    builder.Append(",isolatedDiagnostic=");
+                    builder.Append(string.IsNullOrEmpty(
+                            record.IsolatedDiagnostic)
+                        ? "none"
+                        : record.IsolatedDiagnostic);
+                    builder.Append(",finalReason=");
+                    builder.Append(string.IsNullOrEmpty(record.FinalReason)
+                        ? "none"
+                        : record.FinalReason);
+                }
+                builder.AppendLine();
             }
         }
 
@@ -5752,8 +5958,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
-                ? "EW-B4.2R12B.1-topology"
-                : "EW-B4.2R12B.1-preview";
+                ? "EW-B4.2R13A.3-topology"
+                : "EW-B4.2R13A.3-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *

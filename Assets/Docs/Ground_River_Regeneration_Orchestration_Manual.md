@@ -58,6 +58,10 @@ Ground material authoring
 
 V3S adds no generated coverage texture, no River snapshot scan, and no post-Ground contour pass. River foam, transport, pressure, wakes, disturbances, and water optics remain separate owners.
 
+A3B implements one Ground-owned `GroundHydrologyModifierProfile` selection and Material-only Shore wetness controls. Hydrology refresh follows the same role-aware property-block path as Bank composition: it updates ordinary Ground and all corridor renderers without rebuilding Ground geometry, River Domain, corridor geometry, collider data, Painted Accent coverage, foam, or water runtime state. The local wetness mask reads existing corridor Shore, bank distance, and bank-domain data only; it is independent from Bank Surface Layer reach and requires no River notification beyond the existing material refresh.
+
+A4A is implemented and source-audited pending Unity validation. It adds one Material-only Riverbed Surface Layer strength and transports the selected profile's existing dry palette/finish through the same role-aware property-block path. The shader reads existing exact Riverbed Support and forces submerged cover exclusion without modifying mesh data or persistent Painted Accent coverage. Editing the Riverbed layer or strength refreshes material properties only; it must not regenerate Ground geometry, River Domain, corridor geometry, colliders, Painted Accent coverage, foam, hydrology fields, or water state. Riverbed hydrology remains outside A4A.
+
 ## Corrected V4 Contact / Edge Accent consumer boundary — 2026-07-15
 
 V4 begins after V3S and consumes only explicitly participating GroundModifier snapshots plus eligible GeneratedMass geometry. It has no River snapshot input and no River invalidation dependency.

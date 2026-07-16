@@ -3,9 +3,11 @@ using UnityEngine;
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
     /// <summary>
-    /// Reusable material identity used when River-coupled Ground response
-    /// replaces or exposes a secondary bank or riverbed substrate. Spatial
-    /// placement remains owned by GeneratedGround material controls.
+    /// Reusable dry material identity and cover compatibility used when
+    /// River-coupled Ground response replaces or exposes a secondary bank or
+    /// riverbed substrate. Wetness character belongs to the independent
+    /// GroundHydrologyModifierProfile. Spatial placement remains owned by
+    /// GeneratedGround material controls.
     /// </summary>
     [CreateAssetMenu(
         fileName = "GSLP_NewGroundSurfaceLayer",
@@ -30,7 +32,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private Color lightColor = new Color(0.58f, 0.50f, 0.38f, 1f);
 
-        [Tooltip("Colour target used after this substrate becomes wet.")]
+        [HideInInspector]
+        [Tooltip("Legacy A2A hydrology value retained for serialized compatibility. Active wetness character is owned by GroundHydrologyModifierProfile.")]
         [SerializeField]
         private Color wetColor = new Color(0.24f, 0.21f, 0.17f, 1f);
 
@@ -55,18 +58,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float drySpecularStrength = 0.1f;
 
-        [Header("Hydrological Character")]
-        [Tooltip("How strongly wetness darkens this substrate.")]
+        [HideInInspector]
+        [Tooltip("Legacy A2A hydrology value retained for serialized compatibility. Active wetness character is owned by GroundHydrologyModifierProfile.")]
         [Range(0f, 0.75f)]
         [SerializeField]
         private float wetDarkening = 0.3f;
 
-        [Tooltip("How strongly wetness shifts the substrate toward Wet Colour.")]
+        [HideInInspector]
+        [Tooltip("Legacy A2A hydrology value retained for serialized compatibility. Active wetness character is owned by GroundHydrologyModifierProfile.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float wetTintStrength = 0.65f;
 
-        [Tooltip("Smoothness target when this substrate is fully wet.")]
+        [HideInInspector]
+        [Tooltip("Legacy A2A hydrology value retained for serialized compatibility. Active wetness character is owned by GroundHydrologyModifierProfile.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float wetSmoothness = 0.45f;

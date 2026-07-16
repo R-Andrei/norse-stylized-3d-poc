@@ -1218,6 +1218,16 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamObjectContactArcLengthMinMetres"),
                         Find("foamObjectContactArcLengthMaxMetres"),
                         "Straight downstream distance of both thin wake arms after the source reaches the two side shoulders. This never changes the upstream contact bridge or permits rear wrapping.");
+                    EditorGUILayout.PropertyField(
+                        Find("foamObjectContactArcAlongFlowContactOffsetMetres"),
+                        new GUIContent(
+                            "Along-Flow Contact Offset",
+                            "Signed visual fit in metres for the upstream connector. Negative pulls it closer to or beneath the object silhouette; positive detaches it farther upstream. Zero follows the prepared physical waterline profile. No support-zone lookup or compensation is applied."));
+                    EditorGUILayout.PropertyField(
+                        Find("foamObjectContactArcAcrossRiverContactOffsetMetres"),
+                        new GUIContent(
+                            "Across-River Contact Offset",
+                            "Signed visual fit in metres for both side shoulders and arms. Negative pulls them closer to or beneath the object sides; positive detaches them farther across-river. Zero follows the prepared physical waterline profile. No support-zone lookup or compensation is applied."));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamObjectContactArcInitialPresenceMin"),
@@ -1245,7 +1255,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Wake Arm Length",
                         Find("foamObjectContactSemiArcLengthMinMetres"),
                         Find("foamObjectContactSemiArcLengthMaxMetres"),
-                        "Straight downstream distance of the dominant thin wake arm. Lopsidedness shortens the opposite arm; neither arm follows the obstacle behind its side shoulder.");
+                        "Straight downstream distance of the single selected-side wake arm. The opposite side stops at the face shoulder and never receives a downstream arm.");
+                    EditorGUILayout.PropertyField(
+                        Find("foamObjectContactSemiArcAlongFlowContactOffsetMetres"),
+                        new GUIContent(
+                            "Along-Flow Contact Offset",
+                            "Signed visual fit in metres for the upstream connector. Negative pulls it closer to or beneath the object silhouette; positive detaches it farther upstream. Zero follows the prepared physical waterline profile. No support-zone lookup or compensation is applied."));
+                    EditorGUILayout.PropertyField(
+                        Find("foamObjectContactSemiArcAcrossRiverContactOffsetMetres"),
+                        new GUIContent(
+                            "Across-River Contact Offset",
+                            "Signed visual fit in metres for the face endpoints and selected-side arm. Negative pulls them closer to or beneath the object sides; positive detaches them farther across-river. Zero follows the prepared physical waterline profile. No support-zone lookup or compensation is applied."));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamObjectContactSemiArcInitialPresenceMin"),
@@ -1256,11 +1276,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamObjectContactSemiArcInitialLifeMin"),
                         Find("foamObjectContactSemiArcInitialLifeMax"),
                         "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
-                    DrawMinMaxUnitControls(
-                        "Lopsidedness",
-                        Find("foamObjectContactSemiArcLopsidednessMin"),
-                        Find("foamObjectContactSemiArcLopsidednessMax"),
-                        "Signed by event seed at runtime. Zero keeps both straight downstream wake arms equal. One retains the dominant arm length and shortens the opposite arm to the side shoulder; the complete upstream bridge remains continuous.");
                     EditorGUI.indentLevel--;
                 }
 

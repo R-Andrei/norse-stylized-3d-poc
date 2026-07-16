@@ -465,7 +465,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawReadOnlyRow(
                 new GUIContent(
                     "Object Contact Shell",
-                    "Arc and Semi-Arc follow the immediate contact ring only across the upstream face, then continue from the side shoulders as thin straight downstream ribbons. Wake Arm Length changes only downstream extent; Fleck Size remains independent."),
+                    "Arc and Semi-Arc use event-owned mesh-fitted waterline profiles. Arc follows both front halves and continues from both physical shoulders as thin straight downstream ribbons; Semi-Arc follows only one front half and one deterministically selected shoulder. Wake Arm Length changes only downstream extent; signed Contact Offsets fit the prepared profile without support-zone coupling; Fleck Size remains independent."),
                 $"1 cell | {runtime.FoamLongitudinalCellSpacingMetres:0.###} m along | {lateralCellText}");
 
             if (runtime.TryGetAutomaticObjectRawHalfExtentRanges(

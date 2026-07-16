@@ -19,7 +19,7 @@ playable terrain shape
 → runtime surface state later
 ```
 
-V3M Broad Macro Patch Completion is accepted through V3M-A1.3.4, V3R Ground Elevation Readability is accepted through V3R-A1, and V3S-A2A reusable surface-layer authoring plus the V3S-A2B core Bank material proof are Unity-validated. V3S-A2C Expanded Bank Composition Range is implemented in source and awaits Unity validation. The active milestone is **V3S River-Coupled Ground Response**. V3S owns reusable Bank and Riverbed Surface Layers, grass/snow/frost/Painted Accent retention, broad-bank and waterline hydrology, exact submerged-bed composition, and optional later profile detail through the Ground shader. **V4 Contact / Edge Accents** is queued after V3S and is restricted to GeneratedMass grounding plus explicitly participating GroundModifier boundaries. River banks and riverbeds are not Contact Accent sources. The canonical V3S plan is `Ground_River_Coupled_Surface_Response_Architecture.md`. The completed Painted Accent architecture below remains authoritative for that feature only and must not be read as a declaration that the Ground visual stack is finished.
+V3M Broad Macro Patch Completion is accepted through V3M-A1.3.4, V3R Ground Elevation Readability is accepted through V3R-A1, and V3S is accepted through A3B.2 Independent Shore Hydrology. A2C.4 is the frozen River-coupled isolation baseline. The active milestone is **V3S-A4A Riverbed Dry Substrate and Submerged-Cover Exclusion**, implemented from the authorized plan and source-audited; Unity compilation and visual validation are pending. V3S owns reusable Bank and Riverbed Surface Layers, grass/snow/frost/Painted Accent retention, independent Shore hydrology, exact submerged-bed dry composition, separately planned Riverbed hydrology, and optional later profile detail through the Ground shader. **V4 Contact / Edge Accents** is queued after V3S and is restricted to GeneratedMass grounding plus explicitly participating GroundModifier boundaries. River banks and riverbeds are not Contact Accent sources. The canonical V3S plan is `Ground_River_Coupled_Surface_Response_Architecture.md`. The completed Painted Accent architecture below remains authoritative for that feature only and must not be read as a declaration that the Ground visual stack is finished.
 
 Semantic region masks and independent visual macro composition are separate responsibilities. River-, exposure-, damp-, vegetation-, compaction-, rocky-, and standing-water response may bias macro appearance, but none of those semantic fields alone satisfies the broad macro-composition layer.
 
@@ -64,15 +64,17 @@ V3S-A2A   — reusable surface-layer library and main-Inspector authoring
 V3S-A2B   — Bank Surface Layer core material-composition proof
 V3S-A2C   — metre-based outward Bank material extension
 V3S-A2C.4 — explicit renderer role and ordinary-Ground River-data isolation
-V3S-A3    — cover retreat plus shore / waterline hydrology
-V3S-A4    — exact Riverbed Surface Layer composition
+V3S-A3A   — Bank surface-cover retention
+V3S-A3B   — independent Shore hydrology modifier
+V3S-A4A   — exact dry Riverbed Surface Layer composition and submerged-cover exclusion
+V3S-A4B   — separately approved independent Riverbed hydrology
 V3S-A5    — optional profile detail extension
 V3S-A6    — Snowfield/Grassland/WetMudflat tuning and acceptance
 ```
 
 River-coupled response is direct material interpretation and introduces no generated Contact texture. V4 remains a separate static generated field for GeneratedMass and selected GroundModifier boundaries only.
 
-V3S-A2B proves the selected Bank Surface Layer's complete dry palette and finish. V3S-A2C.1 corrects spatial ownership: all core and outer Bank composition is restricted to the River corridor bank domain. Corridor `UV3.y` starts at zero where Riverbed Support ends and increases outward; `UV3.z` marks valid bank vertices through the corridor handoff. V3S-A2C.4 makes that ownership explicit per renderer and removes the separate broad River-derived exposure, dampness, vegetation, and shore data from ordinary Ground. Metre-based Extension, Strength, and Fade therefore support tight contact, wave-wash allowance, or a broad sand/soil/snow-retreat margin without generating disconnected patches on ordinary Ground or analysing waves. Cover-retention behavior and wetness remain deferred so substrate identity and spatial range can be accepted independently.
+V3S-A2B proves the selected Bank Surface Layer's complete dry palette and finish. V3S-A2C.1 corrects spatial ownership: all core and outer Bank composition is restricted to the River corridor bank domain. Corridor `UV3.y` starts at zero where Riverbed Support ends and increases outward; `UV3.z` marks valid bank vertices through the corridor handoff. V3S-A2C.4 makes that ownership explicit per renderer and removes the separate broad River-derived exposure, dampness, vegetation, and shore data from ordinary Ground. Metre-based Extension, Strength, and Fade therefore support tight contact, wave-wash allowance, or a broad sand/soil/snow-retreat margin without generating disconnected patches on ordinary Ground or analysing waves. A3A independently resolves vegetation, snow, frost, and Painted Accent retention. A3B keeps Shore wetness separate from substrate identity: the reusable hydrology modifier owns wet character, while metre-based wetness reach remains independent from Bank reach. Surface-layer wet fields are legacy hidden data and are not active hydrology authoring. A4A uses exact role-gated `UV3.x` Riverbed Support to apply the selected layer's dry palette and finish after Bank composition and to force terrestrial cover out of submerged support. Its single material-strength control does not own cover exclusion. A4A adds no Riverbed wetness; that remains the separately planned A4B modifier stage.
 
 ## Current authoritative Painted Accent architecture — 2026-07-15
 

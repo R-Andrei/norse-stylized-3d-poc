@@ -157,6 +157,14 @@
                 {
                     mask = ResolveGroundBankCoverRetreat(input).w;
                 }
+                else if (mode == 38)
+                {
+                    mask = ResolveGroundLocalShoreWetness(input);
+                }
+                else if (mode == 39)
+                {
+                    mask = ResolveGroundEffectiveWetness(input);
+                }
                 else
                 {
                     return half3(-1.0h, -1.0h, -1.0h);

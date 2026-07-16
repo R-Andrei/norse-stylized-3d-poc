@@ -1363,3 +1363,87 @@ No changes are made to shared `MeshData.cs`, `MeshBuilder.cs`, shaders, material
 | `RepairProofMeshNormalsAndTangents` | Can reconstruct normals and tangents for tiny valid proof triangles without rejecting them through the former absolute cutoff. |
 
 `ProductionGenerationContractVersion` remains `2`: GM-R12B.1E corrects an over-restrictive implementation of the already-promoted render-normal contract and introduces no new serialized or reusable mesh semantics.
+
+## EW-B4.2R13A.1 outlier-recovery inventory
+
+### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+`TrySolveBoundedIsolatedRailPoint` now computes the exact adjacent-segment parameter in double precision, derives parameter tolerance from the existing absolute point tolerance, and canonicalizes only a spatially bounded endpoint overshoot. Endpoint proximity is no longer an independent rejection. Successful audits retain canonicalization count, maximum parameter overshoot, maximum snap distance, and minimum endpoint distance. A remaining outside-segment failure includes raw/canonical parameter, overshoot, parameter tolerance, snap distance, point tolerance, and nearest-endpoint distance in the existing compact diagnostic.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`RunEdgeWearIsolatedViabilityPreflight` compares certified local width against the canonical minimum style width floor rather than against the current requested-width fraction. `TryFindChamferSharedEdgeRetentionSubset` is a terminal, hard-capped recovery path used only when uniform scaling would deactivate a participant. It enumerates at most 63 retained subsets, solves each subset's stable common scale, rejects sub-floor retained widths, and ranks certified results by retained count, production artistic score, retained width, and deterministic source-edge order.
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+`EdgeWearEdgeViabilityRecord` stores the canonical minimum style width, required certified floor, and isolated-boundary canonicalization evidence. `ChamferCornerStats` stores bounded retention-search invocation, state, commit, and participant counts.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+The viability report labels the new `minimumStyleWidth` gate explicitly, retains requested-width fractions as evidence, reports successful boundary canonicalization measurements, and reports retention-search counts in the compact corner audit. The old failure name `maximum-feasible-width-below-minimum-scale` is superseded by `maximum-feasible-width-below-minimum-style-floor`.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`, `MassGenerator.cs`, and `Editor/GeneratedMassEditor.cs`
+
+Debug-state classification, batch exclusion naming, CSV headers, one-click suite contracts, and comprehensive-report contracts advance to R13A.1. `EdgeWearValidationSuiteJob` stores topology cases and evaluates five editor-only canonical source-edge fixtures so a target cannot disappear behind geometric exclusion while the suite still passes. The artistic score formula and recorded-rank analyzer remain unchanged from the accepted R12B.1 baseline.
+
+## EW-B4.2R13A.2 boundary and full-shell recovery inventory
+
+R13A.1 runtime validation failed (`31/33`, `31/33`, outliers `0/5`). Its endpoint clamp and local retention-subset implementation are superseded. R13A.2 changes the following ownership points.
+
+### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+`TrySolveBoundedIsolatedRailPoint` no longer authorizes an out-of-segment point by clamping it to the presumed adjacent edge. It builds the exact owner-face selected offset line and delegates to `TryResolveBoundedOwnerBoundaryHit`.
+
+`TryResolveBoundedOwnerBoundaryHit` intersects the forward rail against every manifold boundary segment on the exact owner graph/source face, excluding the selected edge. It deduplicates vertex hits, requires a unique nearest forward terminal, and returns exact resolved edge/target-face provenance. `MeasureBoundedPointAgainstGraphEdge` retains the original-adjacent parameter and segment-distance evidence so a changed terminal cannot be confused with numerical drift.
+
+`BoundedOwnerBoundaryHit`, `BoundedIsolatedRailPoint`, and `BoundedSingleEdgeAuditResult` carry resolved edge, original edge, candidate count, ray/segment measurements, snap distance, and alternate-boundary counts. All existing downstream bounded geometry and topology audits remain authoritative.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`RunEdgeWearIsolatedViabilityPreflight` restores `FeasibleWidthFractionValid` as the ordinary gate. `WidthRecoveryProvisional` is a narrow secondary state for an isolated-certified edge that fails the requested-width fraction but still meets the canonical minimum-style absolute floor.
+
+`TrySolveCornerAwareChamferWidths` no longer performs the R13A.1 local 63-state retention subset. When uniform shared-edge scaling would deactivate participants, it records a `ChamferCornerConflictRecord` and retains the existing safe local zeroing behavior for that trial. The full-shell owner decides which participant, if any, is deferred.
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+`ChamferCornerSolution` owns a list of `ChamferCornerConflictRecord` values. `EdgeWearCoverageAudit.CloneForTrial` and `EdgeWearEdgeLifecycleRecord.CloneForTrial` provide isolated lifecycle state for bounded full-shell search without mutating the authoritative audit during rejected states. Viability records are immutable during these trials and are shared read-only.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`HasSelectedWidthRecoveryProvisional` keeps the ordinary R12B.1E route untouched for all non-provisional selections.
+
+`TryAuditConflictDirectedChamferPlaneSolution` owns the bounded full-shell retention search. `EvaluateChamferPlaneRetentionTrial` runs complete corner and plane-shell certification against a cloned coverage audit. `CollectChamferPlaneRetentionBranchEdges` obtains branch candidates from corner-collapse participants, terminal band victim/foreign evidence, or selected provisional edges when a final render-channel rejection has no narrower pair.
+
+Trial ranking is certified count, summed production artistic score, total materialized width, then deterministic forced-defer order. The winner is rerun once against the real audit.
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+`CopyPlaneCutBandAudit` now preserves the first available victim/foreign conflict evidence. This keeps terminal minimum-width band splits branchable by the full-shell owner instead of degrading them to an unclassified construction failure.
+
+### Diagnostics and editor validation
+
+`MassGenerator.EdgeWear.Diagnostics.Logging.cs`, `MassGenerator.cs`, and `GeneratedMassEditor.cs` restore requested-width-fraction exclusion naming, publish provisional-width and complete owner-boundary evidence, and advance suite/report contracts to R13A.2. The existing five editor-only named source-edge fixtures remain unchanged and are part of suite pass/fail.
+
+No shared `MeshData`, `MeshBuilder`, shader, material, UV, scene, prefab, artistic score, Coverage count, or production generation-contract version changes are part of R13A.2.
+
+## EW-B4.2R13A.3 single-search execution inventory
+
+R13A.2 runtime validation was cancelled at topology case `24/33` (`seed 7778`, maximum width) after more than ten minutes. The completed cases remained `24/24`, but preview, outlier, and comprehensive stages never ran. The cause was nested bounded search: `TryAuditConflictDirectedChamferPlaneSolution` could invoke `AuditPlaneCutBevelKernel`, whose width-reduction path could independently invoke `TryResolvePlaneCutCoexistenceByExclusion` for every outer state.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`TryAuditSingleSearchChamferPlaneSolution` replaces the R13A.2 optimizer behavior for selected provisional candidates. Each forced-deferral state runs the corner solver and one complete plane-shell evaluation with kernel coexistence recursion explicitly disabled. The frontier is ordered by fewest forced exclusions, lowest removed R12B.1 artistic score, lowest removed certified width, and deterministic edge order. The first fully certified state wins; the search no longer evaluates every remaining state after success.
+
+The provisional search is capped at 128 states, ten forced exclusions, and five seconds. It checks the editor audit cancellation probe between states and reports explicit cancellation, time-budget, and state-budget terminal reasons. The winning state is rerun once against the authoritative lifecycle audit.
+
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+
+`AuditPlaneCutBevelKernel` and the maximum-coverage width-reduction path accept an `allowCoexistenceSearch` execution flag. Ordinary non-provisional evaluations pass `true` and retain the existing coexistence search. Provisional single-search states pass `false`, so a shell failure returns its exact conflict evidence to the sole active frontier rather than starting a nested second frontier.
+
+The ordinary coexistence search also owns a five-second audit budget and cancellation checks. Its detailed report now includes `timeBudgetExceeded`, `cancelled`, and `elapsedMs` beside the existing state counters.
+
+### `MassGenerator.cs` and `Editor/GeneratedMassEditor.cs`
+
+`SetEditorEdgeWearAuditCancellationProbe` is a transient, nonserialized editor-validation hook. Matrix evaluation installs a cancelable-progress callback only for the synchronous case generation and clears it in `finally`. A cancellation detected inside a search prevents the partially evaluated case from being appended to the matrix.
+
+Suite and report contracts advance to R13A.3. Owner-face boundary resolution, provisional-width evidence, the five mandatory outlier fixtures, GM-R12B.1E channel guards, and the R12B.1 artistic policy remain unchanged.

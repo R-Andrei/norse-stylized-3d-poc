@@ -1,3 +1,31 @@
+# 2026-07-16 — River Foam `4.11C.5.18H.6` Mesh-Fitted Arc Paths and True Half-C Semi-Arcs
+
+Status: implemented in source; mechanical validation passed; Unity compilation, D3D11 compute import, runtime visual validation, and profiler confirmation pending.
+
+Unity observation of `5.18H.5` accepted the signed visual-fit controls but showed that its Semi-Arc still used the complete connector and that both Arc types followed a bounds-derived analytic half-ellipse rather than the object waterline. `5.18H.6` prepares a five-point front profile from the exact zero-padding generated-mesh waterline during the existing staged static-source refresh. The cached points are negative shoulder, first-half midpoint, physical upstream point, second-half midpoint, and positive shoulder. Bounds-contour and analytic fallbacks remain for unavailable or degenerate exact geometry.
+
+Arc uses the complete four-segment front profile plus two straight downstream arms. Semi-Arc uses exactly one deterministic two-segment front half plus one downstream arm and terminates at the physical front point. Active Arc/Semi emitters are retired when Object Pattern or mix weights change; already deposited persistent Foam remains intact.
+
+The signed Along-Flow and Across-River Contact Offsets now fit the prepared profile instead of resizing an ellipse. Five points and the front split reuse source-local lanes in the existing seven-`Vector4` GPU event. No texture, buffer, event vector, kernel, or dispatch is added. Exact mesh work occurs only during staged static preparation/dirty refresh; steady-state Arc/Semi evaluation uses one selected profile segment per texel and no contact-field texture read. Mechanical validation passed 5,000 analytical cases, 336 representative raster cases, both Semi-Arc sides, absent-half and downstream-centre exclusion, monotonic phases, lane parity, unchanged kernels/resources, C# parsing/string scanning, and changed-function HLSL parse/code generation. Unity remains authoritative.
+
+# 2026-07-16 — River Foam `4.11C.5.18H.5` Distinct Single-Arm Semi-Arcs and Signed Contact Fit
+
+Status: Unity-observed intermediate. Signed offsets accepted; complete Semi-Arc connector and analytic-ellipse placement superseded by `5.18H.6`.
+
+Unity validation accepted `5.18H.4` as a correctly oriented no-wrap open C. `5.18H.5` addresses the remaining pattern distinction and fit issues without changing its topology. Semi-Arc now always owns exactly one deterministically selected straight downstream arm; the opposite side ends at the upstream connector shoulder. Legacy Lopsidedness fields remain serialized but hidden and inert.
+
+Arc and Semi-Arc each gain signed Along-Flow and Across-River Contact Offset controls. Zero preserves `5.18H.4`; negative values shrink the corresponding analytic radius and may place source beneath the object silhouette; positive values detach it farther. The values are support-agnostic and resolved once on the CPU into the existing object half-extent lanes. CPU path length, dispatch bounds, and GPU geometry use the same adjusted extents with only a `0.005 m` numerical floor.
+
+No texture, channel, buffer, event lane, kernel, dispatch, persistent state, support query, scene, prefab, material, asset, or metadata file is added. Arc cost is unchanged and Semi-Arc removes the second arm evaluation path.
+
+# 2026-07-15 — River Foam `4.11C.5.18H.4` Event-Owned Analytic Open-C Geometry
+
+Status: Unity-validated as the accepted no-wrap open-C baseline; Semi-Arc distinction and contact fit refined by `5.18H.5`.
+
+Runtime inspection rejected `5.18H.3` as the Arc/Semi-Arc bridge authority. Its straight distance-to-segment arms were correct, but its bridge sampled the single global all-obstacle contact field, which has no per-object identity and could admit rear or foreign contact cells. `5.18H.4` removes that dependency from Arc/Semi-Arc and constructs one event-owned open C from the object's explicit centre and zero-padding physical half-extents: downstream terminal → straight arm → shoulder → analytic upstream half-ellipse → opposite shoulder → straight arm → downstream terminal. The bridge is exactly zero at and behind the shoulder plane, while the accepted terminal-to-terminal Build/Hold/Progressive Release/Rest sequence remains intact.
+
+Arc/Semi-Arc now use local X/Y raster bounds, remove one contact-field texture read per evaluated thread, and skip the full-field object-contact build whenever no Contact Fleck is active. Contact Fleck retains the existing global contact field. No texture, channel, buffer, kernel, dispatch, persistent state, scene, prefab, material, asset, or metadata file is added. Mechanical validation passed actual C# parsing, changed-function HLSL parse/codegen, no-wrap geometry sweeps, representative anisotropic raster connectivity, and unchanged kernel/resource declarations; Unity remains authoritative.
+
 # 2026-07-15 — River Foam `4.11C.5.18H.3` Front Contact Bridge and Straight Wake Arms
 
 Status: implemented in source; Unity compilation and visual validation pending.
@@ -1934,7 +1962,7 @@ Fray/fine-fragment continuation = retired;
 all performance optimization = deferred to one future comprehensive River performance pass.
 ```
 
-The comprehensive performance pass must treat the River as one system and include offscreen and empty-field work, cadence/sleeping, shader compile and runtime cost, diagnostics/readback overhead, chunk visibility/freezing/quality policy, and dormant/unwired systems. P4 accounting and the shader compile recovery checklist remain evidence sources, not active patch queues.
+The comprehensive performance pass must treat the River as one system and include offscreen and empty-field work, cadence/sleeping, shader compile and runtime cost, diagnostics/readback overhead, chunk visibility/freezing/quality policy, and dormant/unwired systems. P4 accounting and the retained shader-compile recovery entries in the canonical River documents remain evidence sources, not active patch queues.
 
 No production code or serialized Unity asset changed in this documentation closure. The next River change is a targeted user-directed Foam adjustment before Stage 7 receives final closure.
 

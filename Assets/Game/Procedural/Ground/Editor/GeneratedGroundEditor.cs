@@ -13,6 +13,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private const double SharedStyleSaveDelaySeconds = 0.35;
         private const string DefaultSurfaceLayerFolder =
             "Assets/Game/Demo/Profiles/Ground/Layers";
+        private const string DefaultHydrologyModifierFolder =
+            "Assets/Game/Demo/Profiles/Ground";
 
         private static readonly HashSet<GroundSurfaceStyleProfile>
             PendingSharedStyleSaves =
@@ -22,8 +24,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             PendingSurfaceLayerSaves =
                 new HashSet<GroundSurfaceLayerProfile>();
 
+        private static readonly HashSet<GroundHydrologyModifierProfile>
+            PendingHydrologyModifierSaves =
+                new HashSet<GroundHydrologyModifierProfile>();
+
         private static List<GroundSurfaceLayerProfile>
             cachedSurfaceLayerProfiles;
+        private static List<GroundHydrologyModifierProfile>
+            cachedHydrologyModifierProfiles;
 
         private static bool sharedStyleSaveUpdateRegistered;
         private static double sharedStyleSaveDeadline;
@@ -89,7 +97,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty vegetationTintStrength;
         private SerializedProperty bankSurfaceLayer;
         private SerializedProperty riverbedSurfaceLayer;
+        private SerializedProperty shoreHydrologyModifier;
         private SerializedProperty bankMaterialStrength;
+        private SerializedProperty riverbedMaterialStrength;
         private SerializedProperty bankMaterialReach;
         private SerializedProperty immediateBankExposure;
         private SerializedProperty waterlineMaterialStrength;
@@ -101,6 +111,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty snowMeltStrength;
         private SerializedProperty frostRetreatStrength;
         private SerializedProperty paintedAccentRetreatStrength;
+        private SerializedProperty shoreWetnessStrength;
+        private SerializedProperty shoreWetnessReach;
+        private SerializedProperty shoreWetnessFade;
+        private SerializedProperty broadBankSaturation;
+        private SerializedProperty immediateBankSaturation;
+        private SerializedProperty waterlineSaturation;
         private SerializedProperty pixelCellSize;
         private SerializedProperty pixelToneCount;
         private SerializedProperty pixelClusterStrength;
@@ -121,7 +137,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty groundDampResponseScale;
         private SerializedProperty groundVegetationResponseScale;
         private SerializedProperty groundRockyDryResponseScale;
-        private SerializedProperty groundShoreDampStrengthScale;
         private SerializedProperty groundPatchBlendStrength;
         private SerializedProperty groundSnowTintStrength;
         private SerializedProperty groundSnowBrightness;
@@ -172,9 +187,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool showMaterialControls;
         private bool showMaterialRiverCoupledSurfaceLayers = true;
         private bool showMaterialRiverCoupledBankComposition = true;
+        private bool showMaterialRiverCoupledRiverbedComposition = true;
         private bool showMaterialRiverCoupledCoverResponse = true;
+        private bool showMaterialRiverCoupledShoreHydrology = true;
         private bool showBankSurfaceLayerSettings = true;
         private bool showRiverbedSurfaceLayerSettings = true;
+        private bool showShoreHydrologyModifierSettings = true;
         private bool showMaterialPalette;
         private bool showMaterialMacroPatchComposition = true;
         private bool showMaterialElevationReadability = true;
@@ -187,6 +205,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private static void InvalidateSurfaceLayerProfileCache()
         {
             cachedSurfaceLayerProfiles = null;
+            cachedHydrologyModifierProfiles = null;
         }
 
         private static void QueueSharedStyleSave(
@@ -214,6 +233,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
 
             PendingSurfaceLayerSaves.Add(layer);
+            sharedStyleSaveDeadline =
+                EditorApplication.timeSinceStartup +
+                SharedStyleSaveDelaySeconds;
+            RegisterPendingAssetSaveUpdate();
+        }
+
+        private static void QueueHydrologyModifierSave(
+            GroundHydrologyModifierProfile modifier)
+        {
+            if (modifier == null || !EditorUtility.IsPersistent(modifier))
+            {
+                return;
+            }
+
+            PendingHydrologyModifierSaves.Add(modifier);
             sharedStyleSaveDeadline =
                 EditorApplication.timeSinceStartup +
                 SharedStyleSaveDelaySeconds;
@@ -272,6 +306,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
 
             PendingSurfaceLayerSaves.Clear();
+
+            foreach (GroundHydrologyModifierProfile modifier in
+                     PendingHydrologyModifierSaves)
+            {
+                if (modifier != null && EditorUtility.IsPersistent(modifier))
+                {
+                    AssetDatabase.SaveAssetIfDirty(modifier);
+                }
+            }
+
+            PendingHydrologyModifierSaves.Clear();
         }
 
         private static void DrawMaterialStorageLine(
@@ -441,8 +486,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             riverbedSurfaceLayer =
                 groundMaterialControls.FindPropertyRelative("riverbedSurfaceLayer");
 
+            shoreHydrologyModifier =
+                groundMaterialControls.FindPropertyRelative(
+                    "shoreHydrologyModifier");
+
             bankMaterialStrength =
                 groundMaterialControls.FindPropertyRelative("bankMaterialStrength");
+
+            riverbedMaterialStrength =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedMaterialStrength");
 
             bankMaterialReach =
                 groundMaterialControls.FindPropertyRelative("bankMaterialReach");
@@ -479,6 +532,30 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             paintedAccentRetreatStrength =
                 groundMaterialControls.FindPropertyRelative(
                     "paintedAccentRetreatStrength");
+
+            shoreWetnessStrength =
+                groundMaterialControls.FindPropertyRelative(
+                    "shoreWetnessStrength");
+
+            shoreWetnessReach =
+                groundMaterialControls.FindPropertyRelative(
+                    "shoreWetnessReach");
+
+            shoreWetnessFade =
+                groundMaterialControls.FindPropertyRelative(
+                    "shoreWetnessFade");
+
+            broadBankSaturation =
+                groundMaterialControls.FindPropertyRelative(
+                    "broadBankSaturation");
+
+            immediateBankSaturation =
+                groundMaterialControls.FindPropertyRelative(
+                    "immediateBankSaturation");
+
+            waterlineSaturation =
+                groundMaterialControls.FindPropertyRelative(
+                    "waterlineSaturation");
 
             pixelCellSize =
                 groundMaterialControls.FindPropertyRelative("pixelCellSize");
@@ -544,9 +621,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             groundRockyDryResponseScale =
                 groundMaterialControls.FindPropertyRelative("groundRockyDryResponseScale");
-
-            groundShoreDampStrengthScale =
-                groundMaterialControls.FindPropertyRelative("groundShoreDampStrengthScale");
 
             groundPatchBlendStrength =
                 groundMaterialControls.FindPropertyRelative("groundPatchBlendStrength");
@@ -3618,6 +3692,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 outerBankStrength,
                 outerBankFade);
 
+            materialChanged |= DrawRiverbedCompositionSubsection(
+                ref showMaterialRiverCoupledRiverbedComposition,
+                riverbedSurfaceLayer,
+                riverbedMaterialStrength);
+
             materialChanged |= DrawBankCoverResponseSubsection(
                 ref showMaterialRiverCoupledCoverResponse,
                 bankSurfaceLayer,
@@ -3625,6 +3704,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 snowMeltStrength,
                 frostRetreatStrength,
                 paintedAccentRetreatStrength);
+
+            materialChanged |= DrawShoreHydrologySubsection(
+                ref showMaterialRiverCoupledShoreHydrology,
+                shoreHydrologyModifier,
+                shoreWetnessStrength,
+                shoreWetnessReach,
+                shoreWetnessFade,
+                broadBankSaturation,
+                immediateBankSaturation,
+                waterlineSaturation);
 
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialMacroPatchComposition,
@@ -3673,7 +3762,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 groundDampResponseScale,
                 groundVegetationResponseScale,
                 groundRockyDryResponseScale,
-                groundShoreDampStrengthScale,
                 groundPatchBlendStrength,
                 groundSnowTintStrength,
                 groundSnowBrightness,
@@ -3702,6 +3790,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             bool materialChanged = false;
             SerializedProperty sharedBankSurfaceLayer =
                 materialControls.FindPropertyRelative("bankSurfaceLayer");
+            SerializedProperty sharedHydrologyModifier =
+                materialControls.FindPropertyRelative(
+                    "shoreHydrologyModifier");
 
             materialChanged |= DrawSurfaceLayerAuthoringSubsection(
                 ref showMaterialRiverCoupledSurfaceLayers,
@@ -3720,6 +3811,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 materialControls.FindPropertyRelative("outerBankStrength"),
                 materialControls.FindPropertyRelative("outerBankFade"));
 
+            materialChanged |= DrawRiverbedCompositionSubsection(
+                ref showMaterialRiverCoupledRiverbedComposition,
+                materialControls.FindPropertyRelative("riverbedSurfaceLayer"),
+                materialControls.FindPropertyRelative(
+                    "riverbedMaterialStrength"));
+
             materialChanged |= DrawBankCoverResponseSubsection(
                 ref showMaterialRiverCoupledCoverResponse,
                 sharedBankSurfaceLayer,
@@ -3729,6 +3826,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 materialControls.FindPropertyRelative("frostRetreatStrength"),
                 materialControls.FindPropertyRelative(
                     "paintedAccentRetreatStrength"));
+
+            materialChanged |= DrawShoreHydrologySubsection(
+                ref showMaterialRiverCoupledShoreHydrology,
+                sharedHydrologyModifier,
+                materialControls.FindPropertyRelative("shoreWetnessStrength"),
+                materialControls.FindPropertyRelative("shoreWetnessReach"),
+                materialControls.FindPropertyRelative("shoreWetnessFade"),
+                materialControls.FindPropertyRelative("broadBankSaturation"),
+                materialControls.FindPropertyRelative(
+                    "immediateBankSaturation"),
+                materialControls.FindPropertyRelative("waterlineSaturation"));
 
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialMacroPatchComposition,
@@ -3782,7 +3890,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 materialControls.FindPropertyRelative("groundDampResponseScale"),
                 materialControls.FindPropertyRelative("groundVegetationResponseScale"),
                 materialControls.FindPropertyRelative("groundRockyDryResponseScale"),
-                materialControls.FindPropertyRelative("groundShoreDampStrengthScale"),
                 materialControls.FindPropertyRelative("groundPatchBlendStrength"),
                 materialControls.FindPropertyRelative("groundSnowTintStrength"),
                 materialControls.FindPropertyRelative("groundSnowBrightness"),
@@ -3822,7 +3929,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUI.indentLevel++;
             EditorGUILayout.HelpBox(
-                "Select and edit reusable Bank and Riverbed substrate assets here. Inherit Primary Ground leaves that zone on the ordinary Ground material. This foundation patch does not yet change normal rendering.",
+                "Select and edit reusable dry Bank and Riverbed substrate assets here. Wetness character is authored separately in the Hydrology Modifier section.",
                 MessageType.Info);
 
             bool changed = false;
@@ -3930,36 +4037,25 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 settingsExpanded = current != null;
             }
 
+            bool createRequested;
+            bool duplicateRequested;
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Create New Layer…"))
-                {
-                    GroundSurfaceLayerProfile created =
-                        CreateSurfaceLayerAsset(null);
-                    if (created != null)
-                    {
-                        layerProperty.objectReferenceValue = created;
-                        current = created;
-                        settingsExpanded = true;
-                        selectionChanged = true;
-                    }
-                }
+                createRequested = GUILayout.Button("Create New Layer…");
 
                 using (new EditorGUI.DisabledScope(current == null))
                 {
-                    if (GUILayout.Button("Duplicate Selected Layer…"))
-                    {
-                        GroundSurfaceLayerProfile duplicate =
-                            CreateSurfaceLayerAsset(current);
-                        if (duplicate != null)
-                        {
-                            layerProperty.objectReferenceValue = duplicate;
-                            current = duplicate;
-                            settingsExpanded = true;
-                            selectionChanged = true;
-                        }
-                    }
+                    duplicateRequested = GUILayout.Button(
+                        "Duplicate Selected Layer…");
                 }
+            }
+
+            if (createRequested || duplicateRequested)
+            {
+                settingsExpanded = true;
+                ScheduleSurfaceLayerAssetCreation(
+                    layerProperty,
+                    duplicateRequested ? current : null);
             }
 
             if (current == null)
@@ -4035,6 +4131,105 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 });
 
             return cachedSurfaceLayerProfiles;
+        }
+
+        private static void ScheduleSurfaceLayerAssetCreation(
+            SerializedProperty layerProperty,
+            GroundSurfaceLayerProfile source)
+        {
+            if (layerProperty == null)
+            {
+                return;
+            }
+
+            Object[] targets =
+                (Object[])layerProperty.serializedObject.targetObjects.Clone();
+            string propertyPath = layerProperty.propertyPath;
+
+            EditorApplication.delayCall += () =>
+            {
+                GroundSurfaceLayerProfile created =
+                    CreateSurfaceLayerAsset(source);
+                if (created == null)
+                {
+                    return;
+                }
+
+                if (AssignCreatedProfileAsset(
+                        targets,
+                        propertyPath,
+                        created,
+                        "Assign Ground Surface Layer"))
+                {
+                    RefreshLoadedGroundsUsingSurfaceLayer(created);
+                }
+            };
+        }
+
+        private static bool AssignCreatedProfileAsset(
+            Object[] targets,
+            string propertyPath,
+            Object createdAsset,
+            string undoName)
+        {
+            if (targets == null ||
+                targets.Length == 0 ||
+                string.IsNullOrWhiteSpace(propertyPath) ||
+                createdAsset == null)
+            {
+                return false;
+            }
+
+            List<Object> validTargets = new List<Object>(targets.Length);
+            for (int index = 0; index < targets.Length; index++)
+            {
+                if (targets[index] != null)
+                {
+                    validTargets.Add(targets[index]);
+                }
+            }
+
+            if (validTargets.Count == 0)
+            {
+                return false;
+            }
+
+            Object[] assignmentTargets = validTargets.ToArray();
+            Undo.RecordObjects(assignmentTargets, undoName);
+
+            SerializedObject assignmentObject =
+                new SerializedObject(assignmentTargets);
+            assignmentObject.UpdateIfRequiredOrScript();
+            SerializedProperty assignmentProperty =
+                assignmentObject.FindProperty(propertyPath);
+
+            if (assignmentProperty == null)
+            {
+                Debug.LogError(
+                    $"GeneratedGroundEditor could not assign '{createdAsset.name}' because serialized property '{propertyPath}' is unavailable.");
+                return false;
+            }
+
+            assignmentProperty.objectReferenceValue = createdAsset;
+            assignmentObject.ApplyModifiedProperties();
+
+            for (int index = 0; index < assignmentTargets.Length; index++)
+            {
+                Object assignmentTarget = assignmentTargets[index];
+                if (assignmentTarget is GeneratedGround ground)
+                {
+                    ground.MarkGroundVisualControlsCustom();
+                    EditorUtility.SetDirty(ground);
+                }
+                else if (assignmentTarget is GroundSurfaceStyleProfile style)
+                {
+                    EditorUtility.SetDirty(style);
+                    QueueSharedStyleSave(style);
+                }
+            }
+
+            SceneView.RepaintAll();
+            return true;
         }
 
         private static GroundSurfaceLayerProfile CreateSurfaceLayerAsset(
@@ -4132,8 +4327,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 layerObject.FindProperty("darkColor"));
             EditorGUILayout.PropertyField(
                 layerObject.FindProperty("lightColor"));
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("wetColor"));
 
             EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField(
@@ -4148,16 +4341,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             EditorGUILayout.PropertyField(
                 layerObject.FindProperty("drySpecularStrength"));
 
-            EditorGUILayout.Space(2f);
-            EditorGUILayout.LabelField(
-                "Hydrological Character",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("wetDarkening"));
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("wetTintStrength"));
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("wetSmoothness"));
 
             EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField(
@@ -4182,6 +4365,389 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 RefreshLoadedGroundsUsingSurfaceLayer(profile);
                 InvalidateSurfaceLayerProfileCache();
             }
+        }
+
+        private static bool DrawHydrologyModifierSelector(
+            SerializedProperty modifierProperty,
+            ref bool settingsExpanded)
+        {
+            if (modifierProperty == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "The serialized Shore Hydrology Modifier reference is unavailable.",
+                    MessageType.Error);
+                return false;
+            }
+
+            List<GroundHydrologyModifierProfile> profiles =
+                GetHydrologyModifierProfiles();
+            GroundHydrologyModifierProfile current =
+                modifierProperty.objectReferenceValue as
+                    GroundHydrologyModifierProfile;
+
+            int currentIndex = 0;
+            for (int index = 0; index < profiles.Count; index++)
+            {
+                if (profiles[index] == current)
+                {
+                    currentIndex = index + 1;
+                    break;
+                }
+            }
+
+            if (current != null && currentIndex == 0)
+            {
+                profiles = new List<GroundHydrologyModifierProfile>(profiles)
+                {
+                    current
+                };
+                currentIndex = profiles.Count;
+            }
+
+            GUIContent[] options = new GUIContent[profiles.Count + 1];
+            options[0] = new GUIContent(
+                "Disabled",
+                "Disable local Shore hydrology while preserving global Ground wetness.");
+
+            for (int index = 0; index < profiles.Count; index++)
+            {
+                GroundHydrologyModifierProfile profile = profiles[index];
+                string assetName = profile != null
+                    ? profile.name
+                    : "Missing Asset";
+                string displayName = profile != null
+                    ? profile.DisplayName
+                    : assetName;
+                string optionLabel = displayName == assetName
+                    ? displayName
+                    : $"{displayName} — {assetName}";
+                string assetPath = profile != null
+                    ? AssetDatabase.GetAssetPath(profile)
+                    : string.Empty;
+                options[index + 1] =
+                    new GUIContent(optionLabel, assetPath);
+            }
+
+            EditorGUI.BeginChangeCheck();
+            int selectedIndex = EditorGUILayout.Popup(
+                new GUIContent(
+                    "Shore Hydrology Modifier",
+                    "Reusable wetness character applied independently from Bank substrate reach."),
+                currentIndex,
+                options);
+            bool selectionChanged = EditorGUI.EndChangeCheck();
+
+            if (selectionChanged)
+            {
+                modifierProperty.objectReferenceValue =
+                    selectedIndex <= 0
+                        ? null
+                        : profiles[selectedIndex - 1];
+                current = modifierProperty.objectReferenceValue as
+                    GroundHydrologyModifierProfile;
+                settingsExpanded = current != null;
+            }
+
+            bool createRequested;
+            bool duplicateRequested;
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                createRequested = GUILayout.Button(
+                    "Create New Hydrology Modifier…");
+
+                using (new EditorGUI.DisabledScope(current == null))
+                {
+                    duplicateRequested = GUILayout.Button(
+                        "Duplicate Selected Modifier…");
+                }
+            }
+
+            if (createRequested || duplicateRequested)
+            {
+                settingsExpanded = true;
+                ScheduleHydrologyModifierAssetCreation(
+                    modifierProperty,
+                    duplicateRequested ? current : null);
+            }
+
+            if (current == null)
+            {
+                EditorGUILayout.LabelField(
+                    "Modifier Definition Stored In",
+                    "Disabled");
+                return selectionChanged;
+            }
+
+            string path = AssetDatabase.GetAssetPath(current);
+            EditorGUILayout.LabelField(
+                new GUIContent("Modifier Definition Stored In", path),
+                new GUIContent(
+                    $"Hydrology Modifier Asset — {current.name}",
+                    path));
+
+            settingsExpanded = EditorGUILayout.Foldout(
+                settingsExpanded,
+                "Wetness Character",
+                true);
+
+            if (settingsExpanded)
+            {
+                EditorGUI.indentLevel++;
+                DrawHydrologyModifierProfileEditor(current);
+                EditorGUI.indentLevel--;
+            }
+
+            return selectionChanged;
+        }
+
+        private static List<GroundHydrologyModifierProfile>
+            GetHydrologyModifierProfiles()
+        {
+            if (cachedHydrologyModifierProfiles != null)
+            {
+                return cachedHydrologyModifierProfiles;
+            }
+
+            string[] guids = AssetDatabase.FindAssets(
+                "t:GroundHydrologyModifierProfile");
+            cachedHydrologyModifierProfiles =
+                new List<GroundHydrologyModifierProfile>(guids.Length);
+
+            for (int index = 0; index < guids.Length; index++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[index]);
+                GroundHydrologyModifierProfile profile =
+                    AssetDatabase.LoadAssetAtPath<
+                        GroundHydrologyModifierProfile>(path);
+                if (profile != null)
+                {
+                    cachedHydrologyModifierProfiles.Add(profile);
+                }
+            }
+
+            cachedHydrologyModifierProfiles.Sort(
+                (left, right) =>
+                {
+                    int displayComparison = string.Compare(
+                        left.DisplayName,
+                        right.DisplayName,
+                        System.StringComparison.OrdinalIgnoreCase);
+                    return displayComparison != 0
+                        ? displayComparison
+                        : string.Compare(
+                            left.name,
+                            right.name,
+                            System.StringComparison.OrdinalIgnoreCase);
+                });
+
+            return cachedHydrologyModifierProfiles;
+        }
+
+        private static void ScheduleHydrologyModifierAssetCreation(
+            SerializedProperty modifierProperty,
+            GroundHydrologyModifierProfile source)
+        {
+            if (modifierProperty == null)
+            {
+                return;
+            }
+
+            Object[] targets =
+                (Object[])modifierProperty.serializedObject.targetObjects.Clone();
+            string propertyPath = modifierProperty.propertyPath;
+
+            EditorApplication.delayCall += () =>
+            {
+                GroundHydrologyModifierProfile created =
+                    CreateHydrologyModifierAsset(source);
+                if (created == null)
+                {
+                    return;
+                }
+
+                if (AssignCreatedProfileAsset(
+                        targets,
+                        propertyPath,
+                        created,
+                        "Assign Ground Hydrology Modifier"))
+                {
+                    RefreshLoadedGroundsUsingHydrologyModifier(created);
+                }
+            };
+        }
+
+        private static GroundHydrologyModifierProfile
+            CreateHydrologyModifierAsset(
+                GroundHydrologyModifierProfile source)
+        {
+            string suggestedName = source == null
+                ? "GHMP_NewGroundHydrologyModifier"
+                : source.name + "_Copy";
+            string title = source == null
+                ? "Create Ground Hydrology Modifier"
+                : "Duplicate Ground Hydrology Modifier";
+            string path = EditorUtility.SaveFilePanelInProject(
+                title,
+                suggestedName,
+                "asset",
+                "Choose where the reusable Ground hydrology modifier asset is stored.",
+                DefaultHydrologyModifierFolder);
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            path = AssetDatabase.GenerateUniqueAssetPath(path);
+            GroundHydrologyModifierProfile modifier = source == null
+                ? ScriptableObject.CreateInstance<
+                    GroundHydrologyModifierProfile>()
+                : Object.Instantiate(source);
+            modifier.name = Path.GetFileNameWithoutExtension(path);
+            modifier.SetDisplayName(
+                source == null
+                    ? ObjectNames.NicifyVariableName(
+                        modifier.name.StartsWith("GHMP_")
+                            ? modifier.name.Substring(5)
+                            : modifier.name)
+                    : source.DisplayName + " Copy");
+
+            AssetDatabase.CreateAsset(modifier, path);
+            EditorUtility.SetDirty(modifier);
+            AssetDatabase.SaveAssetIfDirty(modifier);
+            InvalidateSurfaceLayerProfileCache();
+            return modifier;
+        }
+
+        private static void DrawHydrologyModifierProfileEditor(
+            GroundHydrologyModifierProfile profile)
+        {
+            if (profile == null)
+            {
+                return;
+            }
+
+            SerializedObject modifierObject = new SerializedObject(profile);
+            modifierObject.UpdateIfRequiredOrScript();
+            EditorGUI.BeginChangeCheck();
+
+            EditorGUILayout.LabelField(
+                "Identity",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                modifierObject.FindProperty("displayName"));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Wet Colour Response",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                modifierObject.FindProperty("wetTintColor"));
+            EditorGUILayout.PropertyField(
+                modifierObject.FindProperty("wetTintStrength"));
+            EditorGUILayout.PropertyField(
+                modifierObject.FindProperty("wetDarkening"));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Surface Finish",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                modifierObject.FindProperty("pixelPatternSoftening"));
+            EditorGUILayout.PropertyField(
+                modifierObject.FindProperty("smoothnessBoost"));
+            EditorGUILayout.PropertyField(
+                modifierObject.FindProperty("specularBoost"),
+                new GUIContent(
+                    "Specular Boost",
+                    "Absolute neutral specular increase contributed at full local Shore wetness."));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Cover Interaction",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                modifierObject.FindProperty("snowMeltInfluence"));
+            EditorGUILayout.PropertyField(
+                modifierObject.FindProperty("frostMeltInfluence"));
+
+            bool changed = EditorGUI.EndChangeCheck();
+            bool applied = modifierObject.ApplyModifiedProperties();
+            if (changed || applied)
+            {
+                EditorUtility.SetDirty(profile);
+                QueueHydrologyModifierSave(profile);
+                RefreshLoadedGroundsUsingHydrologyModifier(profile);
+                InvalidateSurfaceLayerProfileCache();
+            }
+        }
+
+        private bool DrawShoreHydrologySubsection(
+            ref bool expanded,
+            SerializedProperty modifierProperty,
+            SerializedProperty strength,
+            SerializedProperty reach,
+            SerializedProperty fade,
+            SerializedProperty broadSaturation,
+            SerializedProperty immediateSaturation,
+            SerializedProperty waterlineSaturation)
+        {
+            expanded = EditorGUILayout.Foldout(
+                expanded,
+                "River-Coupled Ground Response — Shore Hydrology",
+                true);
+
+            if (!expanded)
+            {
+                return false;
+            }
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.HelpBox(
+                "Wetness character and spatial reach are independent from Bank and Riverbed substrate identity.",
+                MessageType.Info);
+
+            EditorGUILayout.LabelField(
+                "Hydrology Modifier",
+                EditorStyles.miniBoldLabel);
+            bool modifierChanged = DrawHydrologyModifierSelector(
+                modifierProperty,
+                ref showShoreHydrologyModifierSettings);
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Spatial Application",
+                EditorStyles.miniBoldLabel);
+
+            bool hasModifier =
+                modifierProperty != null &&
+                modifierProperty.objectReferenceValue != null;
+
+            if (!hasModifier)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select a Shore Hydrology Modifier to enable local wetness. Bank Surface Layer selection is not required.",
+                    MessageType.Info);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "Wetness reach is measured independently from the Riverbed Support boundary and does not follow Bank material reach.",
+                    MessageType.None);
+            }
+
+            EditorGUI.BeginDisabledGroup(!hasModifier);
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(strength);
+            EditorGUILayout.PropertyField(reach);
+            EditorGUILayout.PropertyField(fade);
+            EditorGUILayout.PropertyField(broadSaturation);
+            EditorGUILayout.PropertyField(immediateSaturation);
+            EditorGUILayout.PropertyField(waterlineSaturation);
+            bool spatialChanged = EditorGUI.EndChangeCheck();
+            EditorGUI.EndDisabledGroup();
+            EditorGUI.indentLevel--;
+            return modifierChanged || spatialChanged;
         }
 
         private static bool DrawBankCompositionSubsection(
@@ -4247,6 +4813,48 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             EditorGUILayout.PropertyField(outerBankFade);
             EditorGUI.EndDisabledGroup();
 
+            bool changed = EditorGUI.EndChangeCheck();
+            EditorGUI.EndDisabledGroup();
+            EditorGUI.indentLevel--;
+            return changed;
+        }
+
+        private static bool DrawRiverbedCompositionSubsection(
+            ref bool expanded,
+            SerializedProperty riverbedLayer,
+            SerializedProperty riverbedMaterialStrength)
+        {
+            expanded = EditorGUILayout.Foldout(
+                expanded,
+                "River-Coupled Ground Response — Riverbed Composition",
+                true);
+
+            if (!expanded)
+            {
+                return false;
+            }
+
+            EditorGUI.indentLevel++;
+            bool hasRiverbedLayer =
+                riverbedLayer != null &&
+                riverbedLayer.objectReferenceValue != null;
+
+            if (!hasRiverbedLayer)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select a Riverbed Surface Layer above to enable dry Riverbed material composition. Submerged vegetation, snow, frost, and rendered Painted Accents remain excluded by exact Riverbed Support.",
+                    MessageType.Info);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "The selected dry substrate is applied only on exact Riverbed Support. Wetness remains outside this A4A control.",
+                    MessageType.None);
+            }
+
+            EditorGUI.BeginDisabledGroup(!hasRiverbedLayer);
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(riverbedMaterialStrength);
             bool changed = EditorGUI.EndChangeCheck();
             EditorGUI.EndDisabledGroup();
             EditorGUI.indentLevel--;
@@ -5538,6 +6146,33 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 if (!IsLoadedSceneGround(ground) ||
                     (ground.BankSurfaceLayer != profile &&
                      ground.RiverbedSurfaceLayer != profile))
+                {
+                    continue;
+                }
+
+                ground.RefreshSurfaceMaterialProperties();
+            }
+
+            SceneView.RepaintAll();
+        }
+
+        private static void RefreshLoadedGroundsUsingHydrologyModifier(
+            GroundHydrologyModifierProfile profile)
+        {
+            if (profile == null)
+            {
+                return;
+            }
+
+            GeneratedGround[] grounds =
+                Object.FindObjectsByType<GeneratedGround>(
+                    FindObjectsInactive.Include);
+
+            for (int index = 0; index < grounds.Length; index++)
+            {
+                GeneratedGround ground = grounds[index];
+                if (!IsLoadedSceneGround(ground) ||
+                    ground.ShoreHydrologyModifier != profile)
                 {
                     continue;
                 }

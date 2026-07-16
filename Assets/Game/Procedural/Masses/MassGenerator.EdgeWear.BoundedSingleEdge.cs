@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using ProgrammaticStylized3D.Geometry;
 
@@ -23,7 +24,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float RemainingCentralSpan;
             public float MinimumCentralSpan;
             public int CanonicalRailCount;
+            public int AlternateBoundaryRailCount;
+            public int MaximumBoundaryCandidateCount;
             public float MaximumBoundarySnapDistance;
+            public float MaximumBoundaryPointTolerance;
+            public int MaximumBoundaryDiagnosticRailIndex;
+            public int MaximumBoundaryOriginalAdjacentEdgeIndex;
+            public int MaximumBoundaryResolvedEdgeIndex;
+            public float MaximumBoundaryOriginalRawParameter;
+            public float MaximumBoundaryOriginalSegmentDistance;
+            public float MinimumBoundaryEndpointDistance;
             public int OwnerClipAttemptedCount;
             public int OwnerClipCount;
             public int OwnerIntersectionFailureCount;
@@ -506,6 +516,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public BoundedEdgeClassification Classification;
         }
 
+        private readonly struct BoundedOwnerBoundaryHit
+        {
+            public readonly Vector3 Position;
+            public readonly int LocalEdgeIndex;
+            public readonly int GraphEdgeIndex;
+            public readonly int TargetGraphFaceIndex;
+            public readonly int TargetSourceFaceIndex;
+            public readonly float RayDistance;
+            public readonly float SegmentParameter;
+            public readonly float SnapDistance;
+            public readonly float NearestEndpointDistance;
+
+            public BoundedOwnerBoundaryHit(
+                Vector3 position,
+                int localEdgeIndex,
+                int graphEdgeIndex,
+                int targetGraphFaceIndex,
+                int targetSourceFaceIndex,
+                float rayDistance,
+                float segmentParameter,
+                float snapDistance,
+                float nearestEndpointDistance)
+            {
+                Position = position;
+                LocalEdgeIndex = localEdgeIndex;
+                GraphEdgeIndex = graphEdgeIndex;
+                TargetGraphFaceIndex = targetGraphFaceIndex;
+                TargetSourceFaceIndex = targetSourceFaceIndex;
+                RayDistance = rayDistance;
+                SegmentParameter = segmentParameter;
+                SnapDistance = snapDistance;
+                NearestEndpointDistance = nearestEndpointDistance;
+            }
+        }
+
         private readonly struct BoundedIsolatedRailPoint
         {
             public readonly Vector3 Position;
@@ -514,9 +559,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public readonly int OwnerSourceFaceIndex;
             public readonly int SourceVertexIndex;
             public readonly int AdjacentGraphEdgeIndex;
+            public readonly int OriginalAdjacentGraphEdgeIndex;
             public readonly int TargetGraphFaceIndex;
             public readonly int TargetSourceFaceIndex;
+            public readonly int BoundaryCandidateCount;
+            public readonly bool UsedAlternateBoundarySegment;
             public readonly float BoundarySnapDistance;
+            public readonly float OriginalBoundaryRawParameter;
+            public readonly float OriginalBoundarySegmentDistance;
+            public readonly float ResolvedBoundaryParameter;
+            public readonly float BoundaryPointTolerance;
+            public readonly float NearestBoundaryEndpointDistance;
 
             public BoundedIsolatedRailPoint(
                 Vector3 position,
@@ -525,9 +578,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 int ownerSourceFaceIndex,
                 int sourceVertexIndex,
                 int adjacentGraphEdgeIndex,
+                int originalAdjacentGraphEdgeIndex,
                 int targetGraphFaceIndex,
                 int targetSourceFaceIndex,
-                float boundarySnapDistance)
+                int boundaryCandidateCount,
+                bool usedAlternateBoundarySegment,
+                float boundarySnapDistance,
+                float originalBoundaryRawParameter,
+                float originalBoundarySegmentDistance,
+                float resolvedBoundaryParameter,
+                float boundaryPointTolerance,
+                float nearestBoundaryEndpointDistance)
             {
                 Position = position;
                 RailIndex = railIndex;
@@ -535,9 +596,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 OwnerSourceFaceIndex = ownerSourceFaceIndex;
                 SourceVertexIndex = sourceVertexIndex;
                 AdjacentGraphEdgeIndex = adjacentGraphEdgeIndex;
+                OriginalAdjacentGraphEdgeIndex =
+                    originalAdjacentGraphEdgeIndex;
                 TargetGraphFaceIndex = targetGraphFaceIndex;
                 TargetSourceFaceIndex = targetSourceFaceIndex;
+                BoundaryCandidateCount = boundaryCandidateCount;
+                UsedAlternateBoundarySegment =
+                    usedAlternateBoundarySegment;
                 BoundarySnapDistance = boundarySnapDistance;
+                OriginalBoundaryRawParameter =
+                    originalBoundaryRawParameter;
+                OriginalBoundarySegmentDistance =
+                    originalBoundarySegmentDistance;
+                ResolvedBoundaryParameter = resolvedBoundaryParameter;
+                BoundaryPointTolerance = boundaryPointTolerance;
+                NearestBoundaryEndpointDistance =
+                    nearestBoundaryEndpointDistance;
             }
         }
 
@@ -581,6 +655,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     SelectedOrdinal = -1,
                     SourceEdgeIndex = -1,
+                    MaximumBoundaryDiagnosticRailIndex = -1,
+                    MaximumBoundaryOriginalAdjacentEdgeIndex = -1,
+                    MaximumBoundaryResolvedEdgeIndex = -1,
                     PrepareFailedFace = -1,
                     PrepareFailedProvenanceIndex = -1,
                     ResultPreparation = CreateBoundedPreparationAudit(),
@@ -728,18 +805,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 minimumStableEdgeLength,
                 requestedWidth * 0.5f);
             result.TargetBoundaryCount = isolatedRails.Length;
+            result.MinimumBoundaryEndpointDistance = float.PositiveInfinity;
             for (int railIndex = 0;
                  railIndex < isolatedRails.Length;
                  railIndex++)
             {
-                if (!float.IsNaN(isolatedRails[railIndex].BoundarySnapDistance) &&
-                    !float.IsInfinity(isolatedRails[railIndex].BoundarySnapDistance))
+                BoundedIsolatedRailPoint rail = isolatedRails[railIndex];
+                if (!float.IsNaN(rail.BoundarySnapDistance) &&
+                    !float.IsInfinity(rail.BoundarySnapDistance))
                 {
                     result.CanonicalRailCount++;
                     result.MaximumBoundarySnapDistance = Mathf.Max(
                         result.MaximumBoundarySnapDistance,
-                        isolatedRails[railIndex].BoundarySnapDistance);
+                        rail.BoundarySnapDistance);
+                    result.MaximumBoundaryPointTolerance = Mathf.Max(
+                        result.MaximumBoundaryPointTolerance,
+                        rail.BoundaryPointTolerance);
+                    result.MaximumBoundaryCandidateCount = Mathf.Max(
+                        result.MaximumBoundaryCandidateCount,
+                        rail.BoundaryCandidateCount);
+                    result.MinimumBoundaryEndpointDistance = Mathf.Min(
+                        result.MinimumBoundaryEndpointDistance,
+                        rail.NearestBoundaryEndpointDistance);
+                    if (rail.UsedAlternateBoundarySegment)
+                    {
+                        result.AlternateBoundaryRailCount++;
+                    }
+                    if (rail.OriginalBoundarySegmentDistance >
+                        result.MaximumBoundaryOriginalSegmentDistance)
+                    {
+                        result.MaximumBoundaryDiagnosticRailIndex =
+                            rail.RailIndex;
+                        result.MaximumBoundaryOriginalAdjacentEdgeIndex =
+                            rail.OriginalAdjacentGraphEdgeIndex;
+                        result.MaximumBoundaryResolvedEdgeIndex =
+                            rail.AdjacentGraphEdgeIndex;
+                        result.MaximumBoundaryOriginalRawParameter =
+                            rail.OriginalBoundaryRawParameter;
+                        result.MaximumBoundaryOriginalSegmentDistance =
+                            rail.OriginalBoundarySegmentDistance;
+                    }
                 }
+            }
+            if (float.IsPositiveInfinity(
+                    result.MinimumBoundaryEndpointDistance))
+            {
+                result.MinimumBoundaryEndpointDistance = 0f;
             }
 
             if (!TryBuildBoundedSingleEdgeFaces(
@@ -2876,10 +2987,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
 
-            int adjacentEdgeIndex = previousIsSelected
+            int originalAdjacentEdgeIndex = previousIsSelected
                 ? nextEdgeIndex
                 : previousEdgeIndex;
             PolygonFace ownerSourceFace = sourceFaces[ownerSourceFaceIndex];
+            if (ownerSourceFace == null ||
+                ownerSourceFace.Vertices == null ||
+                ownerSourceFace.Vertices.Count != vertexCount)
+            {
+                blocker =
+                    "the isolated rail owner boundary does not match its topology face";
+                return false;
+            }
+
             Vector3 faceCentre = CalculateAverage(ownerSourceFace.Vertices);
             if (!TryBuildChamferFaceLine(
                     context.Graph,
@@ -2915,98 +3035,67 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
 
-            EdgeWearGraphEdge adjacentEdge =
-                context.Graph.Edges[adjacentEdgeIndex];
-            int targetGraphFaceIndex = adjacentEdge.FaceA ==
-                ownerGraphFaceIndex
-                ? adjacentEdge.FaceB
-                : adjacentEdge.FaceB == ownerGraphFaceIndex
-                    ? adjacentEdge.FaceA
-                    : -1;
-            if (targetGraphFaceIndex < 0 ||
-                targetGraphFaceIndex >= context.Graph.Faces.Count ||
-                adjacentEdge.ExtraFaceCount > 0)
-            {
-                blocker =
-                    "the isolated rail adjacent boundary is not manifold";
-                return false;
-            }
-
-            EdgeWearGraphFace targetGraphFace =
-                context.Graph.Faces[targetGraphFaceIndex];
-            int targetSourceFaceIndex = targetGraphFace.SourceFaceIndex;
-            if (targetSourceFaceIndex < 0 ||
-                targetSourceFaceIndex >= sourceFaces.Count ||
-                targetSourceFaceIndex == ownerSourceFaceIndex)
-            {
-                blocker =
-                    "the isolated rail cannot resolve its exact endpoint-adjacent source face";
-                return false;
-            }
-
-            int targetLocalEdge = -1;
-            int targetOccurrenceCount = 0;
-            for (int localEdgeIndex = 0;
-                 localEdgeIndex < targetGraphFace.EdgeIndices.Count;
-                 localEdgeIndex++)
-            {
-                if (targetGraphFace.EdgeIndices[localEdgeIndex] !=
-                    adjacentEdgeIndex)
-                {
-                    continue;
-                }
-                targetLocalEdge = localEdgeIndex;
-                targetOccurrenceCount++;
-            }
-            PolygonFace targetSourceFace = sourceFaces[targetSourceFaceIndex];
-            if (targetOccurrenceCount != 1 ||
-                targetSourceFace == null ||
-                targetSourceFace.Vertices == null ||
-                targetSourceFace.Vertices.Count !=
-                    targetGraphFace.VertexIndices.Count)
-            {
-                blocker =
-                    "the isolated rail exact target boundary is inconsistent";
-                return false;
-            }
-
-            Vector3 boundaryStart =
-                targetSourceFace.Vertices[targetLocalEdge];
-            Vector3 boundaryEnd = targetSourceFace.Vertices[
-                (targetLocalEdge + 1) % targetSourceFace.Vertices.Count];
-            Vector3 boundarySegment = boundaryEnd - boundaryStart;
-            float boundaryLengthSqr = boundarySegment.sqrMagnitude;
-            if (boundaryLengthSqr <= MinimumEdgeLengthSqr)
-            {
-                blocker = "the isolated rail adjacent source edge is degenerate";
-                return false;
-            }
-
-            float parameter = Vector3.Dot(
-                solved - boundaryStart,
-                boundarySegment) / boundaryLengthSqr;
-            Vector3 canonical =
-                boundaryStart + boundarySegment * parameter;
-            float boundarySnapDistance = (solved - canonical).magnitude;
             float pointTolerance = Mathf.Max(
                 PointMergeDistance * 8f,
                 minimumStableEdgeLength * 0.002f);
-            float minimumEndpointDistance = Mathf.Max(
-                PointMergeDistance * 4f,
-                minimumStableEdgeLength * 0.01f);
-            float boundaryLength = Mathf.Sqrt(boundaryLengthSqr);
-            float endpointParameter = Mathf.Min(
-                0.25f,
-                minimumEndpointDistance / boundaryLength);
-            if (parameter <= endpointParameter ||
-                parameter >= 1f - endpointParameter ||
-                boundarySnapDistance > pointTolerance)
+            MeasureBoundedPointAgainstGraphEdge(
+                context.Graph,
+                originalAdjacentEdgeIndex,
+                solved,
+                out float originalRawParameter,
+                out float originalSegmentDistance);
+
+            ChamferFaceLine selectedLine = previousIsSelected
+                ? previousLine
+                : nextLine;
+            EdgeWearGraphEdge selectedEdge =
+                context.Graph.Edges[selectedEdgeIndex];
+            Vector3 rayDirection = selectedLine.Direction;
+            if (sourceVertexIndex == selectedEdge.VertexB)
             {
-                blocker =
-                    "the isolated rail endpoint lies outside its exact adjacent source-edge segment";
+                rayDirection = -rayDirection;
+            }
+            Vector3 rayOrigin = selectedLine.Point +
+                selectedLine.Direction * Vector3.Dot(
+                    sourceVertex - selectedLine.Point,
+                    selectedLine.Direction);
+            if (Vector3.Dot(solved - rayOrigin, rayDirection) < 0f)
+            {
+                rayDirection = -rayDirection;
+            }
+
+            if (!TryResolveBoundedOwnerBoundaryHit(
+                    sourceFaces,
+                    context,
+                    ownerGraphFaceIndex,
+                    selectedEdgeIndex,
+                    originalAdjacentEdgeIndex,
+                    rayOrigin,
+                    rayDirection,
+                    pointTolerance,
+                    out BoundedOwnerBoundaryHit boundaryHit,
+                    out int boundaryCandidateCount,
+                    out blocker))
+            {
+                blocker = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} (rail={1},originalAdjacentEdge={2}," +
+                    "rawParameter={3:G9},segmentDistance={4:G9}," +
+                    "pointTolerance={5:G9})",
+                    string.IsNullOrEmpty(blocker)
+                        ? "the isolated rail has no unique forward owner-boundary terminal"
+                        : blocker,
+                    railIndex,
+                    originalAdjacentEdgeIndex,
+                    originalRawParameter,
+                    originalSegmentDistance,
+                    pointTolerance);
                 return false;
             }
 
+            Vector3 canonical = boundaryHit.Position;
+            PolygonFace targetSourceFace =
+                sourceFaces[boundaryHit.TargetSourceFaceIndex];
             Vector3 ownerNormal = ownerSourceFace.Normal;
             Vector3 targetNormal = targetSourceFace.Normal;
             if (!IsFinite(ownerNormal) || !IsFinite(targetNormal) ||
@@ -3031,10 +3120,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     targetPlaneDistance) > pointTolerance)
             {
                 blocker =
-                    "the canonical isolated rail leaves one of its exact boundary planes";
+                    "the resolved isolated rail terminal leaves one of its exact boundary planes";
                 return false;
             }
 
+            EdgeWearGraphEdge boundaryEdge =
+                context.Graph.Edges[boundaryHit.GraphEdgeIndex];
+            float boundaryLength = Vector3.Distance(
+                context.Graph.Vertices[boundaryEdge.VertexA].Position,
+                context.Graph.Vertices[boundaryEdge.VertexB].Position);
             float selectedLength = GetGraphEdgeLength(
                 context.Graph,
                 selectedEdgeIndex);
@@ -3058,12 +3152,297 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ownerGraphFaceIndex,
                 ownerSourceFaceIndex,
                 sourceVertexIndex,
-                adjacentEdgeIndex,
-                targetGraphFaceIndex,
-                targetSourceFaceIndex,
-                boundarySnapDistance);
+                boundaryHit.GraphEdgeIndex,
+                originalAdjacentEdgeIndex,
+                boundaryHit.TargetGraphFaceIndex,
+                boundaryHit.TargetSourceFaceIndex,
+                boundaryCandidateCount,
+                boundaryHit.GraphEdgeIndex != originalAdjacentEdgeIndex,
+                boundaryHit.SnapDistance,
+                originalRawParameter,
+                originalSegmentDistance,
+                boundaryHit.SegmentParameter,
+                pointTolerance,
+                boundaryHit.NearestEndpointDistance);
             return true;
         }
+
+        private static void MeasureBoundedPointAgainstGraphEdge(
+            EdgeWearTopologyGraph graph,
+            int graphEdgeIndex,
+            Vector3 point,
+            out float rawParameter,
+            out float segmentDistance)
+        {
+            rawParameter = 0f;
+            segmentDistance = float.PositiveInfinity;
+            if (graphEdgeIndex < 0 ||
+                graphEdgeIndex >= graph.Edges.Count ||
+                !IsFinite(point))
+            {
+                return;
+            }
+
+            EdgeWearGraphEdge edge = graph.Edges[graphEdgeIndex];
+            Vector3 start = graph.Vertices[edge.VertexA].Position;
+            Vector3 end = graph.Vertices[edge.VertexB].Position;
+            Vector3 segment = end - start;
+            double x = segment.x;
+            double y = segment.y;
+            double z = segment.z;
+            double lengthSqr = x * x + y * y + z * z;
+            if (!(lengthSqr > 0.0) ||
+                double.IsNaN(lengthSqr) ||
+                double.IsInfinity(lengthSqr))
+            {
+                return;
+            }
+
+            Vector3 delta = point - start;
+            double parameter =
+                (delta.x * x + delta.y * y + delta.z * z) /
+                lengthSqr;
+            if (double.IsNaN(parameter) ||
+                double.IsInfinity(parameter))
+            {
+                return;
+            }
+
+            rawParameter = (float)parameter;
+            Vector3 closest = start + segment * Mathf.Clamp01(rawParameter);
+            segmentDistance = (point - closest).magnitude;
+        }
+
+        private static bool TryResolveBoundedOwnerBoundaryHit(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            int ownerGraphFaceIndex,
+            int selectedEdgeIndex,
+            int originalAdjacentEdgeIndex,
+            Vector3 rayOrigin,
+            Vector3 rayDirection,
+            float pointTolerance,
+            out BoundedOwnerBoundaryHit resolved,
+            out int candidateCount,
+            out string blocker)
+        {
+            resolved = default;
+            candidateCount = 0;
+            blocker = string.Empty;
+            if (!IsFinite(rayOrigin) || !IsFinite(rayDirection) ||
+                rayDirection.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                blocker = "the isolated rail owner-boundary ray is invalid";
+                return false;
+            }
+
+            EdgeWearGraphFace ownerGraphFace =
+                context.Graph.Faces[ownerGraphFaceIndex];
+            PolygonFace ownerSourceFace =
+                sourceFaces[ownerGraphFace.SourceFaceIndex];
+            Vector3 faceNormal = ownerSourceFace.Normal;
+            if (!IsFinite(faceNormal) ||
+                faceNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                blocker =
+                    "the isolated rail owner face has an invalid normal";
+                return false;
+            }
+            faceNormal.Normalize();
+            rayDirection.Normalize();
+            Vector3 lateral = Vector3.Cross(faceNormal, rayDirection);
+            if (!IsFinite(lateral) ||
+                lateral.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                blocker =
+                    "the isolated rail owner-boundary basis is unstable";
+                return false;
+            }
+            lateral.Normalize();
+
+            List<BoundedOwnerBoundaryHit> hits =
+                new List<BoundedOwnerBoundaryHit>();
+            int edgeCount = ownerGraphFace.EdgeIndices.Count;
+            for (int localEdgeIndex = 0;
+                 localEdgeIndex < edgeCount;
+                 localEdgeIndex++)
+            {
+                int graphEdgeIndex =
+                    ownerGraphFace.EdgeIndices[localEdgeIndex];
+                if (graphEdgeIndex == selectedEdgeIndex)
+                {
+                    continue;
+                }
+
+                EdgeWearGraphEdge graphEdge =
+                    context.Graph.Edges[graphEdgeIndex];
+                int targetGraphFaceIndex = graphEdge.FaceA ==
+                    ownerGraphFaceIndex
+                    ? graphEdge.FaceB
+                    : graphEdge.FaceB == ownerGraphFaceIndex
+                        ? graphEdge.FaceA
+                        : -1;
+                if (targetGraphFaceIndex < 0 ||
+                    targetGraphFaceIndex >= context.Graph.Faces.Count ||
+                    graphEdge.ExtraFaceCount > 0)
+                {
+                    continue;
+                }
+                int targetSourceFaceIndex = context.Graph.Faces[
+                    targetGraphFaceIndex].SourceFaceIndex;
+                if (targetSourceFaceIndex < 0 ||
+                    targetSourceFaceIndex >= sourceFaces.Count ||
+                    targetSourceFaceIndex == ownerGraphFace.SourceFaceIndex)
+                {
+                    continue;
+                }
+
+                Vector3 segmentStart =
+                    ownerSourceFace.Vertices[localEdgeIndex];
+                Vector3 segmentEnd = ownerSourceFace.Vertices[
+                    (localEdgeIndex + 1) % edgeCount];
+                Vector3 segment = segmentEnd - segmentStart;
+                float segmentLength = segment.magnitude;
+                if (segmentLength <= PointMergeDistance ||
+                    !IsFinite(segment))
+                {
+                    continue;
+                }
+
+                Vector3 startDelta = segmentStart - rayOrigin;
+                Vector3 endDelta = segmentEnd - rayOrigin;
+                double x0 = Vector3.Dot(startDelta, rayDirection);
+                double y0 = Vector3.Dot(startDelta, lateral);
+                double x1 = Vector3.Dot(endDelta, rayDirection);
+                double y1 = Vector3.Dot(endDelta, lateral);
+                double denominator = y1 - y0;
+                double lateralTolerance = pointTolerance;
+                if (Math.Abs(denominator) <=
+                    Math.Max(1e-12, lateralTolerance * 1e-4))
+                {
+                    continue;
+                }
+
+                double segmentParameter = -y0 / denominator;
+                double parameterTolerance = pointTolerance / segmentLength;
+                if (segmentParameter < -parameterTolerance ||
+                    segmentParameter > 1.0 + parameterTolerance)
+                {
+                    continue;
+                }
+
+                double rayDistance = x0 +
+                    (x1 - x0) * segmentParameter;
+                if (rayDistance < -pointTolerance)
+                {
+                    continue;
+                }
+
+                float canonicalParameter = Mathf.Clamp01(
+                    (float)segmentParameter);
+                Vector3 segmentPoint = segmentStart +
+                    segment * canonicalParameter;
+                Vector3 rayPoint = rayOrigin +
+                    rayDirection * Mathf.Max(0f, (float)rayDistance);
+                float snapDistance = (segmentPoint - rayPoint).magnitude;
+                if (snapDistance > pointTolerance)
+                {
+                    continue;
+                }
+
+                float nearestEndpointDistance = Mathf.Min(
+                    (segmentPoint - segmentStart).magnitude,
+                    (segmentPoint - segmentEnd).magnitude);
+                hits.Add(new BoundedOwnerBoundaryHit(
+                    segmentPoint,
+                    localEdgeIndex,
+                    graphEdgeIndex,
+                    targetGraphFaceIndex,
+                    targetSourceFaceIndex,
+                    Mathf.Max(0f, (float)rayDistance),
+                    canonicalParameter,
+                    snapDistance,
+                    nearestEndpointDistance));
+            }
+
+            if (hits.Count == 0)
+            {
+                blocker =
+                    "the isolated rail support line does not reach a manifold owner-face boundary";
+                return false;
+            }
+
+            hits.Sort((left, right) =>
+            {
+                int distanceOrder = left.RayDistance.CompareTo(
+                    right.RayDistance);
+                if (distanceOrder != 0)
+                {
+                    return distanceOrder;
+                }
+                bool leftOriginal =
+                    left.GraphEdgeIndex == originalAdjacentEdgeIndex;
+                bool rightOriginal =
+                    right.GraphEdgeIndex == originalAdjacentEdgeIndex;
+                if (leftOriginal != rightOriginal)
+                {
+                    return leftOriginal ? -1 : 1;
+                }
+                float leftInterior = Mathf.Min(
+                    left.SegmentParameter,
+                    1f - left.SegmentParameter);
+                float rightInterior = Mathf.Min(
+                    right.SegmentParameter,
+                    1f - right.SegmentParameter);
+                int interiorOrder = rightInterior.CompareTo(leftInterior);
+                return interiorOrder != 0
+                    ? interiorOrder
+                    : left.GraphEdgeIndex.CompareTo(right.GraphEdgeIndex);
+            });
+
+            BoundedOwnerBoundaryHit nearest = hits[0];
+            List<BoundedOwnerBoundaryHit> distinct =
+                new List<BoundedOwnerBoundaryHit>();
+            for (int hitIndex = 0; hitIndex < hits.Count; hitIndex++)
+            {
+                BoundedOwnerBoundaryHit hit = hits[hitIndex];
+                bool duplicate = false;
+                for (int distinctIndex = 0;
+                     distinctIndex < distinct.Count;
+                     distinctIndex++)
+                {
+                    if ((hit.Position - distinct[distinctIndex].Position)
+                            .magnitude <= pointTolerance)
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate)
+                {
+                    distinct.Add(hit);
+                }
+            }
+            candidateCount = distinct.Count;
+
+            for (int hitIndex = 1; hitIndex < distinct.Count; hitIndex++)
+            {
+                if (Mathf.Abs(
+                        distinct[hitIndex].RayDistance -
+                        nearest.RayDistance) <= pointTolerance &&
+                    (distinct[hitIndex].Position - nearest.Position)
+                        .magnitude > pointTolerance)
+                {
+                    blocker =
+                        "the isolated rail has multiple distinct nearest forward owner-boundary terminals";
+                    return false;
+                }
+            }
+
+            resolved = nearest;
+            return true;
+        }
+
 
 
         private static bool TryBuildBoundedSingleEdgeFaces(

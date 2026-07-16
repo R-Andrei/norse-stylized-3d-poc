@@ -3630,13 +3630,13 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 - [x] Treat zero normals as hard failures and prioritize them ahead of UV-conditioning warnings when selecting the worst triangle.
 - [x] Replace the tangent-only proof with a temporary **Normal/Tangent Repair Proof Clone** that reconstructs invalid normals from triangle geometry before rebuilding only affected or unsafe tangents.
 
-### Runtime acceptance
+### Runtime acceptance — superseded and completed by GM-R12B.1E
 
-- [ ] Compile with zero C# errors.
-- [ ] Regenerate `Rock_14` seed `839`, `Rock_18` seed `1468`, seed `8889` without bevels, and seed `8889` with bevels; require zero missing, non-finite, zero, or non-unit normals and tangents.
-- [ ] Confirm the black triangle and Bloom orb no longer reproduce at the retained camera angles.
-- [ ] Run the R12B.1 one-click edge-wear suite and retain topology `33/33`, preview `33/33`, valid comprehensive evidence, and zero collateral loss/change.
-- [ ] Re-evaluate `2223/36`, `2223/13`, `8889/23`, and `8889/13` after the generation-contract rebuild before resuming geometric outlier recovery.
+- [x] Compile with zero C# errors.
+- [x] Regenerate `Rock_14` seed `839`, `Rock_18` seed `1468`, seed `8889` without bevels, and seed `8889` with bevels; GM-R12B.1E completes the scale-correct form of this repair with zero invalid normals/tangents.
+- [x] Confirm the black triangle and Bloom orb no longer reproduce at the retained camera angles.
+- [ ] Run the combined R13A.1 one-click edge-wear suite and retain topology `33/33`, preview `33/33`, valid comprehensive evidence, and zero collateral loss/change.
+- [ ] Re-evaluate `2223/36`, `2223/13`, `8889/23`, and `8889/13` under R13A.1.
 
 
 ## GM-R12B.1E — scale-correct normal repair follow-up
@@ -3660,9 +3660,148 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 
 ### Runtime acceptance
 
+- [x] Compile with zero C# errors.
+- [x] Regenerate seed `8889` without bevel preview; face `76` completes with finite unit geometric and stored normals.
+- [x] Regenerate seed `8889` with bevel preview; zero missing, non-finite, zero, or non-unit normals/tangents.
+- [x] Re-audit `Rock_14` and `Rock_18`; zero invalid channels retained and the black-triangle/Bloom artifact no longer reproduces.
+- [ ] Run the combined R13A.1 one-click edge-wear suite and retain topology `33/33`, preview `33/33`, comprehensive availability, and zero collateral regression.
+- [ ] Recheck `2223/36`, `2223/13`, `8889/23`, and `8889/13` under the R13A.1 recovery contract.
+
+## EW-B4.2R13A.1 — isolated-rail and width-monotonic outlier recovery
+
+**Status:** rejected by Unity runtime validation; superseded by EW-B4.2R13A.2.
+
+### Locked baselines
+
+- [x] Keep EW-B4.2R12B.1 as the accepted artistic-selection baseline. Do not alter the angle gate, score weights, placement compression, deterministic random contribution, descending-score order, or Coverage selected-count contract.
+- [x] Close the runtime-proven GM-R12B.1E normal-integrity repair in this combined patch rather than creating a standalone closeout patch.
+- [x] Keep shared `MeshData`, `MeshBuilder`, shaders, materials, UV projection, scenes, and prefabs unchanged.
+
+### Isolated-rail recovery
+
+- [x] Calculate the solved endpoint parameter against the exact adjacent source-edge segment in double precision.
+- [x] Derive parameter tolerance from the existing absolute point tolerance divided by exact boundary length.
+- [x] Permit only endpoint overshoot that remains inside that same absolute spatial tolerance, then clamp to the exact segment endpoint.
+- [x] Remove endpoint proximity itself as an exclusion. A point at or near a legitimate source-edge endpoint must proceed to the existing plane, displacement, provenance, distinct-edge, collapse, containment, topology, bounds, volume, and face-quality checks.
+- [x] Do not walk onto another source edge, invent support geometry, revive the rejected support-chain fallback, or bypass any downstream certification.
+- [x] Preserve successful canonicalization evidence and include complete raw parameter/snap evidence in the failure diagnostic if a point remains outside tolerance.
+
+### Width-monotonic viability
+
+- [x] Define the viability floor from the canonical minimum style width (`Edge Wear Width = 0.05`) rather than as a fraction of the current requested width.
+- [x] Require a certified local width of at least `minimumStyleWidth * 0.25`.
+- [x] Continue solving the actual width as the locally certified width capped by the current request; increasing global width may cap a constrained edge but may not remove it solely because its fraction of the larger request became small.
+- [x] Preserve the old requested-width fraction as diagnostic evidence only.
+
+### Bounded shared-edge retention
+
+- [x] Invoke retention search only when the existing uniform shared-edge scale would deactivate at least one participating selected edge.
+- [x] Hard-cap the local search at six participants and therefore at most 63 non-empty subsets.
+- [x] For each retained subset, defer the other local participants, solve the subset's own stable common scale, and reject any retained width below the existing minimum stable width.
+- [x] Select a valid result by greatest retained count, highest summed production artistic score, greatest retained certified width, then deterministic source-edge order.
+- [x] Preserve the existing safe uniform-scale/all-defer behavior when no better certified subset exists.
+- [x] Run every committed result through the unchanged complete corner, replacement-face, rail, plane-shell, topology, containment, bounds, volume, and face-quality audits.
+- [x] Add one editor-only five-check outlier contract over topology-matrix cases so the one-click suite cannot pass merely because a target edge remained geometrically excluded. Production behavior contains no seed or edge-ID branch.
+
+### Target runtime acceptance
+
+- [ ] Full suite contract is `EW-B4.2R13A.1-suite`; topology, preview, and comprehensive contracts use the matching R13A.1 suffix, and `outlierRecoveryChecks=5/5`.
+- [ ] Topology matrix passes `33/33`.
+- [ ] Artistic-preview matrix passes `33/33`.
+- [ ] Comprehensive evidence remains available; recorded production ranks remain valid; current score reproduction remains within tolerance.
+- [ ] Collateral lost/changed, topology failures, face-quality failures, and placement failures remain zero.
+- [ ] Seed `2223`, edge `36` becomes active and certified, or returns a new exact downstream certification failure proving the bounded endpoint canonicalization was not sufficient.
+- [ ] Seed `8889`, edges `13` and `23` become active and certified, or return new exact downstream certification failures.
+- [ ] Seed `2223`, edge `13` remains present at its certified local width across default and maximum requested widths and survives the corner solution.
+- [ ] Re-audit representative ordinary and bevel-preview meshes; retain zero invalid normals/tangents and absence of the black-triangle/Bloom artifact.
+
+## EW-B4.2R13A.1 runtime result — rejected
+
+- [x] Run the R13A.1 one-click suite.
+- [x] Record topology `31/33`, artistic preview `31/33`, and outlier recovery `0/5`.
+- [x] Confirm the target isolated-rail misses are not numerical tolerance errors: `2223/36`, `8889/13`, and `8889/23` land materially outside the presumed adjacent segment.
+- [x] Confirm `2223/13` becomes provisionally geometric but remains `corner-width-inactive` under the local retention model.
+- [x] Record the two maximum-width regressions: seed `1112` terminal plane-band split and seed `5556` final winding/normal guard rejection.
+- [x] Reject endpoint clamping, unconditional global width monotonicity, and local 63-state retention as the accepted recovery architecture.
+
+## EW-B4.2R13A.2 — owner-boundary and full-shell conflict recovery
+
+**Status:** rejected by Unity runtime validation; superseded by EW-B4.2R13A.3.
+
+### Locked boundaries
+
+- [x] Preserve EW-B4.2R12B.1 artistic gates, score, ordering, deterministic random contribution, and Coverage count.
+- [x] Preserve GM-R12B.1E scale-correct normal generation and final render-channel guards.
+- [x] Keep shared `MeshData`, `MeshBuilder`, UV generation, shaders, materials, scenes, prefabs, and generation-contract version unchanged.
+- [x] Retain the five editor-only outlier fixtures; do not add seed or edge-ID branches to production.
+
+### Complete owner-face boundary resolution
+
+- [x] Remove R13A.1 endpoint overshoot authorization and clamping.
+- [x] Intersect each isolated support ray against every manifold boundary segment on its exact owner source face, excluding the selected edge.
+- [x] Reject backward, non-finite, off-segment, non-manifold, and ambiguous nearest hits.
+- [x] Deduplicate coincident vertex hits and select only a unique nearest forward terminal.
+- [x] Preserve exact original-adjacent and resolved-boundary evidence.
+- [x] Keep all existing plane, displacement, provenance, distinct-boundary, collapse, topology, containment, bounds, volume, replacement-face, and render-channel checks.
+
+### Full-shell retention
+
+- [x] Restore requested-width fraction as the ordinary viability gate.
+- [x] Mark an edge provisional only when isolated construction certified an absolute width at the canonical minimum style floor.
+- [x] Invoke conflict search only when a selected provisional edge exists; all ordinary cases retain the direct R12B.1E path.
+- [x] Remove the local 63-state shared-edge subset search.
+- [x] Publish corner-collapse participants as branch candidates.
+- [x] Preserve terminal plane-band victim/foreign evidence as branch candidates.
+- [x] Treat final render-normal/winding rejection as an invalid state; do not weaken the guard.
+- [x] Cap search at 128 states and 10 forced deferrals.
+- [x] Rank valid states by certified count, summed production artistic score, total certified width, then deterministic edge order.
+- [x] Evaluate trials on cloned lifecycle audits and rerun only the winning state against authoritative evidence.
+
+### Runtime acceptance
+
 - [ ] Compile with zero C# errors.
-- [ ] Regenerate seed `8889` without bevel preview; face `76` must complete with finite unit geometric and stored normals.
-- [ ] Regenerate seed `8889` with bevel preview; require zero missing, non-finite, zero, or non-unit normals/tangents.
-- [ ] Re-audit `Rock_14` and `Rock_18`; retain zero invalid channels and absence of the black-triangle/Bloom artifact.
-- [ ] Run the R12B.1 one-click edge-wear suite and retain topology `33/33`, preview `33/33`, comprehensive availability, and zero collateral regression.
-- [ ] Recheck `2223/36`, `2223/13`, `8889/23`, and `8889/13` after render integrity is certified.
+- [ ] Full suite contract is `EW-B4.2R13A.2-suite`; topology, preview, and comprehensive reports use matching contracts.
+- [ ] Topology matrix passes `33/33`.
+- [ ] Artistic-preview matrix passes `33/33`.
+- [ ] Outlier recovery passes `5/5`: `2223/max/36`, `2223/default/13`, `2223/max/13`, `8889/max/13`, and `8889/max/23` are active and certified.
+- [ ] Seed `1112/maximum` no longer ends in an unresolved edge-6/edge-7 band split.
+- [ ] Seed `5556/maximum` produces no final winding/normal exception.
+- [ ] Comprehensive evidence remains available with valid recorded ranks and score reproduction.
+- [ ] Collateral lost/changed, topology, face-quality, placement, and render-channel failures remain zero.
+- [ ] Representative render audit retains zero invalid normals/tangents and no black-triangle/Bloom regression.
+
+## EW-B4.2R13A.2 runtime result — rejected
+
+- [x] Unity compiled sufficiently to start the one-click suite.
+- [x] Current seed `8889` preview remained valid and materialized.
+- [x] Topology completed `24/24` cases before cancellation.
+- [x] Record the stall at topology case `24/33`: `seed 7778`, maximum width.
+- [x] Cancel after more than ten minutes; preview `0/0`, outlier `0/0`, comprehensive unavailable.
+- [x] Diagnose nested 128-state provisional and 128-state coexistence frontiers as the execution explosion.
+- [x] Reject R13A.2 search ownership; do not rerun the unchanged suite.
+
+## EW-B4.2R13A.3 — single-search execution correction
+
+**Status:** implementation complete; Unity runtime validation pending.
+
+### Execution architecture
+
+- [x] Prevent provisional full-shell states from invoking the plane-kernel coexistence frontier.
+- [x] Retain exactly one active conflict frontier per evaluation path.
+- [x] Stop provisional search at the first fully certified priority-ordered state.
+- [x] Order equal-depth states by removed R12B.1 artistic score, removed certified width, and deterministic edge order.
+- [x] Keep the 128-state and ten-forced-deferral caps.
+- [x] Add a five-second audit search budget with explicit terminal evidence.
+- [x] Add synchronous progress-bar cancellation polling between search states.
+- [x] Clear the transient editor cancellation callback in `finally` and do not append a cancelled partial case.
+- [x] Preserve complete owner-face boundary resolution, provisional-width semantics, the five outlier fixtures, and all render/topology guards.
+
+### Runtime acceptance
+
+- [ ] Compile with zero C# errors.
+- [ ] Full suite contract is `EW-B4.2R13A.3-suite`; topology, preview, and comprehensive reports use matching contracts.
+- [ ] `seed 7778 / maximum` returns within five seconds or reports the explicit time-budget failure; it must never lock the editor indefinitely.
+- [ ] Topology matrix passes `33/33`.
+- [ ] Artistic-preview matrix passes `33/33`.
+- [ ] Outlier recovery passes `5/5`.
+- [ ] Comprehensive evidence remains available and collateral/topology/face-quality/placement/render failures remain zero.

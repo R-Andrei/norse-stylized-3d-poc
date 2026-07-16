@@ -8,6 +8,60 @@ using UnityEngine.Rendering;
 namespace ProgrammaticStylized3D.Rivers
 {
 
+    public readonly struct RiverFoamStaticContactProfile
+    {
+        public RiverFoamStaticContactProfile(
+            Vector2 point0,
+            Vector2 point1,
+            Vector2 point2,
+            Vector2 point3,
+            Vector2 point4,
+            float frontSplit,
+            float frontPathLength,
+            bool usedBoundsFallback)
+        {
+            Point0 = point0;
+            Point1 = point1;
+            Point2 = point2;
+            Point3 = point3;
+            Point4 = point4;
+            FrontSplit = Mathf.Clamp(frontSplit, 0.001f, 0.999f);
+            FrontPathLength = Mathf.Max(0f, frontPathLength);
+            UsedBoundsFallback = usedBoundsFallback;
+        }
+
+        public Vector2 Point0 { get; }
+        public Vector2 Point1 { get; }
+        public Vector2 Point2 { get; }
+        public Vector2 Point3 { get; }
+        public Vector2 Point4 { get; }
+        public float FrontSplit { get; }
+        public float FrontPathLength { get; }
+        public bool UsedBoundsFallback { get; }
+
+        public bool IsValid =>
+            IsFinite(Point0) &&
+            IsFinite(Point1) &&
+            IsFinite(Point2) &&
+            IsFinite(Point3) &&
+            IsFinite(Point4) &&
+            FrontPathLength > 0.001f &&
+            FrontSplit > 0.0001f &&
+            FrontSplit < 0.9999f &&
+            Point0.y <= Point1.y + 0.0001f &&
+            Point1.y <= Point2.y + 0.0001f &&
+            Point2.y <= Point3.y + 0.0001f &&
+            Point3.y <= Point4.y + 0.0001f;
+
+        private static bool IsFinite(Vector2 value)
+        {
+            return !float.IsNaN(value.x) &&
+                   !float.IsInfinity(value.x) &&
+                   !float.IsNaN(value.y) &&
+                   !float.IsInfinity(value.y);
+        }
+    }
+
     public readonly struct RiverFoamStaticObjectSource
     {
         public RiverFoamStaticObjectSource(
@@ -21,6 +75,7 @@ namespace ProgrammaticStylized3D.Rivers
             float acrossHalfWidth,
             float staticPressureAlongHalfLength,
             float staticPressureAcrossHalfWidth,
+            RiverFoamStaticContactProfile contactProfile,
             float staticTargetHeightMetres,
             float phase)
         {
@@ -34,6 +89,7 @@ namespace ProgrammaticStylized3D.Rivers
             AcrossHalfWidth = acrossHalfWidth;
             StaticPressureAlongHalfLength = staticPressureAlongHalfLength;
             StaticPressureAcrossHalfWidth = staticPressureAcrossHalfWidth;
+            ContactProfile = contactProfile;
             StaticTargetHeightMetres = staticTargetHeightMetres;
             Phase = phase;
         }
@@ -51,6 +107,7 @@ namespace ProgrammaticStylized3D.Rivers
         // obstacle half-extents and are intentionally used by Object Foam.
         public float StaticPressureAlongHalfLength { get; }
         public float StaticPressureAcrossHalfWidth { get; }
+        public RiverFoamStaticContactProfile ContactProfile { get; }
         public float StaticTargetHeightMetres { get; }
         public float Phase { get; }
     }

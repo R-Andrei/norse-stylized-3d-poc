@@ -13,6 +13,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private const float EdgeWearMinimumViableDihedralDegrees = 15f;
         private const float EdgeWearMinimumFootprintLengthMultiplier = 2f;
         private const float EdgeWearMinimumFeasibleWidthFraction = 0.25f;
+        private const float EdgeWearMinimumStyleWidthSetting = 0.05f;
         private const float EdgeWearMinimumCentralSpanWidthMultiplier = 0.5f;
 
         private static List<EdgeWearBevelCandidate> BuildEdgeWearBevelCandidates(
@@ -84,6 +85,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStableEdgeLength = maximumDimension * 0.0012f;
             float minimumStableFaceArea =
                 maximumDimension * maximumDimension * 0.000001f;
+            float minimumStyleWidth = ResolveGeneratedEdgeWearWidth(
+                maximumDimension,
+                EdgeWearMinimumStyleWidthSetting);
             float structuralTolerance = Mathf.Max(
                 PointMergeDistance * 8f,
                 maximumDimension * 0.00001f);
@@ -410,6 +414,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         faces,
                         preflightContext,
                         requestedWidth,
+                        minimumStyleWidth,
                         minimumStableEdgeLength,
                         minimumStableFaceArea,
                         coverageAudit);
@@ -932,6 +937,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<PolygonFace> sourceFaces,
             ChamferTopologyContext context,
             float requestedWidth,
+            float minimumStyleWidth,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             EdgeWearCoverageAudit audit)
@@ -968,6 +974,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 viability.FeasibleWidthFraction = requestedWidth > 0f
                     ? isolated.SolvedWidth / requestedWidth
                     : 0f;
+                viability.MinimumStyleWidth = minimumStyleWidth;
+                viability.MinimumRequiredCertifiedWidth =
+                    minimumStyleWidth *
+                    EdgeWearMinimumFeasibleWidthFraction;
                 viability.IsolatedSucceeded =
                     isolated.GeometryValid == 1;
                 viability.IsolatedWidthAttemptCount =
@@ -982,6 +992,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     viability.IsolatedSucceeded && requestedWidth > 0f
                         ? isolated.SolvedWidth / requestedWidth
                         : 0f;
+                viability.IsolatedAlternateBoundaryRailCount =
+                    isolated.AlternateBoundaryRailCount;
+                viability.IsolatedMaximumBoundaryCandidateCount =
+                    isolated.MaximumBoundaryCandidateCount;
+                viability.IsolatedMaximumBoundarySnapDistance =
+                    isolated.MaximumBoundarySnapDistance;
+                viability.IsolatedMaximumBoundaryPointTolerance =
+                    isolated.MaximumBoundaryPointTolerance;
+                viability.IsolatedMaximumBoundaryDiagnosticRailIndex =
+                    isolated.MaximumBoundaryDiagnosticRailIndex;
+                viability.IsolatedMaximumBoundaryOriginalAdjacentEdgeIndex =
+                    isolated.MaximumBoundaryOriginalAdjacentEdgeIndex;
+                viability.IsolatedMaximumBoundaryResolvedEdgeIndex =
+                    isolated.MaximumBoundaryResolvedEdgeIndex;
+                viability.IsolatedMaximumBoundaryOriginalRawParameter =
+                    isolated.MaximumBoundaryOriginalRawParameter;
+                viability.IsolatedMaximumBoundaryOriginalSegmentDistance =
+                    isolated.MaximumBoundaryOriginalSegmentDistance;
+                viability.IsolatedMinimumBoundaryEndpointDistance =
+                    isolated.MinimumBoundaryEndpointDistance;
                 viability.EndpointConsumptionA =
                     isolated.EndpointConsumptionA;
                 viability.EndpointConsumptionB =
@@ -1007,6 +1037,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 viability.FeasibleWidthFractionValid =
                     viability.FeasibleWidthFraction + 0.0001f >=
                     EdgeWearMinimumFeasibleWidthFraction;
+                viability.WidthRecoveryProvisional =
+                    viability.IsolatedSucceeded &&
+                    !viability.FeasibleWidthFractionValid &&
+                    viability.IsolatedMaximumCertifiedWidth +
+                        PointMergeDistance >=
+                    viability.MinimumRequiredCertifiedWidth;
                 viability.EndpointSpanValid =
                     viability.RemainingCentralSpan +
                         PointMergeDistance >=
@@ -1045,7 +1081,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 return "isolated-rail-solve-failed";
             }
-            if (!viability.FeasibleWidthFractionValid)
+            if (!viability.FeasibleWidthFractionValid &&
+                !viability.WidthRecoveryProvisional)
             {
                 return "maximum-feasible-width-below-minimum-scale";
             }
@@ -2056,12 +2093,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 widthByEdge.Add(edgeIndex, solvedWidth);
             }
 
+            List<ChamferCornerConflictRecord> cornerConflicts =
+                new List<ChamferCornerConflictRecord>();
             if (!TrySolveCornerAwareChamferWidths(
                     sourceFaces,
                     context,
                     requestedWidth,
                     minimumStableEdgeLength,
                     widthByEdge,
+                    cornerConflicts,
                     ref stats,
                     out blocker))
             {
@@ -2254,7 +2294,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 stats.MinimumSolvedWidth = 0f;
             }
-            solution = new ChamferCornerSolution(corners, widthByEdge, sharedSpans);
+            solution = new ChamferCornerSolution(
+                corners,
+                widthByEdge,
+                sharedSpans,
+                cornerConflicts);
             return true;
         }
 
@@ -2264,6 +2308,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float requestedWidth,
             float minimumStableEdgeLength,
             Dictionary<int, float> widthByEdge,
+            List<ChamferCornerConflictRecord> cornerConflicts,
             ref ChamferCornerStats stats,
             out string blocker)
         {
@@ -2409,6 +2454,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         return false;
                     }
 
+                    bool uniformWouldDeactivate = false;
+                    foreach (int selectedEdgeIndex in participatingEdges)
+                    {
+                        float scaledWidth =
+                            widthByEdge[selectedEdgeIndex] * solvedScale;
+                        if (scaledWidth < minimumStableEdgeLength)
+                        {
+                            uniformWouldDeactivate = true;
+                            break;
+                        }
+                    }
+                    if (uniformWouldDeactivate &&
+                        cornerConflicts != null)
+                    {
+                        ChamferCornerConflictRecord conflict =
+                            new ChamferCornerConflictRecord
+                            {
+                                UnselectedSourceEdgeIndex = edgeIndex,
+                                UniformScale = solvedScale
+                            };
+                        List<int> orderedParticipants =
+                            new List<int>(participatingEdges);
+                        orderedParticipants.Sort();
+                        conflict.ParticipatingSelectedEdges.AddRange(
+                            orderedParticipants);
+                        cornerConflicts.Add(conflict);
+                    }
+
                     bool edgeChanged = false;
                     foreach (int selectedEdgeIndex in participatingEdges)
                     {
@@ -2424,9 +2497,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                         widthByEdge[selectedEdgeIndex] = newWidth;
                         sharedEdgeClampedEdges.Add(selectedEdgeIndex);
-                        float relativeScale = requestedWidth > PointMergeDistance
-                            ? newWidth / requestedWidth
-                            : 1f;
+                        float relativeScale = requestedWidth >
+                            PointMergeDistance
+                                ? newWidth / requestedWidth
+                                : 1f;
                         stats.MinimumSharedEdgeWidthScale = Mathf.Min(
                             stats.MinimumSharedEdgeWidthScale,
                             relativeScale);
@@ -2438,7 +2512,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         bool deferredAny = false;
                         foreach (int selectedEdgeIndex in participatingEdges)
                         {
-                            if (!widthByEdge.TryGetValue(selectedEdgeIndex, out float currentWidth) ||
+                            if (!widthByEdge.TryGetValue(
+                                    selectedEdgeIndex,
+                                    out float currentWidth) ||
                                 currentWidth <= PointMergeDistance)
                             {
                                 continue;

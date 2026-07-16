@@ -138,6 +138,7 @@ namespace ProgrammaticStylized3D.Rivers
                     Mathf.Max(0.05f, source.AcrossHalfWidth),
                     Mathf.Max(0.05f, source.StaticPressureAlongHalfLength),
                     Mathf.Max(0.05f, source.StaticPressureAcrossHalfWidth),
+                    source.FoamContactProfile,
                     Mathf.Max(0f, source.StaticTargetHeightMetres),
                     source.Phase));
             }

@@ -1451,3 +1451,159 @@ GM-R12B.1E therefore normalizes any finite mathematically non-zero vector with a
 Finite UV determinants below the diagnostic conditioning threshold remain reported because they can be useful rendering evidence, but they do not constitute a hard render-channel failure when positions, normals, tangents, UVs, colors, indices, winding, and 3D geometry are valid. The v3 audit reports `passed-with-warnings` rather than the ambiguous historical `flagged` status.
 
 No topology, triangulation, UV projection, shared `MeshData`, shared `MeshBuilder`, shader, material, scene, prefab, edge-wear selection, or bevel-construction policy changes in this correction. Production generation contract version `2` remains current.
+
+## EW-B4.2R13A.1 outlier-recovery architecture
+
+R13A.1 does not reopen artistic ranking. EW-B4.2R12B.1 remains the accepted geometric-priority selection policy. The remaining targets are construction outliers that already pass structural and artistic evaluation.
+
+### Exact-boundary endpoint canonicalization
+
+An isolated rail endpoint is still owned by the exact endpoint-adjacent source edge and its two exact source-face planes. R13A.1 changes only the numerical authorization at the segment boundary:
+
+1. Calculate the raw projection parameter in double precision.
+2. Resolve the existing absolute point tolerance.
+3. Convert that spatial tolerance to a segment parameter tolerance using `pointTolerance / boundaryLength`.
+4. Accept only a raw parameter in `[-parameterTolerance, 1 + parameterTolerance]` whose clamped point remains within the absolute point tolerance.
+5. Canonicalize the accepted point onto `[0,1]`.
+6. Run every existing downstream ownership, plane, displacement, distinct-edge, non-collapse, topology, containment, bounds, volume, and face-quality certification unchanged.
+
+Endpoint proximity is not independently invalid. The previous clearance rule rejected valid near-corner solutions before the stronger certification layers could evaluate them. R13A.1 does not permit edge walking, cross-face substitution, invented supports, or an expanded geometric tolerance.
+
+### Width-monotonic viability
+
+The old preflight compared local certified width with a fixed fraction of the current requested width. That allowed an edge certified at the minimum style tier to disappear when the global requested width increased. R13A.1 defines eligibility against the canonical minimum `Edge Wear Width` style tier instead:
+
+```text
+minimumStyleWidth = ResolveGeneratedEdgeWearWidth(maximumDimension, 0.05)
+minimumRequiredCertifiedWidth = minimumStyleWidth * 0.25
+```
+
+The materialized width remains locally capped. Increasing the global request may thicken capable edges while constrained edges stop at their local maximum; it may not remove a constrained edge solely because its relative fraction became smaller.
+
+### Terminal shared-edge retention search
+
+The existing shared-interval solver remains primary. A bounded subset search runs only when its uniform scale would reduce at least one participating selected edge below the established minimum stable width.
+
+- Maximum participants: six.
+- Maximum non-empty states: 63.
+- Every state defers non-retained local participants, solves a stable common scale for the retained subset, and rejects sub-floor retained widths.
+- Objective order: retained count, summed production artistic score, retained certified width, deterministic source-edge order.
+- No result bypasses the existing complete final corner, replacement-face, rail, plane-shell, topology, containment, bounds, volume, or face-quality validation.
+- If no better subset certifies, the previous safe uniform-scale/all-defer behavior is preserved.
+
+This search is dirty-time generation work only and has no per-frame or rendering cost.
+
+### Active validation contracts
+
+```text
+EW-B4.2R13A.1-suite
+EW-B4.2R13A.1-topology
+EW-B4.2R13A.1-preview
+EW-B4.2R13A.1-comprehensive
+```
+
+The explicit target cases are `2223/36`, `2223/13`, `8889/13`, and `8889/23`. These are acceptance cases, not seed-specific branches in production code. The editor-only one-click suite evaluates five topology-case fixtures: `2223/36` at maximum width, `2223/13` at default and maximum width, and `8889/13` plus `8889/23` at maximum width. Suite status cannot pass unless all five are active, materialized, and certified.
+
+## EW-B4.2R13A.1 runtime rejection
+
+R13A.1 is not an accepted geometry baseline. Runtime validation produced topology `31/33`, artistic preview `31/33`, and outlier recovery `0/5`.
+
+The recorded endpoint parameters disproved the numerical-drift premise. The target rails were materially outside the presumed adjacent segment: `2223/36` was approximately `-0.874`, `8889/13` was `3.892`, and `8889/23` was `-0.596`. Their distances from the presumed segment were millimetres, while the authorized point tolerance was `0.00008`. Clamping them would have been an arbitrary geometry rewrite.
+
+The global minimum-style-width rule made `2223/13` provisionally geometric but the local shared-edge solver still removed it as `corner-width-inactive`. The local 63-state subset solver recovered no target. Keeping additional constrained edges alive globally also introduced two maximum-width regressions: seed `1112` reached a terminal foreign-plane band split, and seed `5556` produced a branch rejected by the final render-normal/winding guard.
+
+Therefore the following R13A.1 production mechanisms are superseded and must not be treated as accepted policy:
+
+- endpoint overshoot clamping to the presumed adjacent segment;
+- unconditional minimum-style-width eligibility;
+- local shared-edge subset retention before full-shell evidence exists.
+
+The five editor-only named-edge fixtures remain authoritative because they correctly prevented a false suite pass.
+
+## EW-B4.2R13A.2 — owner-boundary terminal resolution and conflict-directed retention
+
+R13A.2 restores the ordinary requested-width fraction gate as the default geometric eligibility rule. A locally certified edge that fails only that fraction may remain **provisional** when it is still certified at the canonical minimum style tier. Provisional status is not final authorization; it exists only to permit bounded full-shell conflict search. Cases without a selected provisional edge use the unchanged R12B.1E corner and plane path and pay no search cost.
+
+### Complete owner-face boundary terminal
+
+An isolated rail is a line on its exact owner source-face plane. When the intersection with the presumed endpoint-adjacent boundary lies outside that segment, the correct geometric question is not whether the point can be clamped. The rail must be clipped against the complete polygon boundary of the owner face.
+
+For each rail R13A.2:
+
+1. builds the existing selected offset support line on the exact owner source face;
+2. establishes a forward ray from the selected-edge endpoint using the existing corner solve only to choose direction;
+3. intersects that ray with every finite, manifold boundary segment of the exact owner face except the selected source edge;
+4. rejects backward hits, non-finite intersections, off-segment hits outside the existing world-space point tolerance, and non-manifold target boundaries;
+5. deduplicates coincident vertex hits and requires a unique nearest forward terminal;
+6. preserves the exact resolved graph edge, target graph/source face, ray distance, segment parameter, and original-adjacent miss evidence;
+7. runs the resolved point through the unchanged owner/target plane, displacement, distinct-boundary, collapse, topology, containment, bounds, volume, replacement-face, and render-channel certifications.
+
+This is exact polygon clipping. It does not walk an arbitrary support chain, invent a virtual corner, move source vertices, substitute another owner face, or bypass downstream certification.
+
+### Provisional width and full-shell conflict search
+
+`WidthRecoveryProvisional` is set only when isolated construction succeeds, the ordinary requested-width fraction is below `0.25`, and the certified absolute width still meets `canonicalMinimumStyleWidth * 0.25`. A provisional edge enters the existing candidate population, but its survival is decided by a bounded full-shell search rather than by a global monotonicity promise.
+
+The search is invoked only when at least one selected edge is provisional. It evaluates forced-defer sets against cloned lifecycle evidence. Every state runs:
+
+- the complete corner-width and replacement-face solution;
+- the complete plane-cut bevel kernel and its coexistence closure;
+- band integrity, topology, containment, bounds, volume, face quality, placement, and final render-channel validation.
+
+Corner-width collapse publishes the exact participating selected edges as branch candidates. A terminal plane-band split publishes its victim and foreign edges as branch candidates. If final render-channel validation rejects a provisional configuration before a more specific pair exists, the selected provisional edges are the bounded fallback branch set. Search is capped at `128` states and `10` forced deferrals.
+
+A valid state is chosen deterministically by:
+
+1. greatest certified edge count;
+2. greatest summed accepted R12B.1 artistic score;
+3. greatest total certified materialized width;
+4. lexicographically smallest forced-defer edge set.
+
+The winning state is rerun once against the authoritative coverage audit. Trial clones are editor/generation-time state only and are never serialized.
+
+### Terminal band and render-channel branch semantics
+
+Plane-band evidence must survive terminal minimum-width failure. `CopyPlaneCutBandAudit` therefore preserves the first victim/foreign conflict pair when the destination has none, allowing the full-shell search to branch instead of collapsing the case into an unclassified general failure.
+
+The GM-R12B.1E render-normal guard remains unchanged. A trial that emits a final winding/normal disagreement is an invalid search branch, not a reason to weaken, flip, or bypass the normal contract.
+
+### Contracts and acceptance
+
+Contracts are:
+
+```text
+EW-B4.2R13A.2-suite
+EW-B4.2R13A.2-topology
+EW-B4.2R13A.2-preview
+EW-B4.2R13A.2-comprehensive
+```
+
+Acceptance requires topology `33/33`, artistic preview `33/33`, comprehensive availability, zero collateral/topology/face-quality/placement/render-channel regression, and all five named outlier checks active and certified. No seed or source-edge ID appears in production recovery behavior.
+
+## EW-B4.2R13A.2 runtime rejection — nested-search explosion
+
+R13A.2 is not an accepted geometry baseline. The one-click suite completed the first 24 topology cases and then remained inside `seed 7778 / maximum width` for more than ten minutes until cancelled. Preview, outlier, and comprehensive stages did not run.
+
+The failure was architectural rather than an unbounded language loop. A provisional full-shell frontier of up to 128 states called the plane kernel, and each state could start the existing coexistence frontier of up to 128 states. This allowed approximately 16,384 complete shell evaluations for one matrix case. R13A.2's nested search ownership is superseded.
+
+## EW-B4.2R13A.3 — one active conflict frontier per evaluation
+
+R13A.3 preserves complete owner-face boundary termination and provisional-width eligibility, but forbids nested full-shell search.
+
+- Ordinary non-provisional cases continue through the existing plane-kernel coexistence search.
+- A case containing a selected provisional candidate uses one orchestration-level frontier that recomputes corners and evaluates the complete shell for each forced-deferral state.
+- The kernel coexistence frontier is disabled during those provisional state evaluations. Its exact corner, band, topology, face-quality, placement, and render-channel evidence is returned to the active frontier.
+- The active frontier orders states by fewest exclusions, lowest removed production artistic score, lowest removed certified width, and deterministic edge order. It commits the first fully certified state.
+- Both search routes are capped at 128 states and five seconds during explicit audit execution. Cancellation is polled between states through a transient editor callback.
+- Search exhaustion, time-budget exhaustion, and cancellation are distinct terminal reasons. A partial or cancelled state is never committed.
+
+The five named fixtures remain acceptance gates, but R13A.3 is first required to restore responsive matrix execution and the `33/33` topology and preview floor. No search limit increase is an acceptable substitute for eliminating nesting.
+
+Contracts:
+
+```text
+EW-B4.2R13A.3-suite
+EW-B4.2R13A.3-topology
+EW-B4.2R13A.3-preview
+EW-B4.2R13A.3-comprehensive
+```

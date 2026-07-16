@@ -1191,7 +1191,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcPatternWeight = 0.45f;
 
-        [Tooltip("Normalized Object Foam mix share for lopsided contact semi-arc sources when Pattern is Mixed. The editor keeps object pattern weights summing to one.")]
+        [Tooltip("Normalized Object Foam mix share for single-arm contact semi-arc sources when Pattern is Mixed. The editor keeps object pattern weights summing to one.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcPatternWeight = 0.35f;
 
@@ -1220,6 +1220,12 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Maximum straight downstream wake-arm length in metres for Object Contact Arcs. Increasing this extends the two side wakes downstream and never allows the source to wrap around the rear of the obstacle.")]
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactArcLengthMaxMetres = 1.80f;
+
+        [Tooltip("Signed visual-fit offset in metres applied to the Arc upstream contact radius. Negative values pull the connector closer to or beneath the object silhouette; positive values detach it farther upstream. Zero follows the prepared physical waterline profile. This does not sample or account for support zones.")]
+        [SerializeField] private float foamObjectContactArcAlongFlowContactOffsetMetres = 0f;
+
+        [Tooltip("Signed visual-fit offset in metres applied symmetrically to the Arc side-shoulder radius. Negative values pull both arms closer to or beneath the object sides; positive values detach them farther across-river. Zero follows the prepared physical waterline profile. This does not sample or account for support zones.")]
+        [SerializeField] private float foamObjectContactArcAcrossRiverContactOffsetMetres = 0f;
 
         [HideInInspector]
         [Tooltip("Minimum Object Contact Arc profile scale in metres before deterministic variation. This shapes early tangential reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
@@ -1267,7 +1273,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcBreakupStrengthMax = 0.28f;
 
-        [Tooltip("Per-pattern multiplier for how fast Object Contact Semi-Arc sources build across the upstream contact bridge and asymmetric straight downstream wake arms.")]
+        [Tooltip("Per-pattern multiplier for how fast Object Contact Semi-Arc sources build from the arm-free face shoulder, across the upstream connector, and along the single selected-side downstream wake arm.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactSemiArcFormationSpeedMultiplier = 1.00f;
 
@@ -1281,13 +1287,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcArmReachMax = 0.90f;
 
-        [Tooltip("Minimum dominant straight downstream wake-arm length in metres for Object Contact Semi-Arcs. Lopsidedness shortens the opposite arm while the complete upstream contact bridge remains present.")]
+        [Tooltip("Minimum straight downstream wake-arm length in metres for Object Contact Semi-Arcs. The selected side receives this arm; the opposite side stops at the face shoulder while the complete upstream connector remains present.")]
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactSemiArcLengthMinMetres = 0.35f;
 
-        [Tooltip("Maximum dominant straight downstream wake-arm length in metres for Object Contact Semi-Arcs. Increasing this extends the selected side wake downstream and never allows the source to wrap around the obstacle rear.")]
+        [Tooltip("Maximum straight downstream wake-arm length in metres for Object Contact Semi-Arcs. Increasing this extends the single selected-side wake downstream and never creates an opposite-side arm or rear wrap.")]
         [Min(0.05f)]
         [SerializeField] private float foamObjectContactSemiArcLengthMaxMetres = 1.35f;
+
+        [Tooltip("Signed visual-fit offset in metres applied to the Semi-Arc upstream contact radius. Negative values pull the connector closer to or beneath the object silhouette; positive values detach it farther upstream. Zero follows the prepared physical waterline profile. This does not sample or account for support zones.")]
+        [SerializeField] private float foamObjectContactSemiArcAlongFlowContactOffsetMetres = 0f;
+
+        [Tooltip("Signed visual-fit offset in metres applied symmetrically to the Semi-Arc side-shoulder radius. Negative values pull the face endpoint and single arm closer to or beneath the object sides; positive values detach them farther across-river. Zero follows the prepared physical waterline profile. This does not sample or account for support zones.")]
+        [SerializeField] private float foamObjectContactSemiArcAcrossRiverContactOffsetMetres = 0f;
 
         [HideInInspector]
         [Tooltip("Minimum Object Contact Semi-Arc profile scale in metres before deterministic variation. This shapes one-sided reveal, feather/profile gating, and local allowance inside the fixed immediate contact shell; it does not control shell thickness.")]
@@ -1335,11 +1347,13 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcBreakupStrengthMax = 0.32f;
 
-        [Tooltip("Minimum one-sided bias for Object Contact Semi-Arcs. Zero keeps both open-C arms equal; higher values shorten the non-dominant arm while preserving the complete upstream bridge.")]
+        [HideInInspector]
+        [Tooltip("Legacy Semi-Arc lopsidedness range retained only for serialization compatibility. 5.18H.5 always omits the non-selected arm and uses only a deterministic event-side choice.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcLopsidednessMin = 0.45f;
 
-        [Tooltip("Maximum one-sided bias for Object Contact Semi-Arcs. One keeps the dominant arm at its authored reach and reduces the opposite arm to the side shoulder.")]
+        [HideInInspector]
+        [Tooltip("Legacy Semi-Arc lopsidedness range retained only for serialization compatibility. 5.18H.5 always omits the non-selected arm and uses only a deterministic event-side choice.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcLopsidednessMax = 1.00f;
 
@@ -2582,6 +2596,10 @@ namespace ProgrammaticStylized3D.Rivers
             FoamObjectContactArcLengthMinMetres;
         public float FoamObjectContactArcWakeArmLengthMaxMetres =>
             FoamObjectContactArcLengthMaxMetres;
+        public float FoamObjectContactArcAlongFlowContactOffsetMetres =>
+            ResolveFiniteContactOffset(foamObjectContactArcAlongFlowContactOffsetMetres);
+        public float FoamObjectContactArcAcrossRiverContactOffsetMetres =>
+            ResolveFiniteContactOffset(foamObjectContactArcAcrossRiverContactOffsetMetres);
         public float FoamObjectContactArcWidthMinMetres =>
             Mathf.Max(0.005f, Mathf.Min(
                 foamObjectContactArcWidthMinMetres,
@@ -2640,6 +2658,10 @@ namespace ProgrammaticStylized3D.Rivers
             FoamObjectContactSemiArcLengthMinMetres;
         public float FoamObjectContactSemiArcWakeArmLengthMaxMetres =>
             FoamObjectContactSemiArcLengthMaxMetres;
+        public float FoamObjectContactSemiArcAlongFlowContactOffsetMetres =>
+            ResolveFiniteContactOffset(foamObjectContactSemiArcAlongFlowContactOffsetMetres);
+        public float FoamObjectContactSemiArcAcrossRiverContactOffsetMetres =>
+            ResolveFiniteContactOffset(foamObjectContactSemiArcAcrossRiverContactOffsetMetres);
         public float FoamObjectContactSemiArcWidthMinMetres =>
             Mathf.Max(0.005f, Mathf.Min(
                 foamObjectContactSemiArcWidthMinMetres,
@@ -3331,6 +3353,10 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamObjectContactArcLengthMinMetres,
                 ref foamObjectContactArcLengthMaxMetres,
                 0.05f);
+            SanitizeFiniteContactOffset(
+                ref foamObjectContactArcAlongFlowContactOffsetMetres);
+            SanitizeFiniteContactOffset(
+                ref foamObjectContactArcAcrossRiverContactOffsetMetres);
             SanitizePositiveRange(
                 ref foamObjectContactArcWidthMinMetres,
                 ref foamObjectContactArcWidthMaxMetres,
@@ -3360,6 +3386,10 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamObjectContactSemiArcLengthMinMetres,
                 ref foamObjectContactSemiArcLengthMaxMetres,
                 0.05f);
+            SanitizeFiniteContactOffset(
+                ref foamObjectContactSemiArcAlongFlowContactOffsetMetres);
+            SanitizeFiniteContactOffset(
+                ref foamObjectContactSemiArcAcrossRiverContactOffsetMetres);
             SanitizePositiveRange(
                 ref foamObjectContactSemiArcWidthMinMetres,
                 ref foamObjectContactSemiArcWidthMaxMetres,
@@ -3501,6 +3531,18 @@ namespace ProgrammaticStylized3D.Rivers
                 minimum = maximum;
                 maximum = previousMinimum;
             }
+        }
+
+        private static float ResolveFiniteContactOffset(float value)
+        {
+            return float.IsNaN(value) || float.IsInfinity(value)
+                ? 0f
+                : value;
+        }
+
+        private static void SanitizeFiniteContactOffset(ref float value)
+        {
+            value = ResolveFiniteContactOffset(value);
         }
 
         private static void SanitizeUnitRange(

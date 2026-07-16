@@ -602,6 +602,252 @@ namespace ProgrammaticStylized3D.Rivers
             return true;
         }
 
+        public static bool TryBuildFoamContactProfile(
+            StylizedRiver river,
+            RiverDisturbanceFootprint footprint,
+            Vector3 referenceWorldPosition,
+            out RiverFoamStaticContactProfile profile,
+            out string status)
+        {
+            profile = default;
+            if (river == null ||
+                footprint.Contour == null ||
+                footprint.Contour.Length < 3 ||
+                !river.TryProjectWorldPoint(
+                    referenceWorldPosition,
+                    out StylizedRiverProjection referenceProjection))
+            {
+                status =
+                    "A valid river, contour, and registered source centre are required.";
+                return false;
+            }
+
+            List<Vector2> projectedContour = new(
+                footprint.Contour.Length);
+            for (int index = 0; index < footprint.Contour.Length; index++)
+            {
+                Vector2 localPoint = footprint.Contour[index];
+                Vector3 worldPoint =
+                    footprint.WorldPosition +
+                    footprint.WorldDownstream * localPoint.x +
+                    footprint.WorldAcross * localPoint.y;
+                if (!river.TryProjectWorldPoint(
+                        worldPoint,
+                        out StylizedRiverProjection pointProjection))
+                {
+                    continue;
+                }
+
+                Vector2 projectedPoint = new(
+                    pointProjection.GlobalDistance -
+                        referenceProjection.GlobalDistance,
+                    pointProjection.AcrossMetres -
+                        referenceProjection.AcrossMetres);
+                if (projectedContour.Count == 0 ||
+                    (projectedContour[projectedContour.Count - 1] -
+                     projectedPoint).sqrMagnitude >
+                        ContourPointMergeDistanceSqr)
+                {
+                    projectedContour.Add(projectedPoint);
+                }
+            }
+
+            if (projectedContour.Count >= 2 &&
+                (projectedContour[0] -
+                 projectedContour[projectedContour.Count - 1]).sqrMagnitude <=
+                    ContourPointMergeDistanceSqr)
+            {
+                projectedContour.RemoveAt(projectedContour.Count - 1);
+            }
+
+            if (projectedContour.Count < 3)
+            {
+                status =
+                    "The waterline contour could not be projected into the authoritative river domain.";
+                return false;
+            }
+
+            int negativeShoulderIndex = 0;
+            int positiveShoulderIndex = 0;
+            int frontIndex = 0;
+            for (int index = 1; index < projectedContour.Count; index++)
+            {
+                Vector2 point = projectedContour[index];
+                Vector2 negativeShoulder =
+                    projectedContour[negativeShoulderIndex];
+                if (point.y < negativeShoulder.y - 0.0001f ||
+                    (Mathf.Abs(point.y - negativeShoulder.y) <= 0.0001f &&
+                     point.x < negativeShoulder.x))
+                {
+                    negativeShoulderIndex = index;
+                }
+
+                Vector2 positiveShoulder =
+                    projectedContour[positiveShoulderIndex];
+                if (point.y > positiveShoulder.y + 0.0001f ||
+                    (Mathf.Abs(point.y - positiveShoulder.y) <= 0.0001f &&
+                     point.x < positiveShoulder.x))
+                {
+                    positiveShoulderIndex = index;
+                }
+
+                Vector2 front = projectedContour[frontIndex];
+                if (point.x < front.x - 0.0001f ||
+                    (Mathf.Abs(point.x - front.x) <= 0.0001f &&
+                     Mathf.Abs(point.y) < Mathf.Abs(front.y)))
+                {
+                    frontIndex = index;
+                }
+            }
+
+            if (negativeShoulderIndex == positiveShoulderIndex)
+            {
+                status = "The projected contour does not have distinct lateral shoulders.";
+                return false;
+            }
+
+            List<int> forwardPath = BuildContourIndexPath(
+                projectedContour.Count,
+                negativeShoulderIndex,
+                positiveShoulderIndex,
+                1);
+            List<int> reversePath = BuildContourIndexPath(
+                projectedContour.Count,
+                negativeShoulderIndex,
+                positiveShoulderIndex,
+                -1);
+            bool forwardContainsFront = forwardPath.Contains(frontIndex);
+            bool reverseContainsFront = reversePath.Contains(frontIndex);
+            List<int> selectedPath;
+            if (forwardContainsFront != reverseContainsFront)
+            {
+                selectedPath = forwardContainsFront
+                    ? forwardPath
+                    : reversePath;
+            }
+            else
+            {
+                selectedPath = ResolveAverageContourX(
+                        projectedContour,
+                        forwardPath) <=
+                    ResolveAverageContourX(
+                        projectedContour,
+                        reversePath)
+                        ? forwardPath
+                        : reversePath;
+            }
+
+            int frontPathIndex = selectedPath.IndexOf(frontIndex);
+            if (frontPathIndex <= 0 ||
+                frontPathIndex >= selectedPath.Count - 1)
+            {
+                status =
+                    "The physical upstream point does not split the selected front contour into two valid halves.";
+                return false;
+            }
+
+            List<Vector2> frontPath = new(selectedPath.Count);
+            for (int index = 0; index < selectedPath.Count; index++)
+            {
+                frontPath.Add(projectedContour[selectedPath[index]]);
+            }
+
+            float negativeHalfLength = ResolveOpenPathLength(
+                frontPath,
+                0,
+                frontPathIndex);
+            float positiveHalfLength = ResolveOpenPathLength(
+                frontPath,
+                frontPathIndex,
+                frontPath.Count - 1);
+            float frontPathLength =
+                negativeHalfLength + positiveHalfLength;
+            if (negativeHalfLength <= 0.001f ||
+                positiveHalfLength <= 0.001f ||
+                frontPathLength <= 0.002f)
+            {
+                status =
+                    "The selected physical front contour contains a degenerate half.";
+                return false;
+            }
+
+            Vector2 point0 = frontPath[0];
+            Vector2 point1 = SampleOpenPath(
+                frontPath,
+                0,
+                frontPathIndex,
+                negativeHalfLength * 0.5f);
+            Vector2 point2 = frontPath[frontPathIndex];
+            Vector2 point3 = SampleOpenPath(
+                frontPath,
+                frontPathIndex,
+                frontPath.Count - 1,
+                positiveHalfLength * 0.5f);
+            Vector2 point4 = frontPath[frontPath.Count - 1];
+            float frontSplit = negativeHalfLength / frontPathLength;
+
+            profile = new RiverFoamStaticContactProfile(
+                point0,
+                point1,
+                point2,
+                point3,
+                point4,
+                frontSplit,
+                frontPathLength,
+                footprint.UsedBoundsFallback);
+            if (!profile.IsValid ||
+                Vector2.Distance(point0, point1) <= 0.0005f ||
+                Vector2.Distance(point1, point2) <= 0.0005f ||
+                Vector2.Distance(point2, point3) <= 0.0005f ||
+                Vector2.Distance(point3, point4) <= 0.0005f)
+            {
+                profile = default;
+                status =
+                    "The prepared five-point Foam contact profile was degenerate.";
+                return false;
+            }
+
+            status = footprint.UsedBoundsFallback
+                ? "Prepared a five-point Foam contact profile from the bounds fallback contour."
+                : "Prepared a five-point Foam contact profile from the exact mesh waterline contour.";
+            return true;
+        }
+
+        public static RiverFoamStaticContactProfile
+            BuildFallbackFoamContactProfile(
+                float alongHalfLength,
+                float acrossHalfWidth)
+        {
+            float along = Mathf.Max(MinimumHalfExtent, alongHalfLength);
+            float across = Mathf.Max(MinimumHalfExtent, acrossHalfWidth);
+            const float diagonal = 0.70710678f;
+            Vector2 point0 = new(0f, 0f - across);
+            Vector2 point1 = new(
+                0f - along * diagonal,
+                0f - across * diagonal);
+            Vector2 point2 = new(0f - along, 0f);
+            Vector2 point3 = new(
+                0f - along * diagonal,
+                across * diagonal);
+            Vector2 point4 = new(0f, across);
+            float negativeLength =
+                Vector2.Distance(point0, point1) +
+                Vector2.Distance(point1, point2);
+            float positiveLength =
+                Vector2.Distance(point2, point3) +
+                Vector2.Distance(point3, point4);
+            float totalLength = negativeLength + positiveLength;
+            return new RiverFoamStaticContactProfile(
+                point0,
+                point1,
+                point2,
+                point3,
+                point4,
+                negativeLength / Mathf.Max(0.001f, totalLength),
+                totalLength,
+                true);
+        }
+
         /// <summary>
         /// Builds the accepted Static Pressure support profile.
         ///
@@ -1272,6 +1518,123 @@ namespace ProgrammaticStylized3D.Rivers
 
             return intersections >= 2 &&
                    downstream > upstream + 0.005f;
+        }
+
+        private static List<int> BuildContourIndexPath(
+            int pointCount,
+            int startIndex,
+            int endIndex,
+            int step)
+        {
+            List<int> path = new();
+            if (pointCount <= 0 || (step != 1 && step != -1))
+            {
+                return path;
+            }
+
+            int index = startIndex;
+            for (int guard = 0; guard <= pointCount; guard++)
+            {
+                path.Add(index);
+                if (index == endIndex)
+                {
+                    return path;
+                }
+
+                index = PositiveModulo(index + step, pointCount);
+            }
+
+            path.Clear();
+            return path;
+        }
+
+        private static float ResolveAverageContourX(
+            List<Vector2> contour,
+            List<int> path)
+        {
+            if (contour == null || path == null || path.Count == 0)
+            {
+                return float.PositiveInfinity;
+            }
+
+            float sum = 0f;
+            for (int index = 0; index < path.Count; index++)
+            {
+                sum += contour[path[index]].x;
+            }
+
+            return sum / path.Count;
+        }
+
+        private static float ResolveOpenPathLength(
+            List<Vector2> path,
+            int startIndex,
+            int endIndex)
+        {
+            if (path == null ||
+                startIndex < 0 ||
+                endIndex >= path.Count ||
+                endIndex <= startIndex)
+            {
+                return 0f;
+            }
+
+            float length = 0f;
+            for (int index = startIndex; index < endIndex; index++)
+            {
+                length += Vector2.Distance(path[index], path[index + 1]);
+            }
+
+            return length;
+        }
+
+        private static Vector2 SampleOpenPath(
+            List<Vector2> path,
+            int startIndex,
+            int endIndex,
+            float distance)
+        {
+            if (path == null || path.Count == 0)
+            {
+                return Vector2.zero;
+            }
+
+            if (startIndex < 0 ||
+                endIndex >= path.Count ||
+                endIndex <= startIndex)
+            {
+                return path[Mathf.Clamp(startIndex, 0, path.Count - 1)];
+            }
+
+            float remaining = Mathf.Max(0f, distance);
+            for (int index = startIndex; index < endIndex; index++)
+            {
+                Vector2 start = path[index];
+                Vector2 end = path[index + 1];
+                float segmentLength = Vector2.Distance(start, end);
+                if (remaining <= segmentLength || index == endIndex - 1)
+                {
+                    float interpolation = segmentLength > 0.0001f
+                        ? Mathf.Clamp01(remaining / segmentLength)
+                        : 0f;
+                    return Vector2.Lerp(start, end, interpolation);
+                }
+
+                remaining -= segmentLength;
+            }
+
+            return path[endIndex];
+        }
+
+        private static int PositiveModulo(int value, int modulus)
+        {
+            if (modulus <= 0)
+            {
+                return 0;
+            }
+
+            int result = value % modulus;
+            return result < 0 ? result + modulus : result;
         }
 
         private static Vector2[] BuildPaddedContour(

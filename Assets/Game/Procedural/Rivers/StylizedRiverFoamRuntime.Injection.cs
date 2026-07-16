@@ -217,7 +217,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             automaticFoamSourceEventBuffer.SetData(automaticFoamSourceEventGpuData);
 
-            bool objectSourceActive = false;
+            bool objectContactFieldRequired = false;
             for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
             {
                 AutomaticFoamSourceEvent sourceEvent =
@@ -227,16 +227,14 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
-                if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
-                    sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck ||
-                    sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc)
+                if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck)
                 {
-                    objectSourceActive = true;
+                    objectContactFieldRequired = true;
                     break;
                 }
             }
 
-            if (objectSourceActive)
+            if (objectContactFieldRequired)
             {
                 BuildObjectContactField();
             }
@@ -324,6 +322,74 @@ namespace ProgrammaticStylized3D.Rivers
                         ? sourceEvent.ObjectBuildDuration
                         : sourceEvent.Duration));
 
+            Vector4 distanceData;
+            Vector4 shoreData;
+            Vector4 variationData;
+            Vector4 kinematicsData;
+            Vector4 objectData;
+            if (objectContactCycle)
+            {
+                distanceData = new Vector4(
+                    sourceEvent.ObjectContactPoint0.x,
+                    sourceEvent.ObjectContactPoint0.y,
+                    centreStorageGlobal,
+                    sourceEvent.ObjectContactPoint1.x);
+                shoreData = new Vector4(
+                    sourceEvent.ObjectContactPoint1.y,
+                    sourceEvent.ObjectWakeArmLengthMetres,
+                    materialStepProgress,
+                    sourceEvent.ObjectContactPoint2.x);
+                variationData = new Vector4(
+                    sourceEvent.SourceFillSeed,
+                    sourceEvent.ObjectContactPoint2.y,
+                    sourceEvent.ObjectContactPoint3.x,
+                    sourceEvent.Curvature);
+                kinematicsData = new Vector4(
+                    sourceEvent.ObjectContactPoint3.y,
+                    sourceEvent.ObjectContactPoint4.x,
+                    sourceEvent.ObjectContactPathLengthMetres,
+                    Mathf.Clamp01(sourceEvent.SourceFillBlend));
+                objectData = new Vector4(
+                    sourceEvent.ObjectCentreAcrossMetres,
+                    sourceEvent.ObjectContactPoint4.y,
+                    sourceEvent.ObjectContactFrontSplit,
+                    sourceEvent.ObjectSourceLateralCellSpacingMetres);
+            }
+            else
+            {
+                distanceData = new Vector4(
+                    startStorageGlobal,
+                    endStorageGlobal,
+                    centreStorageGlobal,
+                    river != null && river.FlowDirection >= 0f ? 1f : -1f);
+                shoreData = new Vector4(
+                    sourceEvent.ShoreInsetMetres,
+                    sourceEvent.Type == AutomaticFoamSourceEventType.ShoreRibbon
+                        ? sourceEvent.ShoreRibbonThicknessCells
+                        : sourceEvent.WidthMetres,
+                    sourceEvent.InwardReachMetres,
+                    sourceEvent.FeatherMetres);
+                variationData = new Vector4(
+                    sourceEvent.SourceFillSeed,
+                    sourceEvent.BreakupScaleMetres,
+                    sourceEvent.BreakupStrength,
+                    sourceEvent.Curvature);
+                kinematicsData = new Vector4(
+                    sourceEvent.FormationSpeedMetresPerSecond,
+                    sourceEvent.HeadTrailMetres,
+                    Mathf.Sqrt(
+                        Mathf.Abs(endStorageGlobal - startStorageGlobal) *
+                        Mathf.Abs(endStorageGlobal - startStorageGlobal) +
+                        sourceEvent.InwardReachMetres *
+                        sourceEvent.InwardReachMetres),
+                    Mathf.Clamp01(sourceEvent.SourceFillBlend));
+                objectData = new Vector4(
+                    sourceEvent.ObjectCentreAcrossMetres,
+                    sourceEvent.ObjectAlongHalfLengthMetres,
+                    sourceEvent.ObjectAcrossHalfWidthMetres,
+                    sourceEvent.ObjectContactOffsetMetres);
+            }
+
             return new FoamSourceEventGpuData
             {
                 Header = new Vector4(
@@ -331,54 +397,16 @@ namespace ProgrammaticStylized3D.Rivers
                     phaseCode,
                     progress,
                     sourceEvent.ShapeSeed),
-                Distance = new Vector4(
-                    startStorageGlobal,
-                    endStorageGlobal,
-                    centreStorageGlobal,
-                    river != null && river.FlowDirection >= 0f ? 1f : -1f),
-                Shore = new Vector4(
-                    sourceEvent.ShoreInsetMetres,
-                    sourceEvent.Type == AutomaticFoamSourceEventType.ShoreRibbon
-                        ? sourceEvent.ShoreRibbonThicknessCells
-                        : (objectContactCycle
-                            ? sourceEvent.ObjectWakeArmLengthMetres
-                            : sourceEvent.WidthMetres),
-                    // Arc/Semi-Arc evaluators do not consume inward reach.
-                    // Reuse this source-type-local lane for the normalized
-                    // material-step duration so accumulated Build coverage
-                    // advances by at least the first raster update.
-                    objectContactCycle
-                        ? materialStepProgress
-                        : sourceEvent.InwardReachMetres,
-                    sourceEvent.FeatherMetres),
+                Distance = distanceData,
+                Shore = shoreData,
                 Material = new Vector4(
                     sourceEvent.SourceAmount,
                     sourceEvent.RemainingLife,
                     sourceEvent.PatternSeed,
                     sourceEvent.SourceFillFeatureSize),
-                Variation = new Vector4(
-                    sourceEvent.SourceFillSeed,
-                    sourceEvent.BreakupScaleMetres,
-                    sourceEvent.BreakupStrength,
-                    sourceEvent.Curvature),
-                Kinematics = new Vector4(
-                    sourceEvent.FormationSpeedMetresPerSecond,
-                    sourceEvent.HeadTrailMetres,
-                    objectContactCycle
-                        ? sourceEvent.ObjectContactPathLengthMetres
-                        : Mathf.Sqrt(
-                            Mathf.Abs(endStorageGlobal - startStorageGlobal) *
-                            Mathf.Abs(endStorageGlobal - startStorageGlobal) +
-                            sourceEvent.InwardReachMetres *
-                            sourceEvent.InwardReachMetres),
-                    Mathf.Clamp01(sourceEvent.SourceFillBlend)),
-                ObjectData = new Vector4(
-                    sourceEvent.ObjectCentreAcrossMetres,
-                    sourceEvent.ObjectAlongHalfLengthMetres,
-                    sourceEvent.ObjectAcrossHalfWidthMetres,
-                    objectContactCycle
-                        ? sourceEvent.ObjectSourceLateralCellSpacingMetres
-                        : sourceEvent.ObjectContactOffsetMetres)
+                Variation = variationData,
+                Kinematics = kinematicsData,
+                ObjectData = objectData
             };
         }
 
@@ -406,9 +434,7 @@ namespace ProgrammaticStylized3D.Rivers
                 // upstream bridge and straight downstream wake arms. Keep only
                 // a small raster safety margin instead of re-expanding by the
                 // obstacle half-length on both sides.
-                padding = Mathf.Max(
-                    padding,
-                    longitudinalCellSpacing * 2f);
+                padding = longitudinalCellSpacing * 2f;
             }
             else if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck)
             {
@@ -437,7 +463,26 @@ namespace ProgrammaticStylized3D.Rivers
 
             int startY = 0;
             int countY = fieldHeight;
-            if (sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterLaceConnector ||
+            if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
+                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc)
+            {
+                int centreY = StylizedRiverFoamTopologyFieldSpace
+                    .SignedAcrossNormalizedToNearestTexel(
+                        sourceEvent.CentreAcrossNormalized,
+                        fieldHeight);
+                float sourceLateralCellSpacing = Mathf.Max(
+                    0.01f,
+                    sourceEvent.ObjectSourceLateralCellSpacingMetres);
+                float lateralExtent = Mathf.Max(
+                    sourceLateralCellSpacing,
+                    sourceEvent.LateralPaddingMetres);
+                int padY = Mathf.CeilToInt(
+                    lateralExtent / sourceLateralCellSpacing) + 2;
+                startY = Mathf.Clamp(centreY - padY, 0, fieldHeight - 1);
+                int endY = Mathf.Clamp(centreY + padY, 0, fieldHeight - 1);
+                countY = Mathf.Max(1, endY - startY + 1);
+            }
+            else if (sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterLaceConnector ||
                 sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterTornFragment ||
                 sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterCrossLaceConnector)
             {

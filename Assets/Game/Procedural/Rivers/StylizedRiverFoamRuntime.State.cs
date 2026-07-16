@@ -154,6 +154,12 @@ namespace ProgrammaticStylized3D.Rivers
             public float ObjectSourceLateralCellSpacingMetres;
             public float ObjectWakeArmLengthMetres;
             public float ObjectContactPathLengthMetres;
+            public Vector2 ObjectContactPoint0;
+            public Vector2 ObjectContactPoint1;
+            public Vector2 ObjectContactPoint2;
+            public Vector2 ObjectContactPoint3;
+            public Vector2 ObjectContactPoint4;
+            public float ObjectContactFrontSplit;
             public float CentreAcrossNormalized;
             public float LateralPaddingMetres;
         }
@@ -165,24 +171,31 @@ namespace ProgrammaticStylized3D.Rivers
             // phase (0 Build, 1 Hold, 2 Release), z = phase/reveal progress,
             // w = shape seed.
             public Vector4 Header;
-            // x = start storage global, y = end storage global,
-            // z = centre storage global, w = flow direction.
+            // x/y = start/end storage global except Object Arc/Semi-Arc
+            // contact point 0; z = centre storage global; w = flow direction
+            // except Object Arc/Semi-Arc contact point 1.x.
             public Vector4 Distance;
-            // x = shore inset, y = width metres except Shore Ribbon thickness cells
-            // and Object Arc/Semi-Arc straight wake-arm length metres, z = inward reach or
-            // Arc/Semi-Arc normalized material-step duration, w = feather metres.
+            // x = shore inset except Object Arc/Semi-Arc contact point 1.y;
+            // y = width metres except Shore Ribbon thickness cells and Object
+            // Arc/Semi-Arc straight wake-arm length metres; z = inward reach or
+            // Arc/Semi-Arc normalized material-step duration; w = feather metres
+            // except Object Arc/Semi-Arc contact point 2.x.
             public Vector4 Shore;
             // x = amount, y = remaining life, z = pattern seed,
             // w = source fill feature size.
             public Vector4 Material;
-            // x = source fill seed, y = breakup scale,
-            // z = breakup strength, w = curvature / signed object semi-arc lopsidedness / fragment rotation.
+            // x = source fill seed; y/z = breakup scale/strength except Object
+            // Arc/Semi-Arc contact point 2.y / point 3.x; w = curvature,
+            // selected Semi-Arc side, or fragment rotation.
             public Vector4 Variation;
-            // x = formation speed metres/second, y = moving-head trail metres,
-            // z = source path length metres, w = source fill blend.
+            // x/y = formation speed / moving-head trail except Object Arc/Semi-Arc
+            // contact point 3.y / point 4.x; z = source path length metres;
+            // w = source fill blend.
             public Vector4 Kinematics;
-            // x = object/free-water centre lateral metres, y = object along half length or free-water half length,
-            // z = object across half width or free-water half width, w = object contact offset / free-water shape parameter.
+            // x = object/free-water centre lateral metres; y/z = object half extents
+            // except Object Arc/Semi-Arc contact point 4.y / front split;
+            // w = Fleck contact offset, Free-Water shape parameter, or Object
+            // Arc/Semi-Arc source-local lateral cell spacing metres.
             public Vector4 ObjectData;
         }
 

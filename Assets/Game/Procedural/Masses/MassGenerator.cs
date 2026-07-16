@@ -7,6 +7,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 {
     public static partial class MassGenerator
     {
+#if UNITY_EDITOR
+        private static Func<bool> edgeWearAuditCancellationProbe;
+
+        public static void SetEditorEdgeWearAuditCancellationProbe(
+            Func<bool> cancellationProbe)
+        {
+            edgeWearAuditCancellationProbe = cancellationProbe;
+        }
+#endif
+
+        private static bool IsEdgeWearAuditCancellationRequested()
+        {
+#if UNITY_EDITOR
+            Func<bool> probe = edgeWearAuditCancellationProbe;
+            if (probe == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return probe();
+            }
+            catch (Exception)
+            {
+                edgeWearAuditCancellationProbe = null;
+                return false;
+            }
+#else
+            return false;
+#endif
+        }
+
         public readonly struct PlaneCutBevelPreviewStatus
         {
             public readonly bool PreviewApplied;

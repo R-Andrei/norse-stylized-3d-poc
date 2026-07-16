@@ -114,6 +114,7 @@ namespace ProgrammaticStylized3D.Rivers
         private int automaticShoreBirthSubmittedTotal;
         private float automaticObjectBirthAccumulator;
         private float automaticObjectContactCycleTime;
+        private int automaticObjectPatternAuthoritySignature = int.MinValue;
         private int automaticObjectBirthCursor;
         private int automaticObjectBirthSubmittedLastUpdate;
         private int automaticObjectBirthRejectedLastUpdate;

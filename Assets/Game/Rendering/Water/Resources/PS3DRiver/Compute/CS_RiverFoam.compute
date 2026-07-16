@@ -1091,29 +1091,208 @@ float4 FoamLoadObjectContactField(int2 coordinate)
     return _FoamObjectContactFieldRead.Load(int3(clamped, 0));
 }
 
-float FoamResolveObjectFrontBridgeShape(
+float FoamDistanceSquaredToSegment(
+    float2 queryPosition,
+    float2 segmentStart,
+    float2 segmentEnd,
+    out float segmentT)
+{
+    float2 segment = segmentEnd - segmentStart;
+    float segmentLengthSquared = max(0.000001, dot(segment, segment));
+    segmentT = saturate(
+        dot(queryPosition - segmentStart, segment) /
+        segmentLengthSquared);
+    float2 nearestPoint = segmentStart + segment * segmentT;
+    float2 offset = queryPosition - nearestPoint;
+    return dot(offset, offset);
+}
+
+void FoamUnpackObjectContactProfile(
+    FoamSourceEventData sourceEvent,
+    out float2 point0,
+    out float2 point1,
+    out float2 point2,
+    out float2 point3,
+    out float2 point4,
+    out float frontSplit)
+{
+    point0 = sourceEvent.distance.xy;
+    point1 = float2(sourceEvent.distance.w, sourceEvent.shore.x);
+    point2 = float2(sourceEvent.shore.w, sourceEvent.variation.y);
+    point3 = float2(sourceEvent.variation.z, sourceEvent.kinematics.x);
+    point4 = float2(sourceEvent.kinematics.y, sourceEvent.objectData.y);
+    frontSplit = clamp(sourceEvent.objectData.z, 0.001, 0.999);
+}
+
+float FoamResolveObjectProfileRibbonShape(
     float2 localPosition,
-    float2 radii,
-    float contactConfidence,
+    float2 segmentStart,
+    float2 segmentEnd,
+    float distanceSquared,
+    float2 physicalCellSpacing)
+{
+    float2 segment = segmentEnd - segmentStart;
+    float segmentLength = max(0.001, sqrt(dot(segment, segment)));
+    float tangentX = segment.x / segmentLength;
+    float tangentY = segment.y / segmentLength;
+    float normalX = 0.0 - tangentY;
+    float normalY = tangentX;
+    float normalCellSpacing = sqrt(
+        normalX * normalX *
+            physicalCellSpacing.x * physicalCellSpacing.x +
+        normalY * normalY *
+            physicalCellSpacing.y * physicalCellSpacing.y);
+    float rasterWidth = max(
+        0.0015,
+        normalCellSpacing * 0.34);
+    // Preserve a thin strong row while allowing enough feather radius for
+    // diagonally oriented mesh-profile segments to remain 8-connected on the
+    // cell-centre raster. The outer radius is approximately 0.72 cell.
+    float rasterFeather = max(
+        0.002,
+        normalCellSpacing * 0.38);
+    float distanceToSegment = sqrt(max(0.0, distanceSquared));
+    return 1.0 - smoothstep(
+        rasterWidth,
+        rasterWidth + rasterFeather,
+        distanceToSegment);
+}
+
+float FoamResolveObjectFrontProfileShape(
+    float2 localPosition,
+    float2 point0,
+    float2 point1,
+    float2 point2,
+    float2 point3,
+    float2 point4,
+    float frontSplit,
     float2 physicalCellSpacing,
     out float frontT)
 {
-    float2 normalizedPosition = float2(
-        localPosition.x / max(0.001, radii.x),
-        localPosition.y / max(0.001, radii.y));
-    float frontFeather = clamp(
-        physicalCellSpacing.x / max(0.001, radii.x) * 0.35,
-        0.02,
-        0.18);
-    // Follow the physical obstacle only across the upstream half. The gate is
-    // fully zero at and behind the side axis; the straight wake arms own all
-    // downstream source geometry from the two shoulders onward.
-    float frontHalfGate = 1.0 - smoothstep(
-        0.0 - frontFeather,
-        0.0,
-        normalizedPosition.x);
-    frontT = saturate(normalizedPosition.y * 0.5 + 0.5);
-    return saturate(contactConfidence * frontHalfGate);
+    float2 selectedStart;
+    float2 selectedEnd;
+    float pathStart;
+    float pathSpan;
+    if (localPosition.y <= point1.y)
+    {
+        selectedStart = point0;
+        selectedEnd = point1;
+        pathStart = 0.0;
+        pathSpan = frontSplit * 0.5;
+    }
+    else if (localPosition.y <= point2.y)
+    {
+        selectedStart = point1;
+        selectedEnd = point2;
+        pathStart = frontSplit * 0.5;
+        pathSpan = frontSplit * 0.5;
+    }
+    else if (localPosition.y <= point3.y)
+    {
+        selectedStart = point2;
+        selectedEnd = point3;
+        pathStart = frontSplit;
+        pathSpan = (1.0 - frontSplit) * 0.5;
+    }
+    else
+    {
+        selectedStart = point3;
+        selectedEnd = point4;
+        pathStart = frontSplit + (1.0 - frontSplit) * 0.5;
+        pathSpan = (1.0 - frontSplit) * 0.5;
+    }
+
+    float selectedSegmentT;
+    float selectedDistanceSquared = FoamDistanceSquaredToSegment(
+        localPosition,
+        selectedStart,
+        selectedEnd,
+        selectedSegmentT);
+    frontT = pathStart + selectedSegmentT * pathSpan;
+    return FoamResolveObjectProfileRibbonShape(
+        localPosition,
+        selectedStart,
+        selectedEnd,
+        selectedDistanceSquared,
+        physicalCellSpacing);
+}
+
+float FoamResolveObjectNegativeHalfProfileShape(
+    float2 localPosition,
+    float2 point0,
+    float2 point1,
+    float2 point2,
+    float2 physicalCellSpacing,
+    out float halfT)
+{
+    float2 selectedStart;
+    float2 selectedEnd;
+    float pathStart;
+    if (localPosition.y <= point1.y)
+    {
+        selectedStart = point0;
+        selectedEnd = point1;
+        pathStart = 0.0;
+    }
+    else
+    {
+        selectedStart = point1;
+        selectedEnd = point2;
+        pathStart = 0.5;
+    }
+
+    float selectedSegmentT;
+    float selectedDistanceSquared = FoamDistanceSquaredToSegment(
+        localPosition,
+        selectedStart,
+        selectedEnd,
+        selectedSegmentT);
+    halfT = pathStart + selectedSegmentT * 0.5;
+    return FoamResolveObjectProfileRibbonShape(
+        localPosition,
+        selectedStart,
+        selectedEnd,
+        selectedDistanceSquared,
+        physicalCellSpacing);
+}
+
+float FoamResolveObjectPositiveHalfProfileShape(
+    float2 localPosition,
+    float2 point2,
+    float2 point3,
+    float2 point4,
+    float2 physicalCellSpacing,
+    out float frontToShoulderT)
+{
+    float2 selectedStart;
+    float2 selectedEnd;
+    float pathStart;
+    if (localPosition.y <= point3.y)
+    {
+        selectedStart = point2;
+        selectedEnd = point3;
+        pathStart = 0.0;
+    }
+    else
+    {
+        selectedStart = point3;
+        selectedEnd = point4;
+        pathStart = 0.5;
+    }
+
+    float selectedSegmentT;
+    float selectedDistanceSquared = FoamDistanceSquaredToSegment(
+        localPosition,
+        selectedStart,
+        selectedEnd,
+        selectedSegmentT);
+    frontToShoulderT = pathStart + selectedSegmentT * 0.5;
+    return FoamResolveObjectProfileRibbonShape(
+        localPosition,
+        selectedStart,
+        selectedEnd,
+        selectedDistanceSquared,
+        physicalCellSpacing);
 }
 
 float FoamResolveObjectWakeArmShape(
@@ -1139,12 +1318,24 @@ float FoamResolveObjectWakeArmShape(
     // One strong cross-river row with at most one feathered continuity row.
     // This is a real distance-to-segment ribbon, not Presence attenuation used
     // to imitate fractional-cell geometry.
-    float rasterWidth = max(
+    float requestedWidth = max(
         0.0015,
         physicalCellSpacing.y * 0.34);
-    float rasterFeather = max(
+    float requestedFeather = max(
         0.002,
         physicalCellSpacing.y * 0.20);
+    // Keep opposite arms separated at the downstream centre even when a very
+    // small object is represented on a coarse lateral Foam grid. Normal-sized
+    // objects retain the accepted one-strong-row plus one-feather-row width.
+    float maximumOuterWidth = max(
+        0.003,
+        abs(shoulder.y) * 0.90);
+    float rasterWidth = min(
+        requestedWidth,
+        maximumOuterWidth * 0.63);
+    float rasterFeather = min(
+        requestedFeather,
+        max(0.001, maximumOuterWidth - rasterWidth));
     return 1.0 - smoothstep(
         rasterWidth,
         rasterWidth + rasterFeather,
@@ -1236,50 +1427,54 @@ float FoamEvaluateObjectContactArcSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    int2 coordinate,
     out float amountMultiplier)
 {
-    float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float2 localPosition = float2(
-        (globalDistance - sourceEvent.distance.z) * flowDirection,
+        globalDistance - sourceEvent.distance.z,
         lateralMetres - sourceEvent.objectData.x);
-    float sourceLateralCellSpacing = max(
-        0.01,
-        sourceEvent.objectData.w);
-    float2 radii = float2(
-        max(0.04, sourceEvent.objectData.y) +
-            physicalCellSpacing.x * 0.5,
-        max(0.04, sourceEvent.objectData.z) +
-            sourceLateralCellSpacing * 0.5);
-    float wakeArmLength = max(0.05, sourceEvent.shore.y);
-    float frontBridgeLength = 1.57079632679 * (radii.x + radii.y);
-    float totalPathLength = max(
-        0.001,
-        wakeArmLength + frontBridgeLength + wakeArmLength);
+    float2 point0;
+    float2 point1;
+    float2 point2;
+    float2 point3;
+    float2 point4;
+    float frontSplit;
+    FoamUnpackObjectContactProfile(
+        sourceEvent,
+        point0,
+        point1,
+        point2,
+        point3,
+        point4,
+        frontSplit);
 
-    float4 contact = FoamLoadObjectContactField(coordinate);
+    float wakeArmLength = max(0.05, sourceEvent.shore.y);
+    float totalPathLength = max(0.001, sourceEvent.kinematics.z);
+    float frontProfileLength = max(
+        0.001,
+        totalPathLength - wakeArmLength - wakeArmLength);
     float frontT;
-    float frontShape = FoamResolveObjectFrontBridgeShape(
+    float frontShape = FoamResolveObjectFrontProfileShape(
         localPosition,
-        radii,
-        saturate(contact.r),
+        point0,
+        point1,
+        point2,
+        point3,
+        point4,
+        frontSplit,
         physicalCellSpacing,
         frontT);
 
-    float negativeAcross = 0.0 - radii.y;
-    float2 negativeShoulder = float2(0.0, negativeAcross);
-    float2 positiveShoulder = float2(0.0, radii.y);
     float negativeArmT;
     float positiveArmT;
     float negativeArmShape = FoamResolveObjectWakeArmShape(
         localPosition,
-        negativeShoulder,
+        point0,
         wakeArmLength,
         physicalCellSpacing,
         negativeArmT);
     float positiveArmShape = FoamResolveObjectWakeArmShape(
         localPosition,
-        positiveShoulder,
+        point4,
         wakeArmLength,
         physicalCellSpacing,
         positiveArmT);
@@ -1288,10 +1483,10 @@ float FoamEvaluateObjectContactArcSource(
         wakeArmLength * (1.0 - negativeArmT) /
         totalPathLength);
     float frontPathT = saturate(
-        (wakeArmLength + frontT * frontBridgeLength) /
+        (wakeArmLength + frontT * frontProfileLength) /
         totalPathLength);
     float positivePathT = saturate(
-        (wakeArmLength + frontBridgeLength +
+        (wakeArmLength + frontProfileLength +
          positiveArmT * wakeArmLength) /
         totalPathLength);
 
@@ -1336,7 +1531,7 @@ float FoamEvaluateObjectContactArcSource(
         max(
             negativeArmShape * negativePhase,
             positiveArmShape * positivePhase));
-    amountMultiplier = lerp(0.92, 1.0, saturate(contact.a));
+    amountMultiplier = 1.0;
     return saturate(shape);
 }
 
@@ -1345,89 +1540,82 @@ float FoamEvaluateObjectContactSemiArcSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    int2 coordinate,
     out float amountMultiplier)
 {
-    float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float2 localPosition = float2(
-        (globalDistance - sourceEvent.distance.z) * flowDirection,
+        globalDistance - sourceEvent.distance.z,
         lateralMetres - sourceEvent.objectData.x);
-    float sourceLateralCellSpacing = max(
-        0.01,
-        sourceEvent.objectData.w);
-    float2 radii = float2(
-        max(0.04, sourceEvent.objectData.y) +
-            physicalCellSpacing.x * 0.5,
-        max(0.04, sourceEvent.objectData.z) +
-            sourceLateralCellSpacing * 0.5);
-    float dominantArmLength = max(0.05, sourceEvent.shore.y);
-    float lopsidedness = saturate(abs(sourceEvent.variation.w));
-    float shortArmLength = dominantArmLength * (1.0 - lopsidedness);
-    bool dominantPositive = sourceEvent.variation.w >= 0.0;
-    float negativeArmLength = shortArmLength;
-    float positiveArmLength = dominantArmLength;
-    if (!dominantPositive)
+    float2 point0;
+    float2 point1;
+    float2 point2;
+    float2 point3;
+    float2 point4;
+    float frontSplit;
+    FoamUnpackObjectContactProfile(
+        sourceEvent,
+        point0,
+        point1,
+        point2,
+        point3,
+        point4,
+        frontSplit);
+
+    float armLength = max(0.05, sourceEvent.shore.y);
+    float totalPathLength = max(0.001, sourceEvent.kinematics.z);
+    float selectedFrontLength = max(
+        0.001,
+        totalPathLength - armLength);
+    bool selectedPositive = sourceEvent.variation.w >= 0.0;
+    float armT;
+    float armShape;
+    float frontShape;
+    float frontHalfT;
+    if (selectedPositive)
     {
-        negativeArmLength = dominantArmLength;
-        positiveArmLength = shortArmLength;
+        armShape = FoamResolveObjectWakeArmShape(
+            localPosition,
+            point4,
+            armLength,
+            physicalCellSpacing,
+            armT);
+        float frontToShoulderT;
+        frontShape = FoamResolveObjectPositiveHalfProfileShape(
+            localPosition,
+            point2,
+            point3,
+            point4,
+            physicalCellSpacing,
+            frontToShoulderT);
+        frontHalfT = 1.0 - frontToShoulderT;
+    }
+    else
+    {
+        armShape = FoamResolveObjectWakeArmShape(
+            localPosition,
+            point0,
+            armLength,
+            physicalCellSpacing,
+            armT);
+        frontShape = FoamResolveObjectNegativeHalfProfileShape(
+            localPosition,
+            point0,
+            point1,
+            point2,
+            physicalCellSpacing,
+            frontHalfT);
     }
 
-    float frontBridgeLength = 1.57079632679 * (radii.x + radii.y);
-    float totalPathLength = max(
-        0.001,
-        negativeArmLength + frontBridgeLength + positiveArmLength);
-    float4 contact = FoamLoadObjectContactField(coordinate);
-    float frontT;
-    float frontShape = FoamResolveObjectFrontBridgeShape(
-        localPosition,
-        radii,
-        saturate(contact.r),
-        physicalCellSpacing,
-        frontT);
-
-    float negativeAcross = 0.0 - radii.y;
-    float2 negativeShoulder = float2(0.0, negativeAcross);
-    float2 positiveShoulder = float2(0.0, radii.y);
-    float negativeArmT;
-    float positiveArmT;
-    float negativeArmShape = FoamResolveObjectWakeArmShape(
-        localPosition,
-        negativeShoulder,
-        negativeArmLength,
-        physicalCellSpacing,
-        negativeArmT);
-    float positiveArmShape = FoamResolveObjectWakeArmShape(
-        localPosition,
-        positiveShoulder,
-        positiveArmLength,
-        physicalCellSpacing,
-        positiveArmT);
-
-    float negativePathT = saturate(
-        negativeArmLength * (1.0 - negativeArmT) /
+    float armPathT = saturate(
+        armLength * (1.0 - armT) /
         totalPathLength);
     float frontPathT = saturate(
-        (negativeArmLength + frontT * frontBridgeLength) /
+        (armLength + frontHalfT * selectedFrontLength) /
         totalPathLength);
-    float positivePathT = saturate(
-        (negativeArmLength + frontBridgeLength +
-         positiveArmT * positiveArmLength) /
-        totalPathLength);
-    // The build direction always begins at the short-arm tip and reaches the
-    // dominant arm last. When the dominant side is negative, mirror the
-    // canonical negative-to-positive path coordinate.
-    if (!dominantPositive)
-    {
-        negativePathT = 1.0 - negativePathT;
-        frontPathT = 1.0 - frontPathT;
-        positivePathT = 1.0 - positivePathT;
-    }
-
     float progress = saturate(sourceEvent.header.z);
     float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
     float phase = sourceEvent.header.y;
-    float negativePhase = FoamResolveObjectRibbonPhaseMask(
-        negativePathT,
+    float armPhase = FoamResolveObjectRibbonPhaseMask(
+        armPathT,
         progress,
         materialStepProgress,
         totalPathLength,
@@ -1442,21 +1630,11 @@ float FoamEvaluateObjectContactSemiArcSource(
         physicalCellSpacing,
         phase,
         true);
-    float positivePhase = FoamResolveObjectRibbonPhaseMask(
-        positivePathT,
-        progress,
-        materialStepProgress,
-        totalPathLength,
-        physicalCellSpacing,
-        phase,
-        true);
 
     float shape = max(
-        frontShape * frontPhase,
-        max(
-            negativeArmShape * negativePhase,
-            positiveArmShape * positivePhase));
-    amountMultiplier = lerp(0.90, 1.0, saturate(contact.a));
+        armShape * armPhase,
+        frontShape * frontPhase);
+    amountMultiplier = 1.0;
     return saturate(shape);
 }
 
@@ -1886,7 +2064,6 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             globalDistance,
             lateralMetres,
             physicalCellSpacing,
-            coordinate,
             amountMultiplier);
     }
     else if (sourceType < 4.5)
@@ -1906,7 +2083,6 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             globalDistance,
             lateralMetres,
             physicalCellSpacing,
-            coordinate,
             amountMultiplier);
     }
     else if (sourceType < 6.5)

@@ -103,6 +103,135 @@
             }
 
 #if defined(PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES)
+            float ResolveGroundBoundedUnion(
+                float firstContribution,
+                float secondContribution)
+            {
+                float first = saturate(firstContribution);
+                float second = saturate(secondContribution);
+                return 1.0 - (1.0 - first) * (1.0 - second);
+            }
+
+            float ResolveGroundLocalShoreWetness(
+                Varyings input)
+            {
+                float profileEnabled =
+                    saturate(_GroundShoreHydrologyEnabled);
+                float masterStrength =
+                    saturate(_GroundShoreHydrologySpatialA.x);
+                float reach =
+                    max(0.0, _GroundShoreHydrologySpatialA.y);
+                float fade =
+                    max(0.05, _GroundShoreHydrologySpatialA.z);
+                float bankDomain =
+                    ResolveGroundRiverBankDomain(input);
+                float distance =
+                    ResolveGroundRiverBankDistance(input);
+                float shore = ResolveGroundShoreMask(input);
+                float distanceWeight =
+                    (1.0 - smoothstep(reach, reach + fade, distance)) *
+                    bankDomain;
+                float broadContribution =
+                    distanceWeight *
+                    saturate(_GroundShoreHydrologySpatialA.w);
+                float immediateContribution =
+                    smoothstep(0.17, 0.30, shore) *
+                    saturate(_GroundShoreHydrologySpatialB.x) *
+                    bankDomain;
+                float waterlineContribution =
+                    smoothstep(0.31, 0.40, shore) *
+                    saturate(_GroundShoreHydrologySpatialB.y) *
+                    bankDomain;
+                float composedWetness = ResolveGroundBoundedUnion(
+                    ResolveGroundBoundedUnion(
+                        broadContribution,
+                        immediateContribution),
+                    waterlineContribution);
+
+                return saturate(
+                    profileEnabled *
+                    masterStrength *
+                    composedWetness);
+            }
+
+            float ResolveGroundEffectiveWetness(
+                float localShoreWetness)
+            {
+                return ResolveGroundBoundedUnion(
+                    saturate(_Wetness),
+                    localShoreWetness);
+            }
+
+            float ResolveGroundEffectiveWetness(
+                Varyings input)
+            {
+                return ResolveGroundEffectiveWetness(
+                    ResolveGroundLocalShoreWetness(input));
+            }
+
+            float ResolveGroundCombinedWetPixelSoftening(
+                float localShoreWetness)
+            {
+                return ResolveGroundBoundedUnion(
+                    saturate(_Wetness) *
+                        saturate(_WetPixelSoftening),
+                    localShoreWetness *
+                        saturate(_GroundShoreHydrologyCharacterA.z));
+            }
+
+            float ResolveGroundCombinedWetDarkening(
+                float localShoreWetness)
+            {
+                return ResolveGroundBoundedUnion(
+                    saturate(_Wetness) *
+                        saturate(_WetDarkenStrength) *
+                        0.18,
+                    localShoreWetness *
+                        saturate(_GroundShoreHydrologyCharacterA.y));
+            }
+
+            float ResolveGroundCombinedWetSmoothnessBoost(
+                float localShoreWetness)
+            {
+                return ResolveGroundBoundedUnion(
+                    saturate(_Wetness) *
+                        saturate(_WetSmoothnessBoost) *
+                        0.22,
+                    localShoreWetness *
+                        saturate(_GroundShoreHydrologyCharacterA.w));
+            }
+
+            float ResolveGroundGlobalWetSpecularMultiplier()
+            {
+                return 1.0 + saturate(_Wetness) * 0.025;
+            }
+
+            float ResolveGroundLocalWetSpecularBoost(
+                float localShoreWetness)
+            {
+                return
+                    saturate(localShoreWetness) *
+                    saturate(_GroundShoreHydrologyCharacterB.x);
+            }
+
+            float ResolveGroundSnowHydrologyRetention(
+                float localShoreWetness)
+            {
+                return saturate(
+                    1.0 -
+                    localShoreWetness *
+                    saturate(_GroundShoreHydrologyCharacterB.y));
+            }
+
+            float ResolveGroundFrostHydrologyRetention(
+                float localShoreWetness)
+            {
+                return saturate(
+                    1.0 -
+                    localShoreWetness *
+                    saturate(_GroundShoreHydrologyCharacterB.z));
+            }
+
             float3 ResolveGroundBankZoneWeights(
                 Varyings input)
             {
@@ -185,6 +314,15 @@
                     enabled *
                     strength *
                     composedZones);
+            }
+
+            float ResolveGroundRiverbedMaterialBlend(
+                float riverbedSupport)
+            {
+                return saturate(
+                    saturate(_GroundRiverbedLayerEnabled) *
+                    saturate(_GroundRiverbedMaterialStrength) *
+                    saturate(riverbedSupport));
             }
 
             float4 ResolveGroundBankCoverRetention(

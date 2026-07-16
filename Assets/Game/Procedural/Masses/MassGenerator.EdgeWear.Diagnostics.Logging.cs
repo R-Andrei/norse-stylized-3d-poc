@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -3399,6 +3400,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             builder.Append("statesEvaluated=");
             builder.Append(audit.CoexistenceSearchStatesEvaluated);
+            builder.Append(",timeBudgetExceeded=");
+            builder.Append(audit.CoexistenceSearchTimeBudgetExceeded);
+            builder.Append(",cancelled=");
+            builder.Append(audit.CoexistenceSearchCancelled);
+            builder.Append(",elapsedMs=");
+            builder.Append(audit.CoexistenceSearchElapsedMilliseconds
+                .ToString("G9", CultureInfo.InvariantCulture));
             builder.Append(",statesDeduplicated=");
             builder.Append(audit.CoexistenceSearchStatesDeduplicated);
             builder.Append(",maximumDepth=");
@@ -3673,6 +3681,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ",trialCacheUses=" + audit.CoexistenceTrialCacheUseCount +
                 ",statesEvaluated=" +
                     audit.CoexistenceSearchStatesEvaluated +
+                ",timeBudgetExceeded=" +
+                    audit.CoexistenceSearchTimeBudgetExceeded +
+                ",cancelled=" + audit.CoexistenceSearchCancelled +
+                ",elapsedMs=" +
+                    audit.CoexistenceSearchElapsedMilliseconds.ToString(
+                        "G9", CultureInfo.InvariantCulture) +
                 ",statesDeduplicated=" +
                     audit.CoexistenceSearchStatesDeduplicated +
                 ",maximumDepth=" + audit.CoexistenceSearchMaximumDepth +
@@ -3878,6 +3892,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     record.RequiredFootprintLength.ToString("G9"));
                 builder.Append(",lengthToWidthRatio=");
                 builder.Append(record.LengthToWidthRatio.ToString("G9"));
+                builder.Append(",minimumStyleWidth=");
+                builder.Append(record.MinimumStyleWidth.ToString("G9"));
+                builder.Append(",minimumRequiredCertifiedWidth=");
+                builder.Append(
+                    record.MinimumRequiredCertifiedWidth.ToString("G9"));
                 builder.Append(",gates={dihedral:");
                 builder.Append(record.DihedralValid ? '1' : '0');
                 builder.Append(",footprint:");
@@ -3890,6 +3909,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(",widthFraction:");
                 builder.Append(
                     record.FeasibleWidthFractionValid ? '1' : '0');
+                builder.Append(",widthRecoveryProvisional:");
+                builder.Append(
+                    record.WidthRecoveryProvisional ? '1' : '0');
                 builder.Append(",endpointSpan:");
                 builder.Append(record.EndpointSpanValid ? '1' : '0');
                 builder.Append('}');
@@ -3927,6 +3949,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(",maximumCertifiedFraction:");
                 builder.Append(
                     record.IsolatedMaximumCertifiedWidthFraction
+                        .ToString("G9"));
+                builder.Append(",maxBoundarySnap:");
+                builder.Append(
+                    record.IsolatedMaximumBoundarySnapDistance
+                        .ToString("G9"));
+                builder.Append(",maxBoundaryPointTolerance:");
+                builder.Append(
+                    record.IsolatedMaximumBoundaryPointTolerance
+                        .ToString("G9"));
+                builder.Append(",alternateBoundaryRails:");
+                builder.Append(
+                    record.IsolatedAlternateBoundaryRailCount);
+                builder.Append(",maxBoundaryCandidates:");
+                builder.Append(
+                    record.IsolatedMaximumBoundaryCandidateCount);
+                builder.Append(",maxBoundaryDiagnosticRail:");
+                builder.Append(
+                    record.IsolatedMaximumBoundaryDiagnosticRailIndex);
+                builder.Append(",originalAdjacentEdge:");
+                builder.Append(
+                    record.IsolatedMaximumBoundaryOriginalAdjacentEdgeIndex);
+                builder.Append(",resolvedBoundaryEdge:");
+                builder.Append(
+                    record.IsolatedMaximumBoundaryResolvedEdgeIndex);
+                builder.Append(",originalRawParameter:");
+                builder.Append(
+                    record.IsolatedMaximumBoundaryOriginalRawParameter
+                        .ToString("G9"));
+                builder.Append(",originalSegmentDistance:");
+                builder.Append(
+                    record.IsolatedMaximumBoundaryOriginalSegmentDistance
+                        .ToString("G9"));
+                builder.Append(",minEndpointDistance:");
+                builder.Append(
+                    record.IsolatedMinimumBoundaryEndpointDistance
                         .ToString("G9"));
                 builder.Append(",endpointConsumption:");
                 builder.Append(record.EndpointConsumptionA.ToString("G9"));
@@ -4581,6 +4638,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         audit.CanonicalRailCount +
                     ",maxBoundarySnap:" +
                         audit.MaximumBoundarySnapDistance.ToString("G6") +
+                    ",maxBoundaryPointTolerance:" +
+                        audit.MaximumBoundaryPointTolerance.ToString("G6") +
+                    ",alternateBoundaryRails:" +
+                        audit.AlternateBoundaryRailCount +
+                    ",maxBoundaryCandidates:" +
+                        audit.MaximumBoundaryCandidateCount +
+                    ",maxBoundaryDiagnosticRail:" +
+                        audit.MaximumBoundaryDiagnosticRailIndex +
+                    ",originalAdjacentEdge:" +
+                        audit.MaximumBoundaryOriginalAdjacentEdgeIndex +
+                    ",resolvedBoundaryEdge:" +
+                        audit.MaximumBoundaryResolvedEdgeIndex +
+                    ",originalRawParameter:" +
+                        audit.MaximumBoundaryOriginalRawParameter.ToString("G6") +
+                    ",originalSegmentDistance:" +
+                        audit.MaximumBoundaryOriginalSegmentDistance.ToString("G6") +
+                    ",minEndpointDistance:" +
+                        audit.MinimumBoundaryEndpointDistance.ToString("G6") +
                     ",targetBoundaries:" +
                         audit.TargetBoundaryCount +
                     ",ownerClips:" + audit.OwnerClipCount +
@@ -6054,6 +6129,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     stats.ReplacementEdgeCollapseFailureCount +
                 ", solveFailures=" + stats.WidthSolveFailures + "/" +
                     stats.CornerSolveFailures +
+                ", conflictSearch=" +
+                    stats.ConflictSearchStatesEvaluated + "/" +
+                    stats.ConflictSearchCommittedExclusionCount +
+                    "/" + stats.ConflictSearchTimeBudgetExceeded +
+                    "/" + stats.ConflictSearchCancelled +
+                    "/" + stats.ConflictSearchElapsedMilliseconds
+                        .ToString("G9", CultureInfo.InvariantCulture) +
                 ", ready=" + (ready ? 1 : 0);
             if (!string.IsNullOrEmpty(blocker))
             {

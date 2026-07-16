@@ -583,6 +583,66 @@ namespace ProgrammaticStylized3D.Rivers
                 Activity);
         }
 
+        private readonly struct ResolvedAutomaticObjectContactProfile
+        {
+            public ResolvedAutomaticObjectContactProfile(
+                Vector2 point0,
+                Vector2 point1,
+                Vector2 point2,
+                Vector2 point3,
+                Vector2 point4)
+            {
+                Point0 = point0;
+                Point1 = point1;
+                Point2 = point2;
+                Point3 = point3;
+                Point4 = point4;
+                NegativeHalfLength =
+                    Vector2.Distance(point0, point1) +
+                    Vector2.Distance(point1, point2);
+                PositiveHalfLength =
+                    Vector2.Distance(point2, point3) +
+                    Vector2.Distance(point3, point4);
+                FrontPathLength = NegativeHalfLength + PositiveHalfLength;
+                FrontSplit = NegativeHalfLength /
+                    Mathf.Max(0.001f, FrontPathLength);
+                MinimumX = Mathf.Min(
+                    point0.x,
+                    Mathf.Min(
+                        point1.x,
+                        Mathf.Min(point2.x, Mathf.Min(point3.x, point4.x))));
+                MaximumX = Mathf.Max(
+                    point0.x,
+                    Mathf.Max(
+                        point1.x,
+                        Mathf.Max(point2.x, Mathf.Max(point3.x, point4.x))));
+                MaximumAbsoluteY = Mathf.Max(
+                    Mathf.Abs(point0.y),
+                    Mathf.Max(
+                        Mathf.Abs(point1.y),
+                        Mathf.Max(
+                            Mathf.Abs(point2.y),
+                            Mathf.Max(Mathf.Abs(point3.y), Mathf.Abs(point4.y)))));
+            }
+
+            public Vector2 Point0 { get; }
+            public Vector2 Point1 { get; }
+            public Vector2 Point2 { get; }
+            public Vector2 Point3 { get; }
+            public Vector2 Point4 { get; }
+            public float NegativeHalfLength { get; }
+            public float PositiveHalfLength { get; }
+            public float FrontPathLength { get; }
+            public float FrontSplit { get; }
+            public float MinimumX { get; }
+            public float MaximumX { get; }
+            public float MaximumAbsoluteY { get; }
+            public bool IsValid =>
+                NegativeHalfLength > 0.001f &&
+                PositiveHalfLength > 0.001f &&
+                FrontPathLength > 0.002f;
+        }
+
         private enum AutomaticFreeWaterSourceRecipe
         {
             LaceConnector,
@@ -793,6 +853,7 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectBirthRejectedLastUpdate = 0;
             automaticObjectBirthAnchorCountLastUpdate = 0;
             automaticObjectContactCycleTime += Mathf.Max(0f, deltaTime);
+            RefreshAutomaticObjectPatternAuthority();
 
             if (!ResolveAutomaticObjectSourceProfile(
                     out AutomaticObjectSourceProfile objectProfile,
@@ -889,6 +950,78 @@ namespace ProgrammaticStylized3D.Rivers
                 $"started {cycleStarts} cycle(s) + {fleckStarts} fleck(s), " +
                 $"skipped {skippedThisUpdate}";
             return startsThisUpdate > 0;
+        }
+
+        private void RefreshAutomaticObjectPatternAuthority()
+        {
+            if (river == null)
+            {
+                return;
+            }
+
+            int signature;
+            unchecked
+            {
+                signature = 17;
+                signature = signature * 31 +
+                    (int)river.FoamObjectFoamPattern;
+                signature = signature * 31 + Mathf.RoundToInt(
+                    river.FoamObjectContactArcPatternWeight * 10000f);
+                signature = signature * 31 + Mathf.RoundToInt(
+                    river.FoamObjectContactSemiArcPatternWeight * 10000f);
+                signature = signature * 31 + Mathf.RoundToInt(
+                    river.FoamObjectContactFleckPatternWeight * 10000f);
+            }
+
+            if (automaticObjectPatternAuthoritySignature == int.MinValue)
+            {
+                automaticObjectPatternAuthoritySignature = signature;
+                return;
+            }
+
+            if (automaticObjectPatternAuthoritySignature == signature)
+            {
+                return;
+            }
+
+            automaticObjectPatternAuthoritySignature = signature;
+            automaticObjectBirthAccumulator = 0f;
+            for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
+            {
+                AutomaticFoamSourceEvent sourceEvent =
+                    automaticFoamSourceEvents[index];
+                if (!sourceEvent.Active ||
+                    (sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactArc &&
+                     sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactSemiArc))
+                {
+                    continue;
+                }
+
+                automaticFoamSourceEvents[index] = default;
+                automaticFoamSourceEventGpuData[index] = default;
+                activeAutomaticFoamSourceEventCount = Mathf.Max(
+                    0,
+                    activeAutomaticFoamSourceEventCount - 1);
+            }
+
+            automaticObjectContactStaleSourceIds.Clear();
+            foreach (EntityId sourceId in automaticObjectContactCycleStates.Keys)
+            {
+                automaticObjectContactStaleSourceIds.Add(sourceId);
+            }
+
+            for (int index = 0;
+                 index < automaticObjectContactStaleSourceIds.Count;
+                 index++)
+            {
+                EntityId sourceId =
+                    automaticObjectContactStaleSourceIds[index];
+                AutomaticObjectContactCycleState state =
+                    automaticObjectContactCycleStates[sourceId];
+                state.NextStartTime = automaticObjectContactCycleTime;
+                automaticObjectContactCycleStates[sourceId] = state;
+            }
+            automaticObjectContactStaleSourceIds.Clear();
         }
 
         private bool ResolveAutomaticObjectSourceProfile(
@@ -1261,6 +1394,129 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
+        private static ResolvedAutomaticObjectContactProfile
+            ResolveAutomaticObjectContactProfile(
+                RiverFoamStaticObjectSource source,
+                float alongFlowOffsetMetres,
+                float acrossRiverOffsetMetres)
+        {
+            RiverFoamStaticContactProfile sourceProfile =
+                source.ContactProfile.IsValid
+                    ? source.ContactProfile
+                    : RiverDisturbanceFootprintResolver
+                        .BuildFallbackFoamContactProfile(
+                            source.StaticPressureAlongHalfLength,
+                            source.StaticPressureAcrossHalfWidth);
+
+            Vector2 point0 = sourceProfile.Point0;
+            Vector2 point1 = sourceProfile.Point1;
+            Vector2 point2 = sourceProfile.Point2;
+            Vector2 point3 = sourceProfile.Point3;
+            Vector2 point4 = sourceProfile.Point4;
+
+            const float minimumScale = 0.01f;
+            float frontAcross = point2.y;
+            float negativeSpan = Mathf.Max(
+                0.005f,
+                frontAcross - point0.y);
+            float positiveSpan = Mathf.Max(
+                0.005f,
+                point4.y - frontAcross);
+            float negativeScale = Mathf.Max(
+                minimumScale,
+                (negativeSpan + acrossRiverOffsetMetres) / negativeSpan);
+            float positiveScale = Mathf.Max(
+                minimumScale,
+                (positiveSpan + acrossRiverOffsetMetres) / positiveSpan);
+            point0.y = frontAcross +
+                (point0.y - frontAcross) * negativeScale;
+            point1.y = frontAcross +
+                (point1.y - frontAcross) * negativeScale;
+            point3.y = frontAcross +
+                (point3.y - frontAcross) * positiveScale;
+            point4.y = frontAcross +
+                (point4.y - frontAcross) * positiveScale;
+
+            float shoulderAcrossSpan = Mathf.Max(
+                0.005f,
+                point4.y - point0.y);
+            Vector2[] points =
+            {
+                point0, point1, point2, point3, point4
+            };
+            float maximumFrontDepth = 0.005f;
+            for (int index = 0; index < points.Length; index++)
+            {
+                float shoulderInterpolation = Mathf.Clamp01(
+                    (points[index].y - point0.y) / shoulderAcrossSpan);
+                float shoulderBaseline = Mathf.Lerp(
+                    point0.x,
+                    point4.x,
+                    shoulderInterpolation);
+                maximumFrontDepth = Mathf.Max(
+                    maximumFrontDepth,
+                    shoulderBaseline - points[index].x);
+            }
+
+            float targetFrontDepth = Mathf.Max(
+                0.005f,
+                maximumFrontDepth + alongFlowOffsetMetres);
+            float alongScale = targetFrontDepth / maximumFrontDepth;
+            for (int index = 0; index < points.Length; index++)
+            {
+                float shoulderInterpolation = Mathf.Clamp01(
+                    (points[index].y - point0.y) / shoulderAcrossSpan);
+                float shoulderBaseline = Mathf.Lerp(
+                    point0.x,
+                    point4.x,
+                    shoulderInterpolation);
+                float frontDepth = Mathf.Max(
+                    0f,
+                    shoulderBaseline - points[index].x);
+                points[index].x = shoulderBaseline - frontDepth * alongScale;
+            }
+
+            points[1] = ResolveTwoSegmentMidpoint(
+                points[0],
+                points[1],
+                points[2]);
+            points[3] = ResolveTwoSegmentMidpoint(
+                points[2],
+                points[3],
+                points[4]);
+
+            return new ResolvedAutomaticObjectContactProfile(
+                points[0],
+                points[1],
+                points[2],
+                points[3],
+                points[4]);
+        }
+
+        private static Vector2 ResolveTwoSegmentMidpoint(
+            Vector2 point0,
+            Vector2 point1,
+            Vector2 point2)
+        {
+            float firstLength = Vector2.Distance(point0, point1);
+            float secondLength = Vector2.Distance(point1, point2);
+            float halfLength = (firstLength + secondLength) * 0.5f;
+            if (halfLength <= firstLength || secondLength <= 0.0001f)
+            {
+                return Vector2.Lerp(
+                    point0,
+                    point1,
+                    firstLength > 0.0001f
+                        ? Mathf.Clamp01(halfLength / firstLength)
+                        : 0f);
+            }
+
+            return Vector2.Lerp(
+                point1,
+                point2,
+                Mathf.Clamp01((halfLength - firstLength) / secondLength));
+        }
+
         private bool TryBeginAutomaticObjectSourceEvent(
             AutomaticObjectSourceProfile profile,
             AutomaticObjectSourceRecipe recipe,
@@ -1287,7 +1543,10 @@ namespace ProgrammaticStylized3D.Rivers
             float lopsidedness = 0f;
             float objectWakeArmLengthMetres = 0f;
             float objectSourceLateralCellSpacingMetres = 0f;
+            float objectAlongHalfLengthMetres = 0f;
+            float objectAcrossHalfWidthMetres = 0f;
             float sourcePathDistance;
+            ResolvedAutomaticObjectContactProfile resolvedContactProfile = default;
             float startGlobalDistance;
             float endGlobalDistance;
 
@@ -1382,11 +1641,11 @@ namespace ProgrammaticStylized3D.Rivers
 
                 if (semiArc)
                 {
-                    float side = Hash01(seed + 13.9f) < 0.5f ? -1f : 1f;
-                    lopsidedness = side * Mathf.Lerp(
-                        river.FoamObjectContactSemiArcLopsidednessMin,
-                        river.FoamObjectContactSemiArcLopsidednessMax,
-                        Hash01(seed + 14.7f));
+                    // Semi-Arc selects exactly one physical front half and
+                    // one straight downstream arm. Curvature carries only the
+                    // deterministic selected-side sign; legacy Lopsidedness
+                    // magnitude is no longer an active runtime authority.
+                    lopsidedness = Hash01(seed + 13.9f) < 0.5f ? -1f : 1f;
                 }
 
                 float domainLength = Mathf.Max(
@@ -1399,56 +1658,124 @@ namespace ProgrammaticStylized3D.Rivers
                     0.01f,
                     source.SurfaceHalfWidth * 2f / Mathf.Max(1, fieldHeight));
                 objectSourceLateralCellSpacingMetres = crossRiverCellSpacing;
-                float alongRadius = Mathf.Max(
-                    0.04f,
-                    source.StaticPressureAlongHalfLength) +
-                    longitudinalCellSpacing * 0.5f;
-                float acrossRadius = Mathf.Max(
-                    0.04f,
-                    source.StaticPressureAcrossHalfWidth) +
-                    crossRiverCellSpacing * 0.5f;
+                float alongContactOffsetMetres = semiArc
+                    ? river.FoamObjectContactSemiArcAlongFlowContactOffsetMetres
+                    : river.FoamObjectContactArcAlongFlowContactOffsetMetres;
+                float acrossContactOffsetMetres = semiArc
+                    ? river.FoamObjectContactSemiArcAcrossRiverContactOffsetMetres
+                    : river.FoamObjectContactArcAcrossRiverContactOffsetMetres;
+                resolvedContactProfile = ResolveAutomaticObjectContactProfile(
+                    source,
+                    alongContactOffsetMetres,
+                    acrossContactOffsetMetres);
+                if (!resolvedContactProfile.IsValid)
+                {
+                    foamCompositionRejectedCount++;
+                    return false;
+                }
+
+                objectAlongHalfLengthMetres = Mathf.Max(
+                    0.005f,
+                    Mathf.Max(
+                        Mathf.Abs(resolvedContactProfile.MinimumX),
+                        Mathf.Abs(resolvedContactProfile.MaximumX)));
+                objectAcrossHalfWidthMetres = Mathf.Max(
+                    0.005f,
+                    resolvedContactProfile.MaximumAbsoluteY);
                 float dominantArmLength = Mathf.Max(
                     0.05f,
                     objectWakeArmLengthMetres);
-                float shortArmLength = semiArc
-                    ? dominantArmLength * (1f - Mathf.Abs(lopsidedness))
+                float negativeArmLength = semiArc && lopsidedness > 0f
+                    ? 0f
                     : dominantArmLength;
-                float negativeArmLength;
-                float positiveArmLength;
+                float positiveArmLength = semiArc && lopsidedness < 0f
+                    ? 0f
+                    : dominantArmLength;
+                float selectedFrontLength = semiArc
+                    ? (lopsidedness < 0f
+                        ? resolvedContactProfile.NegativeHalfLength
+                        : resolvedContactProfile.PositiveHalfLength)
+                    : resolvedContactProfile.FrontPathLength;
+                sourcePathDistance = Mathf.Max(
+                    0.001f,
+                    negativeArmLength +
+                    selectedFrontLength +
+                    positiveArmLength);
+
+                float minimumLocalX;
+                float maximumLocalX;
+                float maximumAbsoluteY;
                 if (semiArc && lopsidedness < 0f)
                 {
-                    negativeArmLength = dominantArmLength;
-                    positiveArmLength = shortArmLength;
+                    Vector2 armTip = resolvedContactProfile.Point0 +
+                        new Vector2(negativeArmLength, 0f);
+                    minimumLocalX = Mathf.Min(
+                        resolvedContactProfile.Point0.x,
+                        Mathf.Min(
+                            resolvedContactProfile.Point1.x,
+                            resolvedContactProfile.Point2.x));
+                    maximumLocalX = Mathf.Max(
+                        armTip.x,
+                        Mathf.Max(
+                            resolvedContactProfile.Point0.x,
+                            Mathf.Max(
+                                resolvedContactProfile.Point1.x,
+                                resolvedContactProfile.Point2.x)));
+                    maximumAbsoluteY = Mathf.Max(
+                        Mathf.Abs(resolvedContactProfile.Point0.y),
+                        Mathf.Max(
+                            Mathf.Abs(resolvedContactProfile.Point1.y),
+                            Mathf.Abs(resolvedContactProfile.Point2.y)));
                 }
                 else if (semiArc)
                 {
-                    negativeArmLength = shortArmLength;
-                    positiveArmLength = dominantArmLength;
+                    Vector2 armTip = resolvedContactProfile.Point4 +
+                        new Vector2(positiveArmLength, 0f);
+                    minimumLocalX = Mathf.Min(
+                        resolvedContactProfile.Point2.x,
+                        Mathf.Min(
+                            resolvedContactProfile.Point3.x,
+                            resolvedContactProfile.Point4.x));
+                    maximumLocalX = Mathf.Max(
+                        armTip.x,
+                        Mathf.Max(
+                            resolvedContactProfile.Point2.x,
+                            Mathf.Max(
+                                resolvedContactProfile.Point3.x,
+                                resolvedContactProfile.Point4.x)));
+                    maximumAbsoluteY = Mathf.Max(
+                        Mathf.Abs(resolvedContactProfile.Point2.y),
+                        Mathf.Max(
+                            Mathf.Abs(resolvedContactProfile.Point3.y),
+                            Mathf.Abs(resolvedContactProfile.Point4.y)));
                 }
                 else
                 {
-                    negativeArmLength = dominantArmLength;
-                    positiveArmLength = dominantArmLength;
+                    Vector2 negativeArmTip = resolvedContactProfile.Point0 +
+                        new Vector2(negativeArmLength, 0f);
+                    Vector2 positiveArmTip = resolvedContactProfile.Point4 +
+                        new Vector2(positiveArmLength, 0f);
+                    minimumLocalX = resolvedContactProfile.MinimumX;
+                    maximumLocalX = Mathf.Max(
+                        resolvedContactProfile.MaximumX,
+                        Mathf.Max(negativeArmTip.x, positiveArmTip.x));
+                    maximumAbsoluteY =
+                        resolvedContactProfile.MaximumAbsoluteY;
                 }
 
-                float frontBridgeLength = Mathf.PI * 0.5f *
-                    (alongRadius + acrossRadius);
-                sourcePathDistance = Mathf.Max(
-                    0.001f,
-                    negativeArmLength + frontBridgeLength + positiveArmLength);
-                float maximumArmLength = Mathf.Max(
-                    negativeArmLength,
-                    positiveArmLength);
-                float upstreamExtent = alongRadius + longitudinalCellSpacing;
-                float downstreamExtent = maximumArmLength + longitudinalCellSpacing;
                 startGlobalDistance = Mathf.Clamp(
-                    source.GlobalDistance - flowDirection * upstreamExtent,
+                    source.GlobalDistance +
+                    minimumLocalX - longitudinalCellSpacing,
                     river.Domain.GlobalDistanceMinimum,
                     river.Domain.GlobalDistanceMaximum);
                 endGlobalDistance = Mathf.Clamp(
-                    source.GlobalDistance + flowDirection * downstreamExtent,
+                    source.GlobalDistance +
+                    maximumLocalX + longitudinalCellSpacing,
                     river.Domain.GlobalDistanceMinimum,
                     river.Domain.GlobalDistanceMaximum);
+                objectAcrossHalfWidthMetres = Mathf.Max(
+                    objectAcrossHalfWidthMetres,
+                    maximumAbsoluteY);
             }
 
             if (sourcePathDistance <= 0.05f)
@@ -1522,9 +1849,12 @@ namespace ProgrammaticStylized3D.Rivers
                 breakupScale,
                 breakupStrength,
                 lopsidedness,
+                objectAlongHalfLengthMetres,
+                objectAcrossHalfWidthMetres,
                 objectSourceLateralCellSpacingMetres,
                 objectWakeArmLengthMetres,
-                sourcePathDistance);
+                sourcePathDistance,
+                resolvedContactProfile);
         }
 
         private bool BeginAutomaticObjectFoamSourceEvent(
@@ -1548,9 +1878,12 @@ namespace ProgrammaticStylized3D.Rivers
             float breakupScaleMetres,
             float breakupStrength,
             float lopsidedness,
+            float objectAlongHalfLengthMetres,
+            float objectAcrossHalfWidthMetres,
             float objectSourceLateralCellSpacingMetres,
             float objectWakeArmLengthMetres,
-            float objectContactPathLengthMetres)
+            float objectContactPathLengthMetres,
+            ResolvedAutomaticObjectContactProfile contactProfile)
         {
             if (river == null || !river.FoamEnabled ||
                 river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
@@ -1652,12 +1985,12 @@ namespace ProgrammaticStylized3D.Rivers
                     ? 0.20f
                     : 0f,
                 ObjectCentreAcrossMetres = source.AcrossMetres,
-                ObjectAlongHalfLengthMetres = Mathf.Max(
-                    0.05f,
-                    source.StaticPressureAlongHalfLength),
-                ObjectAcrossHalfWidthMetres = Mathf.Max(
-                    0.05f,
-                    source.StaticPressureAcrossHalfWidth),
+                ObjectAlongHalfLengthMetres = contactCycle
+                    ? Mathf.Max(0.005f, objectAlongHalfLengthMetres)
+                    : Mathf.Max(0.05f, source.StaticPressureAlongHalfLength),
+                ObjectAcrossHalfWidthMetres = contactCycle
+                    ? Mathf.Max(0.005f, objectAcrossHalfWidthMetres)
+                    : Mathf.Max(0.05f, source.StaticPressureAcrossHalfWidth),
                 ObjectContactOffsetMetres = contactCycle
                     ? 0f
                     : Mathf.Max(0f, contactOffsetMetres),
@@ -1669,6 +2002,33 @@ namespace ProgrammaticStylized3D.Rivers
                     : 0f,
                 ObjectContactPathLengthMetres = contactCycle
                     ? Mathf.Max(0.001f, objectContactPathLengthMetres)
+                    : 0f,
+                ObjectContactPoint0 = contactCycle
+                    ? contactProfile.Point0
+                    : Vector2.zero,
+                ObjectContactPoint1 = contactCycle
+                    ? contactProfile.Point1
+                    : Vector2.zero,
+                ObjectContactPoint2 = contactCycle
+                    ? contactProfile.Point2
+                    : Vector2.zero,
+                ObjectContactPoint3 = contactCycle
+                    ? contactProfile.Point3
+                    : Vector2.zero,
+                ObjectContactPoint4 = contactCycle
+                    ? contactProfile.Point4
+                    : Vector2.zero,
+                ObjectContactFrontSplit = contactCycle
+                    ? Mathf.Clamp(contactProfile.FrontSplit, 0.001f, 0.999f)
+                    : 0.5f,
+                CentreAcrossNormalized = contactCycle
+                    ? Mathf.Clamp(source.AcrossNormalized, -1f, 1f)
+                    : 0f,
+                LateralPaddingMetres = contactCycle
+                    ? Mathf.Max(
+                        0.05f,
+                        objectAcrossHalfWidthMetres +
+                        objectSourceLateralCellSpacingMetres * 2f)
                     : 0f
             };
 
@@ -2867,6 +3227,7 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectContactLiveSourceIds.Clear();
             automaticObjectContactStaleSourceIds.Clear();
             automaticObjectContactCycleTime = 0f;
+            automaticObjectPatternAuthoritySignature = int.MinValue;
             automaticObjectContactBuildCount = 0;
             automaticObjectContactHoldCount = 0;
             automaticObjectContactReleaseCount = 0;
