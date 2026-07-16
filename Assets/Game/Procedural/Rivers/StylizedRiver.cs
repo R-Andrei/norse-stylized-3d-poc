@@ -5569,7 +5569,8 @@ namespace ProgrammaticStylized3D.Rivers
                 corridorObject.layer = ground.gameObject.layer;
                 corridorMeshRenderer.sharedMaterial = ground.SharedMaterial;
                 ground.ApplySurfaceProfileMaterialProperties(
-                    corridorMeshRenderer);
+                    corridorMeshRenderer,
+                    GroundSurfaceRenderRole.RiverCorridor);
             }
             else
             {
@@ -5618,7 +5619,8 @@ namespace ProgrammaticStylized3D.Rivers
                 corridorObject.layer = ground.gameObject.layer;
                 corridorMeshRenderer.sharedMaterial = ground.SharedMaterial;
                 ground.ApplySurfaceProfileMaterialProperties(
-                    corridorMeshRenderer);
+                    corridorMeshRenderer,
+                    GroundSurfaceRenderRole.RiverCorridor);
             }
             else
             {
@@ -5963,7 +5965,8 @@ namespace ProgrammaticStylized3D.Rivers
                     corridorMeshRenderer.sharedMaterial =
                         ground.SharedMaterial;
                     ground.ApplySurfaceProfileMaterialProperties(
-                        corridorMeshRenderer);
+                        corridorMeshRenderer,
+                        GroundSurfaceRenderRole.RiverCorridor);
                 }
                 else
                 {

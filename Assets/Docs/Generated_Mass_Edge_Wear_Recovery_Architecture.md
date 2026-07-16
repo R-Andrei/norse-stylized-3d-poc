@@ -1373,3 +1373,81 @@ R11B.1E remains the immutable geometry baseline. R12A adds no selection or geome
 The audit separately records diagnostic context that does not currently influence that formula: edge-axis verticality, a camera-independent owner-normal silhouette potential, maximum preflight width fraction, final solved-width fraction, local viable-edge density measured within the existing `maximumDimension * 0.34` length-score normalization scale, and shared-vertex crowding. The report marks each of these context weights as zero so later R12B decisions cannot accidentally treat descriptive evidence as an already-active selector.
 
 The selection audit is captured after the unchanged descending score sort and Coverage count resolution. Per-edge evidence includes exact score components, eligibility gates, artistic filter reason, selection rank, selection threshold, and score delta. Aggregate evidence includes filter reasons; score minimum/median/maximum for all, selected, and filtered populations; and four-bin distributions for length, dihedral, edge orientation, silhouette potential, local density, and vertex crowding. Both 33-case policies retain their R11B.1E pass/fail rules. Contracts are `EW-B4.2R12A-suite`, `EW-B4.2R12A-topology`, and `EW-B4.2R12A-preview`.
+
+
+## EW-B4.2R12A.1 — one-pass comprehensive artistic evidence contract
+
+R12A.1 is diagnostic-only and sits strictly above the locked R11B.1E geometry boundary. It may read immutable artistic-preview case records and simulate alternative rankings in editor memory, but it may not alter source topology, geometric or coexistence eligibility, hard runtime gates, the production score, Coverage, widths, corner solving, plane-shell construction, placement, or certification.
+
+The canonical one-click suite owns the evidence lifecycle. It reuses the already-generated eleven-seed by three-width artistic-preview matrix, exports every source edge and all known selection/viability/effect fields, evaluates the complete declared scenario universe, analyzes every possible selected slot plus 10%-100% Coverage deciles, writes the three comprehensive Library reports, and embeds the decisive evidence in the single combined validation report.
+
+This patch is intended to end telemetry-by-installment. Any later artistic-selection proposal must be justified from the R12A.1 raw edge table, scenario table, correlations, cutoff sensitivity, Pareto evidence, and width stability. New instrumentation is justified only when a genuinely new runtime variable does not exist in the comprehensive export; it must not be used as a substitute for analyzing the captured evidence.
+
+R12A.1 pass/fail remains subordinate to the existing geometry contracts: both 33-case matrices must pass, collateral lost/changed must remain zero, the current score must reproduce from exported components, all comprehensive outputs must be available, and the selected mass state must remain preserved.
+
+
+## EW-B4.2R12A.1b — recorded-rank analyzer correction
+
+The comprehensive analyzer's exact-current baseline is the production artistic ranking captured before coexistence removes later-incompatible candidates. R12A.1b validates the complete `GeometricEligible && ArtisticEligible` rank universe against `ArtisticEligibleCount`, validates final surviving candidates separately against `CandidateCount`, and permits post-coexistence gaps in `CandidateIndex`. Recorded ranks remain unique, contiguous, finite, and score-nonincreasing across the original artistic population. Alternative hypothetical policies retain deterministic source-edge tie-breaking.
+
+Runtime validation passed: the full suite and both `33/33` matrices passed, comprehensive evidence was produced, seed `5727` retained `34/34` active/certified bevels, collateral loss/change remained zero, and current-score reconstruction error was `1.49011612E-08`.
+
+
+## EW-B4.2R12B.1 — geometric-priority artistic selection
+
+R12B.1 is the first production artistic-policy change above the locked R11B.1E geometry boundary. The R12A.1b comprehensive evidence showed that the previous multiplicative placement modifiers dominated ranking: base suppression and upward boost correlated far more strongly with rank than the nominal angle and length terms. The production policy now restores geometric quality as the primary selector while retaining bounded positional character.
+
+The artistic angle gate changes from `angleScore > 0.035` to `angleScore > 0.055`, raising the approximate artistic dihedral floor from `17.94` degrees to `22.54` degrees. The geometric viability floor remains unchanged at `15` degrees.
+
+The authoritative score is:
+
+```text
+core = angleScore * 0.60
+     + lengthScore * 0.35
+     + deterministicRandom * 0.05
+
+basePriorityFactor = lerp(0.60, 1.00,
+    inverseLerp(0.06, 0.20, baseSuppression))
+
+upwardPriorityFactor = lerp(0.925, 1.075,
+    inverseLerp(0.82, 1.08, upwardEdgeBoost))
+
+score = core * basePriorityFactor * upwardPriorityFactor
+```
+
+`edgeCharacterBoost` remains recorded for evidence but no longer multiplies rank. It is object-wide and therefore cannot change intra-object ordering. Existing length and base gates, Coverage count resolution, descending candidate ordering, coexistence closure, width solving, corner solving, shell construction, and certification remain unchanged.
+
+The editor scenario analyzer applies the same compressed base/upward factors and treats `current-exact`, current ablations, modifier masks, gate masks, and current-plus context sweeps as R12B.1 policies. Scenario count and CSV schemas remain unchanged. Contracts advance to `EW-B4.2R12B.1-suite`, `EW-B4.2R12B.1-topology`, `EW-B4.2R12B.1-preview`, and `EW-B4.2R12B.1-comprehensive`.
+
+
+## GM-R12B.1C — accepted artistic baseline and render-integrity investigation boundary
+
+The accepted EW-B4.2R12B.1 runtime suite passed current preview, both `33/33` matrices, comprehensive analysis, recorded-rank integrity, score reproduction, and collateral preservation. R12B.1 is therefore the authoritative artistic-selection baseline. No further ranking adjustment is justified by the current outliers.
+
+The remaining visibly important missing bevels are classified as geometry-stage outliers: seed `2223` edge `36` and seed `8889` edges `13/23` fail isolated-rail viability, while seed `2223` edge `13` fails width/corner feasibility. This classification is current evidence, not a guarantee that the eventual render-mesh repair cannot alter their structural conditions. Any production fix involving shared mesh channels, vertex duplication, triangulation, UV semantics, or tangent ownership must re-evaluate those four edges before separate recovery work resumes.
+
+The immediate implementation is editor-only and read-only. `GeneratedMassEditor` audits the live `MeshFilter.sharedMesh`, writes `Library/GeneratedMassRenderMeshAudit.txt`, draws the worst triangle, and can create temporary `HideAndDontSave` proof clones for tangent replacement or Unlit isolation. These tools never regenerate or repair production geometry, never serialize a clone, and never change `MeshData`, `MeshBuilder`, Generated Mass UV construction, shaders, materials, scenes, or prefabs. A production repair is prohibited until the audit and proof clone identify the exact failing channel.
+
+
+## GM-R12B.1D — render-normal integrity ownership
+
+The black-triangle/Bloom artifact is proven to originate from invalid Generated Mass stored normals, not from non-finite tangents. `Rock_14`, `Rock_18`, and the seed `8889` bevel preview each emitted `27` zero normals over `9` flat-shaded triangles while tangent magnitudes remained finite and equal to one. Ordinary offending meshes had no UV-degenerate or UV-ill-conditioned triangles, so UV-based tangent reconstruction is not the common root cause.
+
+Generated Mass previously accepted a triangle cross product when its squared magnitude exceeded `MinimumEdgeLengthSqr = 1E-12`, then delegated normalization to `Vector3.normalized`. Cross magnitudes in the interval accepted by the generator but below Unity's internal normalization epsilon could therefore become `(0,0,0)`. GM-R12B.1D established Generated Mass ownership through explicit normalization, pre-application channel validation, and a final post-tangent Unity-mesh channel guard. Its first helper still reused the edge-length-squared threshold for cross-product-squared magnitude; GM-R12B.1E removes that dimensional mismatch while preserving the ownership boundary. Shared `MeshData` and `MeshBuilder` behavior remain unchanged.
+
+The production generation contract advances to version `2`, forcing old accepted transient meshes to rebuild once. This is a render-channel semantic correction only; positions, indices, UV projection, topology, edge-wear ranking, widths, and shell construction are unchanged. The four unresolved bevel outliers must nevertheless be re-evaluated after rebuild before their geometry classes are treated as independent conclusively.
+
+The editor audit contract is `GM-R12B.1D-render-audit-v2`. Zero normals are hard failures and outrank UV-conditioning warnings. The temporary proof path repairs invalid normals from exact triangle winding, then rebuilds only affected or otherwise unsafe tangents; it remains `HideAndDontSave` and never replaces serialized or production geometry.
+
+
+## GM-R12B.1E — scale-correct normal normalization
+
+GM-R12B.1D successfully removed the black-triangle/Bloom artifact from `Rock_14` and `Rock_18`: regenerated meshes reported zero missing, non-finite, zero, or non-unit normals/tangents, and the visible artifacts disappeared. Its first implementation nevertheless rejected seed `8889` face `76`, whose double area was `8.559025E-07` but whose relative area was a healthy `0.296998173`.
+
+The rejection was dimensional, not geometric. `MinimumEdgeLengthSqr` is a length-squared threshold, while a cross-product squared magnitude is length-to-the-fourth. Comparing those quantities imposed an unintended absolute triangle-size floor and contradicted the existing scale-relative triangle acceptance contract.
+
+GM-R12B.1E therefore normalizes any finite mathematically non-zero vector with a double-precision magnitude calculation. Existing scale-relative geometry validation remains authoritative for triangle acceptance. Truly zero or non-finite cross products still fail deterministically; tiny valid triangles do not. Production, editor audit, and temporary proof paths use the same normalization semantics.
+
+Finite UV determinants below the diagnostic conditioning threshold remain reported because they can be useful rendering evidence, but they do not constitute a hard render-channel failure when positions, normals, tangents, UVs, colors, indices, winding, and 3D geometry are valid. The v3 audit reports `passed-with-warnings` rather than the ambiguous historical `flagged` status.
+
+No topology, triangulation, UV projection, shared `MeshData`, shared `MeshBuilder`, shader, material, scene, prefab, edge-wear selection, or bevel-construction policy changes in this correction. Production generation contract version `2` remains current.

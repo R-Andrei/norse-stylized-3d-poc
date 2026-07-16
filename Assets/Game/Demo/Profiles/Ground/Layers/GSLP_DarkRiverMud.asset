@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 584ee81aadbc4e43b5e4816b7eef5b1c, type: 3}
+  m_Name: GSLP_DarkRiverMud
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GroundSurfaceLayerProfile
+  displayName: Dark River Mud
+  baseColor: {r: 0.22, g: 0.18, b: 0.13, a: 1}
+  darkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
+  lightColor: {r: 0.32, g: 0.27, b: 0.19, a: 1}
+  wetColor: {r: 0.1, g: 0.09, b: 0.07, a: 1}
+  macroContrast: 0.35
+  pixelContrast: 0.3
+  drySmoothness: 0.22
+  drySpecularStrength: 0.1
+  wetDarkening: 0.45
+  wetTintStrength: 0.9
+  wetSmoothness: 0.72
+  vegetationRetention: 0.08
+  snowRetention: 0.15
+  frostRetention: 0.1
+  paintedAccentRetention: 0.1

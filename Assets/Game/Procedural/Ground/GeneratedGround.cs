@@ -15,6 +15,12 @@ using ProgrammaticStylized3D.Rivers;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
+    public enum GroundSurfaceRenderRole
+    {
+        OrdinaryGround = 0,
+        RiverCorridor = 1
+    }
+
     public enum GroundPatchSize
     {
         [InspectorName("Compact")]
@@ -117,6 +123,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         [InspectorName("Ground Macro Weighted Tonal Influence")]
         GroundMacroWeightedTonalInfluence = 31,
+
+        [InspectorName("Ground Riverbed Support")]
+        GroundRiverbedSupport = 32,
+
+        [InspectorName("Ground Bank Material Blend")]
+        GroundBankMaterialBlend = 33,
+
+        [InspectorName("Ground Bank Layer Identity")]
+        GroundBankLayerIdentity = 34,
+
+        [InspectorName("Ground Outer Bank Extension")]
+        GroundOuterBankExtension = 35,
+
+        [InspectorName("Ground Bank Cover Retreat")]
+        GroundBankCoverRetreat = 36,
+
+        [InspectorName("Ground Bank Painted Accent Retreat")]
+        GroundBankPaintedAccentRetreat = 37,
     }
 
     public enum PaintedAccentGlyphFamilyPreview
@@ -729,6 +753,44 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundRockyDryResponse");
         private static readonly int GroundShoreDampStrengthId =
             Shader.PropertyToID("_GroundShoreDampStrength");
+        private static readonly int GroundRiverCoupledEnabledId =
+            Shader.PropertyToID("_GroundRiverCoupledEnabled");
+        private static readonly int GroundBankLayerEnabledId =
+            Shader.PropertyToID("_GroundBankLayerEnabled");
+        private static readonly int GroundBankLayerBaseColorId =
+            Shader.PropertyToID("_GroundBankLayerBaseColor");
+        private static readonly int GroundBankLayerDarkColorId =
+            Shader.PropertyToID("_GroundBankLayerDarkColor");
+        private static readonly int GroundBankLayerLightColorId =
+            Shader.PropertyToID("_GroundBankLayerLightColor");
+        private static readonly int GroundBankLayerMacroContrastId =
+            Shader.PropertyToID("_GroundBankLayerMacroContrast");
+        private static readonly int GroundBankLayerPixelContrastId =
+            Shader.PropertyToID("_GroundBankLayerPixelContrast");
+        private static readonly int GroundBankLayerDrySmoothnessId =
+            Shader.PropertyToID("_GroundBankLayerDrySmoothness");
+        private static readonly int GroundBankLayerDrySpecularStrengthId =
+            Shader.PropertyToID("_GroundBankLayerDrySpecularStrength");
+        private static readonly int GroundBankLayerCoverRetentionId =
+            Shader.PropertyToID("_GroundBankLayerCoverRetention");
+        private static readonly int GroundBankCoverRetreatStrengthId =
+            Shader.PropertyToID("_GroundBankCoverRetreatStrength");
+        private static readonly int GroundBankMaterialStrengthId =
+            Shader.PropertyToID("_GroundBankMaterialStrength");
+        private static readonly int GroundBankMaterialReachId =
+            Shader.PropertyToID("_GroundBankMaterialReach");
+        private static readonly int GroundImmediateBankExposureId =
+            Shader.PropertyToID("_GroundImmediateBankExposure");
+        private static readonly int GroundWaterlineMaterialStrengthId =
+            Shader.PropertyToID("_GroundWaterlineMaterialStrength");
+        private static readonly int GroundBankTransitionSoftnessId =
+            Shader.PropertyToID("_GroundBankTransitionSoftness");
+        private static readonly int GroundOuterBankExtensionId =
+            Shader.PropertyToID("_GroundOuterBankExtension");
+        private static readonly int GroundOuterBankStrengthId =
+            Shader.PropertyToID("_GroundOuterBankStrength");
+        private static readonly int GroundOuterBankFadeId =
+            Shader.PropertyToID("_GroundOuterBankFade");
         private static readonly int PixelCellSizeId =
             Shader.PropertyToID("_PixelCellSize");
         private static readonly int PixelToneCountId =
@@ -914,6 +976,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public bool OverrideMaterialControls => overrideMaterialControls;
         public GeneratedGroundDebugView DebugView => debugView;
         public GroundSurfaceProfile SurfaceProfile => ResolveSurfaceProfile();
+        public GroundSurfaceLayerProfile BankSurfaceLayer =>
+            ResolveMaterialControls().BankSurfaceLayer;
+        public GroundSurfaceLayerProfile RiverbedSurfaceLayer =>
+            ResolveMaterialControls().RiverbedSurfaceLayer;
         public GroundSurfaceType SurfaceType => groundSurfaceType;
         public GroundSnowfieldVariant SnowfieldVariant => snowfieldVariant;
         public int ModifierCount => modifiers != null ? modifiers.Length : 0;
@@ -1188,12 +1254,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                 int geometrySignature =
                     CalculateGroundGeometrySignature(currentSnapshotSignature);
+                Mesh attachedGroundMesh =
+                    meshFilter != null
+                        ? meshFilter.sharedMesh
+                        : null;
+                bool legacyRiverCoupledGroundDataPresent =
+                    attachedGroundMesh != null &&
+                    attachedGroundMesh.HasVertexAttribute(
+                        UnityEngine.Rendering.VertexAttribute.TexCoord3);
                 bool geometryOutputMissing =
                     generatedMesh == null ||
                     meshFilter == null ||
                     meshFilter.sharedMesh != generatedMesh ||
                     baseSurface == null ||
-                    !baseSurface.IsValid;
+                    !baseSurface.IsValid ||
+                    legacyRiverCoupledGroundDataPresent;
                 bool geometryChanged =
                     !groundGeometryInitialized ||
                     geometryOutputMissing ||
@@ -1226,10 +1301,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         System.Diagnostics.Stopwatch.GetTimestamp();
                     using (MeshApplyProfilerMarker.Auto())
                     {
+                        generatedMesh.Clear(false);
                         MeshBuilder.ApplyToMesh(
                             meshData,
                             generatedMesh,
                             meshName);
+
+                        if (generatedMesh.HasVertexAttribute(
+                                UnityEngine.Rendering.VertexAttribute.TexCoord3))
+                        {
+                            throw new InvalidOperationException(
+                                "GeneratedGround must not contain River corridor " +
+                                "material-mask UV data.");
+                        }
+
                         meshFilter.sharedMesh = generatedMesh;
                     }
                     lastMeshApplyMilliseconds =
@@ -3720,15 +3805,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private void ApplySurfaceProfileMaterialProperties()
         {
-            ApplySurfaceProfileMaterialProperties(meshRenderer);
+            ApplySurfaceProfileMaterialProperties(
+                meshRenderer,
+                GroundSurfaceRenderRole.OrdinaryGround);
         }
 
-        public void ApplySurfaceProfileMaterialProperties(Renderer targetRenderer)
+        public void ApplySurfaceProfileMaterialProperties(
+            Renderer targetRenderer,
+            GroundSurfaceRenderRole renderRole)
         {
             if (targetRenderer == null)
             {
                 return;
             }
+
+            float riverCoupledEnabled = renderRole switch
+            {
+                GroundSurfaceRenderRole.OrdinaryGround => 0f,
+                GroundSurfaceRenderRole.RiverCorridor => 1f,
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(renderRole),
+                    renderRole,
+                    "Unsupported Ground surface render role.")
+            };
 
             GroundSurfaceProfile resolvedSurfaceProfile =
                 ResolveSurfaceProfile();
@@ -3770,6 +3869,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 resolvedMaterialControls.BaseColor);
             materialProperties.SetFloat(SurfaceContractId, 1f);
             materialProperties.SetFloat(
+                GroundRiverCoupledEnabledId,
+                riverCoupledEnabled);
+            materialProperties.SetFloat(
                 ProfileContrastId,
                 Mathf.Lerp(0.85f, 1.35f, patchContrast) *
                 resolvedMaterialControls.ProfileContrastScale);
@@ -3799,6 +3901,90 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 GroundShoreDampStrengthId,
                 Mathf.Lerp(0.75f, 1.35f, rainAbsorption) *
                 resolvedMaterialControls.GroundShoreDampStrengthScale);
+
+            GroundSurfaceLayerProfile bankSurfaceLayer =
+                resolvedMaterialControls.BankSurfaceLayer;
+            bool hasBankSurfaceLayer = bankSurfaceLayer != null;
+            Color inheritedLayerColor = resolvedMaterialControls.BaseColor;
+
+            materialProperties.SetFloat(
+                GroundBankLayerEnabledId,
+                hasBankSurfaceLayer ? 1f : 0f);
+            materialProperties.SetColor(
+                GroundBankLayerBaseColorId,
+                hasBankSurfaceLayer
+                    ? bankSurfaceLayer.BaseColor
+                    : inheritedLayerColor);
+            materialProperties.SetColor(
+                GroundBankLayerDarkColorId,
+                hasBankSurfaceLayer
+                    ? bankSurfaceLayer.DarkColor
+                    : inheritedLayerColor);
+            materialProperties.SetColor(
+                GroundBankLayerLightColorId,
+                hasBankSurfaceLayer
+                    ? bankSurfaceLayer.LightColor
+                    : inheritedLayerColor);
+            materialProperties.SetFloat(
+                GroundBankLayerMacroContrastId,
+                hasBankSurfaceLayer
+                    ? bankSurfaceLayer.MacroContrast
+                    : 0f);
+            materialProperties.SetFloat(
+                GroundBankLayerPixelContrastId,
+                hasBankSurfaceLayer
+                    ? bankSurfaceLayer.PixelContrast
+                    : 0f);
+            materialProperties.SetFloat(
+                GroundBankLayerDrySmoothnessId,
+                hasBankSurfaceLayer
+                    ? bankSurfaceLayer.DrySmoothness
+                    : resolvedMaterialControls.Smoothness);
+            materialProperties.SetFloat(
+                GroundBankLayerDrySpecularStrengthId,
+                hasBankSurfaceLayer
+                    ? bankSurfaceLayer.DrySpecularStrength
+                    : resolvedMaterialControls.SpecularStrength);
+            materialProperties.SetVector(
+                GroundBankLayerCoverRetentionId,
+                hasBankSurfaceLayer
+                    ? new Vector4(
+                        bankSurfaceLayer.VegetationRetention,
+                        bankSurfaceLayer.SnowRetention,
+                        bankSurfaceLayer.FrostRetention,
+                        bankSurfaceLayer.PaintedAccentRetention)
+                    : Vector4.one);
+            materialProperties.SetVector(
+                GroundBankCoverRetreatStrengthId,
+                new Vector4(
+                    resolvedMaterialControls.VegetationRetreatStrength,
+                    resolvedMaterialControls.SnowMeltStrength,
+                    resolvedMaterialControls.FrostRetreatStrength,
+                    resolvedMaterialControls.PaintedAccentRetreatStrength));
+            materialProperties.SetFloat(
+                GroundBankMaterialStrengthId,
+                resolvedMaterialControls.BankMaterialStrength);
+            materialProperties.SetFloat(
+                GroundBankMaterialReachId,
+                resolvedMaterialControls.BankMaterialReach);
+            materialProperties.SetFloat(
+                GroundImmediateBankExposureId,
+                resolvedMaterialControls.ImmediateBankExposure);
+            materialProperties.SetFloat(
+                GroundWaterlineMaterialStrengthId,
+                resolvedMaterialControls.WaterlineMaterialStrength);
+            materialProperties.SetFloat(
+                GroundBankTransitionSoftnessId,
+                resolvedMaterialControls.BankTransitionSoftness);
+            materialProperties.SetFloat(
+                GroundOuterBankExtensionId,
+                resolvedMaterialControls.OuterBankExtension);
+            materialProperties.SetFloat(
+                GroundOuterBankStrengthId,
+                resolvedMaterialControls.OuterBankStrength);
+            materialProperties.SetFloat(
+                GroundOuterBankFadeId,
+                resolvedMaterialControls.OuterBankFade);
             materialProperties.SetFloat(
                 PixelCellSizeId,
                 resolvedMaterialControls.PixelCellSize);

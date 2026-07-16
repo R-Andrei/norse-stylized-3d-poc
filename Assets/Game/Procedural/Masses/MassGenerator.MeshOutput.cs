@@ -396,14 +396,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 faceNormal;
                 if (hasAuthoredSurfaceNormal)
                 {
-                    if (Vector3.Dot(normal, authoredSurfaceNormal) < 0f)
+                    if (!TryNormalizeMassVector(
+                            authoredSurfaceNormal,
+                            out faceNormal))
+                    {
+                        throw new InvalidOperationException(
+                            "Generated mass face " + faceIndex +
+                            " contains an invalid authored render normal.");
+                    }
+                    if (Vector3.Dot(normal, faceNormal) < 0f)
                     {
                         Vector3 temporary = b;
                         b = c;
                         c = temporary;
                         normal = -normal;
                     }
-                    faceNormal = authoredSurfaceNormal;
                 }
                 else
                 {
@@ -416,9 +423,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         normal = -normal;
                     }
 
-                    faceNormal = normal.sqrMagnitude > MinimumEdgeLengthSqr
-                        ? normal.normalized
-                        : Vector3.up;
+                    if (!TryNormalizeMassVector(normal, out faceNormal))
+                    {
+                        throw new InvalidOperationException(
+                            "Generated mass face " + faceIndex +
+                            " cannot produce a finite unit render normal " +
+                            "from its accepted triangle geometry.");
+                    }
                 }
                 PolygonFaceFeature faceFeature = soup.ResolveFeature(i);
                 float faceFeatureStrength = soup.ResolveFeatureStrength(i);
@@ -481,7 +492,109 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 meshData.AddTriangle(indexA, indexB, indexC);
             }
 
+            ValidateGeneratedMassMeshData(meshData);
             return meshData;
+        }
+
+        private static void ValidateGeneratedMassMeshData(
+            MeshData meshData)
+        {
+            if (meshData == null)
+            {
+                throw new ArgumentNullException(nameof(meshData));
+            }
+            if (meshData.Vertices.Count < 3 ||
+                meshData.Triangles.Count == 0 ||
+                meshData.Triangles.Count % 3 != 0 ||
+                meshData.Normals.Count != meshData.Vertices.Count ||
+                meshData.UV0.Count != meshData.Vertices.Count ||
+                meshData.Colors.Count != meshData.Vertices.Count ||
+                meshData.UV2.Count != meshData.Vertices.Count)
+            {
+                throw new InvalidOperationException(
+                    "Generated mass render channels are incomplete.");
+            }
+
+            for (int vertexIndex = 0;
+                 vertexIndex < meshData.Vertices.Count;
+                 vertexIndex++)
+            {
+                Vector3 position = meshData.Vertices[vertexIndex];
+                Vector3 normal = meshData.Normals[vertexIndex];
+                Vector2 uv0 = meshData.UV0[vertexIndex];
+                Color color = meshData.Colors[vertexIndex];
+                Vector4 uv2 = meshData.UV2[vertexIndex];
+                if (!IsFiniteMassVector(position) ||
+                    !TryNormalizeMassVector(normal, out _) ||
+                    !IsFiniteMassValue(uv0.x) ||
+                    !IsFiniteMassValue(uv0.y) ||
+                    !IsFiniteMassValue(color.r) ||
+                    !IsFiniteMassValue(color.g) ||
+                    !IsFiniteMassValue(color.b) ||
+                    !IsFiniteMassValue(color.a) ||
+                    !IsFiniteMassValue(uv2.x) ||
+                    !IsFiniteMassValue(uv2.y) ||
+                    !IsFiniteMassValue(uv2.z) ||
+                    !IsFiniteMassValue(uv2.w))
+                {
+                    throw new InvalidOperationException(
+                        "Generated mass render channel is invalid at " +
+                        "vertex " + vertexIndex + ".");
+                }
+            }
+
+            for (int triangleOffset = 0;
+                 triangleOffset < meshData.Triangles.Count;
+                 triangleOffset += 3)
+            {
+                int indexA = meshData.Triangles[triangleOffset];
+                int indexB = meshData.Triangles[triangleOffset + 1];
+                int indexC = meshData.Triangles[triangleOffset + 2];
+                if (indexA < 0 || indexA >= meshData.Vertices.Count ||
+                    indexB < 0 || indexB >= meshData.Vertices.Count ||
+                    indexC < 0 || indexC >= meshData.Vertices.Count)
+                {
+                    throw new InvalidOperationException(
+                        "Generated mass triangle contains an invalid " +
+                        "vertex index.");
+                }
+
+                Vector3 geometricNormal = Vector3.Cross(
+                    meshData.Vertices[indexB] -
+                        meshData.Vertices[indexA],
+                    meshData.Vertices[indexC] -
+                        meshData.Vertices[indexA]);
+                if (!TryNormalizeMassVector(
+                        geometricNormal,
+                        out Vector3 normalizedGeometricNormal))
+                {
+                    throw new InvalidOperationException(
+                        "Generated mass triangle " +
+                        (triangleOffset / 3) +
+                        " cannot produce a finite geometric normal.");
+                }
+
+                float minimumNormalDot = Mathf.Min(
+                    Vector3.Dot(
+                        normalizedGeometricNormal,
+                        meshData.Normals[indexA]),
+                    Mathf.Min(
+                        Vector3.Dot(
+                            normalizedGeometricNormal,
+                            meshData.Normals[indexB]),
+                        Vector3.Dot(
+                            normalizedGeometricNormal,
+                            meshData.Normals[indexC])));
+                if (!IsFiniteMassValue(minimumNormalDot) ||
+                    minimumNormalDot < 0.5f)
+                {
+                    throw new InvalidOperationException(
+                        "Generated mass triangle " +
+                        (triangleOffset / 3) +
+                        " contains a render normal that disagrees with " +
+                        "its winding.");
+                }
+            }
         }
 
         private static int AddRenderedVertex(

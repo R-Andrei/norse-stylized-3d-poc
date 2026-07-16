@@ -1244,3 +1244,122 @@ R12A is telemetry-only. It does not alter geometric eligibility, candidate order
 `CaptureEdgeWearArtisticSelectionAudit` runs after the unchanged descending score sort and selected-count calculation. It records the actual selection rank, threshold score, and threshold delta without changing the ordered candidate list. `MassGenerator.EdgeWear.Diagnostics.Logging.cs` adds an `[Artistic Selection Audit]` section with filter-reason counts, all/selected/filtered score ranges, and length, dihedral, orientation, silhouette, density, and crowding distributions. Every bin reports `all/selected/artistically-filtered` counts.
 
 `EdgeWearBatchAuditCaseResult` and `Editor/GeneratedMassEditor.cs` project the same audit into both 33-case matrix TXT/CSV reports and the one-click combined report. Matrix pass criteria are unchanged. Report contracts advance to `EW-B4.2R12A-suite`, `EW-B4.2R12A-topology`, and `EW-B4.2R12A-preview`.
+
+
+## EW-B4.2R12A.1 comprehensive artistic evidence suite
+
+### `MassGenerator.cs`
+
+`EdgeWearArtisticEdgeAuditRecord` is the complete editor-only export boundary for artistic analysis. It carries canonical source identity, endpoints and midpoint, both owner normals and the bevel normal, owner faces, length, dihedral, orientation, seam provenance, every structural/geometric/coexistence/artistic gate, score inputs and multiplicative modifiers, diagnostic context, locality and isolated-rail evidence, effect variation/strength/depth, solved/materialized width, and the final lifecycle state. `EdgeWearBatchAuditCaseResult.ArtisticEdges` exposes the immutable per-case record set to the editor without changing runtime selection.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+The existing candidate pass now copies already-computed geometry, normal, score-component, effect, and context values into the lifecycle record. The production score formula, hard artistic gates, descending score ordering, Coverage selected-count calculation, and generated bevel geometry remain unchanged.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+`PopulateEdgeWearArtisticEdgeRecords` maps the complete lifecycle and viability evidence into the editor-only public record array after each batch case. The export is ordered by canonical source-edge ID and does not recalculate or mutate eligibility, score, width, or certification state.
+
+### `Editor/GeneratedMassEditor.cs`
+
+The one-click suite now derives a comprehensive scenario analysis from the existing 33 artistic-preview matrix cases; it performs no additional rock generation. The scenario universe includes the exact current policy, random/modifier/gate ablations, every angle/length/random weight triple on a 0.05 simplex under all eight modifier masks, all hard-gate masks, single-metric controls, signed context-weight sweeps, and named composite policies. Every fixed selected slot and native Coverage decile is analyzed.
+
+The combined report contains raw per-edge evidence, score/metric Pearson and Spearman correlations, Pareto-front and dominance evidence, per-edge rank ranges and selection frequencies across the full scenario universe, named-policy churn, every cutoff threshold and gap, no-random sensitivity, scenario intersection/union/core evidence, and cross-width rank/Jaccard stability. The same run automatically writes full raw tables to `Library/GeneratedMassEdgeWearArtisticComprehensiveAudit.txt`, `Library/GeneratedMassEdgeWearArtisticComprehensiveEdges.csv`, and `Library/GeneratedMassEdgeWearArtisticComprehensiveScenarios.csv`. The user still needs to copy only `GeneratedMassEdgeWearValidationSuite.txt`.
+
+Contracts are `EW-B4.2R12A.1-suite`, `EW-B4.2R12A.1-topology`, `EW-B4.2R12A.1-preview`, and `EW-B4.2R12A.1-comprehensive`.
+
+
+## EW-B4.2R12A.1b recorded-rank analyzer correction inventory
+
+`Editor/GeneratedMassEditor.cs` treats the complete pre-coexistence `GeometricEligible && ArtisticEligible` population as the production rank universe and validates final surviving `Candidate` membership separately. This preserves legitimate original ranks when coexistence later removes candidates. The exact-current outcome uses recorded production ranks; score reconstruction remains independent.
+
+
+## EW-B4.2R12B.1 geometric-priority selection inventory
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+The artistic angle gate is `angleScore > 0.055`. Candidate score uses angle/length/random weights `0.60/0.35/0.05`, a base priority factor compressed to `0.60..1.00`, and an upward priority factor compressed to `0.925..1.075`. Raw `ArtisticBaseSuppression` and `ArtisticUpwardEdgeBoost` values remain recorded so the analyzer can reproduce the compressed factors. `ArtisticCharacterBoost` remains exported but no longer affects ordering.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+The artistic-selection summary reports the R12B.1 score contract. Existing fields, distributions, and CSV projections remain unchanged.
+
+### `Editor/GeneratedMassEditor.cs`
+
+`current-exact` uses weights `0.60/0.35/0.05`, base and upward modifier masks only, and the same factor compression as production. Current-policy ablations and current-plus context sweeps use the R12B.1 baseline. Hypothetical modifier masks may still include character boost as an explicit counterfactual. Scenario count, raw edge export, scenario export, and rank-integrity validation remain unchanged. Report contracts are `EW-B4.2R12B.1-suite`, `EW-B4.2R12B.1-topology`, `EW-B4.2R12B.1-preview`, and `EW-B4.2R12B.1-comprehensive`.
+
+
+## GM-R12B.1C live render-mesh audit and proof inventory — superseded diagnostic baseline
+
+### `Editor/GeneratedMassEditor.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `DrawRenderMeshDiagnostics` | Exposes the explicit single-object live-mesh audit, report copy/reveal, Scene-view controls, and temporary proof actions. |
+| `BuildRenderMeshAudit` | Reads the current `MeshFilter.sharedMesh` and audits channel counts/finiteness, vector magnitudes, robust position outliers, triangle area/conditioning, UV determinants, stored-normal agreement, and outward winding without mutating the mesh. |
+| `BuildRenderMeshTriangleAudit` | Captures exact per-triangle positions, indices, UV0, normals, tangents, colors, UV2, 3D area, relative area, UV determinant, normal agreement, and winding evidence. |
+| `BuildRenderMeshAuditReport` | Originally wrote `GM-R12B.1-render-audit-v1`; GM-R12B.1D supersedes this contract with the zero-normal-aware v2 report. |
+| `DrawRenderMeshAuditSceneOverlay` | Draws the selected worst triangle, indices, and failure reason with depth-tested or X-ray Handles. |
+| `CreateRenderMeshProofClone` | Creates one temporary `HideAndDontSave` clone at the exact source transform while temporarily suppressing the source renderer. |
+| `RepairProofMeshTangents` | Historical tangent-only proof helper. Removed and replaced by `RepairProofMeshNormalsAndTangents` in GM-R12B.1D after the proof failed on zero stored normals. |
+| `DestroyRenderMeshProofClone` | Restores the source renderer and destroys all temporary proof objects, meshes, and materials on explicit removal or editor deselection. |
+
+No production or shared procedural file changes in this patch. `MeshData.cs`, `MeshBuilder.cs`, `MassGenerator.MeshOutput.cs`, shaders, materials, and serialized assets remain unchanged pending proof.
+
+
+## GM-R12B.1D render-normal repair inventory
+
+### `MassGenerator.Types.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `TryNormalizeMassVector` | GM-R12B.1D introduced explicit normalization to avoid Unity's larger `Vector3.normalized` zero cutoff; GM-R12B.1E corrects it to accept every finite mathematically non-zero vector using double-precision magnitude evaluation. |
+| `TriangleSoup.AddTriangle` | Stores authored normals only through the explicit normalization contract; invalid authored normals remain absent and fall back to geometric face-normal construction. |
+
+### `MassGenerator.MeshOutput.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `BuildMeshData` | Uses explicit authored/geometric normal normalization and fails deterministically instead of emitting `Vector3.up` or zero normals. |
+| `ValidateGeneratedMassMeshData` | Verifies complete finite Generated Mass channels, valid indices, normalizable geometric triangles, and stored-normal agreement before `MeshBuilder` application. |
+
+### `GeneratedMass.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `ProductionGenerationContractVersion = 2` | Invalidates previously accepted transient meshes after the render-normal semantic correction. |
+| `ValidateGeneratedRenderMeshChannels` | Runs once after `MeshBuilder.ApplyToMesh` and tangent recalculation to require complete finite unit normals/tangents, valid handedness, positions, UV0, UV2, and colors. |
+
+### `Editor/GeneratedMassEditor.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `BuildRenderMeshAudit` | Treats zero normals as hard failures and chooses them ahead of UV-conditioning warnings. |
+| `BuildRenderMeshAuditReport` | Emits `GM-R12B.1D-render-audit-v2` with explicit zero-normal triangle flags. |
+| `RepairProofMeshNormalsAndTangents` | Reconstructs invalid proof-clone normals from exact triangle geometry, then rebuilds only affected or unsafe tangents. |
+
+No changes are made to shared `MeshData.cs`, `MeshBuilder.cs`, shaders, materials, scenes, prefabs, UV projection, or edge-wear geometry.
+
+
+## GM-R12B.1E scale-correct render-normal correction inventory
+
+### `MassGenerator.Types.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `TryNormalizeMassVector` | Normalizes every finite mathematically non-zero vector using a double-precision magnitude calculation. It no longer compares cross-product magnitude squared (length^4) with `MinimumEdgeLengthSqr` (length^2). |
+
+### `MassGenerator.MeshOutput.cs`
+
+`BuildMeshData` and `ValidateGeneratedMassMeshData` retain the GM-R12B.1D hard channel contract, but tiny scale-valid triangles such as seed `8889` face `76` now produce a finite unit normal instead of failing the incorrect absolute cutoff. No source positions, indices, UVs, feature channels, topology, or tangent-generation ownership changes.
+
+### `Editor/GeneratedMassEditor.cs`
+
+| Symbol | Responsibility |
+|---|---|
+| `TryNormalizeRenderMeshVector` | Mirrors production's finite non-zero, double-precision normalization contract for audits and proof clones. |
+| `BuildRenderMeshTriangleAudit` | Computes geometric normals through the robust helper rather than Unity's small-vector normalization epsilon. |
+| `BuildRenderMeshAuditReport` | Emits `GM-R12B.1E-render-audit-v3`, with `passed`, `passed-with-warnings`, or `failed` status. Finite UV-conditioning observations remain warnings and do not represent channel failure. |
+| `RepairProofMeshNormalsAndTangents` | Can reconstruct normals and tangents for tiny valid proof triangles without rejecting them through the former absolute cutoff. |
+
+`ProductionGenerationContractVersion` remains `2`: GM-R12B.1E corrects an over-restrictive implementation of the already-promoted render-normal contract and introduces no new serialized or reusable mesh semantics.

@@ -110,6 +110,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         Key = edgeKey,
                         Start = edge.Start,
                         End = edge.End,
+                        Midpoint = midpoint,
                         FaceCount = edge.FaceIndices.Count,
                         Length = length,
                         CoincidentBoundarySeamReconciled =
@@ -231,6 +232,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 lifecycle.StructuralEligible = true;
                 Vector3 bevelNormal = normalSum.normalized;
                 Vector3 edgeDirection = (edge.End - edge.Start) / length;
+                lifecycle.OwnerNormalA = first.Normal;
+                lifecycle.OwnerNormalB = second.Normal;
+                lifecycle.BevelNormal = bevelNormal;
                 float angleScore = Mathf.Clamp01(
                     (1f - Vector3.Dot(first.Normal, second.Normal)) * 0.72f);
                 float baseSuppression = Mathf.SmoothStep(
@@ -239,13 +243,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     lifecycle.Vertical01);
                 bool artisticLengthEligible =
                     length > artisticMinimumLength;
-                bool artisticAngleEligible = angleScore > 0.035f;
+                bool artisticAngleEligible = angleScore > 0.055f;
                 bool artisticBaseEligible = baseSuppression > 0.001f;
                 lifecycle.ArtisticMinimumLength = artisticMinimumLength;
                 lifecycle.ArtisticAngleScore = angleScore;
                 lifecycle.ArtisticBaseSuppression = baseSuppression;
                 lifecycle.ArtisticEdgeAxisVertical01 = Mathf.Clamp01(
                     Mathf.Abs(Vector3.Dot(edgeDirection, Vector3.up)));
+                lifecycle.ArtisticEdgeAxisAbsX = Mathf.Abs(edgeDirection.x);
+                lifecycle.ArtisticEdgeAxisAbsY = Mathf.Abs(edgeDirection.y);
+                lifecycle.ArtisticEdgeAxisAbsZ = Mathf.Abs(edgeDirection.z);
                 lifecycle.ArtisticSilhouettePotential = Mathf.Clamp01(
                     Mathf.Max(
                         new Vector2(first.Normal.x, first.Normal.z).magnitude,
@@ -313,6 +320,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     1.08f,
                     Mathf.Clamp01(
                         (first.Normal.y + second.Normal.y) * 0.5f + 0.5f));
+                float basePriorityFactor = Mathf.Lerp(
+                    0.60f,
+                    1.00f,
+                    Mathf.InverseLerp(0.06f, 0.20f, baseSuppression));
+                float upwardPriorityFactor = Mathf.Lerp(
+                    0.925f,
+                    1.075f,
+                    Mathf.InverseLerp(0.82f, 1.08f, upwardEdgeBoost));
                 float characterBoost = recipe.EdgeCharacter switch
                 {
                     EdgeCharacter.Sharp => 1.08f,
@@ -325,12 +340,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     settings.SurfaceSeed + 0x4A17,
                     midpoint + bevelNormal * 0.173f);
                 float score =
-                    (angleScore * 0.58f +
-                     lengthScore * 0.27f +
-                     random * 0.15f) *
-                    baseSuppression *
-                    upwardEdgeBoost *
-                    characterBoost;
+                    (angleScore * 0.60f +
+                     lengthScore * 0.35f +
+                     random * 0.05f) *
+                    basePriorityFactor *
+                    upwardPriorityFactor;
                 lifecycle.ArtisticLengthScore = lengthScore;
                 lifecycle.ArtisticUpwardEdgeBoost = upwardEdgeBoost;
                 lifecycle.ArtisticCharacterBoost = characterBoost;
@@ -352,6 +366,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     0.78f,
                     1.15f);
 
+                lifecycle.ArtisticDeterministicVariation =
+                    deterministicVariation;
+                lifecycle.ArtisticStrength = strength;
+                lifecycle.ArtisticDepthMultiplier = depthMultiplier;
                 lifecycle.Score = score;
                 provisionalCandidates.Add(
                     new EdgeWearBevelCandidate(
@@ -677,20 +695,46 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 return;
             }
+
+            EdgeWearEdgeLifecycleRecord[] recordByCandidateIndex =
+                new EdgeWearEdgeLifecycleRecord[orderedCandidates.Count];
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    audit.Records[recordIndex];
+                if (!record.Candidate ||
+                    record.CandidateIndex < 0 ||
+                    record.CandidateIndex >=
+                        recordByCandidateIndex.Length ||
+                    recordByCandidateIndex[record.CandidateIndex] != null)
+                {
+                    continue;
+                }
+                recordByCandidateIndex[record.CandidateIndex] = record;
+            }
+
             for (int rank = 0; rank < orderedCandidates.Count; rank++)
             {
                 EdgeWearBevelCandidate candidate = orderedCandidates[rank];
-                EdgeKey key = new EdgeKey(candidate.Start, candidate.End);
-                if (audit.RecordByKey.TryGetValue(
-                        key,
-                        out EdgeWearEdgeLifecycleRecord record))
+                if (candidate.CandidateIndex < 0 ||
+                    candidate.CandidateIndex >=
+                        recordByCandidateIndex.Length)
                 {
-                    record.ArtisticSelectionRank = rank + 1;
-                    record.ArtisticSelectionThreshold =
-                        audit.ArtisticSelectionThreshold;
-                    record.ArtisticSelectionDelta =
-                        record.Score - audit.ArtisticSelectionThreshold;
+                    continue;
                 }
+                EdgeWearEdgeLifecycleRecord record =
+                    recordByCandidateIndex[candidate.CandidateIndex];
+                if (record == null)
+                {
+                    continue;
+                }
+                record.ArtisticSelectionRank = rank + 1;
+                record.ArtisticSelectionThreshold =
+                    audit.ArtisticSelectionThreshold;
+                record.ArtisticSelectionDelta =
+                    record.Score - audit.ArtisticSelectionThreshold;
             }
         }
 

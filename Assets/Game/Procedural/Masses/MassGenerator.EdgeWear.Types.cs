@@ -2119,6 +2119,10 @@ private struct EdgeWearGraphBuildStats
             public int CandidateIndex = -1;
             public Vector3 Start;
             public Vector3 End;
+            public Vector3 Midpoint;
+            public Vector3 OwnerNormalA;
+            public Vector3 OwnerNormalB;
+            public Vector3 BevelNormal;
             public int FaceA = -1;
             public int FaceB = -1;
             public int FaceCount;
@@ -2134,6 +2138,9 @@ private struct EdgeWearGraphBuildStats
             public float ArtisticCharacterBoost = 1f;
             public float ArtisticRandomScore;
             public float ArtisticEdgeAxisVertical01;
+            public float ArtisticEdgeAxisAbsX;
+            public float ArtisticEdgeAxisAbsY;
+            public float ArtisticEdgeAxisAbsZ;
             public float ArtisticSilhouettePotential;
             public float ArtisticFeasibleWidthFraction;
             public float ArtisticSolvedWidthFraction;
@@ -2147,6 +2154,9 @@ private struct EdgeWearGraphBuildStats
             public bool ArtisticAngleEligible;
             public bool ArtisticBaseEligible;
             public string ArtisticFilterReason = string.Empty;
+            public float ArtisticDeterministicVariation;
+            public float ArtisticStrength;
+            public float ArtisticDepthMultiplier;
             public float SolvedWidth;
             public float MaterializedWidth;
             public float MaterializedWidthScale = 1f;

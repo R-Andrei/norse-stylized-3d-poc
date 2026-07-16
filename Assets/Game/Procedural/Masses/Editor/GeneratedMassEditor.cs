@@ -19,6 +19,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private static bool sourceEdgeIndexOverlayXRay;
         private static GeneratedMass sourceEdgeIndexOverlayTarget;
 
+        private const string RenderMeshAuditReportFileName =
+            "GeneratedMassRenderMeshAudit.txt";
+        private const float RenderMeshExtremeTangentMagnitude = 8f;
+        private const float RenderMeshMinimumVectorMagnitude = 0.000001f;
+        private const float RenderMeshMinimumVectorMagnitudeSqr =
+            RenderMeshMinimumVectorMagnitude *
+            RenderMeshMinimumVectorMagnitude;
+        private const float RenderMeshUnitVectorTolerance = 0.01f;
+        private const float RenderMeshDegenerateRelativeArea = 0.00000001f;
+        private const float RenderMeshSliverRelativeArea = 0.00001f;
+        private const float RenderMeshDegenerateUvDeterminant = 0.0000000001f;
+        private const float RenderMeshIllConditionedUvDeterminant = 0.000001f;
+        private const int RenderMeshWorstListCapacity = 8;
+
+        private static bool renderMeshAuditDrawWorstTriangle = true;
+        private static bool renderMeshAuditXRay;
+        private static int renderMeshAuditDrawTriangleOrdinal = -1;
+        private static GeneratedMass renderMeshAuditTarget;
+        private static RenderMeshAuditResult lastRenderMeshAudit;
+        private static GameObject renderMeshProofObject;
+        private static GeneratedMass renderMeshProofTarget;
+        private static Mesh renderMeshProofSourceMesh;
+        private static Mesh renderMeshProofMesh;
+        private static Material renderMeshProofMaterial;
+        private static MeshRenderer renderMeshProofSourceRenderer;
+        private static bool renderMeshProofSourceForceRenderingOff;
+        private static RenderMeshProofMode renderMeshProofMode;
+
         private static readonly int[] EdgeWearBatchShapeSeeds =
         {
             1,
@@ -50,6 +78,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         private const float EdgeWearBatchMinimumWidthScale = 0.25f;
 
+        private enum RenderMeshProofMode
+        {
+            None,
+            NormalTangentRepair,
+            Unlit
+        }
+
         private enum EdgeWearMatrixKind
         {
             TopologyViability,
@@ -73,6 +108,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             string.Empty;
         private const string EdgeWearValidationSuiteReportFileName =
             "GeneratedMassEdgeWearValidationSuite.txt";
+        private const string EdgeWearArtisticComprehensiveReportFileName =
+            "GeneratedMassEdgeWearArtisticComprehensiveAudit.txt";
+        private const string EdgeWearArtisticComprehensiveEdgesCsvFileName =
+            "GeneratedMassEdgeWearArtisticComprehensiveEdges.csv";
+        private const string
+            EdgeWearArtisticComprehensiveScenariosCsvFileName =
+                "GeneratedMassEdgeWearArtisticComprehensiveScenarios.csv";
 
         private const string ColdGreyStoneMaterialPath =
             "Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat";
@@ -130,6 +172,157 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             new GUIContent("Atlas Boundary Coarse Modulation", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
             new GUIContent("Atlas Boundary Fine Modulation", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry.")
         };
+
+        private sealed class RenderMeshAuditResult
+        {
+            public GeneratedMass Target;
+            public Mesh Mesh;
+            public string ObjectName = string.Empty;
+            public string EntityId = string.Empty;
+            public string MeshName = string.Empty;
+            public string Summary = string.Empty;
+            public string Report = string.Empty;
+            public string WorstReason = "none";
+            public int VertexCount;
+            public int NormalCount;
+            public int TangentCount;
+            public int Uv0Count;
+            public int ColorCount;
+            public int Uv2Count;
+            public int TriangleCount;
+            public int SubMeshCount;
+            public int NonFinitePositions;
+            public int PositionOutliers;
+            public int MissingOrPartialNormals;
+            public int NonFiniteNormals;
+            public int ZeroNormals;
+            public int NonUnitNormals;
+            public int MissingOrPartialTangents;
+            public int NonFiniteTangents;
+            public int ZeroTangents;
+            public int ExtremeTangents;
+            public int InvalidTangentHandedness;
+            public int MissingOrPartialUv0;
+            public int NonFiniteUv0;
+            public int MissingOrPartialColors;
+            public int NonFiniteColors;
+            public int OutOfRangeColors;
+            public int MissingOrPartialUv2;
+            public int NonFiniteUv2;
+            public int InvalidTriangleIndices;
+            public int NonFiniteTriangleGeometry;
+            public int DegenerateTriangles;
+            public int SliverTriangles;
+            public int UvDegenerateTriangles;
+            public int UvIllConditionedTriangles;
+            public int WindingFailures;
+            public int NormalAgreementFailures;
+            public float MaximumTangentMagnitude;
+            public float MaximumPositionDistance;
+            public float MedianPositionDistance;
+            public float MinimumRelativeArea = float.PositiveInfinity;
+            public float MinimumAbsoluteUvDeterminant = float.PositiveInfinity;
+            public float MinimumStoredNormalDot = 1f;
+            public float MinimumOutwardDot = 1f;
+            public int WorstTriangleOrdinal = -1;
+            public RenderMeshTriangleAudit WorstTriangle;
+            public readonly List<RenderMeshTriangleAudit>
+                Triangles = new();
+            public readonly List<RenderMeshRankedTriangle>
+                WorstUvTriangles = new();
+            public readonly List<RenderMeshRankedTriangle>
+                WorstTangentTriangles = new();
+
+            public bool ReadFailure;
+
+            public bool HasHardFailure =>
+                ReadFailure ||
+                NonFinitePositions > 0 ||
+                NonFiniteNormals > 0 ||
+                ZeroNormals > 0 ||
+                NonFiniteTangents > 0 ||
+                NonFiniteUv0 > 0 ||
+                NonFiniteColors > 0 ||
+                NonFiniteUv2 > 0 ||
+                InvalidTriangleIndices > 0 ||
+                NonFiniteTriangleGeometry > 0 ||
+                DegenerateTriangles > 0;
+
+            public bool HasWarning =>
+                PositionOutliers > 0 ||
+                MissingOrPartialNormals > 0 ||
+                NonUnitNormals > 0 ||
+                MissingOrPartialTangents > 0 ||
+                ZeroTangents > 0 ||
+                ExtremeTangents > 0 ||
+                InvalidTangentHandedness > 0 ||
+                MissingOrPartialUv0 > 0 ||
+                MissingOrPartialColors > 0 ||
+                OutOfRangeColors > 0 ||
+                MissingOrPartialUv2 > 0 ||
+                SliverTriangles > 0 ||
+                UvDegenerateTriangles > 0 ||
+                UvIllConditionedTriangles > 0 ||
+                WindingFailures > 0 ||
+                NormalAgreementFailures > 0;
+        }
+
+        private sealed class RenderMeshTriangleAudit
+        {
+            public int Ordinal;
+            public int IndexA;
+            public int IndexB;
+            public int IndexC;
+            public Vector3 PositionA;
+            public Vector3 PositionB;
+            public Vector3 PositionC;
+            public Vector2 UvA;
+            public Vector2 UvB;
+            public Vector2 UvC;
+            public Vector3 NormalA;
+            public Vector3 NormalB;
+            public Vector3 NormalC;
+            public Vector4 TangentA;
+            public Vector4 TangentB;
+            public Vector4 TangentC;
+            public Color ColorA;
+            public Color ColorB;
+            public Color ColorC;
+            public Vector4 Uv2A;
+            public Vector4 Uv2B;
+            public Vector4 Uv2C;
+            public float MinimumEdgeLength;
+            public float MaximumEdgeLength;
+            public float DoubleArea;
+            public float RelativeArea;
+            public float UvDeterminant;
+            public Vector3 GeometricNormal;
+            public float MinimumNormalDot;
+            public float OutwardDot;
+            public float MaximumTangentMagnitude;
+            public bool HasNonFiniteVertexChannel;
+            public bool ZeroNormal;
+            public bool Degenerate;
+            public bool Sliver;
+            public bool UvDegenerate;
+            public bool UvIllConditioned;
+            public bool WindingFailure;
+            public bool NormalAgreementFailure;
+        }
+
+        private readonly struct RenderMeshRankedTriangle
+        {
+            public RenderMeshRankedTriangle(
+                int triangleOrdinal,
+                float metric)
+            {
+                TriangleOrdinal = triangleOrdinal;
+                Metric = metric;
+            }
+
+            public int TriangleOrdinal { get; }
+            public float Metric { get; }
+        }
 
         private SerializedProperty coldGreyStoneMaterial;
         private SerializedProperty darkWetRiverStoneMaterial;
@@ -281,6 +474,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             SceneView.RepaintAll();
         }
 
+        [InitializeOnLoadMethod]
+        private static void RegisterRenderMeshProofCleanup()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -=
+                DestroyRenderMeshProofClone;
+            AssemblyReloadEvents.beforeAssemblyReload +=
+                DestroyRenderMeshProofClone;
+            EditorApplication.quitting -= DestroyRenderMeshProofClone;
+            EditorApplication.quitting += DestroyRenderMeshProofClone;
+            EditorApplication.playModeStateChanged -=
+                HandleRenderMeshProofPlayModeChange;
+            EditorApplication.playModeStateChanged +=
+                HandleRenderMeshProofPlayModeChange;
+        }
+
+        private static void HandleRenderMeshProofPlayModeChange(
+            PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingEditMode ||
+                state == PlayModeStateChange.ExitingPlayMode)
+            {
+                DestroyRenderMeshProofClone();
+            }
+        }
+
         private void OnEnable()
         {
             coldGreyStoneMaterial = serializedObject.FindProperty(
@@ -414,6 +632,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "impactRippleCollisionMode");
         }
 
+        private void OnDisable()
+        {
+            GeneratedMass mass = target as GeneratedMass;
+            if (mass != null && renderMeshProofTarget == mass)
+            {
+                DestroyRenderMeshProofClone();
+            }
+        }
+
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -481,6 +708,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             DrawEdgeWearBevelPreview();
             DrawSourceEdgeIndexDebug();
+            DrawRenderMeshDiagnostics();
 
             EditorGUILayout.Space(10f);
             EditorGUILayout.LabelField(
@@ -1172,6 +1400,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             suite.Cancelled = cancelled;
             suite.TerminalReason = terminalReason ?? string.Empty;
 
+            BuildEdgeWearArtisticComprehensiveEvidence(
+                suite,
+                out string comprehensiveReport,
+                out string comprehensiveEdgesCsv,
+                out string comprehensiveScenariosCsv,
+                out string comprehensiveDiagnostic);
+            suite.ComprehensiveArtisticReport =
+                comprehensiveReport ?? string.Empty;
+            suite.ComprehensiveArtisticDiagnostic =
+                comprehensiveDiagnostic ?? string.Empty;
+            suite.ComprehensiveArtisticAvailable =
+                string.IsNullOrEmpty(comprehensiveDiagnostic) &&
+                !string.IsNullOrEmpty(comprehensiveReport);
+            bool comprehensiveWritten =
+                WriteEdgeWearArtisticComprehensiveReports(
+                    comprehensiveReport,
+                    comprehensiveEdgesCsv,
+                    comprehensiveScenariosCsv,
+                    out string comprehensiveWriteDiagnostic);
+            if (!comprehensiveWritten)
+            {
+                suite.ComprehensiveArtisticAvailable = false;
+                suite.ComprehensiveArtisticDiagnostic =
+                    string.IsNullOrEmpty(
+                        suite.ComprehensiveArtisticDiagnostic)
+                        ? comprehensiveWriteDiagnostic
+                        : suite.ComprehensiveArtisticDiagnostic + "; " +
+                            comprehensiveWriteDiagnostic;
+            }
+
             string status = suite.Status;
             string report = BuildEdgeWearValidationSuiteReport(suite);
             bool reportWritten = WriteEdgeWearValidationSuiteReport(
@@ -1209,6 +1467,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     suite.TopologyCollateralFailures +
                 ",previewCollateralFailures:" +
                     suite.PreviewCollateralFailures +
+                ",artisticComprehensive:" +
+                    (suite.ComprehensiveArtisticAvailable ? "1" : "0") +
                 ",report=Library/" +
                     EdgeWearValidationSuiteReportFileName;
             Debug.LogFormat(
@@ -1225,7 +1485,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-B4.2R12A-suite");
+            builder.AppendLine("contract=EW-B4.2R12B.1-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -1258,6 +1518,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append(suite.PreviewCasesPassed);
             builder.Append('/');
             builder.AppendLine(suite.PreviewCasesRun.ToString());
+            builder.Append("artisticComprehensiveAvailable=");
+            builder.AppendLine(
+                suite.ComprehensiveArtisticAvailable ? "1" : "0");
+            builder.Append("artisticComprehensiveReports=");
+            builder.Append("Library/");
+            builder.Append(EdgeWearArtisticComprehensiveReportFileName);
+            builder.Append("|Library/");
+            builder.Append(EdgeWearArtisticComprehensiveEdgesCsvFileName);
+            builder.Append("|Library/");
+            builder.AppendLine(
+                EdgeWearArtisticComprehensiveScenariosCsvFileName);
             builder.Append("cancelled=");
             builder.AppendLine(suite.Cancelled ? "1" : "0");
             builder.Append("terminalReason=");
@@ -1283,7 +1554,3031 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine(string.IsNullOrEmpty(suite.PreviewReportText)
                 ? "not run"
                 : suite.PreviewReportText);
+            builder.AppendLine();
+            builder.AppendLine(
+                "[Comprehensive Artistic Selection Evidence]");
+            builder.AppendLine(suite.ComprehensiveArtisticAvailable
+                ? suite.ComprehensiveArtisticReport
+                : "unavailable: " +
+                    (string.IsNullOrEmpty(
+                        suite.ComprehensiveArtisticDiagnostic)
+                        ? "not captured"
+                        : suite.ComprehensiveArtisticDiagnostic));
             return builder.ToString();
+        }
+
+
+        private const int EdgeWearArtisticModifierBase = 1;
+        private const int EdgeWearArtisticModifierUpward = 2;
+        private const int EdgeWearArtisticModifierCharacter = 4;
+        private const int EdgeWearArtisticGateLength = 1;
+        private const int EdgeWearArtisticGateAngle = 2;
+        private const int EdgeWearArtisticGateBase = 4;
+        private const float EdgeWearArtisticScoreReproductionTolerance =
+            0.000002f;
+        private const float EdgeWearArtisticRankScoreTolerance =
+            0.0000001f;
+
+        private sealed class EdgeWearArtisticScenario
+        {
+            public string Name = string.Empty;
+            public string Category = string.Empty;
+            public float AngleWeight;
+            public float LengthWeight;
+            public float RandomWeight;
+            public float DihedralWeight;
+            public float SilhouetteWeight;
+            public float WidthWeight;
+            public float IsolationWeight;
+            public float LowCrowdingWeight;
+            public float VerticalWeight;
+            public float HorizontalWeight;
+            public float StrengthWeight;
+            public float DepthWeight;
+            public float LocalityWeight;
+            public float SeamWeight;
+            public int ModifierMask;
+            public int GateMask;
+            public bool Named;
+        }
+
+        private sealed class EdgeWearArtisticScenarioOutcome
+        {
+            public EdgeWearArtisticScenario Scenario;
+            public readonly List<int> RankedEdgeIds = new List<int>();
+            public readonly Dictionary<int, float> ScoreByEdge =
+                new Dictionary<int, float>();
+            public readonly Dictionary<int, int> RankByEdge =
+                new Dictionary<int, int>();
+            public float ScoreMinimum;
+            public float ScoreMedian;
+            public float ScoreMaximum;
+            public string RankHash = string.Empty;
+        }
+
+        private sealed class EdgeWearArtisticCaseAnalysis
+        {
+            public EdgeWearViabilityMatrixCase MatrixCase;
+            public MassGenerator.EdgeWearArtisticEdgeAuditRecord[] Edges =
+                Array.Empty<MassGenerator.EdgeWearArtisticEdgeAuditRecord>();
+            public readonly List<EdgeWearArtisticScenarioOutcome> Outcomes =
+                new List<EdgeWearArtisticScenarioOutcome>();
+            public EdgeWearArtisticScenarioOutcome CurrentOutcome;
+            public float CurrentScoreReproductionMaximumError;
+            public int CurrentScoreReproductionFailureCount;
+            public string CurrentScoreReproductionDiagnostic = string.Empty;
+            public bool RecordedProductionRanksValid;
+            public int RecordedProductionRankIntegrityFailureCount;
+            public string RecordedProductionRankIntegrityDiagnostic =
+                string.Empty;
+        }
+
+        private static void BuildEdgeWearArtisticComprehensiveEvidence(
+            EdgeWearValidationSuiteJob suite,
+            out string report,
+            out string edgesCsv,
+            out string scenariosCsv,
+            out string diagnostic)
+        {
+            report = string.Empty;
+            edgesCsv = string.Empty;
+            scenariosCsv = string.Empty;
+            diagnostic = string.Empty;
+            if (suite == null)
+            {
+                diagnostic = "validation suite was null";
+                return;
+            }
+            int expectedCaseCount = EdgeWearBatchShapeSeeds.Length *
+                EdgeWearBatchWidths.Length;
+            if (suite.PreviewCases.Count != expectedCaseCount)
+            {
+                diagnostic = "artistic preview case set was incomplete: " +
+                    suite.PreviewCases.Count + "/" + expectedCaseCount;
+                return;
+            }
+
+            List<EdgeWearArtisticScenario> scenarioUniverse =
+                BuildEdgeWearArtisticScenarioUniverse();
+            if (scenarioUniverse.Count == 0)
+            {
+                diagnostic = "artistic scenario universe was empty";
+                return;
+            }
+
+            StringBuilder caseReportBuilder =
+                new StringBuilder(1048576);
+            StringBuilder edgesCsvBuilder = new StringBuilder(1048576);
+            StringBuilder scenariosCsvBuilder =
+                new StringBuilder(8388608);
+            AppendEdgeWearArtisticCsvHeaderOnly(
+                edgesCsvBuilder,
+                BuildEdgeWearArtisticComprehensiveEdgesCsv(
+                    new List<EdgeWearArtisticCaseAnalysis>()));
+            AppendEdgeWearArtisticCsvHeaderOnly(
+                scenariosCsvBuilder,
+                BuildEdgeWearArtisticComprehensiveScenariosCsv(
+                    new List<EdgeWearArtisticCaseAnalysis>(),
+                    scenarioUniverse));
+
+            List<EdgeWearArtisticCaseAnalysis> crossWidthAnalyses =
+                new List<EdgeWearArtisticCaseAnalysis>(expectedCaseCount);
+            int edgeRows = 0;
+            int geometricRows = 0;
+            int currentEligibleRows = 0;
+            int currentSelectedRows = 0;
+            float maximumScoreError = 0f;
+            int recordedRankIntegrityFailures = 0;
+            int randomSensitive25 = 0;
+            int randomSensitive50 = 0;
+            int randomSensitive75 = 0;
+            int gateContradictions = 0;
+
+            for (int caseIndex = 0;
+                 caseIndex < suite.PreviewCases.Count;
+                 caseIndex++)
+            {
+                EdgeWearViabilityMatrixCase matrixCase =
+                    suite.PreviewCases[caseIndex];
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord[] records =
+                    matrixCase.Result.ArtisticEdges;
+                if (records == null || records.Length == 0)
+                {
+                    diagnostic = "artistic edge records missing for seed=" +
+                        matrixCase.ShapeSeed + ",width=" +
+                        matrixCase.WidthName;
+                    return;
+                }
+
+                EdgeWearArtisticCaseAnalysis analysis =
+                    AnalyzeEdgeWearArtisticCase(
+                        matrixCase,
+                        records,
+                        scenarioUniverse);
+                maximumScoreError = Mathf.Max(
+                    maximumScoreError,
+                    analysis.CurrentScoreReproductionMaximumError);
+                recordedRankIntegrityFailures +=
+                    analysis.RecordedProductionRankIntegrityFailureCount;
+                if (!analysis.RecordedProductionRanksValid)
+                {
+                    diagnostic =
+                        "recorded production rank integrity failed for " +
+                        "seed=" + matrixCase.ShapeSeed + ",width=" +
+                        matrixCase.WidthName + ": " +
+                        analysis.RecordedProductionRankIntegrityDiagnostic;
+                    return;
+                }
+                if (analysis.CurrentScoreReproductionMaximumError >
+                        EdgeWearArtisticScoreReproductionTolerance ||
+                    analysis.CurrentScoreReproductionFailureCount != 0)
+                {
+                    diagnostic =
+                        "current artistic score formula did not reproduce " +
+                        "for seed=" + matrixCase.ShapeSeed + ",width=" +
+                        matrixCase.WidthName + " (scoreError=" +
+                        FormatEdgeWearArtisticFloat(
+                            analysis.CurrentScoreReproductionMaximumError) +
+                        ",failures=" +
+                        analysis.CurrentScoreReproductionFailureCount +
+                        ",diagnostic=" +
+                        analysis.CurrentScoreReproductionDiagnostic + ")";
+                    return;
+                }
+
+                edgeRows += records.Length;
+                for (int edgeIndex = 0;
+                     edgeIndex < records.Length;
+                     edgeIndex++)
+                {
+                    MassGenerator.EdgeWearArtisticEdgeAuditRecord edge =
+                        records[edgeIndex];
+                    geometricRows += edge.GeometricEligible;
+                    currentEligibleRows += edge.ArtisticEligible;
+                    currentSelectedRows += edge.Selected;
+                    if (edge.GeometricEligible != 0 &&
+                        edge.ArtisticEligible == 0 &&
+                        edge.Score >= matrixCase.Result
+                            .ArtisticSelectionThreshold)
+                    {
+                        gateContradictions++;
+                    }
+                }
+                EdgeWearArtisticScenarioOutcome noRandom =
+                    FindEdgeWearArtisticOutcome(
+                        analysis,
+                        "current-no-random");
+                int currentCount =
+                    analysis.CurrentOutcome.RankedEdgeIds.Count;
+                randomSensitive25 += CalculateEdgeWearArtisticChurn(
+                    analysis.CurrentOutcome,
+                    noRandom,
+                    ResolveEdgeWearArtisticCoverageCount(
+                        currentCount,
+                        0.25f));
+                randomSensitive50 += CalculateEdgeWearArtisticChurn(
+                    analysis.CurrentOutcome,
+                    noRandom,
+                    ResolveEdgeWearArtisticCoverageCount(
+                        currentCount,
+                        0.50f));
+                randomSensitive75 += CalculateEdgeWearArtisticChurn(
+                    analysis.CurrentOutcome,
+                    noRandom,
+                    ResolveEdgeWearArtisticCoverageCount(
+                        currentCount,
+                        0.75f));
+
+                AppendEdgeWearArtisticCaseEvidence(
+                    caseReportBuilder,
+                    analysis,
+                    scenarioUniverse);
+                AppendEdgeWearArtisticCsvBody(
+                    edgesCsvBuilder,
+                    BuildEdgeWearArtisticComprehensiveEdgesCsv(
+                        new List<EdgeWearArtisticCaseAnalysis>
+                        {
+                            analysis
+                        }));
+                AppendEdgeWearArtisticCsvBody(
+                    scenariosCsvBuilder,
+                    BuildEdgeWearArtisticComprehensiveScenariosCsv(
+                        new List<EdgeWearArtisticCaseAnalysis>
+                        {
+                            analysis
+                        },
+                        scenarioUniverse));
+
+                analysis.Outcomes.Clear();
+                analysis.Edges = Array.Empty<
+                    MassGenerator.EdgeWearArtisticEdgeAuditRecord>();
+                crossWidthAnalyses.Add(analysis);
+            }
+
+            StringBuilder reportBuilder = new StringBuilder(
+                caseReportBuilder.Length + 32768);
+            reportBuilder.AppendLine(
+                "GeneratedMass comprehensive artistic selection evidence");
+            reportBuilder.AppendLine(
+                "contract=EW-B4.2R12B.1-comprehensive");
+            reportBuilder.Append("cases=");
+            reportBuilder.AppendLine(expectedCaseCount.ToString());
+            reportBuilder.Append("scenariosPerCase=");
+            reportBuilder.AppendLine(scenarioUniverse.Count.ToString());
+            reportBuilder.Append("totalScenarioEvaluations=");
+            reportBuilder.AppendLine(
+                (expectedCaseCount * scenarioUniverse.Count).ToString());
+            reportBuilder.AppendLine(
+                "behaviorChanged=0;geometryChanged=0;selectionChanged=0");
+            reportBuilder.AppendLine(
+                "scenarioUniverse=exact+ablations+all-0.05-angle-length-random-simplex*8-modifier-masks+gate-masks+single-metric+signed-context-sweeps+composites");
+            reportBuilder.AppendLine(
+                "cutoffUniverse=every fixed selected slot plus native coverage deciles 0.10-1.00");
+            reportBuilder.AppendLine(
+                "rawEvidence=all edge geometry,normals,gates,score components,modifiers,context,viability,effect,lifecycle");
+            AppendEdgeWearArtisticGlobalEvidenceValues(
+                reportBuilder,
+                scenarioUniverse,
+                edgeRows,
+                geometricRows,
+                currentEligibleRows,
+                currentSelectedRows,
+                maximumScoreError,
+                recordedRankIntegrityFailures,
+                randomSensitive25,
+                randomSensitive50,
+                randomSensitive75,
+                gateContradictions);
+            AppendEdgeWearArtisticScenarioDefinitions(
+                reportBuilder,
+                scenarioUniverse);
+            reportBuilder.Append(caseReportBuilder);
+            AppendEdgeWearArtisticCrossWidthEvidence(
+                reportBuilder,
+                crossWidthAnalyses);
+
+            report = reportBuilder.ToString();
+            edgesCsv = edgesCsvBuilder.ToString();
+            scenariosCsv = scenariosCsvBuilder.ToString();
+            if (string.IsNullOrEmpty(report) ||
+                string.IsNullOrEmpty(edgesCsv) ||
+                string.IsNullOrEmpty(scenariosCsv))
+            {
+                diagnostic = "one or more comprehensive outputs were empty";
+            }
+        }
+
+        private static void AppendEdgeWearArtisticCsvHeaderOnly(
+            StringBuilder target,
+            string csv)
+        {
+            if (string.IsNullOrEmpty(csv))
+            {
+                return;
+            }
+            int lineEnd = csv.IndexOf('\n');
+            target.Append(lineEnd >= 0
+                ? csv.Substring(0, lineEnd + 1)
+                : csv);
+        }
+
+        private static void AppendEdgeWearArtisticCsvBody(
+            StringBuilder target,
+            string csv)
+        {
+            if (string.IsNullOrEmpty(csv))
+            {
+                return;
+            }
+            int lineEnd = csv.IndexOf('\n');
+            if (lineEnd >= 0 && lineEnd + 1 < csv.Length)
+            {
+                target.Append(csv, lineEnd + 1, csv.Length - lineEnd - 1);
+            }
+        }
+
+        private static void AppendEdgeWearArtisticGlobalEvidenceValues(
+            StringBuilder builder,
+            List<EdgeWearArtisticScenario> scenarios,
+            int edgeRows,
+            int geometricRows,
+            int currentEligibleRows,
+            int currentSelectedRows,
+            float maximumReproductionError,
+            int recordedRankIntegrityFailures,
+            int randomSensitive25,
+            int randomSensitive50,
+            int randomSensitive75,
+            int gateContradictions)
+        {
+            builder.AppendLine();
+            builder.AppendLine("[Global Evidence Summary]");
+            builder.Append("edgeRows/geometric/currentEligible/currentSelected=");
+            builder.Append(edgeRows);
+            builder.Append('/');
+            builder.Append(geometricRows);
+            builder.Append('/');
+            builder.Append(currentEligibleRows);
+            builder.Append('/');
+            builder.AppendLine(currentSelectedRows.ToString());
+            builder.Append("currentScoreReproductionMaximumError=");
+            builder.AppendLine(FormatEdgeWearArtisticFloat(
+                maximumReproductionError));
+            builder.AppendLine("recordedProductionRanksValid=1");
+            builder.Append("recordedProductionRankIntegrityFailures=");
+            builder.AppendLine(recordedRankIntegrityFailures.ToString());
+            builder.Append("hardGateAboveThresholdContradictions=");
+            builder.AppendLine(gateContradictions.ToString());
+            builder.Append("noRandomCutoffChurn25/50/75=");
+            builder.Append(randomSensitive25);
+            builder.Append('/');
+            builder.Append(randomSensitive50);
+            builder.Append('/');
+            builder.AppendLine(randomSensitive75.ToString());
+            builder.Append("scenarioCategories=");
+            Dictionary<string, int> categoryCounts =
+                new Dictionary<string, int>();
+            for (int scenarioIndex = 0;
+                 scenarioIndex < scenarios.Count;
+                 scenarioIndex++)
+            {
+                string category = scenarios[scenarioIndex].Category;
+                categoryCounts.TryGetValue(category, out int count);
+                categoryCounts[category] = count + 1;
+            }
+            List<string> categories = new List<string>(
+                categoryCounts.Keys);
+            categories.Sort(StringComparer.Ordinal);
+            for (int categoryIndex = 0;
+                 categoryIndex < categories.Count;
+                 categoryIndex++)
+            {
+                if (categoryIndex > 0)
+                {
+                    builder.Append(';');
+                }
+                string category = categories[categoryIndex];
+                builder.Append(category);
+                builder.Append(':');
+                builder.Append(categoryCounts[category]);
+            }
+            builder.AppendLine();
+        }
+
+        private static List<EdgeWearArtisticScenario>
+            BuildEdgeWearArtisticScenarioUniverse()
+        {
+            List<EdgeWearArtisticScenario> scenarios =
+                new List<EdgeWearArtisticScenario>(2048);
+            AddEdgeWearArtisticScenario(
+                scenarios,
+                "current-exact",
+                "baseline",
+                0.60f,
+                0.35f,
+                0.05f,
+                EdgeWearArtisticModifierBase |
+                    EdgeWearArtisticModifierUpward,
+                EdgeWearArtisticGateLength |
+                    EdgeWearArtisticGateAngle |
+                    EdgeWearArtisticGateBase,
+                true);
+            AddEdgeWearArtisticScenario(
+                scenarios,
+                "current-no-random",
+                "ablation",
+                0.63157892f,
+                0.36842105f,
+                0f,
+                EdgeWearArtisticModifierBase |
+                    EdgeWearArtisticModifierUpward,
+                7,
+                true);
+            AddEdgeWearArtisticScenario(
+                scenarios,
+                "current-no-modifiers",
+                "ablation",
+                0.60f,
+                0.35f,
+                0.05f,
+                0,
+                7,
+                true);
+            AddEdgeWearArtisticScenario(
+                scenarios,
+                "current-no-gates",
+                "ablation",
+                0.60f,
+                0.35f,
+                0.05f,
+                EdgeWearArtisticModifierBase |
+                    EdgeWearArtisticModifierUpward,
+                0,
+                true);
+
+            for (int modifierMask = 0;
+                 modifierMask <= 7;
+                 modifierMask++)
+            {
+                AddEdgeWearArtisticScenario(
+                    scenarios,
+                    "modifier-mask-" + modifierMask,
+                    "modifier-ablation",
+                    0.60f,
+                    0.35f,
+                    0.05f,
+                    modifierMask,
+                    7,
+                    true);
+            }
+            for (int gateMask = 0; gateMask <= 7; gateMask++)
+            {
+                AddEdgeWearArtisticScenario(
+                    scenarios,
+                    "gate-mask-" + gateMask,
+                    "gate-ablation",
+                    0.60f,
+                    0.35f,
+                    0.05f,
+                    EdgeWearArtisticModifierBase |
+                        EdgeWearArtisticModifierUpward,
+                    gateMask,
+                    true);
+            }
+
+            AddEdgeWearArtisticSingleMetricScenarios(scenarios);
+            AddEdgeWearArtisticContextScenarios(scenarios);
+            AddEdgeWearArtisticCompositeScenarios(scenarios);
+
+            for (int angleUnits = 0;
+                 angleUnits <= 20;
+                 angleUnits++)
+            {
+                for (int lengthUnits = 0;
+                     lengthUnits <= 20 - angleUnits;
+                     lengthUnits++)
+                {
+                    int randomUnits = 20 - angleUnits - lengthUnits;
+                    float angleWeight = angleUnits / 20f;
+                    float lengthWeight = lengthUnits / 20f;
+                    float randomWeight = randomUnits / 20f;
+                    for (int modifierMask = 0;
+                         modifierMask <= 7;
+                         modifierMask++)
+                    {
+                        AddEdgeWearArtisticScenario(
+                            scenarios,
+                            "simplex-a" + angleUnits +
+                                "-l" + lengthUnits +
+                                "-r" + randomUnits +
+                                "-m" + modifierMask,
+                            "weight-simplex",
+                            angleWeight,
+                            lengthWeight,
+                            randomWeight,
+                            modifierMask,
+                            7,
+                            false);
+                    }
+                }
+            }
+            return scenarios;
+        }
+
+        private static void AddEdgeWearArtisticScenario(
+            List<EdgeWearArtisticScenario> scenarios,
+            string name,
+            string category,
+            float angleWeight,
+            float lengthWeight,
+            float randomWeight,
+            int modifierMask,
+            int gateMask,
+            bool named)
+        {
+            scenarios.Add(new EdgeWearArtisticScenario
+            {
+                Name = name,
+                Category = category,
+                AngleWeight = angleWeight,
+                LengthWeight = lengthWeight,
+                RandomWeight = randomWeight,
+                ModifierMask = modifierMask,
+                GateMask = gateMask,
+                Named = named
+            });
+        }
+
+        private static void AddEdgeWearArtisticSingleMetricScenarios(
+            List<EdgeWearArtisticScenario> scenarios)
+        {
+            string[] names =
+            {
+                "angle",
+                "length",
+                "random",
+                "dihedral",
+                "silhouette",
+                "width",
+                "isolation",
+                "low-crowding",
+                "vertical",
+                "horizontal",
+                "strength",
+                "depth",
+                "locality",
+                "seam"
+            };
+            for (int index = 0; index < names.Length; index++)
+            {
+                EdgeWearArtisticScenario scenario =
+                    new EdgeWearArtisticScenario
+                    {
+                        Name = "single-" + names[index],
+                        Category = "single-metric",
+                        GateMask = 7,
+                        ModifierMask = 0,
+                        Named = true
+                    };
+                SetEdgeWearArtisticContextWeight(
+                    scenario,
+                    names[index],
+                    1f);
+                scenarios.Add(scenario);
+            }
+        }
+
+        private static void AddEdgeWearArtisticContextScenarios(
+            List<EdgeWearArtisticScenario> scenarios)
+        {
+            string[] names =
+            {
+                "dihedral",
+                "silhouette",
+                "width",
+                "isolation",
+                "low-crowding",
+                "vertical",
+                "horizontal",
+                "strength",
+                "depth",
+                "locality",
+                "seam"
+            };
+            float[] weights = { -0.5f, -0.25f, 0.25f, 0.5f };
+            for (int nameIndex = 0;
+                 nameIndex < names.Length;
+                 nameIndex++)
+            {
+                for (int weightIndex = 0;
+                     weightIndex < weights.Length;
+                     weightIndex++)
+                {
+                    EdgeWearArtisticScenario scenario =
+                        new EdgeWearArtisticScenario
+                        {
+                            Name = "current-plus-" + names[nameIndex] +
+                                "-" + FormatEdgeWearArtisticFloat(
+                                    weights[weightIndex]),
+                            Category = "context-sweep",
+                            AngleWeight = 0.60f,
+                            LengthWeight = 0.35f,
+                            RandomWeight = 0.05f,
+                            ModifierMask = EdgeWearArtisticModifierBase |
+                                EdgeWearArtisticModifierUpward,
+                            GateMask = 7,
+                            Named = true
+                        };
+                    SetEdgeWearArtisticContextWeight(
+                        scenario,
+                        names[nameIndex],
+                        weights[weightIndex]);
+                    scenarios.Add(scenario);
+                }
+            }
+        }
+
+        private static void AddEdgeWearArtisticCompositeScenarios(
+            List<EdgeWearArtisticScenario> scenarios)
+        {
+            EdgeWearArtisticScenario quality =
+                new EdgeWearArtisticScenario
+                {
+                    Name = "composite-quality-no-random",
+                    Category = "composite",
+                    AngleWeight = 0.34f,
+                    LengthWeight = 0.18f,
+                    DihedralWeight = 0.10f,
+                    SilhouetteWeight = 0.12f,
+                    WidthWeight = 0.08f,
+                    IsolationWeight = 0.09f,
+                    LowCrowdingWeight = 0.09f,
+                    ModifierMask = 7,
+                    GateMask = 7,
+                    Named = true
+                };
+            scenarios.Add(quality);
+            EdgeWearArtisticScenario strongShort =
+                new EdgeWearArtisticScenario
+                {
+                    Name = "composite-strong-short",
+                    Category = "composite",
+                    AngleWeight = 0.42f,
+                    LengthWeight = -0.10f,
+                    DihedralWeight = 0.18f,
+                    SilhouetteWeight = 0.18f,
+                    WidthWeight = 0.12f,
+                    IsolationWeight = 0.10f,
+                    ModifierMask = 7,
+                    GateMask = 7,
+                    Named = true
+                };
+            scenarios.Add(strongShort);
+            EdgeWearArtisticScenario visibleSparse =
+                new EdgeWearArtisticScenario
+                {
+                    Name = "composite-visible-sparse",
+                    Category = "composite",
+                    AngleWeight = 0.25f,
+                    LengthWeight = 0.15f,
+                    SilhouetteWeight = 0.25f,
+                    IsolationWeight = 0.20f,
+                    LowCrowdingWeight = 0.15f,
+                    ModifierMask = 7,
+                    GateMask = 7,
+                    Named = true
+                };
+            scenarios.Add(visibleSparse);
+            EdgeWearArtisticScenario buildReliable =
+                new EdgeWearArtisticScenario
+                {
+                    Name = "composite-build-reliable",
+                    Category = "composite",
+                    AngleWeight = 0.24f,
+                    LengthWeight = 0.18f,
+                    WidthWeight = 0.22f,
+                    LocalityWeight = 0.18f,
+                    IsolationWeight = 0.09f,
+                    LowCrowdingWeight = 0.09f,
+                    ModifierMask = 7,
+                    GateMask = 7,
+                    Named = true
+                };
+            scenarios.Add(buildReliable);
+            EdgeWearArtisticScenario effectForward =
+                new EdgeWearArtisticScenario
+                {
+                    Name = "composite-effect-forward",
+                    Category = "composite",
+                    AngleWeight = 0.25f,
+                    LengthWeight = 0.15f,
+                    SilhouetteWeight = 0.15f,
+                    StrengthWeight = 0.25f,
+                    DepthWeight = 0.20f,
+                    ModifierMask = 7,
+                    GateMask = 7,
+                    Named = true
+                };
+            scenarios.Add(effectForward);
+        }
+
+        private static void SetEdgeWearArtisticContextWeight(
+            EdgeWearArtisticScenario scenario,
+            string name,
+            float weight)
+        {
+            switch (name)
+            {
+                case "angle":
+                    scenario.AngleWeight = weight;
+                    break;
+                case "length":
+                    scenario.LengthWeight = weight;
+                    break;
+                case "random":
+                    scenario.RandomWeight = weight;
+                    break;
+                case "dihedral":
+                    scenario.DihedralWeight = weight;
+                    break;
+                case "silhouette":
+                    scenario.SilhouetteWeight = weight;
+                    break;
+                case "width":
+                    scenario.WidthWeight = weight;
+                    break;
+                case "isolation":
+                    scenario.IsolationWeight = weight;
+                    break;
+                case "low-crowding":
+                    scenario.LowCrowdingWeight = weight;
+                    break;
+                case "vertical":
+                    scenario.VerticalWeight = weight;
+                    break;
+                case "horizontal":
+                    scenario.HorizontalWeight = weight;
+                    break;
+                case "strength":
+                    scenario.StrengthWeight = weight;
+                    break;
+                case "depth":
+                    scenario.DepthWeight = weight;
+                    break;
+                case "locality":
+                    scenario.LocalityWeight = weight;
+                    break;
+                case "seam":
+                    scenario.SeamWeight = weight;
+                    break;
+            }
+        }
+
+        private static EdgeWearArtisticCaseAnalysis
+            AnalyzeEdgeWearArtisticCase(
+                EdgeWearViabilityMatrixCase matrixCase,
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord[] records,
+                List<EdgeWearArtisticScenario> scenarios)
+        {
+            EdgeWearArtisticCaseAnalysis analysis =
+                new EdgeWearArtisticCaseAnalysis
+                {
+                    MatrixCase = matrixCase,
+                    Edges = records
+                };
+            if (scenarios == null || scenarios.Count == 0)
+            {
+                analysis.RecordedProductionRanksValid = false;
+                analysis.RecordedProductionRankIntegrityFailureCount = 1;
+                analysis.RecordedProductionRankIntegrityDiagnostic =
+                    "current-exact scenario was unavailable";
+                return analysis;
+            }
+
+            analysis.RecordedProductionRanksValid =
+                TryBuildRecordedCurrentArtisticOutcome(
+                    matrixCase,
+                    records,
+                    scenarios[0],
+                    out EdgeWearArtisticScenarioOutcome currentOutcome,
+                    out int rankIntegrityFailures,
+                    out string rankIntegrityDiagnostic);
+            analysis.CurrentOutcome = currentOutcome;
+            analysis.RecordedProductionRankIntegrityFailureCount =
+                rankIntegrityFailures;
+            analysis.RecordedProductionRankIntegrityDiagnostic =
+                rankIntegrityDiagnostic;
+            if (currentOutcome != null)
+            {
+                analysis.Outcomes.Add(currentOutcome);
+            }
+
+            for (int scenarioIndex = 1;
+                 scenarioIndex < scenarios.Count;
+                 scenarioIndex++)
+            {
+                analysis.Outcomes.Add(
+                    EvaluateEdgeWearArtisticScenario(
+                        records,
+                        scenarios[scenarioIndex]));
+            }
+
+            CalculateCurrentEdgeWearArtisticScoreReproduction(
+                records,
+                scenarios[0],
+                out float maximumError,
+                out int scoreFailures,
+                out string scoreDiagnostic);
+            analysis.CurrentScoreReproductionMaximumError = maximumError;
+            analysis.CurrentScoreReproductionFailureCount = scoreFailures;
+            analysis.CurrentScoreReproductionDiagnostic = scoreDiagnostic;
+            return analysis;
+        }
+
+        private static bool TryBuildRecordedCurrentArtisticOutcome(
+            EdgeWearViabilityMatrixCase matrixCase,
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord[] records,
+            EdgeWearArtisticScenario currentScenario,
+            out EdgeWearArtisticScenarioOutcome outcome,
+            out int failureCount,
+            out string diagnostic)
+        {
+            outcome = new EdgeWearArtisticScenarioOutcome
+            {
+                Scenario = currentScenario
+            };
+            failureCount = 0;
+            diagnostic = "none";
+            if (records == null)
+            {
+                failureCount = 1;
+                diagnostic = "artistic edge records were null";
+                return false;
+            }
+
+            int rankedCount = 0;
+            int survivingCandidateCount = 0;
+            for (int edgeIndex = 0;
+                 edgeIndex < records.Length;
+                 edgeIndex++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord edge =
+                    records[edgeIndex];
+                if (edge.GeometricEligible != 0 &&
+                    edge.ArtisticEligible != 0)
+                {
+                    rankedCount++;
+                }
+                if (edge.Candidate != 0)
+                {
+                    survivingCandidateCount++;
+                }
+            }
+
+            int expectedRankedCount =
+                matrixCase.Result.ArtisticEligibleCount;
+            if (rankedCount != expectedRankedCount)
+            {
+                failureCount = 1;
+                diagnostic =
+                    "artistic ranking-universe count mismatch " +
+                    "records/result=" + rankedCount + "/" +
+                    expectedRankedCount;
+                return false;
+            }
+            int expectedCandidateCount = matrixCase.Result.CandidateCount;
+            if (survivingCandidateCount != expectedCandidateCount)
+            {
+                failureCount = 1;
+                diagnostic = "surviving candidate count mismatch " +
+                    "records/result=" + survivingCandidateCount + "/" +
+                    expectedCandidateCount;
+                return false;
+            }
+
+            int[] edgeIdByRank = new int[rankedCount];
+            float[] scoreByRank = new float[rankedCount];
+            bool[] rankSeen = new bool[rankedCount];
+            bool[] survivingCandidateIndexSeen =
+                new bool[rankedCount];
+            HashSet<int> sourceEdgeIds = new HashSet<int>();
+            for (int edgeIndex = 0;
+                 edgeIndex < records.Length;
+                 edgeIndex++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord edge =
+                    records[edgeIndex];
+                bool belongsToRankingUniverse =
+                    edge.GeometricEligible != 0 &&
+                    edge.ArtisticEligible != 0;
+                if (!belongsToRankingUniverse)
+                {
+                    if (edge.ArtisticSelectionRank > 0)
+                    {
+                        failureCount = 1;
+                        diagnostic =
+                            "edge outside artistic ranking universe " +
+                            "carried rank: edge=" +
+                            edge.SourceEdgeIndex + ",rank=" +
+                            edge.ArtisticSelectionRank;
+                        return false;
+                    }
+                    if (edge.Candidate != 0)
+                    {
+                        failureCount = 1;
+                        diagnostic =
+                            "surviving candidate was outside artistic " +
+                            "ranking universe: edge=" +
+                            edge.SourceEdgeIndex;
+                        return false;
+                    }
+                    continue;
+                }
+                if (edge.SourceEdgeIndex < 0)
+                {
+                    failureCount = 1;
+                    diagnostic =
+                        "ranked edge had invalid source edge id: " +
+                        "rank=" + edge.ArtisticSelectionRank;
+                    return false;
+                }
+                if (!sourceEdgeIds.Add(edge.SourceEdgeIndex))
+                {
+                    failureCount = 1;
+                    diagnostic = "duplicate ranked source edge id=" +
+                        edge.SourceEdgeIndex;
+                    return false;
+                }
+                if (edge.ArtisticSelectionRank < 1 ||
+                    edge.ArtisticSelectionRank > rankedCount)
+                {
+                    failureCount = 1;
+                    diagnostic = "rank outside artistic universe 1..N: " +
+                        "edge=" + edge.SourceEdgeIndex + ",rank=" +
+                        edge.ArtisticSelectionRank + ",count=" +
+                        rankedCount;
+                    return false;
+                }
+                int rankIndex = edge.ArtisticSelectionRank - 1;
+                if (rankSeen[rankIndex])
+                {
+                    failureCount = 1;
+                    diagnostic = "duplicate production rank=" +
+                        edge.ArtisticSelectionRank + ",edge=" +
+                        edge.SourceEdgeIndex;
+                    return false;
+                }
+                if (float.IsNaN(edge.Score) ||
+                    float.IsInfinity(edge.Score))
+                {
+                    failureCount = 1;
+                    diagnostic = "ranked score was not finite: edge=" +
+                        edge.SourceEdgeIndex;
+                    return false;
+                }
+                if (edge.Candidate != 0)
+                {
+                    if (edge.CandidateIndex < 0 ||
+                        edge.CandidateIndex >= rankedCount)
+                    {
+                        failureCount = 1;
+                        diagnostic =
+                            "surviving candidate index outside original " +
+                            "ranking universe: edge=" +
+                            edge.SourceEdgeIndex + ",candidateIndex=" +
+                            edge.CandidateIndex + ",count=" +
+                            rankedCount;
+                        return false;
+                    }
+                    if (survivingCandidateIndexSeen[
+                            edge.CandidateIndex])
+                    {
+                        failureCount = 1;
+                        diagnostic =
+                            "duplicate surviving candidate index=" +
+                            edge.CandidateIndex;
+                        return false;
+                    }
+                    survivingCandidateIndexSeen[edge.CandidateIndex] =
+                        true;
+                }
+                else if (edge.CandidateIndex >= 0)
+                {
+                    failureCount = 1;
+                    diagnostic =
+                        "post-coexistence excluded ranked edge retained " +
+                        "candidate index: edge=" +
+                        edge.SourceEdgeIndex + ",candidateIndex=" +
+                        edge.CandidateIndex;
+                    return false;
+                }
+
+                rankSeen[rankIndex] = true;
+                edgeIdByRank[rankIndex] = edge.SourceEdgeIndex;
+                scoreByRank[rankIndex] = edge.Score;
+                outcome.ScoreByEdge.Add(
+                    edge.SourceEdgeIndex,
+                    edge.Score);
+                outcome.RankByEdge.Add(
+                    edge.SourceEdgeIndex,
+                    rankIndex);
+            }
+
+            for (int index = 0; index < rankedCount; index++)
+            {
+                if (!rankSeen[index])
+                {
+                    failureCount = 1;
+                    diagnostic = "missing production rank=" +
+                        (index + 1);
+                    return false;
+                }
+                if (index > 0 &&
+                    scoreByRank[index - 1] +
+                        EdgeWearArtisticRankScoreTolerance <
+                    scoreByRank[index])
+                {
+                    failureCount = 1;
+                    diagnostic = "score inversion at ranks=" + index +
+                        "/" + (index + 1) + ",edges=" +
+                        edgeIdByRank[index - 1] + "/" +
+                        edgeIdByRank[index] + ",scores=" +
+                        FormatEdgeWearArtisticFloat(
+                            scoreByRank[index - 1]) + "/" +
+                        FormatEdgeWearArtisticFloat(scoreByRank[index]);
+                    return false;
+                }
+            }
+
+            List<float> scores = new List<float>(rankedCount);
+            StringBuilder hashBuilder = new StringBuilder();
+            for (int rankIndex = 0;
+                 rankIndex < rankedCount;
+                 rankIndex++)
+            {
+                int edgeId = edgeIdByRank[rankIndex];
+                outcome.RankedEdgeIds.Add(edgeId);
+                scores.Add(scoreByRank[rankIndex]);
+                if (rankIndex > 0)
+                {
+                    hashBuilder.Append('/');
+                }
+                hashBuilder.Append(edgeId);
+            }
+            outcome.ScoreMinimum =
+                ResolveEdgeWearArtisticMinimum(scores);
+            outcome.ScoreMedian =
+                ResolveEdgeWearArtisticMedian(scores);
+            outcome.ScoreMaximum =
+                ResolveEdgeWearArtisticMaximum(scores);
+            outcome.RankHash = CalculateEdgeWearArtisticStableHash(
+                hashBuilder.ToString());
+            return true;
+        }
+
+        private static void
+            CalculateCurrentEdgeWearArtisticScoreReproduction(
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord[] records,
+                EdgeWearArtisticScenario currentScenario,
+                out float maximumError,
+                out int failureCount,
+                out string diagnostic)
+        {
+            maximumError = 0f;
+            failureCount = 0;
+            diagnostic = "none";
+            if (records == null || currentScenario == null)
+            {
+                failureCount = 1;
+                diagnostic = "records or current scenario were unavailable";
+                return;
+            }
+            HashSet<int> geometricSourceEdgeIds = new HashSet<int>();
+            for (int edgeIndex = 0;
+                 edgeIndex < records.Length;
+                 edgeIndex++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord edge =
+                    records[edgeIndex];
+                if (edge.GeometricEligible == 0)
+                {
+                    continue;
+                }
+                if (edge.SourceEdgeIndex < 0 ||
+                    !geometricSourceEdgeIds.Add(edge.SourceEdgeIndex))
+                {
+                    failureCount++;
+                    if (diagnostic == "none")
+                    {
+                        diagnostic = "invalid or duplicate geometric source " +
+                            "edge id=" + edge.SourceEdgeIndex;
+                    }
+                    continue;
+                }
+                float reproduced =
+                    CalculateEdgeWearArtisticScenarioScore(
+                        edge,
+                        currentScenario);
+                if (float.IsNaN(reproduced) ||
+                    float.IsInfinity(reproduced) ||
+                    float.IsNaN(edge.Score) ||
+                    float.IsInfinity(edge.Score))
+                {
+                    failureCount++;
+                    if (diagnostic == "none")
+                    {
+                        diagnostic = "non-finite score for edge=" +
+                            edge.SourceEdgeIndex;
+                    }
+                    continue;
+                }
+                float error = Mathf.Abs(reproduced - edge.Score);
+                maximumError = Mathf.Max(maximumError, error);
+                if (error > EdgeWearArtisticScoreReproductionTolerance)
+                {
+                    failureCount++;
+                    if (diagnostic == "none")
+                    {
+                        diagnostic = "score mismatch for edge=" +
+                            edge.SourceEdgeIndex + ",recorded=" +
+                            FormatEdgeWearArtisticFloat(edge.Score) +
+                            ",reproduced=" +
+                            FormatEdgeWearArtisticFloat(reproduced) +
+                            ",error=" +
+                            FormatEdgeWearArtisticFloat(error);
+                    }
+                }
+            }
+        }
+
+        private static EdgeWearArtisticScenarioOutcome
+            EvaluateEdgeWearArtisticScenario(
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord[] records,
+                EdgeWearArtisticScenario scenario)
+        {
+            EdgeWearArtisticScenarioOutcome outcome =
+                new EdgeWearArtisticScenarioOutcome
+                {
+                    Scenario = scenario
+                };
+            List<KeyValuePair<int, float>> ranked =
+                new List<KeyValuePair<int, float>>(records.Length);
+            for (int edgeIndex = 0;
+                 edgeIndex < records.Length;
+                 edgeIndex++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord edge =
+                    records[edgeIndex];
+                if (!IsEdgeWearArtisticScenarioEligible(edge, scenario))
+                {
+                    continue;
+                }
+                float score = CalculateEdgeWearArtisticScenarioScore(
+                    edge,
+                    scenario);
+                ranked.Add(new KeyValuePair<int, float>(
+                    edge.SourceEdgeIndex,
+                    score));
+                outcome.ScoreByEdge[edge.SourceEdgeIndex] = score;
+            }
+            ranked.Sort((left, right) =>
+            {
+                int score = right.Value.CompareTo(left.Value);
+                return score != 0
+                    ? score
+                    : left.Key.CompareTo(right.Key);
+            });
+            List<float> scores = new List<float>(ranked.Count);
+            StringBuilder hashBuilder = new StringBuilder();
+            for (int rank = 0; rank < ranked.Count; rank++)
+            {
+                int edgeId = ranked[rank].Key;
+                outcome.RankedEdgeIds.Add(edgeId);
+                outcome.RankByEdge[edgeId] = rank;
+                scores.Add(ranked[rank].Value);
+                if (rank > 0)
+                {
+                    hashBuilder.Append('/');
+                }
+                hashBuilder.Append(edgeId);
+            }
+            outcome.ScoreMinimum = ResolveEdgeWearArtisticMinimum(scores);
+            outcome.ScoreMedian = ResolveEdgeWearArtisticMedian(scores);
+            outcome.ScoreMaximum = ResolveEdgeWearArtisticMaximum(scores);
+            outcome.RankHash = CalculateEdgeWearArtisticStableHash(
+                hashBuilder.ToString());
+            return outcome;
+        }
+
+        private static bool IsEdgeWearArtisticScenarioEligible(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge,
+            EdgeWearArtisticScenario scenario)
+        {
+            if (edge.GeometricEligible == 0)
+            {
+                return false;
+            }
+            if ((scenario.GateMask & EdgeWearArtisticGateLength) != 0 &&
+                edge.ArtisticLengthEligible == 0)
+            {
+                return false;
+            }
+            if ((scenario.GateMask & EdgeWearArtisticGateAngle) != 0 &&
+                edge.ArtisticAngleEligible == 0)
+            {
+                return false;
+            }
+            return (scenario.GateMask & EdgeWearArtisticGateBase) == 0 ||
+                edge.ArtisticBaseEligible != 0;
+        }
+
+        private static float CalculateEdgeWearArtisticScenarioScore(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge,
+            EdgeWearArtisticScenario scenario)
+        {
+            float score =
+                edge.ArtisticAngleScore * scenario.AngleWeight +
+                edge.ArtisticLengthScore * scenario.LengthWeight +
+                edge.ArtisticRandomScore * scenario.RandomWeight +
+                ResolveEdgeWearArtisticDihedral01(edge) *
+                    scenario.DihedralWeight +
+                edge.ArtisticSilhouettePotential *
+                    scenario.SilhouetteWeight +
+                ResolveEdgeWearArtisticWidth01(edge) *
+                    scenario.WidthWeight +
+                (1f - edge.ArtisticLocalDensity01) *
+                    scenario.IsolationWeight +
+                ResolveEdgeWearArtisticLowCrowding01(edge) *
+                    scenario.LowCrowdingWeight +
+                edge.ArtisticEdgeAxisVertical01 *
+                    scenario.VerticalWeight +
+                (1f - edge.ArtisticEdgeAxisVertical01) *
+                    scenario.HorizontalWeight +
+                edge.ArtisticStrength * scenario.StrengthWeight +
+                ResolveEdgeWearArtisticDepth01(edge) *
+                    scenario.DepthWeight +
+                ResolveEdgeWearArtisticLocality01(edge) *
+                    scenario.LocalityWeight +
+                edge.CoincidentBoundarySeamReconciled *
+                    scenario.SeamWeight;
+            if ((scenario.ModifierMask & EdgeWearArtisticModifierBase) != 0)
+            {
+                score *= ResolveEdgeWearArtisticBasePriorityFactor(edge);
+            }
+            if ((scenario.ModifierMask &
+                 EdgeWearArtisticModifierUpward) != 0)
+            {
+                score *= ResolveEdgeWearArtisticUpwardPriorityFactor(edge);
+            }
+            if ((scenario.ModifierMask &
+                 EdgeWearArtisticModifierCharacter) != 0)
+            {
+                score *= edge.ArtisticCharacterBoost;
+            }
+            return score;
+        }
+
+        private static float ResolveEdgeWearArtisticBasePriorityFactor(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge)
+        {
+            return Mathf.Lerp(
+                0.60f,
+                1.00f,
+                Mathf.InverseLerp(
+                    0.06f,
+                    0.20f,
+                    edge.ArtisticBaseSuppression));
+        }
+
+        private static float ResolveEdgeWearArtisticUpwardPriorityFactor(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge)
+        {
+            return Mathf.Lerp(
+                0.925f,
+                1.075f,
+                Mathf.InverseLerp(
+                    0.82f,
+                    1.08f,
+                    edge.ArtisticUpwardEdgeBoost));
+        }
+
+        private static float ResolveEdgeWearArtisticDihedral01(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge)
+        {
+            return Mathf.Clamp01((edge.DihedralDegrees - 15f) / 75f);
+        }
+
+        private static float ResolveEdgeWearArtisticWidth01(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge)
+        {
+            return Mathf.Clamp01(Mathf.Max(
+                edge.ArtisticFeasibleWidthFraction,
+                edge.ArtisticSolvedWidthFraction));
+        }
+
+        private static float ResolveEdgeWearArtisticLowCrowding01(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge)
+        {
+            int degree = edge.ArtisticSharedVertexDegreeA +
+                edge.ArtisticSharedVertexDegreeB;
+            return 1f - Mathf.Clamp01(degree / 6f);
+        }
+
+        private static float ResolveEdgeWearArtisticDepth01(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge)
+        {
+            return Mathf.InverseLerp(
+                0.78f,
+                1.15f,
+                edge.ArtisticDepthMultiplier);
+        }
+
+        private static float ResolveEdgeWearArtisticLocality01(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge)
+        {
+            float denominator = Mathf.Max(
+                0.000001f,
+                edge.RequestedWidth * 4f);
+            return Mathf.Clamp01(edge.LocalityFeasibleMargin / denominator);
+        }
+
+        private static void AppendEdgeWearArtisticScenarioDefinitions(
+            StringBuilder builder,
+            List<EdgeWearArtisticScenario> scenarios)
+        {
+            builder.AppendLine();
+            builder.AppendLine("[Scenario Definitions]");
+            for (int scenarioIndex = 0;
+                 scenarioIndex < scenarios.Count;
+                 scenarioIndex++)
+            {
+                EdgeWearArtisticScenario scenario = scenarios[scenarioIndex];
+                if (!scenario.Named &&
+                    !string.Equals(
+                        scenario.Category,
+                        "weight-simplex",
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                if (!scenario.Named && scenarioIndex % 64 != 0)
+                {
+                    continue;
+                }
+                builder.Append("scenario=");
+                builder.Append(scenario.Name);
+                builder.Append(",category=");
+                builder.Append(scenario.Category);
+                builder.Append(",weights=");
+                AppendEdgeWearArtisticScenarioWeights(builder, scenario);
+                builder.Append(",modifierMask=");
+                builder.Append(scenario.ModifierMask);
+                builder.Append(",gateMask=");
+                builder.AppendLine(scenario.GateMask.ToString());
+            }
+            builder.AppendLine(
+                "all scenario definitions and outcomes are present in Library/GeneratedMassEdgeWearArtisticComprehensiveScenarios.csv");
+        }
+
+        private static void AppendEdgeWearArtisticScenarioWeights(
+            StringBuilder builder,
+            EdgeWearArtisticScenario scenario)
+        {
+            builder.Append("angle:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.AngleWeight));
+            builder.Append("/length:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.LengthWeight));
+            builder.Append("/random:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.RandomWeight));
+            builder.Append("/dihedral:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.DihedralWeight));
+            builder.Append("/silhouette:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.SilhouetteWeight));
+            builder.Append("/width:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.WidthWeight));
+            builder.Append("/isolation:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.IsolationWeight));
+            builder.Append("/lowCrowding:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.LowCrowdingWeight));
+            builder.Append("/vertical:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.VerticalWeight));
+            builder.Append("/horizontal:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.HorizontalWeight));
+            builder.Append("/strength:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.StrengthWeight));
+            builder.Append("/depth:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.DepthWeight));
+            builder.Append("/locality:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.LocalityWeight));
+            builder.Append("/seam:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                scenario.SeamWeight));
+        }
+
+        private static void AppendEdgeWearArtisticCaseEvidence(
+            StringBuilder builder,
+            EdgeWearArtisticCaseAnalysis analysis,
+            List<EdgeWearArtisticScenario> scenarios)
+        {
+            MassGenerator.EdgeWearBatchAuditCaseResult result =
+                analysis.MatrixCase.Result;
+            builder.AppendLine();
+            builder.Append("[Case seed=");
+            builder.Append(analysis.MatrixCase.ShapeSeed);
+            builder.Append(",width=");
+            builder.Append(analysis.MatrixCase.WidthName);
+            builder.Append('/');
+            builder.Append(FormatEdgeWearArtisticFloat(
+                analysis.MatrixCase.Width));
+            builder.AppendLine("]");
+            builder.Append("resultPassed=");
+            builder.Append(result.Passed ? "1" : "0");
+            builder.Append(",source/geometric/eligible/selected/certified=");
+            builder.Append(result.SourceEdgeCount);
+            builder.Append('/');
+            builder.Append(result.GeometricEligibleCount);
+            builder.Append('/');
+            builder.Append(result.ArtisticEligibleCount);
+            builder.Append('/');
+            builder.Append(result.SelectedCount);
+            builder.Append('/');
+            builder.AppendLine(result.CertifiedCount.ToString());
+            builder.Append("currentRankHash=");
+            builder.Append(analysis.CurrentOutcome.RankHash);
+            builder.Append(",currentScoreError=");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                analysis.CurrentScoreReproductionMaximumError));
+            builder.Append(",recordedProductionRanksValid=");
+            builder.AppendLine(
+                analysis.RecordedProductionRanksValid ? "1" : "0");
+
+            AppendEdgeWearArtisticMetricEvidence(builder, analysis);
+            AppendEdgeWearArtisticParetoEvidence(builder, analysis);
+            AppendEdgeWearArtisticScenarioSensitivity(builder, analysis);
+            AppendEdgeWearArtisticNamedScenarioEvidence(builder, analysis);
+            AppendEdgeWearArtisticFixedSlotEvidence(builder, analysis);
+            AppendEdgeWearArtisticNativeCoverageEvidence(builder, analysis);
+            AppendEdgeWearArtisticRawEdgeEvidence(builder, analysis);
+        }
+
+        private static void AppendEdgeWearArtisticMetricEvidence(
+            StringBuilder builder,
+            EdgeWearArtisticCaseAnalysis analysis)
+        {
+            string[] metrics =
+            {
+                "angle",
+                "length",
+                "random",
+                "dihedral",
+                "silhouette",
+                "width",
+                "isolation",
+                "lowCrowding",
+                "vertical",
+                "horizontal",
+                "strength",
+                "depth",
+                "locality",
+                "baseSuppression",
+                "upwardBoost"
+            };
+            builder.AppendLine("metricCorrelations(score:pearson/spearman)=");
+            for (int metricIndex = 0;
+                 metricIndex < metrics.Length;
+                 metricIndex++)
+            {
+                List<float> scores = new List<float>();
+                List<float> values = new List<float>();
+                for (int edgeIndex = 0;
+                     edgeIndex < analysis.Edges.Length;
+                     edgeIndex++)
+                {
+                    MassGenerator.EdgeWearArtisticEdgeAuditRecord edge =
+                        analysis.Edges[edgeIndex];
+                    if (edge.GeometricEligible == 0)
+                    {
+                        continue;
+                    }
+                    scores.Add(edge.Score);
+                    values.Add(ResolveEdgeWearArtisticMetric(
+                        edge,
+                        metrics[metricIndex]));
+                }
+                builder.Append(metrics[metricIndex]);
+                builder.Append(':');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    CalculateEdgeWearArtisticPearson(scores, values)));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    CalculateEdgeWearArtisticSpearman(scores, values)));
+                builder.Append(",range=");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    ResolveEdgeWearArtisticMinimum(values)));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    ResolveEdgeWearArtisticMedian(values)));
+                builder.Append('/');
+                builder.AppendLine(FormatEdgeWearArtisticFloat(
+                    ResolveEdgeWearArtisticMaximum(values)));
+            }
+        }
+
+        private static float ResolveEdgeWearArtisticMetric(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord edge,
+            string metric)
+        {
+            switch (metric)
+            {
+                case "angle":
+                    return edge.ArtisticAngleScore;
+                case "length":
+                    return edge.ArtisticLengthScore;
+                case "random":
+                    return edge.ArtisticRandomScore;
+                case "dihedral":
+                    return ResolveEdgeWearArtisticDihedral01(edge);
+                case "silhouette":
+                    return edge.ArtisticSilhouettePotential;
+                case "width":
+                    return ResolveEdgeWearArtisticWidth01(edge);
+                case "isolation":
+                    return 1f - edge.ArtisticLocalDensity01;
+                case "lowCrowding":
+                    return ResolveEdgeWearArtisticLowCrowding01(edge);
+                case "vertical":
+                    return edge.ArtisticEdgeAxisVertical01;
+                case "horizontal":
+                    return 1f - edge.ArtisticEdgeAxisVertical01;
+                case "strength":
+                    return edge.ArtisticStrength;
+                case "depth":
+                    return ResolveEdgeWearArtisticDepth01(edge);
+                case "locality":
+                    return ResolveEdgeWearArtisticLocality01(edge);
+                case "baseSuppression":
+                    return edge.ArtisticBaseSuppression;
+                case "upwardBoost":
+                    return edge.ArtisticUpwardEdgeBoost;
+                default:
+                    return 0f;
+            }
+        }
+
+        private static void AppendEdgeWearArtisticParetoEvidence(
+            StringBuilder builder,
+            EdgeWearArtisticCaseAnalysis analysis)
+        {
+            List<int> frontier = new List<int>();
+            int dominanceInversions = 0;
+            for (int edgeIndex = 0;
+                 edgeIndex < analysis.Edges.Length;
+                 edgeIndex++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord candidate =
+                    analysis.Edges[edgeIndex];
+                if (candidate.GeometricEligible == 0)
+                {
+                    continue;
+                }
+                bool dominated = false;
+                for (int otherIndex = 0;
+                     otherIndex < analysis.Edges.Length;
+                     otherIndex++)
+                {
+                    if (edgeIndex == otherIndex)
+                    {
+                        continue;
+                    }
+                    MassGenerator.EdgeWearArtisticEdgeAuditRecord other =
+                        analysis.Edges[otherIndex];
+                    if (other.GeometricEligible == 0 ||
+                        !DoesEdgeWearArtisticDominate(other, candidate))
+                    {
+                        continue;
+                    }
+                    dominated = true;
+                    if (analysis.CurrentOutcome.RankByEdge.TryGetValue(
+                            other.SourceEdgeIndex,
+                            out int otherRank) &&
+                        analysis.CurrentOutcome.RankByEdge.TryGetValue(
+                            candidate.SourceEdgeIndex,
+                            out int candidateRank) &&
+                        otherRank > candidateRank)
+                    {
+                        dominanceInversions++;
+                    }
+                }
+                if (!dominated)
+                {
+                    frontier.Add(candidate.SourceEdgeIndex);
+                }
+            }
+            frontier.Sort();
+            builder.Append("paretoFrontier=");
+            builder.Append(FormatEdgeWearArtisticIdList(frontier));
+            builder.Append(",dominanceRankInversions=");
+            builder.AppendLine(dominanceInversions.ToString());
+        }
+
+        private static bool DoesEdgeWearArtisticDominate(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord left,
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord right)
+        {
+            float[] leftValues =
+            {
+                left.ArtisticAngleScore,
+                left.ArtisticLengthScore,
+                left.ArtisticSilhouettePotential,
+                ResolveEdgeWearArtisticWidth01(left),
+                1f - left.ArtisticLocalDensity01,
+                ResolveEdgeWearArtisticLowCrowding01(left)
+            };
+            float[] rightValues =
+            {
+                right.ArtisticAngleScore,
+                right.ArtisticLengthScore,
+                right.ArtisticSilhouettePotential,
+                ResolveEdgeWearArtisticWidth01(right),
+                1f - right.ArtisticLocalDensity01,
+                ResolveEdgeWearArtisticLowCrowding01(right)
+            };
+            bool strictlyBetter = false;
+            for (int valueIndex = 0;
+                 valueIndex < leftValues.Length;
+                 valueIndex++)
+            {
+                if (leftValues[valueIndex] + 0.000001f <
+                    rightValues[valueIndex])
+                {
+                    return false;
+                }
+                if (leftValues[valueIndex] >
+                    rightValues[valueIndex] + 0.000001f)
+                {
+                    strictlyBetter = true;
+                }
+            }
+            return strictlyBetter;
+        }
+
+        private static void AppendEdgeWearArtisticScenarioSensitivity(
+            StringBuilder builder,
+            EdgeWearArtisticCaseAnalysis analysis)
+        {
+            builder.AppendLine("scenarioSensitivityPerGeometricEdge=");
+            for (int edgeIndex = 0;
+                 edgeIndex < analysis.Edges.Length;
+                 edgeIndex++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord edge =
+                    analysis.Edges[edgeIndex];
+                if (edge.GeometricEligible == 0)
+                {
+                    continue;
+                }
+                int eligible = 0;
+                int rankMinimum = int.MaxValue;
+                int rankMaximum = -1;
+                double rankTotal = 0d;
+                int top25 = 0;
+                int top50 = 0;
+                int top75 = 0;
+                for (int outcomeIndex = 0;
+                     outcomeIndex < analysis.Outcomes.Count;
+                     outcomeIndex++)
+                {
+                    EdgeWearArtisticScenarioOutcome outcome =
+                        analysis.Outcomes[outcomeIndex];
+                    if (!outcome.RankByEdge.TryGetValue(
+                            edge.SourceEdgeIndex,
+                            out int rank))
+                    {
+                        continue;
+                    }
+                    eligible++;
+                    rankMinimum = Mathf.Min(rankMinimum, rank);
+                    rankMaximum = Mathf.Max(rankMaximum, rank);
+                    rankTotal += rank;
+                    int count = outcome.RankedEdgeIds.Count;
+                    if (rank < ResolveEdgeWearArtisticCoverageCount(
+                            count,
+                            0.25f))
+                    {
+                        top25++;
+                    }
+                    if (rank < ResolveEdgeWearArtisticCoverageCount(
+                            count,
+                            0.50f))
+                    {
+                        top50++;
+                    }
+                    if (rank < ResolveEdgeWearArtisticCoverageCount(
+                            count,
+                            0.75f))
+                    {
+                        top75++;
+                    }
+                }
+                builder.Append("edge=");
+                builder.Append(edge.SourceEdgeIndex);
+                builder.Append(",eligibleScenarios=");
+                builder.Append(eligible);
+                builder.Append('/');
+                builder.Append(analysis.Outcomes.Count);
+                builder.Append(",rankMin/mean/max=");
+                builder.Append(rankMinimum == int.MaxValue
+                    ? "none"
+                    : rankMinimum.ToString());
+                builder.Append('/');
+                builder.Append(eligible == 0
+                    ? "none"
+                    : FormatEdgeWearArtisticFloat(
+                        (float)(rankTotal / eligible)));
+                builder.Append('/');
+                builder.Append(rankMaximum < 0
+                    ? "none"
+                    : rankMaximum.ToString());
+                builder.Append(",top25/50/75Frequency=");
+                builder.Append(eligible == 0
+                    ? "0"
+                    : FormatEdgeWearArtisticFloat((float)top25 / eligible));
+                builder.Append('/');
+                builder.Append(eligible == 0
+                    ? "0"
+                    : FormatEdgeWearArtisticFloat((float)top50 / eligible));
+                builder.Append('/');
+                builder.AppendLine(eligible == 0
+                    ? "0"
+                    : FormatEdgeWearArtisticFloat((float)top75 / eligible));
+            }
+        }
+
+        private static void AppendEdgeWearArtisticNamedScenarioEvidence(
+            StringBuilder builder,
+            EdgeWearArtisticCaseAnalysis analysis)
+        {
+            builder.AppendLine("namedScenarioComparisons=");
+            for (int outcomeIndex = 0;
+                 outcomeIndex < analysis.Outcomes.Count;
+                 outcomeIndex++)
+            {
+                EdgeWearArtisticScenarioOutcome outcome =
+                    analysis.Outcomes[outcomeIndex];
+                if (!outcome.Scenario.Named)
+                {
+                    continue;
+                }
+                builder.Append("scenario=");
+                builder.Append(outcome.Scenario.Name);
+                builder.Append(",eligible=");
+                builder.Append(outcome.RankedEdgeIds.Count);
+                builder.Append(",rankCorrelation=");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    CalculateEdgeWearArtisticOutcomeSpearman(
+                        analysis.CurrentOutcome,
+                        outcome)));
+                builder.Append(",churn25/50/75=");
+                builder.Append(CalculateEdgeWearArtisticChurn(
+                    analysis.CurrentOutcome,
+                    outcome,
+                    ResolveEdgeWearArtisticCoverageCount(
+                        analysis.CurrentOutcome.RankedEdgeIds.Count,
+                        0.25f)));
+                builder.Append('/');
+                builder.Append(CalculateEdgeWearArtisticChurn(
+                    analysis.CurrentOutcome,
+                    outcome,
+                    ResolveEdgeWearArtisticCoverageCount(
+                        analysis.CurrentOutcome.RankedEdgeIds.Count,
+                        0.50f)));
+                builder.Append('/');
+                builder.Append(CalculateEdgeWearArtisticChurn(
+                    analysis.CurrentOutcome,
+                    outcome,
+                    ResolveEdgeWearArtisticCoverageCount(
+                        analysis.CurrentOutcome.RankedEdgeIds.Count,
+                        0.75f)));
+                builder.Append(",top25=");
+                builder.Append(FormatEdgeWearArtisticSelectedIds(
+                    outcome,
+                    ResolveEdgeWearArtisticCoverageCount(
+                        outcome.RankedEdgeIds.Count,
+                        0.25f)));
+                builder.AppendLine();
+            }
+        }
+
+        private static void AppendEdgeWearArtisticFixedSlotEvidence(
+            StringBuilder builder,
+            EdgeWearArtisticCaseAnalysis analysis)
+        {
+            builder.AppendLine("fixedSlotEvidence=");
+            int maximumSlots =
+                analysis.CurrentOutcome.RankedEdgeIds.Count;
+            EdgeWearArtisticScenarioOutcome noRandom =
+                FindEdgeWearArtisticOutcome(
+                    analysis,
+                    "current-no-random");
+            for (int selectedCount = 1;
+                 selectedCount <= maximumSlots;
+                 selectedCount++)
+            {
+                HashSet<int> intersection = null;
+                HashSet<int> union = new HashSet<int>();
+                int maximumChurn = 0;
+                int[] frequency = new int[analysis.Edges.Length];
+                for (int outcomeIndex = 0;
+                     outcomeIndex < analysis.Outcomes.Count;
+                     outcomeIndex++)
+                {
+                    EdgeWearArtisticScenarioOutcome outcome =
+                        analysis.Outcomes[outcomeIndex];
+                    HashSet<int> selected =
+                        GetEdgeWearArtisticSelectedSet(
+                            outcome,
+                            selectedCount);
+                    union.UnionWith(selected);
+                    if (intersection == null)
+                    {
+                        intersection = new HashSet<int>(selected);
+                    }
+                    else
+                    {
+                        intersection.IntersectWith(selected);
+                    }
+                    maximumChurn = Mathf.Max(
+                        maximumChurn,
+                        CalculateEdgeWearArtisticChurn(
+                            analysis.CurrentOutcome,
+                            outcome,
+                            selectedCount));
+                    foreach (int edgeId in selected)
+                    {
+                        int recordIndex = FindEdgeWearArtisticRecordIndex(
+                            analysis.Edges,
+                            edgeId);
+                        if (recordIndex >= 0)
+                        {
+                            frequency[recordIndex]++;
+                        }
+                    }
+                }
+                List<int> core90 = new List<int>();
+                for (int recordIndex = 0;
+                     recordIndex < analysis.Edges.Length;
+                     recordIndex++)
+                {
+                    if (frequency[recordIndex] >=
+                        Mathf.CeilToInt(analysis.Outcomes.Count * 0.9f))
+                    {
+                        core90.Add(
+                            analysis.Edges[recordIndex].SourceEdgeIndex);
+                    }
+                }
+                float threshold = ResolveEdgeWearArtisticThreshold(
+                    analysis.CurrentOutcome,
+                    selectedCount);
+                float gap = ResolveEdgeWearArtisticThresholdGap(
+                    analysis.CurrentOutcome,
+                    selectedCount);
+                builder.Append("slots=");
+                builder.Append(selectedCount);
+                builder.Append(",threshold/gap=");
+                builder.Append(FormatEdgeWearArtisticFloat(threshold));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(gap));
+                builder.Append(",noRandomChurn=");
+                builder.Append(CalculateEdgeWearArtisticChurn(
+                    analysis.CurrentOutcome,
+                    noRandom,
+                    selectedCount));
+                builder.Append(",maximumScenarioChurn=");
+                builder.Append(maximumChurn);
+                builder.Append(",intersection/union=");
+                builder.Append(intersection == null ? 0 : intersection.Count);
+                builder.Append('/');
+                builder.Append(union.Count);
+                builder.Append(",core90=");
+                builder.AppendLine(FormatEdgeWearArtisticIdList(core90));
+            }
+        }
+
+        private static void AppendEdgeWearArtisticNativeCoverageEvidence(
+            StringBuilder builder,
+            EdgeWearArtisticCaseAnalysis analysis)
+        {
+            builder.AppendLine("nativeCoverageDeciles=");
+            for (int decile = 1; decile <= 10; decile++)
+            {
+                float coverage = decile / 10f;
+                int selectedCount = ResolveEdgeWearArtisticCoverageCount(
+                    analysis.CurrentOutcome.RankedEdgeIds.Count,
+                    coverage);
+                int maximumChurn = 0;
+                double churnTotal = 0d;
+                int evaluated = 0;
+                for (int outcomeIndex = 0;
+                     outcomeIndex < analysis.Outcomes.Count;
+                     outcomeIndex++)
+                {
+                    int churn = CalculateEdgeWearArtisticChurn(
+                        analysis.CurrentOutcome,
+                        analysis.Outcomes[outcomeIndex],
+                        selectedCount);
+                    maximumChurn = Mathf.Max(maximumChurn, churn);
+                    churnTotal += churn;
+                    evaluated++;
+                }
+                builder.Append("coverage=");
+                builder.Append(FormatEdgeWearArtisticFloat(coverage));
+                builder.Append(",slots=");
+                builder.Append(selectedCount);
+                builder.Append(",current=");
+                builder.Append(FormatEdgeWearArtisticSelectedIds(
+                    analysis.CurrentOutcome,
+                    selectedCount));
+                builder.Append(",threshold/gap=");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    ResolveEdgeWearArtisticThreshold(
+                        analysis.CurrentOutcome,
+                        selectedCount)));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    ResolveEdgeWearArtisticThresholdGap(
+                        analysis.CurrentOutcome,
+                        selectedCount)));
+                builder.Append(",scenarioChurnMean/max=");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    evaluated == 0 ? 0f : (float)(churnTotal / evaluated)));
+                builder.Append('/');
+                builder.AppendLine(maximumChurn.ToString());
+            }
+        }
+
+        private static void AppendEdgeWearArtisticRawEdgeEvidence(
+            StringBuilder builder,
+            EdgeWearArtisticCaseAnalysis analysis)
+        {
+            builder.AppendLine("rawPerEdgeEvidence=");
+            for (int edgeIndex = 0;
+                 edgeIndex < analysis.Edges.Length;
+                 edgeIndex++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord edge =
+                    analysis.Edges[edgeIndex];
+                builder.Append("edge=");
+                builder.Append(edge.SourceEdgeIndex);
+                builder.Append(",candidateIndex=");
+                builder.Append(edge.CandidateIndex);
+                builder.Append(",geometry={start:");
+                builder.Append(FormatEdgeWearArtisticVector(edge.Start));
+                builder.Append(",end:");
+                builder.Append(FormatEdgeWearArtisticVector(edge.End));
+                builder.Append(",mid:");
+                builder.Append(FormatEdgeWearArtisticVector(edge.Midpoint));
+                builder.Append(",length:");
+                builder.Append(FormatEdgeWearArtisticFloat(edge.Length));
+                builder.Append(",dihedral:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.DihedralDegrees));
+                builder.Append(",faces:");
+                builder.Append(edge.FaceA);
+                builder.Append('/');
+                builder.Append(edge.FaceB);
+                builder.Append('/');
+                builder.Append(edge.FaceCount);
+                builder.Append(",classification:");
+                builder.Append(edge.Classification);
+                builder.Append(",seam:");
+                builder.Append(edge.CoincidentBoundarySeamReconciled);
+                builder.Append("},normals={ownerA:");
+                builder.Append(FormatEdgeWearArtisticVector(
+                    edge.OwnerNormalA));
+                builder.Append(",ownerB:");
+                builder.Append(FormatEdgeWearArtisticVector(
+                    edge.OwnerNormalB));
+                builder.Append(",bevel:");
+                builder.Append(FormatEdgeWearArtisticVector(
+                    edge.BevelNormal));
+                builder.Append("},eligibility={structural/geometric/coexistence/artistic:");
+                builder.Append(edge.StructuralEligible);
+                builder.Append('/');
+                builder.Append(edge.GeometricEligible);
+                builder.Append('/');
+                builder.Append(edge.CoexistenceEligible);
+                builder.Append('/');
+                builder.Append(edge.ArtisticEligible);
+                builder.Append(",gates:");
+                builder.Append(edge.ArtisticLengthEligible);
+                builder.Append('/');
+                builder.Append(edge.ArtisticAngleEligible);
+                builder.Append('/');
+                builder.Append(edge.ArtisticBaseEligible);
+                builder.Append(",filter:");
+                builder.Append(edge.ArtisticFilterReason);
+                builder.Append("},score={final:");
+                builder.Append(FormatEdgeWearArtisticFloat(edge.Score));
+                builder.Append(",angle/length/random:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticAngleScore));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticLengthScore));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticRandomScore));
+                builder.Append(",base/upward/character:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticBaseSuppression));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticUpwardEdgeBoost));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticCharacterBoost));
+                builder.Append(",rank/threshold/delta:");
+                builder.Append(edge.ArtisticSelectionRank);
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticSelectionThreshold));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticSelectionDelta));
+                builder.Append("},context={axisVertical/absXYZ:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticEdgeAxisVertical01));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticEdgeAxisAbsX));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticEdgeAxisAbsY));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticEdgeAxisAbsZ));
+                builder.Append(",silhouette/width/density/crowding:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticSilhouettePotential));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    ResolveEdgeWearArtisticWidth01(edge)));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticLocalDensity01));
+                builder.Append('/');
+                builder.Append(edge.ArtisticSharedVertexDegreeA);
+                builder.Append('/');
+                builder.Append(edge.ArtisticSharedVertexDegreeB);
+                builder.Append("},viability={requested/footprint/ratio:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.RequestedWidth));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.RequiredFootprintLength));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.LengthToWidthRatio));
+                builder.Append(",localityFloor/ceiling/margin/guard/minRemoval:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.LocalityRetainPlaneFloor));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.LocalityRemovalPlaneCeiling));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.LocalityFeasibleMargin));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.LocalityGuardMargin));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.LocalityMinimumRemoval));
+                builder.Append(",maximumWidth/fraction:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.MaximumLocallyFeasibleWidth));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.FeasibleWidthFraction));
+                builder.Append(",isolated:");
+                builder.Append(edge.IsolatedSucceeded);
+                builder.Append('/');
+                builder.Append(edge.IsolatedWidthAttemptCount);
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.IsolatedMaximumCertifiedWidthFraction));
+                builder.Append('/');
+                builder.Append(edge.IsolatedOpenEdgeCount);
+                builder.Append('/');
+                builder.Append(edge.IsolatedNonManifoldEdgeCount);
+                builder.Append('/');
+                builder.Append(edge.IsolatedTJunctionCount);
+                builder.Append('/');
+                builder.Append(edge.IsolatedInvalidFaceCount);
+                builder.Append(",failure:");
+                builder.Append(edge.ViabilityFailureReason);
+                builder.Append("},effect={variation/strength/depth:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticDeterministicVariation));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticStrength));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.ArtisticDepthMultiplier));
+                builder.Append("},lifecycle={candidate/selected/active/attempted/certified/deferred/rejected:");
+                builder.Append(edge.Candidate);
+                builder.Append('/');
+                builder.Append(edge.Selected);
+                builder.Append('/');
+                builder.Append(edge.Active);
+                builder.Append('/');
+                builder.Append(edge.AttemptedBuilt);
+                builder.Append('/');
+                builder.Append(edge.CertifiedBuilt);
+                builder.Append('/');
+                builder.Append(edge.Deferred);
+                builder.Append('/');
+                builder.Append(edge.Rejected);
+                builder.Append(",solved/materialized/scale:");
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.SolvedWidth));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.MaterializedWidth));
+                builder.Append('/');
+                builder.Append(FormatEdgeWearArtisticFloat(
+                    edge.MaterializedWidthScale));
+                builder.Append(",reason:");
+                builder.Append(edge.FinalReason);
+                builder.AppendLine("}");
+            }
+        }
+
+        private static void AppendEdgeWearArtisticCrossWidthEvidence(
+            StringBuilder builder,
+            List<EdgeWearArtisticCaseAnalysis> analyses)
+        {
+            builder.AppendLine();
+            builder.AppendLine("[Cross Width Stability]");
+            for (int seedIndex = 0;
+                 seedIndex < EdgeWearBatchShapeSeeds.Length;
+                 seedIndex++)
+            {
+                int seed = EdgeWearBatchShapeSeeds[seedIndex];
+                EdgeWearArtisticCaseAnalysis minimum = null;
+                EdgeWearArtisticCaseAnalysis normal = null;
+                EdgeWearArtisticCaseAnalysis maximum = null;
+                for (int caseIndex = 0;
+                     caseIndex < analyses.Count;
+                     caseIndex++)
+                {
+                    EdgeWearArtisticCaseAnalysis analysis =
+                        analyses[caseIndex];
+                    if (analysis.MatrixCase.ShapeSeed != seed)
+                    {
+                        continue;
+                    }
+                    switch (analysis.MatrixCase.WidthName)
+                    {
+                        case "minimum":
+                            minimum = analysis;
+                            break;
+                        case "default":
+                            normal = analysis;
+                            break;
+                        case "maximum":
+                            maximum = analysis;
+                            break;
+                    }
+                }
+                builder.Append("seed=");
+                builder.Append(seed);
+                AppendEdgeWearArtisticCrossWidthPair(
+                    builder,
+                    "min-default",
+                    minimum,
+                    normal);
+                AppendEdgeWearArtisticCrossWidthPair(
+                    builder,
+                    "default-max",
+                    normal,
+                    maximum);
+                AppendEdgeWearArtisticCrossWidthPair(
+                    builder,
+                    "min-max",
+                    minimum,
+                    maximum);
+                builder.AppendLine();
+            }
+        }
+
+        private static void AppendEdgeWearArtisticCrossWidthPair(
+            StringBuilder builder,
+            string name,
+            EdgeWearArtisticCaseAnalysis left,
+            EdgeWearArtisticCaseAnalysis right)
+        {
+            builder.Append(',');
+            builder.Append(name);
+            builder.Append('=');
+            if (left == null || right == null)
+            {
+                builder.Append("missing");
+                return;
+            }
+            builder.Append("rank:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                CalculateEdgeWearArtisticOutcomeSpearman(
+                    left.CurrentOutcome,
+                    right.CurrentOutcome)));
+            builder.Append("/jaccard25:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                CalculateEdgeWearArtisticJaccard(
+                    left.CurrentOutcome,
+                    right.CurrentOutcome,
+                    0.25f)));
+            builder.Append("/jaccard50:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                CalculateEdgeWearArtisticJaccard(
+                    left.CurrentOutcome,
+                    right.CurrentOutcome,
+                    0.50f)));
+            builder.Append("/jaccard75:");
+            builder.Append(FormatEdgeWearArtisticFloat(
+                CalculateEdgeWearArtisticJaccard(
+                    left.CurrentOutcome,
+                    right.CurrentOutcome,
+                    0.75f)));
+        }
+
+        private static string BuildEdgeWearArtisticComprehensiveEdgesCsv(
+            List<EdgeWearArtisticCaseAnalysis> analyses)
+        {
+            StringBuilder builder = new StringBuilder(524288);
+            builder.AppendLine(
+                "seed,widthName,width,sourceEdge,candidateIndex,start,end,midpoint,ownerNormalA,ownerNormalB,bevelNormal,faceA,faceB,faceCount,length,dihedral,vertical01,classification,seamReconciled,structural,geometric,coexistence,artistic,lengthGate,angleGate,baseGate,filterReason,candidateReason,finalReason,score,minimumLength,lengthScore,angleScore,randomScore,baseSuppression,upwardBoost,characterBoost,axisVertical,axisAbsX,axisAbsY,axisAbsZ,silhouette,feasibleWidthFraction,solvedWidthFraction,localDensity,degreeA,degreeB,selectionRank,selectionThreshold,selectionDelta,deterministicVariation,strength,depthMultiplier,requestedWidth,requiredFootprint,lengthToWidthRatio,localityFloor,localityCeiling,localityMargin,localityGuard,localityMinimumRemoval,localityLimitingVertex,localityLimitingPosition,maximumLocallyFeasibleWidth,feasibleWidthFractionRaw,isolatedSucceeded,isolatedAttempts,isolatedLastWidth,isolatedMaximumWidth,isolatedMaximumFraction,endpointConsumptionA,endpointConsumptionB,remainingSpan,minimumSpan,isolatedOpen,isolatedNonManifold,isolatedTJunction,isolatedInvalidFace,isolatedDiagnostic,viabilityFailure,solvedWidth,materializedWidth,materializedScale,widthReduced,candidate,selected,widthInactive,active,attempted,certified,trialRejected,deferred,rejected");
+            for (int caseIndex = 0;
+                 caseIndex < analyses.Count;
+                 caseIndex++)
+            {
+                EdgeWearArtisticCaseAnalysis analysis = analyses[caseIndex];
+                for (int edgeIndex = 0;
+                     edgeIndex < analysis.Edges.Length;
+                     edgeIndex++)
+                {
+                    MassGenerator.EdgeWearArtisticEdgeAuditRecord edge =
+                        analysis.Edges[edgeIndex];
+                    AppendEdgeWearArtisticCsv(builder,
+                        analysis.MatrixCase.ShapeSeed.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        analysis.MatrixCase.WidthName);
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticFloat(
+                            analysis.MatrixCase.Width));
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.SourceEdgeIndex.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.CandidateIndex.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticVector(edge.Start));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticVector(edge.End));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticVector(edge.Midpoint));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticVector(edge.OwnerNormalA));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticVector(edge.OwnerNormalB));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticVector(edge.BevelNormal));
+                    AppendEdgeWearArtisticCsv(builder, edge.FaceA.ToString());
+                    AppendEdgeWearArtisticCsv(builder, edge.FaceB.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.FaceCount.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticFloat(edge.Length));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticFloat(
+                            edge.DihedralDegrees));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticFloat(edge.Vertical01));
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.Classification);
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.CoincidentBoundarySeamReconciled.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.StructuralEligible.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.GeometricEligible.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.CoexistenceEligible.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.ArtisticEligible.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.ArtisticLengthEligible.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.ArtisticAngleEligible.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.ArtisticBaseEligible.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.ArtisticFilterReason);
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.CandidateReason);
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.FinalReason);
+                    float[] firstFloats =
+                    {
+                        edge.Score,
+                        edge.ArtisticMinimumLength,
+                        edge.ArtisticLengthScore,
+                        edge.ArtisticAngleScore,
+                        edge.ArtisticRandomScore,
+                        edge.ArtisticBaseSuppression,
+                        edge.ArtisticUpwardEdgeBoost,
+                        edge.ArtisticCharacterBoost,
+                        edge.ArtisticEdgeAxisVertical01,
+                        edge.ArtisticEdgeAxisAbsX,
+                        edge.ArtisticEdgeAxisAbsY,
+                        edge.ArtisticEdgeAxisAbsZ,
+                        edge.ArtisticSilhouettePotential,
+                        edge.ArtisticFeasibleWidthFraction,
+                        edge.ArtisticSolvedWidthFraction,
+                        edge.ArtisticLocalDensity01
+                    };
+                    AppendEdgeWearArtisticCsvFloats(builder, firstFloats);
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.ArtisticSharedVertexDegreeA.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.ArtisticSharedVertexDegreeB.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.ArtisticSelectionRank.ToString());
+                    float[] secondFloats =
+                    {
+                        edge.ArtisticSelectionThreshold,
+                        edge.ArtisticSelectionDelta,
+                        edge.ArtisticDeterministicVariation,
+                        edge.ArtisticStrength,
+                        edge.ArtisticDepthMultiplier,
+                        edge.RequestedWidth,
+                        edge.RequiredFootprintLength,
+                        edge.LengthToWidthRatio,
+                        edge.LocalityRetainPlaneFloor,
+                        edge.LocalityRemovalPlaneCeiling,
+                        edge.LocalityFeasibleMargin,
+                        edge.LocalityGuardMargin,
+                        edge.LocalityMinimumRemoval
+                    };
+                    AppendEdgeWearArtisticCsvFloats(builder, secondFloats);
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.LocalityLimitingVertex.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticVector(
+                            edge.LocalityLimitingPosition));
+                    float[] thirdFloats =
+                    {
+                        edge.MaximumLocallyFeasibleWidth,
+                        edge.FeasibleWidthFraction
+                    };
+                    AppendEdgeWearArtisticCsvFloats(builder, thirdFloats);
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.IsolatedSucceeded.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.IsolatedWidthAttemptCount.ToString());
+                    float[] fourthFloats =
+                    {
+                        edge.IsolatedLastAttemptedWidth,
+                        edge.IsolatedMaximumCertifiedWidth,
+                        edge.IsolatedMaximumCertifiedWidthFraction,
+                        edge.EndpointConsumptionA,
+                        edge.EndpointConsumptionB,
+                        edge.RemainingCentralSpan,
+                        edge.MinimumCentralSpan
+                    };
+                    AppendEdgeWearArtisticCsvFloats(builder, fourthFloats);
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.IsolatedOpenEdgeCount.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.IsolatedNonManifoldEdgeCount.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.IsolatedTJunctionCount.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.IsolatedInvalidFaceCount.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.IsolatedDiagnostic);
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.ViabilityFailureReason);
+                    float[] fifthFloats =
+                    {
+                        edge.SolvedWidth,
+                        edge.MaterializedWidth,
+                        edge.MaterializedWidthScale
+                    };
+                    AppendEdgeWearArtisticCsvFloats(builder, fifthFloats);
+                    int[] finalInts =
+                    {
+                        edge.WidthReduced,
+                        edge.Candidate,
+                        edge.Selected,
+                        edge.WidthInactive,
+                        edge.Active,
+                        edge.AttemptedBuilt,
+                        edge.CertifiedBuilt,
+                        edge.TrialRejected,
+                        edge.Deferred,
+                        edge.Rejected
+                    };
+                    for (int intIndex = 0;
+                         intIndex < finalInts.Length;
+                         intIndex++)
+                    {
+                        AppendEdgeWearArtisticCsv(
+                            builder,
+                            finalInts[intIndex].ToString(),
+                            intIndex == finalInts.Length - 1);
+                    }
+                }
+            }
+            return builder.ToString();
+        }
+
+        private static string BuildEdgeWearArtisticComprehensiveScenariosCsv(
+            List<EdgeWearArtisticCaseAnalysis> analyses,
+            List<EdgeWearArtisticScenario> scenarios)
+        {
+            StringBuilder builder = new StringBuilder(8388608);
+            builder.AppendLine(
+                "seed,widthName,width,scenario,category,named,angleWeight,lengthWeight,randomWeight,dihedralWeight,silhouetteWeight,widthWeight,isolationWeight,lowCrowdingWeight,verticalWeight,horizontalWeight,strengthWeight,depthWeight,localityWeight,seamWeight,modifierMask,gateMask,eligibleCount,scoreMinimum,scoreMedian,scoreMaximum,rankHash,rankedIds,currentRankSpearman,churn25,churn50,churn75");
+            for (int caseIndex = 0;
+                 caseIndex < analyses.Count;
+                 caseIndex++)
+            {
+                EdgeWearArtisticCaseAnalysis analysis = analyses[caseIndex];
+                for (int outcomeIndex = 0;
+                     outcomeIndex < analysis.Outcomes.Count;
+                     outcomeIndex++)
+                {
+                    EdgeWearArtisticScenarioOutcome outcome =
+                        analysis.Outcomes[outcomeIndex];
+                    EdgeWearArtisticScenario scenario = outcome.Scenario;
+                    AppendEdgeWearArtisticCsv(builder,
+                        analysis.MatrixCase.ShapeSeed.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        analysis.MatrixCase.WidthName);
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticFloat(
+                            analysis.MatrixCase.Width));
+                    AppendEdgeWearArtisticCsv(builder, scenario.Name);
+                    AppendEdgeWearArtisticCsv(builder, scenario.Category);
+                    AppendEdgeWearArtisticCsv(builder,
+                        scenario.Named ? "1" : "0");
+                    float[] weights =
+                    {
+                        scenario.AngleWeight,
+                        scenario.LengthWeight,
+                        scenario.RandomWeight,
+                        scenario.DihedralWeight,
+                        scenario.SilhouetteWeight,
+                        scenario.WidthWeight,
+                        scenario.IsolationWeight,
+                        scenario.LowCrowdingWeight,
+                        scenario.VerticalWeight,
+                        scenario.HorizontalWeight,
+                        scenario.StrengthWeight,
+                        scenario.DepthWeight,
+                        scenario.LocalityWeight,
+                        scenario.SeamWeight
+                    };
+                    AppendEdgeWearArtisticCsvFloats(builder, weights);
+                    AppendEdgeWearArtisticCsv(builder,
+                        scenario.ModifierMask.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        scenario.GateMask.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        outcome.RankedEdgeIds.Count.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticFloat(
+                            outcome.ScoreMinimum));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticFloat(
+                            outcome.ScoreMedian));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticFloat(
+                            outcome.ScoreMaximum));
+                    AppendEdgeWearArtisticCsv(builder, outcome.RankHash);
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticIdList(
+                            outcome.RankedEdgeIds));
+                    AppendEdgeWearArtisticCsv(builder,
+                        FormatEdgeWearArtisticFloat(
+                            CalculateEdgeWearArtisticOutcomeSpearman(
+                                analysis.CurrentOutcome,
+                                outcome)));
+                    int currentCount =
+                        analysis.CurrentOutcome.RankedEdgeIds.Count;
+                    AppendEdgeWearArtisticCsv(builder,
+                        CalculateEdgeWearArtisticChurn(
+                            analysis.CurrentOutcome,
+                            outcome,
+                            ResolveEdgeWearArtisticCoverageCount(
+                                currentCount,
+                                0.25f)).ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        CalculateEdgeWearArtisticChurn(
+                            analysis.CurrentOutcome,
+                            outcome,
+                            ResolveEdgeWearArtisticCoverageCount(
+                                currentCount,
+                                0.50f)).ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        CalculateEdgeWearArtisticChurn(
+                            analysis.CurrentOutcome,
+                            outcome,
+                            ResolveEdgeWearArtisticCoverageCount(
+                                currentCount,
+                                0.75f)).ToString(),
+                        true);
+                }
+            }
+            return builder.ToString();
+        }
+
+        private static bool WriteEdgeWearArtisticComprehensiveReports(
+            string report,
+            string edgesCsv,
+            string scenariosCsv,
+            out string diagnostic)
+        {
+            try
+            {
+                File.WriteAllText(
+                    GetEdgeWearLibraryPath(
+                        EdgeWearArtisticComprehensiveReportFileName),
+                    report ?? string.Empty,
+                    new UTF8Encoding(false));
+                File.WriteAllText(
+                    GetEdgeWearLibraryPath(
+                        EdgeWearArtisticComprehensiveEdgesCsvFileName),
+                    edgesCsv ?? string.Empty,
+                    new UTF8Encoding(false));
+                File.WriteAllText(
+                    GetEdgeWearLibraryPath(
+                        EdgeWearArtisticComprehensiveScenariosCsvFileName),
+                    scenariosCsv ?? string.Empty,
+                    new UTF8Encoding(false));
+                diagnostic = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                diagnostic = "comprehensive artistic report write failed: " +
+                    exception.GetType().Name + ":" + exception.Message;
+                return false;
+            }
+        }
+
+        private static EdgeWearArtisticScenarioOutcome
+            FindEdgeWearArtisticOutcome(
+                EdgeWearArtisticCaseAnalysis analysis,
+                string scenarioName)
+        {
+            if (analysis == null)
+            {
+                return null;
+            }
+            for (int outcomeIndex = 0;
+                 outcomeIndex < analysis.Outcomes.Count;
+                 outcomeIndex++)
+            {
+                EdgeWearArtisticScenarioOutcome outcome =
+                    analysis.Outcomes[outcomeIndex];
+                if (string.Equals(
+                        outcome.Scenario.Name,
+                        scenarioName,
+                        StringComparison.Ordinal))
+                {
+                    return outcome;
+                }
+            }
+            return null;
+        }
+
+        private static int ResolveEdgeWearArtisticCoverageCount(
+            int eligibleCount,
+            float coverage)
+        {
+            if (eligibleCount <= 0 || coverage <= 0f)
+            {
+                return 0;
+            }
+            return Mathf.Clamp(
+                Mathf.CeilToInt(eligibleCount * Mathf.Clamp01(coverage)),
+                1,
+                eligibleCount);
+        }
+
+        private static HashSet<int> GetEdgeWearArtisticSelectedSet(
+            EdgeWearArtisticScenarioOutcome outcome,
+            int selectedCount)
+        {
+            HashSet<int> selected = new HashSet<int>();
+            if (outcome == null || selectedCount <= 0)
+            {
+                return selected;
+            }
+            int count = Mathf.Min(
+                selectedCount,
+                outcome.RankedEdgeIds.Count);
+            for (int index = 0; index < count; index++)
+            {
+                selected.Add(outcome.RankedEdgeIds[index]);
+            }
+            return selected;
+        }
+
+        private static int CalculateEdgeWearArtisticChurn(
+            EdgeWearArtisticScenarioOutcome left,
+            EdgeWearArtisticScenarioOutcome right,
+            int selectedCount)
+        {
+            if (left == null || right == null)
+            {
+                return selectedCount;
+            }
+            HashSet<int> leftSet = GetEdgeWearArtisticSelectedSet(
+                left,
+                selectedCount);
+            HashSet<int> rightSet = GetEdgeWearArtisticSelectedSet(
+                right,
+                selectedCount);
+            leftSet.SymmetricExceptWith(rightSet);
+            return leftSet.Count / 2;
+        }
+
+        private static float CalculateEdgeWearArtisticJaccard(
+            EdgeWearArtisticScenarioOutcome left,
+            EdgeWearArtisticScenarioOutcome right,
+            float coverage)
+        {
+            if (left == null || right == null)
+            {
+                return 0f;
+            }
+            int selectedCount = ResolveEdgeWearArtisticCoverageCount(
+                Mathf.Min(
+                    left.RankedEdgeIds.Count,
+                    right.RankedEdgeIds.Count),
+                coverage);
+            HashSet<int> leftSet = GetEdgeWearArtisticSelectedSet(
+                left,
+                selectedCount);
+            HashSet<int> rightSet = GetEdgeWearArtisticSelectedSet(
+                right,
+                selectedCount);
+            HashSet<int> intersection = new HashSet<int>(leftSet);
+            intersection.IntersectWith(rightSet);
+            leftSet.UnionWith(rightSet);
+            return leftSet.Count == 0
+                ? 1f
+                : (float)intersection.Count / leftSet.Count;
+        }
+
+        private static float ResolveEdgeWearArtisticThreshold(
+            EdgeWearArtisticScenarioOutcome outcome,
+            int selectedCount)
+        {
+            if (outcome == null || selectedCount <= 0 ||
+                selectedCount > outcome.RankedEdgeIds.Count)
+            {
+                return 0f;
+            }
+            int edgeId = outcome.RankedEdgeIds[selectedCount - 1];
+            return outcome.ScoreByEdge.TryGetValue(edgeId, out float score)
+                ? score
+                : 0f;
+        }
+
+        private static float ResolveEdgeWearArtisticThresholdGap(
+            EdgeWearArtisticScenarioOutcome outcome,
+            int selectedCount)
+        {
+            if (outcome == null || selectedCount <= 0 ||
+                selectedCount >= outcome.RankedEdgeIds.Count)
+            {
+                return 0f;
+            }
+            float selected = ResolveEdgeWearArtisticThreshold(
+                outcome,
+                selectedCount);
+            int nextId = outcome.RankedEdgeIds[selectedCount];
+            float next = outcome.ScoreByEdge.TryGetValue(
+                    nextId,
+                    out float nextScore)
+                ? nextScore
+                : 0f;
+            return selected - next;
+        }
+
+        private static string FormatEdgeWearArtisticSelectedIds(
+            EdgeWearArtisticScenarioOutcome outcome,
+            int selectedCount)
+        {
+            if (outcome == null || selectedCount <= 0)
+            {
+                return "none";
+            }
+            List<int> ids = new List<int>();
+            int count = Mathf.Min(
+                selectedCount,
+                outcome.RankedEdgeIds.Count);
+            for (int index = 0; index < count; index++)
+            {
+                ids.Add(outcome.RankedEdgeIds[index]);
+            }
+            return FormatEdgeWearArtisticIdList(ids);
+        }
+
+        private static int FindEdgeWearArtisticRecordIndex(
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord[] edges,
+            int sourceEdgeId)
+        {
+            for (int edgeIndex = 0;
+                 edgeIndex < edges.Length;
+                 edgeIndex++)
+            {
+                if (edges[edgeIndex].SourceEdgeIndex == sourceEdgeId)
+                {
+                    return edgeIndex;
+                }
+            }
+            return -1;
+        }
+
+        private static float CalculateEdgeWearArtisticOutcomeSpearman(
+            EdgeWearArtisticScenarioOutcome left,
+            EdgeWearArtisticScenarioOutcome right)
+        {
+            if (left == null || right == null)
+            {
+                return 0f;
+            }
+            List<float> leftRanks = new List<float>();
+            List<float> rightRanks = new List<float>();
+            foreach (KeyValuePair<int, int> pair in left.RankByEdge)
+            {
+                if (!right.RankByEdge.TryGetValue(
+                        pair.Key,
+                        out int rightRank))
+                {
+                    continue;
+                }
+                leftRanks.Add(pair.Value);
+                rightRanks.Add(rightRank);
+            }
+            return CalculateEdgeWearArtisticPearson(
+                leftRanks,
+                rightRanks);
+        }
+
+        private static float CalculateEdgeWearArtisticPearson(
+            List<float> left,
+            List<float> right)
+        {
+            if (left == null || right == null ||
+                left.Count != right.Count || left.Count < 2)
+            {
+                return 0f;
+            }
+            double leftMean = 0d;
+            double rightMean = 0d;
+            for (int index = 0; index < left.Count; index++)
+            {
+                leftMean += left[index];
+                rightMean += right[index];
+            }
+            leftMean /= left.Count;
+            rightMean /= right.Count;
+            double numerator = 0d;
+            double leftVariance = 0d;
+            double rightVariance = 0d;
+            for (int index = 0; index < left.Count; index++)
+            {
+                double leftDelta = left[index] - leftMean;
+                double rightDelta = right[index] - rightMean;
+                numerator += leftDelta * rightDelta;
+                leftVariance += leftDelta * leftDelta;
+                rightVariance += rightDelta * rightDelta;
+            }
+            double denominator = Math.Sqrt(
+                leftVariance * rightVariance);
+            return denominator <= 0.0000000001d
+                ? 0f
+                : (float)(numerator / denominator);
+        }
+
+        private static float CalculateEdgeWearArtisticSpearman(
+            List<float> left,
+            List<float> right)
+        {
+            if (left == null || right == null ||
+                left.Count != right.Count || left.Count < 2)
+            {
+                return 0f;
+            }
+            return CalculateEdgeWearArtisticPearson(
+                CalculateEdgeWearArtisticRanks(left),
+                CalculateEdgeWearArtisticRanks(right));
+        }
+
+        private static List<float> CalculateEdgeWearArtisticRanks(
+            List<float> values)
+        {
+            List<KeyValuePair<int, float>> sorted =
+                new List<KeyValuePair<int, float>>(values.Count);
+            for (int index = 0; index < values.Count; index++)
+            {
+                sorted.Add(new KeyValuePair<int, float>(
+                    index,
+                    values[index]));
+            }
+            sorted.Sort((left, right) =>
+            {
+                int comparison = left.Value.CompareTo(right.Value);
+                return comparison != 0
+                    ? comparison
+                    : left.Key.CompareTo(right.Key);
+            });
+            List<float> ranks = new List<float>(values.Count);
+            for (int index = 0; index < values.Count; index++)
+            {
+                ranks.Add(0f);
+            }
+            int cursor = 0;
+            while (cursor < sorted.Count)
+            {
+                int end = cursor + 1;
+                while (end < sorted.Count &&
+                    Mathf.Abs(sorted[end].Value -
+                        sorted[cursor].Value) <= 0.0000001f)
+                {
+                    end++;
+                }
+                float averageRank = (cursor + end - 1) * 0.5f;
+                for (int rankIndex = cursor;
+                     rankIndex < end;
+                     rankIndex++)
+                {
+                    ranks[sorted[rankIndex].Key] = averageRank;
+                }
+                cursor = end;
+            }
+            return ranks;
+        }
+
+        private static float ResolveEdgeWearArtisticMinimum(
+            List<float> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return 0f;
+            }
+            float minimum = values[0];
+            for (int index = 1; index < values.Count; index++)
+            {
+                minimum = Mathf.Min(minimum, values[index]);
+            }
+            return minimum;
+        }
+
+        private static float ResolveEdgeWearArtisticMaximum(
+            List<float> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return 0f;
+            }
+            float maximum = values[0];
+            for (int index = 1; index < values.Count; index++)
+            {
+                maximum = Mathf.Max(maximum, values[index]);
+            }
+            return maximum;
+        }
+
+        private static float ResolveEdgeWearArtisticMedian(
+            List<float> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return 0f;
+            }
+            List<float> sorted = new List<float>(values);
+            sorted.Sort();
+            int midpoint = sorted.Count / 2;
+            return sorted.Count % 2 == 0
+                ? (sorted[midpoint - 1] + sorted[midpoint]) * 0.5f
+                : sorted[midpoint];
+        }
+
+        private static string CalculateEdgeWearArtisticStableHash(
+            string value)
+        {
+            unchecked
+            {
+                uint hash = 2166136261u;
+                string text = value ?? string.Empty;
+                for (int index = 0; index < text.Length; index++)
+                {
+                    hash ^= text[index];
+                    hash *= 16777619u;
+                }
+                return hash.ToString("X8", CultureInfo.InvariantCulture);
+            }
+        }
+
+        private static string FormatEdgeWearArtisticIdList(
+            IList<int> ids)
+        {
+            if (ids == null || ids.Count == 0)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            for (int index = 0; index < ids.Count; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(ids[index]);
+            }
+            return builder.ToString();
+        }
+
+        private static string FormatEdgeWearArtisticFloat(float value)
+        {
+            return value.ToString("G9", CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatEdgeWearArtisticVector(Vector3 value)
+        {
+            return "(" +
+                FormatEdgeWearArtisticFloat(value.x) + "/" +
+                FormatEdgeWearArtisticFloat(value.y) + "/" +
+                FormatEdgeWearArtisticFloat(value.z) + ")";
+        }
+
+        private static void AppendEdgeWearArtisticCsvFloats(
+            StringBuilder builder,
+            float[] values)
+        {
+            for (int index = 0; index < values.Length; index++)
+            {
+                AppendEdgeWearArtisticCsv(
+                    builder,
+                    FormatEdgeWearArtisticFloat(values[index]));
+            }
+        }
+
+        private static void AppendEdgeWearArtisticCsv(
+            StringBuilder builder,
+            string value,
+            bool endOfLine = false)
+        {
+            value ??= string.Empty;
+            bool quote = value.IndexOfAny(
+                new[] { ',', '"', '\r', '\n' }) >= 0;
+            if (quote)
+            {
+                builder.Append('"');
+                builder.Append(value.Replace("\"", "\"\""));
+                builder.Append('"');
+            }
+            else
+            {
+                builder.Append(value);
+            }
+            if (endOfLine)
+            {
+                builder.AppendLine();
+            }
+            else
+            {
+                builder.Append(',');
+            }
         }
 
         private static bool WriteEdgeWearValidationSuiteReport(
@@ -2168,6 +5463,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public EdgeWearViabilityMatrixAggregate PreviewAggregate;
             public string TopologyReportText = string.Empty;
             public string PreviewReportText = string.Empty;
+            public bool ComprehensiveArtisticAvailable;
+            public string ComprehensiveArtisticReport = string.Empty;
+            public string ComprehensiveArtisticDiagnostic = string.Empty;
+            public readonly List<EdgeWearViabilityMatrixCase> PreviewCases =
+                new List<EdgeWearViabilityMatrixCase>();
 
             public EdgeWearValidationSuiteJob(GeneratedMass target)
             {
@@ -2247,6 +5547,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         PreviewAggregate == null ||
                         TopologyAggregate.Status != "passed" ||
                         PreviewAggregate.Status != "passed" ||
+                        !ComprehensiveArtisticAvailable ||
                         !string.IsNullOrEmpty(TerminalReason))
                     {
                         return "failed";
@@ -2361,6 +5662,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 {
                     PreviewAggregate = aggregate;
                     PreviewReportText = reportText ?? string.Empty;
+                    PreviewCases.Clear();
+                    PreviewCases.AddRange(job.Cases);
                 }
             }
         }
@@ -2449,8 +5752,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
-                ? "EW-B4.2R12A-topology"
-                : "EW-B4.2R12A-preview";
+                ? "EW-B4.2R12B.1-topology"
+                : "EW-B4.2R12B.1-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *
@@ -4032,6 +7335,1984 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 debugData.AppliedMultiplierBounds);
         }
 
+        private void DrawRenderMeshDiagnostics()
+        {
+            EditorGUILayout.Space(10f);
+            EditorGUILayout.LabelField(
+                "Mesh Diagnostics",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Audits the currently generated MeshFilter.sharedMesh " +
+                "without regeneration or repair. Proof clones are " +
+                "temporary, non-serialized, and replace only suspect " +
+                "tangents or the material for causal comparison.",
+                MessageType.None);
+
+            GeneratedMass mass = target as GeneratedMass;
+            bool editingMultiple =
+                serializedObject.isEditingMultipleObjects;
+            bool currentAudit = IsCurrentRenderMeshAudit(mass);
+
+            if (renderMeshProofTarget != null &&
+                (renderMeshProofSourceMesh == null ||
+                 renderMeshProofTarget.GeometryMeshFilter == null ||
+                 renderMeshProofTarget.GeometryMeshFilter.sharedMesh !=
+                    renderMeshProofSourceMesh))
+            {
+                DestroyRenderMeshProofClone();
+            }
+
+            using (new EditorGUI.DisabledScope(
+                Application.isPlaying ||
+                editingMultiple ||
+                mass == null))
+            {
+                if (GUILayout.Button("Audit Render Mesh"))
+                {
+                    RunRenderMeshAudit(mass);
+                }
+            }
+
+            if (editingMultiple)
+            {
+                EditorGUILayout.HelpBox(
+                    "Render-mesh diagnostics require one selected mass.",
+                    MessageType.None);
+                return;
+            }
+
+            if (lastRenderMeshAudit != null &&
+                renderMeshAuditTarget == mass &&
+                !currentAudit)
+            {
+                EditorGUILayout.HelpBox(
+                    "The audited mesh has changed. Run Audit Render Mesh " +
+                    "again before drawing or creating a proof clone.",
+                    MessageType.Warning);
+            }
+
+            if (!currentAudit)
+            {
+                return;
+            }
+
+            MessageType auditMessageType =
+                lastRenderMeshAudit.HasHardFailure
+                    ? MessageType.Error
+                    : lastRenderMeshAudit.HasWarning
+                        ? MessageType.Warning
+                        : MessageType.Info;
+            EditorGUILayout.HelpBox(
+                lastRenderMeshAudit.Summary,
+                auditMessageType);
+
+            EditorGUI.BeginChangeCheck();
+            renderMeshAuditDrawWorstTriangle =
+                EditorGUILayout.Toggle(
+                    "Draw Worst Triangle",
+                    renderMeshAuditDrawWorstTriangle);
+            renderMeshAuditXRay = EditorGUILayout.Toggle(
+                "X-Ray Audit Triangle",
+                renderMeshAuditXRay);
+            int maximumTriangleOrdinal = Mathf.Max(
+                0,
+                lastRenderMeshAudit.TriangleCount - 1);
+            renderMeshAuditDrawTriangleOrdinal =
+                EditorGUILayout.IntSlider(
+                    "Triangle To Draw",
+                    Mathf.Clamp(
+                        renderMeshAuditDrawTriangleOrdinal,
+                        0,
+                        maximumTriangleOrdinal),
+                    0,
+                    maximumTriangleOrdinal);
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Use Worst Overall"))
+            {
+                renderMeshAuditDrawTriangleOrdinal =
+                    lastRenderMeshAudit.WorstTriangleOrdinal;
+            }
+            if (GUILayout.Button("Use Worst UV"))
+            {
+                renderMeshAuditDrawTriangleOrdinal =
+                    lastRenderMeshAudit.WorstUvTriangles.Count > 0
+                        ? lastRenderMeshAudit.WorstUvTriangles[0].
+                            TriangleOrdinal
+                        : lastRenderMeshAudit.WorstTriangleOrdinal;
+            }
+            if (GUILayout.Button("Use Worst Tangent"))
+            {
+                renderMeshAuditDrawTriangleOrdinal =
+                    lastRenderMeshAudit.WorstTangentTriangles.Count > 0
+                        ? lastRenderMeshAudit.WorstTangentTriangles[0].
+                            TriangleOrdinal
+                        : lastRenderMeshAudit.WorstTriangleOrdinal;
+            }
+            EditorGUILayout.EndHorizontal();
+            if (EditorGUI.EndChangeCheck())
+            {
+                SceneView.RepaintAll();
+            }
+
+            string reportPath = GetEdgeWearLibraryPath(
+                RenderMeshAuditReportFileName);
+            using (new EditorGUI.DisabledScope(
+                !File.Exists(reportPath)))
+            {
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Copy Render Audit"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        File.ReadAllText(reportPath);
+                }
+                if (GUILayout.Button("Reveal Render Audit"))
+                {
+                    EditorUtility.RevealInFinder(reportPath);
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            using (new EditorGUI.DisabledScope(
+                Application.isPlaying || mass == null))
+            {
+                if (GUILayout.Button(
+                        "Create Normal/Tangent Repair Proof Clone"))
+                {
+                    CreateRenderMeshProofClone(
+                        mass,
+                        RenderMeshProofMode.NormalTangentRepair);
+                }
+                if (GUILayout.Button("Create Unlit Proof Clone"))
+                {
+                    CreateRenderMeshProofClone(
+                        mass,
+                        RenderMeshProofMode.Unlit);
+                }
+            }
+
+            if (renderMeshProofTarget == mass &&
+                renderMeshProofObject != null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Temporary proof active: " +
+                    ResolveRenderMeshProofDisplayName(
+                        renderMeshProofMode) +
+                    ". The source renderer is temporarily suppressed; " +
+                    "remove the proof or deselect the mass to restore it.",
+                    MessageType.Info);
+                if (GUILayout.Button("Remove Render Proof Clone"))
+                {
+                    DestroyRenderMeshProofClone();
+                }
+            }
+        }
+
+        private static bool IsCurrentRenderMeshAudit(
+            GeneratedMass mass)
+        {
+            if (mass == null || lastRenderMeshAudit == null ||
+                renderMeshAuditTarget != mass ||
+                lastRenderMeshAudit.Target != mass)
+            {
+                return false;
+            }
+
+            MeshFilter meshFilter = mass.GeometryMeshFilter;
+            return meshFilter != null &&
+                meshFilter.sharedMesh != null &&
+                meshFilter.sharedMesh == lastRenderMeshAudit.Mesh;
+        }
+
+        private static void RunRenderMeshAudit(GeneratedMass mass)
+        {
+            if (mass == null)
+            {
+                return;
+            }
+
+            DestroyRenderMeshProofClone();
+            RenderMeshAuditResult audit = BuildRenderMeshAudit(mass);
+            renderMeshAuditTarget = mass;
+            lastRenderMeshAudit = audit;
+            renderMeshAuditDrawWorstTriangle =
+                audit != null && audit.WorstTriangleOrdinal >= 0;
+            renderMeshAuditDrawTriangleOrdinal = audit != null
+                ? audit.WorstTriangleOrdinal
+                : -1;
+
+            string report = audit != null
+                ? audit.Report
+                : "GeneratedMass render-mesh audit failed before a " +
+                  "report could be created.";
+            string reportPath = GetEdgeWearLibraryPath(
+                RenderMeshAuditReportFileName);
+            try
+            {
+                File.WriteAllText(
+                    reportPath,
+                    report ?? string.Empty,
+                    new UTF8Encoding(false));
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(
+                    "GeneratedMass render-mesh audit report write " +
+                    "failed. object=" + mass.name +
+                    ", entityId=" + mass.GetEntityId() +
+                    ", exception=" + exception.GetType().Name +
+                    ":" + exception.Message,
+                    mass);
+            }
+
+            if (audit == null)
+            {
+                Debug.LogWarning(
+                    "GeneratedMass render-mesh audit failed. object=" +
+                    mass.name + ", entityId=" + mass.GetEntityId(),
+                    mass);
+            }
+            else
+            {
+                Debug.LogFormat(
+                    audit.HasHardFailure
+                        ? LogType.Error
+                        : audit.HasWarning
+                            ? LogType.Warning
+                            : LogType.Log,
+                    LogOption.NoStacktrace,
+                    mass,
+                    "{0}",
+                    audit.Summary);
+            }
+
+            SceneView.RepaintAll();
+        }
+
+        private static RenderMeshAuditResult BuildRenderMeshAudit(
+            GeneratedMass mass)
+        {
+            MeshFilter meshFilter = mass.GeometryMeshFilter;
+            Mesh mesh = meshFilter != null
+                ? meshFilter.sharedMesh
+                : null;
+            RenderMeshAuditResult result = new RenderMeshAuditResult
+            {
+                Target = mass,
+                Mesh = mesh,
+                ObjectName = mass.name,
+                EntityId = mass.GetEntityId().ToString(),
+                MeshName = mesh != null ? mesh.name : "none"
+            };
+
+            if (mesh == null)
+            {
+                result.ReadFailure = true;
+                result.Summary =
+                    "Render mesh audit failed: the selected mass has no " +
+                    "MeshFilter.sharedMesh.";
+                result.Report = BuildRenderMeshAuditReport(result);
+                return result;
+            }
+
+            try
+            {
+                List<Vector3> vertices = new List<Vector3>();
+                List<Vector3> normals = new List<Vector3>();
+                List<Vector4> tangents = new List<Vector4>();
+                List<Vector2> uv0 = new List<Vector2>();
+                List<Vector4> uv2 = new List<Vector4>();
+                List<Color> colors = new List<Color>();
+                mesh.GetVertices(vertices);
+                mesh.GetNormals(normals);
+                mesh.GetTangents(tangents);
+                mesh.GetUVs(0, uv0);
+                mesh.GetUVs(2, uv2);
+                mesh.GetColors(colors);
+                int[] triangles = mesh.triangles;
+
+                result.VertexCount = vertices.Count;
+                result.NormalCount = normals.Count;
+                result.TangentCount = tangents.Count;
+                result.Uv0Count = uv0.Count;
+                result.ColorCount = colors.Count;
+                result.Uv2Count = uv2.Count;
+                result.TriangleCount = triangles.Length / 3;
+                result.SubMeshCount = mesh.subMeshCount;
+                result.MissingOrPartialNormals =
+                    normals.Count == vertices.Count ? 0 : 1;
+                result.MissingOrPartialTangents =
+                    tangents.Count == vertices.Count ? 0 : 1;
+                result.MissingOrPartialUv0 =
+                    uv0.Count == vertices.Count ? 0 : 1;
+                result.MissingOrPartialColors =
+                    colors.Count == vertices.Count ? 0 : 1;
+                result.MissingOrPartialUv2 =
+                    uv2.Count == 0 || uv2.Count == vertices.Count
+                        ? 0
+                        : 1;
+
+                Vector3 positionCentre = Vector3.zero;
+                int finitePositionCount = 0;
+                for (int vertexIndex = 0;
+                     vertexIndex < vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 position = vertices[vertexIndex];
+                    if (!IsFinite(position))
+                    {
+                        result.NonFinitePositions++;
+                        continue;
+                    }
+                    positionCentre += position;
+                    finitePositionCount++;
+                }
+                if (finitePositionCount > 0)
+                {
+                    positionCentre /= finitePositionCount;
+                }
+
+                List<float> positionDistances = new List<float>(
+                    finitePositionCount);
+                for (int vertexIndex = 0;
+                     vertexIndex < vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 position = vertices[vertexIndex];
+                    if (!IsFinite(position))
+                    {
+                        continue;
+                    }
+                    float distance =
+                        (position - positionCentre).magnitude;
+                    positionDistances.Add(distance);
+                    result.MaximumPositionDistance = Mathf.Max(
+                        result.MaximumPositionDistance,
+                        distance);
+                }
+                positionDistances.Sort();
+                result.MedianPositionDistance = CalculateMedian(
+                    positionDistances);
+                float positionOutlierDistance = Mathf.Max(
+                    0.0001f,
+                    result.MedianPositionDistance * 8f);
+                for (int distanceIndex = 0;
+                     distanceIndex < positionDistances.Count;
+                     distanceIndex++)
+                {
+                    if (positionDistances[distanceIndex] >
+                        positionOutlierDistance)
+                    {
+                        result.PositionOutliers++;
+                    }
+                }
+
+                for (int vertexIndex = 0;
+                     vertexIndex < vertices.Count;
+                     vertexIndex++)
+                {
+                    if (normals.Count == vertices.Count)
+                    {
+                        Vector3 normal = normals[vertexIndex];
+                        if (!IsFinite(normal))
+                        {
+                            result.NonFiniteNormals++;
+                        }
+                        else
+                        {
+                            float magnitude = normal.magnitude;
+                            if (magnitude <
+                                RenderMeshMinimumVectorMagnitude)
+                            {
+                                result.ZeroNormals++;
+                            }
+                            else if (Mathf.Abs(magnitude - 1f) >
+                                     RenderMeshUnitVectorTolerance)
+                            {
+                                result.NonUnitNormals++;
+                            }
+                        }
+                    }
+
+                    if (tangents.Count == vertices.Count)
+                    {
+                        Vector4 tangent = tangents[vertexIndex];
+                        if (!IsFinite(tangent))
+                        {
+                            result.NonFiniteTangents++;
+                        }
+                        else
+                        {
+                            float magnitude = new Vector3(
+                                tangent.x,
+                                tangent.y,
+                                tangent.z).magnitude;
+                            result.MaximumTangentMagnitude = Mathf.Max(
+                                result.MaximumTangentMagnitude,
+                                magnitude);
+                            if (magnitude <
+                                RenderMeshMinimumVectorMagnitude)
+                            {
+                                result.ZeroTangents++;
+                            }
+                            if (magnitude >
+                                RenderMeshExtremeTangentMagnitude)
+                            {
+                                result.ExtremeTangents++;
+                            }
+                            if (Mathf.Abs(
+                                    Mathf.Abs(tangent.w) - 1f) >
+                                RenderMeshUnitVectorTolerance)
+                            {
+                                result.InvalidTangentHandedness++;
+                            }
+                        }
+                    }
+
+                    if (uv0.Count == vertices.Count &&
+                        !IsFinite(uv0[vertexIndex]))
+                    {
+                        result.NonFiniteUv0++;
+                    }
+                    if (colors.Count == vertices.Count)
+                    {
+                        Color color = colors[vertexIndex];
+                        if (!IsFinite(color))
+                        {
+                            result.NonFiniteColors++;
+                        }
+                        else if (color.r < 0f || color.r > 1f ||
+                                 color.g < 0f || color.g > 1f ||
+                                 color.b < 0f || color.b > 1f ||
+                                 color.a < 0f || color.a > 1f)
+                        {
+                            result.OutOfRangeColors++;
+                        }
+                    }
+                    if (uv2.Count == vertices.Count &&
+                        !IsFinite(uv2[vertexIndex]))
+                    {
+                        result.NonFiniteUv2++;
+                    }
+                }
+
+                RenderMeshTriangleAudit firstNonFinite = null;
+                RenderMeshTriangleAudit firstZeroNormal = null;
+                RenderMeshTriangleAudit firstDegenerate = null;
+                RenderMeshTriangleAudit firstExtremeTangent = null;
+                RenderMeshTriangleAudit minimumUv = null;
+                RenderMeshTriangleAudit minimumArea = null;
+                RenderMeshTriangleAudit firstWinding = null;
+                RenderMeshTriangleAudit worstNormalAgreement = null;
+
+                for (int triangleOffset = 0;
+                     triangleOffset + 2 < triangles.Length;
+                     triangleOffset += 3)
+                {
+                    int ordinal = triangleOffset / 3;
+                    int indexA = triangles[triangleOffset];
+                    int indexB = triangles[triangleOffset + 1];
+                    int indexC = triangles[triangleOffset + 2];
+                    if (!IsValidVertexIndex(indexA, vertices.Count) ||
+                        !IsValidVertexIndex(indexB, vertices.Count) ||
+                        !IsValidVertexIndex(indexC, vertices.Count))
+                    {
+                        result.InvalidTriangleIndices++;
+                        continue;
+                    }
+
+                    RenderMeshTriangleAudit triangle =
+                        BuildRenderMeshTriangleAudit(
+                            ordinal,
+                            indexA,
+                            indexB,
+                            indexC,
+                            vertices,
+                            normals,
+                            tangents,
+                            uv0,
+                            colors,
+                            uv2,
+                            positionCentre);
+
+                    result.Triangles.Add(triangle);
+
+                    if (triangle.HasNonFiniteVertexChannel)
+                    {
+                        result.NonFiniteTriangleGeometry++;
+                        firstNonFinite ??= triangle;
+                    }
+                    if (triangle.ZeroNormal)
+                    {
+                        firstZeroNormal ??= triangle;
+                    }
+                    if (triangle.Degenerate)
+                    {
+                        result.DegenerateTriangles++;
+                        firstDegenerate ??= triangle;
+                    }
+                    if (triangle.Sliver)
+                    {
+                        result.SliverTriangles++;
+                    }
+                    if (triangle.UvDegenerate)
+                    {
+                        result.UvDegenerateTriangles++;
+                    }
+                    else if (triangle.UvIllConditioned)
+                    {
+                        result.UvIllConditionedTriangles++;
+                    }
+                    if (triangle.WindingFailure)
+                    {
+                        result.WindingFailures++;
+                        firstWinding ??= triangle;
+                    }
+                    if (triangle.NormalAgreementFailure)
+                    {
+                        result.NormalAgreementFailures++;
+                    }
+                    if (triangle.MaximumTangentMagnitude >
+                        RenderMeshExtremeTangentMagnitude)
+                    {
+                        firstExtremeTangent ??= triangle;
+                    }
+
+                    result.MinimumRelativeArea = Mathf.Min(
+                        result.MinimumRelativeArea,
+                        triangle.RelativeArea);
+                    result.MinimumAbsoluteUvDeterminant = Mathf.Min(
+                        result.MinimumAbsoluteUvDeterminant,
+                        Mathf.Abs(triangle.UvDeterminant));
+                    result.MinimumStoredNormalDot = Mathf.Min(
+                        result.MinimumStoredNormalDot,
+                        triangle.MinimumNormalDot);
+                    result.MinimumOutwardDot = Mathf.Min(
+                        result.MinimumOutwardDot,
+                        triangle.OutwardDot);
+
+                    if (minimumUv == null ||
+                        Mathf.Abs(triangle.UvDeterminant) <
+                        Mathf.Abs(minimumUv.UvDeterminant))
+                    {
+                        minimumUv = triangle;
+                    }
+                    if (minimumArea == null ||
+                        triangle.RelativeArea < minimumArea.RelativeArea)
+                    {
+                        minimumArea = triangle;
+                    }
+                    if (worstNormalAgreement == null ||
+                        triangle.MinimumNormalDot <
+                        worstNormalAgreement.MinimumNormalDot)
+                    {
+                        worstNormalAgreement = triangle;
+                    }
+
+                    InsertRankedTriangle(
+                        result.WorstUvTriangles,
+                        new RenderMeshRankedTriangle(
+                            ordinal,
+                            Mathf.Abs(triangle.UvDeterminant)),
+                        ascending: true);
+                    InsertRankedTriangle(
+                        result.WorstTangentTriangles,
+                        new RenderMeshRankedTriangle(
+                            ordinal,
+                            triangle.MaximumTangentMagnitude),
+                        ascending: false);
+                }
+
+                RenderMeshTriangleAudit worst =
+                    firstNonFinite ??
+                    firstZeroNormal ??
+                    firstDegenerate ??
+                    firstExtremeTangent ??
+                    firstWinding ??
+                    (worstNormalAgreement != null &&
+                     worstNormalAgreement.NormalAgreementFailure
+                        ? worstNormalAgreement
+                        : null) ??
+                    (minimumUv != null &&
+                     minimumUv.UvIllConditioned
+                        ? minimumUv
+                        : null) ??
+                    minimumArea ??
+                    minimumUv;
+                result.WorstTriangle = worst;
+                result.WorstTriangleOrdinal = worst != null
+                    ? worst.Ordinal
+                    : -1;
+                result.WorstReason = ResolveRenderMeshWorstReason(
+                    worst,
+                    firstNonFinite,
+                    firstZeroNormal,
+                    firstDegenerate,
+                    firstExtremeTangent,
+                    minimumUv,
+                    firstWinding,
+                    worstNormalAgreement);
+
+                if (float.IsPositiveInfinity(
+                        result.MinimumRelativeArea))
+                {
+                    result.MinimumRelativeArea = 0f;
+                }
+                if (float.IsPositiveInfinity(
+                        result.MinimumAbsoluteUvDeterminant))
+                {
+                    result.MinimumAbsoluteUvDeterminant = 0f;
+                }
+
+                string status = result.HasHardFailure
+                    ? "failed"
+                    : result.HasWarning
+                        ? "passed-with-warnings"
+                        : "passed";
+                result.Summary =
+                    "GeneratedMass render-mesh audit " + status +
+                    ". object=" + result.ObjectName +
+                    ", vertices=" + result.VertexCount +
+                    ", triangles=" + result.TriangleCount +
+                    ", zeroNormals=" + result.ZeroNormals +
+                    ", nonFinite=" +
+                    (result.NonFinitePositions +
+                     result.NonFiniteNormals +
+                     result.NonFiniteTangents +
+                     result.NonFiniteUv0 +
+                     result.NonFiniteColors +
+                     result.NonFiniteUv2) +
+                    ", extremeTangents=" +
+                    result.ExtremeTangents +
+                    ", uvDegenerate=" +
+                    result.UvDegenerateTriangles +
+                    ", degenerate3D=" +
+                    result.DegenerateTriangles +
+                    ", worstTriangle=" +
+                    result.WorstTriangleOrdinal +
+                    ", reason=" + result.WorstReason +
+                    ". Report: Library/" +
+                    RenderMeshAuditReportFileName;
+                result.Report = BuildRenderMeshAuditReport(result);
+                return result;
+            }
+            catch (Exception exception)
+            {
+                result.ReadFailure = true;
+                result.Summary =
+                    "Render mesh audit failed while reading the live mesh: " +
+                    exception.GetType().Name + ":" +
+                    exception.Message;
+                result.Report = BuildRenderMeshAuditReport(
+                    result,
+                    exception);
+                return result;
+            }
+        }
+
+        private static RenderMeshTriangleAudit
+            BuildRenderMeshTriangleAudit(
+                int ordinal,
+                int indexA,
+                int indexB,
+                int indexC,
+                List<Vector3> vertices,
+                List<Vector3> normals,
+                List<Vector4> tangents,
+                List<Vector2> uv0,
+                List<Color> colors,
+                List<Vector4> uv2,
+                Vector3 positionCentre)
+        {
+            RenderMeshTriangleAudit result =
+                new RenderMeshTriangleAudit
+                {
+                    Ordinal = ordinal,
+                    IndexA = indexA,
+                    IndexB = indexB,
+                    IndexC = indexC,
+                    PositionA = vertices[indexA],
+                    PositionB = vertices[indexB],
+                    PositionC = vertices[indexC],
+                    UvA = uv0.Count == vertices.Count
+                        ? uv0[indexA]
+                        : Vector2.zero,
+                    UvB = uv0.Count == vertices.Count
+                        ? uv0[indexB]
+                        : Vector2.zero,
+                    UvC = uv0.Count == vertices.Count
+                        ? uv0[indexC]
+                        : Vector2.zero,
+                    NormalA = normals.Count == vertices.Count
+                        ? normals[indexA]
+                        : Vector3.zero,
+                    NormalB = normals.Count == vertices.Count
+                        ? normals[indexB]
+                        : Vector3.zero,
+                    NormalC = normals.Count == vertices.Count
+                        ? normals[indexC]
+                        : Vector3.zero,
+                    TangentA = tangents.Count == vertices.Count
+                        ? tangents[indexA]
+                        : Vector4.zero,
+                    TangentB = tangents.Count == vertices.Count
+                        ? tangents[indexB]
+                        : Vector4.zero,
+                    TangentC = tangents.Count == vertices.Count
+                        ? tangents[indexC]
+                        : Vector4.zero,
+                    ColorA = colors.Count == vertices.Count
+                        ? colors[indexA]
+                        : Color.clear,
+                    ColorB = colors.Count == vertices.Count
+                        ? colors[indexB]
+                        : Color.clear,
+                    ColorC = colors.Count == vertices.Count
+                        ? colors[indexC]
+                        : Color.clear,
+                    Uv2A = uv2.Count == vertices.Count
+                        ? uv2[indexA]
+                        : Vector4.zero,
+                    Uv2B = uv2.Count == vertices.Count
+                        ? uv2[indexB]
+                        : Vector4.zero,
+                    Uv2C = uv2.Count == vertices.Count
+                        ? uv2[indexC]
+                        : Vector4.zero
+                };
+
+            result.HasNonFiniteVertexChannel =
+                !IsFinite(result.PositionA) ||
+                !IsFinite(result.PositionB) ||
+                !IsFinite(result.PositionC) ||
+                (normals.Count == vertices.Count &&
+                 (!IsFinite(result.NormalA) ||
+                  !IsFinite(result.NormalB) ||
+                  !IsFinite(result.NormalC))) ||
+                (tangents.Count == vertices.Count &&
+                 (!IsFinite(result.TangentA) ||
+                  !IsFinite(result.TangentB) ||
+                  !IsFinite(result.TangentC))) ||
+                (uv0.Count == vertices.Count &&
+                 (!IsFinite(result.UvA) ||
+                  !IsFinite(result.UvB) ||
+                  !IsFinite(result.UvC))) ||
+                (colors.Count == vertices.Count &&
+                 (!IsFinite(colors[indexA]) ||
+                  !IsFinite(colors[indexB]) ||
+                  !IsFinite(colors[indexC]))) ||
+                (uv2.Count == vertices.Count &&
+                 (!IsFinite(uv2[indexA]) ||
+                  !IsFinite(uv2[indexB]) ||
+                  !IsFinite(uv2[indexC])));
+            result.ZeroNormal = normals.Count != vertices.Count ||
+                IsZeroRenderMeshVector(result.NormalA) ||
+                IsZeroRenderMeshVector(result.NormalB) ||
+                IsZeroRenderMeshVector(result.NormalC);
+
+            Vector3 edgeAB = result.PositionB - result.PositionA;
+            Vector3 edgeAC = result.PositionC - result.PositionA;
+            Vector3 edgeBC = result.PositionC - result.PositionB;
+            float lengthAB = edgeAB.magnitude;
+            float lengthAC = edgeAC.magnitude;
+            float lengthBC = edgeBC.magnitude;
+            result.MinimumEdgeLength = Mathf.Min(
+                lengthAB,
+                Mathf.Min(lengthAC, lengthBC));
+            result.MaximumEdgeLength = Mathf.Max(
+                lengthAB,
+                Mathf.Max(lengthAC, lengthBC));
+            Vector3 cross = Vector3.Cross(edgeAB, edgeAC);
+            result.DoubleArea = cross.magnitude;
+            float maximumEdgeSqr =
+                result.MaximumEdgeLength * result.MaximumEdgeLength;
+            result.RelativeArea = maximumEdgeSqr > 0f
+                ? result.DoubleArea / maximumEdgeSqr
+                : 0f;
+            result.Degenerate =
+                !IsFinite(result.DoubleArea) ||
+                result.RelativeArea <=
+                    RenderMeshDegenerateRelativeArea;
+            result.Sliver = !result.Degenerate &&
+                result.RelativeArea <= RenderMeshSliverRelativeArea;
+            result.GeometricNormal =
+                TryNormalizeRenderMeshVector(
+                    cross,
+                    out Vector3 geometricNormal)
+                    ? geometricNormal
+                    : Vector3.zero;
+
+            Vector2 duv1 = result.UvB - result.UvA;
+            Vector2 duv2 = result.UvC - result.UvA;
+            result.UvDeterminant =
+                duv1.x * duv2.y - duv1.y * duv2.x;
+            float absoluteUvDeterminant =
+                Mathf.Abs(result.UvDeterminant);
+            result.UvDegenerate =
+                !IsFinite(result.UvDeterminant) ||
+                absoluteUvDeterminant <=
+                    RenderMeshDegenerateUvDeterminant;
+            result.UvIllConditioned = result.UvDegenerate ||
+                absoluteUvDeterminant <=
+                    RenderMeshIllConditionedUvDeterminant;
+
+            result.MinimumNormalDot = 1f;
+            if (normals.Count == vertices.Count &&
+                result.GeometricNormal.sqrMagnitude > 0f)
+            {
+                result.MinimumNormalDot = Mathf.Min(
+                    Vector3.Dot(
+                        result.GeometricNormal,
+                        SafeNormalized(result.NormalA)),
+                    Mathf.Min(
+                        Vector3.Dot(
+                            result.GeometricNormal,
+                            SafeNormalized(result.NormalB)),
+                        Vector3.Dot(
+                            result.GeometricNormal,
+                            SafeNormalized(result.NormalC))));
+            }
+            result.NormalAgreementFailure =
+                result.MinimumNormalDot < 0.5f;
+
+            Vector3 triangleCentre =
+                (result.PositionA + result.PositionB +
+                 result.PositionC) / 3f;
+            result.OutwardDot = result.GeometricNormal.sqrMagnitude > 0f
+                ? Vector3.Dot(
+                    result.GeometricNormal,
+                    SafeNormalized(triangleCentre - positionCentre))
+                : 0f;
+            result.WindingFailure = result.OutwardDot < -0.0001f;
+
+            result.MaximumTangentMagnitude = Mathf.Max(
+                ResolveTangentMagnitude(result.TangentA),
+                Mathf.Max(
+                    ResolveTangentMagnitude(result.TangentB),
+                    ResolveTangentMagnitude(result.TangentC)));
+            return result;
+        }
+
+        private static string BuildRenderMeshAuditReport(
+            RenderMeshAuditResult result,
+            Exception exception = null)
+        {
+            StringBuilder builder = new StringBuilder(32768);
+            builder.AppendLine("GeneratedMass live render-mesh audit");
+            builder.AppendLine("contract=GM-R12B.1E-render-audit-v3");
+            builder.Append("status=");
+            builder.AppendLine(
+                result.HasHardFailure
+                    ? "failed"
+                    : result.HasWarning
+                        ? "passed-with-warnings"
+                        : "passed");
+            builder.Append("warnings=uvIllConditioned:");
+            builder.AppendLine(
+                result.UvIllConditionedTriangles.ToString());
+            builder.Append("object=");
+            builder.AppendLine(result.ObjectName);
+            builder.Append("entityId=");
+            builder.AppendLine(result.EntityId);
+            builder.Append("mesh=");
+            builder.AppendLine(result.MeshName);
+            builder.Append("edgeWearPreviewApplied=");
+            builder.AppendLine(
+                result.Target != null &&
+                result.Target.UnifiedEdgeWearPreviewApplied
+                    ? "1"
+                    : "0");
+            builder.Append("vertices=");
+            builder.AppendLine(result.VertexCount.ToString());
+            builder.Append("channelCounts=positions/normals/tangents/uv0/colors/uv2:");
+            builder.Append(result.VertexCount);
+            builder.Append("/");
+            builder.Append(result.NormalCount);
+            builder.Append("/");
+            builder.Append(result.TangentCount);
+            builder.Append("/");
+            builder.Append(result.Uv0Count);
+            builder.Append("/");
+            builder.Append(result.ColorCount);
+            builder.Append("/");
+            builder.AppendLine(result.Uv2Count.ToString());
+            builder.Append("triangles=");
+            builder.AppendLine(result.TriangleCount.ToString());
+            builder.Append("subMeshes=");
+            builder.AppendLine(result.SubMeshCount.ToString());
+            if (exception != null)
+            {
+                builder.Append("exception=");
+                builder.Append(exception.GetType().Name);
+                builder.Append(":");
+                builder.AppendLine(exception.Message);
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("[Channel Summary]");
+            AppendAuditMetric(
+                builder,
+                "positions",
+                result.NonFinitePositions,
+                result.PositionOutliers);
+            AppendAuditMetric(
+                builder,
+                "normals",
+                result.NonFiniteNormals,
+                result.ZeroNormals,
+                result.NonUnitNormals,
+                result.MissingOrPartialNormals);
+            AppendAuditMetric(
+                builder,
+                "tangents",
+                result.NonFiniteTangents,
+                result.ZeroTangents,
+                result.ExtremeTangents,
+                result.InvalidTangentHandedness,
+                result.MissingOrPartialTangents);
+            AppendAuditMetric(
+                builder,
+                "uv0",
+                result.NonFiniteUv0,
+                result.MissingOrPartialUv0);
+            AppendAuditMetric(
+                builder,
+                "colors",
+                result.NonFiniteColors,
+                result.OutOfRangeColors,
+                result.MissingOrPartialColors);
+            AppendAuditMetric(
+                builder,
+                "uv2",
+                result.NonFiniteUv2,
+                result.MissingOrPartialUv2);
+            builder.Append("positionDistance=max/median/outliers:");
+            builder.Append(FormatAuditFloat(
+                result.MaximumPositionDistance));
+            builder.Append("/");
+            builder.Append(FormatAuditFloat(
+                result.MedianPositionDistance));
+            builder.Append("/");
+            builder.AppendLine(result.PositionOutliers.ToString());
+            builder.Append("tangentMagnitude=max/extremeThreshold:");
+            builder.Append(FormatAuditFloat(
+                result.MaximumTangentMagnitude));
+            builder.Append("/");
+            builder.AppendLine(FormatAuditFloat(
+                RenderMeshExtremeTangentMagnitude));
+
+            builder.AppendLine();
+            builder.AppendLine("[Triangle Summary]");
+            builder.Append("invalidIndices=");
+            builder.AppendLine(result.InvalidTriangleIndices.ToString());
+            builder.Append("nonFiniteGeometry=");
+            builder.AppendLine(
+                result.NonFiniteTriangleGeometry.ToString());
+            builder.Append("degenerate3D=");
+            builder.AppendLine(result.DegenerateTriangles.ToString());
+            builder.Append("slivers=");
+            builder.AppendLine(result.SliverTriangles.ToString());
+            builder.Append("uvDegenerate=");
+            builder.AppendLine(result.UvDegenerateTriangles.ToString());
+            builder.Append("uvIllConditioned=");
+            builder.AppendLine(
+                result.UvIllConditionedTriangles.ToString());
+            builder.Append("windingFailures=");
+            builder.AppendLine(result.WindingFailures.ToString());
+            builder.Append("normalAgreementFailures=");
+            builder.AppendLine(
+                result.NormalAgreementFailures.ToString());
+            builder.Append("minimumRelativeArea=");
+            builder.AppendLine(FormatAuditFloat(
+                result.MinimumRelativeArea));
+            builder.Append("minimumAbsoluteUvDeterminant=");
+            builder.AppendLine(FormatAuditFloat(
+                result.MinimumAbsoluteUvDeterminant));
+            builder.Append("minimumStoredNormalDot=");
+            builder.AppendLine(FormatAuditFloat(
+                result.MinimumStoredNormalDot));
+            builder.Append("minimumOutwardDot=");
+            builder.AppendLine(FormatAuditFloat(
+                result.MinimumOutwardDot));
+            builder.Append("worstTriangle=");
+            builder.Append(result.WorstTriangleOrdinal);
+            builder.Append(",reason=");
+            builder.AppendLine(result.WorstReason);
+
+            if (result.WorstTriangle != null)
+            {
+                builder.AppendLine();
+                builder.AppendLine("[Worst Triangle]");
+                AppendRenderMeshTriangleAudit(
+                    builder,
+                    result.WorstTriangle);
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("[Worst UV Determinants]");
+            AppendRankedTriangleList(
+                builder,
+                result.WorstUvTriangles,
+                "absUvDet");
+            builder.AppendLine();
+            builder.AppendLine("[Worst Tangent Magnitudes]");
+            AppendRankedTriangleList(
+                builder,
+                result.WorstTangentTriangles,
+                "maxTangentMagnitude");
+            return builder.ToString();
+        }
+
+        private static void AppendAuditMetric(
+            StringBuilder builder,
+            string label,
+            params int[] values)
+        {
+            builder.Append(label);
+            builder.Append("=");
+            for (int valueIndex = 0;
+                 valueIndex < values.Length;
+                 valueIndex++)
+            {
+                if (valueIndex > 0)
+                {
+                    builder.Append("/");
+                }
+                builder.Append(values[valueIndex]);
+            }
+            builder.AppendLine();
+        }
+
+        private static void AppendRenderMeshTriangleAudit(
+            StringBuilder builder,
+            RenderMeshTriangleAudit triangle)
+        {
+            builder.Append("ordinal=");
+            builder.AppendLine(triangle.Ordinal.ToString());
+            builder.Append("indices=");
+            builder.Append(triangle.IndexA);
+            builder.Append("/");
+            builder.Append(triangle.IndexB);
+            builder.Append("/");
+            builder.AppendLine(triangle.IndexC.ToString());
+            builder.Append("positions=");
+            builder.Append(FormatAuditVector3(triangle.PositionA));
+            builder.Append("|");
+            builder.Append(FormatAuditVector3(triangle.PositionB));
+            builder.Append("|");
+            builder.AppendLine(FormatAuditVector3(
+                triangle.PositionC));
+            builder.Append("edgeLength=min/max:");
+            builder.Append(FormatAuditFloat(
+                triangle.MinimumEdgeLength));
+            builder.Append("/");
+            builder.AppendLine(FormatAuditFloat(
+                triangle.MaximumEdgeLength));
+            builder.Append("doubleArea=");
+            builder.AppendLine(FormatAuditFloat(
+                triangle.DoubleArea));
+            builder.Append("relativeArea=");
+            builder.AppendLine(FormatAuditFloat(
+                triangle.RelativeArea));
+            builder.Append("uv0=");
+            builder.Append(FormatAuditVector2(triangle.UvA));
+            builder.Append("|");
+            builder.Append(FormatAuditVector2(triangle.UvB));
+            builder.Append("|");
+            builder.AppendLine(FormatAuditVector2(triangle.UvC));
+            builder.Append("uvDeterminant=");
+            builder.AppendLine(FormatAuditFloat(
+                triangle.UvDeterminant));
+            builder.Append("geometricNormal=");
+            builder.AppendLine(FormatAuditVector3(
+                triangle.GeometricNormal));
+            builder.Append("storedNormals=");
+            builder.Append(FormatAuditVector3(triangle.NormalA));
+            builder.Append("|");
+            builder.Append(FormatAuditVector3(triangle.NormalB));
+            builder.Append("|");
+            builder.AppendLine(FormatAuditVector3(
+                triangle.NormalC));
+            builder.Append("minimumStoredNormalDot=");
+            builder.AppendLine(FormatAuditFloat(
+                triangle.MinimumNormalDot));
+            builder.Append("outwardDot=");
+            builder.AppendLine(FormatAuditFloat(
+                triangle.OutwardDot));
+            builder.Append("tangents=");
+            builder.Append(FormatAuditVector4(triangle.TangentA));
+            builder.Append("|");
+            builder.Append(FormatAuditVector4(triangle.TangentB));
+            builder.Append("|");
+            builder.AppendLine(FormatAuditVector4(
+                triangle.TangentC));
+            builder.Append("maximumTangentMagnitude=");
+            builder.AppendLine(FormatAuditFloat(
+                triangle.MaximumTangentMagnitude));
+            builder.Append("colors=");
+            builder.Append(FormatAuditColor(triangle.ColorA));
+            builder.Append("|");
+            builder.Append(FormatAuditColor(triangle.ColorB));
+            builder.Append("|");
+            builder.AppendLine(FormatAuditColor(triangle.ColorC));
+            builder.Append("uv2=");
+            builder.Append(FormatAuditVector4(triangle.Uv2A));
+            builder.Append("|");
+            builder.Append(FormatAuditVector4(triangle.Uv2B));
+            builder.Append("|");
+            builder.AppendLine(FormatAuditVector4(triangle.Uv2C));
+            builder.Append("flags=nonFinite/zeroNormal/degenerate/sliver/");
+            builder.Append("uvDegenerate/uvIllConditioned/winding/");
+            builder.Append("normalAgreement:");
+            builder.Append(triangle.HasNonFiniteVertexChannel ? "1" : "0");
+            builder.Append("/");
+            builder.Append(triangle.ZeroNormal ? "1" : "0");
+            builder.Append("/");
+            builder.Append(triangle.Degenerate ? "1" : "0");
+            builder.Append("/");
+            builder.Append(triangle.Sliver ? "1" : "0");
+            builder.Append("/");
+            builder.Append(triangle.UvDegenerate ? "1" : "0");
+            builder.Append("/");
+            builder.Append(triangle.UvIllConditioned ? "1" : "0");
+            builder.Append("/");
+            builder.Append(triangle.WindingFailure ? "1" : "0");
+            builder.Append("/");
+            builder.AppendLine(
+                triangle.NormalAgreementFailure ? "1" : "0");
+        }
+
+        private static void AppendRankedTriangleList(
+            StringBuilder builder,
+            List<RenderMeshRankedTriangle> triangles,
+            string metricLabel)
+        {
+            if (triangles == null || triangles.Count == 0)
+            {
+                builder.AppendLine("none");
+                return;
+            }
+            for (int index = 0; index < triangles.Count; index++)
+            {
+                builder.Append("triangle=");
+                builder.Append(triangles[index].TriangleOrdinal);
+                builder.Append(",");
+                builder.Append(metricLabel);
+                builder.Append("=");
+                builder.AppendLine(FormatAuditFloat(
+                    triangles[index].Metric));
+            }
+        }
+
+        private static void InsertRankedTriangle(
+            List<RenderMeshRankedTriangle> list,
+            RenderMeshRankedTriangle item,
+            bool ascending)
+        {
+            int insertionIndex = 0;
+            while (insertionIndex < list.Count)
+            {
+                bool insertBefore = ascending
+                    ? item.Metric < list[insertionIndex].Metric
+                    : item.Metric > list[insertionIndex].Metric;
+                if (insertBefore)
+                {
+                    break;
+                }
+                insertionIndex++;
+            }
+            list.Insert(insertionIndex, item);
+            if (list.Count > RenderMeshWorstListCapacity)
+            {
+                list.RemoveAt(list.Count - 1);
+            }
+        }
+
+        private static string ResolveRenderMeshWorstReason(
+            RenderMeshTriangleAudit worst,
+            RenderMeshTriangleAudit firstNonFinite,
+            RenderMeshTriangleAudit firstZeroNormal,
+            RenderMeshTriangleAudit firstDegenerate,
+            RenderMeshTriangleAudit firstExtremeTangent,
+            RenderMeshTriangleAudit minimumUv,
+            RenderMeshTriangleAudit firstWinding,
+            RenderMeshTriangleAudit worstNormalAgreement)
+        {
+            if (worst == null)
+            {
+                return "none";
+            }
+            if (worst == firstNonFinite)
+            {
+                return "non-finite vertex channel";
+            }
+            if (worst == firstZeroNormal)
+            {
+                return "zero stored normal";
+            }
+            if (worst == firstDegenerate)
+            {
+                return "degenerate 3D triangle";
+            }
+            if (worst == firstExtremeTangent)
+            {
+                return "extreme tangent magnitude";
+            }
+            if (worst == firstWinding)
+            {
+                return "outward winding failure";
+            }
+            if (worst == worstNormalAgreement &&
+                worst.NormalAgreementFailure)
+            {
+                return "stored-normal disagreement";
+            }
+            if (worst == minimumUv && worst.UvDegenerate)
+            {
+                return "UV-degenerate triangle";
+            }
+            if (worst == minimumUv && worst.UvIllConditioned)
+            {
+                return "UV-ill-conditioned triangle";
+            }
+            return "minimum relative 3D area";
+        }
+
+        private static void DrawRenderMeshAuditSceneOverlay(
+            GeneratedMass mass,
+            RenderMeshAuditResult audit)
+        {
+            if (mass == null || audit == null ||
+                audit.WorstTriangle == null)
+            {
+                return;
+            }
+
+            RenderMeshTriangleAudit triangle =
+                ResolveRenderMeshAuditTriangle(
+                    audit,
+                    renderMeshAuditDrawTriangleOrdinal) ??
+                audit.WorstTriangle;
+            if (triangle == null)
+            {
+                return;
+            }
+            string triangleReason = triangle.Ordinal ==
+                audit.WorstTriangleOrdinal
+                    ? audit.WorstReason
+                    : ResolveRenderMeshTriangleFlags(triangle);
+            Transform meshTransform = mass.GeometryMeshFilter.transform;
+            Vector3 worldA = meshTransform.TransformPoint(
+                triangle.PositionA);
+            Vector3 worldB = meshTransform.TransformPoint(
+                triangle.PositionB);
+            Vector3 worldC = meshTransform.TransformPoint(
+                triangle.PositionC);
+            Vector3 worldCentre = (worldA + worldB + worldC) / 3f;
+
+            Color previousColor = Handles.color;
+            UnityEngine.Rendering.CompareFunction previousZTest =
+                Handles.zTest;
+            Handles.zTest = renderMeshAuditXRay
+                ? UnityEngine.Rendering.CompareFunction.Always
+                : UnityEngine.Rendering.CompareFunction.LessEqual;
+            Handles.color = new Color(1f, 0.08f, 0.04f, 0.22f);
+            Handles.DrawAAConvexPolygon(worldA, worldB, worldC);
+            Handles.color = new Color(1f, 0.08f, 0.04f, 1f);
+            Handles.DrawAAPolyLine(
+                4f,
+                worldA,
+                worldB,
+                worldC,
+                worldA);
+            float handleSize = HandleUtility.GetHandleSize(
+                worldCentre) * 0.05f;
+            Handles.SphereHandleCap(
+                0,
+                worldA,
+                Quaternion.identity,
+                handleSize,
+                EventType.Repaint);
+            Handles.SphereHandleCap(
+                0,
+                worldB,
+                Quaternion.identity,
+                handleSize,
+                EventType.Repaint);
+            Handles.SphereHandleCap(
+                0,
+                worldC,
+                Quaternion.identity,
+                handleSize,
+                EventType.Repaint);
+            Handles.Label(
+                worldCentre,
+                "Render audit triangle " + triangle.Ordinal +
+                "\n" + triangleReason +
+                "\nindices " + triangle.IndexA + "/" +
+                triangle.IndexB + "/" + triangle.IndexC);
+            Handles.zTest = previousZTest;
+            Handles.color = previousColor;
+        }
+
+        private static RenderMeshTriangleAudit
+            ResolveRenderMeshAuditTriangle(
+                RenderMeshAuditResult audit,
+                int ordinal)
+        {
+            if (audit == null || audit.Triangles == null)
+            {
+                return null;
+            }
+            for (int index = 0;
+                 index < audit.Triangles.Count;
+                 index++)
+            {
+                if (audit.Triangles[index].Ordinal == ordinal)
+                {
+                    return audit.Triangles[index];
+                }
+            }
+            return null;
+        }
+
+        private static string ResolveRenderMeshTriangleFlags(
+            RenderMeshTriangleAudit triangle)
+        {
+            if (triangle == null)
+            {
+                return "none";
+            }
+            if (triangle.HasNonFiniteVertexChannel)
+            {
+                return "non-finite vertex channel";
+            }
+            if (triangle.ZeroNormal)
+            {
+                return "zero stored normal";
+            }
+            if (triangle.Degenerate)
+            {
+                return "degenerate 3D triangle";
+            }
+            if (triangle.MaximumTangentMagnitude >
+                RenderMeshExtremeTangentMagnitude)
+            {
+                return "extreme tangent magnitude";
+            }
+            if (triangle.WindingFailure)
+            {
+                return "outward winding failure";
+            }
+            if (triangle.NormalAgreementFailure)
+            {
+                return "stored-normal disagreement";
+            }
+            if (triangle.UvDegenerate)
+            {
+                return "UV-degenerate triangle";
+            }
+            if (triangle.UvIllConditioned)
+            {
+                return "UV-ill-conditioned triangle";
+            }
+            if (triangle.Sliver)
+            {
+                return "3D sliver";
+            }
+            return "audited triangle";
+        }
+
+        private static void CreateRenderMeshProofClone(
+            GeneratedMass mass,
+            RenderMeshProofMode mode)
+        {
+            if (!IsCurrentRenderMeshAudit(mass) ||
+                mass.GeometryMeshFilter == null ||
+                mass.GeometryMeshFilter.sharedMesh == null)
+            {
+                Debug.LogWarning(
+                    "Run Audit Render Mesh on the current generated mesh " +
+                    "before creating a proof clone.",
+                    mass);
+                return;
+            }
+
+            DestroyRenderMeshProofClone();
+            Mesh sourceMesh = mass.GeometryMeshFilter.sharedMesh;
+            MeshRenderer sourceRenderer =
+                mass.GeometryMeshFilter.GetComponent<MeshRenderer>();
+            if (sourceRenderer == null)
+            {
+                Debug.LogWarning(
+                    "GeneratedMass render proof failed: source " +
+                    "MeshRenderer is missing.",
+                    mass);
+                return;
+            }
+
+            Mesh proofMesh = UnityEngine.Object.Instantiate(sourceMesh);
+            proofMesh.name = sourceMesh.name +
+                (mode == RenderMeshProofMode.NormalTangentRepair
+                    ? " [Normal Tangent Repair Proof]"
+                    : " [Unlit Proof]");
+            proofMesh.hideFlags = HideFlags.HideAndDontSave;
+
+            int repairedNormals = 0;
+            int repairedTangents = 0;
+            if (mode == RenderMeshProofMode.NormalTangentRepair)
+            {
+                if (!RepairProofMeshNormalsAndTangents(
+                        proofMesh,
+                        out repairedNormals,
+                        out repairedTangents,
+                        out string repairDiagnostic))
+                {
+                    UnityEngine.Object.DestroyImmediate(proofMesh);
+                    Debug.LogWarning(
+                        "GeneratedMass normal/tangent proof failed: " +
+                        repairDiagnostic,
+                        mass);
+                    return;
+                }
+            }
+
+            GameObject proofObject = new GameObject(
+                mass.name + " [Render Proof]");
+            proofObject.hideFlags = HideFlags.HideAndDontSave;
+            proofObject.layer = mass.gameObject.layer;
+            Transform sourceTransform = mass.transform;
+            proofObject.transform.SetParent(
+                sourceTransform.parent,
+                false);
+            proofObject.transform.localPosition =
+                sourceTransform.localPosition;
+            proofObject.transform.localRotation =
+                sourceTransform.localRotation;
+            proofObject.transform.localScale =
+                sourceTransform.localScale;
+
+            MeshFilter proofFilter =
+                proofObject.AddComponent<MeshFilter>();
+            MeshRenderer proofRenderer =
+                proofObject.AddComponent<MeshRenderer>();
+            proofFilter.sharedMesh = proofMesh;
+            proofRenderer.shadowCastingMode =
+                sourceRenderer.shadowCastingMode;
+            proofRenderer.receiveShadows = sourceRenderer.receiveShadows;
+            proofRenderer.lightProbeUsage = sourceRenderer.lightProbeUsage;
+            proofRenderer.reflectionProbeUsage =
+                sourceRenderer.reflectionProbeUsage;
+            proofRenderer.renderingLayerMask =
+                sourceRenderer.renderingLayerMask;
+            proofRenderer.enabled = sourceRenderer.enabled;
+            proofRenderer.sortingLayerID =
+                sourceRenderer.sortingLayerID;
+            proofRenderer.sortingOrder =
+                sourceRenderer.sortingOrder;
+
+            Material proofMaterial = null;
+            if (mode == RenderMeshProofMode.Unlit)
+            {
+                Shader unlitShader = Shader.Find(
+                    "Universal Render Pipeline/Unlit");
+                if (unlitShader == null)
+                {
+                    unlitShader = Shader.Find("Unlit/Color");
+                }
+                if (unlitShader == null)
+                {
+                    UnityEngine.Object.DestroyImmediate(proofObject);
+                    UnityEngine.Object.DestroyImmediate(proofMesh);
+                    Debug.LogWarning(
+                        "GeneratedMass unlit proof failed: no supported " +
+                        "Unlit shader was found.",
+                        mass);
+                    return;
+                }
+                proofMaterial = new Material(unlitShader)
+                {
+                    name = "GeneratedMass Unlit Proof Material",
+                    hideFlags = HideFlags.HideAndDontSave
+                };
+                Color proofColor = new Color(
+                    0.62f,
+                    0.64f,
+                    0.66f,
+                    1f);
+                if (proofMaterial.HasProperty("_BaseColor"))
+                {
+                    proofMaterial.SetColor("_BaseColor", proofColor);
+                }
+                if (proofMaterial.HasProperty("_Color"))
+                {
+                    proofMaterial.SetColor("_Color", proofColor);
+                }
+                Material[] sourceMaterials =
+                    sourceRenderer.sharedMaterials;
+                int materialCount = Mathf.Max(
+                    1,
+                    sourceMaterials.Length);
+                Material[] proofMaterials =
+                    new Material[materialCount];
+                for (int materialIndex = 0;
+                     materialIndex < proofMaterials.Length;
+                     materialIndex++)
+                {
+                    proofMaterials[materialIndex] = proofMaterial;
+                }
+                proofRenderer.sharedMaterials = proofMaterials;
+            }
+            else
+            {
+                proofRenderer.sharedMaterials =
+                    sourceRenderer.sharedMaterials;
+            }
+
+            renderMeshProofObject = proofObject;
+            renderMeshProofTarget = mass;
+            renderMeshProofSourceMesh = sourceMesh;
+            renderMeshProofMesh = proofMesh;
+            renderMeshProofMaterial = proofMaterial;
+            renderMeshProofSourceRenderer = sourceRenderer;
+            renderMeshProofSourceForceRenderingOff =
+                sourceRenderer.forceRenderingOff;
+            renderMeshProofMode = mode;
+            sourceRenderer.forceRenderingOff = true;
+
+            Debug.Log(
+                "GeneratedMass render proof created. object=" +
+                mass.name + ", entityId=" + mass.GetEntityId() +
+                ", mode=" + ResolveRenderMeshProofDisplayName(mode) +
+                ", repairedNormals=" + repairedNormals +
+                ", repairedTangents=" + repairedTangents +
+                ". Remove the proof clone or deselect the mass to " +
+                "restore the source renderer.",
+                mass);
+            SceneView.RepaintAll();
+        }
+
+        private static bool RepairProofMeshNormalsAndTangents(
+            Mesh mesh,
+            out int repairedNormals,
+            out int repairedTangents,
+            out string diagnostic)
+        {
+            repairedNormals = 0;
+            repairedTangents = 0;
+            diagnostic = string.Empty;
+
+            List<Vector3> vertices = new List<Vector3>();
+            List<Vector3> normals = new List<Vector3>();
+            List<Vector4> tangents = new List<Vector4>();
+            List<Vector2> uv0 = new List<Vector2>();
+            mesh.GetVertices(vertices);
+            mesh.GetNormals(normals);
+            mesh.GetTangents(tangents);
+            mesh.GetUVs(0, uv0);
+
+            int vertexCount = vertices.Count;
+            if (vertexCount < 3)
+            {
+                diagnostic = "the proof mesh contains fewer than three vertices";
+                return false;
+            }
+
+            bool normalChannelComplete = normals.Count == vertexCount;
+            if (!normalChannelComplete)
+            {
+                normals.Clear();
+                for (int vertexIndex = 0;
+                     vertexIndex < vertexCount;
+                     vertexIndex++)
+                {
+                    normals.Add(Vector3.zero);
+                }
+            }
+
+            bool[] repairedNormalVertices = new bool[vertexCount];
+            int[] triangles = mesh.triangles;
+            for (int triangleOffset = 0;
+                 triangleOffset + 2 < triangles.Length;
+                 triangleOffset += 3)
+            {
+                int indexA = triangles[triangleOffset];
+                int indexB = triangles[triangleOffset + 1];
+                int indexC = triangles[triangleOffset + 2];
+                if (!IsValidVertexIndex(indexA, vertexCount) ||
+                    !IsValidVertexIndex(indexB, vertexCount) ||
+                    !IsValidVertexIndex(indexC, vertexCount))
+                {
+                    diagnostic =
+                        "triangle " + (triangleOffset / 3) +
+                        " contains an invalid vertex index";
+                    return false;
+                }
+
+                bool repairA = IsZeroRenderMeshVector(normals[indexA]);
+                bool repairB = IsZeroRenderMeshVector(normals[indexB]);
+                bool repairC = IsZeroRenderMeshVector(normals[indexC]);
+                if (!repairA && !repairB && !repairC)
+                {
+                    continue;
+                }
+
+                Vector3 cross = Vector3.Cross(
+                    vertices[indexB] - vertices[indexA],
+                    vertices[indexC] - vertices[indexA]);
+                if (!TryNormalizeRenderMeshVector(
+                        cross,
+                        out Vector3 geometricNormal))
+                {
+                    diagnostic =
+                        "triangle " + (triangleOffset / 3) +
+                        " cannot produce a stable geometric normal";
+                    return false;
+                }
+
+                if (repairA)
+                {
+                    normals[indexA] = geometricNormal;
+                    repairedNormalVertices[indexA] = true;
+                    repairedNormals++;
+                }
+                if (repairB)
+                {
+                    normals[indexB] = geometricNormal;
+                    repairedNormalVertices[indexB] = true;
+                    repairedNormals++;
+                }
+                if (repairC)
+                {
+                    normals[indexC] = geometricNormal;
+                    repairedNormalVertices[indexC] = true;
+                    repairedNormals++;
+                }
+            }
+
+            for (int vertexIndex = 0;
+                 vertexIndex < vertexCount;
+                 vertexIndex++)
+            {
+                if (!TryNormalizeRenderMeshVector(
+                        normals[vertexIndex],
+                        out Vector3 normalized))
+                {
+                    diagnostic =
+                        "vertex " + vertexIndex +
+                        " still has no finite non-zero normal after repair";
+                    return false;
+                }
+                normals[vertexIndex] = normalized;
+            }
+            mesh.SetNormals(normals);
+
+            bool tangentChannelComplete =
+                tangents.Count == vertexCount;
+            bool[] uvConditionedVertices =
+                BuildUvConditionedTangentVertexMask(
+                    mesh,
+                    vertexCount,
+                    uv0);
+            if (!tangentChannelComplete)
+            {
+                tangents.Clear();
+                for (int vertexIndex = 0;
+                     vertexIndex < vertexCount;
+                     vertexIndex++)
+                {
+                    tangents.Add(Vector4.zero);
+                }
+            }
+
+            for (int vertexIndex = 0;
+                 vertexIndex < vertexCount;
+                 vertexIndex++)
+            {
+                Vector4 tangent = tangents[vertexIndex];
+                float magnitude = ResolveTangentMagnitude(tangent);
+                bool repair = !tangentChannelComplete ||
+                    !IsFinite(tangent) ||
+                    magnitude < RenderMeshMinimumVectorMagnitude ||
+                    magnitude > RenderMeshExtremeTangentMagnitude ||
+                    uvConditionedVertices[vertexIndex] ||
+                    repairedNormalVertices[vertexIndex];
+                if (!repair)
+                {
+                    continue;
+                }
+
+                Vector3 stable = BuildStableTangent(
+                    normals[vertexIndex]);
+                if (!TryNormalizeRenderMeshVector(
+                        stable,
+                        out stable))
+                {
+                    diagnostic =
+                        "vertex " + vertexIndex +
+                        " cannot produce a stable tangent";
+                    return false;
+                }
+                float handedness = IsFinite(tangent.w) &&
+                    Mathf.Abs(tangent.w) > 0.5f
+                        ? Mathf.Sign(tangent.w)
+                        : 1f;
+                tangents[vertexIndex] = new Vector4(
+                    stable.x,
+                    stable.y,
+                    stable.z,
+                    handedness);
+                repairedTangents++;
+            }
+
+            mesh.SetTangents(tangents);
+            return true;
+        }
+
+        private static bool TryNormalizeRenderMeshVector(
+            Vector3 value,
+            out Vector3 normalized)
+        {
+            normalized = Vector3.zero;
+            if (!IsFinite(value))
+            {
+                return false;
+            }
+
+            double x = value.x;
+            double y = value.y;
+            double z = value.z;
+            double magnitudeSqr = x * x + y * y + z * z;
+            if (!(magnitudeSqr > 0.0) ||
+                double.IsNaN(magnitudeSqr) ||
+                double.IsInfinity(magnitudeSqr))
+            {
+                return false;
+            }
+
+            double inverseMagnitude = 1.0 / Math.Sqrt(magnitudeSqr);
+            normalized = new Vector3(
+                (float)(x * inverseMagnitude),
+                (float)(y * inverseMagnitude),
+                (float)(z * inverseMagnitude));
+            float normalizedMagnitudeSqr = normalized.sqrMagnitude;
+            return IsFinite(normalized) &&
+                IsFinite(normalizedMagnitudeSqr) &&
+                normalizedMagnitudeSqr > 0.99f &&
+                normalizedMagnitudeSqr < 1.01f;
+        }
+
+        private static bool[] BuildUvConditionedTangentVertexMask(
+            Mesh mesh,
+            int vertexCount,
+            List<Vector2> uv0)
+        {
+            bool[] mask = new bool[vertexCount];
+            if (mesh == null || uv0 == null ||
+                uv0.Count != vertexCount)
+            {
+                return mask;
+            }
+
+            int[] triangles = mesh.triangles;
+            for (int triangleOffset = 0;
+                 triangleOffset + 2 < triangles.Length;
+                 triangleOffset += 3)
+            {
+                int indexA = triangles[triangleOffset];
+                int indexB = triangles[triangleOffset + 1];
+                int indexC = triangles[triangleOffset + 2];
+                if (!IsValidVertexIndex(indexA, vertexCount) ||
+                    !IsValidVertexIndex(indexB, vertexCount) ||
+                    !IsValidVertexIndex(indexC, vertexCount))
+                {
+                    continue;
+                }
+                Vector2 duv1 = uv0[indexB] - uv0[indexA];
+                Vector2 duv2 = uv0[indexC] - uv0[indexA];
+                float determinant =
+                    duv1.x * duv2.y - duv1.y * duv2.x;
+                if (IsFinite(determinant) &&
+                    Mathf.Abs(determinant) >
+                        RenderMeshIllConditionedUvDeterminant)
+                {
+                    continue;
+                }
+                mask[indexA] = true;
+                mask[indexB] = true;
+                mask[indexC] = true;
+            }
+            return mask;
+        }
+
+        private static Vector3 BuildStableTangent(Vector3 normal)
+        {
+            Vector3 reference = Mathf.Abs(normal.y) < 0.9f
+                ? Vector3.up
+                : Vector3.right;
+            Vector3 tangent = Vector3.Cross(reference, normal);
+            if (!TryNormalizeRenderMeshVector(tangent, out _))
+            {
+                tangent = Vector3.Cross(Vector3.forward, normal);
+            }
+            return tangent;
+        }
+
+        private static void DestroyRenderMeshProofClone()
+        {
+            if (renderMeshProofSourceRenderer != null)
+            {
+                renderMeshProofSourceRenderer.forceRenderingOff =
+                    renderMeshProofSourceForceRenderingOff;
+            }
+            if (renderMeshProofObject != null)
+            {
+                UnityEngine.Object.DestroyImmediate(
+                    renderMeshProofObject);
+            }
+            if (renderMeshProofMesh != null)
+            {
+                UnityEngine.Object.DestroyImmediate(
+                    renderMeshProofMesh);
+            }
+            if (renderMeshProofMaterial != null)
+            {
+                UnityEngine.Object.DestroyImmediate(
+                    renderMeshProofMaterial);
+            }
+            renderMeshProofObject = null;
+            renderMeshProofTarget = null;
+            renderMeshProofSourceMesh = null;
+            renderMeshProofMesh = null;
+            renderMeshProofMaterial = null;
+            renderMeshProofSourceRenderer = null;
+            renderMeshProofSourceForceRenderingOff = false;
+            renderMeshProofMode = RenderMeshProofMode.None;
+            SceneView.RepaintAll();
+        }
+
+        private static string ResolveRenderMeshProofDisplayName(
+            RenderMeshProofMode mode)
+        {
+            return mode switch
+            {
+                RenderMeshProofMode.NormalTangentRepair =>
+                    "normal/tangent repair",
+                RenderMeshProofMode.Unlit => "unlit material",
+                _ => "none"
+            };
+        }
+
+        private static bool IsZeroRenderMeshVector(Vector3 value)
+        {
+            return !IsFinite(value) ||
+                value.sqrMagnitude <
+                    RenderMeshMinimumVectorMagnitudeSqr;
+        }
+
+        private static bool IsValidVertexIndex(
+            int index,
+            int vertexCount)
+        {
+            return index >= 0 && index < vertexCount;
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private static bool IsFinite(Vector2 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y);
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) &&
+                IsFinite(value.z);
+        }
+
+        private static bool IsFinite(Vector4 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) &&
+                IsFinite(value.z) && IsFinite(value.w);
+        }
+
+        private static bool IsFinite(Color value)
+        {
+            return IsFinite(value.r) && IsFinite(value.g) &&
+                IsFinite(value.b) && IsFinite(value.a);
+        }
+
+        private static Vector3 SafeNormalized(Vector3 value)
+        {
+            return TryNormalizeRenderMeshVector(
+                value,
+                out Vector3 normalized)
+                    ? normalized
+                    : Vector3.zero;
+        }
+
+        private static float ResolveTangentMagnitude(Vector4 tangent)
+        {
+            if (!IsFinite(tangent))
+            {
+                return float.PositiveInfinity;
+            }
+            return new Vector3(
+                tangent.x,
+                tangent.y,
+                tangent.z).magnitude;
+        }
+
+        private static float CalculateMedian(List<float> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return 0f;
+            }
+            int middle = values.Count / 2;
+            return values.Count % 2 == 0
+                ? (values[middle - 1] + values[middle]) * 0.5f
+                : values[middle];
+        }
+
+        private static string FormatAuditFloat(float value)
+        {
+            return value.ToString(
+                "R",
+                CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatAuditVector2(Vector2 value)
+        {
+            return "(" + FormatAuditFloat(value.x) + "/" +
+                FormatAuditFloat(value.y) + ")";
+        }
+
+        private static string FormatAuditVector3(Vector3 value)
+        {
+            return "(" + FormatAuditFloat(value.x) + "/" +
+                FormatAuditFloat(value.y) + "/" +
+                FormatAuditFloat(value.z) + ")";
+        }
+
+        private static string FormatAuditVector4(Vector4 value)
+        {
+            return "(" + FormatAuditFloat(value.x) + "/" +
+                FormatAuditFloat(value.y) + "/" +
+                FormatAuditFloat(value.z) + "/" +
+                FormatAuditFloat(value.w) + ")";
+        }
+
+        private static string FormatAuditColor(Color value)
+        {
+            return "(" + FormatAuditFloat(value.r) + "/" +
+                FormatAuditFloat(value.g) + "/" +
+                FormatAuditFloat(value.b) + "/" +
+                FormatAuditFloat(value.a) + ")";
+        }
+
         private void OnSceneGUI()
         {
             GeneratedMass mass = target as GeneratedMass;
@@ -4040,16 +9321,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 return;
             }
 
-            if (!showPressureProfile || !Application.isPlaying ||
-                !StylizedRiverDisturbanceRuntime.
+            if (renderMeshAuditDrawWorstTriangle &&
+                IsCurrentRenderMeshAudit(mass))
+            {
+                DrawRenderMeshAuditSceneOverlay(
+                    mass,
+                    lastRenderMeshAudit);
+            }
+
+            if (showPressureProfile && Application.isPlaying &&
+                StylizedRiverDisturbanceRuntime.
                     TryGetGeneratedSourcePressureProfileDebugData(
                         mass,
                         out GeneratedRiverPressureProfileDebugData debugData))
             {
-                return;
+                DrawPressureProfileSceneOverlay(debugData);
             }
-
-            DrawPressureProfileSceneOverlay(debugData);
         }
 
 

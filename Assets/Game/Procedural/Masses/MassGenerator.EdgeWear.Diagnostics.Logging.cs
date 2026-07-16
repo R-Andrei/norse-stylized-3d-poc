@@ -225,6 +225,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ? 0
                 : coverage.ArtisticEligibleCount;
             PopulateEdgeWearArtisticAuditResult(result, coverage);
+            PopulateEdgeWearArtisticEdgeRecords(result, coverage);
             result.CandidateCount = coverage == null
                 ? 0
                 : coverage.CandidateCount;
@@ -2574,6 +2575,202 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
 
 #if UNITY_EDITOR
+        private static void PopulateEdgeWearArtisticEdgeRecords(
+            EdgeWearBatchAuditCaseResult result,
+            EdgeWearCoverageAudit coverage)
+        {
+            if (result == null || coverage == null ||
+                coverage.Records == null)
+            {
+                if (result != null)
+                {
+                    result.ArtisticEdges =
+                        Array.Empty<EdgeWearArtisticEdgeAuditRecord>();
+                }
+                return;
+            }
+
+            List<EdgeWearArtisticEdgeAuditRecord> records =
+                new List<EdgeWearArtisticEdgeAuditRecord>(
+                    coverage.Records.Count);
+            for (int recordIndex = 0;
+                 recordIndex < coverage.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord source =
+                    coverage.Records[recordIndex];
+                EdgeWearEdgeViabilityRecord viability = source.Viability;
+                EdgeWearArtisticEdgeAuditRecord target =
+                    new EdgeWearArtisticEdgeAuditRecord
+                    {
+                        SourceEdgeIndex = source.SourceEdgeIndex,
+                        CandidateIndex = source.CandidateIndex,
+                        Start = source.Start,
+                        End = source.End,
+                        Midpoint = source.Midpoint,
+                        OwnerNormalA = source.OwnerNormalA,
+                        OwnerNormalB = source.OwnerNormalB,
+                        BevelNormal = source.BevelNormal,
+                        FaceA = source.FaceA,
+                        FaceB = source.FaceB,
+                        FaceCount = source.FaceCount,
+                        Length = source.Length,
+                        DihedralDegrees = source.DihedralDegrees,
+                        Vertical01 = source.Vertical01,
+                        Classification = source.Classification.ToString(),
+                        CoincidentBoundarySeamReconciled =
+                            source.CoincidentBoundarySeamReconciled ? 1 : 0,
+                        StructuralEligible =
+                            source.StructuralEligible ? 1 : 0,
+                        GeometricEligible = source.GeometricEligible ? 1 : 0,
+                        CoexistenceEligible =
+                            source.CoexistenceEligible ? 1 : 0,
+                        ArtisticEligible = source.ArtisticEligible ? 1 : 0,
+                        ArtisticLengthEligible =
+                            source.ArtisticLengthEligible ? 1 : 0,
+                        ArtisticAngleEligible =
+                            source.ArtisticAngleEligible ? 1 : 0,
+                        ArtisticBaseEligible =
+                            source.ArtisticBaseEligible ? 1 : 0,
+                        ArtisticFilterReason =
+                            source.ArtisticFilterReason ?? string.Empty,
+                        CandidateReason =
+                            source.CandidateReason ?? string.Empty,
+                        FinalReason = source.FinalReason ?? string.Empty,
+                        Score = source.Score,
+                        ArtisticMinimumLength = source.ArtisticMinimumLength,
+                        ArtisticLengthScore = source.ArtisticLengthScore,
+                        ArtisticAngleScore = source.ArtisticAngleScore,
+                        ArtisticRandomScore = source.ArtisticRandomScore,
+                        ArtisticBaseSuppression =
+                            source.ArtisticBaseSuppression,
+                        ArtisticUpwardEdgeBoost =
+                            source.ArtisticUpwardEdgeBoost,
+                        ArtisticCharacterBoost =
+                            source.ArtisticCharacterBoost,
+                        ArtisticEdgeAxisVertical01 =
+                            source.ArtisticEdgeAxisVertical01,
+                        ArtisticEdgeAxisAbsX = source.ArtisticEdgeAxisAbsX,
+                        ArtisticEdgeAxisAbsY = source.ArtisticEdgeAxisAbsY,
+                        ArtisticEdgeAxisAbsZ = source.ArtisticEdgeAxisAbsZ,
+                        ArtisticSilhouettePotential =
+                            source.ArtisticSilhouettePotential,
+                        ArtisticFeasibleWidthFraction =
+                            source.ArtisticFeasibleWidthFraction,
+                        ArtisticSolvedWidthFraction =
+                            source.ArtisticSolvedWidthFraction,
+                        ArtisticLocalDensity01 =
+                            source.ArtisticLocalDensity01,
+                        ArtisticSharedVertexDegreeA =
+                            source.ArtisticSharedVertexDegreeA,
+                        ArtisticSharedVertexDegreeB =
+                            source.ArtisticSharedVertexDegreeB,
+                        ArtisticSelectionRank =
+                            source.ArtisticSelectionRank,
+                        ArtisticSelectionThreshold =
+                            source.ArtisticSelectionThreshold,
+                        ArtisticSelectionDelta =
+                            source.ArtisticSelectionDelta,
+                        ArtisticDeterministicVariation =
+                            source.ArtisticDeterministicVariation,
+                        ArtisticStrength = source.ArtisticStrength,
+                        ArtisticDepthMultiplier =
+                            source.ArtisticDepthMultiplier,
+                        SolvedWidth = source.SolvedWidth,
+                        MaterializedWidth = source.MaterializedWidth,
+                        MaterializedWidthScale =
+                            source.MaterializedWidthScale,
+                        WidthReduced = source.WidthReduced ? 1 : 0,
+                        Candidate = source.Candidate ? 1 : 0,
+                        Selected = source.Selected ? 1 : 0,
+                        WidthInactive = source.WidthInactive ? 1 : 0,
+                        Active = source.Active ? 1 : 0,
+                        AttemptedBuilt = source.AttemptedBuilt ? 1 : 0,
+                        CertifiedBuilt = source.Built ? 1 : 0,
+                        TrialRejected = source.TrialRejected ? 1 : 0,
+                        Deferred = source.Deferred ? 1 : 0,
+                        Rejected = source.Rejected ? 1 : 0
+                    };
+                if (viability != null)
+                {
+                    target.RequestedWidth = viability.RequestedWidth;
+                    target.RequiredFootprintLength =
+                        viability.RequiredFootprintLength;
+                    target.LengthToWidthRatio =
+                        viability.LengthToWidthRatio;
+                    target.LocalityRetainPlaneFloor =
+                        viability.LocalityRetainPlaneFloor;
+                    target.LocalityRemovalPlaneCeiling =
+                        viability.LocalityRemovalPlaneCeiling;
+                    target.LocalityFeasibleMargin =
+                        viability.LocalityFeasibleMargin;
+                    target.LocalityGuardMargin =
+                        viability.LocalityGuardMargin;
+                    target.LocalityMinimumRemoval =
+                        viability.LocalityMinimumRemoval;
+                    target.LocalityLimitingVertex =
+                        viability.LocalityLimitingVertex;
+                    target.LocalityLimitingPosition =
+                        viability.LocalityLimitingPosition;
+                    target.MaximumLocallyFeasibleWidth =
+                        viability.MaximumLocallyFeasibleWidth;
+                    target.FeasibleWidthFraction =
+                        viability.FeasibleWidthFraction;
+                    target.IsolatedSucceeded =
+                        viability.IsolatedSucceeded ? 1 : 0;
+                    target.IsolatedWidthAttemptCount =
+                        viability.IsolatedWidthAttemptCount;
+                    target.IsolatedLastAttemptedWidth =
+                        viability.IsolatedLastAttemptedWidth;
+                    target.IsolatedMaximumCertifiedWidth =
+                        viability.IsolatedMaximumCertifiedWidth;
+                    target.IsolatedMaximumCertifiedWidthFraction =
+                        viability.IsolatedMaximumCertifiedWidthFraction;
+                    target.EndpointConsumptionA =
+                        viability.EndpointConsumptionA;
+                    target.EndpointConsumptionB =
+                        viability.EndpointConsumptionB;
+                    target.RemainingCentralSpan =
+                        viability.RemainingCentralSpan;
+                    target.MinimumCentralSpan =
+                        viability.MinimumCentralSpan;
+                    target.IsolatedOpenEdgeCount =
+                        viability.IsolatedOpenEdgeCount;
+                    target.IsolatedNonManifoldEdgeCount =
+                        viability.IsolatedNonManifoldEdgeCount;
+                    target.IsolatedTJunctionCount =
+                        viability.IsolatedTJunctionCount;
+                    target.IsolatedInvalidFaceCount =
+                        viability.IsolatedInvalidFaceCount;
+                    target.IsolatedDiagnostic =
+                        viability.IsolatedDiagnostic ?? string.Empty;
+                    target.ViabilityFailureReason =
+                        viability.FailureReason ?? string.Empty;
+                }
+                records.Add(target);
+            }
+
+            records.Sort((left, right) =>
+            {
+                int leftIndex = left.SourceEdgeIndex;
+                int rightIndex = right.SourceEdgeIndex;
+                if (leftIndex != rightIndex)
+                {
+                    return leftIndex.CompareTo(rightIndex);
+                }
+                int start = left.Start.x.CompareTo(right.Start.x);
+                if (start != 0)
+                {
+                    return start;
+                }
+                start = left.Start.y.CompareTo(right.Start.y);
+                return start != 0
+                    ? start
+                    : left.Start.z.CompareTo(right.Start.z);
+            });
+            result.ArtisticEdges = records.ToArray();
+        }
+
         private static void PopulateEdgeWearArtisticAuditResult(
             EdgeWearBatchAuditCaseResult result,
             EdgeWearCoverageAudit coverage)
@@ -2892,8 +3089,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 summary.FilteredScoreMaximum);
             builder.AppendLine();
             builder.AppendLine(
-                "scoreFormula=(angle*0.58+length*0.27+random*0.15)*" +
-                "baseSuppression*upwardBoost*characterBoost");
+                "scoreFormula=(angle*0.60+length*0.35+random*0.05)*" +
+                "basePriorityFactor*upwardPriorityFactor");
             builder.AppendLine(
                 "diagnosticOnlyContextWeights=" +
                 "silhouette:0,widthFraction:0,localDensity:0,crowding:0");

@@ -26,12 +26,26 @@ MonoBehaviour:
       rockyDryTintStrength: 0.16
       vegetationTint: {r: 0.36, g: 0.49, b: 0.25, a: 1}
       vegetationTintStrength: 0.42
-      groundMacroPatchScale: 1.87
+      bankSurfaceLayer: {fileID: 11400000, guid: b6673354a0024d33b7374b1a24176000, type: 2}
+      riverbedSurfaceLayer: {fileID: 0}
+      bankMaterialStrength: 1
+      bankMaterialReach: 1
+      immediateBankExposure: 0.55
+      waterlineMaterialStrength: 1
+      bankTransitionSoftness: 0.038
+      outerBankExtension: 0.74
+      outerBankStrength: 1
+      outerBankFade: 0.75
+      vegetationRetreatStrength: 0
+      snowMeltStrength: 0
+      frostRetreatStrength: 0
+      paintedAccentRetreatStrength: 0
+      groundMacroPatchScale: 4.3
       groundMacroPatchPatternSeed: 69
-      broadVariation: 0.025
-      groundMacroPatchTransitionSoftness: 0.383
-      groundMacroPatchSeparation: 0.6
-      reliefShadingStrength: 0.25
+      broadVariation: 0.05
+      groundMacroPatchTransitionSoftness: 0.36
+      groundMacroPatchSeparation: 1.31
+      reliefShadingStrength: 0.4
       relativeHeightContrast: 0.75
       pixelCellSize: 0.065
       pixelToneCount: 5
@@ -121,6 +135,20 @@ MonoBehaviour:
       rockyDryTintStrength: 0.28
       vegetationTint: {r: 0.34, g: 0.46, b: 0.24, a: 1}
       vegetationTintStrength: 0.36
+      bankSurfaceLayer: {fileID: 0}
+      riverbedSurfaceLayer: {fileID: 0}
+      bankMaterialStrength: 1
+      bankMaterialReach: 0.65
+      immediateBankExposure: 0.55
+      waterlineMaterialStrength: 1
+      bankTransitionSoftness: 0.55
+      outerBankExtension: 0
+      outerBankStrength: 0.5
+      outerBankFade: 1
+      vegetationRetreatStrength: 0
+      snowMeltStrength: 0
+      frostRetreatStrength: 0
+      paintedAccentRetreatStrength: 0
       groundMacroPatchScale: 5
       groundMacroPatchPatternSeed: 0
       broadVariation: 0.052
@@ -216,6 +244,20 @@ MonoBehaviour:
       rockyDryTintStrength: 0.16
       vegetationTint: {r: 0.3, g: 0.42, b: 0.24, a: 1}
       vegetationTintStrength: 0.38
+      bankSurfaceLayer: {fileID: 0}
+      riverbedSurfaceLayer: {fileID: 0}
+      bankMaterialStrength: 1
+      bankMaterialReach: 0.65
+      immediateBankExposure: 0.55
+      waterlineMaterialStrength: 1
+      bankTransitionSoftness: 0.55
+      outerBankExtension: 0
+      outerBankStrength: 0.5
+      outerBankFade: 1
+      vegetationRetreatStrength: 0
+      snowMeltStrength: 0
+      frostRetreatStrength: 0
+      paintedAccentRetreatStrength: 0
       groundMacroPatchScale: 5.7
       groundMacroPatchPatternSeed: 0
       broadVariation: 0.048
@@ -359,6 +401,20 @@ MonoBehaviour:
       rockyDryTintStrength: 0.34
       vegetationTint: {r: 0.31, g: 0.4, b: 0.22, a: 1}
       vegetationTintStrength: 0.24
+      bankSurfaceLayer: {fileID: 0}
+      riverbedSurfaceLayer: {fileID: 0}
+      bankMaterialStrength: 1
+      bankMaterialReach: 0.65
+      immediateBankExposure: 0.55
+      waterlineMaterialStrength: 1
+      bankTransitionSoftness: 0.55
+      outerBankExtension: 0
+      outerBankStrength: 0.5
+      outerBankFade: 1
+      vegetationRetreatStrength: 0
+      snowMeltStrength: 0
+      frostRetreatStrength: 0
+      paintedAccentRetreatStrength: 0
       groundMacroPatchScale: 4.7
       groundMacroPatchPatternSeed: 0
       broadVariation: 0.058

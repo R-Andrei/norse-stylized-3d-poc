@@ -25,6 +25,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
         _GroundVegetationResponse("Ground Vegetation Response", Range(0, 2)) = 0.25
         _GroundRockyDryResponse("Ground Rocky/Dry Response", Range(0, 2)) = 0.5
         _GroundShoreDampStrength("Ground Shore Damp Strength", Range(0, 2)) = 1
+        [HideInInspector] _GroundRiverCoupledEnabled("Ground River Coupled Enabled", Float) = 0
         _GroundPatchBlendStrength("Ground Patch Blend Strength", Range(0, 1)) = 0.55
         _GroundMacroPatchScale("Ground Macro Patch Scale", Range(0.5, 12)) = 4.5
         _GroundMacroPatchPatternSeed("Macro Patch Pattern Seed", Float) = 0
@@ -42,6 +43,24 @@ Shader "PS3D/Pixel Ground Surface Lit"
         _GroundRockyDryTintStrength("Ground Rocky/Dry Tint Strength", Range(0, 1)) = 0.18
         _GroundVegetationTint("Ground Vegetation Tint", Color) = (0.50, 0.58, 0.42, 1)
         _GroundVegetationTintStrength("Ground Vegetation Tint Strength", Range(0, 1)) = 0.1
+        [HideInInspector] _GroundBankLayerEnabled("Ground Bank Layer Enabled", Float) = 0
+        [HideInInspector] _GroundBankLayerBaseColor("Ground Bank Layer Base Color", Color) = (0.42, 0.36, 0.28, 1)
+        [HideInInspector] _GroundBankLayerDarkColor("Ground Bank Layer Dark Color", Color) = (0.26, 0.21, 0.16, 1)
+        [HideInInspector] _GroundBankLayerLightColor("Ground Bank Layer Light Color", Color) = (0.58, 0.50, 0.38, 1)
+        [HideInInspector] _GroundBankLayerMacroContrast("Ground Bank Layer Macro Contrast", Range(0, 2)) = 0.6
+        [HideInInspector] _GroundBankLayerPixelContrast("Ground Bank Layer Pixel Contrast", Range(0, 2)) = 0.6
+        [HideInInspector] _GroundBankLayerDrySmoothness("Ground Bank Layer Dry Smoothness", Range(0, 1)) = 0.15
+        [HideInInspector] _GroundBankLayerDrySpecularStrength("Ground Bank Layer Dry Specular Strength", Range(0, 1)) = 0.1
+        [HideInInspector] _GroundBankLayerCoverRetention("Ground Bank Layer Cover Retention", Vector) = (1, 1, 1, 1)
+        [HideInInspector] _GroundBankCoverRetreatStrength("Ground Bank Cover Retreat Strength", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _GroundBankMaterialStrength("Ground Bank Material Strength", Range(0, 1)) = 1
+        [HideInInspector] _GroundBankMaterialReach("Ground Bank Material Reach", Range(0, 1)) = 0.65
+        [HideInInspector] _GroundImmediateBankExposure("Ground Immediate-Bank Exposure", Range(0, 1)) = 0.55
+        [HideInInspector] _GroundWaterlineMaterialStrength("Ground Waterline Material Strength", Range(0, 1)) = 1
+        [HideInInspector] _GroundBankTransitionSoftness("Ground Bank Transition Softness", Range(0, 1)) = 0.55
+        [HideInInspector] _GroundOuterBankExtension("Ground Outer Bank Extension", Range(0, 20)) = 0
+        [HideInInspector] _GroundOuterBankStrength("Ground Outer Bank Strength", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundOuterBankFade("Ground Outer Bank Fade", Range(0.05, 10)) = 1
 
         [Header(Ground Surface Features)]
         [HideInInspector] _GroundFeatureMode("Ground Feature Mode", Float) = 0

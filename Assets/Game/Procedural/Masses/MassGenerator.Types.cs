@@ -114,18 +114,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 featureStrengths.Add(featureStrength);
                 featureStrengths.Add(featureStrength);
 
-                bool normalValid =
-                    !float.IsNaN(authoredSurfaceNormal.x) &&
-                    !float.IsNaN(authoredSurfaceNormal.y) &&
-                    !float.IsNaN(authoredSurfaceNormal.z) &&
-                    !float.IsInfinity(authoredSurfaceNormal.x) &&
-                    !float.IsInfinity(authoredSurfaceNormal.y) &&
-                    !float.IsInfinity(authoredSurfaceNormal.z) &&
-                    authoredSurfaceNormal.sqrMagnitude >
-                        MinimumEdgeLengthSqr;
-                Vector3 storedNormal = normalValid
-                    ? authoredSurfaceNormal.normalized
-                    : Vector3.zero;
+                TryNormalizeMassVector(
+                    authoredSurfaceNormal,
+                    out Vector3 storedNormal);
                 authoredSurfaceNormals.Add(storedNormal);
                 authoredSurfaceNormals.Add(storedNormal);
                 authoredSurfaceNormals.Add(storedNormal);
@@ -178,6 +169,57 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 normal = authoredSurfaceNormals[vertexIndex];
                 return normal.sqrMagnitude > MinimumEdgeLengthSqr;
             }
+        }
+
+        private static bool IsFiniteMassValue(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private static bool IsFiniteMassVector(Vector3 value)
+        {
+            return IsFiniteMassValue(value.x) &&
+                IsFiniteMassValue(value.y) &&
+                IsFiniteMassValue(value.z);
+        }
+
+        private static bool TryNormalizeMassVector(
+            Vector3 value,
+            out Vector3 normalized)
+        {
+            normalized = Vector3.zero;
+            if (!IsFiniteMassVector(value))
+            {
+                return false;
+            }
+
+            double x = value.x;
+            double y = value.y;
+            double z = value.z;
+            double magnitudeSqr = x * x + y * y + z * z;
+            if (!(magnitudeSqr > 0.0) ||
+                double.IsNaN(magnitudeSqr) ||
+                double.IsInfinity(magnitudeSqr))
+            {
+                return false;
+            }
+
+            double inverseMagnitude = 1.0 / Math.Sqrt(magnitudeSqr);
+            normalized = new Vector3(
+                (float)(x * inverseMagnitude),
+                (float)(y * inverseMagnitude),
+                (float)(z * inverseMagnitude));
+            float normalizedMagnitudeSqr = normalized.sqrMagnitude;
+            if (!IsFiniteMassVector(normalized) ||
+                !IsFiniteMassValue(normalizedMagnitudeSqr) ||
+                normalizedMagnitudeSqr < 0.999f ||
+                normalizedMagnitudeSqr > 1.001f)
+            {
+                normalized = Vector3.zero;
+                return false;
+            }
+
+            return true;
         }
 
         private readonly struct EdgeKey : IEquatable<EdgeKey>

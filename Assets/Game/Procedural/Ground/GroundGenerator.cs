@@ -181,7 +181,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 baseHeights,
                 baseNormals,
                 modifiers,
-                rivers,
                 resolution,
                 spacing,
                 halfSize,
@@ -767,7 +766,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float[] finalHeights,
             Vector3[] normals,
             IReadOnlyList<GroundModifierSnapshot> modifiers,
-            IReadOnlyList<StylizedRiverGroundSnapshot> rivers,
             int resolution,
             float spacing,
             float halfSize,
@@ -931,12 +929,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             point,
                             modifiers);
 
-                    float shore =
-                        EvaluateShoreInfluence(
-                            point,
-                            spacing,
-                            rivers);
-
                     float dryPatch =
                         EvaluateSoftSurfacePatch(
                             samplePosition + new Vector2(37.7f, -19.3f),
@@ -986,7 +978,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             broadPatch * 0.16f +
                             exposureBias * 0.11f);
 
-                    exposureRaw *= Mathf.Lerp(1f, 0.96f, shore * rainAbsorption);
                     exposureRaw *= Mathf.Lerp(1f, 0.92f, compaction);
                     exposureRaw *= Mathf.Lerp(1f, 0.88f, dampDepositModifier);
                     exposureRaw *= Mathf.Lerp(1f, 0.82f, standingWaterPotential);
@@ -998,7 +989,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             flatness * 0.07f +
                             dampPatch * 0.26f +
                             depositPocket * 0.11f +
-                            shore * 0.07f +
                             compaction * 0.08f +
                             dampDepositModifier * 0.26f +
                             standingWaterPotential * 0.20f +
@@ -1024,7 +1014,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     vegetation *= Mathf.Lerp(1f, 0.65f, compaction);
                     vegetation *= Mathf.Lerp(1f, 0.78f, dampDepositModifier);
                     vegetation *= Mathf.Lerp(1f, 0.52f, standingWaterPotential);
-                    vegetation *= Mathf.Lerp(1f, 0.84f, shore);
                     vegetation *= Mathf.Lerp(1f, 0.58f, rockyDry);
                     vegetationSuitabilityMasks[index] = Mathf.Clamp01(vegetation);
 
@@ -1034,13 +1023,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                     // UV2 contract for future shader/runtime use:
                     // X = compaction/path/flatten influence
-                    // Y = river/shore influence
+                    // Y = reserved zero on ordinary Ground; River corridor owns shore
                     // Z = rocky/dry secondary patch
                     // W = authored standing-water/puddle potential
                     secondarySurfaceMasks[index] =
                         new Vector4(
                             Mathf.Clamp01(compaction),
-                            Mathf.Clamp01(shore),
+                            0f,
                             Mathf.Clamp01(rockyDry),
                             Mathf.Clamp01(standingWaterPotential));
                 }
@@ -1324,119 +1313,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 default:
                     return 0f;
             }
-        }
-
-        private static float EvaluateShoreInfluence(
-            Vector2 point,
-            float spacing,
-            IReadOnlyList<StylizedRiverGroundSnapshot> rivers)
-        {
-            if (rivers == null || rivers.Count == 0)
-            {
-                return 0f;
-            }
-
-            float influence = 0f;
-
-            for (int index = 0; index < rivers.Count; index++)
-            {
-                StylizedRiverGroundSnapshot river = rivers[index];
-
-                if (!river.IsValid ||
-                    !river.TryEvaluate(
-                        point,
-                        out float distance,
-                        out float signedLateralDistance,
-                        out _,
-                        out float visibleHalfWidth,
-                        out float surfaceHalfWidth))
-                {
-                    continue;
-                }
-
-                float safeVisibleHalfWidth =
-                    Mathf.Max(0.001f, visibleHalfWidth);
-                float signedDistance =
-                    Mathf.Abs(signedLateralDistance);
-
-                // Ground UV2.y is stored on a coarse playable-ground grid.
-                // It should therefore hold only a broad, low-amplitude bank
-                // hint. The river corridor owns the precise waterline mask.
-                // Use the visible half-width here; surfaceHalfWidth includes
-                // hidden overlap and caused the previous broad corridor band.
-                float distanceFromVisibleBank =
-                    Mathf.Abs(signedDistance - safeVisibleHalfWidth);
-
-                float bankBandWidth =
-                    Mathf.Max(
-                        spacing * 0.55f,
-                        river.BankBlend * 0.12f);
-
-                float bankBand =
-                    0.34f *
-                    (1f - SmoothStep(
-                        0f,
-                        bankBandWidth,
-                        distanceFromVisibleBank));
-
-                float inside01 =
-                    signedDistance < safeVisibleHalfWidth
-                        ? Mathf.Clamp01(
-                            signedDistance / safeVisibleHalfWidth)
-                        : 0f;
-
-                float innerBedInfluence =
-                    signedDistance < safeVisibleHalfWidth
-                        ? Mathf.Lerp(
-                            0.015f,
-                            0.095f,
-                            SmoothStep(0.68f, 1f, inside01))
-                        : 0f;
-
-                float outerDistance =
-                    Mathf.Max(0f, signedDistance - safeVisibleHalfWidth);
-
-                float outerFadeWidth =
-                    Mathf.Max(
-                        spacing * 0.65f,
-                        river.BankBlend * 0.16f);
-
-                float outerBankInfluence =
-                    signedDistance > safeVisibleHalfWidth
-                        ? 0.18f *
-                          (1f - SmoothStep(
-                              0f,
-                              outerFadeWidth,
-                              outerDistance))
-                        : 0f;
-
-                // Avoid carrying shore hints out to the generated river
-                // handoff/hidden surface boundary. That boundary is not the
-                // waterline and is already handled by corridor geometry.
-                float handoffHalfWidth =
-                    river.ResolveHandoffHalfWidth(surfaceHalfWidth);
-
-                if (distance > handoffHalfWidth)
-                {
-                    continue;
-                }
-
-                float riverInfluence =
-                    Mathf.Max(
-                        bankBand,
-                        Mathf.Max(
-                            innerBedInfluence,
-                            outerBankInfluence));
-
-                riverInfluence =
-                    Mathf.Pow(
-                        Mathf.Clamp01(riverInfluence),
-                        1.18f);
-
-                influence = Mathf.Max(influence, riverInfluence);
-            }
-
-            return Mathf.Clamp01(influence);
         }
 
         private static string BuildSurfaceMaskDiagnostics(

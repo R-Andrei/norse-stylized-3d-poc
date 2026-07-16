@@ -3509,7 +3509,160 @@ The first R10 matrix enforced the `0.25` materialized-width floor and corrected 
 
 ### Runtime acceptance
 
+- [x] Compile with zero C# errors.
+- [x] Run the one-click suite and require current preview pass, topology `33/33`, artistic preview `33/33`, and zero collateral failures. Runtime result passed all requirements.
+- [x] Confirm `[Artistic Selection Audit]` is present and `captured=1`.
+- [x] Use the aggregate and per-edge evidence to define the comprehensive R12A.1 audit instead of retuning selection from assumptions.
+
+
+## EW-B4.2R12A.1 — Comprehensive artistic evidence suite
+
+### Immutable behavior boundary
+
+- [x] Preserve the R11B.1E geometry baseline and all R12A production selection behavior.
+- [x] Perform no additional geometry rebuilds beyond the existing one-click current preview and two 33-case matrices.
+- [x] Keep the production score formula, hard gates, descending ordering, Coverage calculation, widths, and certification unchanged.
+
+### Complete raw evidence
+
+- [x] Export every source edge for every artistic-preview matrix coordinate.
+- [x] Include canonical IDs, endpoints, midpoint, owner normals, bevel normal, owner faces, classification, seam provenance, length, dihedral, and orientation.
+- [x] Include every structural, geometric, coexistence, and artistic gate plus filter/candidate/final reasons.
+- [x] Include all score components and modifiers, selection rank/threshold/delta, context metrics, locality and isolated-rail viability, effect variation/strength/depth, solved/materialized width, and complete lifecycle state.
+
+### Exhaustive ranking analysis
+
+- [x] Evaluate the exact current policy and named random/modifier/gate ablations.
+- [x] Evaluate every angle/length/random weight triple at 0.05 resolution under all eight modifier masks.
+- [x] Evaluate all hard-gate masks, single-metric controls, signed context sweeps, and named composite policies.
+- [x] Analyze every fixed selected slot and native Coverage deciles from 10% through 100%.
+- [x] Report score/metric Pearson and Spearman correlations, Pareto frontier and dominance inversions, per-edge rank ranges and selection frequencies, threshold gaps, no-random sensitivity, scenario churn/intersection/union/core, and cross-width stability.
+
+### One-click output contract
+
+- [x] Embed decisive comprehensive evidence in `Library/GeneratedMassEdgeWearValidationSuite.txt`.
+- [x] Automatically write the complete audit TXT, raw edge CSV, and full scenario CSV without asking the user to perform extra validation steps.
+- [x] Fail the suite when comprehensive evidence is unavailable or cannot be written.
+- [x] Advance contracts to `EW-B4.2R12A.1-suite`, `EW-B4.2R12A.1-topology`, `EW-B4.2R12A.1-preview`, and `EW-B4.2R12A.1-comprehensive`.
+
+### Runtime acceptance
+
+- [x] Compile with zero C# errors.
+- [x] Run **Full Edge-Wear Validation Suite (1 Click)** once.
+- [x] Require suite pass, both matrices `33/33`, zero collateral failures, `artisticComprehensiveAvailable=1`, and current-score reproduction error within floating-point tolerance. R12A.1b passed with both matrices `33/33`, valid recorded production ranks, and maximum score-reproduction error `1.49011612E-08`.
+- [x] Analyze the single copied combined report and make the next artistic-policy decision without another incremental telemetry patch. The accepted decision is R12B.1 geometric-priority artistic selection.
+
+
+## EW-B4.2R12B.1 — Geometric-priority artistic selection
+
+### Production policy
+
+- [x] Raise the artistic angle gate from `0.035` to `0.055` without changing the `15`-degree geometric viability floor.
+- [x] Change the core score weights to angle `0.60`, length `0.35`, and deterministic random `0.05`.
+- [x] Compress base placement influence to `0.60..1.00` using the existing `0.06..0.20` raw suppression range.
+- [x] Compress upward orientation influence to `0.925..1.075` using the existing `0.82..1.08` raw boost range.
+- [x] Remove `edgeCharacterBoost` from intra-object rank multiplication while preserving its recorded evidence field.
+- [x] Preserve Coverage, descending sort behavior, coexistence, widths, corners, geometry, and certification.
+
+### Analyzer and reports
+
+- [x] Reproduce the R12B.1 formula in `current-exact` score validation.
+- [x] Update current/no-random/no-modifier/no-gate and current-plus context scenarios to the R12B.1 core weights and compressed placement factors.
+- [x] Preserve the `1,931` scenarios-per-case universe and existing comprehensive CSV schemas.
+- [x] Update the artistic audit formula text and advance all report contracts to `EW-B4.2R12B.1`.
+
+### Runtime acceptance
+
+- [x] Compile with zero C# errors.
+- [x] Run **Full Edge-Wear Validation Suite (1 Click)** once.
+- [x] Require suite pass, topology `33/33`, preview `33/33`, comprehensive evidence available, valid recorded ranks, score-reproduction error no greater than `0.000002`, and zero collateral loss/change. The accepted run passed both matrices `33/33`, retained comprehensive evidence, reproduced current scores within `5.96046448E-08`, and reported collateral `36/36/0/0/0/1`.
+- [x] Visually compare seeds `2223`, `5727`, and `8889`. R12B.1 materially improved ordinary ranking and is accepted as the artistic-selection baseline. Remaining omissions are geometric outliers rather than ranking failures: seed `2223` edge `36` and seed `8889` edges `13/23` fail isolated-rail viability; seed `2223` edge `13` fails width/corner feasibility.
+
+
+## GM-R12B.1C — Baseline closeout and live render-integrity proof tooling
+
+### Accepted boundary
+
+- [x] Keep EW-B4.2R12B.1 as the active artistic-selection baseline; do not retune ranking while the remaining outliers are geometric.
+- [x] Preserve the unresolved outlier set explicitly: `2223/36`, `2223/13`, `8889/23`, and `8889/13`.
+- [x] Treat the black-triangle/Bloom artifact as a broader render-mesh integrity problem that may still have structural implications for those outliers depending on the eventual production repair.
+
+### Combined diagnostic and proof implementation
+
+- [x] Add one explicit **Mesh Diagnostics** inspector section for a selected `GeneratedMass`.
+- [x] Audit the already-generated `MeshFilter.sharedMesh` without regeneration, mutation, serialization, or automatic execution.
+- [x] Inspect finite positions, normals, tangents, UV0, UV2, and colors; normal/tangent magnitude; robust position outliers; triangle index validity; 3D area/sliver conditioning; UV determinant; stored-normal agreement; and outward winding.
+- [x] Write one compact report to `Library/GeneratedMassRenderMeshAudit.txt`, including exact worst-triangle evidence and capped worst UV/tangent lists.
+- [x] Draw the worst triangle and vertex indices in the Scene view with optional X-ray depth behavior.
+- [x] Initially add a temporary non-serialized tangent-only proof clone. GM-R12B.1D supersedes it with the normal/tangent proof after zero normals were proven.
+- [x] Add a temporary non-serialized Unlit proof clone using the untouched audited mesh.
+- [x] Suppress and restore the source renderer only while a proof clone is active; remove the proof automatically when the mass is deselected.
+- [x] Keep all production mesh generation, `MeshData`, `MeshBuilder`, UV construction, shaders, materials, scenes, and prefabs unchanged until the proof identifies the exact cause.
+
+### Required evidence before production repair
+
+- [x] Audit `Rock_14` seed `839`, `Rock_18` seed `1468`, and seed `8889` with bevels enabled. The three live meshes each contained exactly `27` zero stored normals across `9` triangles; tangents remained finite and unit length. Seed `8889` without bevels remains part of production-fix validation.
+- [x] Identify the decisive common invalid channel. Ordinary `Rock_14`/`Rock_18` meshes had no UV-degenerate or UV-ill-conditioned triangles but did have zero stored normals on the visible failure triangles; seed `8889` preview combined the same zero-normal defect with UV conditioning warnings.
+- [x] Use the Unlit proof clone at the retained failure angle. It removed the visible dark-triangle/Bloom symptom, consistent with a Lit basis failure. The tangent-only proof correctly refused to proceed because the affected vertices had zero normals.
+- [x] Promote the smallest proven repair in GM-R12B.1D: Generated Mass explicit normal normalization plus Generated Mass-specific final channel validation; shared `MeshData`/`MeshBuilder` semantics remain unchanged.
+
+
+## GM-R12B.1D — Generated Mass render-normal integrity repair
+
+### Proven cause
+
+- [x] Confirm `Rock_14`, `Rock_18`, and seed `8889` preview each emitted `27` zero normals while positions, UVs, colors, UV2, and tangents remained finite.
+- [x] Confirm the affected ordinary triangles had valid 3D area and valid UV determinants, excluding UV-conditioned tangent reconstruction as the common cause.
+- [x] Identify the normalization-threshold mismatch: Generated Mass accepted cross products above `MinimumEdgeLengthSqr = 1E-12`, then called Unity `Vector3.normalized`, which can return zero for magnitudes below Unity's larger normalization epsilon. Measured failing double areas `4.12636973E-06` and `8.067349E-06` lie inside that mismatch band.
+
+### Production repair
+
+- [x] Add one explicit `TryNormalizeMassVector` contract used by authored and geometric render normals.
+- [x] Remove the silent `Vector3.up` fallback for accepted triangles; invalid accepted geometry now fails deterministically with the exact face index.
+- [x] Validate Generated Mass `MeshData` positions, normals, UV0, UV2, colors, triangle indices, geometric normal construction, and stored-normal/winding agreement before mesh application.
+- [x] Validate the final Unity mesh after `RecalculateTangents()` for complete finite positions, unit normals, unit tangents, valid handedness, UV0, UV2, and colors.
+- [x] Increment `ProductionGenerationContractVersion` from `1` to `2` so previously accepted transient meshes regenerate once under the corrected normal contract.
+- [x] Keep shared `MeshData`, `MeshBuilder`, UV construction, geometry, topology, materials, shaders, scenes, and prefabs unchanged.
+
+### Diagnostic update
+
+- [x] Advance the audit contract to `GM-R12B.1D-render-audit-v2`.
+- [x] Treat zero normals as hard failures and prioritize them ahead of UV-conditioning warnings when selecting the worst triangle.
+- [x] Replace the tangent-only proof with a temporary **Normal/Tangent Repair Proof Clone** that reconstructs invalid normals from triangle geometry before rebuilding only affected or unsafe tangents.
+
+### Runtime acceptance
+
 - [ ] Compile with zero C# errors.
-- [ ] Run the one-click suite and require current preview pass, topology `33/33`, artistic preview `33/33`, and zero collateral failures.
-- [ ] Confirm `[Artistic Selection Audit]` is present and `captured=1`.
-- [ ] Use the aggregate and per-edge evidence to decide R12B scoring changes; do not retune selection from assumptions.
+- [ ] Regenerate `Rock_14` seed `839`, `Rock_18` seed `1468`, seed `8889` without bevels, and seed `8889` with bevels; require zero missing, non-finite, zero, or non-unit normals and tangents.
+- [ ] Confirm the black triangle and Bloom orb no longer reproduce at the retained camera angles.
+- [ ] Run the R12B.1 one-click edge-wear suite and retain topology `33/33`, preview `33/33`, valid comprehensive evidence, and zero collateral loss/change.
+- [ ] Re-evaluate `2223/36`, `2223/13`, `8889/23`, and `8889/13` after the generation-contract rebuild before resuming geometric outlier recovery.
+
+
+## GM-R12B.1E — scale-correct normal repair follow-up
+
+### Runtime evidence from GM-R12B.1D
+
+- [x] Regenerate and audit `Rock_14` seed `839`: zero invalid normals/tangents and no visible black-triangle/Bloom artifact.
+- [x] Regenerate and audit `Rock_18` seed `1468`: zero invalid normals/tangents and no visible black-triangle/Bloom artifact.
+- [x] Confirm the promoted zero-normal repair solved the original visual failure.
+- [x] Identify seed `8889` face `76` as a tiny but healthy triangle (`doubleArea=8.559025E-07`, `relativeArea=0.296998173`) rejected only by the absolute normal cutoff.
+- [x] Identify the dimensional mismatch: cross-product magnitude squared is length^4 and may not be compared to `MinimumEdgeLengthSqr` in length^2.
+
+### Correction
+
+- [x] Replace production normal normalization with finite non-zero double-precision normalization.
+- [x] Apply the same normalization semantics to editor audit geometric normals and normal/tangent proof reconstruction.
+- [x] Keep the existing scale-relative triangle quality tests authoritative; do not add a new absolute triangle-size floor.
+- [x] Advance the live audit contract to `GM-R12B.1E-render-audit-v3`.
+- [x] Report finite UV-conditioning findings as `passed-with-warnings`; reserve `failed` for invalid indices/channels, zero or non-finite normals/tangents, non-finite geometry, or degenerate 3D triangles.
+- [x] Keep `ProductionGenerationContractVersion = 2`; this patch corrects the implementation of that contract without changing its reuse semantics.
+
+### Runtime acceptance
+
+- [ ] Compile with zero C# errors.
+- [ ] Regenerate seed `8889` without bevel preview; face `76` must complete with finite unit geometric and stored normals.
+- [ ] Regenerate seed `8889` with bevel preview; require zero missing, non-finite, zero, or non-unit normals/tangents.
+- [ ] Re-audit `Rock_14` and `Rock_18`; retain zero invalid channels and absence of the black-triangle/Bloom artifact.
+- [ ] Run the R12B.1 one-click edge-wear suite and retain topology `33/33`, preview `33/33`, comprehensive availability, and zero collateral regression.
+- [ ] Recheck `2223/36`, `2223/13`, `8889/23`, and `8889/13` after render integrity is certified.

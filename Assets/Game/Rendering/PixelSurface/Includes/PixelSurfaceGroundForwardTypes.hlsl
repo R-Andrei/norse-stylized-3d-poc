@@ -1,5 +1,6 @@
 #ifndef PS3D_PIXELSURFACEGROUNDFORWARDTYPES_HLSL
 #define PS3D_PIXELSURFACEGROUNDFORWARDTYPES_HLSL
+#define PS3D_GROUND_HAS_RIVERBED_SUPPORT 1
 
             struct Attributes
             {
@@ -7,6 +8,7 @@
                 float3 normalOS : NORMAL;
                 float2 uv : TEXCOORD0;
                 float4 uv2 : TEXCOORD2;
+                float4 riverMaterialMasks : TEXCOORD3;
                 half4 color : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -22,6 +24,7 @@
                 float3 positionOS : TEXCOORD4;
                 float4 materialMasks : TEXCOORD5;
                 half3 normalOS : TEXCOORD6;
+                half3 riverCoupledMasks : TEXCOORD7;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -47,6 +50,8 @@
                 output.positionOS = input.positionOS.xyz;
                 output.materialMasks = input.uv2;
                 output.normalOS = normalize(input.normalOS);
+                output.riverCoupledMasks =
+                    (half3)input.riverMaterialMasks.xyz;
                 return output;
             }
 #endif // PS3D_PIXELSURFACEGROUNDFORWARDTYPES_HLSL

@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 584ee81aadbc4e43b5e4816b7eef5b1c, type: 3}
+  m_Name: GSLP_CompactedSnowSoil
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GroundSurfaceLayerProfile
+  displayName: Compacted Snow Soil
+  baseColor: {r: 0.5, g: 0.49, b: 0.46, a: 1}
+  darkColor: {r: 0.32, g: 0.31, b: 0.29, a: 1}
+  lightColor: {r: 0.68, g: 0.67, b: 0.64, a: 1}
+  wetColor: {r: 0.28, g: 0.29, b: 0.29, a: 1}
+  macroContrast: 0.55
+  pixelContrast: 0.45
+  drySmoothness: 0.16
+  drySpecularStrength: 0.12
+  wetDarkening: 0.3
+  wetTintStrength: 0.6
+  wetSmoothness: 0.48
+  vegetationRetention: 0.02
+  snowRetention: 0.4
+  frostRetention: 0.75
+  paintedAccentRetention: 0.3

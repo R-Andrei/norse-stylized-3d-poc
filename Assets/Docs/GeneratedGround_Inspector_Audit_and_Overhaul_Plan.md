@@ -4,7 +4,7 @@
 
 **Workstream state: complete, Unity-validated, and accepted on 2026-07-15. Broader Ground development remains active.**
 
-This document closes only the GeneratedGround Inspector overhaul and the Painted Accent authoring, rendering, production-bake, build-validation, and generated-asset lifecycle. It does not declare the Ground visual system complete. The active Ground milestone is V3M Broad Macro Patch Completion, recorded in `Ground_Macro_Patch_Audit_and_Architecture.md`; V4 Contact / Edge Accents remains queued afterward.
+This document closes only the GeneratedGround Inspector overhaul and the Painted Accent authoring, rendering, production-bake, build-validation, and generated-asset lifecycle. It does not declare the Ground visual system complete. V3M Broad Macro Patch Completion and V3R Ground Elevation Readability are accepted. The active Ground milestone is V3S River-Coupled Ground Response, recorded in `Ground_River_Coupled_Surface_Response_Architecture.md`; V4 Contact / Edge Accents remains queued afterward and excludes River sources.
 
 Accepted implementation status:
 
@@ -1285,7 +1285,7 @@ Validation for this hotfix also scans the complete PA-B4 editor file set for unq
 
 # Inspector and Painted Accent workstream closure — 2026-07-15
 
-The GeneratedGround Inspector and Painted Accent production workstream is accepted. No known correctness, authoring, runtime-generation, build-safety, or generated-asset-lifecycle blocker remains in that scope. This is not a closure of GeneratedGround or the Ground visual roadmap. V3M Broad Macro Patch Completion is the active milestone; V4 Contact / Edge Accents is queued after it.
+The GeneratedGround Inspector and Painted Accent production workstream is accepted. No known correctness, authoring, runtime-generation, build-safety, or generated-asset-lifecycle blocker remains in that scope. This is not a closure of GeneratedGround or the Ground visual roadmap. V3S River-Coupled Ground Response is the active milestone; V4 Contact / Edge Accents is queued after V3S and excludes River sources. V3S-A2A extends the main `GeneratedGround` authoring façade with automatic Bank/Riverbed Surface Layer dropdowns, inline reusable-profile editing, and in-place create/duplicate actions; routine River-coupled authoring must not require Project-window asset navigation. V3S-A2B adds the adjacent `River-Coupled Ground Response — Bank Composition` foldout. V3S-A2C.1 retains one master Bank Material Strength plus clearly labelled `Core Bank` and `Outer Bank Extension` groups. The outer group states that distance begins at the Riverbed Support edge and travels across the generated River corridor toward its terrain handoff. Extension, Strength, and Fade remain authored entirely from `GeneratedGround`; Strength/Fade disable automatically while Extension is zero. All controls remain disabled until a Bank Surface Layer is selected and are stored through the same shared-style/local-override ownership path.
 
 The accepted maintenance rules are:
 

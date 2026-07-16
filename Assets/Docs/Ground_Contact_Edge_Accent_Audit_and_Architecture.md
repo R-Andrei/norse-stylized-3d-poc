@@ -2,26 +2,11 @@
 
 ## Status
 
-**Audit state: complete. Implementation has not started.**
+**Audit state: corrected and accepted. Implementation has not started.**
 
-This is the canonical audit and architecture record for V4 Contact / Edge Accents. Its architecture remains accepted. V3M Broad Macro Patch Completion is now accepted through V3M-A1.3.4; V4 implementation is queued only until the small V3R Ground Elevation Readability proof passes gameplay-camera validation.
+This is the canonical V4 Contact / Edge Accent record for GeneratedMass grounding and explicitly participating GroundModifier boundaries. Its earlier River-bank source architecture is superseded by `Ground_River_Coupled_Surface_Response_Architecture.md`. River banks and riverbeds are never rasterized into the V4 Contact field, never appear in V4 source diagnostics, and never invalidate V4 coverage.
 
-The broader Ground system is not complete. The accepted completed slice is:
-
-```text
-GeneratedGround unified authoring
-+ Painted Accent visual layer
-+ persistent production bake
-+ baked-only runtime
-+ build enforcement
-+ generated-asset cleanup
-```
-
-The queued post-V3R milestone is:
-
-```text
-V4 Contact / Edge Accents
-```
+V3M and V3R are accepted. V3S River-Coupled Ground Response is active. V4 begins only after V3S-A5 family acceptance.
 
 The latest project source overrides this document whenever they conflict.
 
@@ -37,12 +22,13 @@ playable terrain shape
 → broad macro patch composition
 → semantic surface-mask response
 → Painted Accent lines
+→ River-Coupled Ground Response
 → Contact / Edge Accents
 → sparse motifs and stamps
 → runtime surface state later
 ```
 
-Ground must visually connect terrain to the environment. Rocks, river banks, authored paths, modifier regions, structures, and other contact zones should feel seated in or belonging to the surface rather than placed on top of an unrelated material.
+Ground must visually connect GeneratedMass objects and explicitly selected modifier boundaries to the terrain. River banks and riverbeds are handled by the direct River-Coupled Ground Response and are outside this generated-field architecture.
 
 The next milestone therefore targets localized Ground-side response around meaningful boundaries and contacts while preserving these constraints:
 
@@ -67,9 +53,8 @@ They should be:
 - restrained in opacity and contrast;
 - broken and irregular rather than mechanically perfect;
 - family/variant controlled;
-- semantically responsive to snow, dampness, compaction, shore proximity, and dry/rocky ground;
+- semantically responsive to snow, dampness, compaction, standing-water potential, exposure, and dry/rocky ground;
 - capable of grounding a rock or standing mass without drawing a complete cartoon ring;
-- capable of emphasizing both banks of a river without duplicating the River corridor's exact waterline rendering;
 - capable of defining path or modifier edges without becoming a hard road decal.
 
 Possible responses include restrained darkening, damp/deposit tinting, snow compression or clearing, low-value rim emphasis, and limited local bias of other static features. The first implementation should not couple Painted Accent placement to contact fields; that interaction can be evaluated only after the contact layer works independently.
@@ -86,7 +71,7 @@ Vertex Color G = exposure
 Vertex Color B = damp/deposit
 Vertex Color A = vegetation suitability
 UV2 X = compaction/path/flatten influence
-UV2 Y = river/shore influence
+UV2 Y = reserved zero on ordinary Ground
 UV2 Z = rocky/dry secondary patch
 UV2 W = standing-water/puddle potential
 ```
@@ -94,45 +79,24 @@ UV2 W = standing-water/puddle potential
 Evidence:
 
 ```text
-Assets/Game/Procedural/Ground/GroundGenerator.cs:1031-1045
-Assets/Game/Procedural/Ground/GroundHeightFieldSnapshot.cs:98-144
-Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl:9-47
+Assets/Game/Procedural/Ground/GroundGenerator.cs:1024-1034
+Assets/Game/Procedural/Ground/GroundHeightFieldSnapshot.cs:180-317
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl:18-56
 ```
 
-These masks are produced at Ground mesh-vertex resolution and interpolated by the shader. A Standard 40 m Ground at Medium 33 resolution has approximately 1.25 m vertex spacing. This is appropriate for broad semantic response but not for a stable 0.05-0.50 m contact rim.
+These ordinary-Ground masks are produced at Ground mesh-vertex resolution and interpolated by the shader. River shore/waterline data is not part of this ordinary-Ground contract; the dedicated corridor publishes its own `UV2.y` value. A Standard 40 m Ground at Medium 33 resolution has approximately 1.25 m vertex spacing. This is appropriate for broad semantic response but not for a stable 0.05-0.50 m contact rim.
 
 **Finding:** existing masks should classify and style a high-resolution contact field, but they should not be the sole geometric source of that field.
 
 **Confidence:** proven, very high.
 
-## 2. The existing shore mask is explicitly a broad hint, not the precise bank boundary
+## 2. River shore and bed response are explicitly outside V4
 
-`GroundGenerator.EvaluateShoreInfluence` already evaluates the exact River snapshot, but its own comments state that `UV2.y` is a coarse, low-amplitude bank hint and that the River corridor owns the precise waterline mask.
+The River corridor exposes exact Riverbed Support in Unity UV channel index `3` / HLSL `TEXCOORD3.x`, while corridor `UV2.y` carries shore/waterline influence. Ordinary Ground writes zero to `UV2.y` and has no UV3 River stream. The Ground shader consumes River channels only when the renderer property block declares the `RiverCorridor` role. No generated Contact texture is required for River response.
 
-Evidence:
+**Finding:** V4 must not read `StylizedRiverGroundSnapshot`, derive bank polylines, rasterize River contribution, or use River changes in its coverage signature. River-coupled appearance is authoritative in `Ground_River_Coupled_Surface_Response_Architecture.md`.
 
-```text
-Assets/Game/Procedural/Ground/GroundGenerator.cs:1329-1438
-```
-
-The River snapshot already exposes the data needed for a precise static bank source:
-
-```text
-signed lateral distance
-visible half-width
-surface half-width
-bank blend
-```
-
-Evidence:
-
-```text
-Assets/Game/Procedural/Rivers/StylizedRiverGroundSnapshot.cs:157-209
-```
-
-**Finding:** V4 should derive river-bank boundaries from `StylizedRiverGroundSnapshot`, then use the existing shore and damp/deposit masks for visual context. Deriving the production accent from the interpolated shore mask would lose precision that is already available.
-
-**Confidence:** proven, very high.
+**Confidence:** accepted architecture and implemented River channel contract; very high.
 
 ## 3. GroundModifier already contains exact analytical boundary input
 
@@ -207,8 +171,7 @@ Blockout structures and ordinary MeshFilter objects do not implement `IGenerated
 
 ```text
 GeneratedMass contacts
-River banks
-GroundModifier/path boundaries
+explicit GroundModifier/path boundaries
 ```
 
 A later explicit opt-in source is required for huts, bridge supports, ordinary props, or non-generated meshes. The system must not scan all renderers or colliders automatically.
@@ -319,8 +282,7 @@ Failures:
 Pipeline:
 
 ```text
-river-bank boundaries
-+ modifier/path boundaries
+modifier/path boundaries
 + GeneratedMass contact contours
 → deterministic coverage raster
 → one Ground-local R8 field
@@ -333,7 +295,7 @@ Advantages:
 - low memory;
 - supports all first-phase source types;
 - source geometry is resolved offline/editor-time;
-- existing shore, compaction, damp, standing-water, exposure, and rocky/dry masks can style the same field differently;
+- existing compaction, damp, standing-water, exposure, and rocky/dry masks can style the same field differently;
 - simple persistent production lifecycle;
 - exact source geometry need not exist in Player.
 
@@ -372,8 +334,7 @@ Failures now:
 
 ```text
 Ground base geometry and immutable GroundHeightFieldSnapshot
-+ current StylizedRiverGroundSnapshot set
-+ current GroundModifierSnapshot set
++ current explicitly participating GroundModifierSnapshot set
 + current eligible GeneratedGeometryRegistry sources
 → deterministic Contact Accent source snapshots
 → source-specific boundary/footprint resolution
@@ -385,11 +346,9 @@ Ground base geometry and immutable GroundHeightFieldSnapshot
 
 ## Source snapshots
 
-### River bank source
+### River exclusion
 
-Use the authoritative River snapshot. Generate left and right bank polylines from the sampled centreline and visible half-widths. Do not infer the bank from `UV2.y`.
-
-The initial field should represent a restrained Ground-side band outside the visible waterline, with optional limited inward damp/deposit overlap. The hidden River handoff boundary is not an artistic bank and must not receive a Contact Accent.
+River banks and riverbeds are not Contact sources. V3S interprets the corridor's shore/waterline and Riverbed Support channels directly in the Ground shader only on `RiverCorridor` role draws. Ordinary Ground publishes zero River shore data and no UV3 River stream. V4 collects no River snapshot and stores no River contribution.
 
 ### Modifier/path source
 
@@ -442,7 +401,6 @@ The shader reads:
 
 ```text
 contactCoverage
-shore
 compaction
 damp/deposit
 standing-water potential
@@ -453,13 +411,13 @@ rocky/dry
 Suggested response selection:
 
 ```text
-shore or damp context
+damp or standing-water context
 → damp/deposit darkening and tint
 
 compaction/path context
 → worn edge darkening and modest vegetation suppression in future systems
 
-neither shore nor compaction
+neither damp/standing-water nor compaction
 → object-contact grounding response
 
 high exposure / snow context
@@ -499,7 +457,6 @@ Band Width
 Edge Softness
 Breakup
 Object Contact Influence
-River Bank Influence
 Modifier / Path Boundary Influence
 Pattern Seed Offset
 ```
@@ -538,7 +495,7 @@ Player runtime must not:
 scan GeneratedGeometryRegistry
 read source meshes
 resolve mass contours
-sample modifiers or River snapshots for Contact Accents
+sample modifiers for Contact Accents
 rasterize or upload Contact Accent coverage
 silently fall back to procedural generation
 ```
@@ -561,7 +518,6 @@ These should invalidate only the Contact Accent source/coverage stages and their
 
 ```text
 Contact band width, softness, breakup, or source weights
-River spline or visible bank width
 GroundModifier shape, transform, blend, or participation
 GeneratedMass final geometry or transform
 Ground shape changes that alter mass-to-ground contact
@@ -575,7 +531,7 @@ Painted Accent-only changes must not rebuild Contact Accent coverage. Contact Ac
 
 ## Event and ordering contract
 
-- Existing GroundModifier and River notifications already reach `GeneratedGround`.
+- Existing GroundModifier notifications already reach `GeneratedGround`.
 - V4 should subscribe to `GeneratedGeometryRegistry.SourceAdded`, `SourceRemoved`, and `SourceChanged` while enabled in Edit Mode.
 - Registry events mark Contact Accent sources stale; they must not force immediate full Ground geometry regeneration.
 - Source collection must be sorted deterministically before rasterization because the registry uses a `HashSet`.
@@ -586,7 +542,6 @@ Painted Accent-only changes must not rebuild Contact Accent coverage. Contact Ac
 The first implementation should report one compact record per Contact Accent build:
 
 ```text
-eligible / rejected River sources
 eligible / rejected modifier sources
 eligible / rejected GeneratedMass sources
 exact / fallback mass contours
@@ -603,7 +558,6 @@ Debug views should include:
 
 ```text
 Raw Contact Coverage
-River Bank Contribution
 Modifier Boundary Contribution
 GeneratedMass Contact Contribution
 Final Lit Contact Response
@@ -613,7 +567,7 @@ Per-source success logs are forbidden. Failure evidence should be capped to a fe
 
 # Rejected shortcuts
 
-- Use the current shore/compaction vertex masks as the complete production contact geometry.
+- Use current semantic vertex masks as the complete production contact geometry.
 - Add a dark outline around every object.
 - Scan every `MeshRenderer`, `MeshFilter`, or `Collider` in the scene.
 - Spawn decals, child meshes, or per-source renderers.
@@ -631,7 +585,7 @@ Purpose: prove input correctness before artistic composition.
 Scope:
 
 - add the Contact / Edge Accent feature kind and Generated Texture classification;
-- collect exact River, modifier, and GeneratedMass source snapshots;
+- collect exact explicit modifier and GeneratedMass source snapshots;
 - add deterministic mass contact-contour extraction with explicit bounds fallback;
 - rasterize a transient Edit Mode R8 field;
 - add source-isolated and raw-coverage debug views;
@@ -642,10 +596,10 @@ Scope:
 
 Acceptance:
 
-1. both visible River banks appear at the correct waterline rather than the hidden handoff boundary;
-2. modifier core boundaries align with circle and oriented-box shapes;
-3. GeneratedMass contacts align with the actual lower footprint rather than a full renderer rectangle;
-4. moving or regenerating a GeneratedMass invalidates only the Contact Accent field;
+1. modifier core boundaries align with circle and oriented-box shapes;
+2. GeneratedMass contacts align with the actual lower footprint rather than a full renderer rectangle;
+3. moving or regenerating a GeneratedMass invalidates only the Contact Accent field;
+4. River structural or material changes do not stale Contact coverage;
 5. unchanged regeneration is a cache hit;
 6. no Painted Accent counters, output, or production asset changes.
 
@@ -667,14 +621,14 @@ Acceptance:
 
 ## V4-A4 — Explicit manual structure source, only if required
 
-After GeneratedMass, River, and modifier coverage is visually accepted, evaluate an explicit opt-in source for huts, bridge supports, ordinary props, and non-generated meshes. Do not add this component pre-emptively.
+After GeneratedMass and modifier coverage is visually accepted, evaluate an explicit opt-in source for huts, bridge supports, ordinary props, and non-generated meshes. Do not add this component pre-emptively.
 
 # Methods-tried ledger
 
 ## Accepted
 
 - Existing semantic masks as visual context, not precise contact geometry.
-- Exact River snapshots as bank-boundary authority.
+- River exclusion from the Contact field; V3S owns shore and bed interpretation.
 - Analytical GroundModifier boundaries.
 - GeneratedGeometryRegistry for automatic GeneratedMass discovery and invalidation.
 - Final-mesh, editor-time GeneratedMass footprint extraction.
@@ -702,6 +656,6 @@ After GeneratedMass, River, and modifier coverage is visually accepted, evaluate
 
 # Next work items
 
-1. Preserve this accepted V4 architecture while V3M is active.
-2. Resume V4-A1 as a raw-source and coverage proof only after broad macro composition is visually accepted.
-3. Validate source alignment and invalidation before introducing the normal lit visual effect.
+1. Preserve V4 as GeneratedMass plus explicit GroundModifier coverage while V3S is active.
+2. Resume V4-A1 only after V3S-A5 family acceptance.
+3. Validate source alignment, River independence, and invalidation before introducing the normal lit visual effect.

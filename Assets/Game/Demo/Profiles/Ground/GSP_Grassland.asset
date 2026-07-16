@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GSP_Grassland
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GroundSurfaceProfile
   displayName: Grassland
-  patchScale: 13
+  patchScale: 13.4
   patchContrast: 0.54
   patchEdgeSoftness: 0.58
   exposureBias: 0.46

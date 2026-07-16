@@ -258,7 +258,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
     ShapeSeed: 5944
     SurfaceSeed: 7566
@@ -278,7 +278,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
       ShapeSeed: 5944
       SurfaceSeed: 7566
@@ -573,7 +573,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 3
     ShapeSeed: 5595
     SurfaceSeed: 7566
@@ -593,7 +593,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 3
       ShapeSeed: 5595
       SurfaceSeed: 7566
@@ -1077,7 +1077,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 2
     ShapeSeed: 4685
     SurfaceSeed: 7566
@@ -1097,7 +1097,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 2
       ShapeSeed: 4685
       SurfaceSeed: 7566
@@ -1357,7 +1357,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 4
     ShapeSeed: 6513
     SurfaceSeed: 7566
@@ -1377,7 +1377,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 4
       ShapeSeed: 6513
       SurfaceSeed: 7566
@@ -1527,7 +1527,7 @@ Transform:
   m_GameObject: {fileID: 106799628}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.13485095, z: 0, w: 0.9908659}
-  m_LocalPosition: {x: -13.52, y: -0.182, z: 3.05}
+  m_LocalPosition: {x: -13.52, y: -0.09, z: 3.05}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1637,7 +1637,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
     ShapeSeed: 4475
     SurfaceSeed: 7566
@@ -1657,7 +1657,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
       ShapeSeed: 4475
       SurfaceSeed: 7566
@@ -2091,7 +2091,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 3
     ShapeSeed: 6504
     SurfaceSeed: 7566
@@ -2111,7 +2111,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 3
       ShapeSeed: 6504
       SurfaceSeed: 7566
@@ -2432,7 +2432,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609313, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: 0.33, y: 22.380001, z: -32.75}
+  m_LocalPosition: {x: -0.28, y: 22.380001, z: -29.779999}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3005,7 +3005,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 3
     ShapeSeed: 6294
     SurfaceSeed: 7566
@@ -3025,7 +3025,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 3
       ShapeSeed: 6294
       SurfaceSeed: 7566
@@ -3203,9 +3203,9 @@ MonoBehaviour:
     transitionDirection: 0
     transitionHeight: -12
     profile: 0
-    broadForm: 0.91
-    roughness: 0.438
-    surfaceDetail: 0.6
+    broadForm: 4.7
+    roughness: 1
+    surfaceDetail: 0.99
     edgeBlend: 1
     surfaceVariation: 0.42
     useModifiers: 1
@@ -3223,11 +3223,27 @@ MonoBehaviour:
     rockyDryTintStrength: 0.34
     vegetationTint: {r: 0.48, g: 0.56, b: 0.39, a: 1}
     vegetationTintStrength: 0.08
+    bankSurfaceLayer: {fileID: 0}
+    riverbedSurfaceLayer: {fileID: 0}
+    bankMaterialStrength: 1
+    bankMaterialReach: 0.65
+    immediateBankExposure: 0.55
+    waterlineMaterialStrength: 1
+    bankTransitionSoftness: 0.55
+    outerBankExtension: 0
+    outerBankStrength: 0.5
+    outerBankFade: 1
+    vegetationRetreatStrength: 0
+    snowMeltStrength: 0
+    frostRetreatStrength: 0
+    paintedAccentRetreatStrength: 0
     groundMacroPatchScale: 3.25
     groundMacroPatchPatternSeed: 0
     broadVariation: 0.095
     groundMacroPatchTransitionSoftness: 0.75
     groundMacroPatchSeparation: 1
+    reliefShadingStrength: 0
+    relativeHeightContrast: 0
     pixelCellSize: 0.055
     pixelToneCount: 4.2
     pixelClusterStrength: 0.68
@@ -3270,37 +3286,37 @@ MonoBehaviour:
   paintedAccentPlacementOverlayWeight: 0
   paintedAccentProductionBakeIdentifier: f29eded2381a4a03b9ef575c3fa71095
   paintedAccentProductionCoverageTexture: {fileID: 2800000, guid: 8f91ad7f88cd9cd44b1880fc834de310, type: 2}
-  paintedAccentProductionCoverageSignature: bfce06b04e5a602192669b7982c4267b6271352c0da0b4ce4f51797f7d48510c
+  paintedAccentProductionCoverageSignature: 8e329afe452adfdb811a523228dccab0c313814921327e014b59f63054364831
   paintedAccentProductionBakeFormatRevision: 1
   paintedAccentProductionCoverageOriginSize: {x: -20, y: -20, z: 40, w: 40}
-  paintedAccentProductionCoveredTexelCount: 7448
-  paintedAccentProductionCoveredTexelFraction: 0.0017757416
+  paintedAccentProductionCoveredTexelCount: 9118
+  paintedAccentProductionCoveredTexelFraction: 0.0021739006
   modifiers:
   - {fileID: 1356653796}
   rivers:
   - {fileID: 1626776158}
   lastSurfaceMaskDiagnostics: 'Surface masks (min/max/avg/p05/p95)
 
-    Tonal: 0.350/0.601/0.483/0.412/0.552
+    Tonal: 0.358/0.596/0.481/0.412/0.551
 
     Exposure:
-    0.215/0.764/0.425/0.215/0.764
+    0.215/0.764/0.427/0.215/0.764
 
-    DampDeposit: 0.236/0.534/0.368/0.293/0.454
+    DampDeposit: 0.230/0.560/0.374/0.289/0.461
 
     Vegetation:
-    0.393/0.679/0.609/0.493/0.658
+    0.389/0.681/0.610/0.482/0.662
 
     Compaction: 0.000/1.000/0.053/0.000/0.741
 
     Shore:
-    0.000/0.279/0.009/0.000/0.032
+    0.000/0.000/0.000/0.000/0.000
 
-    RockyDry: 0.142/0.221/0.177/0.153/0.204
+    RockyDry: 0.140/0.221/0.177/0.153/0.204
 
     StandingWater:
     0.000/0.000/0.000/0.000/0.000'
-  lastValidatedGenerationSignature: -2030999597
+  lastValidatedGenerationSignature: -1359522017
 --- !u!64 &593135562
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -4356,7 +4372,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
     ShapeSeed: 5727
     SurfaceSeed: 3930
@@ -4376,7 +4392,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
       ShapeSeed: 5727
       SurfaceSeed: 3930
@@ -4651,7 +4667,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 4
     ShapeSeed: 2098
     SurfaceSeed: 7566
@@ -4671,7 +4687,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 4
       ShapeSeed: 2098
       SurfaceSeed: 7566
@@ -5386,7 +5402,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
     ShapeSeed: 2029
     SurfaceSeed: 7566
@@ -5406,7 +5422,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
       ShapeSeed: 2029
       SurfaceSeed: 7566
@@ -5796,7 +5812,7 @@ Transform:
   m_GameObject: {fileID: 1112228202}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.26303118, z: 0, w: 0.9647873}
-  m_LocalPosition: {x: -11.51, y: -0.18, z: 2.5}
+  m_LocalPosition: {x: -11.51, y: -0.03, z: 2.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5906,7 +5922,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 3
     ShapeSeed: 6643
     SurfaceSeed: 7566
@@ -5926,7 +5942,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 3
       ShapeSeed: 6643
       SurfaceSeed: 7566
@@ -6410,7 +6426,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 3
     ShapeSeed: 6992
     SurfaceSeed: 7566
@@ -6430,7 +6446,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 3
       ShapeSeed: 6992
       SurfaceSeed: 7566
@@ -6690,7 +6706,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 1
     ShapeSeed: 1468
     SurfaceSeed: 7566
@@ -6710,7 +6726,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 1
       ShapeSeed: 1468
       SurfaceSeed: 7566
@@ -6903,7 +6919,7 @@ Transform:
   m_GameObject: {fileID: 1240706385}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.13485095, z: 0, w: 0.9908659}
-  m_LocalPosition: {x: -15.682, y: 0, z: -10.485}
+  m_LocalPosition: {x: -15.682, y: 0.044, z: -10.485}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7013,7 +7029,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 1
     ShapeSeed: 3356
     SurfaceSeed: 7566
@@ -7033,7 +7049,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 1
       ShapeSeed: 3356
       SurfaceSeed: 7566
@@ -7456,7 +7472,7 @@ Transform:
   m_GameObject: {fileID: 1302693749}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.13485095, z: 0, w: 0.9908659}
-  m_LocalPosition: {x: -11.693, y: -0.176, z: 3.492}
+  m_LocalPosition: {x: -11.693, y: -0.09, z: 3.492}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7566,7 +7582,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
     ShapeSeed: 6643
     SurfaceSeed: 7566
@@ -7586,7 +7602,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
       ShapeSeed: 6643
       SurfaceSeed: 7566
@@ -7774,7 +7790,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Masses.GeneratedMass
   recipe:
     archetype: 0
-    shapeSeed: 5727
+    shapeSeed: 8889
     surfaceSeed: 3778
     size: 2
     formComplexity: 2
@@ -7864,9 +7880,9 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
-    ShapeSeed: 5727
+    ShapeSeed: 8889
     SurfaceSeed: 3778
     Size: 2
     FormComplexity: 2
@@ -7884,9 +7900,9 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
-      ShapeSeed: 5727
+      ShapeSeed: 8889
       SurfaceSeed: 3778
       Size: 2
       FormComplexity: 2
@@ -8014,7 +8030,7 @@ Transform:
   m_GameObject: {fileID: 1321270436}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.116, y: -0.078, z: -5.004}
+  m_LocalPosition: {x: -9.116, y: -0.016, z: -5.004}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8251,7 +8267,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 4
     ShapeSeed: 2308
     SurfaceSeed: 7566
@@ -8271,7 +8287,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 4
       ShapeSeed: 2308
       SurfaceSeed: 7566
@@ -8628,7 +8644,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
     ShapeSeed: 5727
     SurfaceSeed: 3930
@@ -8648,7 +8664,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
       ShapeSeed: 5727
       SurfaceSeed: 3930
@@ -9071,7 +9087,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
     ShapeSeed: 5315
     SurfaceSeed: 7566
@@ -9091,7 +9107,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
       ShapeSeed: 5315
       SurfaceSeed: 7566
@@ -9331,7 +9347,7 @@ Transform:
   m_GameObject: {fileID: 1533091818}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609314, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: 0.33, y: 22.380001, z: -32.75}
+  m_LocalPosition: {x: -0.28, y: 22.380001, z: -29.779999}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9828,7 +9844,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
     ShapeSeed: 5727
     SurfaceSeed: 3778
@@ -9848,7 +9864,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
       ShapeSeed: 5727
       SurfaceSeed: 3778
@@ -9978,7 +9994,7 @@ Transform:
   m_GameObject: {fileID: 1595308776}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.242, y: -0.078, z: -6.928}
+  m_LocalPosition: {x: -9.242, y: -0.141, z: -6.928}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -10012,7 +10028,7 @@ Transform:
   m_GameObject: {fileID: 1611485499}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.33, y: 1.13, z: -12.75}
+  m_LocalPosition: {x: -0.28, y: 1.13, z: -9.78}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -10239,7 +10255,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 4
     ShapeSeed: 5875
     SurfaceSeed: 7566
@@ -10259,7 +10275,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 4
       ShapeSeed: 5875
       SurfaceSeed: 7566
@@ -10881,13 +10897,22 @@ MonoBehaviour:
   foamInwardWashBreakupStrengthMax: 0.14
   foamAutomaticObjectBirthEnabled: 1
   foamObjectFoamCoverage: 0.6
+  foamObjectContactCycleCoverage: 1
   foamObjectFoamActivity: 0.7
   foamObjectFoamFormationSpeedMetresPerSecond: 0.74
+  foamObjectContactHoldDurationMinSeconds: 5
+  foamObjectContactHoldDurationMaxSeconds: 10
+  foamObjectContactReleaseDurationMinSeconds: 0.6
+  foamObjectContactReleaseDurationMaxSeconds: 1.4
+  foamObjectContactRestDurationMinSeconds: 1
+  foamObjectContactRestDurationMaxSeconds: 3
   foamObjectFoamPattern: 0
   foamObjectContactArcPatternWeight: 0.14502627
   foamObjectContactSemiArcPatternWeight: 0.67697376
   foamObjectContactFleckPatternWeight: 0.178
   foamObjectContactArcFormationSpeedMultiplier: 0.85
+  foamObjectContactArcArmReachMin: 0.45
+  foamObjectContactArcArmReachMax: 0.7
   foamObjectContactArcLengthMinMetres: 0.45
   foamObjectContactArcLengthMaxMetres: 1.6
   foamObjectContactArcWidthMinMetres: 0.035
@@ -10901,6 +10926,8 @@ MonoBehaviour:
   foamObjectContactArcBreakupStrengthMin: 0.08
   foamObjectContactArcBreakupStrengthMax: 0.28
   foamObjectContactSemiArcFormationSpeedMultiplier: 0.85
+  foamObjectContactSemiArcArmReachMin: 0.6
+  foamObjectContactSemiArcArmReachMax: 0.9
   foamObjectContactSemiArcLengthMinMetres: 0.35
   foamObjectContactSemiArcLengthMaxMetres: 1.25
   foamObjectContactSemiArcWidthMinMetres: 0.03
@@ -11846,7 +11873,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 3
     ShapeSeed: 5524
     SurfaceSeed: 7566
@@ -11866,7 +11893,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 3
       ShapeSeed: 5524
       SurfaceSeed: 7566
@@ -12037,7 +12064,7 @@ MonoBehaviour:
   recipe:
     archetype: 1
     shapeSeed: 839
-    surfaceSeed: 7566
+    surfaceSeed: 7096
     size: 0
     formComplexity: 3
     surfaceFacetDensity: 3
@@ -12126,10 +12153,10 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 1
     ShapeSeed: 839
-    SurfaceSeed: 7566
+    SurfaceSeed: 7096
     Size: 0
     FormComplexity: 3
     SurfaceFacetDensity: 3
@@ -12146,10 +12173,10 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 1
       ShapeSeed: 839
-      SurfaceSeed: 7566
+      SurfaceSeed: 7096
       Size: 0
       FormComplexity: 3
       SurfaceFacetDensity: 3
@@ -12810,7 +12837,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 1
     ShapeSeed: 5734
     SurfaceSeed: 3930
@@ -12830,7 +12857,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 1
       ShapeSeed: 5734
       SurfaceSeed: 3930
@@ -13122,7 +13149,7 @@ MonoBehaviour:
   lastAppliedFeatureRecipe: 0
   acceptedProductionStateValid: 1
   acceptedProductionState:
-    ContractVersion: 1
+    ContractVersion: 2
     Archetype: 0
     ShapeSeed: 5734
     SurfaceSeed: 7566
@@ -13142,7 +13169,7 @@ MonoBehaviour:
   acceptedFeatureAtlasState:
     ContractVersion: 1
     ProductionState:
-      ContractVersion: 1
+      ContractVersion: 2
       Archetype: 0
       ShapeSeed: 5734
       SurfaceSeed: 7566

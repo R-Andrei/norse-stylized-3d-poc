@@ -13,12 +13,13 @@ playable terrain shape
 → broad macro patch composition
 → semantic surface-mask response
 → Painted Accent lines
+→ River-Coupled Ground Response
 → Contact / Edge Accents
 → sparse motifs and stamps
 → runtime surface state later
 ```
 
-V3M Broad Macro Patch Completion is accepted through V3M-A1.3.4. The active proof milestone is **V3R Ground Elevation Readability**: preserve the accepted gentle geometry while making its height and slope legible from the elevated gameplay camera through restrained value-only cues. **V4 Contact / Edge Accents** remains architecturally accepted and queued after V3R. The completed Painted Accent architecture below remains authoritative for that feature only and must not be read as a declaration that the Ground visual stack is finished.
+V3M Broad Macro Patch Completion is accepted through V3M-A1.3.4, V3R Ground Elevation Readability is accepted through V3R-A1, and V3S-A2A reusable surface-layer authoring plus the V3S-A2B core Bank material proof are Unity-validated. V3S-A2C Expanded Bank Composition Range is implemented in source and awaits Unity validation. The active milestone is **V3S River-Coupled Ground Response**. V3S owns reusable Bank and Riverbed Surface Layers, grass/snow/frost/Painted Accent retention, broad-bank and waterline hydrology, exact submerged-bed composition, and optional later profile detail through the Ground shader. **V4 Contact / Edge Accents** is queued after V3S and is restricted to GeneratedMass grounding plus explicitly participating GroundModifier boundaries. River banks and riverbeds are not Contact Accent sources. The canonical V3S plan is `Ground_River_Coupled_Surface_Response_Architecture.md`. The completed Painted Accent architecture below remains authoritative for that feature only and must not be read as a declaration that the Ground visual stack is finished.
 
 Semantic region masks and independent visual macro composition are separate responsibilities. River-, exposure-, damp-, vegetation-, compaction-, rocky-, and standing-water response may bias macro appearance, but none of those semantic fields alone satisfies the broad macro-composition layer.
 
@@ -49,6 +50,29 @@ GeneratedGround
 Both controls default to zero for compatibility. Relief Shading Strength has a `0–0.75` range and exaggerates slope direction without changing the normal consumed by PBR lighting. Relative Height Contrast has a `0–1` range and represents value response per metre of generated local height. The two cues are independent: slope describes how terrain rises and falls, while relative height distinguishes plateaus or depressions whose local slope may be small.
 
 The response must remain subordinate to terrain family palette, macro composition, semantic masks, Painted Accents, River, props, actors, VFX, and combat readability. It must not become contour bands, ambient occlusion, outlined bumps, or a replacement for actual geometry.
+
+
+## Current authoritative River-coupled architecture — V3S
+
+The River corridor owns visible bed/bank geometry and exact spatial classification. Ground styles and `SH_PixelGroundSurfaceLit` own the appearance. Corridor `UV2.y` owns shore/waterline influence; ordinary GeneratedGround writes zero to that component. River UV channel index `3` packs X = exact Riverbed Support, Y = outward distance from that support boundary, and Z = corridor-bank validity. Ordinary GeneratedGround publishes no River-coupled UV3 stream. Every Ground-shader draw also receives an explicit `OrdinaryGround` or `RiverCorridor` role through its `MaterialPropertyBlock`; only the corridor role authorizes Shore, Riverbed Support, Bank distance, and Bank-domain interpretation. River water continues to own refraction, absorption, optical depth, foam, and water-surface motion.
+
+The implementation order is:
+
+```text
+V3S-A0/A1 — canonical docs and Riverbed Support debug proof
+V3S-A2A   — reusable surface-layer library and main-Inspector authoring
+V3S-A2B   — Bank Surface Layer core material-composition proof
+V3S-A2C   — metre-based outward Bank material extension
+V3S-A2C.4 — explicit renderer role and ordinary-Ground River-data isolation
+V3S-A3    — cover retreat plus shore / waterline hydrology
+V3S-A4    — exact Riverbed Surface Layer composition
+V3S-A5    — optional profile detail extension
+V3S-A6    — Snowfield/Grassland/WetMudflat tuning and acceptance
+```
+
+River-coupled response is direct material interpretation and introduces no generated Contact texture. V4 remains a separate static generated field for GeneratedMass and selected GroundModifier boundaries only.
+
+V3S-A2B proves the selected Bank Surface Layer's complete dry palette and finish. V3S-A2C.1 corrects spatial ownership: all core and outer Bank composition is restricted to the River corridor bank domain. Corridor `UV3.y` starts at zero where Riverbed Support ends and increases outward; `UV3.z` marks valid bank vertices through the corridor handoff. V3S-A2C.4 makes that ownership explicit per renderer and removes the separate broad River-derived exposure, dampness, vegetation, and shore data from ordinary Ground. Metre-based Extension, Strength, and Fade therefore support tight contact, wave-wash allowance, or a broad sand/soil/snow-retreat margin without generating disconnected patches on ordinary Ground or analysing waves. Cover-retention behavior and wetness remain deferred so substrate identity and spatial range can be accepted independently.
 
 ## Current authoritative Painted Accent architecture — 2026-07-15
 
@@ -2608,18 +2632,12 @@ Ground should visually respond around meaningful geometry and semantic boundarie
 
 Contact/edge accent candidates:
 
-- rock bases;
-- standing stones;
-- cliffs and banks;
-- river shorelines;
-- bridge or crossing contact;
-- path boundaries;
-- modifier boundaries;
-- raised/lowered terrain edges;
-- structure foundations;
-- camp pads and authored clearings;
-- damp deposits near water;
-- snow buildup near wind-protected edges.
+- GeneratedMass rock bases and standing masses;
+- explicitly participating path or modifier boundaries;
+- future opt-in bridge, structure-foundation, or ordinary-prop sources only after a separate source contract is approved;
+- local snow compression, deposit, or grounding interpretation driven by the active Ground family.
+
+River shorelines, banks, and riverbeds are explicitly excluded. They belong to the River-Coupled Ground Response defined in `Ground_River_Coupled_Surface_Response_Architecture.md`.
 
 This layer may add local darkening, dampness, deposit hints, outline-like value shifts, accent-line density changes, or surface-wear emphasis. It must not turn every object into a heavy decal blob.
 
@@ -2705,7 +2723,11 @@ Static semantic mask response
   ↓
 Painted accent lines
   ↓
+River-coupled ground response
+  broad bank wetness / waterline core / wet bed
+  ↓
 Contact / edge accents
+  GeneratedMass + selected GroundModifier boundaries
   ↓
 Sparse motifs and stamps
   ↓
@@ -2957,7 +2979,7 @@ Vertex Color B = damp / deposit potential
 Vertex Color A = vegetation suitability
 
 UV2.x = compaction / path / flatten influence
-UV2.y = river / shore influence
+UV2.y = reserved zero on ordinary Ground; River corridor owns shore / waterline influence
 UV2.z = rocky / dry secondary patch
 UV2.w = authored standing-water / puddle potential
 ```
@@ -3082,12 +3104,15 @@ The active direction is now style calibration and shared doctrine layers.
 | 3 | V2 — Base Ground Simplification | Implemented as an asset/docs retune: Snowfield and Wet Mudflat now target calmer matte, lower-noise base surfaces. |
 | 4 | V2B — Grassland Baseline Family | Implemented as a real production `Grassland` surface family so shared style layers can be validated across snow, mud, and living ground. |
 | 5 | V3 — Shader Feature Stack + Painted Accent Lines | Implemented as the first stackable doctrine layer and as the migration away from the old single `_GroundFeatureMode` proof-feature slot; V3D refines the raw accent-line mask from large strips into smaller clustered micro-strokes, and V3E upgrades those strokes into curved visual-relief terrain folds. |
-| 6 | V4 — Contact / Edge Accent Layer | Add localized response near shores, rocks, modifier boundaries, paths, banks, and object contact zones. |
-| 7 | V5 — Sparse Motif Layer | Add reusable sparse chips, cracks, scuffs, stains, snow scratches, stones, and debris hints. |
-| 8 | V6 — Feature Stack Authoring Polish | Add richer editor warnings, cost summaries, and feature-combination guidance after more stack layers exist. |
-| 9 | Later | Runtime Surface State Stub | Revisit wetness, snow depth, compression, footprints, and disturbance after static style acceptance. |
-| 10 | Later | Footprints / Rain / Puddles / Grass Integration | Build on runtime state only after the visual doctrine is proven. |
-| 11 | Future | Mixed Terrain / Profile Blending | Blend surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
+| 6 | V3M — Broad Macro Patch Completion | Accepted through V3M-A1.3.4. |
+| 7 | V3R — Ground Elevation Readability | Accepted through V3R-A1. |
+| 8 | V3S — River-Coupled Ground Response | Active: reusable Bank/Riverbed Surface Layers, bank composition, cover retreat, shore hydrology, exact wet riverbed composition, optional detail, and family acceptance. |
+| 9 | V4 — Contact / Edge Accent Layer | Queued after V3S: GeneratedMass grounding plus explicitly participating GroundModifier boundaries only. |
+| 10 | V5 — Sparse Motif Layer | Add reusable sparse chips, cracks, scuffs, stains, snow scratches, stones, and debris hints. |
+| 11 | V6 — Feature Stack Authoring Polish | Add richer editor warnings, cost summaries, and feature-combination guidance after more stack layers exist. |
+| 12 | Later | Runtime Surface State Stub | Revisit wetness, snow depth, compression, footprints, and disturbance after static style acceptance. |
+| 13 | Later | Footprints / Rain / Puddles / Grass Integration | Build on runtime state only after the visual doctrine is proven. |
+| 14 | Future | Mixed Terrain / Profile Blending | Blend surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
 
 ## Style Calibration Requirements
 

@@ -127,6 +127,36 @@
                         signedColor,
                         displayMagnitude);
                 }
+                else if (mode == 32)
+                {
+                    mask = ResolveGroundRiverbedSupportMask(input);
+                }
+                else if (mode == 33)
+                {
+                    mask = ResolveGroundBankMaterialBlend(input);
+                }
+                else if (mode == 34)
+                {
+                    float bankBlend =
+                        ResolveGroundBankMaterialBlend(input);
+                    return (half3)lerp(
+                        float3(0.025, 0.025, 0.035),
+                        (float3)_GroundBankLayerBaseColor.rgb,
+                        bankBlend);
+                }
+                else if (mode == 35)
+                {
+                    mask = ResolveGroundOuterBankExtensionBlend(input);
+                }
+                else if (mode == 36)
+                {
+                    float4 retreat = ResolveGroundBankCoverRetreat(input);
+                    return (half3)retreat.xyz;
+                }
+                else if (mode == 37)
+                {
+                    mask = ResolveGroundBankCoverRetreat(input).w;
+                }
                 else
                 {
                     return half3(-1.0h, -1.0h, -1.0h);

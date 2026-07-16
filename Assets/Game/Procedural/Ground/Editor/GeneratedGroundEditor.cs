@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -10,10 +11,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
     public sealed class GeneratedGroundEditor : UnityEditor.Editor
     {
         private const double SharedStyleSaveDelaySeconds = 0.35;
+        private const string DefaultSurfaceLayerFolder =
+            "Assets/Game/Demo/Profiles/Ground/Layers";
 
         private static readonly HashSet<GroundSurfaceStyleProfile>
             PendingSharedStyleSaves =
                 new HashSet<GroundSurfaceStyleProfile>();
+
+        private static readonly HashSet<GroundSurfaceLayerProfile>
+            PendingSurfaceLayerSaves =
+                new HashSet<GroundSurfaceLayerProfile>();
+
+        private static List<GroundSurfaceLayerProfile>
+            cachedSurfaceLayerProfiles;
 
         private static bool sharedStyleSaveUpdateRegistered;
         private static double sharedStyleSaveDeadline;
@@ -23,6 +33,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             AssemblyReloadEvents.beforeAssemblyReload +=
                 FlushPendingSharedStyleSaves;
             EditorApplication.quitting += FlushPendingSharedStyleSaves;
+            EditorApplication.projectChanged +=
+                InvalidateSurfaceLayerProfileCache;
         }
 
         private SerializedProperty recipe;
@@ -75,6 +87,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty rockyDryTintStrength;
         private SerializedProperty vegetationTint;
         private SerializedProperty vegetationTintStrength;
+        private SerializedProperty bankSurfaceLayer;
+        private SerializedProperty riverbedSurfaceLayer;
+        private SerializedProperty bankMaterialStrength;
+        private SerializedProperty bankMaterialReach;
+        private SerializedProperty immediateBankExposure;
+        private SerializedProperty waterlineMaterialStrength;
+        private SerializedProperty bankTransitionSoftness;
+        private SerializedProperty outerBankExtension;
+        private SerializedProperty outerBankStrength;
+        private SerializedProperty outerBankFade;
+        private SerializedProperty vegetationRetreatStrength;
+        private SerializedProperty snowMeltStrength;
+        private SerializedProperty frostRetreatStrength;
+        private SerializedProperty paintedAccentRetreatStrength;
         private SerializedProperty pixelCellSize;
         private SerializedProperty pixelToneCount;
         private SerializedProperty pixelClusterStrength;
@@ -144,6 +170,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool showPaintedAccentDiagnostics;
         private bool showSurfaceDiagnostics;
         private bool showMaterialControls;
+        private bool showMaterialRiverCoupledSurfaceLayers = true;
+        private bool showMaterialRiverCoupledBankComposition = true;
+        private bool showMaterialRiverCoupledCoverResponse = true;
+        private bool showBankSurfaceLayerSettings = true;
+        private bool showRiverbedSurfaceLayerSettings = true;
         private bool showMaterialPalette;
         private bool showMaterialMacroPatchComposition = true;
         private bool showMaterialElevationReadability = true;
@@ -152,6 +183,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool showMaterialWeatherFinish;
         private bool showStyleAssetDetails;
 
+
+        private static void InvalidateSurfaceLayerProfileCache()
+        {
+            cachedSurfaceLayerProfiles = null;
+        }
 
         private static void QueueSharedStyleSave(
             GroundSurfaceStyleProfile style)
@@ -166,6 +202,26 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 EditorApplication.timeSinceStartup +
                 SharedStyleSaveDelaySeconds;
 
+            RegisterPendingAssetSaveUpdate();
+        }
+
+        private static void QueueSurfaceLayerSave(
+            GroundSurfaceLayerProfile layer)
+        {
+            if (layer == null || !EditorUtility.IsPersistent(layer))
+            {
+                return;
+            }
+
+            PendingSurfaceLayerSaves.Add(layer);
+            sharedStyleSaveDeadline =
+                EditorApplication.timeSinceStartup +
+                SharedStyleSaveDelaySeconds;
+            RegisterPendingAssetSaveUpdate();
+        }
+
+        private static void RegisterPendingAssetSaveUpdate()
+        {
             if (sharedStyleSaveUpdateRegistered)
             {
                 return;
@@ -205,6 +261,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
 
             PendingSharedStyleSaves.Clear();
+
+            foreach (GroundSurfaceLayerProfile layer in
+                     PendingSurfaceLayerSaves)
+            {
+                if (layer != null && EditorUtility.IsPersistent(layer))
+                {
+                    AssetDatabase.SaveAssetIfDirty(layer);
+                }
+            }
+
+            PendingSurfaceLayerSaves.Clear();
         }
 
         private static void DrawMaterialStorageLine(
@@ -367,6 +434,51 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             vegetationTintStrength =
                 groundMaterialControls.FindPropertyRelative("vegetationTintStrength");
+
+            bankSurfaceLayer =
+                groundMaterialControls.FindPropertyRelative("bankSurfaceLayer");
+
+            riverbedSurfaceLayer =
+                groundMaterialControls.FindPropertyRelative("riverbedSurfaceLayer");
+
+            bankMaterialStrength =
+                groundMaterialControls.FindPropertyRelative("bankMaterialStrength");
+
+            bankMaterialReach =
+                groundMaterialControls.FindPropertyRelative("bankMaterialReach");
+
+            immediateBankExposure =
+                groundMaterialControls.FindPropertyRelative("immediateBankExposure");
+
+            waterlineMaterialStrength =
+                groundMaterialControls.FindPropertyRelative("waterlineMaterialStrength");
+
+            bankTransitionSoftness =
+                groundMaterialControls.FindPropertyRelative("bankTransitionSoftness");
+
+            outerBankExtension =
+                groundMaterialControls.FindPropertyRelative("outerBankExtension");
+
+            outerBankStrength =
+                groundMaterialControls.FindPropertyRelative("outerBankStrength");
+
+            outerBankFade =
+                groundMaterialControls.FindPropertyRelative("outerBankFade");
+
+            vegetationRetreatStrength =
+                groundMaterialControls.FindPropertyRelative(
+                    "vegetationRetreatStrength");
+
+            snowMeltStrength =
+                groundMaterialControls.FindPropertyRelative("snowMeltStrength");
+
+            frostRetreatStrength =
+                groundMaterialControls.FindPropertyRelative(
+                    "frostRetreatStrength");
+
+            paintedAccentRetreatStrength =
+                groundMaterialControls.FindPropertyRelative(
+                    "paintedAccentRetreatStrength");
 
             pixelCellSize =
                 groundMaterialControls.FindPropertyRelative("pixelCellSize");
@@ -3489,6 +3601,31 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool DrawLocalMaterialControlGroups()
         {
             bool materialChanged = false;
+            materialChanged |= DrawSurfaceLayerAuthoringSubsection(
+                ref showMaterialRiverCoupledSurfaceLayers,
+                bankSurfaceLayer,
+                riverbedSurfaceLayer);
+
+            materialChanged |= DrawBankCompositionSubsection(
+                ref showMaterialRiverCoupledBankComposition,
+                bankSurfaceLayer,
+                bankMaterialStrength,
+                bankMaterialReach,
+                immediateBankExposure,
+                waterlineMaterialStrength,
+                bankTransitionSoftness,
+                outerBankExtension,
+                outerBankStrength,
+                outerBankFade);
+
+            materialChanged |= DrawBankCoverResponseSubsection(
+                ref showMaterialRiverCoupledCoverResponse,
+                bankSurfaceLayer,
+                vegetationRetreatStrength,
+                snowMeltStrength,
+                frostRetreatStrength,
+                paintedAccentRetreatStrength);
+
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialMacroPatchComposition,
                 "Macro Patch Composition",
@@ -3563,6 +3700,36 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             SerializedProperty materialControls)
         {
             bool materialChanged = false;
+            SerializedProperty sharedBankSurfaceLayer =
+                materialControls.FindPropertyRelative("bankSurfaceLayer");
+
+            materialChanged |= DrawSurfaceLayerAuthoringSubsection(
+                ref showMaterialRiverCoupledSurfaceLayers,
+                sharedBankSurfaceLayer,
+                materialControls.FindPropertyRelative("riverbedSurfaceLayer"));
+
+            materialChanged |= DrawBankCompositionSubsection(
+                ref showMaterialRiverCoupledBankComposition,
+                sharedBankSurfaceLayer,
+                materialControls.FindPropertyRelative("bankMaterialStrength"),
+                materialControls.FindPropertyRelative("bankMaterialReach"),
+                materialControls.FindPropertyRelative("immediateBankExposure"),
+                materialControls.FindPropertyRelative("waterlineMaterialStrength"),
+                materialControls.FindPropertyRelative("bankTransitionSoftness"),
+                materialControls.FindPropertyRelative("outerBankExtension"),
+                materialControls.FindPropertyRelative("outerBankStrength"),
+                materialControls.FindPropertyRelative("outerBankFade"));
+
+            materialChanged |= DrawBankCoverResponseSubsection(
+                ref showMaterialRiverCoupledCoverResponse,
+                sharedBankSurfaceLayer,
+                materialControls.FindPropertyRelative(
+                    "vegetationRetreatStrength"),
+                materialControls.FindPropertyRelative("snowMeltStrength"),
+                materialControls.FindPropertyRelative("frostRetreatStrength"),
+                materialControls.FindPropertyRelative(
+                    "paintedAccentRetreatStrength"));
+
             materialChanged |= DrawMaterialSubsection(
                 ref showMaterialMacroPatchComposition,
                 "Macro Patch Composition",
@@ -3636,6 +3803,502 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 materialControls.FindPropertyRelative("specularStrength"));
 
             return materialChanged;
+        }
+
+        private bool DrawSurfaceLayerAuthoringSubsection(
+            ref bool expanded,
+            SerializedProperty bankLayer,
+            SerializedProperty riverbedLayer)
+        {
+            expanded = EditorGUILayout.Foldout(
+                expanded,
+                "River-Coupled Ground Response — Surface Layers",
+                true);
+
+            if (!expanded)
+            {
+                return false;
+            }
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.HelpBox(
+                "Select and edit reusable Bank and Riverbed substrate assets here. Inherit Primary Ground leaves that zone on the ordinary Ground material. This foundation patch does not yet change normal rendering.",
+                MessageType.Info);
+
+            bool changed = false;
+            changed |= DrawSurfaceLayerSelector(
+                "Bank Surface Layer",
+                "Secondary substrate exposed across River banks.",
+                bankLayer,
+                ref showBankSurfaceLayerSettings,
+                "Bank Layer Settings");
+
+            EditorGUILayout.Space(4f);
+
+            changed |= DrawSurfaceLayerSelector(
+                "Riverbed Surface Layer",
+                "Secondary substrate used on the visible submerged River corridor.",
+                riverbedLayer,
+                ref showRiverbedSurfaceLayerSettings,
+                "Riverbed Layer Settings");
+
+            EditorGUI.indentLevel--;
+            return changed;
+        }
+
+        private static bool DrawSurfaceLayerSelector(
+            string label,
+            string tooltip,
+            SerializedProperty layerProperty,
+            ref bool settingsExpanded,
+            string settingsLabel)
+        {
+            if (layerProperty == null)
+            {
+                EditorGUILayout.HelpBox(
+                    $"The serialized {label} reference is unavailable.",
+                    MessageType.Error);
+                return false;
+            }
+
+            List<GroundSurfaceLayerProfile> profiles =
+                GetSurfaceLayerProfiles();
+            GroundSurfaceLayerProfile current =
+                layerProperty.objectReferenceValue as
+                    GroundSurfaceLayerProfile;
+
+            int currentIndex = 0;
+            for (int index = 0; index < profiles.Count; index++)
+            {
+                if (profiles[index] == current)
+                {
+                    currentIndex = index + 1;
+                    break;
+                }
+            }
+
+            if (current != null && currentIndex == 0)
+            {
+                profiles = new List<GroundSurfaceLayerProfile>(profiles)
+                {
+                    current
+                };
+                currentIndex = profiles.Count;
+            }
+
+            GUIContent[] options =
+                new GUIContent[profiles.Count + 1];
+            options[0] = new GUIContent(
+                "Inherit Primary Ground",
+                "Use the ordinary Ground material without a secondary layer asset.");
+
+            for (int index = 0; index < profiles.Count; index++)
+            {
+                GroundSurfaceLayerProfile profile = profiles[index];
+                string assetName = profile != null
+                    ? profile.name
+                    : "Missing Asset";
+                string displayName = profile != null
+                    ? profile.DisplayName
+                    : assetName;
+                string optionLabel = displayName == assetName
+                    ? displayName
+                    : $"{displayName} — {assetName}";
+                string assetPath = profile != null
+                    ? AssetDatabase.GetAssetPath(profile)
+                    : string.Empty;
+
+                options[index + 1] =
+                    new GUIContent(optionLabel, assetPath);
+            }
+
+            EditorGUI.BeginChangeCheck();
+            int selectedIndex = EditorGUILayout.Popup(
+                new GUIContent(label, tooltip),
+                currentIndex,
+                options);
+            bool selectionChanged = EditorGUI.EndChangeCheck();
+
+            if (selectionChanged)
+            {
+                layerProperty.objectReferenceValue =
+                    selectedIndex <= 0
+                        ? null
+                        : profiles[selectedIndex - 1];
+                current = layerProperty.objectReferenceValue as
+                    GroundSurfaceLayerProfile;
+                settingsExpanded = current != null;
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Create New Layer…"))
+                {
+                    GroundSurfaceLayerProfile created =
+                        CreateSurfaceLayerAsset(null);
+                    if (created != null)
+                    {
+                        layerProperty.objectReferenceValue = created;
+                        current = created;
+                        settingsExpanded = true;
+                        selectionChanged = true;
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(current == null))
+                {
+                    if (GUILayout.Button("Duplicate Selected Layer…"))
+                    {
+                        GroundSurfaceLayerProfile duplicate =
+                            CreateSurfaceLayerAsset(current);
+                        if (duplicate != null)
+                        {
+                            layerProperty.objectReferenceValue = duplicate;
+                            current = duplicate;
+                            settingsExpanded = true;
+                            selectionChanged = true;
+                        }
+                    }
+                }
+            }
+
+            if (current == null)
+            {
+                EditorGUILayout.LabelField(
+                    "Layer Definition Stored In",
+                    "Primary Ground material controls");
+                return selectionChanged;
+            }
+
+            string path = AssetDatabase.GetAssetPath(current);
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Layer Definition Stored In",
+                    path),
+                new GUIContent(
+                    $"Surface Layer Asset — {current.name}",
+                    path));
+
+            settingsExpanded = EditorGUILayout.Foldout(
+                settingsExpanded,
+                settingsLabel,
+                true);
+
+            if (settingsExpanded)
+            {
+                EditorGUI.indentLevel++;
+                DrawSurfaceLayerProfileEditor(current);
+                EditorGUI.indentLevel--;
+            }
+
+            return selectionChanged;
+        }
+
+        private static List<GroundSurfaceLayerProfile>
+            GetSurfaceLayerProfiles()
+        {
+            if (cachedSurfaceLayerProfiles != null)
+            {
+                return cachedSurfaceLayerProfiles;
+            }
+
+            string[] guids = AssetDatabase.FindAssets(
+                "t:GroundSurfaceLayerProfile");
+            cachedSurfaceLayerProfiles =
+                new List<GroundSurfaceLayerProfile>(guids.Length);
+
+            for (int index = 0; index < guids.Length; index++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[index]);
+                GroundSurfaceLayerProfile profile =
+                    AssetDatabase.LoadAssetAtPath<GroundSurfaceLayerProfile>(
+                        path);
+                if (profile != null)
+                {
+                    cachedSurfaceLayerProfiles.Add(profile);
+                }
+            }
+
+            cachedSurfaceLayerProfiles.Sort(
+                (left, right) =>
+                {
+                    int displayComparison = string.Compare(
+                        left.DisplayName,
+                        right.DisplayName,
+                        System.StringComparison.OrdinalIgnoreCase);
+                    return displayComparison != 0
+                        ? displayComparison
+                        : string.Compare(
+                            left.name,
+                            right.name,
+                            System.StringComparison.OrdinalIgnoreCase);
+                });
+
+            return cachedSurfaceLayerProfiles;
+        }
+
+        private static GroundSurfaceLayerProfile CreateSurfaceLayerAsset(
+            GroundSurfaceLayerProfile source)
+        {
+            EnsureSurfaceLayerFolderExists();
+
+            string suggestedName = source == null
+                ? "GSLP_NewGroundSurfaceLayer"
+                : source.name + "_Copy";
+            string title = source == null
+                ? "Create Ground Surface Layer"
+                : "Duplicate Ground Surface Layer";
+            string path = EditorUtility.SaveFilePanelInProject(
+                title,
+                suggestedName,
+                "asset",
+                "Choose where the reusable Ground surface-layer asset is stored.",
+                DefaultSurfaceLayerFolder);
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            path = AssetDatabase.GenerateUniqueAssetPath(path);
+
+            GroundSurfaceLayerProfile layer = source == null
+                ? ScriptableObject.CreateInstance<GroundSurfaceLayerProfile>()
+                : Object.Instantiate(source);
+            layer.name = Path.GetFileNameWithoutExtension(path);
+            layer.SetDisplayName(
+                source == null
+                    ? ObjectNames.NicifyVariableName(
+                        layer.name.StartsWith("GSLP_")
+                            ? layer.name.Substring(5)
+                            : layer.name)
+                    : source.DisplayName + " Copy");
+
+            AssetDatabase.CreateAsset(layer, path);
+            EditorUtility.SetDirty(layer);
+            AssetDatabase.SaveAssetIfDirty(layer);
+            InvalidateSurfaceLayerProfileCache();
+            return layer;
+        }
+
+        private static void EnsureSurfaceLayerFolderExists()
+        {
+            if (AssetDatabase.IsValidFolder(DefaultSurfaceLayerFolder))
+            {
+                return;
+            }
+
+            string[] parts = DefaultSurfaceLayerFolder.Split('/');
+            string current = parts[0];
+
+            for (int index = 1; index < parts.Length; index++)
+            {
+                string next = current + "/" + parts[index];
+                if (!AssetDatabase.IsValidFolder(next))
+                {
+                    AssetDatabase.CreateFolder(current, parts[index]);
+                }
+
+                current = next;
+            }
+        }
+
+        private static void DrawSurfaceLayerProfileEditor(
+            GroundSurfaceLayerProfile profile)
+        {
+            if (profile == null)
+            {
+                return;
+            }
+
+            SerializedObject layerObject = new SerializedObject(profile);
+            layerObject.UpdateIfRequiredOrScript();
+
+            EditorGUI.BeginChangeCheck();
+
+            EditorGUILayout.LabelField(
+                "Identity",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("displayName"));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Palette",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("baseColor"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("darkColor"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("lightColor"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("wetColor"));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Surface Character",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("macroContrast"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("pixelContrast"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("drySmoothness"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("drySpecularStrength"));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Hydrological Character",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("wetDarkening"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("wetTintStrength"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("wetSmoothness"));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Cover Compatibility",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("vegetationRetention"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("snowRetention"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("frostRetention"));
+            EditorGUILayout.PropertyField(
+                layerObject.FindProperty("paintedAccentRetention"));
+
+            bool changed = EditorGUI.EndChangeCheck();
+            bool applied = layerObject.ApplyModifiedProperties();
+
+            if (changed || applied)
+            {
+                EditorUtility.SetDirty(profile);
+                QueueSurfaceLayerSave(profile);
+                RefreshLoadedGroundsUsingSurfaceLayer(profile);
+                InvalidateSurfaceLayerProfileCache();
+            }
+        }
+
+        private static bool DrawBankCompositionSubsection(
+            ref bool expanded,
+            SerializedProperty bankLayer,
+            SerializedProperty bankMaterialStrength,
+            SerializedProperty coreBankReach,
+            SerializedProperty immediateBankExposure,
+            SerializedProperty waterlineMaterialStrength,
+            SerializedProperty coreTransitionSoftness,
+            SerializedProperty outerBankExtension,
+            SerializedProperty outerBankStrength,
+            SerializedProperty outerBankFade)
+        {
+            expanded = EditorGUILayout.Foldout(
+                expanded,
+                "River-Coupled Ground Response — Bank Composition",
+                true);
+
+            if (!expanded)
+            {
+                return false;
+            }
+
+            EditorGUI.indentLevel++;
+            bool hasBankLayer =
+                bankLayer != null &&
+                bankLayer.objectReferenceValue != null;
+
+            if (!hasBankLayer)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select a Bank Surface Layer above to enable bank material-composition controls. Inherit Primary Ground intentionally produces no secondary bank substrate.",
+                    MessageType.Info);
+            }
+
+            EditorGUI.BeginDisabledGroup(!hasBankLayer);
+            EditorGUI.BeginChangeCheck();
+
+            EditorGUILayout.PropertyField(bankMaterialStrength);
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Core Bank",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(coreBankReach);
+            EditorGUILayout.PropertyField(immediateBankExposure);
+            EditorGUILayout.PropertyField(waterlineMaterialStrength);
+            EditorGUILayout.PropertyField(coreTransitionSoftness);
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Outer Bank Extension",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "Starts at the Riverbed Support edge and extends outward across the generated River corridor toward its terrain handoff.",
+                MessageType.None);
+            EditorGUILayout.PropertyField(outerBankExtension);
+            EditorGUI.BeginDisabledGroup(
+                outerBankExtension == null ||
+                outerBankExtension.floatValue <= 0.0001f);
+            EditorGUILayout.PropertyField(outerBankStrength);
+            EditorGUILayout.PropertyField(outerBankFade);
+            EditorGUI.EndDisabledGroup();
+
+            bool changed = EditorGUI.EndChangeCheck();
+            EditorGUI.EndDisabledGroup();
+            EditorGUI.indentLevel--;
+            return changed;
+        }
+
+        private static bool DrawBankCoverResponseSubsection(
+            ref bool expanded,
+            SerializedProperty bankLayer,
+            SerializedProperty vegetationRetreatStrength,
+            SerializedProperty snowMeltStrength,
+            SerializedProperty frostRetreatStrength,
+            SerializedProperty paintedAccentRetreatStrength)
+        {
+            expanded = EditorGUILayout.Foldout(
+                expanded,
+                "River-Coupled Ground Response — Surface-Cover Response",
+                true);
+
+            if (!expanded)
+            {
+                return false;
+            }
+
+            EditorGUI.indentLevel++;
+            bool hasBankLayer =
+                bankLayer != null &&
+                bankLayer.objectReferenceValue != null;
+
+            if (!hasBankLayer)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select a Bank Surface Layer above to author vegetation, snow, frost, and Painted Accent retention. Inherit Primary Ground preserves all ordinary cover.",
+                    MessageType.Info);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "Each control scales the selected layer's authored retention fraction across the existing Bank material blend. Zero preserves the current response.",
+                    MessageType.None);
+            }
+
+            EditorGUI.BeginDisabledGroup(!hasBankLayer);
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(vegetationRetreatStrength);
+            EditorGUILayout.PropertyField(snowMeltStrength);
+            EditorGUILayout.PropertyField(frostRetreatStrength);
+            EditorGUILayout.PropertyField(paintedAccentRetreatStrength);
+            bool changed = EditorGUI.EndChangeCheck();
+            EditorGUI.EndDisabledGroup();
+            EditorGUI.indentLevel--;
+            return changed;
         }
 
         private static bool DrawMaterialSubsection(
@@ -4846,6 +5509,35 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     ground.SurfaceVariantId != variantId ||
                     (!includeLocalMaterialOverrides &&
                      ground.OverrideMaterialControls))
+                {
+                    continue;
+                }
+
+                ground.RefreshSurfaceMaterialProperties();
+            }
+
+            SceneView.RepaintAll();
+        }
+
+        private static void RefreshLoadedGroundsUsingSurfaceLayer(
+            GroundSurfaceLayerProfile profile)
+        {
+            if (profile == null)
+            {
+                return;
+            }
+
+            GeneratedGround[] grounds =
+                Object.FindObjectsByType<GeneratedGround>(
+                    FindObjectsInactive.Include);
+
+            for (int index = 0; index < grounds.Length; index++)
+            {
+                GeneratedGround ground = grounds[index];
+
+                if (!IsLoadedSceneGround(ground) ||
+                    (ground.BankSurfaceLayer != profile &&
+                     ground.RiverbedSurfaceLayer != profile))
                 {
                     continue;
                 }

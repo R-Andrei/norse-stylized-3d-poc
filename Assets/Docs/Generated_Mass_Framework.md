@@ -78,7 +78,7 @@ A production mass must have:
 - zero open edges;
 - zero non-manifold edges;
 - zero T-junctions;
-- finite vertices and normals;
+- finite vertices, unit normals, and finite unit tangents;
 - non-degenerate retained faces;
 - consistent outward winding;
 - positive enclosed volume;
@@ -116,7 +116,7 @@ Atlas generation is justified only when a retained material feature needs it. Ge
 - Expensive validation is explicit editor/diagnostic-only and never runs from `OnEnable`, ordinary `OnValidate`, script reload, or Play Mode transitions.
 - Collider recooking occurs only when geometry was rebuilt or the collider lost its certified mesh binding.
 - Exact world-triangle fingerprints are invalidated by geometry changes and calculated lazily on the first consumer request.
-- Any future normal-generation semantic change must increment the production-generation contract version before old generated state may be reused.
+- Any normal-generation semantic change must increment the production-generation contract version before old generated state may be reused. GM-R12B.1D advances this contract from `1` to `2`.
 - Production geometry must respect the accepted tier budgets.
 - Do not add per-frame full-mesh rebuilds.
 - Cache reusable deterministic data when it materially reduces regeneration cost.
@@ -132,6 +132,9 @@ Atlas generation is justified only when a retained material feature needs it. Ge
 - Diagnostics must never alter production eligibility unless explicitly promoted.
 - Editor-only previews must be clearly labeled and must not become serialized artistic controls accidentally.
 - Existing layers, tags, components, asset names, and serialized structures may not change without approval.
+- Live render-channel integrity audits are explicit, single-object, editor-only actions over the already-generated `MeshFilter.sharedMesh`; they must never run from generation, `OnEnable`, `OnValidate`, Play Mode transitions, or per frame.
+- Diagnostic proof meshes and materials must use `HideAndDontSave`, must not serialize or replace the production mesh, and must restore the source renderer when removed or when selection changes.
+- A render-channel repair may not be promoted from a proof clone until the exact failing triangle/channel is measured and the smallest-blast-radius ownership boundary is justified. GM-R12B.1D proved Generated Mass zero normals and promotes a Generated Mass-only normalization/validation repair; shared `MeshData`, `MeshBuilder`, UV construction, and shader behavior remain unchanged.
 
 ## Validation contract
 
@@ -155,3 +158,20 @@ Every geometry implementation patch requires:
 | `Generated_Mass_Framework.md` | Stable feature, control, performance, and validation contract. |
 
 Other documents may reference the canonical progress ledger, but must not maintain competing or complementary patch histories.
+
+
+## Generated Mass render-normal integrity contract
+
+- Every authored or geometric render normal is normalized explicitly from any finite, mathematically non-zero vector using double-precision magnitude evaluation. Triangle acceptance remains governed by the existing scale-relative geometry tests; no edge-length-squared threshold may be reused for a cross-product-squared normal test.
+- Accepted triangles may not silently fall back to an unrelated axis normal. Only a truly zero or non-finite geometric normal is a deterministic generation failure; tiny but scale-valid triangles must normalize successfully.
+- Generated Mass validates all authored `MeshData` channels before mesh application and validates final Unity normals/tangents after tangent reconstruction.
+- Final normals and tangent XYZ vectors must be finite and unit length; tangent handedness must be finite and approximately `-1` or `+1`.
+- These guards run only when Generated Mass geometry is built or explicitly regenerated. They add no per-frame work and do not alter shared procedural-mesh consumers.
+
+
+## Scale-correct render-normal clarification
+
+- Triangle validity is established by the generator's existing finite and scale-relative geometry tests. Render-normal normalization may not introduce an unrelated absolute triangle-size cutoff.
+- A cross product may be normalized when it is finite and mathematically non-zero, even when its magnitude is below Unity's `Vector3.normalized` epsilon or below an edge-length threshold.
+- Production and explicit editor diagnostics must use equivalent robust normalization semantics so an accepted production triangle and its audit cannot disagree solely because of normalization thresholds.
+- UV-conditioning metrics are diagnostic warnings when all final channels and 3D geometry remain finite and valid; they are not independently a production failure.

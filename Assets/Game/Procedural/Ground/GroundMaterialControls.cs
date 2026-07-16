@@ -42,6 +42,89 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float vegetationTintStrength = 0.10f;
 
+    [Header("River-Coupled Surface Layers")]
+    [Tooltip("Optional reusable substrate exposed across River banks. Null inherits the primary Ground surface.")]
+    [SerializeField]
+    private GroundSurfaceLayerProfile bankSurfaceLayer;
+
+    [Tooltip("Optional reusable substrate used across the visible submerged River corridor. Null inherits the primary Ground surface.")]
+    [SerializeField]
+    private GroundSurfaceLayerProfile riverbedSurfaceLayer;
+
+    [Header("River-Coupled Bank Composition")]
+    [InspectorName("Bank Material Strength")]
+    [Tooltip("Master amount of the selected Bank Surface Layer. Zero preserves the ordinary Ground surface everywhere.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float bankMaterialStrength = 1f;
+
+    [InspectorName("Core Bank Reach")]
+    [Tooltip("How much of the existing precise broad-bank field participates before any optional outward extension. This changes material composition only, not River or Ground geometry.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float bankMaterialReach = 0.65f;
+
+    [InspectorName("Immediate-Bank Exposure")]
+    [Tooltip("Additional substrate replacement across the stronger immediate-bank portion of the shore field.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float immediateBankExposure = 0.55f;
+
+    [InspectorName("Waterline Material Strength")]
+    [Tooltip("Additional substrate replacement at the highest corridor-only shore values. This controls material identity independently from wetness.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float waterlineMaterialStrength = 1f;
+
+    [InspectorName("Core Bank Transition Softness")]
+    [Tooltip("Softness of the core broad-bank, immediate-bank, and waterline transitions. This does not control the separately authored outer-bank fade.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float bankTransitionSoftness = 0.55f;
+
+    [InspectorName("Outer Bank Extension")]
+    [Tooltip("Additional distance in metres from the exact Riverbed Support boundary across the River corridor bank. Zero disables the outer extension.")]
+    [Range(0f, 20f)]
+    [SerializeField]
+    private float outerBankExtension;
+
+    [InspectorName("Outer Bank Strength")]
+    [Tooltip("Material-blend strength of the optional outer extension. The master Bank Material Strength still scales the complete result.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float outerBankStrength = 0.5f;
+
+    [InspectorName("Outer Bank Fade")]
+    [Tooltip("Fade distance in metres beyond the authored Outer Bank Extension across the River corridor toward its terrain handoff.")]
+    [Range(0.05f, 10f)]
+    [SerializeField]
+    private float outerBankFade = 1f;
+
+    [Header("River-Coupled Surface-Cover Response")]
+    [InspectorName("Vegetation Retreat Strength")]
+    [Tooltip("How strongly the selected Bank Surface Layer's vegetation-retention value suppresses the ordinary vegetation response. Zero preserves current rendering.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float vegetationRetreatStrength;
+
+    [InspectorName("Snow Melt Strength")]
+    [Tooltip("How strongly the selected Bank Surface Layer's snow-retention value suppresses the ordinary snow response. Zero preserves current rendering.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float snowMeltStrength;
+
+    [InspectorName("Frost Retreat Strength")]
+    [Tooltip("How strongly the selected Bank Surface Layer's frost-retention value suppresses the ordinary frost response. Zero preserves current rendering.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float frostRetreatStrength;
+
+    [InspectorName("Painted Accent Retreat Strength")]
+    [Tooltip("How strongly the selected Bank Surface Layer's Painted Accent retention suppresses rendered Painted Accent ink. Raw coverage remains unchanged. Zero preserves current rendering.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float paintedAccentRetreatStrength;
+
     [Header("Macro Patch Composition")]
     [InspectorName("Macro Patch Scale")]
     [Tooltip("Metre scale of broad ground material patches.")]
@@ -246,6 +329,22 @@ public sealed class GroundMaterialControls
         vegetationTint,
         new Color(0.50f, 0.58f, 0.42f, 1f));
     public float VegetationTintStrength => Mathf.Clamp01(vegetationTintStrength);
+    public GroundSurfaceLayerProfile BankSurfaceLayer => bankSurfaceLayer;
+    public GroundSurfaceLayerProfile RiverbedSurfaceLayer => riverbedSurfaceLayer;
+    public float BankMaterialStrength => Mathf.Clamp01(bankMaterialStrength);
+    public float BankMaterialReach => Mathf.Clamp01(bankMaterialReach);
+    public float ImmediateBankExposure => Mathf.Clamp01(immediateBankExposure);
+    public float WaterlineMaterialStrength => Mathf.Clamp01(waterlineMaterialStrength);
+    public float BankTransitionSoftness => Mathf.Clamp01(bankTransitionSoftness);
+    public float OuterBankExtension => Mathf.Clamp(outerBankExtension, 0f, 20f);
+    public float OuterBankStrength => Mathf.Clamp01(outerBankStrength);
+    public float OuterBankFade => Mathf.Clamp(outerBankFade, 0.05f, 10f);
+    public float VegetationRetreatStrength =>
+        Mathf.Clamp01(vegetationRetreatStrength);
+    public float SnowMeltStrength => Mathf.Clamp01(snowMeltStrength);
+    public float FrostRetreatStrength => Mathf.Clamp01(frostRetreatStrength);
+    public float PaintedAccentRetreatStrength =>
+        Mathf.Clamp01(paintedAccentRetreatStrength);
     public float PixelCellSize => Mathf.Clamp(pixelCellSize, 0.005f, 0.5f);
     public float PixelToneCount => Mathf.Clamp(pixelToneCount, 2f, 8f);
     public float PixelClusterStrength => Mathf.Clamp01(pixelClusterStrength);
@@ -303,6 +402,20 @@ public sealed class GroundMaterialControls
     {
         if (source == null)
         {
+            bankSurfaceLayer = null;
+            riverbedSurfaceLayer = null;
+            bankMaterialStrength = 1f;
+            bankMaterialReach = 0.65f;
+            immediateBankExposure = 0.55f;
+            waterlineMaterialStrength = 1f;
+            bankTransitionSoftness = 0.55f;
+            outerBankExtension = 0f;
+            outerBankStrength = 0.5f;
+            outerBankFade = 1f;
+            vegetationRetreatStrength = 0f;
+            snowMeltStrength = 0f;
+            frostRetreatStrength = 0f;
+            paintedAccentRetreatStrength = 0f;
             ApplySnowfieldVariant(GroundSnowfieldVariant.Clean);
             return;
         }
@@ -315,6 +428,20 @@ public sealed class GroundMaterialControls
         rockyDryTintStrength = source.rockyDryTintStrength;
         vegetationTint = source.vegetationTint;
         vegetationTintStrength = source.vegetationTintStrength;
+        bankSurfaceLayer = source.bankSurfaceLayer;
+        riverbedSurfaceLayer = source.riverbedSurfaceLayer;
+        bankMaterialStrength = source.bankMaterialStrength;
+        bankMaterialReach = source.bankMaterialReach;
+        immediateBankExposure = source.immediateBankExposure;
+        waterlineMaterialStrength = source.waterlineMaterialStrength;
+        bankTransitionSoftness = source.bankTransitionSoftness;
+        outerBankExtension = source.outerBankExtension;
+        outerBankStrength = source.outerBankStrength;
+        outerBankFade = source.outerBankFade;
+        vegetationRetreatStrength = source.vegetationRetreatStrength;
+        snowMeltStrength = source.snowMeltStrength;
+        frostRetreatStrength = source.frostRetreatStrength;
+        paintedAccentRetreatStrength = source.paintedAccentRetreatStrength;
         pixelCellSize = source.pixelCellSize;
         pixelToneCount = source.pixelToneCount;
         pixelClusterStrength = source.pixelClusterStrength;

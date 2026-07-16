@@ -166,6 +166,100 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
 
 #if UNITY_EDITOR
+        public sealed class EdgeWearArtisticEdgeAuditRecord
+        {
+            public int SourceEdgeIndex = -1;
+            public int CandidateIndex = -1;
+            public Vector3 Start;
+            public Vector3 End;
+            public Vector3 Midpoint;
+            public Vector3 OwnerNormalA;
+            public Vector3 OwnerNormalB;
+            public Vector3 BevelNormal;
+            public int FaceA = -1;
+            public int FaceB = -1;
+            public int FaceCount;
+            public float Length;
+            public float DihedralDegrees;
+            public float Vertical01;
+            public string Classification = string.Empty;
+            public int CoincidentBoundarySeamReconciled;
+            public int StructuralEligible;
+            public int GeometricEligible;
+            public int CoexistenceEligible;
+            public int ArtisticEligible;
+            public int ArtisticLengthEligible;
+            public int ArtisticAngleEligible;
+            public int ArtisticBaseEligible;
+            public string ArtisticFilterReason = string.Empty;
+            public string CandidateReason = string.Empty;
+            public string FinalReason = string.Empty;
+            public float Score;
+            public float ArtisticMinimumLength;
+            public float ArtisticLengthScore;
+            public float ArtisticAngleScore;
+            public float ArtisticRandomScore;
+            public float ArtisticBaseSuppression;
+            public float ArtisticUpwardEdgeBoost;
+            public float ArtisticCharacterBoost;
+            public float ArtisticEdgeAxisVertical01;
+            public float ArtisticEdgeAxisAbsX;
+            public float ArtisticEdgeAxisAbsY;
+            public float ArtisticEdgeAxisAbsZ;
+            public float ArtisticSilhouettePotential;
+            public float ArtisticFeasibleWidthFraction;
+            public float ArtisticSolvedWidthFraction;
+            public float ArtisticLocalDensity01;
+            public int ArtisticSharedVertexDegreeA;
+            public int ArtisticSharedVertexDegreeB;
+            public int ArtisticSelectionRank = -1;
+            public float ArtisticSelectionThreshold;
+            public float ArtisticSelectionDelta;
+            public float ArtisticDeterministicVariation;
+            public float ArtisticStrength;
+            public float ArtisticDepthMultiplier;
+            public float RequestedWidth;
+            public float RequiredFootprintLength;
+            public float LengthToWidthRatio;
+            public float LocalityRetainPlaneFloor;
+            public float LocalityRemovalPlaneCeiling;
+            public float LocalityFeasibleMargin;
+            public float LocalityGuardMargin;
+            public float LocalityMinimumRemoval;
+            public int LocalityLimitingVertex = -1;
+            public Vector3 LocalityLimitingPosition;
+            public float MaximumLocallyFeasibleWidth;
+            public float FeasibleWidthFraction;
+            public int IsolatedSucceeded;
+            public int IsolatedWidthAttemptCount;
+            public float IsolatedLastAttemptedWidth;
+            public float IsolatedMaximumCertifiedWidth;
+            public float IsolatedMaximumCertifiedWidthFraction;
+            public float EndpointConsumptionA;
+            public float EndpointConsumptionB;
+            public float RemainingCentralSpan;
+            public float MinimumCentralSpan;
+            public int IsolatedOpenEdgeCount;
+            public int IsolatedNonManifoldEdgeCount;
+            public int IsolatedTJunctionCount;
+            public int IsolatedInvalidFaceCount;
+            public string IsolatedDiagnostic = string.Empty;
+            public string ViabilityFailureReason = string.Empty;
+            public float SolvedWidth;
+            public float MaterializedWidth;
+            public float MaterializedWidthScale;
+            public int WidthReduced;
+            public int Candidate;
+            public int Selected;
+            public int WidthInactive;
+            public int Active;
+            public int AttemptedBuilt;
+            public int CertifiedBuilt;
+            public int TrialRejected;
+            public int Deferred;
+            public int Rejected;
+        }
+
         public sealed class EdgeWearBatchAuditCaseResult
         {
             public bool Completed;
@@ -217,6 +311,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public string ArtisticSilhouetteBins = string.Empty;
             public string ArtisticLocalDensityBins = string.Empty;
             public string ArtisticCrowdingBins = string.Empty;
+            public EdgeWearArtisticEdgeAuditRecord[] ArtisticEdges =
+                Array.Empty<EdgeWearArtisticEdgeAuditRecord>();
             public int CandidateCount;
             public int SelectedCount;
             public int CertifiedCount;

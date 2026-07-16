@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 using Unity.Profiling;
@@ -361,7 +362,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private const int StandardFeatureAtlasResolution = 256;
         private const int DetailedFeatureAtlasResolution = 256;
         private const int HeroFeatureAtlasResolution = 512;
-        private const int ProductionGenerationContractVersion = 1;
+        private const int ProductionGenerationContractVersion = 2;
         private const int FeatureAtlasGenerationContractVersion = 1;
         private const string GeneratedMeshNamePrefix = "GeneratedMass_";
         private const string PlaneCutPreviewMeshNameSuffix =
@@ -2091,6 +2092,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 sourceMeshData,
                 generatedMesh,
                 meshName);
+            ValidateGeneratedRenderMeshChannels(generatedMesh);
 
             if (featureAtlas != null)
             {
@@ -2103,6 +2105,96 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             InvalidateStableWorldGeometryFingerprint();
             RemoveLegacyRiverFoamProxy();
             NotifyGeometryChanged();
+        }
+
+        private static void ValidateGeneratedRenderMeshChannels(
+            Mesh mesh)
+        {
+            if (mesh == null)
+            {
+                throw new ArgumentNullException(nameof(mesh));
+            }
+
+            List<Vector3> vertices = new List<Vector3>();
+            List<Vector3> normals = new List<Vector3>();
+            List<Vector4> tangents = new List<Vector4>();
+            List<Vector2> uv0 = new List<Vector2>();
+            List<Vector4> uv2 = new List<Vector4>();
+            List<Color> colors = new List<Color>();
+            mesh.GetVertices(vertices);
+            mesh.GetNormals(normals);
+            mesh.GetTangents(tangents);
+            mesh.GetUVs(0, uv0);
+            mesh.GetUVs(2, uv2);
+            mesh.GetColors(colors);
+
+            int vertexCount = vertices.Count;
+            if (vertexCount < 3 ||
+                normals.Count != vertexCount ||
+                tangents.Count != vertexCount ||
+                uv0.Count != vertexCount ||
+                uv2.Count != vertexCount ||
+                colors.Count != vertexCount)
+            {
+                throw new InvalidOperationException(
+                    "Generated Mass final render mesh contains an " +
+                    "incomplete vertex channel.");
+            }
+
+            for (int vertexIndex = 0;
+                 vertexIndex < vertexCount;
+                 vertexIndex++)
+            {
+                Vector3 position = vertices[vertexIndex];
+                Vector3 normal = normals[vertexIndex];
+                Vector4 tangent = tangents[vertexIndex];
+                Vector2 uv = uv0[vertexIndex];
+                Vector4 secondaryUv = uv2[vertexIndex];
+                Color color = colors[vertexIndex];
+                float normalMagnitudeSqr = normal.sqrMagnitude;
+                float tangentMagnitudeSqr =
+                    tangent.x * tangent.x +
+                    tangent.y * tangent.y +
+                    tangent.z * tangent.z;
+                if (!IsFiniteGeneratedRenderValue(position.x) ||
+                    !IsFiniteGeneratedRenderValue(position.y) ||
+                    !IsFiniteGeneratedRenderValue(position.z) ||
+                    !IsFiniteGeneratedRenderValue(normal.x) ||
+                    !IsFiniteGeneratedRenderValue(normal.y) ||
+                    !IsFiniteGeneratedRenderValue(normal.z) ||
+                    !IsFiniteGeneratedRenderValue(normalMagnitudeSqr) ||
+                    normalMagnitudeSqr < 0.99f ||
+                    normalMagnitudeSqr > 1.01f ||
+                    !IsFiniteGeneratedRenderValue(tangent.x) ||
+                    !IsFiniteGeneratedRenderValue(tangent.y) ||
+                    !IsFiniteGeneratedRenderValue(tangent.z) ||
+                    !IsFiniteGeneratedRenderValue(tangent.w) ||
+                    !IsFiniteGeneratedRenderValue(tangentMagnitudeSqr) ||
+                    tangentMagnitudeSqr < 0.99f ||
+                    tangentMagnitudeSqr > 1.01f ||
+                    Mathf.Abs(Mathf.Abs(tangent.w) - 1f) > 0.001f ||
+                    !IsFiniteGeneratedRenderValue(uv.x) ||
+                    !IsFiniteGeneratedRenderValue(uv.y) ||
+                    !IsFiniteGeneratedRenderValue(secondaryUv.x) ||
+                    !IsFiniteGeneratedRenderValue(secondaryUv.y) ||
+                    !IsFiniteGeneratedRenderValue(secondaryUv.z) ||
+                    !IsFiniteGeneratedRenderValue(secondaryUv.w) ||
+                    !IsFiniteGeneratedRenderValue(color.r) ||
+                    !IsFiniteGeneratedRenderValue(color.g) ||
+                    !IsFiniteGeneratedRenderValue(color.b) ||
+                    !IsFiniteGeneratedRenderValue(color.a))
+                {
+                    throw new InvalidOperationException(
+                        "Generated Mass final render mesh contains an " +
+                        "invalid channel value at vertex " +
+                        vertexIndex + ".");
+                }
+            }
+        }
+
+        private static bool IsFiniteGeneratedRenderValue(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private void RefreshStableWorldGeometryFingerprint()

@@ -1,10 +1,10 @@
 # Ground Generation and Surface Upgrade Plan
 
-## Current authoritative status — 2026-07-15
+## Current authoritative status — 2026-07-16
 
 The GeneratedGround Inspector and Painted Accent production workstream is complete, Unity-validated, and accepted through GI-A1–GI-A4 and PA-B1–PA-B4.1. **GeneratedGround and the broader Ground visual roadmap are not complete.**
 
-The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. **V3M — Broad Macro Patch Completion** is Unity-validated and accepted through V3M-A1.3.4: the shader now provides readable broad regions, authorable scale/seed/intensity/softness/separation, stable occupancy, bounded high-seed precision, meaningful pattern variation, and contour-only secondary distortion that materially reduces repeated circular islands. The active proof milestone is **V3R — Ground Elevation Readability**. V3R-A1 adds cheap value-only hillshading from the real Ground normal plus relative generated-height contrast, with both controls disabled by default and no geometry, collision, texture, generated-mask, or lighting-normal change. **V4 — Contact / Edge Accents** remains architecturally accepted and is queued after V3R gameplay-camera validation.
+The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. **V3M — Broad Macro Patch Completion** and **V3R — Ground Elevation Readability** are Unity-validated and visually accepted. The active milestone is **V3S — River-Coupled Ground Response**. On 2026-07-16 the user confirmed that V3S-A2C.4 solved Bank material spilling into ordinary Ground; its explicit `OrdinaryGround` / `RiverCorridor` renderer authorization, ordinary-Ground River-data cleanup, and complementary UV-layout invariants are now the frozen isolation baseline. **V3S-A3A — Bank Surface-Cover Retention and Retreat** is explicitly authorized and active. It consumes the selected Bank profile's existing vegetation, snow, frost, and Painted Accent retention without adding hydrology or changing River files. Ground-owned Bank and Riverbed Surface Layers remain authored on the main `GeneratedGround` component and are interpreted only on corridor-role geometry. **V4 — Contact / Edge Accents** remains queued after V3S and is restricted to GeneratedMass grounding plus explicitly participating GroundModifier boundaries. River banks and riverbeds never enter the V4 generated Contact field. The canonical V3S ownership, evidence, exact A3A scope, defaults, implementation sequence, and acceptance contract is `Ground_River_Coupled_Surface_Response_Architecture.md`.
 
 The accepted current pipeline is:
 
@@ -45,17 +45,70 @@ Ground or scene no longer needs its bake
 
 ## Next work items
 
-1. Treat V3M broad macro composition as accepted through V3M-A1.3.4.
-2. Unity-validate V3R-A1 from the gameplay camera with both controls at zero, then with restrained visible values.
-3. Confirm Relief Shading Strength reveals gentle slope direction without changing actual lighting normals or producing outlined bumps.
-4. Confirm Relative Height Contrast distinguishes higher and lower generated terrain without reading as another arbitrary mask.
-5. Resume V4 Contact / Edge Accents after the elevation-readability proof is accepted.
+1. Implement only the recorded V3S-A3A ten-file scope; do not modify River files, scenes, prefabs, materials, style assets, or starter layer assets.
+2. Add four zero-default Ground controls and one packed shader vector for vegetation, snow, frost, and Painted Accent retreat strength.
+3. Consume the existing Bank profile retention vector in all intended final-render paths while keeping raw Painted Accent coverage and debug modes `28–29` unchanged.
+4. Add debug modes `36–37` and preserve the accepted A2C.4 ordinary-Ground exclusion and modes `12`, `32–35`.
+5. Complete source parser, malformed-string, line-ending, scope, shared-include, and contract audits; Unity compilation remains pending outside this archive environment.
+6. Unity-validate A3A before authorizing A3B Shore hydrology; keep V4 queued until V3S family validation is complete.
 
 ---
 
+## V3S-A0/A1 — Canonical architecture and Riverbed Support proof
+
+**Status:** Unity-validated and visually accepted.
+
+The official River-coupled architecture and complete patch sequence are recorded in `Ground_River_Coupled_Surface_Response_Architecture.md`. V3S-A0/A1 corrects the canonical roadmap and consumes the River corridor's UV channel index `3` / HLSL `TEXCOORD3` contract in the Ground shader. `UV3.x` is forwarded as one `half` varying and exposed through debug mode `32`, `Ground Riverbed Support`. The shared `PixelSurfaceGroundResponse.hlsl` resolver returns zero for shader consumers that do not define Ground Riverbed Support, preserving `SH_PixelSurfaceLit` compatibility. This proof changes no normal lit material response.
+
+V3S-A0/A1 validation gate:
+
+1. Unity compiles both Ground and generic Pixel Surface shaders.
+2. Ordinary GeneratedGround is zero in the new debug view.
+3. Centre, FlatBedEdge, and BedSlope are one.
+4. HiddenCover, OuterBlend, and BuriedApron are zero except expected interpolation at the first transition strip.
+5. Existing Ground Shore output remains unchanged.
+6. Normal lit rendering remains unchanged.
+
+## V3S-A2A — Reusable surface-layer authoring foundation
+
+**Status:** Unity-validated and accepted.
+
+Adds `GroundSurfaceLayerProfile`, Bank and Riverbed profile references in `GroundMaterialControls`, six starter assets, automatic dropdown discovery, inline profile editing, and in-place create/duplicate actions under the main `GeneratedGround` Material Controls. Existing style assets remain unassigned and normal rendering is intentionally unchanged. The complete contract is in `Ground_River_Coupled_Surface_Response_Architecture.md`.
+
+
+## V3S-A2B — Bank material-composition proof
+
+**Status:** Unity-validated as the material-state and control proof. Its original spatial interpretation was incomplete because ordinary Ground could participate; V3S-A2C.1 restricts all Bank composition to the River corridor bank domain.
+
+Adds the Ground-owned `Bank Material Strength`, `Core Bank Reach`, `Immediate-Bank Exposure`, `Waterline Material Strength`, and `Core Bank Transition Softness` controls directly beneath the main GeneratedGround Surface Layers authoring. The selected Bank profile's base/dark/light palette, macro/pixel contrast, dry smoothness, and dry specular character are carried through the existing `MaterialPropertyBlock` path to the River corridor renderer. Debug modes `33` and `34` prove the scalar Bank material field and selected layer identity. No wetness, cover retreat, or Riverbed rendering is added.
+
+## V3S-A2C / A2C.1 / A2C.2 / A2C.3 / A2C.4 — Expanded Corridor-Owned Bank Composition Range
+
+**Status:** A2C ordinary-Ground ownership rejected by visual validation. A2C.1 corridor-owned bank distance is visually validated. A2C.2 empty-stream cleanup failed visual validation. A2C.3 remains an ordinary-Ground mesh-layout integrity safeguard. On 2026-07-16 the user confirmed that A2C.4 solved Bank material spilling into ordinary Ground. Its explicit renderer authorization and ordinary-Ground River-data cleanup are accepted and frozen as the isolation baseline.
+
+A2C.1 removes the generated Ground UV3 distance stream and extends the existing River corridor UV3 contract instead: X remains Riverbed Support, Y stores outward distance in metres from the support boundary, Z marks the corridor bank domain, and W remains zero. The main GeneratedGround Inspector retains the clear `Core Bank` and `Outer Bank Extension` groups. Core UV2.y weights and optional metre-based extension are both masked by corridor bank validity, so the selected layer starts at the bed edge, crosses `HiddenCover` and `OuterBlend`, and cannot create disconnected patches on ordinary Ground. Debug mode `35`, `Ground Outer Bank Extension`, isolates the optional corridor contribution. No wave analysis, generated texture, texture sample, new renderer, scene, prefab, or collider behavior is added.
+
+A2C.2 attempted to fix the migration defect by assigning an empty UV channel `3`, but visual validation proved that this did not reliably target the mesh attached to the Ground renderer and did not reset the retained vertex layout. A2C.3 supersedes that attempt as a data-integrity safeguard. `GeneratedGround` inspects the actual `MeshFilter.sharedMesh`, treats any attached `TEXCOORD3` as missing/invalid Ground geometry, resets the generated mesh layout with `Mesh.Clear(false)` before normal mesh application, and asserts afterward that ordinary Ground contains no `TEXCOORD3`.
+
+A2C.4 adds two independently justified corrections. Its exact thirteen-file scope, shared-include compatibility, central-resolver coverage, line endings, textual structure, and active-document consistency were audited, and on 2026-07-16 the user confirmed that the live Bank spill into ordinary Ground is solved. First, every Ground-profile property binding requires a mandatory `GroundSurfaceRenderRole`: the ordinary renderer writes `_GroundRiverCoupledEnabled = 0`, and all three River corridor bindings write `1`. The central shared response include gates Shore, Riverbed Support, Bank distance, and Bank domain while preserving generic Pixel Surface Shore behavior through preprocessor-safe fallback. Second, ordinary Ground no longer derives exposure, damp/deposit, vegetation, or `UV2.y` from River proximity; the corridor continues to publish its precise Shore signal and now asserts its four-component `TexCoord3` after writing the stream. Structural River concealment, handoff, regeneration orchestration, and explicit Painted Accent River exclusion remain unchanged. The explicit role is a containment and future-proofing contract, not a proven retrospective diagnosis. Complete evidence, scope, risks, and validation are recorded in `Ground_River_Coupled_Surface_Response_Architecture.md`.
+
+## V3S-A3A — Bank Surface-Cover Retention and Retreat
+
+**Status:** source implementation and post-change audit complete in the approved ten-file scope; Unity compilation and visual validation pending.
+
+A3A adds four zero-default Material-only controls under `River-Coupled Ground Response — Surface-Cover Response`: Vegetation Retreat Strength, Snow Melt Strength, Frost Retreat Strength, and Painted Accent Retreat Strength. The selected Bank profile already stores the four compatibility fractions, and `GeneratedGround` already transports them as `_GroundBankLayerCoverRetention`. A3A packs the new master strengths into `_GroundBankCoverRetreatStrength`, resolves effective retention through the accepted Bank material blend, and applies the four channels to existing vegetation, snow, frost, and Painted Accent consumers. Debug mode `36` displays vegetation/snow/frost retreat in RGB and mode `37` displays Painted Accent retreat. Raw Painted Accent modes `28–29`, A2C.4 role gating, ordinary-Ground UV3 absence, corridor UV3 semantics, Bank spatial math, hydrology, and Riverbed rendering remain unchanged.
+
+Approved scope, implementation formulas, and the post-change source audit are canonical in `Ground_River_Coupled_Surface_Response_Architecture.md`. The supplied archive has no `.git` metadata, so branch/HEAD/working-tree comparisons are unavailable and must be performed in the actual repository before integration. Unity must now validate the zero-default baseline, each independent retreat channel, debug modes `36–37`, ordinary-Ground exclusion, and persistence through refresh/regeneration before A3B is authorized.
+
+## V3S-A3B — Shore Hydrology and Legacy Wetness Refactor
+
+**Status:** planned only; not authorized as part of A3A.
+
+A3B will remove Shore from the existing generic damp/deposit and pooled-wetness formulas before applying one bounded local/global wetness response. It must not begin until A3A is Unity-validated.
+
 ## V3R-A1 — Ground Elevation Readability proof
 
-**Status:** Implemented; Unity validation pending.
+**Status:** Unity-validated and visually accepted.
 
 Gentle generated Ground elevation can disappear from the intended elevated gameplay camera because the surface normals remain close to vertical and the calm material palette provides few broad form cues. V3R-A1 adds two independent, Material-only value responses under `Material Controls > Elevation Readability`:
 
@@ -3373,13 +3426,15 @@ However, `TrampledWear` is now classified as a proof/experiment, not the next vi
 | 3 | Patch V2 — Base Ground Simplification | Implemented as an asset/docs retune. Snowfield and Wet Mudflat now use calmer matte bases with lower pixel variation, lower patch contrast, and reduced broad noise so future accents can sit on top. |
 | 4 | Patch V2B — Grassland Baseline Family | Implemented as a production `Grassland` family with Clean, Patchy, Damp, and Worn Meadow variants. Establishes the canonical three-family test set. |
 | 5 | Patch V3 — Shader Feature Stack + Painted Accent Lines | Implemented. Variants now use a real shader feature stack, and Painted Accent Lines are the first stackable doctrine layer. |
-| 6 | Patch V3M — Broad Macro Patch Completion | **Active milestone.** Replace visually insufficient broad noise with deliberate, readable, restrained macro-region composition. See `Ground_Macro_Patch_Audit_and_Architecture.md`. |
-| 7 | Patch V4 — Contact / Edge Accent Layer | **Queued after V3M.** Add localized accent response near shores, rocks, modifier boundaries, paths, banks, and object contact zones. Existing semantic masks provide style context; the audited production geometry is a separate generated contact field. See `Ground_Contact_Edge_Accent_Audit_and_Architecture.md`. |
-| 8 | Patch V5 — Sparse Motif Layer | Add reusable sparse marks such as chips, cracks, scuffs, stains, snow scratches, stones, or debris hints. Avoid stamp spam. |
-| 9 | Patch V6 — Feature Stack Authoring Polish | Add richer warnings, cost summaries, duplicate/combination guidance, and editor UX after more stack layers exist. |
-| 10 | Later | Ground Surface Runtime State Stub | Revisit runtime wetness, snow depth, compression, footprints, and disturbance after the static visual stack is accepted. |
-| 11 | Later | Footprints / Rain / Puddles / Grass Integration | Build on the runtime state contract only after the visual doctrine is stable. |
-| 12 | Future | Mixed Terrain / Profile Blending | Add explicit support for blended surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
+| 6 | Patch V3M — Broad Macro Patch Completion | **Accepted through V3M-A1.3.4.** See `Ground_Macro_Patch_Audit_and_Architecture.md`. |
+| 7 | Patch V3R — Ground Elevation Readability | **Accepted through V3R-A1.** Cheap value-only relief and relative-height cues; no geometry or lighting-normal change. |
+| 8 | Patch V3S — River-Coupled Ground Response | **Active.** Riverbed Support is proven. Implement reusable Bank/Riverbed Surface Layers, bank composition, cover retreat, hydrological finish, exact bed composition, optional profile detail, and family acceptance. See `Ground_River_Coupled_Surface_Response_Architecture.md`. |
+| 9 | Patch V4 — Contact / Edge Accent Layer | **Queued after V3S.** GeneratedMass grounding plus explicitly participating GroundModifier boundaries only. River is excluded. See `Ground_Contact_Edge_Accent_Audit_and_Architecture.md`. |
+| 10 | Patch V5 — Sparse Motif Layer | Add reusable sparse marks such as chips, cracks, scuffs, stains, snow scratches, stones, or debris hints. Avoid stamp spam. |
+| 11 | Patch V6 — Feature Stack Authoring Polish | Add richer warnings, cost summaries, duplicate/combination guidance, and editor UX after more stack layers exist. |
+| 12 | Later | Ground Surface Runtime State Stub | Revisit runtime wetness, snow depth, compression, footprints, and disturbance after the static visual stack is accepted. |
+| 13 | Later | Footprints / Rain / Puddles / Grass Integration | Build on the runtime state contract only after the visual doctrine is stable. |
+| 14 | Future | Mixed Terrain / Profile Blending | Add explicit support for blended surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
 
 ### Paused runtime roadmap
 
@@ -5144,7 +5199,7 @@ Vertex Color G = exposure / accumulation eligibility
 Vertex Color B = damp/deposit potential, including authored modifier boost
 Vertex Color A = vegetation suitability
 UV2.x = compaction/path/flatten influence
-UV2.y = shore influence
+UV2.y = shore influence at Patch T; reserved zero on ordinary Ground after V3S-A2C.4
 UV2.z = rocky/dry patch
 UV2.w = authored standing-water / puddle potential
 ```

@@ -15,10 +15,11 @@ Read these before implementing any candidate:
 1. `Assets/AGENTS.md`
 2. `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
 3. `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
-4. `Assets/Docs/River_Rendering_Roadmap.md`
-5. `Assets/Docs/River_Foam_Stage6_Architecture.md`
-6. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
-7. `Assets/Docs/Proof of Concept/09_Rock_And_River_Handoff.md`
+4. `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+5. `Assets/Docs/River_Rendering_Roadmap.md`
+6. `Assets/Docs/River_Foam_Stage6_Architecture.md`
+7. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+8. `Assets/Docs/Proof of Concept/09_Rock_And_River_Handoff.md`
 
 If this manual conflicts with a subsystem invariant in one of those documents, the subsystem invariant remains authoritative until the conflict is explicitly reviewed and accepted.
 
@@ -40,30 +41,37 @@ This manual defines a staged migration to:
 - coalesced editor lifecycle work without weakening synchronous readiness where it is required;
 - a future contributor/consumer contract that does not become a global arbitrary dependency graph.
 
-## V4 Contact / Edge Accent consumer boundary — 2026-07-15
+## V3S River-Coupled Ground Response boundary — updated 2026-07-16
 
-V4 Contact / Edge Accents is the next active Ground feature milestone. It consumes River structural data but does not become a River owner and must not introduce a Ground↔River regeneration loop.
-
-The accepted dataflow is:
+V3S is direct Ground-shader interpretation of River-owned corridor semantics. The River corridor publishes `UV2.y` shore/waterline influence and packed UV3 values: X = Riverbed Support, Y = outward bank distance from that support boundary, and Z = corridor-bank validity. Ordinary GeneratedGround writes zero to `UV2.y` and publishes no River-coupled UV3 stream. GeneratedGround still owns all appearance controls and applies the resolved material property block to both renderers, but every application must pass an explicit role: `OrdinaryGround` writes `_GroundRiverCoupledEnabled = 0`, while `RiverCorridor` writes `1`. Material-only refresh must preserve those roles; Bank Surface Layer composition is authorized only on the corridor draw.
 
 ```text
-River authoring
-→ authoritative StylizedRiverGroundSnapshot / River Domain
+River structural authoring
+→ rebuild River Domain/corridor geometry when structurally required
+→ publish current shore/waterline, Riverbed Support, and corridor-bank distance/domain channels
 
-Ground recipe + modifiers
-→ immutable GroundHeightFieldSnapshot
+Ground material authoring
+→ refresh Ground renderer property block with OrdinaryGround role
+→ refresh River corridor renderer property block with RiverCorridor role
+→ no Ground geometry or River structural rebuild
+```
 
-River snapshot + Ground snapshot + modifier snapshots + eligible generated geometry
-→ editor-time Contact Accent source snapshots
-→ Contact Accent coverage
+V3S adds no generated coverage texture, no River snapshot scan, and no post-Ground contour pass. River foam, transport, pressure, wakes, disturbances, and water optics remain separate owners.
+
+## Corrected V4 Contact / Edge Accent consumer boundary — 2026-07-15
+
+V4 begins after V3S and consumes only explicitly participating GroundModifier snapshots plus eligible GeneratedMass geometry. It has no River snapshot input and no River invalidation dependency.
+
+```text
+Ground snapshot + explicit modifier snapshots + eligible GeneratedMass geometry
+→ editor-time Contact source snapshots
+→ Ground-local Contact coverage
 → persistent Ground-owned production texture
 ```
 
-The Contact Accent pass may derive left/right visible-bank boundaries from the River snapshot. It must not infer the production bank from the coarse Ground shore mask, rebuild visible River geometry, mutate River Domain, or notify the River merely because contact coverage changed.
+River spline, width, corridor geometry, shore mask, Riverbed Support, water material, foam, or disturbance changes do not stale Contact coverage. Contact material-only changes do not invalidate Ground geometry, River Domain, River corridor geometry, Painted Accent placement, or River runtime state. Player runtime binds persistent Contact output only and performs no source evaluation.
 
-A River spline or visible-width change invalidates Contact Accent coverage through the existing Ground/River notification transaction. A Contact Accent material-only change does not invalidate Ground geometry, River Domain, River surface/corridor geometry, Painted Accent placement, or River runtime state. Player runtime binds persistent Contact Accent output only and performs no River snapshot evaluation for this feature.
-
-The detailed V4 contract is recorded in `Ground_Contact_Edge_Accent_Audit_and_Architecture.md`.
+The detailed V3S and V4 contracts are recorded in `Ground_River_Coupled_Surface_Response_Architecture.md` and `Ground_Contact_Edge_Accent_Audit_and_Architecture.md`.
 
 ## Accepted Painted Accent production boundary — 2026-07-15
 

@@ -191,10 +191,16 @@
                             (float)input.color.b));
                 float vertexVariation =
                     ((float)input.color.r - 0.5) * 2.0 * contractMask;
+                float bankMaterialBlend =
+                    ResolveGroundBankMaterialBlend(input);
+                float4 bankCoverRetention =
+                    ResolveGroundBankCoverRetention(bankMaterialBlend);
+                float effectiveFrostStrength =
+                    saturate(_FrostStrength) * bankCoverRetention.z;
                 float pixelProfileContrast =
                     max(0.0, _ProfilePixelContrast) *
                     lerp(1.0, 1.0 - saturate(_WetPixelSoftening), saturate(_Wetness)) *
-                    lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength)) *
+                    lerp(1.0, max(0.0, _FrostContrast), effectiveFrostStrength) *
                     lerp(1.0, 0.25, saturate(_MonolithicFlatten));
                 float fineTonalOffset =
                     (pixelVariation * _PixelVariation +
@@ -229,11 +235,14 @@
                 float groundSnowVisual = saturate(
                     pow(saturate(exposureMask), 0.82) *
                     max(0.0, _GroundSnowResponse) *
-                    (1.0 - groundDampVisual * 0.36));
+                    (1.0 - groundDampVisual * 0.36) *
+                    bankCoverRetention.y);
                 float groundRockyDryVisual = saturate(
                     groundRockyDry * max(0.0, _GroundRockyDryResponse));
                 float groundVegetationVisual = saturate(
-                    groundVegetation * max(0.0, _GroundVegetationResponse));
+                    groundVegetation *
+                    max(0.0, _GroundVegetationResponse) *
+                    bankCoverRetention.x);
                 float directionalFeature = ResolveGroundDirectionalStreakFeature(
                     input,
                     exposureMask,
@@ -254,13 +263,14 @@
                     contractMask);
                 float paintedAccentCoverage =
                     ResolveGroundPaintedAccentCoverage(input) *
+                    bankCoverRetention.w *
                     contractMask *
                     saturate(_GroundPaintedAccentInkOpacity);
 
 
                 float profileContrast =
                     max(0.0, _ProfileContrast) *
-                    lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
+                    lerp(1.0, max(0.0, _FrostContrast), effectiveFrostStrength);
                 float patchBlend =
                     saturate(_GroundPatchBlendStrength) * profileContrast;
                 float snowPatch = saturate(
@@ -286,6 +296,35 @@
                     _BaseColor.rgb *
                     tonalScale *
                     (half)max(0.0, groundSemanticScale);
+
+                float bankLayerSignedVariation = clamp(
+                    broadValue *
+                        max(0.0, _GroundBankLayerMacroContrast) *
+                        0.72 +
+                    pixelVariation *
+                        max(0.0, _GroundBankLayerPixelContrast) *
+                        0.20 +
+                    vertexVariation *
+                        max(0.0, _GroundBankLayerPixelContrast) *
+                        0.08,
+                    -1.0,
+                    1.0);
+                half3 bankLayerPalette =
+                    bankLayerSignedVariation < 0.0
+                        ? lerp(
+                            _GroundBankLayerBaseColor.rgb,
+                            _GroundBankLayerDarkColor.rgb,
+                            (half)(-bankLayerSignedVariation))
+                        : lerp(
+                            _GroundBankLayerBaseColor.rgb,
+                            _GroundBankLayerLightColor.rgb,
+                            (half)bankLayerSignedVariation);
+                half3 bankLayerAlbedo =
+                    baseSample.rgb * bankLayerPalette;
+                albedo = lerp(
+                    albedo,
+                    bankLayerAlbedo,
+                    (half)bankMaterialBlend);
 
                 // Separate snow value lift from snow hue. Ground Snow Brightness
                 // now controls luminance, while Ground Snow Tint Strength controls
@@ -489,6 +528,12 @@
                         min(
                             min((float)input.color.r, (float)input.color.g),
                             (float)input.color.b));
+                float bankMaterialBlend =
+                    ResolveGroundBankMaterialBlend(input);
+                float4 bankCoverRetention =
+                    ResolveGroundBankCoverRetention(bankMaterialBlend);
+                float effectiveFrostStrength =
+                    saturate(_FrostStrength) * bankCoverRetention.z;
                 float pooledWetnessFeature = ResolveGroundPooledWetnessFeature(
                     input,
                     ResolveGroundDampDepositMask(input),
@@ -509,9 +554,10 @@
                     ResolveGroundCompactionMask(input),
                     ResolveGroundShoreMask(input),
                     ResolveGroundRockyDryMask(input),
-                    contractMask);
+                    contractMask,
+                    bankCoverRetention.w);
 
-                return saturate(
+                half ordinarySmoothness = saturate(
                     (half)_Smoothness +
                     (half)_Wetness * (half)_WetSmoothnessBoost * 0.22h +
                     (half)pooledWetnessFeature * 0.025h -
@@ -519,7 +565,12 @@
                     (half)paintedAccentLinesFeature * 0.012h +
                     (half)_MonolithicFlatten *
                     (half)_MonolithicSmoothnessBoost -
-                    (half)_FrostStrength * 0.06h);
+                    (half)effectiveFrostStrength * 0.06h);
+                return saturate(
+                    lerp(
+                        ordinarySmoothness,
+                        (half)_GroundBankLayerDrySmoothness,
+                        (half)bankMaterialBlend));
             }
 
             InputData BuildInputData(Varyings input, half3 normalWS)
@@ -550,6 +601,10 @@
                         min(
                             min((float)input.color.r, (float)input.color.g),
                             (float)input.color.b));
+                float bankMaterialBlend =
+                    ResolveGroundBankMaterialBlend(input);
+                float4 bankCoverRetention =
+                    ResolveGroundBankCoverRetention(bankMaterialBlend);
                 float pooledWetnessFeature = ResolveGroundPooledWetnessFeature(
                     input,
                     ResolveGroundDampDepositMask(input),
@@ -570,7 +625,8 @@
                     ResolveGroundCompactionMask(input),
                     ResolveGroundShoreMask(input),
                     ResolveGroundRockyDryMask(input),
-                    contractMask);
+                    contractMask,
+                    bankCoverRetention.w);
 
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.albedo = albedo;
@@ -596,6 +652,10 @@
                         1.0h,
                         0.94h,
                         saturate((half)paintedAccentLinesFeature));
+                surfaceData.specular = lerp(
+                    surfaceData.specular,
+                    (half3)_GroundBankLayerDrySpecularStrength,
+                    (half)bankMaterialBlend);
                 surfaceData.metallic = 0.0h;
                 surfaceData.smoothness = ResolveGroundProfileSmoothness(input);
                 surfaceData.normalTS = half3(0.0h, 0.0h, 1.0h);

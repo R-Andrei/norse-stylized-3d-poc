@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using ProgrammaticStylized3D.Geometry;
 using ProgrammaticStylized3D.Geometry.Ground;
 
@@ -41,7 +42,7 @@ namespace ProgrammaticStylized3D.Rivers
         public bool TightBendWarning { get; }
         public bool IsValid => RingCount >= 2 && AcrossVertexCount >= 3;
     }
-    
+
 
     /// <summary>
     /// Builds the visible riverbed and banks independently from the broad ground
@@ -519,11 +520,17 @@ namespace ProgrammaticStylized3D.Rivers
                             corridorShoreInfluence,
                             groundSample.RockyDry,
                             groundSample.ReservedSurfaceMask));
+                    float riverBankDomain =
+                        ResolveRiverBankDomain(crossPoint);
                     riverMaterialMasks.Add(
                         new Vector4(
                             ResolveRiverbedSupport(crossPoint),
-                            0f,
-                            0f,
+                            riverBankDomain > 0.5f
+                                ? Mathf.Max(
+                                    0f,
+                                    acrossDistance - visibleHalfWidth)
+                                : 0f,
+                            riverBankDomain,
                             0f));
                     terrainIntegrationWeights.Add(
                         terrainIntegrationWeight);
@@ -562,6 +569,14 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             renderMesh.SetUVs(3, riverMaterialMasks);
+
+            if (!renderMesh.HasVertexAttribute(VertexAttribute.TexCoord3) ||
+                renderMesh.GetVertexAttributeDimension(
+                    VertexAttribute.TexCoord3) != 4)
+            {
+                throw new InvalidOperationException(
+                    "River corridor render geometry must contain a four-component TexCoord3 material-mask stream after build.");
+            }
 
             MeshBuilder.ApplyToMesh(
                 colliderData,
@@ -1229,6 +1244,18 @@ namespace ProgrammaticStylized3D.Rivers
                 CrossRegion.Centre => 1f,
                 CrossRegion.FlatBedEdge => 1f,
                 CrossRegion.BedSlope => 1f,
+                _ => 0f
+            };
+        }
+
+        private static float ResolveRiverBankDomain(CrossPoint point)
+        {
+            return point.Region switch
+            {
+                CrossRegion.BedSlope when point.T >= 0.9999f => 1f,
+                CrossRegion.HiddenCover => 1f,
+                CrossRegion.OuterBlend => 1f,
+                CrossRegion.BuriedApron => 1f,
                 _ => 0f
             };
         }
