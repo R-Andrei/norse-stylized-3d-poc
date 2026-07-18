@@ -138,6 +138,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public string Reason;
             public float Length;
             public float DihedralDegrees;
+            public float MacroBaseRequestedWidth;
+            public float MacroIdentity01;
+            public float MacroSampledMultiplier;
+            public float MacroEffectiveMultiplier;
+            public float MacroRequestedWidth;
+            public bool MacroMinimumStyleClamped;
 
             public EdgeWearDebugEdgeRecord(
                 int edgeIndex,
@@ -181,6 +187,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Reason = reason ?? string.Empty;
                 Length = length;
                 DihedralDegrees = dihedralDegrees;
+                MacroBaseRequestedWidth = 0f;
+                MacroIdentity01 = 0f;
+                MacroSampledMultiplier = 1f;
+                MacroEffectiveMultiplier = 1f;
+                MacroRequestedWidth = 0f;
+                MacroMinimumStyleClamped = false;
             }
         }
 
@@ -256,6 +268,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float ArtisticDeterministicVariation;
             public float ArtisticStrength;
             public float ArtisticDepthMultiplier;
+            public float MacroBaseRequestedWidth;
+            public float MacroIdentity01;
+            public float MacroSampledMultiplier = 1f;
+            public float MacroEffectiveMultiplier = 1f;
+            public int MacroMinimumStyleClamped;
             public float RequestedWidth;
             public float RequiredFootprintLength;
             public float LengthToWidthRatio;
@@ -308,6 +325,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public bool RequireAllGeometricCandidates;
             public int ShapeSeed;
             public float EdgeWearWidth;
+            public float EdgeWearMacroVariationCoverage;
+            public float EdgeWearMacroVariation;
+            public float MacroBaseRequestedWidth;
+            public float MacroMultiplierMinimum = 1f;
+            public float MacroMultiplierMedian = 1f;
+            public float MacroMultiplierMaximum = 1f;
+            public float MacroRequestedWidthMinimum;
+            public float MacroRequestedWidthMedian;
+            public float MacroRequestedWidthMaximum;
+            public int MacroEvaluatedEdgeCount;
+            public int MacroParticipantEdgeCount;
+            public int MacroVariedEdgeCount;
+            public int MacroMinimumStyleClampedEdgeCount;
+            public int MacroFeasibilityReducedEdgeCount;
+            public string MacroSignature = string.Empty;
             public double TotalMilliseconds;
             public double PreflightMilliseconds;
             public int RawSourceEdgeCount;
@@ -709,6 +741,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (!TryBeginEdgeWearBatchAuditCapture(
                     recipe.ShapeSeed,
                     surfaceFeatures.EdgeWearWidth,
+                    surfaceFeatures.EdgeWearMacroVariationCoverage,
+                    surfaceFeatures.EdgeWearMacroVariation,
                     requireAllGeometricCandidates,
                     out EdgeWearBatchAuditCaseResult immediateFailure))
             {

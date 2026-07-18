@@ -92,6 +92,10 @@ namespace ProgrammaticStylized3D.Rivers
         {
             return !resourcesDirty &&
                 currentState != null &&
+                previousState != null &&
+                writeState != null &&
+                presentationPreviousState != null &&
+                presentationPreviousState.IsCreated() &&
                 shapeMaskTexture != null &&
                 shapeMaskTexture.IsCreated() &&
                 filmSourceTexture != null &&
@@ -130,7 +134,21 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyMetricsBuffer != null &&
                 transportMetricsBuffer != null &&
                 domainVersion == river.Domain.Version &&
-                allocatedQuality == river.Quality;
+                allocatedQuality == river.Quality &&
+                !FoamGridConfigurationChanged();
+        }
+
+        private bool FoamGridConfigurationChanged()
+        {
+            if (river == null || allocatedFoamGridMode != river.FoamGridMode)
+            {
+                return river != null;
+            }
+
+            return river.FoamGridMode == StylizedRiverFoamGridMode.FixedMetric &&
+                !Mathf.Approximately(
+                    allocatedFoamRequestedCellSizeMetres,
+                    river.FoamFixedMetricRequestedCellSizeMetres);
         }
 
         private void RecordTopologyStartupRestartReasons()
@@ -157,6 +175,11 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyStartupDirtyReasons |=
                     TopologyStartupDirtyReason.QualityChanged;
             }
+            if (FoamGridConfigurationChanged())
+            {
+                topologyStartupDirtyReasons |=
+                    TopologyStartupDirtyReason.GridConfigurationChanged;
+            }
         }
 
         private bool InitializationInputsChanged()
@@ -172,7 +195,8 @@ namespace ProgrammaticStylized3D.Rivers
             return river == null ||
                 !river.Domain.IsValid ||
                 domainVersion != river.Domain.Version ||
-                allocatedQuality != river.Quality;
+                allocatedQuality != river.Quality ||
+                FoamGridConfigurationChanged();
         }
 
         private void AdvanceInitializationPhase()
@@ -239,6 +263,8 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         stateA = CreateFieldTexture("PS3D_RiverFoam_A");
                         stateB = CreateFieldTexture("PS3D_RiverFoam_B");
+                        presentationPreviousState = CreateFieldTexture(
+                            "PS3D_RiverFoam_PreviousCommitted");
                         shapeMaskTexture = CreateShapeMaskTexture(
                             "PS3D_RiverFoam_ShapeMask");
                         filmSourceTexture = CreateFilmTexture(
@@ -301,7 +327,7 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         neutralDisturbanceTexture =
                             CreateNeutralDisturbanceTexture();
-                        previousState = stateA;
+                        previousState = presentationPreviousState;
                         currentState = stateA;
                         writeState = stateB;
                         currentVisualOccupancy = visualOccupancyA;
@@ -542,6 +568,10 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         DispatchClear(stateA, 0, fieldWidth);
                         DispatchClear(stateB, 0, fieldWidth);
+                        DispatchClear(
+                            presentationPreviousState,
+                            0,
+                            fieldWidth);
                         ClearRenderTexture(shapeMaskTexture);
                         ClearRenderTexture(filmSourceTexture);
                         ClearRenderTexture(filmSupportTexture);
@@ -576,25 +606,35 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverFoamGridDescriptor.ValidateFoundation();
             StylizedRiverFoamTopologyCacheCodec.ValidateFoundation();
             StylizedRiverFoamTopologyFieldSpace.ValidateFoundation();
-            if (!TryResolveLegacyInitializationDescriptor(
-                    domain,
-                    maximumTextureSize,
-                    out StylizedRiverFoamGridDescriptor activeDescriptor))
+            ResolveFixedMetricCandidateDescriptor(
+                domain,
+                maximumTextureSize);
+
+            StylizedRiverFoamGridDescriptor activeDescriptor;
+            if (river.FoamGridMode ==
+                StylizedRiverFoamGridMode.FixedMetric)
+            {
+                if (!fixedMetricCandidateDescriptor.IsCreated)
+                {
+                    ReportFixedMetricAllocationFailure(maximumTextureSize);
+                    initializationPhase = InitializationPhase.Failed;
+                    return false;
+                }
+
+                activeDescriptor = fixedMetricCandidateDescriptor;
+                fixedMetricCandidateFailureReason =
+                    "Active fixed-metric selection";
+            }
+            else if (!TryResolveLegacyInitializationDescriptor(
+                         domain,
+                         maximumTextureSize,
+                         out activeDescriptor))
             {
                 ReportAllocationFailure(maximumTextureSize);
                 initializationPhase = InitializationPhase.Failed;
                 return false;
             }
 
-            ResolveFixedMetricCandidateDescriptor(
-                domain,
-                maximumTextureSize);
-
-            // P3 makes the descriptor the only allocation-dimension authority,
-            // but deliberately keeps LegacyNormalizedAcross active. Enabling
-            // the prepared fixed-metric candidate before P4-P9 would allow old
-            // cache, topology, source, compute, transport, and render consumers
-            // to observe a mixed coordinate state.
             ApplyGridDescriptorDimensions(activeDescriptor);
             gridDescriptorGpuData = gridDescriptor.ToGpuData();
 
@@ -609,6 +649,9 @@ namespace ProgrammaticStylized3D.Rivers
             allocationWarningReported = false;
             domainVersion = domain.Version;
             allocatedQuality = river.Quality;
+            allocatedFoamGridMode = river.FoamGridMode;
+            allocatedFoamRequestedCellSizeMetres =
+                river.FoamFixedMetricRequestedCellSizeMetres;
             initializationMotionTime = river.MotionTime;
             return true;
         }
@@ -679,8 +722,8 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            float requestedCellSize = StylizedRiverFoamGridDescriptor
-                .ResolveProvisionalRequestedCellSizeMetres(river.Quality);
+            float requestedCellSize =
+                river.FoamFixedMetricRequestedCellSizeMetres;
             if (!StylizedRiverFoamGridDescriptor.TryCreateFixedMetricOneStrip(
                     river.Quality,
                     requestedCellSize,
@@ -697,7 +740,10 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            fixedMetricCandidateFailureReason = "Ready; activation deferred";
+            fixedMetricCandidateFailureReason =
+                river.FoamGridMode == StylizedRiverFoamGridMode.FixedMetric
+                    ? "Ready; selected for activation"
+                    : "Ready; legacy compatibility selected";
         }
 
         private static bool TryResolveDomainSurfaceLateralRange(
@@ -909,6 +955,23 @@ namespace ProgrammaticStylized3D.Rivers
 
             resolvedWidth = (int)width;
             return true;
+        }
+
+        private void ReportFixedMetricAllocationFailure(
+            int maximumTextureSize)
+        {
+            if (allocationWarningReported)
+            {
+                return;
+            }
+
+            Debug.LogWarning(
+                $"Stage 6 Foam on '{name}' is disabled because the selected " +
+                $"fixed-metric field could not be allocated within the " +
+                $"hardware texture limit of {maximumTextureSize} pixels. " +
+                $"{fixedMetricCandidateFailureReason}",
+                this);
+            allocationWarningReported = true;
         }
 
         private void ReportAllocationFailure(int maximumTextureSize)
@@ -1181,6 +1244,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
             ReleaseTexture(ref stateA);
             ReleaseTexture(ref stateB);
+            ReleaseTexture(ref presentationPreviousState);
             ReleaseTexture(ref shapeMaskTexture);
             ReleaseTexture(ref filmSourceTexture);
             ReleaseTexture(ref filmSupportTexture);

@@ -1,15 +1,15 @@
 
 struct FoamSourceEventData
 {
-    // x = source type, y = side sign except Object Arc/Semi-Arc phase
-    // (0 Build, 1 Hold, 2 Release), z = phase/reveal progress, w = shape seed.
+    // x = source type, y = side sign except Object Arc/Semi-Arc deposition
+    // phase (Build = 0), z = reveal progress, w = shape seed.
     float4 header;
     // x/y = start/end storage global except Object Arc/Semi-Arc point 0;
     // z = centre storage global; w = flow direction except Object Arc/Semi-Arc point 1.x.
     float4 distance;
     // x = shore inset except Object Arc/Semi-Arc point 1.y; y = width metres
     // except Shore Ribbon thickness cells and Object Arc/Semi-Arc wake-arm length;
-    // z = inward reach or Arc/Semi-Arc material-step duration; w = feather or point 2.x.
+    // z = inward reach or Arc/Semi-Arc normalized material-step duration; w = feather or point 2.x.
     float4 shore;
     // x = source amount, y = remaining life, z = material pattern seed,
     // w = source fill feature size.
@@ -26,6 +26,11 @@ struct FoamSourceEventData
     // Object Arc/Semi-Arc point 4.y / front split; w = Fleck contact offset or
     // Arc/Semi-Arc source-local lateral cell spacing metres.
     float4 objectData;
+    // x = previous deposition side/phase, y = previous deposition progress,
+    // z = previous deposition state valid (0 on the first source tick), w reserved.
+    // Current deposition side/phase and progress remain header.y/z. Positive
+    // coverage difference gates the current absolute source target.
+    float4 deposit;
 };
 
 // RG-METRIC-P5 CPU/GPU descriptor ABI. The five float4 lanes mirror

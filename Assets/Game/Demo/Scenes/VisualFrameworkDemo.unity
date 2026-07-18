@@ -3237,7 +3237,19 @@ MonoBehaviour:
     outerBankExtension: 0
     outerBankStrength: 0.5
     outerBankFade: 1
+    bankDetailScaleMultiplier: 1
+    bankDetailNormalStrengthMultiplier: 1
+    bankDetailCavityStrengthMultiplier: 1
+    bankDetailValueFormMultiplier: 1
+    bankDetailFinishVariationMultiplier: 1
+    bankLegacyPixelCellInfluenceMultiplier: 1
     riverbedMaterialStrength: 1
+    riverbedDetailScaleMultiplier: 1
+    riverbedDetailNormalStrengthMultiplier: 1
+    riverbedDetailCavityStrengthMultiplier: 1
+    riverbedDetailValueFormMultiplier: 1
+    riverbedDetailFinishVariationMultiplier: 1
+    riverbedLegacyPixelCellInfluenceMultiplier: 1
     riverbedWetnessStrength: 1
     riverbedToBankWetnessBlendDistance: 0.2
     riverbedToBankWetnessBlendSoftness: 0.75
@@ -7855,7 +7867,7 @@ MonoBehaviour:
   overallRockTintStrength: 0
   lightingTintInfluence: 0.8
   edgeWearAmount: 0.238
-  edgeWearWidth: 0.198
+  edgeWearWidth: 0.344
   edgeWearCoverage: 2
   edgeWearSoftness: 0.258
   edgeWearResponseStrength: 1
@@ -7941,7 +7953,7 @@ MonoBehaviour:
     Request: 0
     Resolution: 0
     EdgeWearAmount: 0.238
-    EdgeWearWidth: 0.198
+    EdgeWearWidth: 0.344
     EdgeWearCoverage: 2
     EdgeWearSoftness: 0.258
     CreaseAmount: 1

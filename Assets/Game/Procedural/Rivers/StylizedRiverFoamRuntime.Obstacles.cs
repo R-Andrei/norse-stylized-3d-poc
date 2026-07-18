@@ -275,6 +275,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 ApplyBoundaryToState(stateA);
                 ApplyBoundaryToState(stateB);
+                ApplyBoundaryToState(presentationPreviousState);
             }
         }
 
@@ -382,8 +383,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
             else
             {
-                // Exact legacy signature lane. Do not change while the active
-                // runtime mapping remains LegacyNormalizedAcross.
+                // Exact legacy-compatibility signature lane. Do not change;
+                // caches and A/B comparisons rely on its historical identity.
                 hash = AccumulateHash(hash, 3);
             }
             hash = AccumulateHash(hash, river != null ? river.VisualSeed : 0);
@@ -534,7 +535,15 @@ namespace ProgrammaticStylized3D.Rivers
                 motionLaneRawValues,
                 Mathf.Clamp01(neutralCoverage));
             const float minimumLaneMotionMagnitude = 0.125f;
+            const float nearNeutralIntentThreshold = 0.15f;
             float denominator = Mathf.Max(0.0001f, 1f - neutralThreshold);
+            float minimumIntent = 1f;
+            float maximumIntent = -1f;
+            double absoluteIntentSum = 0.0;
+            double squaredIntentSum = 0.0;
+            int positiveCount = 0;
+            int negativeCount = 0;
+            int nearNeutralCount = 0;
             for (int index = 0; index < cellCount; index++)
             {
                 float raw = motionLaneRawValues[index];
@@ -568,7 +577,86 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 motionLaneHalfData[index] = Mathf.FloatToHalf(resolved);
+                minimumIntent = Mathf.Min(minimumIntent, resolved);
+                maximumIntent = Mathf.Max(maximumIntent, resolved);
+                absoluteIntentSum += Mathf.Abs(resolved);
+                squaredIntentSum += resolved * resolved;
+                if (resolved > nearNeutralIntentThreshold)
+                {
+                    positiveCount++;
+                }
+                else if (resolved < -nearNeutralIntentThreshold)
+                {
+                    negativeCount++;
+                }
+                else
+                {
+                    nearNeutralCount++;
+                }
             }
+
+            int lateralFaceCount = Mathf.Max(0, fieldWidth * (fieldHeight - 1));
+            double absoluteFaceIntentSum = 0.0;
+            double squaredFaceIntentSum = 0.0;
+            double uncancelledFaceMagnitudeSum = 0.0;
+            double cancelledFaceMagnitudeSum = 0.0;
+            int opposingFaceCount = 0;
+            for (int y = 0; y < fieldHeight - 1; y++)
+            {
+                int lowerRowOffset = y * fieldWidth;
+                int upperRowOffset = (y + 1) * fieldWidth;
+                for (int x = 0; x < fieldWidth; x++)
+                {
+                    float lower = Mathf.HalfToFloat(
+                        motionLaneHalfData[lowerRowOffset + x]);
+                    float upper = Mathf.HalfToFloat(
+                        motionLaneHalfData[upperRowOffset + x]);
+                    float faceIntent = 0.5f * (lower + upper);
+                    float uncancelledMagnitude = 0.5f * (
+                        Mathf.Abs(lower) + Mathf.Abs(upper));
+                    absoluteFaceIntentSum += Mathf.Abs(faceIntent);
+                    squaredFaceIntentSum += faceIntent * faceIntent;
+                    uncancelledFaceMagnitudeSum += uncancelledMagnitude;
+                    cancelledFaceMagnitudeSum += Mathf.Max(
+                        0f,
+                        uncancelledMagnitude - Mathf.Abs(faceIntent));
+                    if (lower * upper < 0f &&
+                        Mathf.Abs(lower) > nearNeutralIntentThreshold &&
+                        Mathf.Abs(upper) > nearNeutralIntentThreshold)
+                    {
+                        opposingFaceCount++;
+                    }
+                }
+            }
+
+            float inverseCellCount = cellCount > 0 ? 1f / cellCount : 0f;
+            float inverseFaceCount = lateralFaceCount > 0
+                ? 1f / lateralFaceCount
+                : 0f;
+            lastMotionLaneMinimumIntent = cellCount > 0 ? minimumIntent : 0f;
+            lastMotionLaneMaximumIntent = cellCount > 0 ? maximumIntent : 0f;
+            lastMotionLaneMeanAbsoluteIntent =
+                (float)(absoluteIntentSum * inverseCellCount);
+            lastMotionLaneRootMeanSquareIntent = Mathf.Sqrt(
+                Mathf.Max(0f, (float)(squaredIntentSum * inverseCellCount)));
+            lastMotionLanePositiveFraction = positiveCount * inverseCellCount;
+            lastMotionLaneNegativeFraction = negativeCount * inverseCellCount;
+            lastMotionLaneNearNeutralFraction =
+                nearNeutralCount * inverseCellCount;
+            lastMotionLaneMeanAbsoluteFaceIntent =
+                (float)(absoluteFaceIntentSum * inverseFaceCount);
+            lastMotionLaneRootMeanSquareFaceIntent = Mathf.Sqrt(
+                Mathf.Max(
+                    0f,
+                    (float)(squaredFaceIntentSum * inverseFaceCount)));
+            lastMotionLaneOpposingFaceFraction =
+                opposingFaceCount * inverseFaceCount;
+            lastMotionLaneFaceCancellationRatio =
+                uncancelledFaceMagnitudeSum > 0.000001
+                    ? Mathf.Clamp01((float)(
+                        cancelledFaceMagnitudeSum /
+                        uncancelledFaceMagnitudeSum))
+                    : 0f;
 
             motionLaneTexture.SetPixelData(motionLaneHalfData, 0);
             motionLaneTexture.Apply(false, false);

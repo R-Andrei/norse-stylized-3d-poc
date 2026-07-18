@@ -26,13 +26,18 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Generated Array",
+                "Generated Arrays",
                 EditorStyles.boldLabel);
 
             Texture2DArray array = library.GeneratedTextureArray;
             EditorGUILayout.ObjectField(
-                "Texture Array",
+                "Packed Detail Array",
                 array,
+                typeof(Texture2DArray),
+                false);
+            EditorGUILayout.ObjectField(
+                "Authored Color Array",
+                library.GeneratedAuthoredColorArray,
                 typeof(Texture2DArray),
                 false);
             EditorGUILayout.LabelField(
@@ -52,7 +57,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
             using (new EditorGUI.DisabledScope(validation.Count > 0))
             {
-                if (GUILayout.Button("Rebuild Packed Detail Array"))
+                if (GUILayout.Button("Rebuild Surface Material Arrays"))
                 {
                     StylizedSurfaceDetailLibraryBuilder.Rebuild(library);
                 }

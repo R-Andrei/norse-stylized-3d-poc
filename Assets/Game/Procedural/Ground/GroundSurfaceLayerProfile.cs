@@ -127,6 +127,32 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ? surfaceMaterial.CavityColor
                 : darkColor;
         public Color WetColor => wetColor;
+        public StylizedSurfaceMaterialPayloadMode PayloadMode =>
+            surfaceMaterial != null
+                ? surfaceMaterial.PayloadMode
+                : StylizedSurfaceMaterialPayloadMode.PaletteDetail;
+        public bool UsesAuthoredColor =>
+            surfaceMaterial != null && surfaceMaterial.UsesAuthoredColor;
+        public float AuthoredColorStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.AuthoredColorStrength
+                : 0f;
+        public Color AuthoredColorTint =>
+            surfaceMaterial != null
+                ? surfaceMaterial.AuthoredColorTint
+                : Color.white;
+        public float AuthoredColorTintStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.AuthoredColorTintStrength
+                : 0f;
+        public float AuthoredColorLightingStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.AuthoredColorLightingStrength
+                : 1f;
+        public float AuthoredRoughnessStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.AuthoredRoughnessStrength
+                : 0f;
         public float MacroContrast =>
             surfaceMaterial != null
                 ? surfaceMaterial.MacroContrast
@@ -189,6 +215,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             return surfaceMaterial != null &&
                    surfaceMaterial.TryResolveDetail(
+                       out textureArray,
+                       out sliceIndex);
+        }
+
+        public bool TryResolveAuthoredColor(
+            out Texture2DArray textureArray,
+            out int sliceIndex)
+        {
+            textureArray = null;
+            sliceIndex = -1;
+
+            return surfaceMaterial != null &&
+                   surfaceMaterial.TryResolveAuthoredColor(
                        out textureArray,
                        out sliceIndex);
         }

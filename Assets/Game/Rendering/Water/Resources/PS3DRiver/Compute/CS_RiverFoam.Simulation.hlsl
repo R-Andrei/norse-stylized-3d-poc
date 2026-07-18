@@ -322,8 +322,16 @@ void FoamResolveLongitudinalFaceFlux(
     }
 }
 
-float4 FoamResolveLateralFaceFlux(int x, int lowerY)
+float4 FoamResolveLateralFaceFlux(
+    int x,
+    int lowerY,
+    out float faceVelocity,
+    out float donorPresence,
+    out float faceLength)
 {
+    faceVelocity = 0.0;
+    donorPresence = 0.0;
+    faceLength = 0.0;
     int2 lowerCoordinate = int2(x, lowerY);
     int2 upperCoordinate = int2(x, lowerY + 1);
     if (!FoamTransportInsideSimulation(lowerCoordinate) ||
@@ -352,12 +360,26 @@ float4 FoamResolveLateralFaceFlux(int x, int lowerY)
     float upperVelocity = FoamResolveGridVelocity(
         upperCoordinate,
         upperValid).y;
-    float faceVelocity = 0.5 * (lowerVelocity + upperVelocity);
+    faceVelocity = 0.5 * (lowerVelocity + upperVelocity);
     float4 donor = faceVelocity >= 0.0
         ? lowerPacked
         : upperPacked;
-    return faceVelocity *
-        FoamTransportLateralFaceLength(x, lowerY) * donor;
+    donorPresence = donor.x;
+    faceLength = FoamTransportLateralFaceLength(x, lowerY);
+    return faceVelocity * faceLength * donor;
+}
+
+float4 FoamResolveLateralFaceFlux(int x, int lowerY)
+{
+    float ignoredVelocity;
+    float ignoredPresence;
+    float ignoredLength;
+    return FoamResolveLateralFaceFlux(
+        x,
+        lowerY,
+        ignoredVelocity,
+        ignoredPresence,
+        ignoredLength);
 }
 
 uint FoamTransportFixedPoint(float value)
@@ -365,6 +387,38 @@ uint FoamTransportFixedPoint(float value)
     float scaled = max(0.0, value) *
         max(1.0, _FoamTransportMetricFixedPointScale);
     return (uint)min(4294967040.0, floor(scaled + 0.5));
+}
+
+void FoamAccumulateLateralTransportEvidence(
+    float faceVelocity,
+    float donorPresence,
+    float faceLength,
+    float presenceFlux)
+{
+    if (_FoamTransportMetricsEnabled == 0 ||
+        donorPresence <= FoamMaterialStateEpsilon ||
+        faceLength <= 0.0)
+    {
+        return;
+    }
+
+    float weight = donorPresence * faceLength;
+    float movement = _FoamDeltaTime * abs(presenceFlux);
+    uint ignored;
+    _FoamTransportMetrics.InterlockedAdd(
+        FoamTransportLateralWeightedSpeedNumeratorOffset,
+        FoamTransportFixedPoint(abs(faceVelocity) * weight),
+        ignored);
+    _FoamTransportMetrics.InterlockedAdd(
+        FoamTransportLateralWeightedSpeedWeightOffset,
+        FoamTransportFixedPoint(weight),
+        ignored);
+    _FoamTransportMetrics.InterlockedAdd(
+        presenceFlux >= 0.0
+            ? FoamTransportLateralPositiveMovementOffset
+            : FoamTransportLateralNegativeMovementOffset,
+        FoamTransportFixedPoint(movement),
+        ignored);
 }
 
 void FoamAccumulateTransportTriplet(

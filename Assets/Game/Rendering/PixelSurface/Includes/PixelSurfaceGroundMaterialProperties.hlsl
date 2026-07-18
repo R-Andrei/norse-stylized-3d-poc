@@ -38,6 +38,8 @@
                 float _GroundBankLayerDrySmoothness;
                 float _GroundBankLayerDrySpecularStrength;
                 half4 _GroundBankLayerCavityColor;
+                float4 _GroundBankLayerAuthoredColorA;
+                half4 _GroundBankLayerAuthoredColorTint;
                 float4 _GroundBankLayerDetailA;
                 float4 _GroundBankLayerDetailB;
                 float4 _GroundBankLayerDetailC;
@@ -52,6 +54,8 @@
                 float _GroundRiverbedLayerDrySmoothness;
                 float _GroundRiverbedLayerDrySpecularStrength;
                 half4 _GroundRiverbedLayerCavityColor;
+                float4 _GroundRiverbedLayerAuthoredColorA;
+                half4 _GroundRiverbedLayerAuthoredColorTint;
                 float4 _GroundRiverbedLayerDetailA;
                 float4 _GroundRiverbedLayerDetailB;
                 float4 _GroundRiverbedLayerDetailC;

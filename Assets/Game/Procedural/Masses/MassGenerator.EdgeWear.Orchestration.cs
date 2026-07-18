@@ -272,12 +272,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 else if (applyBoundedSingleEdgePreview)
                 {
+                    float boundedRequestedWidth = requestedWidth;
+                    List<EdgeWearSelectedGraphEdge> boundedEligible =
+                        BuildBoundedSingleEdgeEligibleList(context);
+                    if (boundedEdgeOrdinal >= 0 &&
+                        boundedEdgeOrdinal < boundedEligible.Count)
+                    {
+                        boundedRequestedWidth =
+                            ResolveEdgeWearRequestedWidth(
+                                coverageAudit,
+                                boundedEligible[boundedEdgeOrdinal]
+                                    .GraphEdgeIndex,
+                                requestedWidth);
+                    }
                     BoundedSingleEdgeAuditResult boundedAudit =
                         AuditBoundedSingleEdgeBevel(
                             edgeWearFaces,
                             context,
                             boundedEdgeOrdinal,
-                            requestedWidth,
+                            boundedRequestedWidth,
                             minimumStableEdgeLength,
                             minimumStableFaceArea,
                             true,
@@ -975,6 +988,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         ? lifecycle.DihedralDegrees
                         : 0f);
                 records[edgeIndex].GraphEdgeIndex = edgeIndex;
+                if (lifecycle != null && lifecycle.Viability != null)
+                {
+                    EdgeWearEdgeViabilityRecord viability =
+                        lifecycle.Viability;
+                    records[edgeIndex].MacroBaseRequestedWidth =
+                        viability.BaseRequestedWidth;
+                    records[edgeIndex].MacroIdentity01 =
+                        viability.MacroIdentity01;
+                    records[edgeIndex].MacroSampledMultiplier =
+                        viability.MacroSampledMultiplier;
+                    records[edgeIndex].MacroEffectiveMultiplier =
+                        viability.MacroEffectiveMultiplier;
+                    records[edgeIndex].MacroRequestedWidth =
+                        viability.RequestedWidth;
+                    records[edgeIndex].MacroMinimumStyleClamped =
+                        viability.MacroMinimumStyleClamped;
+                }
             }
 
             for (int suppressedIndex = 0;
@@ -2899,6 +2929,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 record.CoexistenceFailureReason ?? string.Empty;
             if (viabilityFailure ==
                     "maximum-feasible-width-below-minimum-scale" ||
+                viabilityFailure ==
+                    "maximum-certified-width-at-stable-width-floor" ||
                 coexistenceFailure == "global-width-floor-conflict" ||
                 coexistenceFailure == "corner-width-missing" ||
                 coexistenceFailure == "corner-width-inactive" ||

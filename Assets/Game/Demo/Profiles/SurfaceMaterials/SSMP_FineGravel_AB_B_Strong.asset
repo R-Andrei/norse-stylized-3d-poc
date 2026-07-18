@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f12659a811e34f53a1ea4f46239acb3a, type: 3}
+  m_Name: SSMP_FineGravel_AB_B_Strong
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Rendering.PixelSurface.StylizedSurfaceMaterialProfile
+  displayName: Fine Gravel A5 - Strong Rim
+  baseColor: {r: 0.45, g: 0.42, b: 0.36, a: 1}
+  darkColor: {r: 0.21, g: 0.19, b: 0.17, a: 1}
+  lightColor: {r: 0.70, g: 0.65, b: 0.56, a: 1}
+  cavityColor: {r: 0.055, g: 0.045, b: 0.038, a: 1}
+  macroContrast: 0.22
+  legacyPixelCellInfluence: 0
+  detailValueStrength: 1.08
+  detailEnabled: 1
+  detailLibrary: {fileID: 11400000, guid: 76da696691df47bd838dd4853da01588, type: 2}
+  detailEntryId: fine-gravel-ab-b-strong
+  detailWorldScale: 1.65
+  detailNormalStrength: 0.76
+  detailCavityStrength: 0.78
+  detailCavityBias: 0.40
+  detailFormHighlightStrength: 0.88
+  drySmoothness: 0.08
+  drySpecularStrength: 0.05
+  finishVariationStrength: 0.045

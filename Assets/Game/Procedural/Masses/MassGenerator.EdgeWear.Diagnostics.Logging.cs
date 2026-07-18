@@ -35,6 +35,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             public int ShapeSeed;
             public float EdgeWearWidth;
+            public float EdgeWearMacroVariationCoverage;
+            public float EdgeWearMacroVariation;
             public bool RequireAllGeometricCandidates;
             public bool AuditCaptured;
             public PlaneCutBevelAuditResult Audit;
@@ -52,6 +54,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static bool TryBeginEdgeWearBatchAuditCapture(
             int shapeSeed,
             float edgeWearWidth,
+            float edgeWearMacroVariationCoverage,
+            float edgeWearMacroVariation,
             bool requireAllGeometricCandidates,
             out EdgeWearBatchAuditCaseResult immediateFailure)
         {
@@ -62,6 +66,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     ShapeSeed = shapeSeed,
                     EdgeWearWidth = edgeWearWidth,
+                    EdgeWearMacroVariationCoverage =
+                        edgeWearMacroVariationCoverage,
+                    EdgeWearMacroVariation = edgeWearMacroVariation,
                     RequireAllGeometricCandidates =
                         requireAllGeometricCandidates,
                     PrimaryFailure =
@@ -75,6 +82,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     ShapeSeed = shapeSeed,
                     EdgeWearWidth = edgeWearWidth,
+                    EdgeWearMacroVariationCoverage =
+                        edgeWearMacroVariationCoverage,
+                    EdgeWearMacroVariation = edgeWearMacroVariation,
                     RequireAllGeometricCandidates =
                         requireAllGeometricCandidates
                 };
@@ -97,6 +107,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     EdgeWearWidth = capture == null
                         ? 0f
                         : capture.EdgeWearWidth,
+                    EdgeWearMacroVariationCoverage = capture == null
+                        ? 0f
+                        : capture.EdgeWearMacroVariationCoverage,
+                    EdgeWearMacroVariation = capture == null
+                        ? 0f
+                        : capture.EdgeWearMacroVariation,
                     RequireAllGeometricCandidates = capture != null &&
                         capture.RequireAllGeometricCandidates,
                     TotalMilliseconds = totalMilliseconds,
@@ -148,7 +164,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     evaluationException.GetType().Name + ":" +
                     evaluationException.Message;
             }
-            else if (string.IsNullOrEmpty(result.PrimaryFailure) &&
+            else if ((string.IsNullOrEmpty(result.PrimaryFailure) ||
+                string.Equals(
+                    result.PrimaryFailure,
+                    "none",
+                    StringComparison.Ordinal)) &&
                 !string.IsNullOrEmpty(capture.CornerBlocker))
             {
                 result.PrimaryFailure = capture.CornerBlocker;
@@ -225,6 +245,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             result.ArtisticEligibleCount = coverage == null
                 ? 0
                 : coverage.ArtisticEligibleCount;
+            PopulateEdgeWearMacroAuditResult(result, coverage);
             PopulateEdgeWearArtisticAuditResult(result, coverage);
             PopulateEdgeWearArtisticEdgeRecords(result, coverage);
             result.CandidateCount = coverage == null
@@ -430,7 +451,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EdgeWearCoverageAudit coverage = audit.CoverageAudit;
             GeneratedGeometryStableHashBuilder evaluation =
                 GeneratedGeometryStableHashBuilder.Create(
-                    "PS3D.GeneratedMass.EdgeWear.Evaluation.v2");
+                    "PS3D.GeneratedMass.EdgeWear.Evaluation.v3");
             evaluation.AddInt32(coverage == null
                 ? 0
                 : coverage.SourceEdgeCount);
@@ -449,6 +470,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             evaluation.AddInt32(coverage == null
                 ? 0
                 : coverage.BuiltCount);
+            evaluation.AddSingle(
+                result.EdgeWearMacroVariationCoverage);
+            evaluation.AddSingle(result.EdgeWearMacroVariation);
+            evaluation.AddString(result.MacroSignature);
             evaluation.AddFingerprint(
                 audit.ExclusionReasonFingerprint);
             evaluation.AddFingerprint(audit.SelectedEdgeFingerprint);
@@ -2553,6 +2578,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.AppendLine(FormatEdgeWearCoverageSummary(
                 audit.CoverageAudit));
             builder.AppendLine();
+            builder.AppendLine("[Macro Width Variation]");
+            builder.AppendLine(FormatEdgeWearMacroVariationSummary(
+                audit.CoverageAudit));
+            builder.AppendLine();
             builder.AppendLine("[Micro Topology Normalization]");
             builder.AppendLine(FormatEdgeWearMicroTopologyNormalization(
                 audit.CoverageAudit));
@@ -2953,6 +2982,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     };
                 if (viability != null)
                 {
+                    target.MacroBaseRequestedWidth =
+                        viability.BaseRequestedWidth;
+                    target.MacroIdentity01 = viability.MacroIdentity01;
+                    target.MacroSampledMultiplier =
+                        viability.MacroSampledMultiplier;
+                    target.MacroEffectiveMultiplier =
+                        viability.MacroEffectiveMultiplier;
+                    target.MacroMinimumStyleClamped =
+                        viability.MacroMinimumStyleClamped ? 1 : 0;
                     target.RequestedWidth = viability.RequestedWidth;
                     target.RequiredFootprintLength =
                         viability.RequiredFootprintLength;
@@ -3029,6 +3067,122 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     : left.Start.z.CompareTo(right.Start.z);
             });
             result.ArtisticEdges = records.ToArray();
+        }
+
+        private static void PopulateEdgeWearMacroAuditResult(
+            EdgeWearBatchAuditCaseResult result,
+            EdgeWearCoverageAudit coverage)
+        {
+            if (result == null || coverage == null ||
+                coverage.Records == null)
+            {
+                return;
+            }
+
+            result.EdgeWearMacroVariationCoverage =
+                coverage.MacroVariationCoverage;
+            result.EdgeWearMacroVariation = coverage.MacroVariation;
+            result.MacroBaseRequestedWidth =
+                coverage.MacroBaseRequestedWidth;
+            List<EdgeWearEdgeLifecycleRecord> ordered =
+                new List<EdgeWearEdgeLifecycleRecord>(coverage.Records);
+            ordered.Sort((left, right) =>
+                ResolveEdgeWearDisplaySourceEdgeIndex(coverage, left).
+                    CompareTo(
+                        ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverage,
+                            right)));
+            List<float> multipliers = new List<float>();
+            List<float> widths = new List<float>();
+            StringBuilder signature = new StringBuilder(1024);
+            for (int recordIndex = 0;
+                 recordIndex < ordered.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord lifecycle =
+                    ordered[recordIndex];
+                EdgeWearEdgeViabilityRecord viability =
+                    lifecycle.Viability;
+                if (viability == null ||
+                    lifecycle.MicroTopologySuppressed ||
+                    lifecycle.MicroTopologyGeneratedTransition ||
+                    viability.BaseRequestedWidth <= PointMergeDistance)
+                {
+                    continue;
+                }
+
+                multipliers.Add(viability.MacroEffectiveMultiplier);
+                widths.Add(viability.RequestedWidth);
+                result.MacroEvaluatedEdgeCount++;
+                if (viability.MacroVariationParticipates)
+                {
+                    result.MacroParticipantEdgeCount++;
+                }
+                if (viability.MacroEffectiveMultiplier < 0.999999f)
+                {
+                    result.MacroVariedEdgeCount++;
+                }
+                if (viability.MacroMinimumStyleClamped)
+                {
+                    result.MacroMinimumStyleClampedEdgeCount++;
+                }
+                if (viability.MaximumLocallyFeasibleWidth >
+                        PointMergeDistance &&
+                    viability.MaximumLocallyFeasibleWidth +
+                        PointMergeDistance < viability.RequestedWidth)
+                {
+                    result.MacroFeasibilityReducedEdgeCount++;
+                }
+
+                signature.Append(
+                    ResolveEdgeWearDisplaySourceEdgeIndex(
+                        coverage,
+                        lifecycle));
+                signature.Append(':');
+                signature.Append(
+                    viability.MacroParticipationIdentity01.ToString(
+                        "R",
+                        CultureInfo.InvariantCulture));
+                signature.Append(':');
+                signature.Append(
+                    viability.MacroVariationParticipates ? '1' : '0');
+                signature.Append(':');
+                signature.Append(viability.MacroIdentity01.ToString(
+                    "R",
+                    CultureInfo.InvariantCulture));
+                signature.Append(':');
+                signature.Append(
+                    viability.MacroSampledMultiplier.ToString(
+                        "R",
+                        CultureInfo.InvariantCulture));
+                signature.Append(':');
+                signature.Append(
+                    viability.MacroEffectiveMultiplier.ToString(
+                        "R",
+                        CultureInfo.InvariantCulture));
+                signature.Append(':');
+                signature.Append(viability.RequestedWidth.ToString(
+                    "R",
+                    CultureInfo.InvariantCulture));
+                signature.Append(';');
+            }
+
+            multipliers.Sort();
+            widths.Sort();
+            if (multipliers.Count > 0)
+            {
+                result.MacroMultiplierMinimum = multipliers[0];
+                result.MacroMultiplierMedian = ResolveEdgeWearSortedMedian(
+                    multipliers);
+                result.MacroMultiplierMaximum =
+                    multipliers[multipliers.Count - 1];
+                result.MacroRequestedWidthMinimum = widths[0];
+                result.MacroRequestedWidthMedian = ResolveEdgeWearSortedMedian(
+                    widths);
+                result.MacroRequestedWidthMaximum =
+                    widths[widths.Count - 1];
+            }
+            result.MacroSignature = signature.ToString();
         }
 
         private static void PopulateEdgeWearArtisticAuditResult(
@@ -3587,6 +3741,111 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return string.Join("/", ids);
         }
 
+        private static float ResolveEdgeWearSortedMedian(
+            List<float> sorted)
+        {
+            if (sorted == null || sorted.Count == 0)
+            {
+                return 0f;
+            }
+            int middle = sorted.Count / 2;
+            return (sorted.Count & 1) == 0
+                ? (sorted[middle - 1] + sorted[middle]) * 0.5f
+                : sorted[middle];
+        }
+
+        private static string FormatEdgeWearMacroVariationSummary(
+            EdgeWearCoverageAudit audit)
+        {
+            if (audit == null || audit.Records == null)
+            {
+                return "notCaptured";
+            }
+
+            List<float> multipliers = new List<float>();
+            List<float> widths = new List<float>();
+            int participants = 0;
+            int varied = 0;
+            int minimumStyleClamped = 0;
+            int feasibilityReduced = 0;
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord lifecycle =
+                    audit.Records[recordIndex];
+                EdgeWearEdgeViabilityRecord viability =
+                    lifecycle.Viability;
+                if (viability == null ||
+                    lifecycle.MicroTopologySuppressed ||
+                    lifecycle.MicroTopologyGeneratedTransition ||
+                    viability.BaseRequestedWidth <= PointMergeDistance)
+                {
+                    continue;
+                }
+
+                multipliers.Add(viability.MacroEffectiveMultiplier);
+                widths.Add(viability.RequestedWidth);
+                if (viability.MacroVariationParticipates)
+                {
+                    participants++;
+                }
+                if (viability.MacroEffectiveMultiplier < 0.999999f)
+                {
+                    varied++;
+                }
+                if (viability.MacroMinimumStyleClamped)
+                {
+                    minimumStyleClamped++;
+                }
+                if (viability.MaximumLocallyFeasibleWidth >
+                        PointMergeDistance &&
+                    viability.MaximumLocallyFeasibleWidth +
+                        PointMergeDistance < viability.RequestedWidth)
+                {
+                    feasibilityReduced++;
+                }
+            }
+
+            multipliers.Sort();
+            widths.Sort();
+            float multiplierMinimum = multipliers.Count > 0
+                ? multipliers[0]
+                : 1f;
+            float multiplierMedian = multipliers.Count > 0
+                ? ResolveEdgeWearSortedMedian(multipliers)
+                : 1f;
+            float multiplierMaximum = multipliers.Count > 0
+                ? multipliers[multipliers.Count - 1]
+                : 1f;
+            float widthMinimum = widths.Count > 0 ? widths[0] : 0f;
+            float widthMedian = widths.Count > 0
+                ? ResolveEdgeWearSortedMedian(widths)
+                : 0f;
+            float widthMaximum = widths.Count > 0
+                ? widths[widths.Count - 1]
+                : 0f;
+            return "policy=canonical-shape-seed-source-edge/downward-only" +
+                ",coverage=" +
+                    audit.MacroVariationCoverage.ToString("G9") +
+                ",strength=" + audit.MacroVariation.ToString("G9") +
+                ",baseRequestedWidth=" +
+                    audit.MacroBaseRequestedWidth.ToString("G9") +
+                ",evaluated=" + multipliers.Count +
+                ",participants=" + participants +
+                ",varied=" + varied +
+                ",minimumStyleClamped=" + minimumStyleClamped +
+                ",feasibilityReduced=" + feasibilityReduced +
+                ",multiplier=" +
+                    multiplierMinimum.ToString("G9") + "/" +
+                    multiplierMedian.ToString("G9") + "/" +
+                    multiplierMaximum.ToString("G9") +
+                ",requestedWidth=" +
+                    widthMinimum.ToString("G9") + "/" +
+                    widthMedian.ToString("G9") + "/" +
+                    widthMaximum.ToString("G9");
+        }
+
         private static string FormatEdgeWearCoverageSummary(
             EdgeWearCoverageAudit audit)
         {
@@ -4032,6 +4291,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
             if (string.Equals(reason,
                     "maximum-feasible-width-below-minimum-scale",
+                    StringComparison.Ordinal) ||
+                string.Equals(reason,
+                    "maximum-certified-width-at-stable-width-floor",
                     StringComparison.Ordinal))
             {
                 return 6;
@@ -4377,6 +4639,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     builder.AppendLine(",preflight=notCaptured");
                     continue;
                 }
+                builder.Append(",macro={base:");
+                builder.Append(record.BaseRequestedWidth.ToString("G9"));
+                builder.Append(",coverage:");
+                builder.Append(
+                    record.MacroVariationCoverage.ToString("G9"));
+                builder.Append(",strength:");
+                builder.Append(record.MacroVariation.ToString("G9"));
+                builder.Append(",participationIdentity:");
+                builder.Append(
+                    record.MacroParticipationIdentity01.ToString("G9"));
+                builder.Append(",participates:");
+                builder.Append(
+                    record.MacroVariationParticipates ? '1' : '0');
+                builder.Append(",identity:");
+                builder.Append(record.MacroIdentity01.ToString("G9"));
+                builder.Append(",sampled:");
+                builder.Append(
+                    record.MacroSampledMultiplier.ToString("G9"));
+                builder.Append(",effective:");
+                builder.Append(
+                    record.MacroEffectiveMultiplier.ToString("G9"));
+                builder.Append(",minimumStyleClamped:");
+                builder.Append(
+                    record.MacroMinimumStyleClamped ? '1' : '0');
+                builder.Append('}');
                 builder.Append(",requestedWidth=");
                 builder.Append(record.RequestedWidth.ToString("G9"));
                 builder.Append(",requiredFootprintLength=");
@@ -4673,6 +4960,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     record.MicroTopologyGeneratedTransition ? '1' : '0');
                 builder.Append(",graphEdge=");
                 builder.Append(record.SourceEdgeIndex);
+                if (record.Viability != null)
+                {
+                    builder.Append(",macro={base:");
+                    builder.Append(
+                        record.Viability.BaseRequestedWidth.ToString("G9"));
+                    builder.Append(",coverage:");
+                    builder.Append(
+                        record.Viability.MacroVariationCoverage.ToString(
+                            "G9"));
+                    builder.Append(",strength:");
+                    builder.Append(
+                        record.Viability.MacroVariation.ToString("G9"));
+                    builder.Append(",participationIdentity:");
+                    builder.Append(
+                        record.Viability.MacroParticipationIdentity01
+                            .ToString("G9"));
+                    builder.Append(",participates:");
+                    builder.Append(
+                        record.Viability.MacroVariationParticipates
+                            ? '1'
+                            : '0');
+                    builder.Append(",identity:");
+                    builder.Append(
+                        record.Viability.MacroIdentity01.ToString("G9"));
+                    builder.Append(",sampled:");
+                    builder.Append(
+                        record.Viability.MacroSampledMultiplier.ToString(
+                            "G9"));
+                    builder.Append(",effective:");
+                    builder.Append(
+                        record.Viability.MacroEffectiveMultiplier.ToString(
+                            "G9"));
+                    builder.Append(",requested:");
+                    builder.Append(
+                        record.Viability.RequestedWidth.ToString("G9"));
+                    builder.Append('}');
+                }
                 builder.Append(",structural=");
                 builder.Append(record.StructuralEligible ? '1' : '0');
                 builder.Append(",geometric=");

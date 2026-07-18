@@ -40,9 +40,35 @@ namespace ProgrammaticStylized3D.Rivers
             gridDescriptor.RepresentedLateralMaximumMetres;
         public float FoamGridProvisionalRequestedCellSizeMetres =>
             river != null
-                ? StylizedRiverFoamGridDescriptor
-                    .ResolveProvisionalRequestedCellSizeMetres(river.Quality)
+                ? river.FoamFixedMetricRequestedCellSizeMetres
                 : 0f;
+        public string FoamAuthoredGridMode => river != null
+            ? river.FoamGridMode.ToString()
+            : "Unavailable";
+        public string FoamAuthoredFixedMetricCellSize => river != null
+            ? river.FoamFixedMetricCellSize.ToString()
+            : "Unavailable";
+        public bool FoamGridSelectionMatchesActive
+        {
+            get
+            {
+                if (river == null || !gridDescriptor.IsCreated)
+                {
+                    return false;
+                }
+
+                bool fixedSelected = river.FoamGridMode ==
+                    StylizedRiverFoamGridMode.FixedMetric;
+                if (fixedSelected != gridDescriptor.UsesFixedMetricLattice)
+                {
+                    return false;
+                }
+
+                return !fixedSelected || Mathf.Approximately(
+                    gridDescriptor.RequestedDxMetres,
+                    river.FoamFixedMetricRequestedCellSizeMetres);
+            }
+        }
         public bool FoamFixedMetricCandidateAvailable =>
             fixedMetricCandidateDescriptor.IsCreated;
         public string FoamFixedMetricCandidateStatus =>
@@ -69,7 +95,9 @@ namespace ProgrammaticStylized3D.Rivers
             fixedMetricCandidateDescriptor.RepresentedLateralMaximumMetres;
         public long FoamFixedMetricCandidateStructuralCellCount =>
             fixedMetricCandidateDescriptor.StructuralCellCount;
-        public bool FoamFixedMetricRuntimeActivationDeferred => true;
+        public bool FoamFixedMetricRuntimeActive =>
+            gridDescriptor.IsCreated &&
+            gridDescriptor.UsesFixedMetricLattice;
         public int TopologyWidth => topologyTexture != null ? topologyTexture.width : 0;
         public int TopologyHeight => topologyTexture != null ? topologyTexture.height : 0;
         public bool MajorTopologyAvailable => majorTopology != null;
@@ -77,6 +105,28 @@ namespace ProgrammaticStylized3D.Rivers
         public float FoamMotionLaneScrollMetres =>
             lastMotionLaneScrollCells *
             Mathf.Max(0f, ResolveMotionLaneLongitudinalSpacingMetres());
+        public float FoamMotionLaneMinimumIntent =>
+            lastMotionLaneMinimumIntent;
+        public float FoamMotionLaneMaximumIntent =>
+            lastMotionLaneMaximumIntent;
+        public float FoamMotionLaneMeanAbsoluteIntent =>
+            lastMotionLaneMeanAbsoluteIntent;
+        public float FoamMotionLaneRootMeanSquareIntent =>
+            lastMotionLaneRootMeanSquareIntent;
+        public float FoamMotionLanePositiveFraction =>
+            lastMotionLanePositiveFraction;
+        public float FoamMotionLaneNegativeFraction =>
+            lastMotionLaneNegativeFraction;
+        public float FoamMotionLaneNearNeutralFraction =>
+            lastMotionLaneNearNeutralFraction;
+        public float FoamMotionLaneMeanAbsoluteFaceIntent =>
+            lastMotionLaneMeanAbsoluteFaceIntent;
+        public float FoamMotionLaneRootMeanSquareFaceIntent =>
+            lastMotionLaneRootMeanSquareFaceIntent;
+        public float FoamMotionLaneOpposingFaceFraction =>
+            lastMotionLaneOpposingFaceFraction;
+        public float FoamMotionLaneFaceCancellationRatio =>
+            lastMotionLaneFaceCancellationRatio;
         public float FoamMotionLaneDownstreamBasisMetres =>
             MotionLaneDownstreamBasisMetres;
         public float FoamMotionLaneLateralReferenceSpanMetres =>
@@ -1010,6 +1060,16 @@ namespace ProgrammaticStylized3D.Rivers
         public long SteadyStateWorkTransportMetricErrorCount =>
             steadyStateWorkTransportMetricErrorCount;
         public float RenderInterpolationAlpha => lastRenderInterpolationAlpha;
+        public long SteadyStateWorkRenderInterpolationSampleCount =>
+            steadyStateWorkRenderInterpolationSampleCount;
+        public float SteadyStateWorkRenderInterpolationMinimum =>
+            steadyStateWorkRenderInterpolationSampleCount > 0
+                ? steadyStateWorkRenderInterpolationMinimum
+                : lastRenderInterpolationAlpha;
+        public float SteadyStateWorkRenderInterpolationMaximum =>
+            steadyStateWorkRenderInterpolationSampleCount > 0
+                ? steadyStateWorkRenderInterpolationMaximum
+                : lastRenderInterpolationAlpha;
         public float EstimatedTransportCellsPerStep =>
             lastEstimatedTransportCellsPerStep;
         public float EstimatedLateralTransportCellsPerStep =>
@@ -1098,6 +1158,12 @@ namespace ProgrammaticStylized3D.Rivers
             transportBoundaryCapacityHitCount;
         public uint TransportObstacleCapacityHitCount =>
             transportObstacleCapacityHitCount;
+        public float TransportLateralMaterialWeightedSpeed =>
+            transportLateralMaterialWeightedSpeed;
+        public float TransportLateralPositiveMovement =>
+            transportLateralPositiveMovement;
+        public float TransportLateralNegativeMovement =>
+            transportLateralNegativeMovement;
         public bool InitializationComplete =>
             initializationPhase == InitializationPhase.Ready;
         public bool ResourcesAllocated =>
@@ -1127,6 +1193,7 @@ namespace ProgrammaticStylized3D.Rivers
         public long EstimatedMemoryBytes =>
             EstimateTextureBytes(stateA) +
             EstimateTextureBytes(stateB) +
+            EstimateTextureBytes(presentationPreviousState) +
             EstimateTextureBytes(shapeMaskTexture) +
             EstimateTextureBytes(filmSourceTexture) +
             EstimateTextureBytes(filmSupportTexture) +

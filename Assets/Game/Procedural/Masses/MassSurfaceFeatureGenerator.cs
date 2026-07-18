@@ -10,6 +10,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float edgeWearAmount,
             float edgeWearWidth,
             float edgeWearCoverage,
+            float edgeWearMacroVariationCoverage,
+            float edgeWearMacroVariation,
             float edgeWearSoftness,
             float creaseAmount,
             float creaseWidth,
@@ -21,6 +23,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EdgeWearAmount = Mathf.Clamp(edgeWearAmount, 0f, 2f);
             EdgeWearWidth = Mathf.Clamp(edgeWearWidth, 0.05f, 2f);
             EdgeWearCoverage = Mathf.Clamp(edgeWearCoverage, 0.1f, 2f);
+            EdgeWearMacroVariationCoverage =
+                Mathf.Clamp01(edgeWearMacroVariationCoverage);
+            EdgeWearMacroVariation =
+                Mathf.Clamp01(edgeWearMacroVariation);
             EdgeWearSoftness = Mathf.Clamp01(edgeWearSoftness);
             CreaseAmount = Mathf.Clamp(creaseAmount, 0f, 2f);
             CreaseWidth = Mathf.Clamp(creaseWidth, 0.25f, 2f);
@@ -33,6 +39,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public float EdgeWearAmount { get; }
         public float EdgeWearWidth { get; }
         public float EdgeWearCoverage { get; }
+        public float EdgeWearMacroVariationCoverage { get; }
+        public float EdgeWearMacroVariation { get; }
         public float EdgeWearSoftness { get; }
         public float CreaseAmount { get; }
         public float CreaseWidth { get; }

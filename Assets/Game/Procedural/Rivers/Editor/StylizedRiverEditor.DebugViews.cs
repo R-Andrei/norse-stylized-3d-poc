@@ -498,7 +498,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawReadOnlyRow(
                 new GUIContent(
                     "Object Contact Cycles",
-                    "Per-object Arc/Semi-Arc emission phases. Build grows one contiguous open-C source path, Hold replenishes that complete path, Release clears it contiguously, and Rest submits no source. The downstream rear remains unsourced in every phase."),
+                    "Per-object Arc/Semi-Arc deposition. Build shows only the newly revealed contiguous open-C birth frontier. Hold, Release, and Rest deposit no additional material. The downstream rear remains unsourced."),
                 $"{runtime.AutomaticObjectContactBuildCount} build | " +
                 $"{runtime.AutomaticObjectContactHoldCount} hold | " +
                 $"{runtime.AutomaticObjectContactReleaseCount} release | " +
@@ -1429,7 +1429,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 case StylizedRiverFoamDebugView.Final:
                     return
-                        "The exact normal player-facing Foam result from the current committed Layer C state after conservative transport, topology-adjusted Remaining Life, surface coupling, lighting, and final Presence coverage. Rejected render-only residual prediction is no longer active.";
+                        "The exact normal player-facing Foam result from ordinary temporal interpolation between the previous and current committed Layer C states after conservative transport, topology-adjusted Remaining Life, surface coupling, lighting, and final Presence coverage. Rejected velocity backtracing remains inactive.";
 
                 case StylizedRiverFoamDebugView.FoamAndAgingTopology:
                     return
@@ -1441,15 +1441,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.MaterialPresence:
                     return
-                        "Raw committed persistent material Presence sampled directly from the current Layer C texture at the unshifted field coordinate. Brightness is literal stored amount, so low-density donor-cell tails may remain dark even when presence-gated comparison views still acknowledge meaningful material.";
+                        "Persistent material Presence sampled at the unshifted field coordinate through ordinary temporal interpolation between the previous and current committed Layer C states. Brightness remains literal packed Presence; no velocity backtrace, hidden transport, or morphology is applied.";
 
                 case StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return
-                        "Normalized Remaining Life decoded from the committed Layer C life moment, then multiplied by the shared meaningful-Presence visibility gate (0.02 to 0.16). Brightness still represents life inside meaningful material, while tiny low-density transport tails no longer appear as full white coverage.";
+                        "Normalized Remaining Life decoded from the temporally interpolated committed Layer C life moment, then multiplied by the shared meaningful-Presence visibility gate (0.02 to 0.16). Tiny low-density transport tails no longer appear as full white coverage.";
 
                 case StylizedRiverFoamDebugView.FoamMotionField:
                     return
-                        "Unified resolved Foam velocity contract. Bright neutral gray is straight full-speed downstream motion, red is rightward lateral velocity, blue is leftward lateral velocity, darker values are downstream slowdown/stagnation, and yellow marks obstacle-routing influence. Semi-transparent white uses the shared meaningful-Presence visibility gate at the committed unshifted coordinate; it is an ownership overlay, not raw Presence amplitude.";
+                        "Unified resolved Foam velocity contract. Bright neutral gray is straight full-speed downstream motion, red is rightward lateral velocity, blue is leftward lateral velocity, darker values are downstream slowdown/stagnation, and yellow marks obstacle-routing influence. Semi-transparent white uses the temporally interpolated committed material at the unshifted coordinate; it is an ownership overlay, not raw Presence amplitude.";
 
                 case StylizedRiverFoamDebugView.FoamMotionFieldCellGrid:
                     return

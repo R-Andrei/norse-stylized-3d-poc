@@ -4,12 +4,12 @@
 
 - Date: 2026-07-18
 - Work type: Dependency audit and migration tracking register
-- Implementation status: `RG-METRIC-P2` through `RG-METRIC-P10` are Unity-validated and closed. `RG-METRIC-P11` is mechanically verified and complete with no executable change. Active fixed-metric allocation remains deliberately deferred to P12.
+- Implementation status: `RG-METRIC-P2` through `RG-METRIC-P10` are Unity-validated and closed. `RG-METRIC-P11` is complete. `RG-METRIC-P12` is active in Unity and its first Medium fixed candidate passed machine-verifiable runtime evidence. `RG-METRIC-P12a` proved full committed-state interpolation but did not remove dead-edge Layer C resurrection. `RG-METRIC-P12b` is mechanically implemented: automatic sources deposit only newly revealed Build coverage, committed presentation ownership is parity-safe, and P12 now measures effective lateral face/flux evidence. Unity validation remains pending.
 - Source snapshot: user-supplied `Assets(72).zip` with accepted P9a, P10, and P10a overlays; no `.git` metadata is present
 - Prior design sources:
   - `River Foam Fixed-Metric Resolution Handoff`
   - Follow-up audit response accepting the coordinate-contract corrections
-- Persistent repository changes: canonical documentation; validated P2–P9 descriptor, cache, topology, routing, source, transport, replacement, film, shape, and production-render foundations; P10/P10a read-only diagnostic/Inspector presentation cleanup; and P11 documentation-only audit closure
+- Persistent repository changes: canonical documentation; validated P2–P9 descriptor, cache, topology, routing, source, transport, replacement, film, shape, and production-render foundations; P10/P10a read-only diagnostic/Inspector presentation cleanup; P11 audit closure; P12 authored selection/allocation/candidate evidence; P12a committed-state interpolation, Motion Lane evidence, and report clipboard convenience; and P12b deposit-once automatic-source ownership, parity-safe committed presentation, and effective lateral face/flux evidence
 
 ## 2. Purpose
 
@@ -51,8 +51,9 @@ Implemented dependency items through P4:
 
 Current remaining program dependencies:
 
-- P12 fixed-metric candidate activation, visual comparison, and performance/memory selection;
-- P13 final tier tuning, cache freeze, and contiguous Stage 1 baseline closure.
+- P12b Unity verification that dead source-covered cells remain dead, Build deposits only its advancing frontier, Hold/Release deposit nothing, committed presentation resources remain distinct, and effective lateral face/flux evidence is finite;
+- P12 fixed/legacy or fixed-size candidate comparison, visual judgement, and performance/memory selection after the ownership correction is accepted;
+- P13 final tier tuning, overall Foam-amount pass, cache freeze, and contiguous Stage 1 baseline closure.
 
 The read-only cache metadata Inspector deferred during P4 now exists in `StylizedRiverFoamTopologyCacheAssetEditor.cs`; no P4 metadata-presentation blocker remains.
 
@@ -68,6 +69,24 @@ P6 closes these inactive fixed-metric dependencies while preserving active legac
 - one user-triggered comprehensive report with assigned-cache mutation proof.
 
 Disturbance allocation, quality, generation, and renderer ownership remained unchanged. The corrected single P6 report reached live `Ready`, proved current-cache installation without build/write, validated all P6 contracts, proved cleanup/binding disablement, and returned `Overall: PASS`. P7 source, P8 transport/replacement, and P9 production-render consumers subsequently closed.
+
+
+### 2.1.9 Patch 12b dependency disposition
+
+P12a's full-range presentation interpolation proved that the remaining edge flicker originated in committed Layer C state rather than a pinned renderer alpha. Static code audit then confirmed that active automatic events re-rasterized cumulative source coverage after transport/lifecycle and could restore a packed-zero cell through the normal birth merge. P12b changes that ownership without changing source geometry, schedule, cache identity, or overall birth tuning:
+
+- the CPU/GPU source-event ABI is eight `float4` lanes / 128 bytes and carries current plus previous deposition phase/progress;
+- all eight automatic source families reuse their existing evaluators; `max(0, currentCoverage - previousCoverage)` is the deposition gate, while the current absolute source contribution remains the target passed to the existing non-additive birth merge;
+- Object Arc/Semi-Arc Hold and Release retain event timing but resolve to completed Build coverage on both sides of the difference and therefore deposit zero;
+- moving or retracting coverage never deletes already-born material;
+- manual ellipse, compound, segment, and probe injections remain separate and unchanged;
+- one same-format previous-committed packed-state texture is copied before each material update, so previous/current presentation remains distinct for odd or even transport substeps;
+- the existing transport metric buffer grows from 23 to 27 values and records material-weighted absolute lateral face speed plus signed Presence-area movement, with each north face counted once;
+- generated Motion Lane evidence now distinguishes cell-centre intent from face intent and reports opposing-neighbour cancellation;
+- P7 source validation and the active P12 snapshot own deterministic deposit-once and committed-state-distinctness checks;
+- no kernel, compute buffer, cache contract, serialized River field, scene, prefab, material, or source recipe is added or changed.
+
+Unity C# compilation, D3D11 import, actual GPU source raster behavior, visual dead-edge stability, P12 candidate evidence, and final P9 endpoint remain authoritative and pending.
 
 ### 2.1.2 Patch 07 dependency disposition
 
@@ -423,6 +442,29 @@ P11 audited the complete post-P10a dependency chain and found no production defe
 - active legacy ownership, deferred fixed activation, P8/P9 endpoint presence, P10 Inspector actions, canonical status, and protected serialized-file scope.
 
 No executable, shader, compute, cache, resource, serialized, scene, prefab, material, asset, or `.meta` change was required. P11 changes only the five canonical status documents and releases P12.
+
+### 2.1.7 Patch 12 activation disposition
+
+P12 closes the source-level activation dependency and leaves candidate selection open for Unity evidence:
+
+- serialized River authoring selects `Fixed Metric` or `Legacy Normalized Across`; fixed is the source default;
+- fixed candidate size can follow quality or explicitly select `0.25`, `0.20`, `0.15`, or `0.10 m`;
+- `ResolveInitializationDimensions` selects the authored descriptor at the real production allocation gate;
+- allocated mapping and size participate in resource-current, initialization-restart, dirty-notification, and failed-start recovery contracts;
+- the existing descriptor-aware cache package remains authoritative, so a mismatched candidate requires the existing explicit Edit Mode rebuild;
+- P9 validates whichever authored mapping is active while retaining all actual GPU film/shape/render checks;
+- one Play Mode P12 snapshot reuses existing accounting for comparable descriptor, cache, initialization, topology, transport, memory, dispatch, cell, substep, visibility, and CPU-submit evidence;
+- no automatic cache write, duplicate runtime, compute/render formula, resource, kernel, source recipe, scene, prefab, material, or cache-asset edit is introduced.
+
+Unity must now determine whether fixed candidates are visually correct and affordable. P12 remains open until at least one fixed candidate and the intended comparison baseline have complete visual and snapshot evidence, followed by one passing P9 endpoint on the candidate selected for continuation.
+
+
+
+### 2.1.7 P12a visual-evidence disposition
+
+The first active fixed candidate passed descriptor/cache/topology/CFL/curvature/resource evidence but exposed two distinct review items. Layer C state changed at the accepted material cadence while Final and Layer C debug presentation selected only the newest committed texture, so conservative whole-cell updates appeared as abrupt edge flicker. P12a uses the already allocated previous/current state pair for ordinary fixed-step interpolation; it does not restore point-velocity residual prediction, add a transport path, or alter stored material.
+
+The apparent lateral-response question is not yet classified as a defect. `Maximum Lateral Speed Ratio` sets the velocity ceiling, while `Lane Advection Ratio` only scrolls the generated route texture downstream. P12a adds range, mean-absolute, RMS, positive, negative, and near-neutral lane evidence to the existing live snapshot. Excessive total foam coverage remains a deliberate P13 tuning item.
 
 ## 3. Completeness statement and limits
 

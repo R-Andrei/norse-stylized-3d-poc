@@ -1,44 +1,34 @@
 # Current River Rendering Roadmap
 
-## Fixed-metric River Foam coordinate status — P11
+## Fixed-metric River Foam coordinate status — P12
 
-The coordinate-consumer migration through `RG-METRIC-P9` and the P10/P10a diagnostic/Inspector cleanup are Unity-validated and closed. The final endpoint report passed actual GPU Film Source, visual-occupancy, and shape execution; production/debug same-point mapping; resource ownership; cleanup; and assigned-cache immutability.
+P2–P10 are Unity-validated and closed; P11 found no mechanical or consistency defect. P12 now activates the authored grid selection at the real runtime allocation gate. Fixed metric is the source default, with quality-derived spacing and explicit `0.25`, `0.20`, `0.15`, and `0.10 m` candidates; legacy normalized-across remains directly selectable for comparison and rollback.
 
-`RG-METRIC-P11` completed the repository-wide mechanical and consistency audit without finding a production defect. CPU/GPU descriptor lanes, structured-buffer ABI, all 23 kernels and C# lookups, shader properties/bindings, cache schema/fingerprints, fixed-versus-legacy branches, migrated coordinate consumers, Inspector actions, and canonical statuses are consistent.
+Selection changes intentionally invalidate runtime resources and require an explicit matching cache rebuild. No automatic cache write, duplicate runtime path, scene/prefab/material migration, or compute/render retuning is included. The P12 snapshot records active descriptor, cache, initialization, topology, CFL/curvature, memory, dispatch/cell/substep, visibility, and CPU-submit evidence; visual acceptance remains direct Unity review.
 
-The active runtime still uses `LegacyNormalizedAcross`. A complete `FixedMetricLattice` candidate descriptor is prepared but deliberately inactive until the P12 visual/performance sweep. P11 changes documentation only; it does not change source geometry, transport, topology, film, shape, rendering, resources, caches, scenes, prefabs, materials, or serialized River values.
-
-Current Inspector ownership is:
-
-```text
-Runtime Diagnostics → Foam
-  active descriptor + fixed candidate + CFL/curvature + memory/dispatch evidence
-
-Actions → Foam Cache & Validation
-  normal cache lifecycle + current P9 endpoint regression
-  Historical / Deep Diagnostics (collapsed by default)
-```
-
-No new Debug View is introduced. Fixed-metric activation and quality selection remain P12; final tuning/cache freeze remain P13.
+The first P12 Medium fixed candidate passed runtime evidence. P12a restored ordinary previous/current committed-state interpolation and proved a full interpolation range, but Unity still showed dead source-covered Layer C edges repeatedly reappearing. P12b follows the confirmed code path rather than adding more render smoothing: automatic sources now deposit only newly revealed Build coverage; Hold and Release deposit nothing; one dedicated previous-committed packed-state texture makes presentation ownership independent of transport substep parity; and P12 records face-level lane cancellation plus material-weighted signed lateral movement. Clipboard-copy actions remain adjacent to all saved reports. Overall foam coverage is deliberately deferred to the later layer-by-layer P13 tuning pass.
 
 
-`4.11C.5.17D.1C — Camera-Readable Chip Population` is Unity-validated and accepted. Static Chipping work is closed for the current milestone.
+## Deposit-once automatic-source ownership and effective lateral evidence — `RG-METRIC-P12b` — mechanically implemented, Unity validation pending
 
-Accepted production sequence:
+P12b corrects a committed Layer C ownership defect found after the fixed candidate was activated. Before this patch, every active source event re-rasterized its cumulative footprint after transport and lifecycle. A weak edge cell could reach packed zero and then receive fresh Presence, Remaining Life, and pattern state from the same event on the next material tick. Repeated source-space maintenance also visually opposed lateral transport.
+
+Current source ownership is:
 
 ```text
-coherent Foam → analytical Chipping → structural Strands → composition
+Build    positive-difference gate; current authored source target at the advancing frontier;
+Hold     no new birth;
+Release  no new birth and no deletion;
+already-born material    transport/lifecycle-owned.
 ```
 
-Accepted Chipping controls:
+All eight family evaluators and source geometry remain unchanged. The source-event ABI adds previous deposition state and becomes eight `float4` lanes / 128 bytes. Manual injection remains unchanged. Event Hold/Release durations remain authored scheduling phases even though they no longer maintain material.
 
-```text
-Amount, Size, Spacing, Irregularity, Edge Width, Interior Access
-```
+A dedicated previous-committed packed-state texture is copied before each material update. Transport continues to ping-pong its original two writable states, so previous/current renderer ownership remains distinct for one through 64 substeps. This adds one state-sized texture and one GPU texture copy per material tick, but no kernel or dispatch.
 
-`D.1A.1` is rejected and rolled back. `D.1D — Coherent Edge-Bite Admission` is skipped because the current result is good enough. Remaining-Life interaction is deferred as optional future enhancement rather than an active dependency. The zoom-dependent thin-strip capture remains known technical debt and is not blocking completion.
+The existing transport metric buffer grows by four counters rather than adding a buffer. It reports material-weighted absolute lateral face speed and positive/negative Presence-area movement. Generated Motion Lane reporting additionally measures face intent, opposing-sign neighbours, and cancellation ratio. These metrics diagnose effective transport without changing velocity, face averaging, source amount, or final render tuning.
 
-There is no active Chipping patch. `4.11C.5.18E` and the detaching-deposition replacement `4.11C.5.18F.1` are Unity-validated and accepted. The active visual patch is `4.11C.5.18H.6.2 — Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle`. `5.18H.4` is Unity-validated as the accepted no-wrap open-C baseline; the `5.18G` duty-cycle scheduler is retained, `5.18G.1` is superseded, and `5.18H.3` is rejected as the Arc/Semi-Arc bridge authority.
+P12b Unity acceptance requires zero compile/import errors or warnings, stable dead edges in Material Presence and Remaining Life, Build-frontier-only Automatic Birth Sources, a passing P12 snapshot copied from the Inspector, and a final P9 consumer regression. P13 remains the owner of total Foam-amount reduction and final tier/cache freeze.
 
 ## Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle — `4.11C.5.18H.6.2` — implemented, Unity validation pending
 

@@ -176,6 +176,20 @@
                         _GroundBankLayerDetailA,
                         _GroundBankLayerDetailB,
                         _GroundBankLayerDetailC);
+                    [branch]
+                    if (_GroundBankLayerAuthoredColorA.x > 0.5)
+                    {
+                        float4 authoredSample = SAMPLE_TEXTURE2D_ARRAY(
+                            _GroundBankLayerAuthoredColorArray,
+                            sampler_GroundBankLayerAuthoredColorArray,
+                            detailUv,
+                            _GroundBankLayerAuthoredColorA.y);
+                        result = PS3D_AssignAuthoredSurfaceColor(
+                            result,
+                            authoredSample,
+                            _GroundBankLayerAuthoredColorA,
+                            _GroundBankLayerAuthoredColorTint);
+                    }
                 }
 
                 return result;
@@ -204,6 +218,20 @@
                         _GroundRiverbedLayerDetailA,
                         _GroundRiverbedLayerDetailB,
                         _GroundRiverbedLayerDetailC);
+                    [branch]
+                    if (_GroundRiverbedLayerAuthoredColorA.x > 0.5)
+                    {
+                        float4 authoredSample = SAMPLE_TEXTURE2D_ARRAY(
+                            _GroundRiverbedLayerAuthoredColorArray,
+                            sampler_GroundRiverbedLayerAuthoredColorArray,
+                            detailUv,
+                            _GroundRiverbedLayerAuthoredColorA.y);
+                        result = PS3D_AssignAuthoredSurfaceColor(
+                            result,
+                            authoredSample,
+                            _GroundRiverbedLayerAuthoredColorA,
+                            _GroundRiverbedLayerAuthoredColorTint);
+                    }
                 }
 
                 return result;
@@ -388,7 +416,12 @@
                         _GroundBankLayerDetailB.w,
                         bankLayerDetail);
                 half3 bankLayerAlbedo =
-                    baseSample.rgb * bankLayerPalette;
+                    baseSample.rgb *
+                    PS3D_ResolveStylizedSurfaceAuthoredColor(
+                        bankLayerPalette,
+                        _GroundBankLayerDarkColor.rgb,
+                        _GroundBankLayerCavityColor.rgb,
+                        bankLayerDetail);
 
                 float riverbedLegacyPixelInfluence =
                     saturate(_GroundRiverbedLayerDetailC.y);
@@ -416,7 +449,12 @@
                         _GroundRiverbedLayerDetailB.w,
                         riverbedLayerDetail);
                 half3 riverbedLayerAlbedo =
-                    baseSample.rgb * riverbedLayerPalette;
+                    baseSample.rgb *
+                    PS3D_ResolveStylizedSurfaceAuthoredColor(
+                        riverbedLayerPalette,
+                        _GroundRiverbedLayerDarkColor.rgb,
+                        _GroundRiverbedLayerCavityColor.rgb,
+                        riverbedLayerDetail);
                 half3 albedo =
                     ordinaryGroundAlbedo * (half)substrateWeights.x +
                     bankLayerAlbedo * (half)substrateWeights.y +
@@ -680,14 +718,14 @@
                     (half)_MonolithicFlatten *
                     (half)_MonolithicSmoothnessBoost -
                     (half)effectiveFrostStrength * 0.06h);
-                half bankDrySmoothness = saturate(
-                    (half)_GroundBankLayerDrySmoothness +
-                    (half)bankLayerDetail.finishSigned -
-                    (half)bankLayerDetail.cavity * 0.08h);
-                half riverbedDrySmoothness = saturate(
-                    (half)_GroundRiverbedLayerDrySmoothness +
-                    (half)riverbedLayerDetail.finishSigned -
-                    (half)riverbedLayerDetail.cavity * 0.08h);
+                half bankDrySmoothness =
+                    PS3D_ResolveStylizedSurfaceDrySmoothness(
+                        (half)_GroundBankLayerDrySmoothness,
+                        bankLayerDetail);
+                half riverbedDrySmoothness =
+                    PS3D_ResolveStylizedSurfaceDrySmoothness(
+                        (half)_GroundRiverbedLayerDrySmoothness,
+                        riverbedLayerDetail);
                 half resolvedDrySmoothness =
                     ordinaryDrySmoothness * (half)substrateWeights.x +
                     bankDrySmoothness * (half)substrateWeights.y +
@@ -996,6 +1034,42 @@
                         neutralLitColor,
                         pbrColor.rgb,
                         lightingTintInfluence);
+
+                float authoredBankWeight =
+                    substrateWeights.y *
+                    bankLayerDetail.authoredColorStrength;
+                float authoredRiverbedWeight =
+                    substrateWeights.z *
+                    riverbedLayerDetail.authoredColorStrength;
+                float authoredCoverage = saturate(
+                    authoredBankWeight + authoredRiverbedWeight);
+                float authoredLightingStrength =
+                    authoredCoverage > 0.0001
+                        ? saturate(
+                            (authoredBankWeight *
+                                bankLayerDetail.authoredLightingStrength +
+                             authoredRiverbedWeight *
+                                riverbedLayerDetail.authoredLightingStrength) /
+                            max(0.0001,
+                                authoredBankWeight +
+                                authoredRiverbedWeight))
+                        : 1.0;
+                half3 positiveSpecularRemainder = max(
+                    pbrColor.rgb -
+                    albedo * max(0.0h, lightingLuma),
+                    half3(0.0h, 0.0h, 0.0h));
+                half authoredDiffuseLighting = lerp(
+                    1.0h,
+                    max(0.0h, lightingLuma),
+                    (half)authoredLightingStrength);
+                half3 authoredPreservedColor =
+                    albedo * authoredDiffuseLighting +
+                    positiveSpecularRemainder;
+                finalRgb = lerp(
+                    finalRgb,
+                    authoredPreservedColor,
+                    (half)authoredCoverage);
+
                 finalRgb += ResolveGroundStylizedShoreWetHighlight(
                     input,
                     inputData,

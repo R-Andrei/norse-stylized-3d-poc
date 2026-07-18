@@ -235,7 +235,11 @@ namespace ProgrammaticStylized3D.Rivers
         private const int TransportUnitCapacityHitCountMetricIndex = 20;
         private const int TransportBoundaryCapacityHitCountMetricIndex = 21;
         private const int TransportObstacleCapacityHitCountMetricIndex = 22;
-        private const int TransportMetricCount = 23;
+        private const int TransportLateralWeightedSpeedNumeratorMetricIndex = 23;
+        private const int TransportLateralWeightedSpeedWeightMetricIndex = 24;
+        private const int TransportLateralPositiveMovementMetricIndex = 25;
+        private const int TransportLateralNegativeMovementMetricIndex = 26;
+        private const int TransportMetricCount = 27;
         private const float TransportMetricFixedPointScale = 4096f;
         private const float TransportMetricsUpdateRate = 4f;
         private const float TransportTargetCfl = 0.90f;
@@ -297,7 +301,8 @@ namespace ProgrammaticStylized3D.Rivers
             GeneratedSourceRemoved = 1 << 5,
             GeneratedSourceChanged = 1 << 6,
             ObstaclesChanged = 1 << 7,
-            TopologySettingsChanged = 1 << 8
+            TopologySettingsChanged = 1 << 8,
+            GridConfigurationChanged = 1 << 9
         }
 
         private enum InitializationPhase

@@ -1697,9 +1697,10 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         gridSpacing,
         gridLateral,
         gridLongitudinal);
-    // The current committed Layer C state is the production presentation
-    // authority. Point-velocity residual backtracing was retired after Unity
-    // validation proved that it oscillated around conservative closed faces.
+    // The previous/current committed Layer C pair is the production
+    // presentation authority. Ordinary fixed-step interpolation hides material
+    // cadence without restoring point-velocity residual backtracing across
+    // conservative closed faces.
     float storedGlobalDistance = globalDistance;
     float storedLateralMetres = lateralMetres;
     float2 foamUV = fieldUV;

@@ -49,6 +49,34 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Foam Enabled",
                     "Master switch for persistent foam. Disabled foam allocates no simulation textures and contributes nothing to the water shader."));
 
+            SerializedProperty gridMode = Find("foamGridMode");
+            EditorGUILayout.PropertyField(
+                gridMode,
+                new GUIContent(
+                    "Grid Mode",
+                    "Fixed Metric is the active P12 test path. Legacy Normalized Across remains available for direct A/B comparison and rollback."));
+
+            bool fixedMetricSelected = gridMode.hasMultipleDifferentValues ||
+                gridMode.enumValueIndex ==
+                    (int)StylizedRiverFoamGridMode.FixedMetric;
+            using (new EditorGUI.DisabledScope(!fixedMetricSelected))
+            {
+                EditorGUILayout.PropertyField(
+                    Find("foamFixedMetricCellSize"),
+                    new GUIContent(
+                        "Fixed Cell Size",
+                        "Quality Default resolves Low to 0.25 m, Medium to 0.15 m, and High to 0.10 m. The explicit 0.20 m option is the intermediate P12 candidate."));
+            }
+
+            EditorGUILayout.HelpBox(
+                "Changing Grid Mode or the resolved Fixed Cell Size deliberately " +
+                "invalidates the active Foam resources and topology-cache " +
+                "descriptor. " +
+                "Rebuild the assigned Foam topology cache in Edit Mode before " +
+                "testing the new selection. Play Mode changes may interrupt " +
+                "Foam until that rebuild is completed.",
+                MessageType.None);
+
             bool hasRiver = false;
             bool allFoamEnabled = true;
             bool held = false;
@@ -1148,13 +1176,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Anchor Coverage",
                         "Stable share of registered object anchors that receive the per-object Arc/Semi-Arc cycle. One includes every eligible object."));
                 EditorGUILayout.HelpBox(
-                    "Each eligible object grows one contiguous thin open-C ribbon through the immediate upstream/shoulder contact ring, replenishes that open C during Hold, then releases it contiguously before Rest. Arcs release in Build order; Semi-Arcs retract the dominant arm first and clear the path in reverse order. The downstream rear is never sourced.",
+                    "Each eligible object progressively deposits one contiguous thin open-C ribbon through the immediate upstream/shoulder contact ring. Hold and Release retain event timing but deposit no additional material; the born ribbon is then owned only by transport and lifecycle. The downstream rear is never sourced.",
                     MessageType.None);
                 DrawMinMaxUnitControls(
                     "Hold Duration (s)",
                     Find("foamObjectContactHoldDurationMinSeconds"),
                     Find("foamObjectContactHoldDurationMaxSeconds"),
-                    "How long the complete one-cell open-C contact ribbon remains actively replenished after Build finishes.");
+                    "How long the object event remains in Hold after Build finishes. Hold deposits no additional material.");
                 DrawMinMaxUnitControls(
                     "Release Duration (s)",
                     Find("foamObjectContactReleaseDurationMinSeconds"),

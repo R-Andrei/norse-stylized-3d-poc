@@ -110,6 +110,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty riverbedHydrologyModifier;
         private SerializedProperty bankMaterialStrength;
         private SerializedProperty bankDetailScaleMultiplier;
+        private SerializedProperty bankAuthoredColorStrengthMultiplier;
+        private SerializedProperty bankAuthoredColorLightingMultiplier;
         private SerializedProperty bankDetailNormalStrengthMultiplier;
         private SerializedProperty bankDetailCavityStrengthMultiplier;
         private SerializedProperty bankDetailValueFormMultiplier;
@@ -117,6 +119,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty bankLegacyPixelCellInfluenceMultiplier;
         private SerializedProperty riverbedMaterialStrength;
         private SerializedProperty riverbedDetailScaleMultiplier;
+        private SerializedProperty riverbedAuthoredColorStrengthMultiplier;
+        private SerializedProperty riverbedAuthoredColorLightingMultiplier;
         private SerializedProperty riverbedDetailNormalStrengthMultiplier;
         private SerializedProperty riverbedDetailCavityStrengthMultiplier;
         private SerializedProperty riverbedDetailValueFormMultiplier;
@@ -540,6 +544,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 groundMaterialControls.FindPropertyRelative(
                     "bankDetailScaleMultiplier");
 
+            bankAuthoredColorStrengthMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankAuthoredColorStrengthMultiplier");
+
+            bankAuthoredColorLightingMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankAuthoredColorLightingMultiplier");
+
             bankDetailNormalStrengthMultiplier =
                 groundMaterialControls.FindPropertyRelative(
                     "bankDetailNormalStrengthMultiplier");
@@ -567,6 +579,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             riverbedDetailScaleMultiplier =
                 groundMaterialControls.FindPropertyRelative(
                     "riverbedDetailScaleMultiplier");
+
+            riverbedAuthoredColorStrengthMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedAuthoredColorStrengthMultiplier");
+
+            riverbedAuthoredColorLightingMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedAuthoredColorLightingMultiplier");
 
             riverbedDetailNormalStrengthMultiplier =
                 groundMaterialControls.FindPropertyRelative(
@@ -3822,6 +3842,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 outerBankStrength,
                 outerBankFade,
                 bankDetailScaleMultiplier,
+                bankAuthoredColorStrengthMultiplier,
+                bankAuthoredColorLightingMultiplier,
                 bankDetailNormalStrengthMultiplier,
                 bankDetailCavityStrengthMultiplier,
                 bankDetailValueFormMultiplier,
@@ -3852,6 +3874,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 riverbedSurfaceLayer,
                 riverbedMaterialStrength,
                 riverbedDetailScaleMultiplier,
+                riverbedAuthoredColorStrengthMultiplier,
+                riverbedAuthoredColorLightingMultiplier,
                 riverbedDetailNormalStrengthMultiplier,
                 riverbedDetailCavityStrengthMultiplier,
                 riverbedDetailValueFormMultiplier,
@@ -3959,6 +3983,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 materialControls.FindPropertyRelative(
                     "bankDetailScaleMultiplier"),
                 materialControls.FindPropertyRelative(
+                    "bankAuthoredColorStrengthMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "bankAuthoredColorLightingMultiplier"),
+                materialControls.FindPropertyRelative(
                     "bankDetailNormalStrengthMultiplier"),
                 materialControls.FindPropertyRelative(
                     "bankDetailCavityStrengthMultiplier"),
@@ -3995,6 +4023,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 materialControls.FindPropertyRelative("riverbedMaterialStrength"),
                 materialControls.FindPropertyRelative(
                     "riverbedDetailScaleMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "riverbedAuthoredColorStrengthMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "riverbedAuthoredColorLightingMultiplier"),
                 materialControls.FindPropertyRelative(
                     "riverbedDetailNormalStrengthMultiplier"),
                 materialControls.FindPropertyRelative(
@@ -4104,6 +4136,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             SerializedProperty extensionStrength,
             SerializedProperty extensionFade,
             SerializedProperty detailScaleMultiplier,
+            SerializedProperty authoredColorStrengthMultiplier,
+            SerializedProperty authoredColorLightingMultiplier,
             SerializedProperty detailNormalStrengthMultiplier,
             SerializedProperty detailCavityStrengthMultiplier,
             SerializedProperty detailValueFormMultiplier,
@@ -4165,6 +4199,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             {
                 EditorGUI.BeginChangeCheck();
                 EditorGUILayout.PropertyField(detailScaleMultiplier);
+                EditorGUILayout.PropertyField(authoredColorStrengthMultiplier);
+                EditorGUILayout.PropertyField(authoredColorLightingMultiplier);
                 EditorGUILayout.PropertyField(detailNormalStrengthMultiplier);
                 EditorGUILayout.PropertyField(detailCavityStrengthMultiplier);
                 EditorGUILayout.PropertyField(detailValueFormMultiplier);
@@ -4308,6 +4344,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             SerializedProperty customRiverbedLayer,
             SerializedProperty materialStrength,
             SerializedProperty detailScaleMultiplier,
+            SerializedProperty authoredColorStrengthMultiplier,
+            SerializedProperty authoredColorLightingMultiplier,
             SerializedProperty detailNormalStrengthMultiplier,
             SerializedProperty detailCavityStrengthMultiplier,
             SerializedProperty detailValueFormMultiplier,
@@ -4451,6 +4489,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             {
                 EditorGUI.BeginChangeCheck();
                 EditorGUILayout.PropertyField(detailScaleMultiplier);
+                EditorGUILayout.PropertyField(authoredColorStrengthMultiplier);
+                EditorGUILayout.PropertyField(authoredColorLightingMultiplier);
                 EditorGUILayout.PropertyField(detailNormalStrengthMultiplier);
                 EditorGUILayout.PropertyField(detailCavityStrengthMultiplier);
                 EditorGUILayout.PropertyField(detailValueFormMultiplier);
@@ -5190,6 +5230,28 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             EditorGUI.BeginChangeCheck();
 
             EditorGUILayout.LabelField(
+                "Payload",
+                EditorStyles.miniBoldLabel);
+            DrawSerializedProperties(materialObject, "payloadMode");
+            SerializedProperty payloadMode =
+                materialObject.FindProperty("payloadMode");
+            bool usesAuthoredColor =
+                payloadMode != null &&
+                payloadMode.enumValueIndex ==
+                    (int)StylizedSurfaceMaterialPayloadMode.AuthoredColor;
+            if (usesAuthoredColor)
+            {
+                DrawSerializedProperties(
+                    materialObject,
+                    "authoredColorStrength",
+                    "authoredColorTint",
+                    "authoredColorTintStrength",
+                    "authoredColorLightingStrength",
+                    "authoredRoughnessStrength");
+            }
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
                 "Palette",
                 EditorStyles.miniBoldLabel);
             DrawSerializedProperties(
@@ -5206,8 +5268,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             DrawSerializedProperties(
                 materialObject,
                 "macroContrast",
-                "legacyPixelCellInfluence",
-                "detailValueStrength");
+                "legacyPixelCellInfluence");
+            if (!usesAuthoredColor)
+            {
+                DrawSerializedProperties(
+                    materialObject,
+                    "detailValueStrength");
+            }
 
             EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField(
@@ -5221,8 +5288,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 "detailWorldScale",
                 "detailNormalStrength",
                 "detailCavityStrength",
-                "detailCavityBias",
-                "detailFormHighlightStrength");
+                "detailCavityBias");
+            if (!usesAuthoredColor)
+            {
+                DrawSerializedProperties(
+                    materialObject,
+                    "detailFormHighlightStrength");
+            }
 
             EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField(
@@ -5231,8 +5303,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             DrawSerializedProperties(
                 materialObject,
                 "drySmoothness",
-                "drySpecularStrength",
-                "finishVariationStrength");
+                "drySpecularStrength");
+            if (!usesAuthoredColor)
+            {
+                DrawSerializedProperties(
+                    materialObject,
+                    "finishVariationStrength");
+            }
 
             bool changed = EditorGUI.EndChangeCheck();
             bool applied = materialObject.ApplyModifiedProperties();
@@ -5946,6 +6023,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             if (targets.Length == 1 && target is GeneratedGround ground)
             {
                 EditorGUILayout.Space(4f);
+                if (GUILayout.Button("Run Surface Material Validation"))
+                {
+                    ProgrammaticStylized3D.Rendering.PixelSurface.Editor
+                        .StylizedSurfaceMaterialValidation.RunAndCopy(ground);
+                }
+
                 if (GUILayout.Button("Copy All Ground Diagnostics"))
                 {
                     EditorGUIUtility.systemCopyBuffer =

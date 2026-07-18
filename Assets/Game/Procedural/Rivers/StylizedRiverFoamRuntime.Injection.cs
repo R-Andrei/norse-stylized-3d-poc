@@ -100,7 +100,14 @@ namespace ProgrammaticStylized3D.Rivers
                 ? lastUpdateCellIterations
                 : 0L;
 
-            previousState = currentState;
+            if (presentationPreviousState == null ||
+                !presentationPreviousState.IsCreated())
+            {
+                return;
+            }
+
+            Graphics.CopyTexture(currentState, presentationPreviousState);
+            previousState = presentationPreviousState;
             float transportMetricsInterval = 1f /
                 TransportMetricsUpdateRate;
             transportMetricsAccumulator += materialStepDuration;
@@ -200,12 +207,15 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
+                float previousElapsed = sourceEvent.Elapsed;
                 sourceEvent.Elapsed = Mathf.Min(
                     sourceEvent.Duration,
                     sourceEvent.Elapsed + Mathf.Max(0f, deltaTime));
                 automaticFoamSourceEvents[index] = sourceEvent;
                 automaticFoamSourceEventGpuData[index] =
-                    BuildAutomaticFoamSourceGpuData(sourceEvent);
+                    BuildAutomaticFoamSourceGpuData(
+                        sourceEvent,
+                        previousElapsed);
                 activeCount++;
             }
 
@@ -250,9 +260,19 @@ namespace ProgrammaticStylized3D.Rivers
                         continue;
                     }
 
-                    DispatchAutomaticFoamSourceEvent(index, sourceEvent, target);
-                    automaticSourceEventsRasterizedLastUpdate++;
-                    injectedLastUpdate++;
+                    FoamSourceEventGpuData gpuData =
+                        automaticFoamSourceEventGpuData[index];
+                    bool hasNewDeposition = gpuData.Deposit.z < 0.5f ||
+                        gpuData.Header.z > gpuData.Deposit.y + 0.000001f;
+                    if (hasNewDeposition)
+                    {
+                        DispatchAutomaticFoamSourceEvent(
+                            index,
+                            sourceEvent,
+                            target);
+                        automaticSourceEventsRasterizedLastUpdate++;
+                        injectedLastUpdate++;
+                    }
 
                     if (sourceEvent.Elapsed >= sourceEvent.Duration - 0.00001f)
                     {
@@ -269,15 +289,43 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         private FoamSourceEventGpuData BuildAutomaticFoamSourceGpuData(
-            AutomaticFoamSourceEvent sourceEvent)
+            AutomaticFoamSourceEvent sourceEvent,
+            float previousElapsed)
         {
             return BuildAutomaticFoamSourceGpuData(
                 sourceEvent,
+                previousElapsed,
                 gridDescriptor);
+        }
+
+        private static void ResolveAutomaticSourceDepositionState(
+            AutomaticFoamSourceEvent sourceEvent,
+            float elapsed,
+            out float phaseOrSide,
+            out float progress)
+        {
+            bool objectContactCycle =
+                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
+                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc;
+            if (objectContactCycle)
+            {
+                float buildDuration = Mathf.Max(
+                    0.0001f,
+                    sourceEvent.ObjectBuildDuration);
+                phaseOrSide = 0f;
+                progress = Mathf.Clamp01(
+                    Mathf.Clamp(elapsed, 0f, buildDuration) / buildDuration);
+                return;
+            }
+
+            phaseOrSide = sourceEvent.SideSign;
+            progress = Mathf.Clamp01(
+                elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
         }
 
         private FoamSourceEventGpuData BuildAutomaticFoamSourceGpuData(
             AutomaticFoamSourceEvent sourceEvent,
+            float previousElapsed,
             StylizedRiverFoamGridDescriptor descriptor)
         {
             float startStorageGlobal =
@@ -293,36 +341,16 @@ namespace ProgrammaticStylized3D.Rivers
                 ? WorldGlobalDistanceToFoamStorageGlobalDistance(
                     sourceEvent.ObjectCentreGlobalDistance)
                 : (startStorageGlobal + endStorageGlobal) * 0.5f;
-            float progress = Mathf.Clamp01(
-                sourceEvent.Elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
-            float phaseCode = sourceEvent.SideSign;
-            if (objectContactCycle)
-            {
-                float buildEnd = Mathf.Max(0.0001f, sourceEvent.ObjectBuildDuration);
-                float holdEnd = buildEnd + Mathf.Max(0f, sourceEvent.ObjectHoldDuration);
-                if (sourceEvent.Elapsed < buildEnd)
-                {
-                    phaseCode = 0f;
-                    progress = Mathf.Clamp01(sourceEvent.Elapsed / buildEnd);
-                }
-                else if (sourceEvent.Elapsed < holdEnd)
-                {
-                    phaseCode = 1f;
-                    progress = sourceEvent.ObjectHoldDuration > 0.0001f
-                        ? Mathf.Clamp01(
-                            (sourceEvent.Elapsed - buildEnd) /
-                            sourceEvent.ObjectHoldDuration)
-                        : 1f;
-                }
-                else
-                {
-                    phaseCode = 2f;
-                    progress = Mathf.Clamp01(
-                        (sourceEvent.Elapsed - holdEnd) /
-                        Mathf.Max(0.0001f, sourceEvent.ObjectReleaseDuration));
-                }
-            }
-
+            ResolveAutomaticSourceDepositionState(
+                sourceEvent,
+                sourceEvent.Elapsed,
+                out float phaseCode,
+                out float progress);
+            ResolveAutomaticSourceDepositionState(
+                sourceEvent,
+                previousElapsed,
+                out float previousPhaseCode,
+                out float previousProgress);
             float materialStepProgress = Mathf.Clamp01(
                 (1f / Mathf.Max(1f, ResolveUpdateRate())) /
                 Mathf.Max(
@@ -418,7 +446,12 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceEvent.SourceFillFeatureSize),
                 Variation = variationData,
                 Kinematics = kinematicsData,
-                ObjectData = objectData
+                ObjectData = objectData,
+                Deposit = new Vector4(
+                    previousPhaseCode,
+                    previousProgress,
+                    previousElapsed > 0.000001f ? 1f : 0f,
+                    0f)
             };
         }
 
@@ -609,7 +642,8 @@ namespace ProgrammaticStylized3D.Rivers
             ClearFoamCompositionEvents();
 
             if (computeShader == null || currentState == null ||
-                writeState == null || boundaryTexture == null ||
+                writeState == null || presentationPreviousState == null ||
+                boundaryTexture == null ||
                 writeIsolatedLifeProbeKernel < 0 || fieldWidth <= 0 ||
                 fieldHeight <= 0)
             {
@@ -648,7 +682,12 @@ namespace ProgrammaticStylized3D.Rivers
 
             DispatchIsolatedLifeProbeToState(currentState, rectA, rectB, rectC);
             DispatchIsolatedLifeProbeToState(writeState, rectA, rectB, rectC);
-            previousState = currentState;
+            DispatchIsolatedLifeProbeToState(
+                presentationPreviousState,
+                rectA,
+                rectB,
+                rectC);
+            previousState = presentationPreviousState;
             simulationInterpolation = 1f;
             lastRenderInterpolationAlpha = simulationInterpolation;
 

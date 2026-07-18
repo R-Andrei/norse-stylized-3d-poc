@@ -368,11 +368,15 @@ Shader "PS3D/Stylized River Water"
 
             float4 SampleCommittedFoamState(float2 fieldUV)
             {
-                return SAMPLE_TEXTURE2D_LOD(
-                    _FoamCurrent,
-                    sampler_FoamCurrent,
+                return RiverWaterFoamSampleInterpolatedState(
+                    TEXTURE2D_ARGS(
+                        _FoamPrevious,
+                        sampler_FoamPrevious),
+                    TEXTURE2D_ARGS(
+                        _FoamCurrent,
+                        sampler_FoamCurrent),
                     saturate(fieldUV),
-                    0.0);
+                    _FoamInterpolation);
             }
 
             float ResolveCommittedFoamPresenceVisibility(
@@ -1182,9 +1186,10 @@ Shader "PS3D/Stylized River Water"
                         resolvedVelocity.downstreamSpeedFactor);
                     float3 fieldColour = fieldHue * downstreamBrightness;
 
-                    // Motion Field diagnostics show the committed Layer C state
-                    // at fieldUV. Render-only residual prediction must not move
-                    // the white ownership overlay or its simulation-cell grid.
+                    // Motion Field diagnostics show the same temporal blend
+                    // between two committed Layer C states used by Final Foam.
+                    // Rejected velocity backtracing remains absent, so neither
+                    // the white ownership overlay nor its grid crosses faces.
                     float committedPresence = saturate(
                         SampleCommittedFoamState(foam.fieldUV).r);
                     float committedPresenceVisibility =
@@ -1207,8 +1212,9 @@ Shader "PS3D/Stylized River Water"
                             foamDimensions = laneDimensions;
                         }
 
-                        // Draw persistent material cells in committed field space,
-                        // never in the residual-predicted presentation coordinate.
+                        // Draw persistent material cells in descriptor-owned
+                        // field space. Temporal blending changes only packed state,
+                        // never the simulation-cell coordinate.
                         float2 cellCoordinate =
                             saturate(foam.fieldUV) * (float2)foamDimensions;
                         float2 cellFraction = frac(cellCoordinate);

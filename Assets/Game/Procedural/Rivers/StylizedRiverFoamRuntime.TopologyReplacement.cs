@@ -704,17 +704,30 @@ namespace ProgrammaticStylized3D.Rivers
             snapshot.Interpolation = simulationInterpolation;
             snapshot.HoldsVisibleResources = true;
 
-            if (stateA == previousState || stateA == currentState)
+            RenderTexture detachedWriteState = writeState;
+            if (stateA == previousState || stateA == currentState ||
+                stateA == detachedWriteState)
             {
                 stateA = null;
             }
-            if (stateB == previousState || stateB == currentState)
+            if (stateB == previousState || stateB == currentState ||
+                stateB == detachedWriteState)
             {
                 stateB = null;
+            }
+            if (presentationPreviousState == previousState ||
+                presentationPreviousState == currentState)
+            {
+                presentationPreviousState = null;
             }
             previousState = null;
             currentState = null;
             writeState = null;
+            if (detachedWriteState != snapshot.PreviousState &&
+                detachedWriteState != snapshot.CurrentState)
+            {
+                ReleaseTexture(ref detachedWriteState);
+            }
             topologyTexture = null;
             topologySourcesTexture = null;
             obstacleExclusionTexture = null;
@@ -1176,6 +1189,7 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         ApplyBoundaryToState(stateA);
                         ApplyBoundaryToState(stateB);
+                        ApplyBoundaryToState(presentationPreviousState);
                     }
 
                     if (!pendingObstacleRebuild &&

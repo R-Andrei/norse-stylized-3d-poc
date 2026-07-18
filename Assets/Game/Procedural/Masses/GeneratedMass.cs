@@ -516,6 +516,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float EdgeWearBrightnessLift;
             public Color EdgeWearTint;
             public float EdgeWearTintStrength;
+            public float EdgeWearMacroVariationCoverage;
             public float EdgeWearMacroVariation;
             public float EdgeWearMicroVariation;
             public float CreaseAmount;
@@ -817,7 +818,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float edgeWearTintStrength;
 
-        [Tooltip("Reserved for richer inter-edge variation on generated bevel/chamfer wear. The first EW-4 pass uses deterministic edge scoring only.")]
+        [Tooltip("Deterministic fraction of ordinary eligible canonical source edges that participate in macro width variation. Zero preserves uniform widths; one allows every ordinary eligible edge to participate.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float edgeWearMacroVariationCoverage = 1f;
+
+        [Tooltip("Strength of deterministic average-width variation on participating edges. Zero preserves uniform widths; one allows the full current downward-only range.")]
         [Range(0f, 1f)]
         [SerializeField]
         [FormerlySerializedAs("edgeWearBreakup")]
@@ -905,14 +911,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private Mesh generatedMesh;
         private Texture2D generatedFeatureAtlas0;
         private Texture2D generatedFeatureAtlas1;
-        [NonSerialized]
         private bool stableWorldGeometryFingerprintValid;
-        [NonSerialized]
         private GeneratedGeometryStableFingerprint
             stableWorldGeometryFingerprint;
-        [NonSerialized]
         private Mesh stableWorldGeometryFingerprintMesh;
-        [NonSerialized]
         private Matrix4x4 stableWorldGeometryFingerprintMatrix;
         private bool regenerationInProgress;
 #if UNITY_EDITOR
@@ -1004,6 +1006,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [NonSerialized]
         private float sourceEdgeIndexDebugEdgeWearCoverage;
         [NonSerialized]
+        private float sourceEdgeIndexDebugEdgeWearMacroVariationCoverage;
+        [NonSerialized]
+        private float sourceEdgeIndexDebugEdgeWearMacroVariation;
+        [NonSerialized]
         private int sourceEdgeIndexDebugShapeSeed = -1;
 #endif
 
@@ -1042,6 +1048,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public float EdgeWearBrightnessLift => edgeWearBrightnessLift;
         public Color EdgeWearTint => edgeWearTint;
         public float EdgeWearTintStrength => edgeWearTintStrength;
+        public float EdgeWearMacroVariationCoverage =>
+            edgeWearMacroVariationCoverage;
         public float EdgeWearMacroVariation => edgeWearMacroVariation;
         public float EdgeWearMicroVariation => edgeWearMicroVariation;
         public float CreaseAmount => creaseAmount;
@@ -1181,7 +1189,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                    sourceEdgeIndexDebugEdgeWearAmount == edgeWearAmount &&
                    sourceEdgeIndexDebugEdgeWearWidth == edgeWearWidth &&
                    sourceEdgeIndexDebugEdgeWearCoverage ==
-                       edgeWearCoverage;
+                       edgeWearCoverage &&
+                   sourceEdgeIndexDebugEdgeWearMacroVariationCoverage ==
+                       edgeWearMacroVariationCoverage &&
+                   sourceEdgeIndexDebugEdgeWearMacroVariation ==
+                       edgeWearMacroVariation;
         }
 
         private void SetSourceEdgeIndexDebugFromCurrentEvaluation(
@@ -1196,6 +1208,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             sourceEdgeIndexDebugEdgeWearAmount = edgeWearAmount;
             sourceEdgeIndexDebugEdgeWearWidth = edgeWearWidth;
             sourceEdgeIndexDebugEdgeWearCoverage = edgeWearCoverage;
+            sourceEdgeIndexDebugEdgeWearMacroVariationCoverage =
+                edgeWearMacroVariationCoverage;
+            sourceEdgeIndexDebugEdgeWearMacroVariation =
+                edgeWearMacroVariation;
             sourceEdgeIndexDebugShapeSeed = recipe != null
                 ? recipe.ShapeSeed
                 : -1;
@@ -1445,44 +1461,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ? meshFilter.transform.localToWorldMatrix
                 : Matrix4x4.identity;
 
-            bool rejectedRestoredZero =
-                stableWorldGeometryFingerprintValid &&
-                stableWorldGeometryFingerprint.IsDefault;
-            bool meshChanged =
-                stableWorldGeometryFingerprintMesh != currentMesh;
-            bool transformChanged =
-                !stableWorldGeometryFingerprintMatrix.Equals(currentMatrix);
-            string refreshStatus = string.Empty;
             if (!stableWorldGeometryFingerprintValid ||
-                rejectedRestoredZero ||
-                meshChanged ||
-                transformChanged)
+                stableWorldGeometryFingerprintMesh != currentMesh ||
+                !stableWorldGeometryFingerprintMatrix.Equals(currentMatrix))
             {
-                RefreshStableWorldGeometryFingerprint(
-                    rejectedRestoredZero,
-                    out refreshStatus);
+                RefreshStableWorldGeometryFingerprint();
             }
 
             fingerprint = stableWorldGeometryFingerprint;
-            bool usable =
-                stableWorldGeometryFingerprintValid &&
-                !fingerprint.IsDefault;
-            if (usable)
-            {
-                status = string.IsNullOrEmpty(refreshStatus)
-                    ? "Using the generated owner's exact world-geometry fingerprint."
-                    : refreshStatus;
-            }
-            else
-            {
-                fingerprint = default;
-                status = string.IsNullOrEmpty(refreshStatus)
-                    ? "The generated owner could not prepare an exact " +
-                      "world-geometry fingerprint."
-                    : refreshStatus;
-            }
-
-            return usable;
+            status = stableWorldGeometryFingerprintValid
+                ? "Using the generated owner's exact world-geometry fingerprint."
+                : "The generated owner could not prepare an exact " +
+                  "world-geometry fingerprint.";
+            return stableWorldGeometryFingerprintValid;
         }
 
         private void OnEnable()
@@ -2226,53 +2217,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
-        private void RefreshStableWorldGeometryFingerprint(
-            bool repairingRestoredZero,
-            out string status)
+        private void RefreshStableWorldGeometryFingerprint()
         {
             using (ComputeFingerprintProfilerMarker.Auto())
             {
-                Mesh resolvedMesh = meshFilter != null
-                    ? meshFilter.sharedMesh
-                    : null;
-                Matrix4x4 resolvedMatrix = meshFilter != null
-                    ? meshFilter.transform.localToWorldMatrix
-                    : Matrix4x4.identity;
-                bool computed =
+                stableWorldGeometryFingerprintValid =
                     GeneratedGeometryStableFingerprintUtility
                         .TryComputeExactWorldTriangleFingerprint(
                             meshFilter,
-                            out GeneratedGeometryStableFingerprint
-                                resolvedFingerprint,
-                            out string computeStatus) &&
-                    !resolvedFingerprint.IsDefault;
-
-                // Publish the four-lane transient cache atomically only after
-                // every value has been resolved. Unity hot reload must never
-                // restore a valid flag independently from its readonly struct.
-                stableWorldGeometryFingerprint = computed
-                    ? resolvedFingerprint
-                    : default;
-                stableWorldGeometryFingerprintMesh = resolvedMesh;
-                stableWorldGeometryFingerprintMatrix = resolvedMatrix;
-                stableWorldGeometryFingerprintValid = computed;
-
-                if (computed)
-                {
-                    status = repairingRestoredZero
-                        ? "Recomputed the generated owner's exact world-geometry " +
-                          "fingerprint after rejecting a restored all-zero " +
-                          "transient cache value."
-                        : "Prepared the generated owner's exact world-geometry " +
-                          "fingerprint. " + (computeStatus ?? string.Empty);
-                }
-                else
-                {
-                    status =
-                        "The generated owner could not prepare a usable exact " +
-                        "world-geometry fingerprint. " +
-                        (computeStatus ?? string.Empty);
-                }
+                            out stableWorldGeometryFingerprint,
+                            out _);
+                stableWorldGeometryFingerprintMesh = meshFilter != null
+                    ? meshFilter.sharedMesh
+                    : null;
+                stableWorldGeometryFingerprintMatrix = meshFilter != null
+                    ? meshFilter.transform.localToWorldMatrix
+                    : Matrix4x4.identity;
             }
         }
 
@@ -2407,6 +2367,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             edgeWearBrightnessLift = values.EdgeWearBrightnessLift;
             edgeWearTint = values.EdgeWearTint;
             edgeWearTintStrength = values.EdgeWearTintStrength;
+            edgeWearMacroVariationCoverage =
+                values.EdgeWearMacroVariationCoverage;
             edgeWearMacroVariation = values.EdgeWearMacroVariation;
             edgeWearMicroVariation = values.EdgeWearMicroVariation;
             creaseAmount = values.CreaseAmount;
@@ -2485,6 +2447,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                        edgeWearTintStrength,
                        values.EdgeWearTintStrength) &&
                    FloatApproximately(
+                       edgeWearMacroVariationCoverage,
+                       values.EdgeWearMacroVariationCoverage) &&
+                   FloatApproximately(
                        edgeWearMacroVariation,
                        values.EdgeWearMacroVariation) &&
                    FloatApproximately(
@@ -2516,8 +2481,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.EdgeWearBrightnessLift = 0.24f;
                     values.EdgeWearTint = new Color(0.68f, 0.69f, 0.65f, 1f);
                     values.EdgeWearTintStrength = 0.12f;
+                    values.EdgeWearMacroVariationCoverage = 1f;
                     values.EdgeWearMacroVariation = 0.28f;
-                    values.EdgeWearMicroVariation = 0.22f;
+                    values.EdgeWearMicroVariation = 0f;
                     return values;
 
                 case GeneratedMassFeatureRecipe.WetRiverStone:
@@ -2537,6 +2503,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.EdgeWearSoftness = 0.65f;
                     values.EdgeWearResponseStrength = 0f;
                     values.EdgeWearTintStrength = 0f;
+                    values.EdgeWearMacroVariationCoverage = 1f;
                     values.EdgeWearMacroVariation = 0f;
                     values.EdgeWearMicroVariation = 0f;
                     return values;
@@ -2555,6 +2522,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.CreaseSoftness = 0.45f;
                     values.EdgeWearResponseStrength = 0f;
                     values.EdgeWearTintStrength = 0f;
+                    values.EdgeWearMacroVariationCoverage = 1f;
                     values.EdgeWearMacroVariation = 0f;
                     values.EdgeWearMicroVariation = 0f;
                     return values;
@@ -2573,6 +2541,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.CreaseAmount = 0.35f;
                     values.EdgeWearResponseStrength = 0f;
                     values.EdgeWearTintStrength = 0f;
+                    values.EdgeWearMacroVariationCoverage = 1f;
                     values.EdgeWearMacroVariation = 0f;
                     values.EdgeWearMicroVariation = 0f;
                     values.LightingTintInfluence = 0.2f;
@@ -2620,8 +2589,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearBrightnessLift = 0.38f,
                 EdgeWearTint = new Color(0.72f, 0.70f, 0.60f, 1f),
                 EdgeWearTintStrength = 0.18f,
+                EdgeWearMacroVariationCoverage = 1f,
                 EdgeWearMacroVariation = 0.32f,
-                EdgeWearMicroVariation = 0.28f,
+                EdgeWearMicroVariation = 0f,
                 CreaseAmount = 1f,
                 CreaseWidth = 1f,
                 CreaseLength = 1f,
@@ -3011,6 +2981,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 edgeWearAmount,
                 edgeWearWidth,
                 edgeWearCoverage,
+                edgeWearMacroVariationCoverage,
+                edgeWearMacroVariation,
                 edgeWearSoftness,
                 creaseAmount,
                 creaseWidth,

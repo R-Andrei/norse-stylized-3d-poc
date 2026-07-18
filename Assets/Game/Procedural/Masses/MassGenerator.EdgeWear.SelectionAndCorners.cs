@@ -17,6 +17,77 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             2f;
         private const float EdgeWearMinimumStyleWidthSetting = 0.05f;
         private const float EdgeWearMinimumCentralSpanWidthMultiplier = 0.5f;
+        private const float EdgeWearMacroMinimumSampledMultiplier = 0.55f;
+        private const int EdgeWearMacroVariationSalt = 0x6D31;
+        private const int EdgeWearMacroParticipationSalt = 0x4B17;
+
+        private static void ResolveEdgeWearMacroRequestedWidth(
+            int shapeSeed,
+            int canonicalSourceEdgeIndex,
+            float macroVariationCoverage,
+            float macroVariationStrength,
+            float baseRequestedWidth,
+            float minimumStyleWidth,
+            bool generatedTransition,
+            out float participationIdentity01,
+            out bool participates,
+            out float identity01,
+            out float sampledMultiplier,
+            out float effectiveMultiplier,
+            out float variedRequestedWidth,
+            out bool minimumStyleClamped)
+        {
+            int stableIdentity = Mathf.Max(0, canonicalSourceEdgeIndex);
+            participationIdentity01 = generatedTransition
+                ? 1f
+                : Hash01(
+                    unchecked(shapeSeed + EdgeWearMacroParticipationSalt),
+                    stableIdentity);
+            identity01 = generatedTransition
+                ? 0f
+                : Hash01(
+                    unchecked(shapeSeed + EdgeWearMacroVariationSalt),
+                    stableIdentity);
+            float smoothIdentity =
+                identity01 * identity01 * (3f - 2f * identity01);
+            sampledMultiplier = generatedTransition
+                ? 1f
+                : Mathf.Lerp(
+                    EdgeWearMacroMinimumSampledMultiplier,
+                    1f,
+                    smoothIdentity);
+
+            float coverage = generatedTransition
+                ? 0f
+                : Mathf.Clamp01(macroVariationCoverage);
+            float strength = generatedTransition
+                ? 0f
+                : Mathf.Clamp01(macroVariationStrength);
+            participates = coverage > 0f &&
+                strength > 0f &&
+                (coverage >= 1f ||
+                 participationIdentity01 < coverage);
+            if (!participates)
+            {
+                effectiveMultiplier = 1f;
+                variedRequestedWidth = baseRequestedWidth;
+                minimumStyleClamped = false;
+                return;
+            }
+
+            float requestedMultiplier =
+                Mathf.Lerp(1f, sampledMultiplier, strength);
+            float unboundedWidth =
+                baseRequestedWidth * requestedMultiplier;
+            variedRequestedWidth =
+                Mathf.Max(minimumStyleWidth, unboundedWidth);
+            minimumStyleClamped = variedRequestedWidth >
+                unboundedWidth + PointMergeDistance;
+            effectiveMultiplier =
+                baseRequestedWidth > PointMergeDistance
+                    ? variedRequestedWidth / baseRequestedWidth
+                    : 1f;
+        }
 
         private static List<EdgeWearBevelCandidate> BuildEdgeWearBevelCandidates(
             List<PolygonFace> faces,
@@ -37,7 +108,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 maximumCoverageMode,
                 includeAllGeometricCandidates)
             {
-                MicroTopologyNormalization = microTopologyNormalization
+                MicroTopologyNormalization = microTopologyNormalization,
+                MacroVariationCoverage =
+                    settings.EdgeWearMacroVariationCoverage,
+                MacroVariation = settings.EdgeWearMacroVariation,
+                MacroBaseRequestedWidth = requestedWidth
             };
             System.Diagnostics.Stopwatch viabilityStopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
@@ -122,6 +197,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeKey edgeKey = new EdgeKey(edge.Start, edge.End);
                 Vector3 midpoint = (edge.Start + edge.End) * 0.5f;
                 float length = (edge.End - edge.Start).magnitude;
+                int originalSourceEdgeIndex =
+                    microTopologyNormalization == null
+                        ? edgeIndex
+                        : microTopologyNormalization.
+                            ResolveOriginalSourceEdgeIndex(
+                                edgeKey,
+                                edgeIndex);
+                bool microGeneratedTransition =
+                    microTopologyNormalization != null &&
+                    microTopologyNormalization.
+                        GeneratedTransitionKeys.Contains(edgeKey);
+                ResolveEdgeWearMacroRequestedWidth(
+                    recipe.ShapeSeed,
+                    originalSourceEdgeIndex,
+                    settings.EdgeWearMacroVariationCoverage,
+                    settings.EdgeWearMacroVariation,
+                    requestedWidth,
+                    minimumStyleWidth,
+                    microGeneratedTransition,
+                    out float macroParticipationIdentity01,
+                    out bool macroVariationParticipates,
+                    out float macroIdentity01,
+                    out float macroSampledMultiplier,
+                    out float macroEffectiveMultiplier,
+                    out float variedRequestedWidth,
+                    out bool macroMinimumStyleClamped);
                 EdgeWearEdgeLifecycleRecord lifecycle =
                     new EdgeWearEdgeLifecycleRecord
                     {
@@ -138,16 +239,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             bounds.max.y,
                             midpoint.y),
                         OriginalSourceEdgeIndex =
-                            microTopologyNormalization == null
-                                ? -1
-                                : microTopologyNormalization.
-                                    ResolveOriginalSourceEdgeIndex(
-                                        edgeKey,
-                                        -1),
+                            originalSourceEdgeIndex,
                         MicroTopologyGeneratedTransition =
-                            microTopologyNormalization != null &&
-                            microTopologyNormalization.
-                                GeneratedTransitionKeys.Contains(edgeKey)
+                            microGeneratedTransition
                     };
                 EdgeWearEdgeViabilityRecord viability =
                     new EdgeWearEdgeViabilityRecord
@@ -155,13 +249,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         Key = edgeKey,
                         MinimumDihedralDegrees =
                             EdgeWearMinimumViableDihedralDegrees,
-                        RequestedWidth = requestedWidth,
+                        BaseRequestedWidth = requestedWidth,
+                        MacroVariationCoverage =
+                            settings.EdgeWearMacroVariationCoverage,
+                        MacroVariation = settings.EdgeWearMacroVariation,
+                        MacroParticipationIdentity01 =
+                            macroParticipationIdentity01,
+                        MacroVariationParticipates =
+                            macroVariationParticipates,
+                        MacroIdentity01 = macroIdentity01,
+                        MacroSampledMultiplier =
+                            macroSampledMultiplier,
+                        MacroEffectiveMultiplier =
+                            macroEffectiveMultiplier,
+                        MacroMinimumStyleClamped =
+                            macroMinimumStyleClamped,
+                        RequestedWidth = variedRequestedWidth,
                         RequiredFootprintLength =
-                            requestedWidth *
+                            variedRequestedWidth *
                                 EdgeWearMinimumFootprintLengthMultiplier +
                             footprintGuard,
-                        LengthToWidthRatio = requestedWidth > 0f
-                            ? length / requestedWidth
+                        LengthToWidthRatio = variedRequestedWidth > 0f
+                            ? length / variedRequestedWidth
                             : 0f
                     };
                 lifecycle.Viability = viability;
@@ -748,12 +857,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 record.ArtisticLocalDensity01 = geometric.Count > 1
                     ? Mathf.Clamp01((float)nearby / (geometric.Count - 1))
                     : 0f;
+                float edgeRequestedWidth = record.Viability == null
+                    ? requestedWidth
+                    : record.Viability.RequestedWidth;
                 record.ArtisticFeasibleWidthFraction =
-                    record.Viability == null || requestedWidth <= 0f
+                    record.Viability == null ||
+                    edgeRequestedWidth <= 0f
                         ? 0f
                         : Mathf.Clamp01(
                             record.Viability.MaximumLocallyFeasibleWidth /
-                            requestedWidth);
+                            edgeRequestedWidth);
             }
         }
 
@@ -1050,12 +1163,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             for (int ordinal = 0; ordinal < eligible.Count; ordinal++)
             {
                 audit.ViabilityIsolatedEvaluationCount++;
+                int graphEdgeIndex = eligible[ordinal].GraphEdgeIndex;
+                float edgeRequestedWidth =
+                    ResolveEdgeWearRequestedWidth(
+                        audit,
+                        graphEdgeIndex,
+                        requestedWidth);
                 BoundedSingleEdgeAuditResult isolated =
                     AuditBoundedSingleEdgeBevel(
                         sourceFaces,
                         context,
                         ordinal,
-                        requestedWidth,
+                        edgeRequestedWidth,
                         minimumStableEdgeLength,
                         minimumStableFaceArea,
                         false,
@@ -1074,8 +1193,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 // describe a failed or partial attempt as a certified width.
                 viability.MaximumLocallyFeasibleWidth =
                     isolated.SolvedWidth;
-                viability.FeasibleWidthFraction = requestedWidth > 0f
-                    ? isolated.SolvedWidth / requestedWidth
+                viability.FeasibleWidthFraction = edgeRequestedWidth > 0f
+                    ? isolated.SolvedWidth / edgeRequestedWidth
                     : 0f;
                 viability.MinimumStyleWidth = minimumStyleWidth;
                 viability.MinimumRequiredCertifiedWidth =
@@ -1109,8 +1228,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         ? isolated.SolvedWidth
                         : 0f;
                 viability.IsolatedMaximumCertifiedWidthFraction =
-                    viability.IsolatedSucceeded && requestedWidth > 0f
-                        ? isolated.SolvedWidth / requestedWidth
+                    viability.IsolatedSucceeded && edgeRequestedWidth > 0f
+                        ? isolated.SolvedWidth / edgeRequestedWidth
                         : 0f;
                 viability.IsolatedAlternateBoundaryRailCount =
                     isolated.AlternateBoundaryRailCount;
@@ -1140,7 +1259,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     isolated.RemainingCentralSpan;
                 viability.MinimumCentralSpan = Mathf.Max(
                     isolated.MinimumCentralSpan,
-                    requestedWidth *
+                    edgeRequestedWidth *
                         EdgeWearMinimumCentralSpanWidthMultiplier);
                 viability.IsolatedOpenEdgeCount =
                     isolated.OpenEdgeCount;
@@ -1188,7 +1307,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 string failureReason =
                     ResolveEdgeWearIsolatedViabilityFailure(
                         isolated,
-                        viability);
+                        viability,
+                        minimumStableEdgeLength);
                 if (!string.IsNullOrEmpty(failureReason))
                 {
                     SetEdgeWearGeometricIneligibility(
@@ -1233,11 +1353,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private static string ResolveEdgeWearIsolatedViabilityFailure(
             BoundedSingleEdgeAuditResult isolated,
-            EdgeWearEdgeViabilityRecord viability)
+            EdgeWearEdgeViabilityRecord viability,
+            float minimumStableEdgeLength)
         {
             if (isolated.IsolatedRailSolved != 1)
             {
                 return "isolated-rail-solve-failed";
+            }
+            bool reducedToStableWidthFloor =
+                viability.IsolatedSucceeded &&
+                viability.IsolatedMaximumCertifiedWidth <=
+                    minimumStableEdgeLength + PointMergeDistance &&
+                viability.IsolatedMaximumCertifiedWidth +
+                    PointMergeDistance < viability.RequestedWidth;
+            if (reducedToStableWidthFloor)
+            {
+                return "maximum-certified-width-at-stable-width-floor";
             }
             if (!viability.FeasibleWidthFractionValid &&
                 !viability.WidthRecoveryProvisional)
@@ -2348,7 +2479,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
 
-                float locallyCertifiedWidth = requestedWidth;
+                float edgeRequestedWidth =
+                    ResolveEdgeWearRequestedWidth(
+                        coverageAudit,
+                        edgeIndex,
+                        requestedWidth);
+                float locallyCertifiedWidth = edgeRequestedWidth;
                 if (coverageAudit != null &&
                     coverageAudit.ViabilityByGraphEdge.TryGetValue(
                         edgeIndex,
@@ -2383,6 +2519,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (!TrySolveCornerAwareChamferWidths(
                     sourceFaces,
                     context,
+                    coverageAudit,
                     requestedWidth,
                     minimumStableEdgeLength,
                     widthByEdge,
@@ -2495,8 +2632,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     float nextLength = GetGraphEdgeLength(
                         context.Graph,
                         nextEdgeIndex);
+                    float localRequestedWidth =
+                        ResolveChamferCornerRequestedWidth(
+                            coverageAudit,
+                            widthByEdge,
+                            previousEdgeIndex,
+                            nextEdgeIndex,
+                            requestedWidth);
                     float localLimit = CalculateChamferCornerDisplacementLimit(
-                        requestedWidth,
+                        localRequestedWidth,
                         minimumStableEdgeLength,
                         previousLength,
                         nextLength);
@@ -2591,6 +2735,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static bool TrySolveCornerAwareChamferWidths(
             List<PolygonFace> sourceFaces,
             ChamferTopologyContext context,
+            EdgeWearCoverageAudit coverageAudit,
             float requestedWidth,
             float minimumStableEdgeLength,
             Dictionary<int, float> widthByEdge,
@@ -2630,8 +2775,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     float nextLength = GetGraphEdgeLength(
                         context.Graph,
                         corner.NextSourceEdgeIndex);
+                    float localRequestedWidth =
+                        ResolveChamferCornerRequestedWidth(
+                            coverageAudit,
+                            widthByEdge,
+                            corner.PreviousSourceEdgeIndex,
+                            corner.NextSourceEdgeIndex,
+                            requestedWidth);
                     float localLimit = CalculateChamferCornerDisplacementLimit(
-                        requestedWidth,
+                        localRequestedWidth,
                         minimumStableEdgeLength,
                         previousLength,
                         nextLength);
@@ -2661,7 +2813,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         TryClampChamferEdgeWidth(
                             corner.PreviousSourceEdgeIndex,
                             scale,
-                            requestedWidth,
+                            ResolveEdgeWearRequestedWidth(
+                                coverageAudit,
+                                corner.PreviousSourceEdgeIndex,
+                                requestedWidth),
                             minimumStableEdgeLength,
                             widthByEdge,
                             cornerClampedEdges,
@@ -2674,7 +2829,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         TryClampChamferEdgeWidth(
                             corner.NextSourceEdgeIndex,
                             scale,
-                            requestedWidth,
+                            ResolveEdgeWearRequestedWidth(
+                                coverageAudit,
+                                corner.NextSourceEdgeIndex,
+                                requestedWidth),
                             minimumStableEdgeLength,
                             widthByEdge,
                             cornerClampedEdges,
@@ -2779,9 +2937,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             uniformlyZeroedParticipants.Add(
                                 selectedEdgeIndex);
                         }
-                        float relativeScale = requestedWidth >
+                        float edgeRequestedWidth =
+                            ResolveEdgeWearRequestedWidth(
+                                coverageAudit,
+                                selectedEdgeIndex,
+                                requestedWidth);
+                        float relativeScale = edgeRequestedWidth >
                             PointMergeDistance
-                                ? newWidth / requestedWidth
+                                ? newWidth / edgeRequestedWidth
                                 : 1f;
                         stats.MinimumSharedEdgeWidthScale = Mathf.Min(
                             stats.MinimumSharedEdgeWidthScale,
@@ -3166,6 +3329,64 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             stats.InitialMaximumCornerDisplacement = displacement;
+        }
+
+        private static float ResolveEdgeWearRequestedWidth(
+            EdgeWearCoverageAudit coverageAudit,
+            int graphEdgeIndex,
+            float fallbackRequestedWidth)
+        {
+            if (coverageAudit != null &&
+                coverageAudit.ViabilityByGraphEdge.TryGetValue(
+                    graphEdgeIndex,
+                    out EdgeWearEdgeViabilityRecord viability) &&
+                viability != null &&
+                viability.RequestedWidth > PointMergeDistance)
+            {
+                return viability.RequestedWidth;
+            }
+
+            return fallbackRequestedWidth;
+        }
+
+        private static float ResolveChamferCornerRequestedWidth(
+            EdgeWearCoverageAudit coverageAudit,
+            Dictionary<int, float> widthByEdge,
+            int previousEdgeIndex,
+            int nextEdgeIndex,
+            float fallbackRequestedWidth)
+        {
+            float localRequestedWidth = 0f;
+            if (widthByEdge != null &&
+                widthByEdge.TryGetValue(
+                    previousEdgeIndex,
+                    out float previousWidth) &&
+                previousWidth > PointMergeDistance)
+            {
+                localRequestedWidth = Mathf.Max(
+                    localRequestedWidth,
+                    ResolveEdgeWearRequestedWidth(
+                        coverageAudit,
+                        previousEdgeIndex,
+                        fallbackRequestedWidth));
+            }
+            if (widthByEdge != null &&
+                widthByEdge.TryGetValue(
+                    nextEdgeIndex,
+                    out float nextWidth) &&
+                nextWidth > PointMergeDistance)
+            {
+                localRequestedWidth = Mathf.Max(
+                    localRequestedWidth,
+                    ResolveEdgeWearRequestedWidth(
+                        coverageAudit,
+                        nextEdgeIndex,
+                        fallbackRequestedWidth));
+            }
+
+            return localRequestedWidth > PointMergeDistance
+                ? localRequestedWidth
+                : fallbackRequestedWidth;
         }
 
         private static bool TryClampChamferEdgeWidth(

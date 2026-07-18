@@ -779,6 +779,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundBankLayerCavityColor");
         private static readonly int GroundBankLayerDetailArrayId =
             Shader.PropertyToID("_GroundBankLayerDetailArray");
+        private static readonly int GroundBankLayerAuthoredColorArrayId =
+            Shader.PropertyToID("_GroundBankLayerAuthoredColorArray");
+        private static readonly int GroundBankLayerAuthoredColorAId =
+            Shader.PropertyToID("_GroundBankLayerAuthoredColorA");
+        private static readonly int GroundBankLayerAuthoredColorTintId =
+            Shader.PropertyToID("_GroundBankLayerAuthoredColorTint");
         private static readonly int GroundBankLayerDetailAId =
             Shader.PropertyToID("_GroundBankLayerDetailA");
         private static readonly int GroundBankLayerDetailBId =
@@ -809,6 +815,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundRiverbedLayerCavityColor");
         private static readonly int GroundRiverbedLayerDetailArrayId =
             Shader.PropertyToID("_GroundRiverbedLayerDetailArray");
+        private static readonly int GroundRiverbedLayerAuthoredColorArrayId =
+            Shader.PropertyToID("_GroundRiverbedLayerAuthoredColorArray");
+        private static readonly int GroundRiverbedLayerAuthoredColorAId =
+            Shader.PropertyToID("_GroundRiverbedLayerAuthoredColorA");
+        private static readonly int GroundRiverbedLayerAuthoredColorTintId =
+            Shader.PropertyToID("_GroundRiverbedLayerAuthoredColorTint");
         private static readonly int GroundRiverbedLayerDetailAId =
             Shader.PropertyToID("_GroundRiverbedLayerDetailA");
         private static readonly int GroundRiverbedLayerDetailBId =
@@ -4031,6 +4043,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 bankSurfaceLayer,
                 inheritedLayerColor,
                 resolvedMaterialControls.BankDetailScaleMultiplier,
+                resolvedMaterialControls.BankAuthoredColorStrengthMultiplier,
+                resolvedMaterialControls.BankAuthoredColorLightingMultiplier,
                 resolvedMaterialControls.BankDetailNormalStrengthMultiplier,
                 resolvedMaterialControls.BankDetailCavityStrengthMultiplier,
                 resolvedMaterialControls.BankDetailValueFormMultiplier,
@@ -4038,6 +4052,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 resolvedMaterialControls.BankLegacyPixelCellInfluenceMultiplier,
                 GroundBankLayerCavityColorId,
                 GroundBankLayerDetailArrayId,
+                GroundBankLayerAuthoredColorArrayId,
+                GroundBankLayerAuthoredColorAId,
+                GroundBankLayerAuthoredColorTintId,
                 GroundBankLayerDetailAId,
                 GroundBankLayerDetailBId,
                 GroundBankLayerDetailCId);
@@ -4105,6 +4122,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 riverbedSurfaceLayer,
                 inheritedLayerColor,
                 resolvedMaterialControls.RiverbedDetailScaleMultiplier,
+                resolvedMaterialControls.RiverbedAuthoredColorStrengthMultiplier,
+                resolvedMaterialControls.RiverbedAuthoredColorLightingMultiplier,
                 resolvedMaterialControls.RiverbedDetailNormalStrengthMultiplier,
                 resolvedMaterialControls.RiverbedDetailCavityStrengthMultiplier,
                 resolvedMaterialControls.RiverbedDetailValueFormMultiplier,
@@ -4112,6 +4131,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 resolvedMaterialControls.RiverbedLegacyPixelCellInfluenceMultiplier,
                 GroundRiverbedLayerCavityColorId,
                 GroundRiverbedLayerDetailArrayId,
+                GroundRiverbedLayerAuthoredColorArrayId,
+                GroundRiverbedLayerAuthoredColorAId,
+                GroundRiverbedLayerAuthoredColorTintId,
                 GroundRiverbedLayerDetailAId,
                 GroundRiverbedLayerDetailBId,
                 GroundRiverbedLayerDetailCId);
@@ -4375,6 +4397,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundSurfaceLayerProfile layer,
             Color fallbackColor,
             float detailScaleMultiplier,
+            float authoredColorStrengthMultiplier,
+            float authoredColorLightingMultiplier,
             float detailNormalStrengthMultiplier,
             float detailCavityStrengthMultiplier,
             float detailValueFormMultiplier,
@@ -4382,6 +4406,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float legacyPixelCellInfluenceMultiplier,
             int cavityColorId,
             int textureArrayId,
+            int authoredColorArrayId,
+            int authoredColorAId,
+            int authoredColorTintId,
             int detailAId,
             int detailBId,
             int detailCId)
@@ -4393,6 +4420,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 layer.TryResolveDetail(
                     out textureArray,
                     out sliceIndex);
+            Texture2DArray authoredColorArray = null;
+            int authoredColorSliceIndex = -1;
+            bool hasAuthoredColor =
+                hasDetail &&
+                layer != null &&
+                layer.TryResolveAuthoredColor(
+                    out authoredColorArray,
+                    out authoredColorSliceIndex);
 
             properties.SetColor(
                 cavityColorId,
@@ -4407,6 +4442,38 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     textureArrayId,
                     textureArray);
             }
+            if (hasAuthoredColor)
+            {
+                properties.SetTexture(
+                    authoredColorArrayId,
+                    authoredColorArray);
+            }
+            properties.SetVector(
+                authoredColorAId,
+                hasAuthoredColor
+                    ? new Vector4(
+                        1f,
+                        authoredColorSliceIndex,
+                        layer.AuthoredColorStrength * Mathf.Clamp(
+                            authoredColorStrengthMultiplier,
+                            0f,
+                            2f),
+                        Mathf.Clamp01(
+                            layer.AuthoredColorLightingStrength * Mathf.Clamp(
+                                authoredColorLightingMultiplier,
+                                0f,
+                                2f)))
+                    : Vector4.zero);
+            Color authoredTint = layer != null
+                ? layer.AuthoredColorTint
+                : Color.white;
+            authoredTint.a = hasAuthoredColor && layer != null
+                ? layer.AuthoredColorTintStrength
+                : 0f;
+            properties.SetColor(
+                authoredColorTintId,
+                authoredTint);
+
             float safeScaleMultiplier = Mathf.Clamp(
                 detailScaleMultiplier,
                 0.25f,
@@ -4459,8 +4526,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                                 0f,
                                 2f))
                         : 1f,
-                    0f,
-                    0f));
+                    hasAuthoredColor ? 1f : 0f,
+                    hasAuthoredColor && layer != null
+                        ? layer.AuthoredRoughnessStrength
+                        : 0f));
         }
 
         private void ApplyResolvedFeatureMaterialProperties(

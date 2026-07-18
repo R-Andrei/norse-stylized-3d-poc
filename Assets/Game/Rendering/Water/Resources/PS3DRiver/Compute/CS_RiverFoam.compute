@@ -2350,64 +2350,15 @@ struct FoamAutomaticSourceRasterSample
     float clearState;
 };
 
-FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
+float FoamEvaluateAutomaticSourceContribution(
+    FoamSourceEventData sourceEvent,
+    float sourceType,
+    float globalDistance,
+    float lateralMetres,
+    float shoreMetres,
+    float2 physicalCellSpacing,
     int2 coordinate)
 {
-    FoamAutomaticSourceRasterSample result;
-    result.packedState = 0.0.xxxx;
-    result.injectedPresence = 0.0;
-    result.sourceType = 0.0;
-    result.clearState = 0.0;
-
-    int x = coordinate.x;
-    int y = coordinate.y;
-    if (!IsFoamGridColumnInsideDomain(x))
-    {
-        result.clearState = 1.0;
-        return result;
-    }
-
-    float coverage = LoadBoundaryCoverage(coordinate);
-    float obstacleFootprint = saturate(
-        _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
-    float validFluid = coverage * (1.0 - obstacleFootprint);
-    if (validFluid <= 0.001)
-    {
-        result.clearState = 1.0;
-        return result;
-    }
-
-    FoamSourceEventData sourceEvent =
-        _FoamSourceEvents[max(0, _FoamSourceEventIndex)];
-    float sourceType = sourceEvent.header.x;
-    result.sourceType = sourceType;
-    if (sourceType < 0.5)
-    {
-        return result;
-    }
-
-    FoamMetricRow metric = _FoamMetricRows[x];
-    float lateralMetres = FoamLateralMetresAtTexel(y, metric);
-    float globalDistance = _FoamGlobalStart +
-        FoamGridLocalDistanceAtTexel(x);
-    float2 physicalPosition = float2(globalDistance, lateralMetres);
-    float2 physicalCellSpacing = float2(
-        max(0.01, metric.widthsAndSpacing.z),
-        max(0.01, metric.widthsAndSpacing.w));
-    float2 shoreEdges = _FoamCurrentShoreEdgesRead.Load(int3(x, 0, 0));
-    float shoreMetres = sourceEvent.header.y < 0.0
-        ? shoreEdges.x
-        : shoreEdges.y;
-    float inwardMetres = sourceEvent.header.y < 0.0
-        ? lateralMetres - shoreMetres
-        : shoreMetres - lateralMetres;
-    bool shoreSource = sourceType < 2.5;
-    if (shoreSource &&
-        inwardMetres < -max(sourceEvent.shore.w, physicalCellSpacing.y))
-    {
-        return result;
-    }
-
     float amountMultiplier = 1.0;
     float shape = 0.0;
     if (sourceType < 1.5)
@@ -2487,13 +2438,107 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     }
     else
     {
+        return 0.0;
+    }
+
+    return saturate(shape) * max(0.0, amountMultiplier);
+}
+
+FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
+    int2 coordinate)
+{
+    FoamAutomaticSourceRasterSample result;
+    result.packedState = 0.0.xxxx;
+    result.injectedPresence = 0.0;
+    result.sourceType = 0.0;
+    result.clearState = 0.0;
+
+    int x = coordinate.x;
+    int y = coordinate.y;
+    if (!IsFoamGridColumnInsideDomain(x))
+    {
+        result.clearState = 1.0;
         return result;
     }
 
-    if (shape <= FoamMaterialStateEpsilon)
+    float coverage = LoadBoundaryCoverage(coordinate);
+    float obstacleFootprint = saturate(
+        _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
+    float validFluid = coverage * (1.0 - obstacleFootprint);
+    if (validFluid <= 0.001)
+    {
+        result.clearState = 1.0;
+        return result;
+    }
+
+    FoamSourceEventData sourceEvent =
+        _FoamSourceEvents[max(0, _FoamSourceEventIndex)];
+    float sourceType = sourceEvent.header.x;
+    result.sourceType = sourceType;
+    if (sourceType < 0.5 || sourceType >= 8.5)
     {
         return result;
     }
+
+    FoamMetricRow metric = _FoamMetricRows[x];
+    float lateralMetres = FoamLateralMetresAtTexel(y, metric);
+    float globalDistance = _FoamGlobalStart +
+        FoamGridLocalDistanceAtTexel(x);
+    float2 physicalPosition = float2(globalDistance, lateralMetres);
+    float2 physicalCellSpacing = float2(
+        max(0.01, metric.widthsAndSpacing.z),
+        max(0.01, metric.widthsAndSpacing.w));
+    float2 shoreEdges = _FoamCurrentShoreEdgesRead.Load(int3(x, 0, 0));
+    float shoreMetres = sourceEvent.header.y < 0.0
+        ? shoreEdges.x
+        : shoreEdges.y;
+    float inwardMetres = sourceEvent.header.y < 0.0
+        ? lateralMetres - shoreMetres
+        : shoreMetres - lateralMetres;
+    bool shoreSource = sourceType < 2.5;
+    if (shoreSource &&
+        inwardMetres < -max(sourceEvent.shore.w, physicalCellSpacing.y))
+    {
+        return result;
+    }
+
+    float currentContribution = FoamEvaluateAutomaticSourceContribution(
+        sourceEvent,
+        sourceType,
+        globalDistance,
+        lateralMetres,
+        shoreMetres,
+        physicalCellSpacing,
+        coordinate);
+
+    FoamSourceEventData previousSourceEvent = sourceEvent;
+    previousSourceEvent.header.y = sourceEvent.deposit.x;
+    previousSourceEvent.header.z = sourceEvent.deposit.y;
+    float previousContribution = 0.0;
+    if (sourceEvent.deposit.z > 0.5)
+    {
+        previousContribution = FoamEvaluateAutomaticSourceContribution(
+            previousSourceEvent,
+            sourceType,
+            globalDistance,
+            lateralMetres,
+            shoreMetres,
+            physicalCellSpacing,
+            coordinate);
+    }
+    float newlyRevealedContribution = sourceEvent.deposit.z > 0.5
+        ? max(0.0, currentContribution - previousContribution)
+        : currentContribution;
+    if (newlyRevealedContribution <= FoamMaterialStateEpsilon)
+    {
+        return result;
+    }
+
+    // FoamMergeBornPresence treats its source as an absolute Presence target,
+    // not an additive delta. The positive difference is therefore deposition
+    // permission, while the current source contribution preserves the authored
+    // full-strength spatial target at the advancing frontier.
+    float birthContribution = currentContribution;
 
     bool objectRibbonSource =
         (sourceType > 2.5 && sourceType < 3.5) ||
@@ -2513,8 +2558,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             sourceFillBlend);
     }
     float injectedPresence = saturate(
-        shape * sourceFill * sourceEvent.material.x * amountMultiplier *
-        validFluid);
+        birthContribution * sourceFill * sourceEvent.material.x * validFluid);
     if (injectedPresence <= FoamMaterialStateEpsilon)
     {
         return result;
@@ -3670,8 +3714,23 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         y,
         westFlux,
         westOutflow);
-    float4 northFlux = FoamResolveLateralFaceFlux(x, y);
+    float northFaceVelocity;
+    float northDonorPresence;
+    float northFaceLength;
+    float4 northFlux = FoamResolveLateralFaceFlux(
+        x,
+        y,
+        northFaceVelocity,
+        northDonorPresence,
+        northFaceLength);
     float4 southFlux = FoamResolveLateralFaceFlux(x, y - 1);
+    // Every interior lateral face is the north face of exactly one cell.
+    // Count it once here; south-face values remain transport-only.
+    FoamAccumulateLateralTransportEvidence(
+        northFaceVelocity,
+        northDonorPresence,
+        northFaceLength,
+        northFlux.x);
 
     float4 currentMass = currentPacked * cellArea;
     float4 transportedMass = currentMass - _FoamDeltaTime * (

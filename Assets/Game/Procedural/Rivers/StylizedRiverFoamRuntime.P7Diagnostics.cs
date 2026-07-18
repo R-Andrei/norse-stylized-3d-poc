@@ -83,6 +83,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool fixedCandidateReady = false;
             bool unitPolicyExact = false;
             bool automaticExact = false;
+            bool depositOnceExact = false;
             bool manualExact = false;
             bool coordinateProbeExact = false;
             bool evaluatorExact = false;
@@ -107,6 +108,7 @@ namespace ProgrammaticStylized3D.Rivers
                 fixedCandidateReady = resourcesCompleteWhileMeasured &&
                     fixedMetricCandidateDescriptor.IsCreated &&
                     fixedMetricCandidateDescriptor.UsesFixedMetricLattice;
+                depositOnceExact = ValidateP7DepositOnceContracts(report);
 
                 report.AppendLine("ACTIVE SOURCE OWNERSHIP");
                 report.AppendLine(
@@ -293,7 +295,8 @@ namespace ProgrammaticStylized3D.Rivers
             bool overall = livePreparationReady &&
                 resourcesCompleteWhileMeasured && activeLegacy &&
                 fixedCandidateReady && unitPolicyExact && automaticExact &&
-                manualExact && coordinateProbeExact && evaluatorExact &&
+                depositOnceExact && manualExact && coordinateProbeExact &&
+                evaluatorExact &&
                 lifecycleExact && cleanupExact && cacheExact;
 
             report.AppendLine("FINAL LEDGER");
@@ -309,6 +312,9 @@ namespace ProgrammaticStylized3D.Rivers
             report.AppendLine(
                 "All eight automatic source families: " +
                 (automaticExact ? "PASS" : "FAIL"));
+            report.AppendLine(
+                "Deposit-once automatic-source ownership: " +
+                (depositOnceExact ? "PASS" : "FAIL"));
             report.AppendLine(
                 "Manual ellipse/compound/segment commands: " +
                 (manualExact ? "PASS" : "FAIL"));
@@ -370,6 +376,121 @@ namespace ProgrammaticStylized3D.Rivers
                 $"{probeWidth:R}m; gap={probeGap:R}m.");
             report.AppendLine(
                 "SOURCE UNIT POLICY VERDICT: " +
+                (exact ? "PASS" : "FAIL"));
+            report.AppendLine();
+            return exact;
+        }
+
+        private bool ValidateP7DepositOnceContracts(StringBuilder report)
+        {
+            report.AppendLine("DEPOSIT-ONCE AUTOMATIC-SOURCE OWNERSHIP");
+            StylizedRiverFoamGridDescriptor descriptor =
+                gridDescriptor.IsCreated
+                    ? gridDescriptor
+                    : fixedMetricCandidateDescriptor;
+            AutomaticFoamSourceEvent shore = CreateP7SyntheticAutomaticSource(
+                AutomaticFoamSourceEventType.ShoreRibbon,
+                -1f,
+                river.Domain.GlobalDistanceMinimum + 1.5f,
+                river.Domain.GlobalDistanceMinimum + 3.5f,
+                river.Domain.GlobalDistanceMinimum + 2.5f,
+                -0.5f);
+            shore.Elapsed = 0.80f;
+            FoamSourceEventGpuData shoreBuild =
+                BuildAutomaticFoamSourceGpuData(shore, 0.70f, descriptor);
+            FoamSourceEventGpuData shoreRepeated =
+                BuildAutomaticFoamSourceGpuData(shore, 0.80f, descriptor);
+
+            AutomaticFoamSourceEvent arc = CreateP7SyntheticAutomaticSource(
+                AutomaticFoamSourceEventType.ObjectContactArc,
+                1f,
+                river.Domain.GlobalDistanceMinimum + 4f,
+                river.Domain.GlobalDistanceMinimum + 7f,
+                river.Domain.GlobalDistanceMinimum + 5.5f,
+                0.25f);
+            arc.Elapsed = 0.65f;
+            FoamSourceEventGpuData arcBuild =
+                BuildAutomaticFoamSourceGpuData(arc, 0.55f, descriptor);
+            arc.Elapsed = 0.75f;
+            FoamSourceEventGpuData arcBuildToHold =
+                BuildAutomaticFoamSourceGpuData(arc, 0.65f, descriptor);
+            arc.Elapsed = 1.10f;
+            FoamSourceEventGpuData arcHold =
+                BuildAutomaticFoamSourceGpuData(arc, 0.95f, descriptor);
+            arc.Elapsed = 1.65f;
+            FoamSourceEventGpuData arcRelease =
+                BuildAutomaticFoamSourceGpuData(arc, 1.50f, descriptor);
+
+            bool shoreBuildAdvances =
+                shoreBuild.Header.z > shoreBuild.Deposit.y;
+            bool repeatedInteriorZero = P7FloatBitsEqual(
+                shoreRepeated.Header.z,
+                shoreRepeated.Deposit.y);
+            bool arcBuildAdvances =
+                arcBuild.Header.y == 0f && arcBuild.Deposit.x == 0f &&
+                arcBuild.Header.z > arcBuild.Deposit.y;
+            bool arcBuildToHoldCompletes =
+                Mathf.Approximately(arcBuildToHold.Header.z, 1f) &&
+                arcBuildToHold.Header.z > arcBuildToHold.Deposit.y;
+            bool arcHoldZero =
+                Mathf.Approximately(arcHold.Header.z, 1f) &&
+                P7FloatBitsEqual(arcHold.Header.z, arcHold.Deposit.y);
+            bool arcReleaseZero =
+                Mathf.Approximately(arcRelease.Header.z, 1f) &&
+                P7FloatBitsEqual(arcRelease.Header.z, arcRelease.Deposit.y);
+
+            string projectRoot = Path.GetFullPath(
+                Path.Combine(Application.dataPath, ".."));
+            string computePath = Path.Combine(
+                projectRoot,
+                "Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/" +
+                "CS_RiverFoam.compute");
+            string computeSource = File.Exists(computePath)
+                ? File.ReadAllText(computePath)
+                : string.Empty;
+            bool gpuPositiveDifferenceGate =
+                computeSource.IndexOf(
+                    "max(0.0, currentContribution - previousContribution)",
+                    StringComparison.Ordinal) >= 0 &&
+                computeSource.IndexOf(
+                    "previousSourceEvent.header.y = sourceEvent.deposit.x;",
+                    StringComparison.Ordinal) >= 0 &&
+                computeSource.IndexOf(
+                    "previousSourceEvent.header.z = sourceEvent.deposit.y;",
+                    StringComparison.Ordinal) >= 0;
+            bool absoluteTargetPreserved =
+                computeSource.IndexOf(
+                    "float birthContribution = currentContribution;",
+                    StringComparison.Ordinal) >= 0 &&
+                computeSource.IndexOf(
+                    "FoamMergeBornPresence(",
+                    StringComparison.Ordinal) >= 0;
+            bool deadCellRemainsDead = repeatedInteriorZero &&
+                computeSource.IndexOf(
+                    "newlyRevealedContribution <= FoamMaterialStateEpsilon",
+                    StringComparison.Ordinal) >= 0;
+
+            bool exact = descriptor.IsCreated && shoreBuildAdvances &&
+                repeatedInteriorZero && arcBuildAdvances &&
+                arcBuildToHoldCompletes && arcHoldZero && arcReleaseZero &&
+                gpuPositiveDifferenceGate && absoluteTargetPreserved &&
+                deadCellRemainsDead;
+            report.AppendLine(
+                $"Shore Build frontier advances: {shoreBuildAdvances}; " +
+                $"repeated Build interior zero: {repeatedInteriorZero}");
+            report.AppendLine(
+                $"Object Build advances: {arcBuildAdvances}; " +
+                $"Build-to-Hold completes final frontier: " +
+                $"{arcBuildToHoldCompletes}");
+            report.AppendLine(
+                $"Object Hold zero: {arcHoldZero}; Release zero: " +
+                $"{arcReleaseZero}");
+            report.AppendLine(
+                $"GPU positive-difference gate: {gpuPositiveDifferenceGate}; " +
+                $"absolute birth target preserved: {absoluteTargetPreserved}; " +
+                $"dead covered cell remains dead: {deadCellRemainsDead}");
+            report.AppendLine(
+                "DEPOSIT-ONCE SOURCE VERDICT: " +
                 (exact ? "PASS" : "FAIL"));
             report.AppendLine();
             return exact;
@@ -474,10 +595,12 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamSourceEventGpuData legacyGpu =
                     BuildAutomaticFoamSourceGpuData(
                         sourceEvent,
+                        Mathf.Max(0f, sourceEvent.Elapsed - 0.10f),
                         gridDescriptor);
                 FoamSourceEventGpuData fixedGpu =
                     BuildAutomaticFoamSourceGpuData(
                         sourceEvent,
+                        Mathf.Max(0f, sourceEvent.Elapsed - 0.10f),
                         fixedMetricCandidateDescriptor);
                 bool sourceUnitExact =
                     P7AutomaticGpuContractExact(
@@ -1666,7 +1789,7 @@ namespace ProgrammaticStylized3D.Rivers
                     AutomaticFoamSourceEventCapacity &&
                 automaticFoamSourceEventGpuData.Length ==
                     AutomaticFoamSourceEventCapacity &&
-                sourceStride == sizeof(float) * 28 &&
+                sourceStride == sizeof(float) * 32 &&
                 pendingInjections.Count == pendingInjectionCountBefore &&
                 pendingMaterialBirths.Count == pendingMaterialBirthCountBefore &&
                 activeFoamCompositionEventCount == activeCompositionCountBefore &&
@@ -1682,7 +1805,7 @@ namespace ProgrammaticStylized3D.Rivers
                 $"{automaticFoamSourceEventGpuData.Length}");
             report.AppendLine(
                 $"FoamSourceEventGpuData stride: {sourceStride} bytes; " +
-                $"expected={sizeof(float) * 28}");
+                $"expected={sizeof(float) * 32}");
             report.AppendLine(
                 $"Queue/event state unchanged while validating: injections=" +
                 $"{pendingInjections.Count}/{pendingInjectionCountBefore}; " +
@@ -1712,7 +1835,8 @@ namespace ProgrammaticStylized3D.Rivers
                 P7VectorBitsEqual(legacy.Material, fixedMetric.Material) &&
                 P7VectorBitsEqual(legacy.Variation, fixedMetric.Variation) &&
                 P7VectorBitsEqual(legacy.Kinematics, fixedMetric.Kinematics) &&
-                P7VectorBitsEqual(legacy.ObjectData, fixedMetric.ObjectData);
+                P7VectorBitsEqual(legacy.ObjectData, fixedMetric.ObjectData) &&
+                P7VectorBitsEqual(legacy.Deposit, fixedMetric.Deposit);
             if (!sharedLanesExact)
             {
                 return false;

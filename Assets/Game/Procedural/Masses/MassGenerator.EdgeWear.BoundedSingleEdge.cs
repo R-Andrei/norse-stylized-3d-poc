@@ -11,6 +11,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
     {
         #region Bounded single-edge bevel prototype
 
+        private const int BoundedIsolatedMaximumWidthAttempts = 12;
+        private const float BoundedIsolatedWidthBackoff = 0.75f;
+
         private struct BoundedSingleEdgeAuditResult
         {
             public int CandidateCount;
@@ -688,6 +691,162 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 out TriangleSoup previewSoup)
         {
             previewSoup = null;
+            List<EdgeWearIsolatedWidthAttemptRecord> aggregateAttempts =
+                new List<EdgeWearIsolatedWidthAttemptRecord>(
+                    BoundedIsolatedMaximumWidthAttempts);
+            float nextRequestedWidth = requestedWidth;
+            int remainingAttempts = BoundedIsolatedMaximumWidthAttempts;
+            BoundedSingleEdgeAuditResult result = default;
+
+            while (remainingAttempts > 0)
+            {
+                result = AuditBoundedSingleEdgeBevelSingleSchedule(
+                    sourceFaces,
+                    context,
+                    requestedOrdinal,
+                    nextRequestedWidth,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    auditCandidatePool,
+                    remainingAttempts,
+                    out TriangleSoup attemptSoup);
+                AppendBoundedWidthAttempts(
+                    aggregateAttempts,
+                    result.IsolatedWidthAttempts);
+                remainingAttempts = Mathf.Max(
+                    0,
+                    BoundedIsolatedMaximumWidthAttempts -
+                        aggregateAttempts.Count);
+
+                if (result.GeometryValid == 1)
+                {
+                    previewSoup = attemptSoup;
+                    return FinalizeBoundedAggregateWidthSchedule(
+                        result,
+                        aggregateAttempts,
+                        remainingAttempts == 0);
+                }
+
+                if (!ShouldRetryBoundedOwnerSupportAtLowerWidth(result) ||
+                    remainingAttempts == 0)
+                {
+                    return FinalizeBoundedAggregateWidthSchedule(
+                        result,
+                        aggregateAttempts,
+                        remainingAttempts == 0);
+                }
+
+                float minimumWidth = Mathf.Max(
+                    result.IsolatedMinimumWidth,
+                    Mathf.Max(
+                        minimumStableEdgeLength,
+                        PointMergeDistance * 4f));
+                float failedWidth = result.SolvedWidth > 0f
+                    ? result.SolvedWidth
+                    : nextRequestedWidth;
+                if (failedWidth <= minimumWidth + PointMergeDistance)
+                {
+                    result.IsolatedAttemptScheduleComplete = 1;
+                    return FinalizeBoundedAggregateWidthSchedule(
+                        result,
+                        aggregateAttempts,
+                        true);
+                }
+
+                float reducedWidth = Mathf.Max(
+                    minimumWidth,
+                    failedWidth * BoundedIsolatedWidthBackoff);
+                if (reducedWidth >= failedWidth - PointMergeDistance)
+                {
+                    return FinalizeBoundedAggregateWidthSchedule(
+                        result,
+                        aggregateAttempts,
+                        false);
+                }
+                nextRequestedWidth = reducedWidth;
+            }
+
+            return FinalizeBoundedAggregateWidthSchedule(
+                result,
+                aggregateAttempts,
+                true);
+        }
+
+        private static void AppendBoundedWidthAttempts(
+            List<EdgeWearIsolatedWidthAttemptRecord> aggregate,
+            List<EdgeWearIsolatedWidthAttemptRecord> attempts)
+        {
+            if (aggregate == null || attempts == null)
+            {
+                return;
+            }
+
+            for (int attemptIndex = 0;
+                 attemptIndex < attempts.Count &&
+                 aggregate.Count < BoundedIsolatedMaximumWidthAttempts;
+                 attemptIndex++)
+            {
+                EdgeWearIsolatedWidthAttemptRecord attempt =
+                    attempts[attemptIndex];
+                attempt.AttemptIndex = aggregate.Count + 1;
+                aggregate.Add(attempt);
+            }
+        }
+
+        private static bool ShouldRetryBoundedOwnerSupportAtLowerWidth(
+            BoundedSingleEdgeAuditResult result)
+        {
+            return result.GeometryValid != 1 &&
+                result.IsolatedRailSolved == 1 &&
+                (result.OwnerClipCount != 2 ||
+                 result.EndpointSupportClipCount != 2 ||
+                 result.EndpointSupportRemovedVertexCount != 2 ||
+                 result.EndpointSupportRailInsertionCount != 4);
+        }
+
+        private static BoundedSingleEdgeAuditResult
+            FinalizeBoundedAggregateWidthSchedule(
+                BoundedSingleEdgeAuditResult result,
+                List<EdgeWearIsolatedWidthAttemptRecord> aggregateAttempts,
+                bool scheduleComplete)
+        {
+            result.IsolatedWidthAttempts = aggregateAttempts ??
+                new List<EdgeWearIsolatedWidthAttemptRecord>();
+            result.WidthAttemptCount = result.IsolatedWidthAttempts.Count;
+            if (scheduleComplete ||
+                result.WidthAttemptCount >=
+                    BoundedIsolatedMaximumWidthAttempts)
+            {
+                result.IsolatedAttemptScheduleComplete = 1;
+            }
+            if (result.IsolatedWidthAttempts.Count > 0)
+            {
+                EdgeWearIsolatedWidthAttemptRecord terminal =
+                    result.IsolatedWidthAttempts[
+                        result.IsolatedWidthAttempts.Count - 1];
+                result.IsolatedTerminalConstructionAtMinimum =
+                    terminal.ConstructionAttempted &&
+                    terminal.Width <=
+                        result.IsolatedMinimumWidth + PointMergeDistance
+                        ? 1
+                        : 0;
+            }
+            return FinalizeBoundedSingleEdgeAuditResult(result);
+        }
+
+        private static BoundedSingleEdgeAuditResult
+            AuditBoundedSingleEdgeBevelSingleSchedule(
+                List<PolygonFace> sourceFaces,
+                ChamferTopologyContext context,
+                int requestedOrdinal,
+                float requestedWidth,
+                float minimumStableEdgeLength,
+                float minimumStableFaceArea,
+                bool auditCandidatePool,
+                int maximumWidthAttempts,
+                out TriangleSoup previewSoup)
+        {
+            previewSoup = null;
             BoundedSingleEdgeAuditResult result =
                 new BoundedSingleEdgeAuditResult
                 {
@@ -805,7 +964,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out bool railScheduleComplete,
                     out int widthAttemptCount,
                     out float solvedWidth,
-                    out string railBlocker))
+                    out string railBlocker,
+                    maximumWidthAttempts))
             {
                 result.IsolatedWidthAttempts = widthAttempts;
                 result.IsolatedMinimumWidth = minimumIsolatedWidth;
@@ -3134,13 +3294,46 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             out float solvedWidth,
             out string blocker)
         {
-            const int maximumWidthAttempts = 12;
-            const float widthBackoff = 0.75f;
+            return TrySolveBoundedIsolatedSingleEdgeRails(
+                sourceFaces,
+                context,
+                selected,
+                requestedWidth,
+                minimumStableEdgeLength,
+                out rails,
+                out widthAttempts,
+                out minimumWidth,
+                out scheduleComplete,
+                out widthAttemptCount,
+                out solvedWidth,
+                out blocker,
+                BoundedIsolatedMaximumWidthAttempts);
+        }
+
+        private static bool TrySolveBoundedIsolatedSingleEdgeRails(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            EdgeWearSelectedGraphEdge selected,
+            float requestedWidth,
+            float minimumStableEdgeLength,
+            out BoundedIsolatedRailPoint[] rails,
+            out List<EdgeWearIsolatedWidthAttemptRecord> widthAttempts,
+            out float minimumWidth,
+            out bool scheduleComplete,
+            out int widthAttemptCount,
+            out float solvedWidth,
+            out string blocker,
+            int maximumWidthAttempts)
+        {
+            int boundedMaximumWidthAttempts = Mathf.Clamp(
+                maximumWidthAttempts,
+                1,
+                BoundedIsolatedMaximumWidthAttempts);
 
             rails = null;
             widthAttempts =
                 new List<EdgeWearIsolatedWidthAttemptRecord>(
-                    maximumWidthAttempts);
+                    boundedMaximumWidthAttempts);
             minimumWidth = 0f;
             scheduleComplete = false;
             widthAttemptCount = 0;
@@ -3175,7 +3368,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float attemptWidth = Mathf.Max(minimumWidth, initialWidth);
             string lastBlocker = string.Empty;
             for (int attemptIndex = 0;
-                 attemptIndex < maximumWidthAttempts;
+                 attemptIndex < boundedMaximumWidthAttempts;
                  attemptIndex++)
             {
                 widthAttemptCount++;
@@ -3206,7 +3399,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     scheduleComplete =
                         attemptWidth <=
                             minimumWidth + PointMergeDistance ||
-                        widthAttemptCount >= maximumWidthAttempts;
+                        widthAttemptCount >= boundedMaximumWidthAttempts;
                     return true;
                 }
 
@@ -3218,7 +3411,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 float nextWidth = Mathf.Max(
                     minimumWidth,
-                    attemptWidth * widthBackoff);
+                    attemptWidth * BoundedIsolatedWidthBackoff);
                 if (nextWidth >= attemptWidth - PointMergeDistance)
                 {
                     break;
@@ -3226,7 +3419,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 attemptWidth = nextWidth;
             }
 
-            if (widthAttemptCount >= maximumWidthAttempts)
+            if (widthAttemptCount >= boundedMaximumWidthAttempts)
             {
                 scheduleComplete = true;
             }

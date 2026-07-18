@@ -20,6 +20,26 @@ namespace ProgrammaticStylized3D.Rivers
         High
     }
 
+    public enum StylizedRiverFoamGridMode
+    {
+        FixedMetric = 0,
+        LegacyNormalizedAcross = 1
+    }
+
+    public enum StylizedRiverFoamFixedMetricCellSize
+    {
+        [InspectorName("Quality Default")]
+        QualityDefault = 0,
+        [InspectorName("0.25 m")]
+        Metres0_25 = 1,
+        [InspectorName("0.20 m")]
+        Metres0_20 = 2,
+        [InspectorName("0.15 m")]
+        Metres0_15 = 3,
+        [InspectorName("0.10 m")]
+        Metres0_10 = 4
+    }
+
     public enum StylizedRiverWaterBodyPreset
     {
         ClearStream,
@@ -916,6 +936,17 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Master switch for the Stage 6 shared persistent Foam field. When disabled, no Foam textures are allocated or simulated and the water shader receives a neutral Foam input.")]
         [SerializeField] private bool foamEnabled;
 
+        [Tooltip("Selects the active Foam coordinate contract. Fixed Metric is the P12 test default. Legacy Normalized Across remains available for direct A/B comparison and rollback.")]
+        [SerializeField]
+        private StylizedRiverFoamGridMode foamGridMode =
+            StylizedRiverFoamGridMode.FixedMetric;
+
+        [Tooltip("Selects the requested fixed-metric cell size. Quality Default resolves Low to 0.25 m, Medium to 0.15 m, and High to 0.10 m. Changing this or Grid Mode invalidates the current Foam resources when the resolved descriptor changes and then requires a matching topology-cache rebuild.")]
+        [SerializeField]
+        private StylizedRiverFoamFixedMetricCellSize
+            foamFixedMetricCellSize =
+                StylizedRiverFoamFixedMetricCellSize.QualityDefault;
+
         [Tooltip("Persistent prepared-topology cache associated with this authored river. Exact caches load directly. Stale-compatible caches may be used for one Play session without replacement; missing or incompatible caches require explicit Edit Mode preparation and are never generated or saved automatically during Play.")]
         [SerializeField]
         private StylizedRiverFoamTopologyCacheAsset foamTopologyCacheAsset;
@@ -1160,11 +1191,11 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamObjectFoamFormationSpeedMetresPerSecond =
             DefaultShoreFoamFormationSpeedMetresPerSecond;
 
-        [Tooltip("Minimum time in seconds that an eligible object's complete Contact Arc or Contact Semi-Arc remains actively replenished after the progressive build finishes.")]
+        [Tooltip("Minimum time in seconds that an eligible object event remains in Hold after progressive deposition finishes. Hold schedules the event lifecycle but does not deposit material again.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactHoldDurationMinSeconds = 5.0f;
 
-        [Tooltip("Maximum time in seconds that an eligible object's complete Contact Arc or Contact Semi-Arc remains actively replenished after the progressive build finishes.")]
+        [Tooltip("Maximum time in seconds that an eligible object event remains in Hold after progressive deposition finishes. Hold schedules the event lifecycle but does not deposit material again.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactHoldDurationMaxSeconds = 10.0f;
 
@@ -2354,6 +2385,11 @@ namespace ProgrammaticStylized3D.Rivers
             ResolveInteractionMinimumWavelength();
 
         public bool FoamEnabled => foamEnabled;
+        public StylizedRiverFoamGridMode FoamGridMode => foamGridMode;
+        public StylizedRiverFoamFixedMetricCellSize
+            FoamFixedMetricCellSize => foamFixedMetricCellSize;
+        public float FoamFixedMetricRequestedCellSizeMetres =>
+            ResolveFoamFixedMetricRequestedCellSizeMetres();
         public bool FoamStateHeld =>
             Application.isPlaying && foamEnabled && foamStateHeld;
         public StylizedRiverFoamTopologyCacheAsset FoamTopologyCacheAsset =>
@@ -5010,8 +5046,41 @@ namespace ProgrammaticStylized3D.Rivers
             movingTrailWidth = WakeSpread;
         }
 
+        private float ResolveFoamFixedMetricRequestedCellSizeMetres()
+        {
+            return foamFixedMetricCellSize switch
+            {
+                StylizedRiverFoamFixedMetricCellSize.Metres0_25 =>
+                    StylizedRiverFoamGridDescriptor
+                        .ConservativeCandidateCellSizeMetres,
+                StylizedRiverFoamFixedMetricCellSize.Metres0_20 =>
+                    StylizedRiverFoamGridDescriptor
+                        .IntermediateCandidateCellSizeMetres,
+                StylizedRiverFoamFixedMetricCellSize.Metres0_15 =>
+                    StylizedRiverFoamGridDescriptor
+                        .TargetCandidateCellSizeMetres,
+                StylizedRiverFoamFixedMetricCellSize.Metres0_10 =>
+                    StylizedRiverFoamGridDescriptor
+                        .StressCandidateCellSizeMetres,
+                _ => StylizedRiverFoamGridDescriptor
+                    .ResolveProvisionalRequestedCellSizeMetres(quality)
+            };
+        }
+
         private void ValidateSettings()
         {
+            if (!Enum.IsDefined(typeof(StylizedRiverFoamGridMode), foamGridMode))
+            {
+                foamGridMode = StylizedRiverFoamGridMode.FixedMetric;
+            }
+            if (!Enum.IsDefined(
+                    typeof(StylizedRiverFoamFixedMetricCellSize),
+                    foamFixedMetricCellSize))
+            {
+                foamFixedMetricCellSize =
+                    StylizedRiverFoamFixedMetricCellSize.QualityDefault;
+            }
+
             width = Mathf.Max(0.5f, width);
             bankBlend = Mathf.Max(0.1f, bankBlend);
             depth = Mathf.Max(0.1f, depth);

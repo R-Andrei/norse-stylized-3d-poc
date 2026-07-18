@@ -11,9 +11,9 @@
 | Engine | Unity 6000.5.0f1, URP |
 | Work type | Canonical architecture and implementation plan |
 | Architecture status | Fixed-metric, centreline-relative river-space lattice accepted as the direction |
-| Implementation status | **`RG-METRIC-P2` through `RG-METRIC-P10` are Unity-validated and closed. `RG-METRIC-P11` is mechanically verified and complete. Active allocation remains `LegacyNormalizedAcross`; fixed candidate activation remains P12.** |
-| Code authorization | **The user explicitly authorized `RG-METRIC-P11` after P10/P10a compiled, the consolidated Inspector was observed, and the unchanged P9 endpoint returned `Overall: PASS`. P11 authorization covers repository-wide read-only mechanical/consistency audit and canonical documentation closure only. Production compute/render behavior, fixed-metric activation, serialized River data, scenes, prefabs, materials, and cache assets remain outside scope.** |
-| Persistent game-file changes made while producing this document | P2-P10 are installed and Unity-validated. P11 changes only the five canonical status documents. It adds no C#, shader, compute, serialized River field, scene, prefab, material, cache asset, Debug View, resource, kernel, persistent texture/buffer, or active fixed-metric allocation. |
+| Implementation status | **`RG-METRIC-P2` through `RG-METRIC-P10` are Unity-validated and closed. `RG-METRIC-P11` is complete. `RG-METRIC-P12` source activation and candidate evidence tooling are mechanically verified; Unity candidate evidence is pending.** |
+| Code authorization | **The user explicitly authorized direct P12 fixed-metric activation and practical Play Mode testing, including temporary visible River breakage. Authorization covers source-default and Inspector selection, real allocation/invalidation ownership, active-selection diagnostics, and read-only candidate evidence. Scene/prefab/material/cache-asset raw edits and automatic cache writes remain outside scope.** |
+| Persistent game-file changes made while producing this document | P12 adds two serialized River enum fields, production descriptor selection/invalidation ownership, active-selection diagnostics, one Editor-only P12 report, and canonical status updates. It does not edit scenes, prefabs, materials, cache assets, shaders, compute/HLSL, resources, kernels, source recipes, topology algorithms, or persistent GPU allocations. |
 | Source snapshot used | User-supplied `Assets(72).zip` with accepted P9a, P10, and P10a overlays |
 | Source limitations | No `.git` metadata, package manifest, Library, current `Editor.log`, or complete project root in the supplied snapshot |
 
@@ -75,8 +75,8 @@ Neither document alone is sufficient for implementation.
 | Live repository review | `BLOCKED`: supplied archive contains no `.git` metadata, branch, HEAD, upstream, status, diff, or history |
 | Runtime baseline capture | `PARTIAL`: final P9/P10 endpoint report and P10 Inspector capture are supplied; P12 visual/performance baseline and profiler evidence remain pending |
 | Canonical queue reconciliation | Complete for documentation patch 01 |
-| Runtime implementation | P2-P10 are Unity-validated and closed; P11 completed the full mechanical/consistency audit without executable changes |
-| Unity validation | P2-P10 complete. P11 is documentation-only and requires no additional runtime rerun. P12 owns candidate activation, visual comparison, and performance evidence |
+| Runtime implementation | P2-P10 are Unity-validated and closed; P11 is complete; P12 source activation and candidate evidence tooling are mechanically verified |
+| Unity validation | P2-P10 complete. P12 requires cache rebuild, fixed/legacy visual comparison, candidate snapshots, and one final P9 endpoint on the selected candidate |
 | Strip-pool production architecture | Planned future phase; not implemented |
 
 ## 1. Authority, precedence, and change control
@@ -1073,7 +1073,7 @@ Every phase below is independently reviewable. No phase is complete merely becau
 | `RG-METRIC-P9` | Film occupancy, shape evaluation, and production rendering | `COMPLETE — UNITY VALIDATED`; P9a removed the three D3D11 warning forms and the rerun returned `Overall: PASS` |
 | `RG-METRIC-P10` | Diagnostics, inspector semantics, and documentation | `UNITY-VALIDATED AND CLOSED` |
 | `RG-METRIC-P11` | Mechanical verification and full consistency audit | `MECHANICALLY VERIFIED AND COMPLETE` |
-| `RG-METRIC-P12` | Unity candidate sweep and visual/performance selection | `NOT STARTED` |
+| `RG-METRIC-P12` | Unity candidate sweep and visual/performance selection | `MECHANICALLY VERIFIED — UNITY EVIDENCE PENDING` |
 | `RG-METRIC-P13` | Final tier tuning, cache freeze, and contiguous baseline closure | `NOT STARTED` |
 | `RG-STRIP-P0` | Strip/pool architecture review and design | `FUTURE` |
 | `RG-STRIP-P1` | Strip resource/cache/render implementation | `FUTURE` |
@@ -1946,7 +1946,11 @@ The supplied workspace has no `.git` directory, so branch/status/history compari
 
 No other path is approved. Any required expansion must be recorded here before editing.
 
-#### Invariants and non-goals
+#### Recorded scope expansion before edit
+
+The activation implementation invalidates two current code comments that described legacy as the universally active runtime. `StylizedRiverFoamGridDescriptor.cs` and `StylizedRiverFoamRuntime.Obstacles.cs` are therefore added before modification for comment-only correction. Their executable bytes remain protected and will be compared separately in the post-change audit. **Status: approved by the existing P12 activation objective; implementation pending.**
+
+### Invariants and non-goals
 
 1. Active mapping remains `LegacyNormalizedAcross`; fixed-metric allocation remains deferred.
 2. Live water rendering and current-shore animation continue using live/captured `_FoamTime` exactly as before.
@@ -3909,3 +3913,358 @@ This inventory is generated from public Foam properties in the supplied `Stylize
 # Appendix H — Immediate next action after documentation patch 01
 
 The next implementation step is to finish the blocked live portion of `RG-METRIC-P0`, not code. Use this plan and the dependency register against the actual Git workspace, record branch/HEAD/upstream/status/diffs/history and the immutable rollback reference, then capture the required Unity baseline package. Only after that evidence is recorded may `RG-METRIC-P2` be changed from `NOT STARTED` to `READY` and receive an exact approved implementation-file scope.
+
+
+## Implementation record — `RG-METRIC-P12a — Committed-state temporal presentation and candidate evidence`
+
+### Status
+
+Implementation complete; Unity compilation, shader import, visual confirmation, and expanded P12 snapshot remain pending.
+
+### Objective and observed evidence
+
+The first Unity fixed candidate activated the full migrated production path and passed its machine-verifiable runtime snapshot. The supplied `Material Presence` video contains 172 frames over 6.239567 seconds and shows abrupt whole-cell edge changes. Source inspection identified the presentation discontinuity:
+
+- `StylizedRiverFoamRuntime.Lifecycle.cs` forced `simulationInterpolation = 1f` after every update;
+- `StylizedRiverFoamRuntime.Injection.cs::SimulateFullField` already assigns `previousState = currentState` before one complete material tick and publishes the newly committed state through the existing ping-pong swap;
+- `RiverWaterFoam.hlsl::RiverWaterFoamSampleInterpolatedState` already performs packed previous/current interpolation for Final Foam;
+- `SH_CleanStylizedRiver.shader::SampleCommittedFoamState` bypassed that helper and sampled `_FoamCurrent` directly for Layer C and Motion Field diagnostics.
+
+The lateral-response observation is separate. `Maximum Lateral Speed Ratio` owns the canonical lateral speed ceiling. `Lane Advection Ratio` only scrolls the generated Motion Lane phase downstream and does not amplify signed lateral intent. P12a therefore records the generated lane distribution before deciding whether any generator or transport change is justified.
+
+### Invariants and non-goals
+
+- Preserve conservative Layer C transport, lifecycle, topology, source, and cache state exactly.
+- Reuse the existing previous/current ARGBHalf textures; add no resource, kernel, dispatch, persistent allocation, serialized field, or cache contract.
+- Interpolate packed Presence, life moment, and pattern moment at the unchanged field coordinate. Do not restore velocity reconstruction, point backtracing, obstacle prediction, or any cross-face presentation path.
+- State Hold, initialization, topology-replacement hold, resource reset, and direct probe paths retain exact-current alpha `1` where already required.
+- Do not change Motion Lane generation or transport. Added lane statistics are observational only.
+- Do not change automatic/manual source budgets, lifecycle controls, shape, visibility, or overall Final Foam amount. Excessive coverage remains a P13 layer-by-layer tuning item.
+- Add no Debug View.
+- Retain report files and add an adjacent clipboard-copy action for every Foam report action.
+
+### Approved file scope
+
+Canonical documentation:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+
+Editor and diagnostics:
+
+6. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+7. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+8. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Diagnostics.cs`
+9. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.P12Diagnostics.cs`
+10. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`
+
+Runtime presentation and evidence:
+
+11. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+12. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+13. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Obstacles.cs`
+14. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.RuntimeUpdates.cs`
+15. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+16. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+
+No file is created, removed, renamed, generated, or serialized.
+
+### File-by-file implementation sequence
+
+1. Record P12a evidence, scope, invariants, acceptance, and deferred amount tuning in the five canonical documents.
+2. Resolve `simulationInterpolation` from `simulationAccumulator / stepDuration` after fixed-step work and retain exact-current special paths.
+3. Route Layer C and Motion Field debug sampling through the same existing packed-state interpolation helper as Final Foam; update active comments/descriptions only.
+4. Accumulate generated Motion Lane range, mean absolute, RMS, and sign/near-neutral coverage without altering the texture output.
+5. Record presentation-alpha min/max during the explicit P12 accounting window; expose both evidence groups in the Inspector and P12 report.
+6. Make the P12 report reject hard-pinned interpolation by requiring a captured alpha range of at least `0.25`, and validate lane fractions sum to one.
+7. Place clipboard-copy actions adjacent to P12, P9, P8, P7, P6, P5.3, P5.1, obstacle-baseline, and obstacle-comparison reports while retaining logging and disk reveal.
+8. Complete the full diff, C# 9, shader/include, resource/kernel, source-budget, packed-moment, timing, and cross-subsystem consistency audits.
+
+### Risks and controls
+
+- **One-tick visual latency:** ordinary fixed-step interpolation intentionally presents from the previous committed state toward the current committed state. It is limited to one material tick and is the cost of removing hard cadence steps without prediction.
+- **Packed moment validity:** convex interpolation must preserve `0 <= lifeMoment <= Presence` and `0 <= patternMoment <= Presence`; randomized validation is required.
+- **False diagnostic pass:** the P12 report must fail if alpha remains pinned even when all values are finite.
+- **Misdiagnosed lateral weakness:** lane statistics must remain evidence only; no steering retune is authorized without the Unity result.
+- **Shared shader impact:** all shader source outside `SampleCommittedFoamState` must remain executable-equivalent, and the shared Foam include change must be comment-only.
+
+### Acceptance and validation status
+
+- [x] Exact 16-file scope and no serialized/resource/kernel changes.
+- [x] All 90 River C# files pass delimiter/string and C# 9 multiline-interpolation scans.
+- [x] All changed shader/include delimiters and local includes pass.
+- [x] Compute shaders and render resource/kernel/property declarations remain unchanged.
+- [x] 250,000 randomized packed-state blends preserve Presence/life/pattern moment bounds.
+- [x] 15 cadence/frame-rate timing cases keep alpha in `[0,1]` and produce at least `0.80` captured range.
+- [x] Motion Lane production output calculation is unchanged; statistics are appended after the exact half output assignment.
+- [x] Every Foam report action has an adjacent clipboard-copy action and disk output remains available.
+- [x] Overall Foam source/amount owners remain byte-identical and the issue is deferred to P13.
+- [ ] Unity C# compilation and D3D11 shader import produce zero errors or warnings.
+- [ ] Layer C Material Presence and Final Foam no longer hard-step at the material cadence.
+- [ ] Expanded P12 snapshot passes interpolation range, lane evidence, runtime, and cache gates.
+- [ ] P9 consumer regression remains `Overall: PASS` after visual acceptance.
+
+## Implementation record — `RG-METRIC-P12 — Fixed-metric activation and candidate evidence`
+
+### Current objective
+
+Activate the already-migrated `FixedMetricLattice` path as the default P12 test configuration, retain a direct `LegacyNormalizedAcross` compatibility switch, expose the four approved candidate spacings (`0.25`, `0.20`, `0.15`, and `0.10 m`), and produce one compact live candidate report containing the runtime/cache/transport/work evidence needed for visual and performance selection. This patch intentionally allows a changed candidate to invalidate the current cache and interrupt Foam until the matching cache is rebuilt; P12 does not add a shadow runtime, test-only duplicate resources, automatic rollback, or source-recipe compensation.
+
+### User authorization and testing policy
+
+The user explicitly authorized direct Play Mode activation even when a candidate may visibly break the River. Practical failure discovery is preferred over additional safety scaffolding. Persistent scene/prefab/material/cache writes remain explicit: this patch changes source defaults and Inspector controls but does not raw-edit or serialize any scene, prefab, material, or cache asset.
+
+### Reviewed evidence
+
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs::ResolveInitializationDimensions` always resolves `TryResolveLegacyInitializationDescriptor`, then prepares but never selects `fixedMetricCandidateDescriptor`. This is the single active-allocation gate.
+- `Game/Procedural/Rivers/StylizedRiverFoamGridDescriptor.cs::TryCreateFixedMetricOneStrip` already resolves the complete contiguous fixed descriptor, including exact 32 m chunk columns, global lateral rows, odd film dimensions, represented lateral extent, and initialization signature. No new coordinate contract is required.
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.TopologyCache.cs::CreateTopologyCachePackage` serializes the active `gridDescriptor`; `TryResolveAssignedTopologyCacheForStartup` rejects descriptor mismatches. Therefore switching mapping or spacing must deliberately require rebuilding the assigned cache through the existing explicit Edit Mode workflow.
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs::AreResourcesCompleteAndCurrent`, `InitializationInputsChanged`, and `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs::NotifyRiverChanged` currently track only domain and quality. New mapping/spacing authoring must join those invalidation contracts so live changes cannot retain resources built for a different descriptor.
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.P9Diagnostics.cs::RunP9ComprehensiveValidationReport` hard-codes active legacy ownership. P12 activation would make the current endpoint fail for the wrong reason unless the report verifies the authored active selection instead. Its actual fixed GPU film/shape/render tests remain valid and must remain unchanged.
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.RuntimeUpdates.cs` already owns explicit steady-state work accounting, including dispatches, cell iterations, transport substeps/CFL, CPU submission time, topology work, and shape work. P12 can reuse this accounting rather than introduce a duplicate profiler path.
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs` owns Foam runtime/quality authoring; `StylizedRiverEditor.Actions.cs` owns cache preparation and current validation actions; `StylizedRiverEditor.Diagnostics.cs` already displays descriptor, CFL, curvature, memory, and candidate evidence. No new Debug View is required.
+- The supplied workspace has no `.git` metadata. The immutable comparison baseline is `/mnt/data/p12_work/base`, reconstructed from the user-supplied Assets snapshot plus validated P9a, P10, P10a, and documentation-only P11 packages. Full-file hashes and line-ending counts were captured before this plan edit.
+
+### Approved file scope
+
+Canonical documentation:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+
+Authoring and Inspector:
+
+6. `Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+9. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Diagnostics.cs`
+
+Runtime allocation/invalidation/diagnostics:
+
+10. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+11. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+12. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+13. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+14. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`
+15. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.P9Diagnostics.cs`
+16. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.P12Diagnostics.cs` plus `.meta`
+17. `Game/Procedural/Rivers/StylizedRiverFoamGridDescriptor.cs` — contract-summary comment only
+18. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Obstacles.cs` — legacy-signature comment only
+
+No compute shader, HLSL include, render shader, source recipe, topology generator, Disturbance source, scene, prefab, material, cache asset, tag, layer, or generated asset is approved for modification. `StylizedRiverFoamRuntime.TopologyCache.cs`, `StylizedRiverFoamRuntime.RuntimeUpdates.cs`, and `StylizedRiverFoamRuntime.TopologyReplacement.cs` were reviewed as direct contracts and remain unchanged. The two comment-only scope additions above are required because activation makes their former “active runtime remains legacy” statements factually stale; no executable line in either file may change.
+
+### Invariants and non-goals
+
+- New existing-content default: `FixedMetricLattice` with quality-derived spacing. This material default change is explicitly authorized for P12 testing. Medium remains `0.15 m`, Low `0.25 m`, High `0.10 m`.
+- `0.20 m` is an explicit candidate override, not a new quality tier.
+- `LegacyNormalizedAcross` remains directly selectable for A/B comparison and rollback.
+- Candidate changes may stop Foam until the assigned topology cache is rebuilt. No runtime topology generation or automatic cache write is introduced.
+- Legacy formulas remain byte-equivalent on the legacy branch. Fixed formulas, kernels, resources, source recipes, birth budgets, topology rules, transport, film, shape, and rendering remain unchanged.
+- No new persistent texture, buffer, component, or serialized asset is added. Two small serialized River enum fields are added; source code does not modify any existing scene or prefab instance.
+- No automatic visual verdict is claimed. The P12 report proves machine-verifiable runtime/cache/transport/work contracts; the user supplies visual comparison evidence.
+
+### File-by-file implementation sequence
+
+1. Add public P12 mapping and fixed-cell-size enums, serialized defaults, resolved properties, and enum sanitization in `StylizedRiver.cs`. **Status: mechanically verified.**
+2. Add mapping/candidate controls and cache-invalidating guidance to Foam Runtime & Quality in `StylizedRiverEditor.Foam.cs`. **Status: mechanically verified.**
+3. Select fixed or legacy descriptors in `StylizedRiverFoamRuntime.Resources.cs`; track mapping/cell-size allocation ownership through `Members`, `Constants`, and `Lifecycle`. **Status: mechanically verified.**
+4. Replace deferred-only diagnostic semantics with active-selection semantics in `PublicSurface` and `StylizedRiverEditor.Diagnostics.cs`. **Status: mechanically verified.**
+5. Update the P9 endpoint to preserve and validate the authored active selection rather than requiring legacy. Keep all actual GPU consumer tests unchanged. **Status: mechanically verified.**
+6. Add one Play Mode P12 candidate snapshot report reusing existing steady-state accounting, and expose start/reset plus write actions in `StylizedRiverEditor.Actions.cs`. **Status: mechanically verified.**
+7. Update all five canonical documents with activation state, exact test workflow, evidence boundaries, and P13 handoff. **Status: mechanically verified.**
+8. Run full post-change parser, symbol, source-scope, C# 9 multiline-string, enum/default, descriptor-selection, invalidation, report, package-byte, and protected-file audits. **Status: mechanically verified; final 19-file archive reproduced every source byte.**
+
+### Acceptance criteria
+
+- Existing rivers select fixed metric by default without any raw scene/prefab edit.
+- The Inspector offers fixed/legacy selection and all four candidate spacings.
+- The active descriptor exactly matches the authored selection and requested spacing.
+- Changing mapping or spacing invalidates/reinitializes resources and makes an incompatible cache fail explicitly.
+- Explicit cache preparation produces a cache whose descriptor matches the current active selection.
+- The unchanged P9 GPU consumer regression passes for either selected active mapping.
+- The P12 report requires a live complete runtime plus an explicit comparable accounting window, records descriptor/cache/field/CFL/curvature/memory/work evidence, and does not claim visual acceptance.
+- No protected shader/compute/topology/source/render/serialized asset changes occur.
+
+### Risks and validation focus
+
+- **Cache mismatch after activation:** expected and visible; verify the startup reason is descriptor mismatch and explicit rebuild resolves it.
+- **Live mapping change retaining stale resources:** prevented by allocated mapping/spacing comparisons in all resource-current, restart, and notification paths.
+- **P9 false failure after activation:** prevented by selected-active ownership validation.
+- **Unbounded fixed allocation:** existing descriptor maximum-dimension rejection remains authoritative; P12 adds no fallback scale change.
+- **Misleading performance comparison:** P12 report requires an explicit accounting window and reports visibility percentage, elapsed time, frames, dispatches, cells, substeps, and CPU submission work.
+- **C# language compatibility:** all changed C# files must parse under C# 9-compatible syntax; multiline interpolation expressions are prohibited.
+
+### Rollback checkpoint
+
+The exact post-P11 source in `/mnt/data/p12_work/base`. Selecting `LegacyNormalizedAcross` is the immediate runtime comparison/rollback path; reverting the P12 package restores the previous default and removes the two new serialized authoring fields.
+
+### Post-implementation consistency and compliance audit
+
+Source audit result before final packaging:
+
+```text
+Primary P12 audit:                         28 passed / 0 failed
+Independent P12 audit:                     43 passed / 0 failed
+Changed files:                             19 exact
+River C# files parsed:                     90
+Parser configurations:                    360
+C# syntax nodes inspected:          2,053,325
+River methods indexed:                  1,647
+C# 9 multiline interpolation defects:       0
+Duplicate exact method signatures:           0
+Protected GPU/render/serialized files: 77 unchanged
+Serialized River field delta:                2 exact
+P9 helper/GPU method changes:                 0
+Comment-only executable differences:          0
+Archive files verified:                  19 / 19
+Archive extraction byte mismatches:           0
+```
+
+The audit confirmed that only `RunP9ComprehensiveValidationReport` changed inside the P9 diagnostic file; every P9 GPU/helper method body remains hash-identical. `StylizedRiverFoamGridDescriptor.cs` and `StylizedRiverFoamRuntime.Obstacles.cs` differ only in comments after whitespace/comment stripping. Topology-cache ownership, steady-state accounting, topology replacement, compute, HLSL, render shaders, scenes, prefabs, materials, and cache assets remain byte-identical.
+
+One implementation refinement was made during audit: invalidation now tracks the resolved requested fixed spacing rather than the fixed-size enum identity. Therefore `Quality Default` and an explicit candidate resolving to the same metres do not trigger a false rebuild, and fixed-size edits are irrelevant while legacy mode is active. This remains within the recorded mapping/spacing ownership plan.
+
+Unity 6000.5.0f1 compilation, D3D11 import, explicit fixed-cache rebuild, Play Mode visual evidence, P12 snapshots, and the selected-candidate P9 rerun remain authoritative and pending.
+
+## Implementation record — `RG-METRIC-P12b — Deposit-once automatic sources, stable committed-state ownership, and effective lateral-flux evidence`
+
+### Objective and acceptance criteria
+
+Correct the two code-audited Layer C ownership defects exposed by the active fixed-metric candidate, and add transport-facing lateral evidence without changing overall Foam quantity tuning:
+
+1. Automatic source events must create material only from coverage newly revealed during the current material step. Previously revealed Build interiors, Hold, and Release must not deposit again. A cell that has died must remain dead unless a distinct later birth event or manual injection reaches it.
+2. The renderer's previous committed state must remain a distinct texture for every transport-substep parity, including even substep counts.
+3. P12 evidence must distinguish generated cell-centre lane intent from effective lateral face intent and material-weighted lateral transport.
+4. Existing manual injections, source geometry, source amount parameters, transport equations, source-event schedules, overall birth budgets, topology, film, shape, final-render controls, and fixed/legacy coordinate contracts must remain unchanged.
+5. Existing disk reports and adjacent clipboard-copy actions remain available.
+
+Acceptance requires a zero-error mechanical audit, exact CPU/GPU source-event ABI agreement, unchanged kernel/resource declarations except the intentional metric-count extension, deterministic deposit-once behavioral cases, committed-state ownership cases across one through several substeps, unchanged manual-injection code, and Unity validation showing no dead-edge resurrection in Material Presence or Remaining Life.
+
+### Reviewed evidence
+
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs::SimulateFullField` runs transport/lifecycle first, then calls `DispatchAutomaticFoamSourceEvents(currentState, materialStepDuration)`, then manual births. Automatic sources therefore re-author source-space material after transport.
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs::DispatchAutomaticFoamSourceEvents` advances and dispatches every active event on every material tick until total event duration completes.
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs::FoamSourceEventGpuData` and `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl::FoamSourceEventData` contain only current phase/progress; no previous deposition coverage is available to the GPU.
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute::EvaluateFoamAutomaticSourceRasterSample` evaluates cumulative Build/Hold/Release source coverage and `ApplyFoamAutomaticSourceRasterSample` merges it with `FoamMergeBornPresence`.
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl::FoamEncodeMaterialState` clears Presence, life moment, and pattern moment when Presence or Remaining Life reaches zero; the next active-source dispatch can therefore restore all three through `FoamMergeBornPresence`.
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs::SimulateFullField` aliases `previousState = currentState` before ping-pong transport. With an even number of substeps, the final write can return to that same texture, so previous/current presentation ownership is not guaranteed distinct.
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl::FoamResolveLateralFaceFlux` averages adjacent cell velocities at the face. Existing P12 lane statistics measure only cell-centre intent and cannot quantify face cancellation or material-weighted lateral movement.
+- The supplied active-candidate snapshot proves the current candidate uses one substep, traverses the full presentation interpolation interval, and contains nontrivial generated lane intent. It does not measure effective face flux. The visual evidence shows repeated state changes only in already-eroded source-covered edges.
+- The supplied workspace has no `.git` metadata. The immutable rollback baseline is `/mnt/data/p12b_baseline/Assets`, reconstructed from the user-supplied post-P12a source. Full-file hashes and line-ending counts are captured before implementation.
+
+### Approved file scope
+
+Canonical documentation:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+
+Runtime C# contracts and ownership:
+
+6. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+7. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+8. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+9. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+10. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+11. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs`
+12. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Obstacles.cs`
+13. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+14. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.TopologyReplacement.cs`
+15. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`
+16. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+17. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.P12Diagnostics.cs`
+18. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Diagnostics.cs`
+
+GPU source and transport contracts:
+
+19. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl`
+20. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl`
+21. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl`
+22. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+
+No scene, prefab, material, cache asset, source recipe, serialized River field, topology rule, film/shape path, render shader, Debug View, kernel, texture format, tag, layer, or generated asset is approved for change. One additional persistent packed-state texture is approved solely to preserve the previous committed presentation state across arbitrary substep parity. Four existing transport-metric counters are approved; no new compute buffer is added.
+
+### File-by-file implementation sequence
+
+1. Extend CPU/GPU automatic-source data by one `float4` carrying previous deposition phase/progress; update the exact 128-byte stride contract. **Status: implemented and mechanically validated; Unity import pending.**
+2. Pack current and previous deposition progress. Object Arc/Semi-Arc deposition progress is clamped to Build; Hold and Release resolve to identical completed Build coverage and therefore zero delta. **Status: implemented and mechanically validated; Unity behavior pending.**
+3. Refactor the automatic-source evaluator to compute current and previous source contribution. Use `max(0, current - previous)` as deposition permission, then merge the current absolute source target so the existing non-additive birth merge preserves authored strength. Preserve all eight family evaluators and manual injection paths. **Status: implemented; mechanically validated, Unity pending.**
+4. Allocate one same-format `presentationPreviousState` texture. Copy the committed current state into it before each material update, then ping-pong simulation independently. Include allocation, clear, boundary, topology replacement, release, completeness, and memory accounting ownership. **Status: implemented and mechanically validated across one through 64 substeps; Unity behavior pending.**
+5. Extend existing transport metrics with material-weighted lateral speed numerator/weight and positive/negative lateral Presence movement, accumulated once per north face. **Status: implemented and mechanically validated; Unity readback pending.**
+6. Compute generated-lane face mean, RMS, opposing-face fraction, and cancellation ratio after the existing texture output is finalized; expose them with the transport metrics in P12 snapshot and Inspector diagnostics. **Status: implemented and mechanically validated; Unity snapshot pending.**
+7. Extend the existing P7 source regression with CPU/GPU ABI checks and deterministic deposit-once semantics for Build, Build-to-Hold, Hold, Release, dead covered cells, and unchanged manual births. **Status: implemented and mechanically validated; Unity report pending.**
+8. Update all five canonical documents, run full post-change source/diff/compliance validation, and package changed files only. **Status: complete; the final 25-file archive was extracted and reproduced every source byte.**
+
+### Invariants, non-goals, and risks
+
+- Deposit-once changes source ownership, not source geometry or schedule. Build duration still controls reveal timing; Hold and Release remain event-lifecycle phases but no longer maintain material.
+- Positive coverage difference is used. A moving/retracting source never deletes material; transport and lifecycle remain the only post-birth state owners.
+- Overall Foam quantity is deliberately not tuned in P12b. The final amount pass remains P13.
+- Manual ellipse, segment, compound, and probe injections remain byte-identical.
+- The presentation-state texture adds one packed-state field. At the active 428 x 45 candidate this is approximately `428 * 45 * 8 = 154,080` bytes before API overhead; exact runtime accounting must include it.
+- Lateral metrics are read-only evidence. No lane amplitude, face averaging, transport coefficient, or velocity cap is changed in P12b.
+- Transport metric accumulation must count each lateral face once to avoid double counting.
+- The source-event ABI change must update C# stride, HLSL layout, P7 assertions, and every construction site together.
+- Unity 6000.5.0f1 compilation, D3D11 compute import, actual GPU source behavior, visual flicker removal, and active-candidate P9 regression remain authoritative Unity checks.
+
+### Validation and compliance checklist
+
+- [x] Final diff contains only the 25 approved files after the recorded text-only scope amendment.
+- [x] All changed C# files pass C# 9 delimiter/string/interpolation checks and the available tree-sitter parser; Unity compilation remains pending.
+- [x] CPU and GPU automatic-source layouts are exactly eight `float4` lanes / 128 bytes.
+- [x] All 23 kernels remain present in exact order; HLSL texture/buffer declarations are unchanged and only the existing metric buffer count grows.
+- [x] Deterministic source cases prove positive Build-frontier deposition and zero repeated Build-interior, Hold, and Release deposition.
+- [x] Dead covered-cell model remains zero when deposition permission is zero; manual injection bodies are byte-identical.
+- [x] Presentation previous/current/write resources remain distinct for one through 64 transport substeps and all allocation/replacement/cleanup paths own the third texture.
+- [x] Lateral metrics are finite, face-counted once, remain within fixed-point headroom, and leave transport output unchanged.
+- [x] Protected source recipes, topology algorithms, film/shape/render code, scenes, prefabs, materials, cache assets, and serialized fields remain byte-identical.
+- [x] Canonical documents agree on P12b state and preserve P13 amount-tuning deferral.
+- [ ] Unity compile/import, P7 source regression, P12 snapshot, visual Layer C review, and P9 endpoint remain authoritative and pending with exact next actions.
+
+### P12b scope amendment — source-phase authoring text
+
+Post-implementation consistency review found three direct authoring/debug descriptions that explicitly state Object Arc/Semi-Arc Hold continuously replenishes material and Release clears the source path. Deposit-once ownership makes those statements false even though the serialized durations and source geometry remain unchanged. The following existing files are added for text-only correction before further implementation:
+
+23. `Game/Procedural/Rivers/StylizedRiver.cs` — two Hold-duration tooltips only.
+24. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs` — Object Contact lifecycle help text only.
+25. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs` — Automatic Birth Sources description only.
+
+No serialized field, default, GUI control, Debug View identity, recipe value, or executable source scheduling changes are authorized in these three files. Final scope is 25 files.
+
+
+### P12b implementation-validation correction — target merge semantics
+
+The first provisional shader rewrite passed the positive coverage delta directly to `FoamMergeBornPresence`. Final implementation review rejected that form before packaging: `FoamMergeBornPresence` treats source Presence as an absolute target (`max(existing, source)`), not an additive increment. Feeding a small per-tick delta would therefore leave progressively revealed feather/interior cells at only the largest single-step delta instead of the authored source strength.
+
+The accepted implementation uses the positive current-minus-previous contribution only as deposition permission. At a newly advancing frontier it passes the current absolute source contribution to the unchanged merge. This preserves normal-strength source authoring during Build while still making identical old Build coverage, Hold, and Release non-depositing. The deterministic P7 contract now requires both the positive-difference gate and the absolute-target assignment.
+
+
+### P12b final mechanical-validation record
+
+The final audit passed `42 / 42` primary gates and an independent audit passed `44 / 44` gates. It parsed all `165` project/River C# files (`1,352,809` syntax nodes) with zero parser errors, scanned all changed C# for C# 9 string/interpolation defects, preserved all `23` kernels in exact order, preserved all `58` HLSL texture/buffer declarations, proved the eight source-family evaluator bodies and manual-injection bodies byte-identical, and exercised `101,000` deposition-progression cases, `250,000` absolute-target merge cases, `250,000` lateral-flux equivalence cases, `100,000` lane-face metric cases, and committed-state ownership for one through `64` substeps.
+
+Validation caught and corrected two implementation issues before packaging:
+
+1. A provisional direct-delta merge would have underfilled newly revealed source cells because `FoamMergeBornPresence` consumes an absolute target. The final code uses positive difference only as permission and supplies current absolute contribution as the target.
+2. The first three-texture topology-transition detachment left the unused ping-pong write texture outside snapshot ownership. The final detachment captures that write reference and releases it unless it is one of the two snapshot textures.
+3. The provisional source packing zeroed the accepted Object Arc/Semi-Arc material-step reveal feather. The final code restores the exact prior `material tick / Build duration` packing, and the audit now requires it.
+
+The final changed-files archive contains exactly `25` `Assets/...` entries. A clean extraction reproduced every final source byte with zero mismatches.
+
+Unity 6000.5.0f1 compilation, D3D11 compute import, real GPU source behavior, Layer C visual acceptance, P12 metric readback, and the P9 endpoint remain pending.
+
+
+### P12b final consistency correction — Object Arc/Semi-Arc reveal feather packing
+
+The final full-file reread found that the provisional CPU packing had replaced the existing Object Arc/Semi-Arc normalized material-step reveal width in `FoamSourceEventGpuData.Shore.z` with zero. The evaluator bodies were byte-identical, but their packed reveal-feather input would have changed from the accepted `material tick / Build duration` value to the shader's `0.0001` floor. That violates the recorded invariant that source geometry and Build reveal behavior remain unchanged.
+
+Before packaging, restore the exact existing material-step-progress calculation and continue packing it into `Shore.z`. Current and previous source contributions will use the same preserved reveal width; only phase/progress history and the positive-difference deposition gate remain new. Extend the final mechanical audit to require the preserved calculation and CPU/GPU comments.

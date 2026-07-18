@@ -2103,6 +2103,15 @@ private struct EdgeWearGraphBuildStats
             public bool EndpointSpanValid;
             public bool Viable;
             public float MinimumDihedralDegrees;
+            public float BaseRequestedWidth;
+            public float MacroVariationCoverage;
+            public float MacroVariation;
+            public float MacroParticipationIdentity01;
+            public bool MacroVariationParticipates;
+            public float MacroIdentity01;
+            public float MacroSampledMultiplier = 1f;
+            public float MacroEffectiveMultiplier = 1f;
+            public bool MacroMinimumStyleClamped;
             public float RequestedWidth;
             public float RequiredFootprintLength;
             public float LengthToWidthRatio;
@@ -2210,6 +2219,9 @@ private struct EdgeWearGraphBuildStats
                     new Dictionary<int, EdgeWearEdgeViabilityRecord>();
             public EdgeWearMicroTopologyNormalizationResult
                 MicroTopologyNormalization;
+            public float MacroVariationCoverage;
+            public float MacroVariation;
+            public float MacroBaseRequestedWidth;
             public int RawSourceEdgeCount;
             public int SourceEdgeCount;
             public int CoincidentBoundarySeamPairCount;
@@ -2287,6 +2299,10 @@ private struct EdgeWearGraphBuildStats
                 {
                     MicroTopologyNormalization =
                         MicroTopologyNormalization,
+                    MacroVariationCoverage =
+                        MacroVariationCoverage,
+                    MacroVariation = MacroVariation,
+                    MacroBaseRequestedWidth = MacroBaseRequestedWidth,
                     RawSourceEdgeCount = RawSourceEdgeCount,
                     SourceEdgeCount = SourceEdgeCount,
                     CoincidentBoundarySeamPairCount =

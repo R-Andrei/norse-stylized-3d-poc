@@ -8,6 +8,14 @@ The sole canonical patch history, methods-tried ledger, validation record, curre
 Docs/Generated_Mass_Feature_Implementation_Checklist.md
 ```
 
+## Current accepted baseline and next ownership
+
+- `EW-V1A.2b` is the accepted and frozen deterministic per-edge macro-width irregularity baseline. Its Unity suite passed current preview, macro zero parity/determinism/distribution/retention, both `33/33` matrices, recovery `5/5`, unresolved `0`, and negative exclusion `1/1`, with no cancellation or terminal failure.
+- `EW-B4.2R13A.9a` remains the exact uniform basic-bevel/recovery fallback when Macro Variation Coverage or Strength is zero.
+- Ordinary production remains `EdgeWearEvaluationMode.None`; the accepted bevel remains explicit editor preview/audit geometry with `geometryCommit=disabled`.
+- `edgeWearMacroVariationCoverage` owns deterministic participation and the migration-stable `edgeWearMacroVariation` field owns Strength. The dormant `edgeWearMicroVariation` value remains hidden and unconsumed.
+- The next feature owner is `EW-V2` smooth within-edge irregularity. No along-edge profile/segment owner exists yet; do not describe the current constant-width-per-edge shell as having taper, lobes, drift, chips, or notches.
+
 ## Dependency boundary
 
 ```text
@@ -29,7 +37,7 @@ Production/shared construction
 
 | File | Responsibility |
 |---|---|
-| `MassGenerator.cs` | Shared constants and explicit evaluation-mode entry points: production `None`, editor-only `PlaneCutPreview`, editor-only `LegacyDiagnosticAudit`, and editor-only `BoundedSingleEdgePreview`. |
+| `MassGenerator.cs` | Shared constants and eight explicit evaluation-mode entry points: production `None`; editor-only `SourceEdgeIndexDebug`, `PlaneCutPreview`, `LegacyDiagnosticAudit`, `BoundedSingleEdgePreview`, `UnifiedBoundedPreview`, `UnifiedBatchAudit`, and `UnifiedPreviewBatchAudit`. |
 | `MassGenerator.Types.cs` | Core polygon, edge, vertex-key, mesh-output support records, plus source, rejected plane, bounded bevel, and bounded endpoint-cap provenance. |
 | `MassGenerator.Helpers.cs` | Shared polygon sanitization, welding, geometry predicates, and utility methods. |
 | `MassGenerator.Polyhedron.cs` | Convex half-space clipping, cap construction, and polygon-face maintenance. |
@@ -39,7 +47,7 @@ Production/shared construction
 
 | File | Responsibility |
 |---|---|
-| `MassGenerator.EdgeWear.Orchestration.cs` | Runs only for an explicit diagnostic mode. Plane-cut preview and legacy reconstruction are mutually exclusive; ordinary production generation never enters this orchestration. |
+| `MassGenerator.EdgeWear.Orchestration.cs` | Runs only for explicit editor evaluation modes. It owns source-index debug, plane-cut, bounded-single-edge, unified preview, topology-batch, artistic-preview parity, and legacy comparison routing; ordinary production generation exits immediately. |
 | `MassGenerator.EdgeWear.Graph.cs` | Source topology graph and generic topology audits. |
 | `MassGenerator.EdgeWear.SelectionAndCorners.cs` | Deterministic edge selection, width feasibility, corner positions, and rail solving. |
 | `MassGenerator.EdgeWear.Types.cs` | Edge-wear graph, provenance, diagnostic, and builder result records. |
@@ -48,32 +56,44 @@ Production/shared construction
 
 ```text
 MassGenerator.Generate(...)
-    -> EdgeWearEvaluationMode.None
-    -> no edge-wear orchestration or audit output
+    -> None
+    -> unchanged production mass; no edge-wear orchestration or audit
+
+MassGenerator.GenerateSourceEdgeIndexDebug(...)
+    -> SourceEdgeIndexDebug
+    -> source topology, canonical edge IDs, and eligibility overlay evidence
 
 MassGenerator.GeneratePlaneCutBevelPreview(...)
-    -> EdgeWearEvaluationMode.PlaneCutPreview
-    -> shared selection/corner preparation
-    -> plane-cut kernel only
-    -> one plane-cut compact audit
-
-MassGenerator.RunLegacyEdgeWearDiagnosticAudit(...)
-    -> EdgeWearEvaluationMode.LegacyDiagnosticAudit
-    -> legacy replacement/strip/patch/corrected-clone evidence only
-    -> one legacy compact audit
-    -> returned mesh data is discarded by GeneratedMass
+    -> PlaneCutPreview
+    -> retained historical plane-cut preview and compact audit
 
 MassGenerator.GenerateBoundedSingleEdgeBevelPreview(...)
-    -> EdgeWearEvaluationMode.BoundedSingleEdgePreview
-    -> shared selection and corner solve
-    -> one bounded source edge selected by stable ordinal
-    -> one bounded bevel polygon, two clipped endpoint-support faces, and zero endpoint caps
-    -> one bounded-edge compact audit
+    -> BoundedSingleEdgePreview
+    -> one selected source edge through isolated bounded construction
+
+MassGenerator.RunLegacyEdgeWearDiagnosticAudit(...)
+    -> LegacyDiagnosticAudit
+    -> legacy replacement/strip/patch/corrected-clone comparison only
+
+MassGenerator.GenerateUnifiedEdgeWearPreview(...)
+    -> UnifiedBoundedPreview
+    -> current accepted multi-edge preview authority
+    -> R13A.9a certified baseline, micro normalization, recovery, and final preview status
+
+MassGenerator.GenerateUnifiedEdgeWearBatchAuditCase(...)
+    -> UnifiedBatchAudit
+    -> all-geometric topology viability case
+
+MassGenerator.GenerateUnifiedEdgeWearPreviewParityAuditCase(...)
+    -> UnifiedPreviewBatchAudit
+    -> artistic-preview parity case
 ```
+
+All seven non-`None` modes are editor-only. None may be entered by `OnEnable`, ordinary `OnValidate`, Play Mode transitions, or production generation.
 
 ## Retained legacy construction path
 
-The following files retain the previous replacement-face, strip, patch, boundary-repair, and overlap-investigation implementation. They remain available as comparison evidence while the plane-cut clone is validated, but their diagnostic outputs do not modify rendered geometry.
+The following files retain the previous replacement-face, strip, patch, boundary-repair, and overlap-investigation implementation. They remain available as historical comparison evidence after the unified R13A.9a clone was accepted, but their diagnostic outputs do not modify rendered geometry or define the next visual architecture.
 
 | File group | Responsibility |
 |---|---|
@@ -324,7 +344,7 @@ The production `MassGenerator.Generate` path remains unchanged and every physica
 geometryCommit=disabled
 ```
 
-In Edit Mode only, `GeneratedMassEditor` can request the audited clone through the non-serialized plane-cut preview control. The active preview contains edge bevel planes only; global vertex-junction planes are not emitted. Locality-incompatible candidates and weaker attributed edge-plane conflicts may be explicitly deferred. Clean-band, polygon, and triangle certification govern preview adoption, while bounded local-junction loop extraction is reported from the final retained-edge set. Preview is disabled in Play Mode and does not serialize a production selector. No diagnostic result may mutate serialized assets, materials, shaders, scenes, prefabs, tags, layers, or components.
+In Edit Mode only, `GeneratedMassEditor` can request source-edge indexing, bounded single-edge evidence, retained plane-cut evidence, the accepted unified multi-edge preview, and the one-click topology/artistic/comprehensive suites. `UnifiedBoundedPreview` is the current visual authority. Clean-band, polygon, triangle, recovery, micro-topology, normal, tangent, and render-channel certification govern its adoption. Preview is disabled in Play Mode and does not serialize a production selector. No diagnostic result may mutate serialized assets, materials, shaders, scenes, prefabs, tags, layers, or components.
 
 ## EW-B1.4 bounded source-face certification
 
@@ -1608,3 +1628,106 @@ The evaluation summary adds one compact `materialRecovery` record with canonical
 Suite, topology, artistic-preview, and comprehensive labels advance to R13A.9a. Existing fixture semantics already reject zero-execution unresolved states; `width-recovery-proven-infeasible` is now reachable only through the completed target-trial finalizer. Seed-8889 edges `13/23` still require certification and edge `40` remains a definitive negative exclusion.
 
 No changes are made to `MassGenerator.cs`, `GeneratedMass.cs`, `MassGenerator.EdgeWear.Graph.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, mesh output/shared procedural types, serialized assets, materials, shaders, or the production `EdgeWearEvaluationMode.None` path.
+
+Unity runtime validation accepted R13A.9a: current preview passed; topology and artistic-preview matrices passed `33/33`; recovery passed `5/5`; unresolved is `0`; negative exclusion passed `1/1`; and no timeout or cancellation occurred. This section is now the frozen basic-bevel/recovery inventory.
+
+## EW-V1A.1 macro authoring split and control cleanup — controls validated; active visual baseline rejected
+
+### `MassSurfaceFeatureGenerator.cs`
+
+`MassSurfaceFeatureSettings` carries clamped Macro Variation Coverage and Strength through immutable explicit preview/audit settings. Neither control is added to production-generation state.
+
+### `GeneratedMass.cs`
+
+The existing `edgeWearMacroVariation` serialized field is retained as Strength for migration stability. New `edgeWearMacroVariationCoverage` defaults to one, so existing V1A Strength values preserve all-edge behavior. Source-index debug freshness and `CreateSurfaceFeatureSettings` include both controls. The dormant Micro Variation backing field remains hidden and unconsumed; its visible Inspector control is removed.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`ResolveEdgeWearMacroRequestedWidth` now derives two independent stable values from shape seed plus canonical original source-edge identity: a participation identity and the existing width identity. Coverage thresholds the participation identity; Strength blends the existing sampled `0.55x–1.0x` multiplier. Zero on either control returns the base request exactly, Coverage `1` explicitly includes every ordinary edge, generated transitions remain `1.0x`, and minimum style width remains a hard floor.
+
+The edge-local request is used by footprint and width-ratio viability, isolated bounded schedules, central-span requirements, artistic feasibility context, corner initialization, corner displacement limits, clamp ratios, recovery evidence, and final shell construction. Score weights and random streams remain unchanged.
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+Viability and coverage records own base width, Coverage, Strength, participation identity/state, width identity, sampled/effective multiplier, minimum-style clamp state, and the real request. Trial cloning preserves coverage-level evidence and lifecycle clones retain the viability record used by the frozen recovery system.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+Source-edge debug records expose macro evidence. Explicit bounded-single-edge preview resolves the selected canonical edge's local request before invoking the unchanged bounded kernel. Unified orchestration, coexistence, augmentation, search limits, and production evaluation remain otherwise unchanged.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+Detailed telemetry reports Coverage, Strength, participant count, participation identity/state, width samples, and per-edge preflight/lifecycle evidence. Batch results carry aggregate participant/varied counts, minimum/median/maximum multipliers and requests, and an ordered canonical deterministic signature. The evaluation fingerprint includes Coverage, Strength, and signature.
+
+### `MassGenerator.cs`
+
+Public debug, artistic-edge audit, and batch-case records expose macro evidence. No mesh generation contract changes.
+
+### `Editor/GeneratedMassEditor.cs`
+
+The Edge Wear Inspector distinguishes **Bevel Coverage**, **Macro Variation Coverage**, and **Macro Variation Strength**. Macro controls are grouped with Geometry Edge-Wear Inputs. The unconsumed Micro Variation control and editor property dependency are removed while its raw serialized property remains excluded from generic fallback drawing. Matrix snapshots preserve Coverage and Strength. V1A.1 checks zero-by-Strength parity, zero-by-Coverage parity, repeated determinism, full-Coverage compatibility, participant bounds, and active distribution before the existing safety suite. V1A.2 adds construction-width retention. Matrix CSV gains Coverage, Strength, and participant-count columns; comprehensive edge CSV remains unchanged.
+
+### Unchanged ownership
+
+`MassGenerator.EdgeWear.BoundedSingleEdge.cs`, bounded/retained-hull/plane kernels, micro-topology normalization, recovery scheduling and predicates, artistic score weights, normal/tangent output, shaders, materials, scenes, prefabs, metadata, production `EdgeWearEvaluationMode.None`, and search budgets remain unchanged. Unity validated the control split and one-click contracts, but active Width testing exposed the construction-width defect owned by V1A.2; V1A.1 does not replace R13A.9a as an accepted visual baseline. No shader, material, scene, prefab, geometry-kernel, micro-topology, recovery, normal/tangent, search-budget, or production path changes are part of this control patch.
+
+
+## EW-V1A.2 construction-width backoff inventory
+
+### `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+`AuditBoundedSingleEdgeBevel` is now the finite schedule owner. It calls `AuditBoundedSingleEdgeBevelSingleSchedule`, aggregates ordered rail/construction evidence, and retries only when a rail-success result fails the existing owner/support construction contract. The next request is derived from the last solved width, preventing a local starting-width cap from repeating the same failed construction.
+
+`TrySolveBoundedIsolatedSingleEdgeRails` retains its existing public-private overload compatibility. A new bounded overload accepts the remaining attempt count; the shared constants remain twelve attempts and `0.75` backoff. The legacy nine-argument caller in `MassGenerator.EdgeWear.BoundedAllEdges.cs` continues to use the full default budget.
+
+`FinalizeBoundedAggregateWidthSchedule` renumbers and preserves all attempts, keeps the final certified result when one exists, and reports complete infeasibility only at the existing minimum or total attempt cap. No rail, owner clip, retained-hull, plane-cut, preparation, topology, triangulation, or render algorithm is replaced.
+
+### `Editor/GeneratedMassEditor.cs`
+
+Contracts advance to `EW-V1A.2`. The macro contract now includes active retention: zero-macro certified, artistically meaningful canonical edges must remain materialized or carry complete bounded infeasibility evidence, and every current `owner-face-support-insufficient` exclusion must be complete rather than unresolved. The report emits baseline, certified, proven-infeasible, and unproven-loss counts/IDs.
+
+### Unchanged ownership
+
+Macro Coverage/Strength sampling, Inspector authoring, selection scores, micro-topology normalization, corner/coexistence and augmentation searches, full-shell kernels, normals/tangents, shaders, materials, scenes, prefabs, serialized defaults, production `EdgeWearEvaluationMode.None`, and search budgets remain unchanged.
+
+
+## EW-V1A.2a stable-width classification inventory
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`RunEdgeWearIsolatedViabilityPreflight` retains the complete V1A.2 schedule evidence, then rejects a reduced isolated result whose maximum certified width has reached the absolute `minimumStableEdgeLength` floor. The terminal reason is `maximum-certified-width-at-stable-width-floor`. The gate applies only when the request was actually reduced to that floor; it does not reject all widths below `minimumStyleWidth` and does not change the accepted `minimumStyleWidth * 0.25` width-monotonic policy.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs` and `MassGenerator.EdgeWear.Orchestration.cs`
+
+The new reason is categorized and displayed as an existing width-floor failure. Batch completion now treats both an empty primary failure and the literal sentinel `none` as replaceable when an exact corner blocker was captured.
+
+### `Editor/GeneratedMassEditor.cs`
+
+Suite, topology, artistic-preview, and comprehensive labels advance to `EW-V1A.2a`. The existing matrices are the acceptance contract: the minimum-width seed-8889 case must exclude the floor-bound edge before selection and return both matrices to `33/33` without changing macro sampling or geometry construction.
+
+
+## EW-V1A.2b stable-floor fixture-resolution inventory
+
+### `Editor/GeneratedMassEditor.cs`
+
+`IsStableWidthFloorProvenInfeasible` recognizes the exact terminal audit state introduced by V1A.2a. It requires geometric, candidate, and selection exclusion; successful isolated construction evidence; positive requested and maximum-certified widths; no active, certified, or materialized bevel; and matching viability/final reasons of `maximum-certified-width-at-stable-width-floor`.
+
+`EvaluateOutlierRecoveryExpectation` accepts that proof only for fixtures that do not require certified recovery and reports `stable-width-floor-proven-infeasible` distinctly. Seed-8889 edges `13/23` still require certification, and the edge-40 negative exclusion remains unchanged. Contract labels advance to `EW-V1A.2b`.
+
+No production geometry, viability, width scheduling, corner/coexistence, recovery, macro sampling, selection, micro-topology, rendering, or serialized authoring file changes.
+
+
+## EW-V1A accepted freeze inventory
+
+`EW-V1A.2b` freezes the V1A code boundary without changing implementation files. The accepted runtime evidence is: current preview `31/31` selected/active/certified; macro zero parity, determinism, distribution, and retention passed; topology and artistic-preview matrices passed `33/33`; outlier closure passed `5/5` with two certified recoveries, three proven-infeasible outcomes, and zero unresolved; negative exclusion passed `1/1`; no cancellation or terminal failure.
+
+The frozen authoring and geometry ownership is:
+
+- **Bevel Coverage** selects artistically eligible bevel candidates.
+- **Macro Variation Coverage** selects a deterministic canonical-edge subset.
+- **Macro Variation Strength** applies the downward-only width sample to participants; full Strength remains bounded to `0.55x–1.0x`.
+- Width remains constant along each source edge. Zero Coverage or zero Strength reproduces the R13A.9a request and edge-identity fallback.
+- The complete construction-width schedule, stable-floor classification, certified-baseline recovery, micro-topology normalization, topology/quality gates, and render-channel contracts remain authoritative.
+- Seed-8889 source edge `10` remains retained through certified width reduction; edges `13/23/39` remain certified, edge `40` remains excluded, and micro component `14/24/30` remains suppressed.
+
+V1A does not own within-edge taper, swell, narrowing drift, localized chips/notches, artistic normal shaping, or final material/rendering finish. Those responsibilities remain with EW-V2 through EW-V5.

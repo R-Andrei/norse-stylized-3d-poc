@@ -3,6 +3,12 @@ using UnityEngine;
 
 namespace ProgrammaticStylized3D.Rendering.PixelSurface
 {
+    public enum StylizedSurfaceMaterialPayloadMode
+    {
+        PaletteDetail = 0,
+        AuthoredColor = 1
+    }
+
     /// <summary>
     /// Reusable dry stylized material identity. It contains no Ground, River,
     /// road, wall, placement, or hydrology ownership. Consumers choose
@@ -16,6 +22,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
         [Header("Identity")]
         [SerializeField]
         private string displayName = "Stylized Surface Material";
+
+        [Header("Payload")]
+        [SerializeField]
+        private StylizedSurfaceMaterialPayloadMode payloadMode =
+            StylizedSurfaceMaterialPayloadMode.PaletteDetail;
 
         [Header("Palette")]
         [SerializeField]
@@ -31,6 +42,30 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
         [SerializeField]
         private Color cavityColor = new Color(0.12f, 0.10f, 0.08f, 1f);
 
+        [Header("Authored Color")]
+        [Tooltip("Blend strength of the optional authored colour-array payload. Palette Detail materials ignore this value.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float authoredColorStrength = 1f;
+
+        [Tooltip("Optional reusable tint applied to the authored colour payload.")]
+        [SerializeField]
+        private Color authoredColorTint = Color.white;
+
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float authoredColorTintStrength;
+
+        [Tooltip("Fraction of ordinary scene lighting retained over the authored stylized colour. Lower values preserve more painted form.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float authoredColorLightingStrength = 0.6f;
+
+        [Tooltip("How strongly packed alpha roughness replaces the profile dry-smoothness target for authored-colour materials.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float authoredRoughnessStrength = 1f;
+
         [Header("Broad Response")]
         [Range(0f, 2f)]
         [SerializeField]
@@ -41,7 +76,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
         [SerializeField]
         private float legacyPixelCellInfluence = 1f;
 
-        [Tooltip("Strength of the packed alpha channel's authored per-element value variation.")]
+        [Tooltip("Strength of the packed alpha channel's authored per-element value variation. Authored Color materials use alpha as roughness instead.")]
         [Range(0f, 2f)]
         [SerializeField]
         private float detailValueStrength = 0f;
@@ -53,7 +88,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
         [SerializeField]
         private StylizedSurfaceDetailLibrary detailLibrary;
 
-        [Tooltip("Stable library entry ID. It is resolved to the current array slice at material-refresh time.")]
+        [Tooltip("Stable library entry ID. It is resolved to the current detail and optional authored-colour slices at material-refresh time.")]
         [SerializeField]
         private string detailEntryId = string.Empty;
 
@@ -75,7 +110,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
         [SerializeField]
         private float detailCavityBias = 0.5f;
 
-        [Tooltip("Additional use of positive authored form values toward the material light colour.")]
+        [Tooltip("Additional use of positive authored form values toward the material light colour. Authored Color materials normally leave this at zero.")]
         [Range(0f, 2f)]
         [SerializeField]
         private float detailFormHighlightStrength = 0f;
@@ -89,7 +124,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
         [SerializeField]
         private float drySpecularStrength = 0.1f;
 
-        [Tooltip("Signed dry smoothness modulation derived from the packed alpha channel.")]
+        [Tooltip("Signed dry smoothness modulation derived from packed alpha for Palette Detail materials.")]
         [Range(0f, 0.5f)]
         [SerializeField]
         private float finishVariationStrength = 0f;
@@ -104,15 +139,31 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
                 ? name
                 : displayName;
 
+        public StylizedSurfaceMaterialPayloadMode PayloadMode => payloadMode;
+        public bool UsesAuthoredColor =>
+            payloadMode == StylizedSurfaceMaterialPayloadMode.AuthoredColor;
         public Color BaseColor => baseColor;
         public Color DarkColor => darkColor;
         public Color LightColor => lightColor;
         public Color CavityColor => cavityColor;
+        public float AuthoredColorStrength =>
+            UsesAuthoredColor ? Mathf.Clamp01(authoredColorStrength) : 0f;
+        public Color AuthoredColorTint => authoredColorTint;
+        public float AuthoredColorTintStrength =>
+            UsesAuthoredColor ? Mathf.Clamp01(authoredColorTintStrength) : 0f;
+        public float AuthoredColorLightingStrength =>
+            UsesAuthoredColor
+                ? Mathf.Clamp01(authoredColorLightingStrength)
+                : 1f;
+        public float AuthoredRoughnessStrength =>
+            UsesAuthoredColor ? Mathf.Clamp01(authoredRoughnessStrength) : 0f;
         public float MacroContrast => Mathf.Clamp(macroContrast, 0f, 2f);
         public float LegacyPixelCellInfluence =>
             Mathf.Clamp01(legacyPixelCellInfluence);
         public float DetailValueStrength =>
-            Mathf.Clamp(detailValueStrength, 0f, 2f);
+            UsesAuthoredColor
+                ? 0f
+                : Mathf.Clamp(detailValueStrength, 0f, 2f);
         public bool DetailEnabled => detailEnabled;
         public StylizedSurfaceDetailLibrary DetailLibrary => detailLibrary;
         public string DetailEntryId => detailEntryId ?? string.Empty;
@@ -123,12 +174,16 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
             Mathf.Clamp(detailCavityStrength, 0f, 2f);
         public float DetailCavityBias => Mathf.Clamp01(detailCavityBias);
         public float DetailFormHighlightStrength =>
-            Mathf.Clamp(detailFormHighlightStrength, 0f, 2f);
+            UsesAuthoredColor
+                ? 0f
+                : Mathf.Clamp(detailFormHighlightStrength, 0f, 2f);
         public float DrySmoothness => Mathf.Clamp01(drySmoothness);
         public float DrySpecularStrength =>
             Mathf.Clamp01(drySpecularStrength);
         public float FinishVariationStrength =>
-            Mathf.Clamp(finishVariationStrength, 0f, 0.5f);
+            UsesAuthoredColor
+                ? 0f
+                : Mathf.Clamp(finishVariationStrength, 0f, 0.5f);
 
         public bool TryResolveDetail(
             out Texture2DArray textureArray,
@@ -140,6 +195,22 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
             return detailEnabled &&
                    detailLibrary != null &&
                    detailLibrary.TryResolve(
+                       DetailEntryId,
+                       out textureArray,
+                       out sliceIndex);
+        }
+
+        public bool TryResolveAuthoredColor(
+            out Texture2DArray textureArray,
+            out int sliceIndex)
+        {
+            textureArray = null;
+            sliceIndex = -1;
+
+            return detailEnabled &&
+                   UsesAuthoredColor &&
+                   detailLibrary != null &&
+                   detailLibrary.TryResolveAuthoredColor(
                        DetailEntryId,
                        out textureArray,
                        out sliceIndex);

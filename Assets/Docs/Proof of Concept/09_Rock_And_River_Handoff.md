@@ -22,6 +22,8 @@ This handoff is historical below the supersession notice. Use `Docs/River_Foam_S
 > **River Foam supersession notice — 2026-07-07**
 >
 > This handoff is historical for earlier rock/river refactor context. Any river Foam architecture, static-foam, morphing, lateral motion, or rendering responsibility statement in this document is superseded by `Docs/River_Foam_Stage6_Architecture.md` and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`. Use those documents as the active Foam source of truth.
+>
+> The Generated Mass sections are also historical snapshots. Current Generated Mass architecture, code ownership, accepted runtime baseline, patch history, and next work are owned by `Docs/Generated_Mass_Framework.md`, `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`, `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`, and `Docs/Generated_Mass_Feature_Implementation_Checklist.md`. Do not use the old file excerpts, lifecycle summary, constants, or refactor seams below as current implementation instructions.
 
 
 ## Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle — `4.11C.5.18H.6.2` — implemented, Unity validation pending

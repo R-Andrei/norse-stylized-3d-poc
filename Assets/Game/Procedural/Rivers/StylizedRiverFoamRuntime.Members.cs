@@ -16,6 +16,7 @@ namespace ProgrammaticStylized3D.Rivers
         private ComputeShader computeShader;
         private RenderTexture stateA;
         private RenderTexture stateB;
+        private RenderTexture presentationPreviousState;
         private RenderTexture automaticBirthDebugTexture;
         private RenderTexture previousState;
         private RenderTexture currentState;
@@ -447,6 +448,17 @@ namespace ProgrammaticStylized3D.Rivers
         private int lastMaterialStepsThisFrame;
         private float lastRenderInterpolationAlpha = 1f;
         private float lastMotionLaneScrollCells;
+        private float lastMotionLaneMinimumIntent;
+        private float lastMotionLaneMaximumIntent;
+        private float lastMotionLaneMeanAbsoluteIntent;
+        private float lastMotionLaneRootMeanSquareIntent;
+        private float lastMotionLanePositiveFraction;
+        private float lastMotionLaneNegativeFraction;
+        private float lastMotionLaneNearNeutralFraction;
+        private float lastMotionLaneMeanAbsoluteFaceIntent;
+        private float lastMotionLaneRootMeanSquareFaceIntent;
+        private float lastMotionLaneOpposingFaceFraction;
+        private float lastMotionLaneFaceCancellationRatio;
         private int lastMotionLaneSignature = int.MinValue;
         private int lastObstacleRoutingSignature = int.MinValue;
         private float lastEstimatedTransportCellsPerStep;
@@ -482,6 +494,11 @@ namespace ProgrammaticStylized3D.Rivers
         private uint transportUnitCapacityHitCount;
         private uint transportBoundaryCapacityHitCount;
         private uint transportObstacleCapacityHitCount;
+        private float transportLateralWeightedSpeedNumerator;
+        private float transportLateralWeightedSpeedWeight;
+        private float transportLateralMaterialWeightedSpeed;
+        private float transportLateralPositiveMovement;
+        private float transportLateralNegativeMovement;
         private float transportPresenceUnaccountedError;
         private float transportLifeUnaccountedError;
         private float transportPatternUnaccountedError;
@@ -522,6 +539,8 @@ namespace ProgrammaticStylized3D.Rivers
         private int applyBoundaryKernel = -1;
         private int obstacleGeometryVersion = -1;
         private StylizedRiverQuality allocatedQuality;
+        private StylizedRiverFoamGridMode allocatedFoamGridMode;
+        private float allocatedFoamRequestedCellSizeMetres;
 
         private int lastUpdateDispatches;
         private int recentPeakDispatches;
@@ -548,6 +567,9 @@ namespace ProgrammaticStylized3D.Rivers
         private long steadyStateWorkTransportSubstepCount;
         private int steadyStateWorkMaximumTransportSubsteps;
         private float steadyStateWorkMaximumTransportCfl;
+        private long steadyStateWorkRenderInterpolationSampleCount;
+        private float steadyStateWorkRenderInterpolationMinimum = 1f;
+        private float steadyStateWorkRenderInterpolationMaximum;
         private long steadyStateWorkMaterialDispatchCount;
         private long steadyStateWorkMaterialCellIterations;
         private double steadyStateWorkMaterialCpuMilliseconds;

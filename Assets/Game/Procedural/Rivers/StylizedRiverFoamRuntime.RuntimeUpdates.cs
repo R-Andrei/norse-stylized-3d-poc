@@ -187,6 +187,9 @@ namespace ProgrammaticStylized3D.Rivers
             steadyStateWorkTransportSubstepCount = 0;
             steadyStateWorkMaximumTransportSubsteps = 0;
             steadyStateWorkMaximumTransportCfl = 0f;
+            steadyStateWorkRenderInterpolationSampleCount = 0;
+            steadyStateWorkRenderInterpolationMinimum = 1f;
+            steadyStateWorkRenderInterpolationMaximum = 0f;
             steadyStateWorkMaterialDispatchCount = 0;
             steadyStateWorkMaterialCellIterations = 0;
             steadyStateWorkMaterialCpuMilliseconds = 0.0;
@@ -248,6 +251,16 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 steadyStateWorkHeldFrameCount++;
             }
+
+            float interpolation = Mathf.Clamp01(
+                lastRenderInterpolationAlpha);
+            steadyStateWorkRenderInterpolationSampleCount++;
+            steadyStateWorkRenderInterpolationMinimum = Mathf.Min(
+                steadyStateWorkRenderInterpolationMinimum,
+                interpolation);
+            steadyStateWorkRenderInterpolationMaximum = Mathf.Max(
+                steadyStateWorkRenderInterpolationMaximum,
+                interpolation);
         }
 
         private static long CaptureWorkTimestamp()

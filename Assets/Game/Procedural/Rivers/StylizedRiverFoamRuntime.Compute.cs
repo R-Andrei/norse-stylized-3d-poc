@@ -746,6 +746,23 @@ namespace ProgrammaticStylized3D.Rivers
                 values[TransportBoundaryCapacityHitCountMetricIndex];
             transportObstacleCapacityHitCount =
                 values[TransportObstacleCapacityHitCountMetricIndex];
+            transportLateralWeightedSpeedNumerator =
+                values[TransportLateralWeightedSpeedNumeratorMetricIndex] *
+                inverseScale;
+            transportLateralWeightedSpeedWeight =
+                values[TransportLateralWeightedSpeedWeightMetricIndex] *
+                inverseScale;
+            transportLateralMaterialWeightedSpeed =
+                transportLateralWeightedSpeedWeight > 0.000001f
+                    ? transportLateralWeightedSpeedNumerator /
+                        transportLateralWeightedSpeedWeight
+                    : 0f;
+            transportLateralPositiveMovement =
+                values[TransportLateralPositiveMovementMetricIndex] *
+                inverseScale;
+            transportLateralNegativeMovement =
+                values[TransportLateralNegativeMovementMetricIndex] *
+                inverseScale;
 
             float attributedPresenceLoss =
                 transportPresenceUnitCapacityLoss +
@@ -817,6 +834,11 @@ namespace ProgrammaticStylized3D.Rivers
             transportUnitCapacityHitCount = 0u;
             transportBoundaryCapacityHitCount = 0u;
             transportObstacleCapacityHitCount = 0u;
+            transportLateralWeightedSpeedNumerator = 0f;
+            transportLateralWeightedSpeedWeight = 0f;
+            transportLateralMaterialWeightedSpeed = 0f;
+            transportLateralPositiveMovement = 0f;
+            transportLateralNegativeMovement = 0f;
             transportPresenceUnaccountedError = 0f;
             transportLifeUnaccountedError = 0f;
             transportPatternUnaccountedError = 0f;

@@ -26,6 +26,24 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 MessageType.Info);
 
             DrawSection("Identity", "displayName");
+            DrawSection("Payload", "payloadMode");
+            SerializedProperty payloadMode =
+                serializedObject.FindProperty("payloadMode");
+            bool authoredColorMode =
+                payloadMode != null &&
+                payloadMode.enumValueIndex ==
+                    (int)StylizedSurfaceMaterialPayloadMode.AuthoredColor;
+            if (authoredColorMode)
+            {
+                DrawSection(
+                    "Authored Color",
+                    "authoredColorStrength",
+                    "authoredColorTint",
+                    "authoredColorTintStrength",
+                    "authoredColorLightingStrength",
+                    "authoredRoughnessStrength");
+            }
+
             DrawSection(
                 "Palette",
                 "baseColor",
@@ -35,8 +53,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             DrawSection(
                 "Broad Response",
                 "macroContrast",
-                "legacyPixelCellInfluence",
-                "detailValueStrength");
+                "legacyPixelCellInfluence");
+            if (!authoredColorMode)
+            {
+                DrawSection(
+                    "Palette Detail Variation",
+                    "detailValueStrength");
+            }
             DrawSection(
                 "Structural Detail",
                 "detailEnabled",
@@ -53,8 +76,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     "detailWorldScale",
                     "detailNormalStrength",
                     "detailCavityStrength",
-                    "detailCavityBias",
-                    "detailFormHighlightStrength");
+                    "detailCavityBias");
+                if (!authoredColorMode)
+                {
+                    DrawProperties("detailFormHighlightStrength");
+                }
             }
 
             if (detailIsEnabled)
@@ -65,8 +91,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             DrawSection(
                 "Dry Finish",
                 "drySmoothness",
-                "drySpecularStrength",
-                "finishVariationStrength");
+                "drySpecularStrength");
+            if (!authoredColorMode)
+            {
+                DrawSection(
+                    "Palette Detail Finish Variation",
+                    "finishVariationStrength");
+            }
 
             if (serializedObject.ApplyModifiedProperties())
             {
@@ -286,7 +317,9 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         profile.DetailEntryId,
                         StringComparison.Ordinal))
                 {
-                    return entry.SourceTexture;
+                    return profile.UsesAuthoredColor
+                        ? entry.AuthoredBaseColor
+                        : entry.SourceTexture;
                 }
             }
 
@@ -336,6 +369,24 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     float u = (x + 0.5f) / size;
                     float v = (y + 0.5f) / size;
                     Color packed = source.GetPixelBilinear(u, v);
+                    if (profile.UsesAuthoredColor)
+                    {
+                        Color tinted = Color.Lerp(
+                            packed,
+                            packed * profile.AuthoredColorTint,
+                            profile.AuthoredColorTintStrength);
+                        float authoredLighting = Mathf.Lerp(
+                            1f,
+                            0.92f,
+                            profile.AuthoredColorLightingStrength);
+                        pixels[y * size + x] = Color.Lerp(
+                            profile.BaseColor,
+                            tinted * authoredLighting,
+                            profile.AuthoredColorStrength);
+                        pixels[y * size + x].a = 1f;
+                        continue;
+                    }
+
                     Vector2 slope = new Vector2(
                         packed.r * 2f - 1f,
                         packed.g * 2f - 1f) *
@@ -419,6 +470,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 hash = hash * 31 + profile.DarkColor.GetHashCode();
                 hash = hash * 31 + profile.LightColor.GetHashCode();
                 hash = hash * 31 + profile.CavityColor.GetHashCode();
+                hash = hash * 31 + profile.PayloadMode.GetHashCode();
+                hash = hash * 31 + profile.AuthoredColorStrength.GetHashCode();
+                hash = hash * 31 + profile.AuthoredColorTint.GetHashCode();
+                hash = hash * 31 + profile.AuthoredColorTintStrength.GetHashCode();
+                hash = hash * 31 + profile.AuthoredColorLightingStrength.GetHashCode();
                 hash = hash * 31 +
                        profile.DetailValueStrength.GetHashCode();
                 hash = hash * 31 +

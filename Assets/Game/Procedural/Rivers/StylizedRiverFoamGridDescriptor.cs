@@ -47,10 +47,10 @@ namespace ProgrammaticStylized3D.Rivers
     /// Immutable semantic authority for River Foam field dimensions and
     /// coordinate mapping. RG-METRIC-P3 makes this descriptor authoritative for
     /// allocation dimensions and defines the complete one-strip metric CPU
-    /// conversion contract. The active runtime remains LegacyNormalizedAcross
-    /// until every dependent GPU, cache, topology, source, transport, and render
-    /// consumer is migrated; the fixed-metric path is therefore prepared and
-    /// exhaustively validated without allowing mixed coordinate state.
+    /// conversion contract. RG-METRIC-P12 permits either the fixed-metric or
+    /// legacy compatibility mapping to become active from the authored River
+    /// selection; every dependent consumer reads the same descriptor so mixed
+    /// coordinate state remains prohibited.
     /// </summary>
     internal readonly struct StylizedRiverFoamGridDescriptor :
         IEquatable<StylizedRiverFoamGridDescriptor>

@@ -150,6 +150,18 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float bankDetailScaleMultiplier = 1f;
 
+    [InspectorName("Authored Color Strength Multiplier")]
+    [Tooltip("Multiplies reusable authored-colour strength for this Bank application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float bankAuthoredColorStrengthMultiplier = 1f;
+
+    [InspectorName("Scene Lighting Strength Multiplier")]
+    [Tooltip("Multiplies the reusable authored-colour scene-lighting strength for this Bank application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float bankAuthoredColorLightingMultiplier = 1f;
+
     [InspectorName("Normal Strength Multiplier")]
     [Tooltip("Multiplies reusable structural-detail normal strength for this Bank application. One preserves the shared material definition.")]
     [Range(0f, 2f)]
@@ -193,6 +205,18 @@ public sealed class GroundMaterialControls
     [Range(0.25f, 4f)]
     [SerializeField]
     private float riverbedDetailScaleMultiplier = 1f;
+
+    [InspectorName("Authored Color Strength Multiplier")]
+    [Tooltip("Multiplies reusable authored-colour strength for this Riverbed application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float riverbedAuthoredColorStrengthMultiplier = 1f;
+
+    [InspectorName("Scene Lighting Strength Multiplier")]
+    [Tooltip("Multiplies the reusable authored-colour scene-lighting strength for this Riverbed application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float riverbedAuthoredColorLightingMultiplier = 1f;
 
     [InspectorName("Normal Strength Multiplier")]
     [Tooltip("Multiplies reusable structural-detail normal strength for this Riverbed application. One preserves the shared material definition.")]
@@ -601,6 +625,10 @@ public sealed class GroundMaterialControls
     public float OuterBankFade => Mathf.Clamp(outerBankFade, 0.05f, 10f);
     public float BankDetailScaleMultiplier =>
         Mathf.Clamp(bankDetailScaleMultiplier, 0.25f, 4f);
+    public float BankAuthoredColorStrengthMultiplier =>
+        Mathf.Clamp(bankAuthoredColorStrengthMultiplier, 0f, 2f);
+    public float BankAuthoredColorLightingMultiplier =>
+        Mathf.Clamp(bankAuthoredColorLightingMultiplier, 0f, 2f);
     public float BankDetailNormalStrengthMultiplier =>
         Mathf.Clamp(bankDetailNormalStrengthMultiplier, 0f, 2f);
     public float BankDetailCavityStrengthMultiplier =>
@@ -615,6 +643,10 @@ public sealed class GroundMaterialControls
         Mathf.Clamp01(riverbedMaterialStrength);
     public float RiverbedDetailScaleMultiplier =>
         Mathf.Clamp(riverbedDetailScaleMultiplier, 0.25f, 4f);
+    public float RiverbedAuthoredColorStrengthMultiplier =>
+        Mathf.Clamp(riverbedAuthoredColorStrengthMultiplier, 0f, 2f);
+    public float RiverbedAuthoredColorLightingMultiplier =>
+        Mathf.Clamp(riverbedAuthoredColorLightingMultiplier, 0f, 2f);
     public float RiverbedDetailNormalStrengthMultiplier =>
         Mathf.Clamp(riverbedDetailNormalStrengthMultiplier, 0f, 2f);
     public float RiverbedDetailCavityStrengthMultiplier =>
@@ -734,6 +766,8 @@ public sealed class GroundMaterialControls
             outerBankStrength = 0.5f;
             outerBankFade = 1f;
             bankDetailScaleMultiplier = 1f;
+            bankAuthoredColorStrengthMultiplier = 1f;
+            bankAuthoredColorLightingMultiplier = 1f;
             bankDetailNormalStrengthMultiplier = 1f;
             bankDetailCavityStrengthMultiplier = 1f;
             bankDetailValueFormMultiplier = 1f;
@@ -741,6 +775,8 @@ public sealed class GroundMaterialControls
             bankLegacyPixelCellInfluenceMultiplier = 1f;
             riverbedMaterialStrength = 1f;
             riverbedDetailScaleMultiplier = 1f;
+            riverbedAuthoredColorStrengthMultiplier = 1f;
+            riverbedAuthoredColorLightingMultiplier = 1f;
             riverbedDetailNormalStrengthMultiplier = 1f;
             riverbedDetailCavityStrengthMultiplier = 1f;
             riverbedDetailValueFormMultiplier = 1f;
@@ -794,6 +830,10 @@ public sealed class GroundMaterialControls
         outerBankStrength = source.outerBankStrength;
         outerBankFade = source.outerBankFade;
         bankDetailScaleMultiplier = source.bankDetailScaleMultiplier;
+        bankAuthoredColorStrengthMultiplier =
+            source.bankAuthoredColorStrengthMultiplier;
+        bankAuthoredColorLightingMultiplier =
+            source.bankAuthoredColorLightingMultiplier;
         bankDetailNormalStrengthMultiplier =
             source.bankDetailNormalStrengthMultiplier;
         bankDetailCavityStrengthMultiplier =
@@ -807,6 +847,10 @@ public sealed class GroundMaterialControls
         riverbedMaterialStrength = source.riverbedMaterialStrength;
         riverbedDetailScaleMultiplier =
             source.riverbedDetailScaleMultiplier;
+        riverbedAuthoredColorStrengthMultiplier =
+            source.riverbedAuthoredColorStrengthMultiplier;
+        riverbedAuthoredColorLightingMultiplier =
+            source.riverbedAuthoredColorLightingMultiplier;
         riverbedDetailNormalStrengthMultiplier =
             source.riverbedDetailNormalStrengthMultiplier;
         riverbedDetailCavityStrengthMultiplier =

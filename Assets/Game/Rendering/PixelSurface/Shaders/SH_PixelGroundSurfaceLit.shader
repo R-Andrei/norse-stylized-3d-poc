@@ -60,6 +60,9 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundBankLayerDrySpecularStrength("Ground Bank Layer Dry Specular Strength", Range(0, 1)) = 0.1
         [HideInInspector] _GroundBankLayerCavityColor("Ground Bank Layer Cavity Color", Color) = (0.12, 0.10, 0.08, 1)
         [HideInInspector] [NoScaleOffset] _GroundBankLayerDetailArray("Ground Bank Layer Detail Array", 2DArray) = "" {}
+        [HideInInspector] [NoScaleOffset] _GroundBankLayerAuthoredColorArray("Ground Bank Layer Authored Color Array", 2DArray) = "" {}
+        [HideInInspector] _GroundBankLayerAuthoredColorA("Ground Bank Layer Authored Color A", Vector) = (0, 0, 0, 1)
+        [HideInInspector] _GroundBankLayerAuthoredColorTint("Ground Bank Layer Authored Color Tint", Color) = (1, 1, 1, 0)
         [HideInInspector] _GroundBankLayerDetailA("Ground Bank Layer Detail A", Vector) = (0, 0, 1, 0)
         [HideInInspector] _GroundBankLayerDetailB("Ground Bank Layer Detail B", Vector) = (0, 0.5, 0, 0)
         [HideInInspector] _GroundBankLayerDetailC("Ground Bank Layer Detail C", Vector) = (0, 1, 0, 0)
@@ -75,6 +78,9 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundRiverbedLayerDrySpecularStrength("Ground Riverbed Layer Dry Specular Strength", Range(0, 1)) = 0.1
         [HideInInspector] _GroundRiverbedLayerCavityColor("Ground Riverbed Layer Cavity Color", Color) = (0.12, 0.10, 0.08, 1)
         [HideInInspector] [NoScaleOffset] _GroundRiverbedLayerDetailArray("Ground Riverbed Layer Detail Array", 2DArray) = "" {}
+        [HideInInspector] [NoScaleOffset] _GroundRiverbedLayerAuthoredColorArray("Ground Riverbed Layer Authored Color Array", 2DArray) = "" {}
+        [HideInInspector] _GroundRiverbedLayerAuthoredColorA("Ground Riverbed Layer Authored Color A", Vector) = (0, 0, 0, 1)
+        [HideInInspector] _GroundRiverbedLayerAuthoredColorTint("Ground Riverbed Layer Authored Color Tint", Color) = (1, 1, 1, 0)
         [HideInInspector] _GroundRiverbedLayerDetailA("Ground Riverbed Layer Detail A", Vector) = (0, 0, 1, 0)
         [HideInInspector] _GroundRiverbedLayerDetailB("Ground Riverbed Layer Detail B", Vector) = (0, 0.5, 0, 0)
         [HideInInspector] _GroundRiverbedLayerDetailC("Ground Riverbed Layer Detail C", Vector) = (0, 1, 0, 0)
@@ -210,8 +216,12 @@ Shader "PS3D/Pixel Ground Surface Lit"
             SAMPLER(sampler_GroundPaintedAccentCoverage);
             TEXTURE2D_ARRAY(_GroundBankLayerDetailArray);
             SAMPLER(sampler_GroundBankLayerDetailArray);
+            TEXTURE2D_ARRAY(_GroundBankLayerAuthoredColorArray);
+            SAMPLER(sampler_GroundBankLayerAuthoredColorArray);
             TEXTURE2D_ARRAY(_GroundRiverbedLayerDetailArray);
             SAMPLER(sampler_GroundRiverbedLayerDetailArray);
+            TEXTURE2D_ARRAY(_GroundRiverbedLayerAuthoredColorArray);
+            SAMPLER(sampler_GroundRiverbedLayerAuthoredColorArray);
 
             #include "../Includes/PixelSurfaceGroundForwardTypes.hlsl"
             #include "../Includes/PixelSurfaceGroundResponse.hlsl"

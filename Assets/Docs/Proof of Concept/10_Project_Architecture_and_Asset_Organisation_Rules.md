@@ -1,12 +1,12 @@
 ---
 document_id: PS3D-10
 title: "Project Architecture and Asset Organisation Rules"
-version: 0.1
+version: 0.2
 status: active
 scope: project-organisation
 authoritative_for: "Unity folder placement, asset ownership, naming, feature boundaries, recipes, presets, editor code, and generated-content organisation"
 related_documents: [PS3D-00, PS3D-08, PS3D-09]
-last_updated: 2026-06-22
+last_updated: 2026-07-18
 ---
 
 # Project Architecture and Asset Organisation Rules
@@ -38,7 +38,12 @@ Assets/Game/
 │   │   └── MeshBuilder.cs
 │   └── Masses/
 │       ├── GeneratedMass.cs
+│       ├── GeneratedMassFeatureAtlasBaker.cs
+│       ├── MassSurfaceFeatureGenerator.cs
+│       ├── MassSurfaceFeatureGraph.cs
 │       ├── MassGenerator.cs
+│       ├── MassGenerator.*.cs
+│       ├── MassGenerator.EdgeWear.*.cs
 │       └── Editor/
 │           └── GeneratedMassEditor.cs
 │
@@ -110,12 +115,19 @@ Editor-only code stays beside its runtime feature in a nested `Editor` folder:
 ```text
 Game/Procedural/Masses/
 ├── GeneratedMass.cs
+├── GeneratedMassFeatureAtlasBaker.cs
+├── MassSurfaceFeatureGenerator.cs
+├── MassSurfaceFeatureGraph.cs
 ├── MassGenerator.cs
+├── MassGenerator.*.cs
+├── MassGenerator.EdgeWear.*.cs
 └── Editor/
     └── GeneratedMassEditor.cs
 ```
 
 Do not create a distant global editor hierarchy unless an editor tool genuinely serves several unrelated systems.
+
+Large feature implementations may be split into partial files under the same feature directory. Partial-file names must describe a real responsibility boundary, for example `MassGenerator.EdgeWear.Orchestration.cs` or `MassGenerator.MeshOutput.cs`; they do not create a new architectural layer. The Generated Mass canonical file/method inventory is `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`.
 
 ### Shared code
 

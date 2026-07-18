@@ -129,7 +129,14 @@ static const uint FoamTransportTotalCapacityHitCountOffset = 76u;
 static const uint FoamTransportUnitCapacityHitCountOffset = 80u;
 static const uint FoamTransportBoundaryCapacityHitCountOffset = 84u;
 static const uint FoamTransportObstacleCapacityHitCountOffset = 88u;
-static const uint FoamTransportMetricCount = 23u;
+// Effective lateral evidence. Numerator/weight resolve a material-weighted
+// absolute face speed. Positive/negative movement are Presence-area moved
+// across each north face during this substep; every face is counted once.
+static const uint FoamTransportLateralWeightedSpeedNumeratorOffset = 92u;
+static const uint FoamTransportLateralWeightedSpeedWeightOffset = 96u;
+static const uint FoamTransportLateralPositiveMovementOffset = 100u;
+static const uint FoamTransportLateralNegativeMovementOffset = 104u;
+static const uint FoamTransportMetricCount = 27u;
 RWByteAddressBuffer _FoamTransportMetrics;
 
 // RG-METRIC-P2 descriptor lanes. Later phases switch coordinate consumers

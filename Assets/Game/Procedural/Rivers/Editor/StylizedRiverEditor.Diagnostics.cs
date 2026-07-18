@@ -677,6 +677,47 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                       $"{runtime.FoamMotionLaneScrollCells:0.00} cells"
                     : unavailable);
             DrawReadOnlyRow(
+                new GUIContent(
+                    "Lane Intent",
+                    "Resolved generated lane texture before obstacle routing. " +
+                    "Fractions classify intent above +0.15, below -0.15, or " +
+                    "inside the near-neutral band."),
+                runtime != null
+                    ? $"range {runtime.FoamMotionLaneMinimumIntent:0.00}…" +
+                      $"{runtime.FoamMotionLaneMaximumIntent:0.00} / " +
+                      $"mean |v| {runtime.FoamMotionLaneMeanAbsoluteIntent:0.00} / " +
+                      $"RMS {runtime.FoamMotionLaneRootMeanSquareIntent:0.00} / " +
+                      $"+ {FormatPercent(runtime.FoamMotionLanePositiveFraction)} / " +
+                      $"- {FormatPercent(runtime.FoamMotionLaneNegativeFraction)} / " +
+                      $"neutral {FormatPercent(runtime.FoamMotionLaneNearNeutralFraction)}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Lateral Face Intent",
+                    "Adjacent lane intents are averaged at transport faces. " +
+                    "Cancellation is the removed absolute intent relative to " +
+                    "the uncancelled adjacent-cell magnitude."),
+                runtime != null
+                    ? $"mean |v| " +
+                      $"{runtime.FoamMotionLaneMeanAbsoluteFaceIntent:0.00} / " +
+                      $"RMS {runtime.FoamMotionLaneRootMeanSquareFaceIntent:0.00} / " +
+                      $"opposed " +
+                      $"{FormatPercent(runtime.FoamMotionLaneOpposingFaceFraction)} / " +
+                      $"cancel " +
+                      $"{FormatPercent(runtime.FoamMotionLaneFaceCancellationRatio)}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Lateral Material Flux",
+                    "Latest transport-metric readback. Speed is weighted by " +
+                    "donor Presence and physical face length; movement counts " +
+                    "Presence-area crossing each lateral face once."),
+                runtime != null && runtime.TransportMetricsAvailable
+                    ? $"{runtime.TransportLateralMaterialWeightedSpeed:0.000} m/s / " +
+                      $"+ {runtime.TransportLateralPositiveMovement:0.0000} m² / " +
+                      $"- {runtime.TransportLateralNegativeMovement:0.0000} m²"
+                    : (runtime != null ? "Waiting for metric readback" : unavailable));
+            DrawReadOnlyRow(
                 new GUIContent("Field Signatures"),
                 runtime != null
                     ? $"lane {runtime.FoamMotionLaneSignature} / " +
@@ -974,6 +1015,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             ? "Completed sample found no visible foam"
                             : "No completed sample");
             DrawReadOnlyRow(
+                new GUIContent(
+                    "Presentation Interpolation",
+                    "Temporal blend between the previous and current committed " +
+                    "Layer C states. This is ordinary fixed-step interpolation, " +
+                    "not the retired velocity backtrace."),
+                runtime != null
+                    ? $"alpha {runtime.RenderInterpolationAlpha:0.000} / " +
+                      $"capture {runtime.SteadyStateWorkRenderInterpolationMinimum:0.000}…" +
+                      $"{runtime.SteadyStateWorkRenderInterpolationMaximum:0.000} / " +
+                      $"{runtime.SteadyStateWorkRenderInterpolationSampleCount:N0} samples"
+                    : unavailable);
+            DrawReadOnlyRow(
                 new GUIContent("Material Clock"),
                 runtime != null
                     ? runtime.MaterialClockStatus
@@ -1186,6 +1239,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     : unavailable);
             DrawReadOnlyRow(
                 new GUIContent(
+                    "Authored Grid Selection",
+                    "Current River authoring selection and whether the allocated " +
+                    "descriptor matches it."),
+                runtime != null
+                    ? $"{runtime.FoamAuthoredGridMode} / " +
+                      $"{runtime.FoamAuthoredFixedMetricCellSize} / " +
+                      (runtime.FoamGridSelectionMatchesActive
+                          ? "active match"
+                          : "not active")
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
                     "Active Grid Contract",
                     "Current runtime coordinate mapping and immutable descriptor " +
                     "contract identifiers."),
@@ -1218,14 +1283,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawReadOnlyRow(
                 new GUIContent(
                     "Fixed Candidate",
-                    "Prepared fixed-metric descriptor state. Runtime activation " +
-                    "remains deliberately deferred to the candidate sweep."),
+                    "Prepared fixed-metric descriptor state and whether it is " +
+                    "the current active allocation."),
                 runtime != null
                     ? runtime.FoamFixedMetricCandidateAvailable
-                        ? $"{runtime.FoamFixedMetricCandidateStatus} / activation " +
-                          (runtime.FoamFixedMetricRuntimeActivationDeferred
-                              ? "deferred"
-                              : "allowed")
+                        ? $"{runtime.FoamFixedMetricCandidateStatus} / " +
+                          (runtime.FoamFixedMetricRuntimeActive
+                              ? "active"
+                              : "standby")
                         : runtime.FoamFixedMetricCandidateStatus
                     : unavailable);
             DrawReadOnlyRow(
@@ -1246,9 +1311,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawReadOnlyRow(
                 new GUIContent(
                     "Candidate / Active Cells",
-                    "Allocation comparison only. The active legacy and prepared " +
-                    "fixed grids use different coordinate contracts, so this is " +
-                    "not reported as physical waste."),
+                    "Allocation comparison between the prepared fixed candidate " +
+                    "and the current active grid. When fixed metric is active, " +
+                    "the ratio should be 1.00×."),
                 cellCountComparison);
             DrawReadOnlyRow(
                 new GUIContent("Layer C State Textures"),

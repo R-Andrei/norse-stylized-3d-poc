@@ -1,25 +1,46 @@
 # Current accepted Chipping baseline — `4.11C.5.17D.1C`
 
-## Fixed-metric River Foam coordinate status — P11
+## Fixed-metric River Foam coordinate status — P12
 
-The coordinate-consumer migration through `RG-METRIC-P9` and the P10/P10a diagnostic/Inspector cleanup are Unity-validated and closed. The final endpoint report passed actual GPU Film Source, visual-occupancy, and shape execution; production/debug same-point mapping; resource ownership; cleanup; and assigned-cache immutability.
+The coordinate-consumer migration through `RG-METRIC-P9`, P10/P10a Inspector cleanup, and P11 repository-wide audit are closed. P12 now makes the authored grid selection authoritative at production allocation.
 
-`RG-METRIC-P11` completed the repository-wide mechanical and consistency audit without finding a production defect. CPU/GPU descriptor lanes, structured-buffer ABI, all 23 kernels and C# lookups, shader properties/bindings, cache schema/fingerprints, fixed-versus-legacy branches, migrated coordinate consumers, Inspector actions, and canonical statuses are consistent.
+Source defaults select `Fixed Metric / Quality Default` (`0.25 m` Low, `0.15 m` Medium, `0.10 m` High). Explicit `0.25`, `0.20`, `0.15`, and `0.10 m` candidates and direct `Legacy Normalized Across` rollback/A-B selection are available in `Foam → Runtime & Quality`.
 
-The active runtime still uses `LegacyNormalizedAcross`. A complete `FixedMetricLattice` candidate descriptor is prepared but deliberately inactive until the P12 visual/performance sweep. P11 changes documentation only; it does not change source geometry, transport, topology, film, shape, rendering, resources, caches, scenes, prefabs, materials, or serialized River values.
+Changing selection invalidates live Foam resources and requires the assigned topology cache to be rebuilt for the new descriptor through the existing explicit Edit Mode workflow. Runtime generation or automatic cache serialization is not introduced. Every production consumer continues to read the same active descriptor.
 
 Current Inspector ownership is:
 
 ```text
+Foam → Runtime & Quality
+  Grid Mode + Fixed Cell Size
+
 Runtime Diagnostics → Foam
-  active descriptor + fixed candidate + CFL/curvature + memory/dispatch evidence
+  authored/active selection + descriptor + candidate + CFL/curvature + memory/work evidence
 
 Actions → Foam Cache & Validation
-  normal cache lifecycle + current P9 endpoint regression
+  explicit cache lifecycle + P12 candidate capture + current P9 endpoint regression
   Historical / Deep Diagnostics (collapsed by default)
 ```
 
-No new Debug View is introduced. Fixed-metric activation and quality selection remain P12; final tuning/cache freeze remain P13.
+The first P12 Medium fixed candidate passed runtime/cache/transport evidence. P12a restored ordinary previous/current interpolation and proved that the presentation alpha traversed the complete material-step interval, but dead Layer C edges still flickered in both Material Presence and Remaining Life. The subsequent code audit confirmed that automatic events re-authored cumulative source coverage after transport/lifecycle and could resurrect packed-zero material; it also found that the previous-state alias was not parity-safe for even transport substep counts.
+
+P12b replaces that ownership with deposit-once automatic sources. Build uses the positive difference between current and previous source coverage only as the newly advancing deposition gate and preserves the current authored source contribution as the absolute birth target. Hold and Release preserve event scheduling but deposit nothing and never erase material. Once born, Layer C material belongs only to transport and lifecycle. One same-format previous-committed packed-state texture is copied before each material update so renderer/debug interpolation remains exact for any substep parity. The existing transport metric buffer additionally reports material-weighted lateral face speed and signed Presence-area movement, while generated-lane diagnostics distinguish cell-centre intent from face cancellation. All report groups retain disk output and adjacent clipboard-copy actions. P13 still owns overall foam-amount tuning, final tier selection, cache freeze, and Stage 1 closure. No new Debug View is introduced.
+
+
+### Current automatic-source deposition ownership — P12b
+
+Automatic source events remain scheduled through Build, Hold, Release, and Rest, but those phases no longer imply continuing Layer C maintenance:
+
+```text
+Build    deposit newly revealed positive coverage only;
+Hold     deposit zero;
+Release  deposit zero and delete zero;
+Rest     no active event;
+```
+
+The GPU evaluates the unchanged source-family shape at current and previous deposition progress. `max(0, current - previous)` determines whether the current texel is on an advancing deposition frontier; when permitted, the current authored source contribution is merged as the absolute Presence target expected by `FoamMergeBornPresence`. A shrinking or moving source cannot erase material, and an already-dead cell cannot be reborn merely because its old event remains active. Manual injections remain explicit one-shot commands and do not use this difference contract.
+
+The `Automatic Birth Sources` view now represents deposition for the current material step rather than the complete scheduled source footprint: an advancing Build frontier may be visible; Hold, Release, and Rest should be black. Historical sections below that describe a fully replenished Hold footprint remain records of the superseded pre-P12b source behavior rather than current runtime authority.
 
 
 Static Chipping work is complete for the current milestone and is Unity-validated as a whole.
@@ -1235,6 +1256,8 @@ removed
 `Foam Committed Final Preview` is removed because it is now identical to production. Serialized debug value `16` is reserved and resolves safely to Final Foam. `Foam Evaluated Final Preview` remains diagnostic-only for the later Layer D production decision. No Layer D promotion occurs in this patch.
 
 The two Layer C ARGBHalf textures remain mandatory read/write ping-pong storage for conservative transport; they are not render-history textures and are not removed. The patch adds no texture, field, channel, buffer, kernel, dispatch, or memory allocation. It reduces fragment work by removing production Motion Lane, Obstacle Routing, and Obstacle Exclusion reads that existed only for residual prediction.
+
+P12a later uses that same previous/current committed pair for ordinary fixed-step presentation interpolation. This supersedes the literal `current only` presentation line above without reversing the accepted removal of velocity reconstruction or coordinate backtracing.
 
 Both accepted visibility policies remain available. Supported Aging Rate remains `0.05–1.00`, and lifecycle aging remains one complete material-tick decrement on the final CFL substep. The grey-body/white-border appearance exists in committed and evaluated presentation alike and is therefore recorded as a later Layer E shader-composition issue, not a transport or lifecycle fault.
 
@@ -3462,10 +3485,10 @@ Layer D owns the accepted advected temporal visual occupancy sheet;
 Layer D does not own a separate persistent fracture or damage state;
 _FoamShapeMask is the full-resolution diagnostic product;
 Layer E owns the accepted analytical Chipping, structural Strands, colour, opacity, and lighting;
-Final Foam consumes committed Layer C state directly; `_FoamShapeMask` remains a diagnostic/evaluated product and has no queued production-integration patch.
+Final Foam consumes an ordinary fixed-step temporal blend of the previous/current committed Layer C states; `_FoamShapeMask` remains a diagnostic/evaluated product and has no queued production-integration patch.
 ```
 
-`4.11C.5.16E.2` is the active architecture state and is Unity-validated. Point-velocity residual prediction is retired after the committed/evaluated previews proved stable while residual-predicted Final Foam stuttered. Final Foam keeps both reversible visibility policies, the supported-aging minimum is `0.05`, and lifecycle aging is quantized once per complete material tick rather than once per CFL substep. `_FoamShapeMask` remains diagnostic-only.
+`4.11C.5.16E.2` remains the accepted no-backtrace architecture. P12a adds only ordinary interpolation between the two already committed Layer C states so the 8/12/16 Hz material cadence is not exposed as hard edge changes; it does not reconstruct velocity or move the sample coordinate. Final Foam keeps both reversible visibility policies, the supported-aging minimum is `0.05`, and lifecycle aging is quantized once per complete material tick rather than once per CFL substep. `_FoamShapeMask` remains diagnostic-only.
 
 The accepted R1–R5 Inspector redesign is the current Layer F tooling contract. `4.11C.5.16E.3 — Transport Presence Capacity-Loss Attribution Audit` is Unity-validated and accepted. It uses `Runtime Diagnostics > Foam > Layer C — Material & Lifecycle > Transport Accounting` and changes no transport, lifecycle, source, Layer D, or rendering behavior.
 

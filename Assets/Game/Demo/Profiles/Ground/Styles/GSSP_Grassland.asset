@@ -26,9 +26,9 @@ MonoBehaviour:
       rockyDryTintStrength: 0.16
       vegetationTint: {r: 0.36, g: 0.49, b: 0.25, a: 1}
       vegetationTintStrength: 0.42
-      bankSurfaceLayer: {fileID: 11400000, guid: a9656675b9f44e98ace5e4d4616d991a, type: 2}
-      riverbedSurfaceLayer: {fileID: 11400000, guid: b6673354a0024d33b7374b1a24176000, type: 2}
-      riverbedSurfaceSource: 3
+      bankSurfaceLayer: {fileID: 11400000, guid: 405649d59a402863594a8cca28f8af5b, type: 2}
+      riverbedSurfaceLayer: {fileID: 0}
+      riverbedSurfaceSource: 2
       shoreHydrologyModifier: {fileID: 11400000, guid: 0993d09f3cc2ac545941e48fab022de0, type: 2}
       riverbedHydrologySource: 0
       riverbedHydrologyModifier: {fileID: 0}
@@ -41,6 +41,8 @@ MonoBehaviour:
       outerBankStrength: 1
       outerBankFade: 0.75
       bankDetailScaleMultiplier: 1
+      bankAuthoredColorStrengthMultiplier: 1
+      bankAuthoredColorLightingMultiplier: 1
       bankDetailNormalStrengthMultiplier: 1
       bankDetailCavityStrengthMultiplier: 1
       bankDetailValueFormMultiplier: 1
@@ -48,6 +50,8 @@ MonoBehaviour:
       bankLegacyPixelCellInfluenceMultiplier: 1
       riverbedMaterialStrength: 1
       riverbedDetailScaleMultiplier: 1
+      riverbedAuthoredColorStrengthMultiplier: 1
+      riverbedAuthoredColorLightingMultiplier: 1
       riverbedDetailNormalStrengthMultiplier: 1
       riverbedDetailCavityStrengthMultiplier: 1
       riverbedDetailValueFormMultiplier: 1
@@ -184,6 +188,8 @@ MonoBehaviour:
       outerBankStrength: 0.5
       outerBankFade: 1
       bankDetailScaleMultiplier: 1
+      bankAuthoredColorStrengthMultiplier: 1
+      bankAuthoredColorLightingMultiplier: 1
       bankDetailNormalStrengthMultiplier: 1
       bankDetailCavityStrengthMultiplier: 1
       bankDetailValueFormMultiplier: 1
@@ -191,6 +197,8 @@ MonoBehaviour:
       bankLegacyPixelCellInfluenceMultiplier: 1
       riverbedMaterialStrength: 1
       riverbedDetailScaleMultiplier: 1
+      riverbedAuthoredColorStrengthMultiplier: 1
+      riverbedAuthoredColorLightingMultiplier: 1
       riverbedDetailNormalStrengthMultiplier: 1
       riverbedDetailCavityStrengthMultiplier: 1
       riverbedDetailValueFormMultiplier: 1
@@ -327,6 +335,8 @@ MonoBehaviour:
       outerBankStrength: 0.5
       outerBankFade: 1
       bankDetailScaleMultiplier: 1
+      bankAuthoredColorStrengthMultiplier: 1
+      bankAuthoredColorLightingMultiplier: 1
       bankDetailNormalStrengthMultiplier: 1
       bankDetailCavityStrengthMultiplier: 1
       bankDetailValueFormMultiplier: 1
@@ -334,6 +344,8 @@ MonoBehaviour:
       bankLegacyPixelCellInfluenceMultiplier: 1
       riverbedMaterialStrength: 1
       riverbedDetailScaleMultiplier: 1
+      riverbedAuthoredColorStrengthMultiplier: 1
+      riverbedAuthoredColorLightingMultiplier: 1
       riverbedDetailNormalStrengthMultiplier: 1
       riverbedDetailCavityStrengthMultiplier: 1
       riverbedDetailValueFormMultiplier: 1
@@ -518,6 +530,8 @@ MonoBehaviour:
       outerBankStrength: 0.5
       outerBankFade: 1
       bankDetailScaleMultiplier: 1
+      bankAuthoredColorStrengthMultiplier: 1
+      bankAuthoredColorLightingMultiplier: 1
       bankDetailNormalStrengthMultiplier: 1
       bankDetailCavityStrengthMultiplier: 1
       bankDetailValueFormMultiplier: 1
@@ -525,6 +539,8 @@ MonoBehaviour:
       bankLegacyPixelCellInfluenceMultiplier: 1
       riverbedMaterialStrength: 1
       riverbedDetailScaleMultiplier: 1
+      riverbedAuthoredColorStrengthMultiplier: 1
+      riverbedAuthoredColorLightingMultiplier: 1
       riverbedDetailNormalStrengthMultiplier: 1
       riverbedDetailCavityStrengthMultiplier: 1
       riverbedDetailValueFormMultiplier: 1

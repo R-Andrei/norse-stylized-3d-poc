@@ -57,8 +57,8 @@ namespace ProgrammaticStylized3D.Rivers
                 "material, or serialized river state is stored.");
             report.AppendLine(
                 "Contracts: exact structural-to-film grouping + represented " +
-                "physical area + descriptor-owned fixed render mapping; active " +
-                "runtime mapping remains LegacyNormalizedAcross.");
+                "physical area + descriptor-owned fixed render mapping; the " +
+                "authored active grid selection must remain authoritative.");
             report.AppendLine();
 
             StylizedRiverFoamTopologyCacheAsset assignedAsset =
@@ -74,7 +74,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool livePreparationReady = false;
             bool transactionStarted = false;
             bool resourcesCompleteWhileMeasured = false;
-            bool activeLegacy = false;
+            bool activeSelectionExact = false;
             bool fixedCandidateReady = false;
             bool groupingExact = false;
             bool areaExact = false;
@@ -104,9 +104,8 @@ namespace ProgrammaticStylized3D.Rivers
                 resourcesCompleteWhileMeasured = livePreparationReady &&
                     initializationPhase == InitializationPhase.Ready &&
                     AreResourcesCompleteAndCurrent();
-                activeLegacy = resourcesCompleteWhileMeasured &&
-                    gridDescriptor.IsCreated &&
-                    !gridDescriptor.UsesFixedMetricLattice;
+                activeSelectionExact = resourcesCompleteWhileMeasured &&
+                    FoamGridSelectionMatchesActive;
                 fixedCandidateReady = resourcesCompleteWhileMeasured &&
                     fixedMetricCandidateDescriptor.IsCreated &&
                     fixedMetricCandidateDescriptor.UsesFixedMetricLattice;
@@ -118,6 +117,10 @@ namespace ProgrammaticStylized3D.Rivers
                     $"Resources complete while measured: " +
                     $"{resourcesCompleteWhileMeasured}");
                 report.AppendLine(
+                    $"Authored selection: {river.FoamGridMode} / " +
+                    $"{river.FoamFixedMetricCellSize} / " +
+                    $"requested={river.FoamFixedMetricRequestedCellSizeMetres:0.000}m");
+                report.AppendLine(
                     $"Active descriptor: " +
                     $"{(gridDescriptor.IsCreated ? gridDescriptor.Mapping.ToString() : "Unallocated")} / " +
                     $"{gridDescriptor.InitializationSignature:X16}");
@@ -125,9 +128,9 @@ namespace ProgrammaticStylized3D.Rivers
                     $"Fixed candidate: {fixedCandidateReady}; status=" +
                     $"{fixedMetricCandidateFailureReason}");
                 report.AppendLine(
-                    "P9 does not activate fixed-metric allocation, source " +
-                    "rasterization, transport, topology generation, or unrelated " +
-                    "water rendering.");
+                    "P9 preserves the authored active mapping while validating " +
+                    "the migrated film, shape, and render consumers. It does not " +
+                    "retune sources or alter unrelated water rendering.");
                 if (!livePreparationReady &&
                     !string.IsNullOrEmpty(preparationFailure))
                 {
@@ -135,12 +138,14 @@ namespace ProgrammaticStylized3D.Rivers
                         "Preparation failure: " + preparationFailure);
                 }
                 report.AppendLine(
-                    "ACTIVE LEGACY OWNERSHIP VERDICT: " +
-                    (activeLegacy && fixedCandidateReady ? "PASS" : "FAIL"));
+                    "ACTIVE GRID SELECTION VERDICT: " +
+                    (activeSelectionExact && fixedCandidateReady
+                        ? "PASS"
+                        : "FAIL"));
                 report.AppendLine();
 
-                if (resourcesCompleteWhileMeasured && activeLegacy &&
-                    fixedCandidateReady)
+                if (resourcesCompleteWhileMeasured &&
+                    activeSelectionExact && fixedCandidateReady)
                 {
                     stateBefore = currentState;
                     filmSourceBefore = filmSourceTexture;
@@ -323,7 +328,7 @@ namespace ProgrammaticStylized3D.Rivers
                 bindingsDisabled && string.IsNullOrEmpty(cleanupFailure);
             bool cacheExact = metadataUnchanged && payloadUnchanged;
             bool overall = livePreparationReady &&
-                resourcesCompleteWhileMeasured && activeLegacy &&
+                resourcesCompleteWhileMeasured && activeSelectionExact &&
                 fixedCandidateReady && groupingExact && areaExact &&
                 filmSourceExact && occupancyExact && shapeExact &&
                 renderMappingExact && kernelResourceExact &&
@@ -335,8 +340,10 @@ namespace ProgrammaticStylized3D.Rivers
                 "Live diagnostic preparation transaction: " +
                 (livePreparationReady ? "PASS" : "FAIL"));
             report.AppendLine(
-                "Active legacy ownership preserved: " +
-                (activeLegacy && fixedCandidateReady ? "PASS" : "FAIL"));
+                "Authored active grid selection preserved: " +
+                (activeSelectionExact && fixedCandidateReady
+                    ? "PASS"
+                    : "FAIL"));
             report.AppendLine(
                 "Film grouping and odd-edge mapping: " +
                 (groupingExact ? "PASS" : "FAIL"));

@@ -189,8 +189,7 @@ namespace ProgrammaticStylized3D.Rivers
         private struct FoamSourceEventGpuData
         {
             // x = source type, y = side sign except Object Arc/Semi-Arc
-            // phase (0 Build, 1 Hold, 2 Release), z = phase/reveal progress,
-            // w = shape seed.
+            // deposition phase (Build = 0), z = reveal progress, w = shape seed.
             public Vector4 Header;
             // x/y = start/end storage global except Object Arc/Semi-Arc
             // contact point 0; z = centre storage global; w = flow direction
@@ -220,6 +219,12 @@ namespace ProgrammaticStylized3D.Rivers
             // w = Fleck contact offset, Free-Water shape parameter, or Object
             // Arc/Semi-Arc source-local lateral cell spacing metres.
             public Vector4 ObjectData;
+            // x = previous deposition side/phase, y = previous deposition
+            // progress, z = previous deposition state valid (0 for the first
+            // source tick, 1 afterward), w reserved. Current phase/progress
+            // remain Header.y/z. Positive coverage newly revealed between these
+            // states gates the current authored source target.
+            public Vector4 Deposit;
         }
 
         private struct FoamCompositionEvent

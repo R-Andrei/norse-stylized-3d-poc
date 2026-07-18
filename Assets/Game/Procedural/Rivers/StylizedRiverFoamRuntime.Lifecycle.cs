@@ -462,10 +462,14 @@ namespace ProgrammaticStylized3D.Rivers
                 MeasureTopologyMetrics(true);
             }
 
-            // Production rendering consumes the current committed Layer C
-            // state directly. Point-velocity residual prediction was rejected
-            // because it visibly oscillated beside blocked rock and bank faces.
-            simulationInterpolation = 1f;
+            // Present the two already-committed Layer C states with ordinary
+            // fixed-step temporal interpolation. This adds no velocity
+            // prediction and never samples across blocked faces: transport
+            // remains authoritative, while the 8/12/16 Hz material cadence no
+            // longer appears as abrupt whole-cell edge changes in rendering.
+            simulationInterpolation = stepDuration > 0.0001f
+                ? Mathf.Clamp01(simulationAccumulator / stepDuration)
+                : 1f;
             lastRenderInterpolationAlpha = simulationInterpolation;
 
             if (IsSleeping)
@@ -653,10 +657,14 @@ namespace ProgrammaticStylized3D.Rivers
             bool domainChanged = domainVersion != river.Domain.Version;
             bool qualityChanged =
                 currentState != null && allocatedQuality != river.Quality;
-            resourcesDirty |= domainChanged || qualityChanged;
-            boundaryDirty |= domainChanged;
+            bool gridConfigurationChanged =
+                FoamGridConfigurationChanged();
+            resourcesDirty |= domainChanged || qualityChanged ||
+                gridConfigurationChanged;
+            boundaryDirty |= domainChanged || gridConfigurationChanged;
             if (initializationPhase == InitializationPhase.Failed &&
-                (domainChanged || qualityChanged))
+                (domainChanged || qualityChanged ||
+                 gridConfigurationChanged))
             {
                 initializationPhase = InitializationPhase.NotStarted;
             }
@@ -862,6 +870,17 @@ namespace ProgrammaticStylized3D.Rivers
                 DispatchClear(stateB, 0, fieldWidth);
             }
 
+            if (presentationPreviousState != null)
+            {
+                DispatchClear(
+                    presentationPreviousState,
+                    0,
+                    fieldWidth);
+            }
+
+            previousState = presentationPreviousState;
+            currentState = stateA;
+            writeState = stateB;
             ClearRenderTexture(shapeMaskTexture);
             ClearRenderTexture(filmSourceTexture);
             ClearRenderTexture(filmSupportTexture);

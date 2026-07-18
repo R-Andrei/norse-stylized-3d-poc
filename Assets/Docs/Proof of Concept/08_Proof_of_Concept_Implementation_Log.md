@@ -1,3 +1,13 @@
+# 2026-07-18 — Generated Mass `EW-B4.2R13A.9a` basic-bevel/recovery baseline accepted; visual irregularity phase opened
+
+Status: Unity-validated and accepted as the frozen uniform basic-bevel/recovery foundation.
+
+The one-click suite passed current preview, topology `33/33`, artistic-preview `33/33`, recovery closure `5/5`, unresolved `0`, negative exclusion `1/1`, comprehensive evidence availability, state preservation, and zero cancellation/terminal failure. Seed `8889` retains certified source edges `13`, `23`, and `39`; edge `40` remains intentionally excluded; micro-topology component `14/24/30` remains suppressed. R13A.9a replaces R13A.8 as the accepted recovery baseline; R13A.9 remains rejected.
+
+This closes only the uniform basic bevel foundation. Edge wear remains visually incomplete relative to the accepted stone references. The active continuation is `EW-V1A — Deterministic Per-Edge Macro Wear Identity`, followed by along-edge micro profiles, localized chips, artistic normal shaping, and final material/rendering finish. Existing Macro Variation and Micro Variation fields remain reserved and currently have no consumed geometry or shader effect; V1A should activate the existing Macro Variation control rather than add a duplicate.
+
+No production promotion occurs. Ordinary generation remains `EdgeWearEvaluationMode.None`, explicit editor preview owns the bevel clone, and `geometryCommit=disabled` remains active.
+
 # 2026-07-16 — River Foam `4.11C.5.18H.6.2` Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle
 
 Status: implemented in source; mechanical validation passed; Unity validation pending.

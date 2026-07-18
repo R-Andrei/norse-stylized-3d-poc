@@ -10,17 +10,29 @@ Docs/Generated_Mass_Feature_Implementation_Checklist.md
 
 ## Current status
 
-The active experimental geometry direction is now a bounded single-edge bevel primitive built from a true one-edge local rail solve. Deterministic edge selection, local width feasibility, exact source-boundary ownership, provenance, final generated-face outward certification, and exact polygon/triangle certification remain useful.
+`EW-B4.2R13A.9a` remains the frozen uniform basic-bevel/recovery architecture and exact zero-irregularity fallback. `EW-V1A.2b` is Unity-validated and accepted as the frozen deterministic per-edge macro-width extension. Its one-click suite passed current preview; macro zero parity, determinism, distribution, and retention; topology `33/33`; artistic preview `33/33`; recovery closure `5/5`; unresolved `0`; and negative exclusion `1/1`, with comprehensive evidence available and no cancellation or terminal failure.
 
-Unity wireframe validation rejected infinite whole-rock half-space planes for both vertex junctions and edge bevels. A whole-rock edge plane can produce one manifold, planar, uninterrupted provenance-owned cap that still runs inward and bears little resemblance to the intended bounded rail quadrilateral. The next admissible geometry must geometrically modify only the two owner faces, emit one bounded bevel polygon, and close only the two local endpoint neighborhoods. Endpoint-adjacent non-owner boundaries may receive collinear subdivisions solely to share the local cap edges without changing their planar surface.
+The architecture now establishes:
 
-The legacy construction and repair path remains in the project as diagnostic comparison evidence. Ordinary production generation performs no edge-wear evaluation or edge-wear logging. In Edit Mode only, explicit non-serialized actions may evaluate the plane-cut clone or run the legacy comparison audit for one selected mass. Play Mode always uses production geometry.
+- deterministic source-edge selection and canonical identity;
+- exact local width/rail feasibility;
+- immutable certified-baseline fallback;
+- conflict-safe coexistence and bounded recovery;
+- micro-topology normalization for invisible blockers;
+- certified topology, convexity, containment, bounds, volume, face quality, triangulation, normals, tangents, and render channels;
+- stable seed-8889 positive/negative fixtures, including edges `13/23/39`, suppressed component `14/24/30`, and excluded edge `40`.
+
+The accepted R13A.9a uniform baseline and V1A.2b macro extension are closed. V1A.2 completed owner/support construction-width backoff and retained the reported meaningful edge; V1A.2a closed stable-floor classification before corner solving; V1A.2b closed the corresponding editor-only fixture proof. Edge wear as a complete visual feature remains open beginning with along-edge micro irregularity, followed by chips, artistic normal shaping, and final rendering finish.
+
+The legacy construction and repair paths and the earlier bounded/plane experiments remain documented as architecture history and diagnostic comparison evidence. Any pre-R13A section that speaks of a future geometry direction is historical unless repeated by the current contract near the end of this document.
+
+Ordinary production generation still performs no edge-wear evaluation or logging. Explicit editor preview/audit modes own the accepted bevel clone, and Play Mode uses production geometry.
 
 ```text
 geometryCommit=disabled
 ```
 
-remains mandatory until topology and visual preview are both approved.
+remains mandatory. R13A.9a accepts the editor geometry foundation; it does not promote that clone to production.
 
 ## Evaluation-mode isolation
 
@@ -85,7 +97,7 @@ source convex polygon faces
     -> stable eligible selected-edge order
     -> choose one editor-only source-edge ordinal
     -> solve the selected edge directly with only its support line offset
-    -> deterministically back off width until all four rail points lie inside their exact adjacent source-edge segments
+    -> deterministically back off width until rails and the complete bounded shell certify
     -> bind each rail point to its graph-owned endpoint-adjacent source face and segment
     -> pair the two rails at each endpoint to one exact graph-owned support face
     -> replace endpoint-support source vertex A with its ordered rail pair
@@ -1908,4 +1920,121 @@ EW-B4.2R13A.9a-preview
 EW-B4.2R13A.9a-comprehensive
 ```
 
-Implementation and static validation are complete. Unity compilation and the complete one-click suite remain mandatory before acceptance. R13A.8 remains the accepted runtime recovery baseline until that evidence exists.
+Unity compilation and the complete one-click suite passed. Runtime evidence is:
+
+```text
+suite: passed
+current preview: passed
+topology: 33/33
+artistic preview: 33/33
+outlier resolution: 5/5
+certified recoveries: 2
+finite proven-infeasible fixtures: 3
+unresolved: 0
+negative exclusion: 1/1
+cancelled: 0
+terminal reason: none
+```
+
+R13A.9a supersedes R13A.8 as the accepted recovery baseline. R13A.9 remains a rejected intermediate. The basic bevel/recovery architecture is frozen.
+
+## Basic-bevel freeze boundary and visual continuation
+
+The accepted R13A.9a shell is the zero-irregularity reference for every later visual pass.
+
+### Next phases
+
+```text
+EW-V1  deterministic macro irregularity between edges
+EW-V2  bounded smooth width variation along one edge
+EW-V3  localized chips/notches after V2 continuity is stable
+EW-V4  artistic bevel-normal shaping
+EW-V5  final material/rendering finish
+```
+
+### Recovery architecture constraints on irregularity
+
+- Macro Variation Coverage or Strength at zero must reproduce the R13A.9a requested/resolved/materialized widths and edge identity.
+- V1 may vary the requested width per canonical source edge but retains one constant width along each edge. Coverage chooses a deterministic canonical-edge subset; Strength controls the downward variation of participants. Existing corner, viability, recovery, and full-shell certification judge the real varied widths.
+- V2/V3 may add subdivisions only through explicit source-edge provenance and bounded tier budgets. They may not bypass endpoint ownership, micro-topology normalization, recovery fallback, or final shell certification.
+- Artistic normal work must preserve the existing finite-unit normal/tangent integrity contract; visual shaping is not permission to weaken technical validation.
+- Rendering finish remains downstream of valid geometry and normals.
+- No visual phase may add per-frame mesh work or silently change production `EdgeWearEvaluationMode.None`.
+
+`EW-V1A.1` exposes Macro Variation Coverage and Macro Variation Strength for explicit editor geometry evaluation. Coverage `1` preserves the V1A all-edge multiplier stream; zero on either control restores exact uniform requests. Its Unity suite passed, but active Width testing exposed the incomplete construction-width schedule corrected by EW-V1A.2. The dormant serialized Micro Variation value remains hidden and unconsumed until EW-V2. Production evaluation is unchanged.
+
+
+### EW-V1A.1 integration with the frozen recovery system
+
+- Width identity and participation identity are captured from canonical original source provenance before graph remapping, so micro-topology normalization cannot silently change either decision.
+- Participation is a second salted deterministic hash threshold. Coverage increases produce nested participant sets; Coverage `1` explicitly includes every ordinary evaluated edge even if the normalized hash reaches its representable upper endpoint.
+- Each viability record stores base request, Coverage, Strength, participation identity/state, width identity, sampled multiplier, effective multiplier, minimum-style clamp state, and varied request. Trial coverage clones preserve this evidence.
+- The certified baseline and all recovery trials receive the same edge-local requests. V1A.1 does not add a recovery class, alter provisional-width predicates, broaden allowed collateral, or expand the bounded frontier.
+- Corner displacement limits use the maximum request of the active participating edges; per-edge clamp scales are measured against each edge's own request. When Coverage or Strength is zero these reduce exactly to the uniform-width contract.
+- Downward-only sampling cannot demand a width broader than the accepted baseline, but narrower requests may truthfully change footprint or feasibility outcomes. Full shell, recovery, canonical identity, and negative-exclusion certification remain mandatory.
+- Direct V1A.1 suite evidence is additive: zero-by-Strength parity, zero-by-Coverage parity, repeated determinism, full-Coverage compatibility, participant bounds, and active distribution are checked before the existing `33/33`, `5/5`, unresolved-zero, negative-exclusion, comprehensive, state-preservation, timeout, and render-integrity contracts.
+- Inspector cleanup is an authoring correction only: ordinary Coverage is labelled Bevel Coverage, dormant Micro Variation is hidden, and every visible Edge Wear control has a current geometry or shader consumer.
+
+
+### EW-V1A.2 full construction-width schedule
+
+The isolated width schedule is authoritative only when each scheduled width covers both rail solving and bounded shell certification. A rail-success width is not a certified feasible width by itself.
+
+EW-V1A.2 applies the existing finite contract as follows:
+
+1. solve rails at the current width;
+2. if rails fail, continue the existing `0.75` schedule;
+3. if rails succeed, run the complete existing owner/support construction, preparation, provenance, topology, containment, bounds/volume, triangulation, and render certification;
+4. if that result fails the existing owner/support construction class, continue at `lastSolvedWidth * 0.75`;
+5. return immediately for every other failure class;
+6. commit the first completely certified width, or report complete infeasibility only after minimum-width or twelve-attempt exhaustion.
+
+Rail failures and construction failures consume the same twelve-attempt budget. Ordered evidence retains every failed width and the terminal certified or proven-infeasible width. This is not a new recovery frontier and does not alter corner/coexistence augmentation, material recovery, geometry tolerances, or production evaluation.
+
+The V1A.2 one-click contract compares zero-macro certified meaningful source-edge identity with the active case and independently rejects any current `owner-face-support-insufficient` exclusion whose width schedule remains unresolved.
+
+
+### EW-V1A.2a stable-floor classification boundary
+
+The canonical minimum style width and the absolute stable geometry width are distinct:
+
+```text
+minimumStyleWidth = ResolveGeneratedEdgeWearWidth(maximumDimension, 0.05)
+minimumRequiredCertifiedWidth = minimumStyleWidth * 0.25
+minimumStableEdgeLength = maximumDimension * 0.0012
+```
+
+Widths below `minimumStyleWidth` remain valid when they satisfy the accepted width-monotonic recovery floor. A reduced isolated result that reaches `minimumStableEdgeLength` has no legal downward adjustment left for shared-corner solving. V1A.2a therefore classifies only that floor-bound reduced result before artistic selection and corner construction. It does not lower any tolerance, change the twelve-attempt schedule, or reinterpret the minimum style tier as the terminal geometry floor.
+
+The batch diagnostic contract also replaces the sentinel `none` with a captured corner blocker so any future early corner failure carries its exact reason.
+
+
+## EW-V1A.2b editor fixture-proof boundary
+
+V1A.2a runtime validation passed current preview, macro parity/determinism/distribution/retention, both `33/33` matrices, and the edge-40 negative gate. The remaining `3/5` outlier result was an editor classification mismatch: two non-certification-required seed-2223 fixtures terminated with the exact production reason `maximum-certified-width-at-stable-width-floor`.
+
+The editor may treat that outcome as proven infeasible only when the artistic audit record confirms all of the following:
+
+- geometric, candidate, and selection exclusion;
+- isolated construction succeeded and both requested and maximum-certified widths are positive;
+- active, certified, and materialized output are all zero;
+- `ViabilityFailureReason` and `FinalReason` both equal `maximum-certified-width-at-stable-width-floor`.
+
+This fixture proof does not change production recovery architecture and cannot satisfy a fixture that explicitly requires certified recovery. The distinct report label is `stable-width-floor-proven-infeasible`.
+
+
+## EW-V1A recovery-system freeze boundary
+
+The accepted `EW-V1A.2b` macro feature does not replace or loosen the R13A.9a recovery architecture. It supplies deterministic per-edge requested widths before the existing viability, corner, coexistence, recovery, and certification stages. Zero Macro Variation Coverage or Strength returns the exact uniform request path.
+
+The V1A freeze preserves these mandatory properties:
+
+- participation and width identities derive from shape seed plus canonical original source-edge identity;
+- increasing Coverage adds a stable nested participant set;
+- Strength is downward-only and cannot request more than the uniform Width reference;
+- construction-width reduction may retain a meaningful edge only through the complete bounded schedule and full certification;
+- a reduced result at the absolute stable geometry floor is excluded before corner solving;
+- certified-baseline fallback, material/corner recovery protections, topology/quality gates, and negative exclusions remain unchanged;
+- width remains constant along each edge, so no V2/V3 profile behavior is implied.
+
+Runtime acceptance: current preview passed with `31/31` selected/active/certified; both matrices passed `33/33`; recovery passed `5/5`; unresolved was `0`; negative exclusion passed `1/1`; and no cancellation or terminal failure occurred. The next architecture work belongs to EW-V2 and requires a separate plan.

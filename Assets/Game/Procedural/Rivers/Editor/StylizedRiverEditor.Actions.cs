@@ -720,12 +720,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Fixed-Metric Consumer Validation",
+                "P12 Candidate Evidence",
                 EditorStyles.boldLabel);
             EditorGUILayout.LabelField(
-                "The active runtime remains LegacyNormalizedAcross. The P9 " +
-                "report is the current end-to-end regression for all migrated " +
-                "fixed-metric consumers while activation remains deferred.",
+                "Fixed Metric is now the default test path. Rebuild the assigned " +
+                "cache after any change that alters the active mapping or resolved " +
+                "cell size. Use the " +
+                "live capture for comparable runtime evidence and the P9 report " +
+                "for the full migrated-consumer regression.",
                 EditorStyles.wordWrappedMiniLabel);
             DrawReadOnlyRow(
                 new GUIContent(
@@ -761,6 +763,48 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         : runtime.TopologyCacheDiagnosticReportPath);
             }
 
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying ||
+                       runtime == null ||
+                       river == null))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Start / Reset P12 Candidate Capture",
+                            "Starts a clean explicit steady-state work window " +
+                            "for the currently active mapping and candidate.")))
+                {
+                    runtime.ResetSteadyStateWorkAccounting();
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying ||
+                       runtime == null ||
+                       river == null ||
+                       !runtime.SteadyStateWorkAccountingActive))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Write P12 Candidate Snapshot",
+                            "Writes one read-only live report containing the " +
+                            "active descriptor, cache, initialization, CFL, " +
+                            "curvature, temporal presentation, Motion Lane, " +
+                            "memory, and explicit steady-state work window. " +
+                            "Visual acceptance remains manual.")))
+                {
+                    runtime.RunP12ActiveCandidateSnapshotReport();
+                    Repaint();
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+
+            DrawLatestFoamReportCopyButton(
+                runtime,
+                "Copy P12 Snapshot to Clipboard");
+
+            EditorGUILayout.BeginHorizontal();
             using (new EditorGUI.DisabledScope(
                        Application.isPlaying ||
                        runtime == null ||
@@ -769,8 +813,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 if (GUILayout.Button(
                         new GUIContent(
                             "Run Fixed-Metric Consumer Regression (P9)",
-                            "Runs the validated P9 endpoint report. It installs " +
-                            "the assigned cache into temporary live resources and " +
+                            "Runs the validated P9 endpoint report using the " +
+                            "currently authored active mapping. It installs the " +
+                            "assigned cache into temporary live resources and " +
                             "verifies structural-to-film grouping, represented " +
                             "area, actual GPU Film Source, visual occupancy and " +
                             "shape paths, production/debug mapping, cleanup, and " +
@@ -780,6 +825,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Repaint();
                 }
             }
+
+            DrawLatestFoamReportCopyButton(
+                runtime,
+                "Copy P9 Report");
+            EditorGUILayout.EndHorizontal();
 
             using (new EditorGUI.DisabledScope(
                        runtime == null ||
@@ -823,6 +873,23 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
         }
 
+        private static void DrawLatestFoamReportCopyButton(
+            StylizedRiverFoamRuntime runtime,
+            string buttonLabel)
+        {
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       string.IsNullOrEmpty(
+                           runtime.TopologyCacheDiagnosticReport)))
+            {
+                if (GUILayout.Button(buttonLabel))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        runtime.TopologyCacheDiagnosticReport;
+                }
+            }
+        }
+
         private void DrawFoamHistoricalDiagnostics()
         {
             StylizedRiver river = targets.Length == 1
@@ -838,10 +905,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "normal cache workflow.",
                 EditorStyles.wordWrappedMiniLabel);
 
-            using (new EditorGUI.DisabledScope(
-                       Application.isPlaying ||
-                       runtime == null ||
-                       river == null))
+            bool reportActionDisabled =
+                Application.isPlaying || runtime == null || river == null;
+
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(reportActionDisabled))
             {
                 if (GUILayout.Button(
                         new GUIContent(
@@ -853,7 +921,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     runtime.RunP8ComprehensiveValidationReport();
                     Repaint();
                 }
+            }
+            DrawLatestFoamReportCopyButton(runtime, "Copy P8 Report");
+            EditorGUILayout.EndHorizontal();
 
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(reportActionDisabled))
+            {
                 if (GUILayout.Button(
                         new GUIContent(
                             "Run P7 Source Contract Report",
@@ -864,7 +938,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     runtime.RunP7ComprehensiveValidationReport();
                     Repaint();
                 }
+            }
+            DrawLatestFoamReportCopyButton(runtime, "Copy P7 Report");
+            EditorGUILayout.EndHorizontal();
 
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(reportActionDisabled))
+            {
                 if (GUILayout.Button(
                         new GUIContent(
                             "Run P6 Routing / External-Field Report",
@@ -875,7 +955,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     runtime.RunP6ComprehensiveValidationReport();
                     Repaint();
                 }
+            }
+            DrawLatestFoamReportCopyButton(runtime, "Copy P6 Report");
+            EditorGUILayout.EndHorizontal();
 
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(reportActionDisabled))
+            {
                 if (GUILayout.Button(
                         new GUIContent(
                             "Run P5.3 Deterministic Topology Report",
@@ -886,7 +972,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     runtime.RunP53ComprehensiveValidationReport();
                     Repaint();
                 }
+            }
+            DrawLatestFoamReportCopyButton(runtime, "Copy P5.3 Report");
+            EditorGUILayout.EndHorizontal();
 
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(reportActionDisabled))
+            {
                 if (GUILayout.Button(
                         new GUIContent(
                             "Run P5.1 Two-Build Audit",
@@ -900,8 +992,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     runtime.RunTopologyCacheDeterminismDiagnosticAudit();
                     Repaint();
                 }
+            }
+            DrawLatestFoamReportCopyButton(runtime, "Copy P5.1 Report");
+            EditorGUILayout.EndHorizontal();
 
-                EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(reportActionDisabled))
+            {
                 if (GUILayout.Button(
                         new GUIContent(
                             "Capture Obstacle Baseline",
@@ -912,6 +1009,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     runtime.CaptureTopologyObstacleDiagnosticBaseline();
                     Repaint();
                 }
+            }
+            DrawLatestFoamReportCopyButton(
+                    runtime,
+                    "Copy Baseline Report");
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(reportActionDisabled))
+            {
                 if (GUILayout.Button(
                         new GUIContent(
                             "Compare Obstacles to Baseline",
@@ -923,8 +1029,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         .CompareTopologyObstaclesAgainstDiagnosticBaseline();
                     Repaint();
                 }
-                EditorGUILayout.EndHorizontal();
             }
+            DrawLatestFoamReportCopyButton(
+                    runtime,
+                    "Copy Comparison Report");
+            EditorGUILayout.EndHorizontal();
         }
 
         private void DrawFoamLayerCTestActions()

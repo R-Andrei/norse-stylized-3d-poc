@@ -1,10 +1,196 @@
 # Ground Generation and Surface Upgrade Plan
 
+
+## 2026-07-19 — GSU-M2.0: Optional Authored-Color Surface Materials
+
+**Status:** Implemented and statically audited. Unity compilation, array rebuild, visual acceptance, Memory Profiler evidence, and GPU profiling remain pending.
+
+### Objective
+
+Add an optional authored-color payload to the existing reusable `StylizedSurfaceMaterialProfile` architecture, import the supplied `Stylized_StoneGround_01` material set as a temporary Fine Gravel candidate, and keep every current palette-detail material behaviorally unchanged. The original purchased maps are editor-only authoring inputs. Runtime output remains generated 256×256 texture-array slices.
+
+### Reviewed evidence
+
+The pre-edit review covered the current material profile, Ground adapter, library, builder, profile/library editors, Ground transport, Bank/Riverbed application controls, shader properties, packed-detail decoder, albedo/smoothness/specular evaluation, current serialized Fine Gravel assets, and the five canonical Ground documents. Primary reviewed paths:
+
+```text
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceDetailLibrary.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryEditor.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialProfileEditor.cs
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader
+Assets/Game/Procedural/Ground/GroundSurfaceLayerProfile.cs
+Assets/Game/Procedural/Ground/GroundMaterialControls.cs
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+```
+
+The supplied source maps are 2048×2048 JPEGs, not 4K. They remain development inputs only:
+
+```text
+Stylized_StoneGround_01_basecolor.jpg
+Stylized_StoneGround_01_normal.jpg
+Stylized_StoneGround_01_normalogl.jpg
+Stylized_StoneGround_01_height.jpg
+Stylized_StoneGround_01_ambientocclusion.jpg
+Stylized_StoneGround_01_roughness.jpg
+Stylized_StoneGround_01_metallic.jpg
+```
+
+`normal` and `normalogl` differ primarily by green-channel inversion. GSU-M2.0 uses `normal` as the DirectX-style source and records an explicit per-entry green-flip option. Metallic is ignored because the supplied map is effectively black and stone remains nonmetallic.
+
+### Current architecture findings
+
+- `StylizedSurfaceDetailLibrary.Entry` currently owns one editor-only prepacked source and resolves one generated linear RGBA detail array by stable ID.
+- `StylizedSurfaceMaterialProfile` currently owns palette/detail/finish only.
+- Ground Bank and Riverbed each sample at most one packed-detail array and apply application-specific scale, normal, cavity, form/value, finish, and legacy-cell multipliers.
+- The current packed alpha channel is interpreted as signed form/value and signed finish variation.
+- The current shader has no authored-color array and therefore cannot preserve the purchased pack's painted stone colour, worn edges, and broad internal form.
+- Source references are already editor-only in the library schema; extending that editor-only entry recipe avoids runtime references to the purchased maps.
+
+### Approved files
+
+Implementation may modify only the following existing files:
+
+```text
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+Assets/Docs/Ground_Contact_Edge_Accent_Audit_and_Architecture.md
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceDetailLibrary.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryEditor.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialProfileEditor.cs
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader
+Assets/Game/Procedural/Ground/GroundSurfaceLayerProfile.cs
+Assets/Game/Procedural/Ground/GroundMaterialControls.cs
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+Assets/Game/Demo/Profiles/SurfaceMaterials/SSDL_DefaultSurfaceDetails.asset
+```
+
+Approved additions:
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs
+Assets/Game/Demo/Profiles/SurfaceMaterials/SSMP_FineGravel_ImportedStoneGround01.asset
+Assets/Game/Demo/Profiles/Ground/Layers/GSLP_FineGravel_ImportedStoneGround01.asset
+Assets/Game/ArtSources/Editor/SurfaceMaterials/StylizedStoneGround01/**
+```
+
+### Invariants and non-goals
+
+- Existing palette-detail profiles must serialize and render identically when the new authored-color mode is disabled.
+- No River source, River geometry, masks, UV3, hydrology, scene, prefab, layer, tag, renderer, mesh, or draw-call architecture changes.
+- The original 2048 source maps must remain under an `Editor` folder and must not be referenced by runtime profile fields.
+- Runtime material data remains 256×256 with mipmaps.
+- Imported materials add one optional authored-color sample only where that payload is enabled.
+- Metallic remains zero.
+- Canonical `SSMP_FineGravel` is not overwritten before Unity comparison and explicit acceptance.
+- Matching Bank/Riverbed sample reuse is deferred because their independent application scales and response multipliers prevent safe raw-sample reuse without a larger evaluator rewrite. Profiling will determine whether that optimization is required.
+
+### File-by-file implementation sequence
+
+1. Extend the library entry recipe and builder to generate a linear packed-detail array plus a compact sRGB authored-color array with per-entry colour-slice mapping.
+2. Extend reusable material profiles and the Ground adapter with an explicit payload mode and authored colour, tint, scene-lighting, and roughness controls.
+3. Extend Ground Bank/Riverbed application controls and transport with authored-colour and scene-lighting multipliers.
+4. Extend shader properties, sampling, palette resolution, roughness evaluation, and final lighting blend while preserving the legacy path.
+5. Add an editor-only comprehensive validation report that writes to `Library/SurfaceMaterialDiagnostics` and copies the report to the clipboard from one Inspector action.
+6. Add the editor-only source maps, library material-set recipe, imported reusable profile, and Ground adapter.
+7. Update all canonical documents, remove A5 from active guidance, and record it as rejected historical evidence.
+
+### Acceptance criteria
+
+- Existing palette-detail profiles resolve no authored-color array and retain their previous shader path.
+- The imported candidate resolves one 256² colour slice and one 256² packed-detail slice from the same stable entry ID.
+- Detail R/G derive from the supplied normal, B from height/AO contact recession, and A from roughness.
+- The imported source files are all under an `Editor` folder; the validation report finds no runtime field referencing them.
+- Bank and Riverbed expose authored-colour and scene-lighting application multipliers with neutral default `1`.
+- The imported profile remains reusable outside River code.
+- Static parsing and reference/import checks pass for every changed source file.
+- Unity compilation, library rebuild, visual comparison, Memory Profiler evidence, and GPU profiling remain explicit pending gates.
+
+### Risks
+
+- Authored base colour contains painted form shading; excessive dynamic lighting can double-light it. The profile and per-application lighting controls must default to a restrained imported value while legacy materials remain at full lighting.
+- Source normal convention may be inverted. The entry recipe stores an explicit green-channel flip, and Unity visual validation remains authoritative.
+- JPEG source compression can introduce small data errors. The supplied pack is accepted as the source; the builder normalizes and downsamples once at editor time.
+- A second sample increases texture bandwidth only for authored-colour materials. The quality trade is intentional and must be profiled in the production camera.
+
+### Post-implementation consistency and compliance audit
+
+**Result:** The final source/asset diff matches the approved GSU-M2.0 scope. No River implementation, River geometry, hydrology, scene, prefab, material, layer, tag, renderer, mesh, or unrelated subsystem file is included. The shared shader impact is limited to the Ground shader and its Ground-specific includes.
+
+Implemented existing-file modifications:
+
+```text
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+Assets/Docs/Ground_Contact_Edge_Accent_Audit_and_Architecture.md
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceDetailLibrary.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryEditor.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialProfileEditor.cs
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader
+Assets/Game/Procedural/Ground/GroundSurfaceLayerProfile.cs
+Assets/Game/Procedural/Ground/GroundMaterialControls.cs
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+Assets/Game/Demo/Profiles/SurfaceMaterials/SSDL_DefaultSurfaceDetails.asset
+```
+
+Implemented additions:
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs (+ meta)
+Assets/Game/Demo/Profiles/SurfaceMaterials/SSMP_FineGravel_ImportedStoneGround01.asset (+ meta)
+Assets/Game/Demo/Profiles/Ground/Layers/GSLP_FineGravel_ImportedStoneGround01.asset (+ meta)
+Assets/Game/ArtSources.meta
+Assets/Game/ArtSources/Editor.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials/StylizedStoneGround01.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials/StylizedStoneGround01/* (seven 2048² source JPEGs plus metas)
+```
+
+Static verification completed:
+
+- Tree-sitter C# parsing reports no syntax-error or missing nodes in all ten changed/new C# files.
+- Method-declaration/invocation arity matches for the changed Bank, Riverbed, and material-property transport functions.
+- Shader/HLSL braces, parentheses, brackets, and preprocessor blocks balance in all four changed shader files.
+- All six authored-colour shader property names match across `GeneratedGround`, ShaderLab properties/resources, the Ground material CBUFFER, and the Ground forward evaluator.
+- New ScriptableObject YAML script GUIDs match their current `.cs.meta` files; the imported layer resolves the imported material GUID; the material resolves the existing detail-library GUID; and every source-map GUID resolves to the supplied editor-only map.
+- All seven supplied maps are 2048×2048. Base colour is authored as sRGB; normal, height, AO, roughness, and metallic are linear; metallic is retained only as editor source evidence and is not consumed.
+- The palette-detail path is neutral by construction: authored enable/strength defaults to zero, authored payload decode remains zero, the prior palette/cavity result is selected, the prior smoothness equation is selected, and the final authored-lighting blend has zero coverage.
+- The imported material adds one 256² RGBA32 colour slice and one 256² RGBA32 packed slice with full mip chains after the Unity rebuild. The uncompressed upper-bound estimate is approximately 0.667 MiB for those two slices. Compression is not claimed or applied by this patch.
+- A compile-risk correction discovered during audit replaced an invalid `List<int> ?? int[]` null-coalescing expression with an explicit `IReadOnlyList<int>` return path. The validation report also now requires `/Editor/` placement only for authored material-set sources, not legacy prepacked sources.
+
+Unavailable checks are explicitly pending:
+
+- No Unity executable is available in the reconstruction environment, so C# assembly compilation, ShaderLab/HLSL compilation, array sub-asset generation, and URP runtime rendering were not run.
+- Git metadata is absent, so branch, `HEAD`, working-tree status, and commit-history comparison could not be verified. The supplied A5 file baseline was used for the scoped existing-file comparison instead.
+- Production-camera visual acceptance, normal green-channel convention, wetness/submersion behavior, actual player-build exclusion, Memory Profiler evidence, and Ground-pass GPU timing remain Unity gates.
+
+
 ## Current authoritative status — 2026-07-18
 
 The GeneratedGround Inspector and Painted Accent production workstream is complete, Unity-validated, and accepted through GI-A1–GI-A4 and PA-B1–PA-B4.1. **GeneratedGround and the broader Ground visual roadmap are not complete.**
 
-The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. **V3M — Broad Macro Patch Completion**, **V3R — Ground Elevation Readability**, and the complete **V3S-A4B.3 River-coupled appearance baseline** are Unity-validated and accepted. A2C.4 remains the frozen renderer-isolation baseline and A4B.3 remains the frozen River-coupled placement, hydrology, and highlight baseline. **GSU-M1 — Reusable Stylized Surface Material Foundation** is implemented and source-audited. GSU-M1.3.1 guards the transient missing-array state, GSU-M1.7 adds reusable shared-material editing and neutral Bank/Riverbed application multipliers, and GSU-M1.7.1 corrects the Unity 6.5 `EntityId` compile blocker. Unity evidence rejects the GSU-M1.6 and GSU-M1.7 Fine Gravel payloads: GSU-M1.6 remained a soft cellular/cobblestone field, while GSU-M1.7's 512² source remained blocky, insufficiently varied, and unnecessarily expensive as the standard isometric runtime tier. **GSU-M1.8 — Rounded-Pebble Source Reauthor and 256 Runtime Restoration** is implemented and source-audited. It replaces polygonal/cell-like packing with independently authored rounded pebble forms, restores the standard runtime array to 256², preserves the one-packed-sample generic contract, and leaves all River, shader, renderer, geometry, hydrology, and Inspector code unchanged. Unity compilation, 256² array rebuild, production-camera visual acceptance, and GPU profiling remain pending. Reusable material identity belongs to a generic Pixel Surface profile and detail library, while Ground, River corridors, future roads, and future walls are consumers. Family-recipe tuning remains blocked until Fine Gravel and the required existing surface materials are accepted. **V4 — Contact / Edge Accents** remains queued afterward and excludes River sources.
+The active mission is to finish the restrained-stylized static Ground stack before runtime surface simulation. **V3M — Broad Macro Patch Completion**, **V3R — Ground Elevation Readability**, and the complete **V3S-A4B.3 River-coupled appearance baseline** are Unity-validated and accepted. A2C.4 remains the frozen renderer-isolation baseline and A4B.3 remains the frozen River-coupled placement, hydrology, and highlight baseline. **GSU-M1 — Reusable Stylized Surface Material Foundation** is implemented and source-audited. GSU-M1.3.1 guards the transient missing-array state, GSU-M1.7 adds reusable shared-material editing and neutral Bank/Riverbed application multipliers, and GSU-M1.7.1 corrects the Unity 6.5 `EntityId` compile blocker. Unity evidence rejects the GSU-M1.6 and GSU-M1.7 Fine Gravel payloads. GSU-M1.8 restored the 256² runtime tier and improved rounded packing, but user evidence now rejects its texture as too edge-driven and too shallow: the packed map concentrates slope near stone rims, leaves broad interiors comparatively flat, and bakes inconsistent per-stone directional value that competes with scene lighting. **GSU-M1.9A — Fine Gravel Height-First Texture Reauthor** is visually rejected by Unity evidence: its generated stone bodies remain too flat, noisy, and materially unconvincing. **GSU-M1.9A.1 — Fine Gravel Packed-Source A/B Evaluation** is visually rejected: both image-generated candidates exposed non-periodic edge neighbourhoods and invalid/incoherent packed slope behaviour in Unity. **GSU-M1.9A.3 — Source-Preserved Integrable Stone Form** is visually rejected: Unity exposed tile-axis large/small segregation and insufficient stone-edge definition. **GSU-M1.9A.5 — Source-Art Packed Conversion, Macro Rebalance, and Worn Edge Accent** is visually rejected historical evidence: its packed-only conversion discarded the authored colour and form that made the source attractive. **GSU-M2.0 — Optional Authored-Color Surface Materials** is now the active material gate. It adds one optional sRGB colour-array sample beside the existing packed-detail sample, imports `Stylized_StoneGround_01` as a temporary reusable Fine Gravel candidate, and keeps all source maps editor-only while runtime slices remain 256². Reusable material identity belongs to a generic Pixel Surface profile and detail library, while Ground, River corridors, future roads, and future walls are consumers. Family-recipe tuning remains blocked until Fine Gravel and the required existing surface materials are accepted. **V4 — Contact / Edge Accents** remains queued afterward and excludes River sources.
 
 The accepted current pipeline is:
 
@@ -50,18 +236,43 @@ Ground or scene no longer needs its bake
 
 ## Next work items
 
-1. Unity-validate GSU-M1.8; confirm the project compiles after GSU-M1.7.1, the River remains visible, the detail array rebuilds at 256², and no null texture exception recurs.
-2. Validate Fine Gravel from the production camera and close range as Bank, Riverbed, and matching Bank/Riverbed in dry and wet states. The hidden asset Preview pane and offline render are supporting evidence only.
-3. Validate the existing GSU-M1.7 inline shared-material controls and neutral per-application Bank/Riverbed multipliers from the actual River/GeneratedGround authoring context.
-4. Profile no-detail, Fine Gravel, and detailed Bank/Riverbed overlap views; confirm unchanged draw count/GC and record Ground-pass GPU timing.
-5. Expand materials sequentially at the standard 256 runtime tier without material-name shader branches; each later material should require content/profile data rather than shader edits.
-6. Begin family-level tuning and then V4 Contact / Edge Accents only after reusable-material acceptance gates close.
+1. Let Unity import the editor-only `StylizedStoneGround01` source maps and rebuild `SSDL_DefaultSurfaceDetails`; confirm four packed-detail slices and one authored-colour slice at 256².
+2. Select `Fine Gravel — Imported Stone Ground 01` for Bank and/or Riverbed and run **Run Surface Material Validation** once; paste the complete saved report if it fails.
+3. Compare the imported candidate against canonical Fine Gravel from the same close and production cameras in dry, wet, and submerged states; verify normal orientation and adjust only the explicit green-flip setting if lighting is inverted.
+4. Profile the Ground pass with canonical Fine Gravel and the imported authored-colour candidate; record draw count, GC, texture memory, and GPU timing.
+5. After visual/performance acceptance, promote the imported material to canonical Fine Gravel, delete rejected A1–A5 temporary assets, and archive the 2048 source pack outside active project content if repository size becomes undesirable.
+
+## GSU-M1.9A.1 — Fine Gravel Packed-Source A/B Evaluation — visually rejected; historical
+
+**Status:** Rejected by Unity evidence; no longer actionable.
+
+This temporary test installed `Fine Gravel A - Direct Normal` and `Fine Gravel B - Strong Form`, both produced from image-generated normal-style candidates. Neither candidate had genuinely periodic edge neighbourhoods, and their RGB fields did not constitute coherent packed slope data. Unity exposed visible repeat bands, malformed relief, flattening, and generally inadequate stone form. Do not validate, tune, or promote either A1 payload. GSU-M1.9A.3 overwrites those temporary payloads while retaining their serialized GUID/stable-ID plumbing only for safe migration.
+---
+
+## GSU-M1.9A.3 — Source-Preserved Integrable Stone Form — visually rejected; historical
+
+**Status:** Superseded by GSU-M1.9A.4 after Unity exposed macro size segregation and insufficient contour definition.
+
+GSU-M1.9A.1 is visually rejected. Its image-generated candidates were neither genuinely seamless nor valid coherent packed slope fields. GSU-M1.9A.2 remained an offline deterministic investigation only and proved periodic conversion, but its distance-cap reconstruction concentrated useful slope near stone rims and left large interiors too uniform. GSU-M1.9A.3 replaced the two temporary A/B texel payloads while deliberately retaining their existing GUIDs, library stable IDs, importer settings, and Ground-layer references so an installed A1 evaluation is upgraded without orphaning serialized selections. The legacy temporary filenames and stable IDs are cleanup debt only; they must be deleted when a winner replaces canonical `fine-gravel`.
+
+The two historical A3 candidates were rebuilt deterministically from the user-supplied rounded-stone source rather than generated as final textures:
+
+- **`Fine Gravel A3 - Source Preserved`** keeps restrained relief while preserving source-derived silhouettes, size distribution, neutralized internal stone-body cues, localized crowns, irregular shoulders, and hierarchical crevices.
+- **`Fine Gravel A3 - Vertical Form`** uses the identical periodic stone layout, B cavity, and A variation, but increases coherent body slope and localized crown amplitude. It was the leading A3 candidate for stronger roundness and verticality before Unity rejected the shared layout and contour treatment.
+
+The non-periodic source boundaries are moved to the centre one axis at a time; only stones intersecting each centre repair band are removed and repacked from extracted source silhouettes on a toroidal 1024² authoring canvas. This preserves most of the supplied layout while making opposite edge neighbourhoods continuous. Each stone uses a continuous side profile plus one or two localized crowns, source-body variation with its directional plane removed, and restrained microstructure. Broad whole-stone white plateaus are prohibited. The final 256² R/G channels are derived from one periodic height field, so the slopes are internally coherent and integrable; B contains a soft contact shoulder and narrower deep gap core; A contains non-directional per-stone and internal form variation.
+
+Offline validation includes 3×3 shader-reference tiling, 256/128/64/32 mip tests, numerical wrap-to-adjacent ratios, per-stone height-distribution evidence, and a CPU reference that reproduces the current packed-detail decode, palette, cavity bands, flat-ground normal perturbation, and material values. The reference uses a simplified ambient/diffuse lighting term and is not claimed to reproduce the complete URP pass. Unity production-camera rendering remains authoritative.
+
+Runtime architecture and cost do not change: three temporary 256² RGBA32 mipmapped slices remain during evaluation, only the selected substrate slice is sampled, and there is no new shader sample, ALU branch, draw call, renderer, mesh data, River data, or runtime CPU process. No C#, HLSL, ShaderLab, River source, scene, prefab, canonical Fine Gravel assignment, or unrelated material changes in this patch.
+
+**Unity gate:** rebuild `SSDL_DefaultSurfaceDetails`, historically required comparison of the two A3 choices with identical shared/application values from the same close and production cameras, include dry and wet views, and judge body roundness, internal variation, coherent common light direction, cavity width, repetition, seam visibility, and mip survival. Select a winner or reject both; do not tune the shader to hide a deficient packed source.
 
 ---
 
 ## GSU-M1 — Reusable Stylized Surface Material Foundation
 
-**Status:** Implemented and source-audited through GSU-M1.8. GSU-M1.3.1 adds null-safe transport, GSU-M1.7 adds generic shared/application authoring, and GSU-M1.7.1 repairs the Unity 6.5 `EntityId` compile blocker. GSU-M1.8 supersedes the rejected 512 Fine Gravel payload with a rounded-pebble 256 runtime source while preserving the one-sample evaluator and frozen River contract. Unity compilation, production-camera visual acceptance, and GPU profiling remain pending user validation.
+**Status:** Implemented and source-audited through the rejected GSU-M1.9A.5 packed-only experiments. GSU-M1.3.1 adds null-safe transport, GSU-M1.7 adds generic shared/application authoring, and GSU-M1.7.1 repairs the Unity 6.5 `EntityId` compile blocker. GSU-M1.8 retains authority for the 256 runtime-tier restoration only. GSU-M2.0 now owns the active imported Fine Gravel evaluation path by adding optional authored colour beside the existing packed detail while preserving the frozen River contract. Unity array rebuild, production-camera visual acceptance, and GPU profiling remain pending user validation.
 
 ### Objective
 
@@ -137,9 +348,9 @@ The library array is linear, repeat-wrapped, mipmapped, and 256×256 per slice f
 
 ## GSU-M1.7 — Fine Gravel High-Definition Material and River Authoring Pass
 
-**Status:** Inspector/transport architecture retained; the GSU-M1.7 512² Fine Gravel payload is visually rejected and superseded by GSU-M1.8. GSU-M1.7.1 corrects the editor-only `EntityId` compile blocker. The shared-material and per-application authoring controls remain current; Fine Gravel remains explicitly unfrozen pending GSU-M1.8 Unity validation.
+**Status:** Inspector/transport architecture retained; the GSU-M1.7 512² Fine Gravel payload is visually rejected, GSU-M1.8 retains only the 256 runtime-tier correction, and GSU-M1.9A.3 owns the current temporary Fine Gravel A/B payload. GSU-M1.7.1 corrects the editor-only `EntityId` compile blocker. The shared-material and per-application authoring controls remain current; Fine Gravel remains explicitly unfrozen pending GSU-M1.9A.3 Unity validation.
 
-> **Superseded payload record:** the 512-specific content, performance, and validation text in this M1.7 section is retained only as historical implementation evidence. Do not execute its 512 array gate. The current actionable payload and validation contract is GSU-M1.8 at 256²; only the shared/application authoring and cavity-evaluator changes from M1.7 remain current.
+> **Superseded payload record:** the 512-specific content, performance, and validation text in this M1.7 section is retained only as historical implementation evidence. Do not execute its 512 array gate. The current actionable payload and validation contract is GSU-M1.9A.3 at the 256² tier restored by M1.8; only the shared/application authoring and cavity-evaluator changes from M1.7 remain current.
 
 ### Objective and acceptance criteria
 
@@ -247,7 +458,7 @@ No ShaderLab property, CBUFFER declaration, River source, River geometry, UV3 va
 - Texture/import/library validation passes: 512² RGBA, linear, readable, Repeat, mipmapped, 512 importer limits, stable `fine-gravel` entry, stable asset references, and zero duplicate GUIDs across 321 metadata files. Periodic boundary deltas are at most 1.22 times ordinary adjacent-pixel deltas.
 - `GeneratedGroundEditor.cs` retains CRLF line endings. No scene, prefab, material, River source, debug enum, unrelated `GSLP_*`, or unrelated surface-material asset changed.
 
-**Historical gate retired:** do not rebuild or validate the default array at 512². GSU-M1.8 owns the current 256² array, visual, and profiling gate. Retain only the M1.7 shared/application-control validation.
+**Historical gate retired:** do not rebuild or validate the default array at 512². GSU-M1.8 owns only the 256² tier restoration; GSU-M1.9A.3 owns the current temporary Fine Gravel visual and profiling gate. Retain only the M1.7 shared/application-control validation.
 
 
 ## GSU-M1.7.1 — EntityId Foldout-Key Compile Repair
@@ -301,9 +512,80 @@ No runtime Ground file, shader, River source, serialized asset, texture, scene, 
 
 **Pending Unity gate:** recompile in Unity 6000.5.0f1 and confirm the `CS0619` error is gone before continuing visual validation.
 
+
+## GSU-M1.9A — Fine Gravel Height-First Texture Reauthor — visually rejected; historical
+
+**Status:** Implemented and source-audited on 2026-07-18. Unity array rebuild, production-camera acceptance, and profiling remain pending. Fine Gravel remains unfrozen.
+
+### Objective
+
+Replace the GSU-M1.8 Fine Gravel packed texture without changing the generic material schema or evaluator. The replacement must create convincing pseudo-volume from a continuous raised-stone height field rather than from rim-only slope rings. Fine Gravel remains a dense rounded-pebble material at the standard 256² runtime tier; it is not converted into the larger `Rounded River Rock` material.
+
+### Reviewed evidence
+
+- User Unity evidence shows GSU-M1.8 stones as separated but comparatively flat discs. The perceived depth comes primarily from dark gaps, while broad stone interiors carry little turning form.
+- `T_SurfaceDetail_FineGravel.png` shows RG slope concentrated around boundaries and mostly neutral stone centres. This matches the observed rim-embossed result.
+- `generate_fine_gravel_m18_final.py` built each stone from a high constant shoulder term (`0.68 + 0.28 * rounded`) and added random directional tone/face terms into A. The broad constant shoulder explains the flat interiors; the random directional A contribution explains highlights that do not consistently follow scene lighting.
+- `PixelSurfaceMaterialDetail.hlsl::PS3D_DecodeStylizedSurfaceDetail` already interprets RG as signed slope, B as cavity shoulder/core, and A as palette/finish variation. The texture can therefore correct height and lighting coherence without a shader or profile change.
+
+### Approved affected files
+
+**Canonical documentation — modify**
+
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+- `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+- `Assets/Docs/Ground_Contact_Edge_Accent_Audit_and_Architecture.md`
+
+**Fine Gravel payload — modify**
+
+- `Assets/Game/Demo/Profiles/SurfaceMaterials/Textures/T_SurfaceDetail_FineGravel.png`
+
+No code, shader, profile, library, importer, River source, scene, prefab, material, or other surface asset is in scope.
+
+### Height-first construction contract
+
+1. Build a seamless 1024² authoring height field from independently placed rounded ellipsoidal/superelliptic caps, then downsample height to the final 256² runtime field.
+2. Use three deterministic size populations and restrained silhouette wobble; avoid polygonal cells, acute protrusions, uniform equal-width borders, and excessive tiny bubble fillers.
+3. Give every stone a continuous raised body: full centre height, meaningful centre-to-edge falloff, rounded shoulder, and recessed surrounding gap. Do not begin from a near-constant interior plateau.
+4. Derive RG signed slope from the final 256² height field after downsampling. The normal signal must cross broad stone interiors and preserve a common scene-light response; random baked highlight directions are prohibited.
+5. Encode B as a soft contact shoulder plus a narrower deep gap core with variable width. Interior centres must remain below the current cavity bias.
+6. Encode A as non-directional per-stone value identity with restrained height-correlated variation only. It must not encode a random light direction or competing per-stone highlight.
+7. Preserve the existing 256² RGBA, linear, readable, Repeat, mipmapped, bilinear importer contract, source GUID, library stable ID, and one-sample runtime path.
+
+### Implemented result
+
+- Reused the accepted dense 682-stone multi-scale packing from GSU-M1.8—30 large anchors, 132 medium stones, and 520 small infill stones—so this correction isolates height/form rather than reopening placement and scale distribution.
+- Replaced the near-constant shoulder profile with continuous sphere/broad-cap height. Each stone now rises from its contact edge through a full rounded body; height is authored at 1024² and downsampled before slope derivation.
+- Derived RG from the final 256² height field and increased body-to-rim slope balance. Interior/rim mean encoded slope ratio rises from approximately `0.272` in GSU-M1.8 to `0.318` while retaining strong edge turn.
+- Retained B cavity shoulder/core semantics and similar total coverage. New mask coverage is approximately `82.4%`; cavity mean remains approximately `0.205`, close to the prior `0.211`.
+- Removed random directional face/tilt terms from A. Global A correlation with encoded X/Y slope falls from approximately `-0.036/+0.023` to approximately `-0.006/+0.003`, supporting scene-light ownership of the common bright side.
+- Preserved 256² RGBA, source GUID, importer, library, profile, stable entry ID, sample count, and all runtime/editor code.
+
+### Post-implementation source audit
+
+- Final diff against the reconstructed GSU-M1.8 baseline contains exactly the five canonical documents plus `T_SurfaceDetail_FineGravel.png`.
+- No C#, HLSL, ShaderLab, profile, library, importer, River source, scene, prefab, other surface asset, or metadata file differs.
+- PNG validation passes: 256×256 RGBA, valid byte ranges, periodic first/last-edge deltas below ordinary adjacent-pixel deltas on both axes, and unchanged importer/GUID contract.
+- Texture-only runtime cost is unchanged. Unity compilation is not required by the changed files, but Unity import/array rebuild and scene visual validation remain mandatory.
+
+### Acceptance criteria
+
+- Packed-map inspection shows meaningful RG gradients across stone bodies, not only rainbow rings at the perimeter.
+- Height-only preview shows raised rounded pebbles with clear mass and recessed gaps before material response is applied.
+- A-channel inspection contains no random directional highlight lobe.
+- Downsampled 128² evidence retains large/medium/small separation and stone body without collapsing into dark outlines.
+- Unity production-camera evidence shows a coherent common light-facing side, stronger rounded volume, no sharp protruding aggregate, and no regression to cellular/cobblestone packing.
+- Fine Gravel remains unfrozen until explicit user acceptance. Material-response changes, if still required, must be a separately planned GSU-M1.9B update after the texture is accepted.
+
+### Performance
+
+Runtime sample count, shader ALU, draw calls, renderer count, mesh data, and CPU work are unchanged because only packed texel values change. The shipped source remains 256², so array memory remains approximately 0.333 MiB per uncompressed RGBA32 slice including mips. The 1024² construction field is an offline authoring intermediate and is not packaged.
+
 ## GSU-M1.8 — Rounded-Pebble Source Reauthor and 256 Runtime Restoration
 
-**Status:** Implemented and source-audited on 2026-07-18. Unity compilation, generated-array rebuild, gameplay visual acceptance, and GPU profiling remain pending. Fine Gravel remains unfrozen.
+**Status:** Implemented and source-audited on 2026-07-18, then visually rejected by user evidence. Its 256² runtime-tier correction remains accepted, but its packed texture is superseded by GSU-M1.9A because it reads as shallow rim embossing rather than raised rounded pebbles.
 
 ### Objective and acceptance criteria
 
@@ -6157,3 +6439,84 @@ Validation procedure:
 9. Confirm the log reports `surfaceMode=EnvironmentIntegratedFlatInk`, all five response constants, `receiveShadows=True`, and `shadowCasting=Off`.
 
 Acceptance requires terrain-integrated illumination and shadow response without returning to physically shaded ridge faces, highlights, material gloss, glow, or emission.
+
+## GSU-M1.9A.4 — Balanced Toroidal Mix and Hard Rock Contour
+
+**Status:** Visually superseded by GSU-M1.9A.5 after Unity exposed persistent macro cross bias, excessive micro-fillers, and insufficient authored worn-edge definition.
+
+GSU-M1.9A.3 is visually rejected. Its source-preserved reconstruction improved interior verticality, but Unity evidence exposed two remaining packed-source defects: the repaired source layout segregated large and small stones into repeatable macro regions that formed visible cross/square patterns when tiled, and the stone-to-gap transition remained too gradual, causing individual forms to read as soft dirt mounds rather than hard rocks. A4 replaces only the two temporary A/B packed payloads while retaining their GUIDs, stable IDs, importer settings, Ground adapters, and serialized selections. The temporary legacy filenames remain cleanup debt until one candidate replaces canonical `fine-gravel`.
+
+A4 starts from the coherent periodic A3 vertical height/form data and applies only deterministic, periodic operations. Two independently phase-warped copies of the same source layout are combined without alpha-blended ghosting: the second copy contributes only substantial stone bodies inside genuinely low regions of the first. This breaks the previous tile-axis size bands and interleaves large, medium, and small forms more chaotically while preserving a single coherent height field. Both active candidates use exactly the same redistributed layout, coverage, cavity topology, and non-directional form variation:
+
+- **`Fine Gravel A4 - Balanced Mix`** uses a moderately compressed contact wall and restrained slope amplitude.
+- **`Fine Gravel A4 - Hard Rock Contour`** uses a narrower contact wall, stronger edge-normal energy, stronger stone-side cavity shoulder, and stronger neutral edge/body separation. It is the leading candidate for the requested hard-rock delimitation, but no winner is declared before Unity evidence.
+
+The mixed layout covers approximately `58.6%` of the tile. High regions remain localized rather than broad plateaus: Balanced Mix places about `2.43%` of stone pixels above `0.90` height and `9.31%` above `0.75`; Hard Rock Contour places about `2.75%` above `0.90` and `11.38%` above `0.75`. Mean edge-gradient energy is approximately `1.94×` the inner-body gradient for Balanced Mix and `2.37×` for Hard Rock Contour. The final R/G slopes are re-derived from each periodic height field; B remains a hierarchical deep-gap core plus narrow stone-side contact shoulder; A remains lighting-neutral.
+
+Runtime architecture and cost do not change: three temporary 256² RGBA32 mipmapped slices remain during evaluation, only the selected substrate slice is sampled, and there is no new shader sample, ALU branch, draw call, renderer, mesh data, River data, or runtime CPU process. No C#, HLSL, ShaderLab, River source, scene, prefab, canonical Fine Gravel assignment, or unrelated material changes in this patch.
+
+**Unity gate:** rebuild `SSDL_DefaultSurfaceDetails`, compare the two A4 choices with identical shared/application values from the same close and production cameras, include dry and wet views, and judge local size mixing, absence of the prior cross/square macro pattern, hard contour readability, internal form, cavity width, repetition, seam visibility, and mip survival. Select a winner or reject both; do not tune the shader to conceal a deficient packed source.
+
+
+## GSU-M1.9A.5 — Source-Art Packed Conversion, Macro Rebalance, and Worn Edge Accent
+
+**Status:** Implemented and source-audited; Unity comparison pending.
+
+### Objective
+
+Replace the visually rejected A4 temporary Fine Gravel payloads with two controlled 256² candidates derived from the user-approved worn-rock source image. Preserve the reusable one-sample packed-detail architecture while correcting the three Unity-observed defects: repeated cross/square macro size segregation, excessive tiny-stone noise at gameplay distance, and insufficient hard-rock edge definition.
+
+### Reviewed evidence
+
+- Unity A4 repeat evidence shows a stable cross-like macro region where small stones concentrate through the tile centre while larger stones dominate surrounding regions.
+- Unity close and production-camera evidence shows improved internal verticality but weak stone delimitation; rocks read as soft mounds because the packed source lacks an explicit bright worn-rim signal.
+- The approved source image contains a better large/medium/small hierarchy, fewer micro-fillers, dark crevices, hard contours, and visible worn edge highlights. It is a beauty source only and must not be sampled directly as packed material data.
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl` already maps positive A-channel variation toward the material light colour and maps B to contact/deep-cavity bands; therefore A can carry a lighting-neutral worn-rim accent without adding a shader sample or material-name branch.
+
+### Approved files
+
+- the five canonical Ground documents;
+- `Assets/Game/Demo/Profiles/SurfaceMaterials/SSDL_DefaultSurfaceDetails.asset`;
+- the two existing temporary `SSMP_FineGravel_AB_*` assets;
+- the two existing temporary `GSLP_FineGravel_AB_*` assets;
+- the two existing temporary packed PNG payloads.
+
+Importer metadata, GUIDs, stable IDs, C#, HLSL, ShaderLab, River source, scenes, prefabs, canonical `fine-gravel`, and unrelated materials are outside scope.
+
+### Implementation sequence
+
+1. Treat the approved image as authoring source only. Extract stone silhouettes, neutralized surface character, crevice structure, and worn-edge cues.
+2. Repack extracted source stones on a 1024² toroidal authoring canvas with local size-class balancing. Medium stones dominate; large stones remain distributed; the smallest filler class is capped and used only where necessary.
+3. Construct coherent per-stone height with localized crowns, irregular internal form, and compressed contact walls. Derive final R/G slopes only after area-downsampling to 256².
+4. Derive B as hierarchical contact shoulder plus deep crevice core. Derive A as neutral body variation plus an explicit narrow positive worn-rim band; no directional sunlight or cast shadow is baked.
+5. Produce two candidates from the identical periodic layout: a restrained worn-edge candidate and a stronger worn-edge/contour candidate. Retain the temporary A/B GUID and stable-ID plumbing for safe serialized migration.
+6. Validate 3×3 repeat, 256/128/64/32 mip survival, edge-neighbourhood continuity, size-density balance, small-stone share, packed-channel ranges, and a CPU reference matching current packed-detail decode. Package only after those checks pass.
+
+### Invariants and non-goals
+
+- Runtime remains one packed sample per active detailed substrate.
+- Runtime resolution remains 256² RGBA32 with the existing mip/import contract.
+- No geometry, parallax, displacement, extra draw call, renderer, runtime CPU process, or River contract change.
+- The explicit rim is an authored material-form cue in A, not a world-light direction and not a replacement for URP lighting.
+- A5 is rejected historical evidence. GSU-M2.0 is the active material gate; canonical Fine Gravel remains unfrozen until the imported authored-colour candidate passes Unity comparison and explicit user acceptance.
+
+### Acceptance criteria
+
+- No visible cross, square, quadrant, or axis-aligned size-density pattern in 3×3 repeats or Unity gameplay views.
+- Medium stones dominate and tiny filler stones no longer create distant visual noise.
+- Individual stones show a clearly delimited hard contour and restrained bright worn rim.
+- Internal stone form and verticality remain at least as strong as the accepted part of A4.
+- No broad seam band at full resolution or lower mips.
+- No runtime architecture or cost regression.
+
+### Implementation result
+
+Historical A5 replaced the two temporary A4 texel payloads in place and retained their existing GUIDs, stable IDs, importer settings, Ground adapters, and serialized selections. Its choices, **`Fine Gravel A5 - Worn Edge`** and **`Fine Gravel A5 - Strong Rim`**, are visually rejected because the packed-only conversion discarded the authored colour and broad form that made the source attractive. They remain cleanup debt only and are not active validation candidates. GSU-M2.0 supersedes them with **`Fine Gravel — Imported Stone Ground 01`**.
+
+The source is cropped to a low-discontinuity 1024² region, projected to a periodic luminance field, segmented into stone bodies, stripped of broad directional lighting planes per stone, and converted into coherent height, slope, cavity, neutral source character, and worn-rim data. The two candidates share one layout, height field, cavity topology, and source character; only packed slope amplitude, A-channel rim strength, and matching generic profile strengths differ.
+
+The runtime tile contains `109` recognized stones after removal of sub-runtime fragments: `31` large, `41` medium, and `37` small by count. Small stones occupy about `0.94%` of runtime texels, medium stones about `9.78%`, and large stones about `51.10%`; total stone coverage is about `61.82%`. The smallest class therefore remains available as sparse filler without recreating the distant micro-pebble carpet. R/G are derived after final 256² downsampling, B remains the hierarchical crevice/contact signal, and A contains neutralized source texture plus a narrow positive worn-rim cue.
+
+Static 256/128/64/32 packed and shader-reference tests report a worst wrap-to-ordinary-adjacency ratio of approximately `1.29`; no exact Unity seam, mip, lighting, dry/wet, or production-camera acceptance is claimed until the project test. Runtime architecture and nominal cost remain unchanged: three temporary 256² slices during evaluation, one packed sample for the selected substrate, no new shader branch, draw call, geometry, renderer, or runtime CPU process.
+
+**Unity gate:** rebuild `SSDL_DefaultSurfaceDetails`, compare **Worn Edge** and **Strong Rim** with identical shared/application values from the same close and production cameras, include dry and wet views, and judge macro repetition, distant noise, worn-rim readability, internal form, cavity width, and mip stability. Promote neither candidate until explicit visual acceptance.
