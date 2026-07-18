@@ -1522,3 +1522,89 @@ The lifecycle and bounded audit records now include schedule completion/resoluti
 Suite semantics now report positive fixture resolution as certified, proven infeasible, or unresolved. The suite adds `8889 / maximum / edge 40` as an editor-only negative exclusion fixture and advances all R13 contracts to R13A.7. No production seed/source-edge policy is introduced.
 
 No changes are made to `MassGenerator.cs`, `GeneratedMass.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.MeshOutput.cs`, shared procedural mesh types, serialized assets, materials, or shaders.
+
+## EW-B4.2R13A.8 micro-topology normalization inventory
+
+### `MassGenerator.EdgeWear.Graph.cs`
+
+`NormalizeEdgeWearMicroTopology` owns explicit-evaluation normalization. It builds the original graph, finds style-seed and global-footprint-bounded micro components, evaluates deterministic existing-vertex collapses, rebuilds a temporary convex base hull through `TryBuildBoundedConvexHullPlanes` and `TryOrderBoundedHullFacet`, and accepts only closed contained candidates that preserve every non-component source edge. Helper methods own component discovery, diameter measurement, retained-point hull emission, original-ID remapping, normalized graph-index provenance, and complete per-candidate blocker evidence.
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+`EdgeWearMicroTopologyNormalizationResult` stores thresholds, source/normalized counts, volumes, elapsed time, stable key/index provenance, generated transition keys, suppressed original edges, and bounded component/canonical-attempt records. `EdgeWearEdgeLifecycleRecord` separates internal normalized graph ID from `OriginalSourceEdgeIndex` and records suppressed/generated-transition states. `EdgeWearCollateralBaselineRecord` retains stable original identity for evidence while preserving internal graph identity for solver comparison. `EdgeWearCoverageAudit` carries the immutable normalization result through trials.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`BuildEdgeWearBevelCandidates` consumes normalized faces, creates synthetic `micro-topology-suppressed` lifecycle records, maps surviving normalized edges back to original IDs, excludes generated transition edges structurally, and preserves deterministic strength variation through original source identity. `MapEdgeWearCoverageAuditSourceIndices` keeps internal graph IDs for solver dictionaries while leaving original IDs intact for diagnostics.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`ApplyGeneratedEdgeWearBevels` invokes normalization only after the explicit evaluation-mode gate, then uses the normalized working faces for candidate building, topology context, corner solving, baseline augmentation, bounded preview, plane preview, and source-edge debug. Debug records expose original display IDs and separate internal graph IDs; suppressed edges are appended with state `MicroTopologySuppressed`.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+Detailed telemetry adds `[Micro Topology Normalization]` with seed/component thresholds, component/candidate counts, original/normalized topology counts, suppressed IDs, generated transition count, volume loss, timing, exact per-component/per-canonical-attempt evidence, and blockers. Viability, exclusion, coexistence, collateral, and lifecycle output uses stable original IDs and reports internal graph ID separately. Public artistic audit records expose suppression and generated-transition flags with synthetic non-colliding IDs for generated transitions.
+
+### `MassGenerator.cs` and `Editor/GeneratedMassEditor.cs`
+
+The public debug record now carries both display `EdgeIndex` and internal `GraphEdgeIndex`; `MicroTopologySuppressed` receives overlay code `M`. Artistic audit records carry micro state. The editor advances R13A.8 contracts, requires certified recovery for seed-8889 edges `13/23`, and broadens the edge-40 negative gate to any definitive non-provisional exclusion while expressly rejecting micro suppression.
+
+No changes are made to `GeneratedMass.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.BoundedAllEdges.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.MeshOutput.cs`, shared procedural mesh types, serialized assets, materials, or shaders.
+
+
+## EW-B4.2R13A.9 material width-recovery inventory — rejected runtime intermediate
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+`EdgeWearEdgeViabilityRecord` adds `MaterialWidthRecoveryEligible` and `MaterialWidthRecoveryRequiredLength`. `EdgeWearEdgeLifecycleRecord` distinguishes `RecoveryBaselineDeferred` from genuine corner inactivation and carries width-recovery resolution/evidence. `ChamferCornerSolution` retains the exact external forced-deferral set used for that solve.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+The material gate is computed after isolated certification from existing artistic eligibility and `sourceLength >= requiredFootprintLength * 2`. Raw width-provisional semantics and the ordinary `0.25` requested-width-fraction gate are unchanged. `ApplyEdgeWearCoverageCornerSolution` labels an externally forced width-provisional zero as `recovery-baseline-deferred`, labels non-provisional search deferral separately, and reserves corner recovery capture for an actual recorded zeroing event.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`CollectSelectedMaterialWidthRecoveryEdges` admits only selected, artistically eligible provisional records that pass the material-length gate. The certified baseline still excludes every raw width provisional. The augmentation frontier includes the existing all-target state plus one target-wise state per recovery edge; corner participant variants are generated from the corresponding target state. Search budgets, cancellation, kernel-recursion isolation, and commit guards are unchanged.
+
+`ApplyRecoveryResolution` separates material-width and corner outcomes. Complete bounded frontier exhaustion may produce `width-recovery-proven-infeasible`; a winning shell marks a material target certified only when that target is built. Material width recovery has no allowed baseline losses.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+Viability and lifecycle reports include material-width threshold, eligibility, baseline deferral, resolution, and evidence. Canonical `planeEdges`/`edges` fields map graph evidence through lifecycle provenance, while `planeGraphEdges`/`graphEdges` retain raw internal indices. No new recurring console report is added.
+
+### `Editor/GeneratedMassEditor.cs`
+
+Suite, topology, artistic-preview, and comprehensive contracts advance to R13A.9. The two seed-2223 edge-13 fixtures accept certified material recovery or explicit `width-recovery-proven-infeasible` after complete target-aware frontier exhaustion. Seed-8889 edges `13/23` still require certification and edge `40` remains a negative exclusion fixture.
+
+No changes are made to `MassGenerator.cs`, `GeneratedMass.cs`, `MassGenerator.EdgeWear.Graph.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, mesh output/shared procedural types, serialized assets, materials, or shaders. Unity runtime evidence rejected the R13A.9 collector/frontier design because it attempted neither intended seed-2223 target and allowed an unrelated material candidate to exhaust the five-second branch budget.
+
+
+## EW-B4.2R13A.9a immutable material-recovery execution inventory
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+`EdgeWearEdgeLifecycleRecord` adds bounded material execution state: `MaterialWidthRecoveryTarget`, historical `MaterialWidthRecoveryBaselineDeferred`, `MaterialWidthRecoveryAttempted`, `MaterialWidthRecoveryTrialCompleted`, `MaterialWidthRecoveryTrialSucceeded`, `MaterialWidthRecoveryCertified`, and exact `MaterialWidthRecoveryFailure`. Existing `RecoveryBaselineDeferred` continues to describe the current trial's forced-zero state and is not reused as immutable target evidence. Trial cloning remains a value-preserving `MemberwiseClone`.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+`IsEdgeWearMaterialWidthRecoveryEligible` centralizes the seed-independent predicate over immutable isolated-construction, width-fraction, minimum-certified-width, artistic, and two-footprint evidence. `CaptureImmutableMaterialWidthRecoveryTargets` runs once after graph mapping, iterates `context.SelectedEdges`, refreshes the predicate from the canonical audit record, marks immutable target membership, and returns stable graph-edge IDs before baseline/trial lifecycle mutation.
+
+Raw width-provisional edges remain certified-baseline exclusions. `ApplyEdgeWearCoverageCornerSolution` continues to distinguish `recovery-baseline-deferred` from organic corner zeroing and search-only `augmentation-forced-deferred`.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`TryAuditCertifiedBaselineAugmentation` receives the immutable material target set explicitly. The certified baseline still forces every raw width provisional and retained-hull recovery edge off. `EvaluateMaterialWidthRecoveryTargets` then processes material targets sequentially in graph-edge order, derives exclusions from the current certified working baseline, re-enables only the current target, and invokes one existing complete-shell trial with kernel conflict recursion disabled.
+
+`IsMaterialWidthRecoveryTrialAcceptable` requires a fully valid shell, target certification, increased certified count, and preservation of every edge built by the current working baseline. Successful results become the next working baseline; failures create no child states. Cancellation or timeout terminates the material phase and suppresses later non-material recovery in that evaluation.
+
+Retained-hull and exact corner-participant targets remain in the pre-existing bounded frontier. `CollectCertifiedMaterialWidthRecoveryEdges` protects committed material targets from later branch deferral. Helper methods own baseline-deferral capture, attempted/completed/succeeded/certified state, incomplete-trial classification, exact failure propagation, final resolution, and material/non-material metadata combination.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+The evaluation summary adds one compact `materialRecovery` record with canonical `eligible`, `baselineDeferred`, `attempted`, `completed`, `certified`, and `failed` sets. Every non-certified target appears in `failed`, including `not-attempted`. Detailed viability output separates immutable target membership, historical baseline deferral, current trial deferral, attempted/completed/succeeded/certified state, failure, resolution, and evidence. Existing canonical `planeEdges` and raw `planeGraphEdges` semantics remain unchanged.
+
+### `Editor/GeneratedMassEditor.cs`
+
+Suite, topology, artistic-preview, and comprehensive labels advance to R13A.9a. Existing fixture semantics already reject zero-execution unresolved states; `width-recovery-proven-infeasible` is now reachable only through the completed target-trial finalizer. Seed-8889 edges `13/23` still require certification and edge `40` remains a definitive negative exclusion.
+
+No changes are made to `MassGenerator.cs`, `GeneratedMass.cs`, `MassGenerator.EdgeWear.Graph.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, mesh output/shared procedural types, serialized assets, materials, shaders, or the production `EdgeWearEvaluationMode.None` path.

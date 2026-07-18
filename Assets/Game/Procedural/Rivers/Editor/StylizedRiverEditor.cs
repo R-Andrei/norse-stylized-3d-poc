@@ -92,6 +92,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             ActionsDomainValidation,
             ActionsDisturbanceTests,
             ActionsFoamLayerACache,
+            ActionsFoamHistoricalDiagnostics,
             ActionsFoamLayerCTests,
             ActionsFoamLifecycleProbes,
             ActionsRuntimeClearReset

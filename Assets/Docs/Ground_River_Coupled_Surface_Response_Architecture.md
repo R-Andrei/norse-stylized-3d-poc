@@ -1,8 +1,6 @@
-# Ground River-Coupled Surface Response Architecture and Implementation Plan
+# Ground / River-Coupled Surface Response Architecture
 
-## Status — 2026-07-17
-
-**V3S-A4B.3 — Waterline Highlight Band and Inward Riverbed Wetness Transition is Unity-validated, visually accepted, and frozen as the current River-coupled Ground-response baseline. The accepted result preserves normalized Bank/Riverbed substrate composition, explicit Riverbed substrate ownership, independent Shore and Riverbed hydrology, submerged Riverbed finish suppression, a thin metre-authored Shore highlight band, and an inward Riverbed-edge wetness transition that remains inside `Ground Riverbed Support`. No further River-coupled mechanic is authorized by this freeze. Family-recipe tuning is paused until the user-requested updates to the existing Ground surfaces are separately specified, audited, planned, and accepted.**
+**V3S-A4B.3 — Waterline Highlight Band and Inward Riverbed Wetness Transition is Unity-validated, visually accepted, and frozen as the current River-coupled Ground-response baseline. GSU-M1 supplies generic reusable dry material detail to this unchanged consumer path. GSU-M1.3.1 guards transient missing-array transport, GSU-M1.7 adds Ground-owned shared/application authoring, and GSU-M1.7.1 corrects the editor-only Unity 6.5 `EntityId` compile blocker. GSU-M1.8 changes only Fine Gravel profile/library/texture data and documentation: it supersedes the rejected 512 payload with a rounded-pebble 256 runtime source. No River source, corridor geometry, role authorization, mask, UV3, hydrology, highlight, composition, renderer, or shader contract changes. Unity recompilation, 256 array rebuild, visual/performance acceptance, and sequential material expansion remain before family-recipe tuning.**
 
 This document is the canonical authority for River-coupled Ground appearance. It supersedes every earlier proposal that placed River banks or riverbeds inside the generic V4 Contact / Edge Accent field.
 
@@ -842,7 +840,7 @@ Raw Painted Accent coverage sampling and debug modes `28–29` remain unchanged.
 
 ### A3A post-change source audit — 2026-07-16
 
-**Source status:** implementation complete in the recorded ten-file scope; Unity compilation and visual validation remain pending because the supplied archive contains no Unity Editor state or `.git` metadata.
+**Historical source-audit status:** implementation was complete in the recorded ten-file scope at this checkpoint. Subsequent Unity validation accepted A3A on 2026-07-16; the former pending statement is closed.
 
 - Exact scope comparison against the preserved `/mnt/data/a3a_baseline` snapshot reports only the two canonical documents and eight approved Ground/shader files changed; no River, scene, prefab, material, style-profile, starter-layer, shared mesh-core, or unrelated file changed.
 - Tree-sitter C# parsing reports no syntax-error or missing nodes in all three changed C# files. The malformed multiline-string scan passes.
@@ -918,7 +916,7 @@ No runtime Ground code, shader, River file, scene, prefab, material, existing pr
 
 ### V3S-A3B.2 — Wet-response calibration and Hydrology Inspector consolidation
 
-**Status:** implemented and source-audited on 2026-07-16 in the exact approved six-file scope. Unity compilation and visual validation are pending.
+**Status:** Unity-validated and accepted on 2026-07-16. The exact six-file source audit remains the implementation record; its former pending-validation state is closed.
 
 #### Observed evidence
 
@@ -1302,7 +1300,7 @@ No River file, shared mesh core, scene, prefab, material, existing style asset, 
 
 ## V3S-A4A.1 — Normalized Bank/Riverbed composition and region-oriented authoring
 
-**Status:** implemented exactly from the pre-recorded plan and source/compliance audited. Unity compilation and visual validation are pending.
+**Status:** Unity-validated and accepted as part of the frozen A4B.3 River-coupled baseline. The implementation-time source/compliance audit below remains historical evidence; its former pending-validation state is closed.
 
 ### Objective
 
@@ -1441,7 +1439,7 @@ The A3B.1 delayed asset-creation workflow is mandatory. No modal dialog may open
 
 ## V3S-A4B — Exact-support Riverbed hydrology
 
-**Status:** implemented after the A4A.1 normalized-composition consistency check and source/compliance audited. Unity compilation and visual validation are pending.
+**Status:** Unity-validated and accepted as part of the frozen A4B.3 River-coupled baseline. The implementation-time source/compliance audit below remains historical evidence; its former pending-validation state is closed.
 
 ### Objective
 
@@ -1516,7 +1514,7 @@ Riverbed wetness is independent from Bank and Riverbed substrate identity. Prima
 
 ## V3S-A4B.1 — Submerged Riverbed finish decoupling
 
-**Status:** implemented exactly from the pre-recorded plan and final source/compliance audited. Unity compilation and visual validation are pending.
+**Status:** Unity-validated and accepted. Zero-default submerged smoothness/specular response remains part of the frozen A4B.3 baseline; the implementation-time source audit below is historical evidence.
 
 ### Observed Unity evidence
 
@@ -1639,7 +1637,7 @@ Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader
 
 ## V3S-A4B.2 — Stylized Shore wet-finish shaping and Riverbed/Bank wetness transition
 
-**Status:** implemented exactly from the pre-recorded plan and source/compliance audited. Unity compilation and visual validation are pending.
+**Status:** historical and superseded by A4B.3. A4B.2's camera-readable Shore highlight shaping was retained, but its broad highlight placement and outward Bank-side Riverbed-wetness transition were rejected. A4B.3 replaced them with the accepted thin waterline highlight band and inward Riverbed transition. No A4B.2 pending-validation instruction remains active.
 
 ### Observed Unity evidence
 
@@ -1838,23 +1836,15 @@ No other file is approved. `GroundSurfaceLayerProfile`, `GroundHydrologyModifier
 5. Verify `Ground Effective Wetness` includes global, Shore, and Riverbed wetness; confirm Bank controls do not move Riverbed support/wetness and Riverbed controls do not move Bank or Shore masks.
 6. Refresh material properties and regenerate Ground once; confirm persistence, unchanged raw Painted Accent coverage, no ordinary-Ground spill, and no River rebuild requirement.
 
-## V3S-A5 — Optional profile detail extension
+## GSU-M1 — Generic reusable surface-material consumption
 
-After base composition is accepted, extend `GroundSurfaceLayerProfile` with optional packed detail:
+The former River-owned optional profile-detail step has been removed. Reusable dry material identity is not owned by River-coupled Ground response. The implemented foundation is `GSU-M1 — Reusable Stylized Surface Material Foundation` in `Ground_Generation_Surface_Upgrade_Plan.md`. GSU-M1.3.1 corrects null-safe shared property transport; GSU-M1.7 supplies River-facing Ground authoring without moving ownership into River code; GSU-M1.7.1 repairs the editor-only compile blocker. GSU-M1.8 supersedes the visually rejected 512 Fine Gravel payload with a rounded-pebble 256 runtime source and changes no River contract. Unity compilation and visual/performance acceptance remain pending.
 
-```text
-Detail Texture / Texture2DArray slice
-Detail Scale
-Normal Strength
-Cavity Strength
-Finish Variation
-```
-
-Use stable world-space XZ sampling. One packed sample should provide normal XY, cavity/value response, and finish variation. Profiles without detail perform no sample. Do not hardcode Sand/Mud/Gravel/Rock shader cases, add parallax, tessellation, generated stones, extra renderers, or procedural Voronoi.
+River-coupled Ground remains a consumer through the existing Bank/Riverbed profile references, normalized composition weights, renderer-role authorization, and frozen UV3 contract. `GroundSurfaceLayerProfile` references a generic `StylizedSurfaceMaterialProfile` and retains only Ground-specific cover compatibility plus legacy appearance fallback. The generic profile and shared packed-detail library can later be consumed by roads, walls, cliffs, and other Pixel Surface renderers. Within the existing Bank and Riverbed groups, the shared definition is now editable inline and neutral application multipliers adjust scale, normal, cavity, value/form, finish, and retained legacy-cell influence for that application. Those controls are Ground-owned property inputs; they do not alter River geometry, masks, hydrology, highlight, UV3, or normalized substrate composition.
 
 ## V3S-A6 — Family tuning and production acceptance
 
-Only after A2B–A5 behavior is accepted, assign and tune shared defaults for:
+Only after GSU-M1 is Unity-accepted and the required reusable material set is expanded and accepted, assign and tune shared defaults for:
 
 ```text
 Snowfield
@@ -2032,7 +2022,7 @@ new renderers/draw calls        none
 new collider work               none
 ```
 
-V3S-A2A is authoring/storage only and changes no shader output. V3S-A2B–A4 add bounded scalar shader work and profile property transport. V3S-A2C.1 packs corridor-bank distance and validity into the River corridor's already-existing `Vector4` UV3 stream, so ordinary Ground gains no new mesh memory and no extra channel. V3S-A2C.4 adds one explicit per-renderer float in the existing property block and a bounded uniform authorization test; it adds no texture sample, keyword, variant, material, renderer, draw call, generated texture, or per-frame CPU process. Multiplication guarantees zero output but does not claim that the shader compiler skips every River arithmetic operation. V3S-A5 adds at most one optional packed detail sample for profiles that enable it.
+V3S-A2A is authoring/storage only and changes no shader output. V3S-A2B–A4 add bounded scalar shader work and profile property transport. V3S-A2C.1 packs corridor-bank distance and validity into the River corridor's already-existing `Vector4` UV3 stream, so ordinary Ground gains no new mesh memory and no extra channel. V3S-A2C.4 adds one explicit per-renderer float in the existing property block and a bounded uniform authorization test; it adds no texture sample, keyword, variant, material, renderer, draw call, generated texture, or per-frame CPU process. Multiplication guarantees zero output but does not claim that the shader compiler skips every River arithmetic operation. GSU-M1 adds one optional packed detail sample per active detailed substrate, with at most two samples only where detailed Bank and Riverbed substrates genuinely blend. The generic library and material profile own the detail; River remains a consumer.
 
 V4 adds one R8 texture sample and one bounded static texture per Ground; all source work remains Edit Mode or production-bake time.
 
@@ -2095,8 +2085,8 @@ Patch 10 — V3S-A4B
     inherited / custom / disabled modifier ownership
     no reach/fade field and no new debug view
 
-Patch 11 — V3S-A5
-    optional packed profile detail
+Patch 11 — Superseded
+    River-owned profile detail replaced by generic GSU-M1 material foundation
 
 
 Patch 12 — V3S-A6
@@ -2127,4 +2117,4 @@ Patch 15 — V4-A3
 
 # Immediate next work item
 
-Unity-validate the implemented V3S-A4B.1 package exactly through the six-step gate above. A4A.1/A4B substrate ownership, normalized composition, exact-support wetness, and Inspector grouping are accepted and must not be reopened. Do not begin V3S-A5 or water-reflection work until the submerged Ground finish is accepted.
+A4B.3 is Unity-validated, accepted, and frozen. Do not reopen River authorization, corridor UV3 semantics, normalized substrate composition, hydrology, waterline highlight placement, or inward Riverbed transition during GSU-M1 validation or later material expansion. Unity-compile, confirm River restoration and 256² array rebuild, and visually validate/profile GSU-M1.8 Fine Gravel plus the retained GSU-M1.7 Bank/Riverbed shared/application controls through the canonical GSU-M1 plan; water-reflection work remains separate.

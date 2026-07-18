@@ -9,7 +9,8 @@ namespace ProgrammaticStylized3D.Rivers
     {
         private const string ComputeResourcePath =
             "PS3DRiver/Compute/CS_RiverFoam";
-        private const float ChunkLengthMetres = 32f;
+        private const float ChunkLengthMetres =
+            StylizedRiverFoamGridDescriptor.LongitudinalChunkLengthMetres;
         // Stage 6 structural resolution is shared by persistent material,
         // topology, and the authoritative obstacle mask. Medium is
         // the standard project tier; Low and High preserve the same physical
@@ -239,6 +240,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float TransportMetricsUpdateRate = 4f;
         private const float TransportTargetCfl = 0.90f;
         private const int MaximumTransportSubsteps = 64;
+        private const float TransportMinimumCurvatureJacobian = 0.25f;
+        private const float TransportLatticeAlignmentTolerance = 0.0001f;
+        private const float TransportCurvatureCompatibilityTolerance = 0.0005f;
         private const float TransportConservationErrorGate = 0.0025f;
         private const float TransportClampLossGate = 0.0010f;
 
@@ -273,7 +277,12 @@ namespace ProgrammaticStylized3D.Rivers
             ObstacleMismatch = 1 << 8,
             GenerationMismatch = 1 << 9,
             CombinedMismatch = 1 << 10,
-            InstallRejected = 1 << 11
+            InstallRejected = 1 << 11,
+            CoordinateContract = 1 << 12,
+            CacheContract = 1 << 13,
+            GridDescriptorMismatch = 1 << 14,
+            ObstacleFingerprintContract = 1 << 15,
+            DynamicTopologyPhaseContract = 1 << 16
         }
 
         [Flags]
@@ -328,6 +337,17 @@ namespace ProgrammaticStylized3D.Rivers
             WaitForObstacleStability,
             BuildObstacleExclusion,
             RefreshTopologySources
+        }
+
+        private enum PersistentStateReplacementPolicy
+        {
+            None,
+            ExactFixedLatticeCopy,
+            ClearLegacyMapping,
+            ClearUnsupportedContract,
+            ClearSpacingOrPhaseMismatch,
+            ClearNonIntegerAlignment,
+            ClearCurvatureMismatch
         }
 
         private enum TopologyReplacementPhase
@@ -395,6 +415,14 @@ namespace ProgrammaticStylized3D.Rivers
             public float GlobalStart;
             public float FieldLength;
             public float ValidFieldLength;
+            public StylizedRiverFoamGridDescriptor Descriptor;
+            public StylizedRiverFoamGridGpuData DescriptorGpuData;
+            public FoamMetricRow[] MetricRows = Array.Empty<FoamMetricRow>();
+            public PersistentStateReplacementPolicy ReplacementPolicy;
+            public int ReplacementOffsetX;
+            public int ReplacementOffsetY;
+            public string ReplacementDetail = string.Empty;
+            public bool MaterialLifetimeAuthorityActive;
 
             // Dimension-changing transitions keep the last complete renderer
             // bindings alive while the replacement resource set initializes.
@@ -546,6 +574,16 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamGlobalStart");
         private static readonly int FoamFieldLengthId =
             Shader.PropertyToID("_FoamFieldLength");
+        private static readonly int FoamGridDescriptorContractId =
+            Shader.PropertyToID("_FoamGridDescriptorContract");
+        private static readonly int FoamGridDescriptorSpacingId =
+            Shader.PropertyToID("_FoamGridDescriptorSpacing");
+        private static readonly int FoamGridDescriptorLateralId =
+            Shader.PropertyToID("_FoamGridDescriptorLateral");
+        private static readonly int FoamGridDescriptorLongitudinalId =
+            Shader.PropertyToID("_FoamGridDescriptorLongitudinal");
+        private static readonly int FoamGridDescriptorExtentId =
+            Shader.PropertyToID("_FoamGridDescriptorExtent");
         private static readonly int FoamColourId =
             Shader.PropertyToID("_FoamColour");
         private static readonly int FoamInteriorOpacityFloorId =

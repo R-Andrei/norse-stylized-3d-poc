@@ -28,6 +28,19 @@ struct FoamSourceEventData
     float4 objectData;
 };
 
+// RG-METRIC-P5 CPU/GPU descriptor ABI. The five float4 lanes mirror
+// StylizedRiverFoamGridGpuData exactly. Topology-owned dispatches bind the
+// descriptor immediately before use; other Foam layers remain on their
+// staged legacy coordinate paths until their owning migration phases.
+struct FoamGridDescriptorData
+{
+    float4 contract;
+    float4 spacing;
+    float4 lateral;
+    float4 longitudinal;
+    float4 extent;
+};
+
 struct FoamMetricRow
 {
     // x = left surface half-width, y = right surface half-width,

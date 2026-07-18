@@ -322,6 +322,11 @@ Shader "PS3D/Stylized River Water"
                 float4 _FoamObstacleExclusion_TexelSize;
                 float4 _FoamMotionLane_TexelSize;
                 float4 _FoamObstacleRouting_TexelSize;
+                float4 _FoamGridDescriptorContract;
+                float4 _FoamGridDescriptorSpacing;
+                float4 _FoamGridDescriptorLateral;
+                float4 _FoamGridDescriptorLongitudinal;
+                float4 _FoamGridDescriptorExtent;
 
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
@@ -858,11 +863,6 @@ Shader "PS3D/Stylized River Water"
                 foamSurface.wakeDownstreamGradient = wake.downstreamGradient;
                 foamSurface.wakeLateralGradient = wake.lateralGradient;
 
-                float2 foamFieldUV = float2(
-                    saturate((input.domainData.x - _FoamGlobalStart) /
-                        max(0.001, _FoamFieldLength)),
-                    saturate(input.domainData.y /
-                        max(0.001, input.domainData.w) * 0.5 + 0.5));
                 RiverWaterFoamResult foam = RiverWaterEvaluateFoam(
                     TEXTURE2D_ARGS(
                         _FoamPrevious,
@@ -883,9 +883,18 @@ Shader "PS3D/Stylized River Water"
                     _FoamStrandScale,
                     _FoamStrandReach,
                     _FreezeAmount,
+                    _FoamGridDescriptorContract,
+                    _FoamGridDescriptorSpacing,
+                    _FoamGridDescriptorLateral,
+                    _FoamGridDescriptorLongitudinal,
+                    _FoamGridDescriptorExtent,
                     foamSurface);
 
                 int foamDebug = (int)round(_FoamDebugView);
+                if (foamDebug != 0 && foam.validField < 0.5)
+                {
+                    return half4(0.0, 0.0, 0.0, 1.0);
+                }
                 float productionChipEnabled = step(
                     0.0001,
                     _FoamChipActivation);
@@ -1026,7 +1035,7 @@ Shader "PS3D/Stylized River Water"
 
                 if (foamDebug == 17)
                 {
-                    float2 committedFieldUV = foamFieldUV;
+                    float2 committedFieldUV = foam.fieldUV;
                     float evaluatedShape = saturate(
                         SAMPLE_TEXTURE2D(
                             _FoamShapeMask,
@@ -1080,7 +1089,9 @@ Shader "PS3D/Stylized River Water"
                     int2 routingDimensions = int2(
                         max(1.0, _FoamObstacleRouting_TexelSize.z),
                         max(1.0, _FoamObstacleRouting_TexelSize.w));
-                    float laneX = foam.fieldUV.x * (float)laneDimensions.x -
+                    float2 foamMotionFieldUV = foam.fieldUV;
+                    float laneX = foamMotionFieldUV.x *
+                        (float)laneDimensions.x -
                         _FoamMotionLaneScrollCells;
                     laneX = fmod(laneX, (float)laneDimensions.x);
                     if (laneX < 0.0)
@@ -1099,7 +1110,8 @@ Shader "PS3D/Stylized River Water"
                     }
 
                     int laneY = clamp(
-                        (int)floor(foam.fieldUV.y * (float)laneDimensions.y),
+                        (int)floor(
+                            foamMotionFieldUV.y * (float)laneDimensions.y),
                         0,
                         laneDimensions.y - 1);
                     float laneBlend = frac(laneX);
@@ -1110,7 +1122,8 @@ Shader "PS3D/Stylized River Water"
                     float lane = clamp(lerp(laneA, laneB, laneBlend), -1.0, 1.0);
 
                     int2 routingCoordinate = clamp(
-                        (int2)floor(foam.fieldUV * (float2)routingDimensions),
+                        (int2)floor(
+                            foamMotionFieldUV * (float2)routingDimensions),
                         int2(0, 0),
                         routingDimensions - 1);
                     float2 obstacleRouting = _FoamObstacleRouting.Load(
@@ -1122,7 +1135,8 @@ Shader "PS3D/Stylized River Water"
                         max(1.0, _FoamObstacleExclusion_TexelSize.w));
                     int2 obstacleCoordinate = clamp(
                         (int2)floor(
-                            foam.fieldUV * (float2)obstacleDimensions),
+                            foamMotionFieldUV *
+                            (float2)obstacleDimensions),
                         int2(0, 0),
                         obstacleDimensions - 1);
                     float obstacleFootprint = saturate(
@@ -1244,6 +1258,11 @@ Shader "PS3D/Stylized River Water"
                             _FoamShapeMask,
                             sampler_FoamCurrent,
                             foam.fieldUV).r);
+                    float2 foamFilmUV = RiverWaterFoamFieldUVToFilmUV(
+                        foam.fieldUV,
+                        _FoamCurrent_TexelSize.zw,
+                        _FoamGridDescriptorExtent.zw,
+                        _FoamGridDescriptorContract);
 
                     if (foamDebug == 11)
                     {
@@ -1251,7 +1270,7 @@ Shader "PS3D/Stylized River Water"
                             SAMPLE_TEXTURE2D(
                                 _FoamFilmSource,
                                 sampler_FoamCurrent,
-                                foam.fieldUV).r);
+                                foamFilmUV).r);
                         return half4(filmSource.xxx, 1.0);
                     }
 
@@ -1261,7 +1280,7 @@ Shader "PS3D/Stylized River Water"
                             SAMPLE_TEXTURE2D(
                                 _FoamFilmSupport,
                                 sampler_FoamCurrent,
-                                foam.fieldUV).r);
+                                foamFilmUV).r);
                         return half4(filmSupport.xxx, 1.0);
                     }
 
@@ -1269,12 +1288,12 @@ Shader "PS3D/Stylized River Water"
                         SAMPLE_TEXTURE2D(
                             _FoamFilmSource,
                             sampler_FoamCurrent,
-                            foam.fieldUV).r);
+                            foamFilmUV).r);
                     float filmSupport = saturate(
                         SAMPLE_TEXTURE2D(
                             _FoamFilmSupport,
                             sampler_FoamCurrent,
-                            foam.fieldUV).r);
+                            foamFilmUV).r);
                     float instantaneousFilmTarget = saturate(max(
                         smoothstep(0.10, 0.46, filmSource) * 0.68,
                         smoothstep(0.28, 0.74, filmSupport) * 0.60));
@@ -1282,7 +1301,7 @@ Shader "PS3D/Stylized River Water"
                         SAMPLE_TEXTURE2D(
                             _FoamVisualOccupancy,
                             sampler_FoamCurrent,
-                            foam.fieldUV).r);
+                            foamFilmUV).r);
 
                     if (foamDebug == 13)
                     {

@@ -1,4 +1,3 @@
-
 float3 ResolveCurrentGeneratedTopology(int2 outputCoordinate)
 {
     float4 generatedWork = _FoamTopologyGeneratedRead.Load(
@@ -49,6 +48,167 @@ float3 ResolveCurrentGeneratedTopology(int2 outputCoordinate)
         max(independentAgingPressure, hostedAgingPressure)));
 }
 
+bool FoamTopologyTransitionPreviousUsesFixedMetricLattice()
+{
+    return (int)round(
+        _FoamTopologyTransitionGridDescriptorContract.z) == 1;
+}
+
+float FoamTopologyTransitionPreviousLocalDistanceAtUV(float u)
+{
+    if (FoamTopologyTransitionPreviousUsesFixedMetricLattice())
+    {
+        return _FoamTopologyTransitionGridDescriptorLongitudinal.x +
+            saturate(u) *
+            _FoamTopologyTransitionGridDescriptorLongitudinal.y;
+    }
+
+    return saturate(u) * _FoamTopologyTransitionFieldLength;
+}
+
+bool TryResolveTopologyTransitionPreviousUV(
+    float globalDistance,
+    float lateralMetres,
+    out float2 previousUV)
+{
+    previousUV = 0.0.xx;
+    float previousLocalDistance =
+        globalDistance - _FoamTopologyTransitionGlobalStart;
+    if (previousLocalDistance < 0.0 ||
+        previousLocalDistance >
+            _FoamTopologyTransitionValidLength + 0.0001)
+    {
+        return false;
+    }
+
+    float previousU;
+    if (FoamTopologyTransitionPreviousUsesFixedMetricLattice())
+    {
+        float previousStart =
+            _FoamTopologyTransitionGridDescriptorLongitudinal.x;
+        float previousLength = max(
+            0.0001,
+            _FoamTopologyTransitionGridDescriptorLongitudinal.y);
+        previousU =
+            (previousLocalDistance - previousStart) / previousLength;
+    }
+    else
+    {
+        previousU = previousLocalDistance /
+            max(0.0001, _FoamTopologyTransitionFieldLength);
+    }
+    if (previousU < 0.0 || previousU > 1.0)
+    {
+        return false;
+    }
+
+    int previousMetricX = FoamUVToContainingTexel(
+        previousU,
+        _FoamTopologyTransitionDimensions.x);
+    FoamMetricRow previousMetric =
+        _FoamTopologyTransitionMetricRows[previousMetricX];
+    float previousV;
+    if (FoamTopologyTransitionPreviousUsesFixedMetricLattice())
+    {
+        float previousDy = max(
+            0.0001,
+            _FoamTopologyTransitionGridDescriptorSpacing.w);
+        float previousGlobalY =
+            (lateralMetres -
+             _FoamTopologyTransitionGridDescriptorLateral.x) /
+            previousDy;
+        float previousLocalY = previousGlobalY -
+            _FoamTopologyTransitionGridDescriptorLateral.y;
+        previousV = (previousLocalY + 0.5) /
+            max(1.0, _FoamTopologyTransitionGridDescriptorLateral.z);
+        if (previousV < 0.0 || previousV > 1.0)
+        {
+            return false;
+        }
+    }
+    else
+    {
+        float previousLeft = max(
+            0.0001,
+            previousMetric.widthsAndSpacing.x);
+        float previousRight = max(
+            0.0001,
+            previousMetric.widthsAndSpacing.y);
+        if (lateralMetres < -previousLeft ||
+            lateralMetres > previousRight)
+        {
+            return false;
+        }
+        previousV = FoamMetresToAcross01(
+            lateralMetres,
+            previousLeft,
+            previousRight);
+    }
+
+    previousUV = saturate(float2(previousU, previousV));
+    return true;
+}
+
+bool TryResolvePersistentStateRemapCoordinate(
+    int2 currentCoordinate,
+    out int2 previousCoordinate)
+{
+    previousCoordinate = int2(0, 0);
+    if (_FoamPersistentStateRemapEnabled == 0 ||
+        !FoamGridUsesFixedMetricLattice() ||
+        !FoamTopologyTransitionPreviousUsesFixedMetricLattice())
+    {
+        return false;
+    }
+
+    int currentX = clamp(
+        currentCoordinate.x,
+        0,
+        max(0, _FoamDimensions.x - 1));
+    FoamMetricRow currentMetric = _FoamMetricRows[currentX];
+    float currentLocalDistance =
+        FoamGridLocalDistanceAtTexel(currentCoordinate.x);
+    float globalDistance = _FoamGlobalStart + currentLocalDistance;
+    float previousLocalDistance =
+        globalDistance - _FoamTopologyTransitionGlobalStart;
+    float previousDx = max(
+        0.0001,
+        _FoamTopologyTransitionGridDescriptorSpacing.z);
+    float previousXFloat =
+        (previousLocalDistance -
+         _FoamTopologyTransitionGridDescriptorLongitudinal.x) /
+        previousDx - 0.5;
+    int previousX = (int)round(previousXFloat);
+    if (abs(previousXFloat - (float)previousX) > 0.001 ||
+        previousX < 0 ||
+        previousX >= _FoamTopologyTransitionDimensions.x)
+    {
+        return false;
+    }
+
+    float lateralMetres = FoamLateralMetresAtTexel(
+        currentCoordinate.y,
+        currentMetric);
+    float previousDy = max(
+        0.0001,
+        _FoamTopologyTransitionGridDescriptorSpacing.w);
+    float previousGlobalY =
+        (lateralMetres -
+         _FoamTopologyTransitionGridDescriptorLateral.x) /
+        previousDy;
+    float previousYFloat = previousGlobalY -
+        _FoamTopologyTransitionGridDescriptorLateral.y;
+    int previousY = (int)round(previousYFloat);
+    if (abs(previousYFloat - (float)previousY) > 0.001 ||
+        previousY < 0 ||
+        previousY >= _FoamTopologyTransitionDimensions.y)
+    {
+        return false;
+    }
+
+    previousCoordinate = int2(previousX, previousY);
+    return true;
+}
 
 float3 SampleTopologyTransitionBilinear(float2 uv)
 {
@@ -75,7 +235,6 @@ float3 SampleTopologyTransitionBilinear(float2 uv)
         blend.y);
 }
 
-
 float3 ApplyGeneratedTopologyTransition(
     float3 currentGenerated,
     int2 outputCoordinate,
@@ -98,43 +257,19 @@ float3 ApplyGeneratedTopologyTransition(
     }
     else
     {
-        float currentLocalDistance = saturate(uv.x) * _FoamFieldLength;
+        float currentLocalDistance = FoamGridLocalDistanceAtUV(uv.x);
         float globalDistance = _FoamGlobalStart + currentLocalDistance;
-        float previousLocalDistance =
-            globalDistance - _FoamTopologyTransitionGlobalStart;
-        if (previousLocalDistance >= 0.0 &&
-            previousLocalDistance <=
-                _FoamTopologyTransitionValidLength + 0.0001 &&
-            _FoamTopologyTransitionFieldLength > 0.0001)
+        float lateralMetres = FoamLateralMetresAtUV(
+            uv.y,
+            currentMetric);
+        float2 previousUV;
+        if (TryResolveTopologyTransitionPreviousUV(
+                globalDistance,
+                lateralMetres,
+                previousUV))
         {
-            float previousU = previousLocalDistance /
-                _FoamTopologyTransitionFieldLength;
-            int previousMetricX = FoamUVToContainingTexel(
-                previousU,
-                _FoamTopologyTransitionDimensions.x);
-            FoamMetricRow previousMetric =
-                _FoamTopologyTransitionMetricRows[previousMetricX];
-            float lateralMetres = FoamAcross01ToMetres(
-                saturate(uv.y),
-                currentMetric.widthsAndSpacing.x,
-                currentMetric.widthsAndSpacing.y);
-            float previousLeft = max(
-                0.0001,
-                previousMetric.widthsAndSpacing.x);
-            float previousRight = max(
-                0.0001,
-                previousMetric.widthsAndSpacing.y);
-            if (lateralMetres >= -previousLeft &&
-                lateralMetres <= previousRight)
-            {
-                float previousV = FoamMetresToAcross01(
-                    lateralMetres,
-                    previousLeft,
-                    previousRight);
-                previousGenerated = SampleTopologyTransitionBilinear(
-                    float2(previousU, previousV));
-                previousAvailable = true;
-            }
+            previousGenerated = SampleTopologyTransitionBilinear(previousUV);
+            previousAvailable = true;
         }
     }
 

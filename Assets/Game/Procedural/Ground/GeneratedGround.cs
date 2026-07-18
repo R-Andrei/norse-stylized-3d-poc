@@ -775,6 +775,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundBankLayerDrySmoothness");
         private static readonly int GroundBankLayerDrySpecularStrengthId =
             Shader.PropertyToID("_GroundBankLayerDrySpecularStrength");
+        private static readonly int GroundBankLayerCavityColorId =
+            Shader.PropertyToID("_GroundBankLayerCavityColor");
+        private static readonly int GroundBankLayerDetailArrayId =
+            Shader.PropertyToID("_GroundBankLayerDetailArray");
+        private static readonly int GroundBankLayerDetailAId =
+            Shader.PropertyToID("_GroundBankLayerDetailA");
+        private static readonly int GroundBankLayerDetailBId =
+            Shader.PropertyToID("_GroundBankLayerDetailB");
+        private static readonly int GroundBankLayerDetailCId =
+            Shader.PropertyToID("_GroundBankLayerDetailC");
         private static readonly int GroundBankLayerCoverRetentionId =
             Shader.PropertyToID("_GroundBankLayerCoverRetention");
         private static readonly int GroundBankCoverRetreatStrengthId =
@@ -795,6 +805,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundRiverbedLayerDrySmoothness");
         private static readonly int GroundRiverbedLayerDrySpecularStrengthId =
             Shader.PropertyToID("_GroundRiverbedLayerDrySpecularStrength");
+        private static readonly int GroundRiverbedLayerCavityColorId =
+            Shader.PropertyToID("_GroundRiverbedLayerCavityColor");
+        private static readonly int GroundRiverbedLayerDetailArrayId =
+            Shader.PropertyToID("_GroundRiverbedLayerDetailArray");
+        private static readonly int GroundRiverbedLayerDetailAId =
+            Shader.PropertyToID("_GroundRiverbedLayerDetailA");
+        private static readonly int GroundRiverbedLayerDetailBId =
+            Shader.PropertyToID("_GroundRiverbedLayerDetailB");
+        private static readonly int GroundRiverbedLayerDetailCId =
+            Shader.PropertyToID("_GroundRiverbedLayerDetailC");
         private static readonly int GroundRiverbedMaterialStrengthId =
             Shader.PropertyToID("_GroundRiverbedMaterialStrength");
         private static readonly int GroundRiverbedHydrologyEnabledId =
@@ -4006,6 +4026,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 hasBankSurfaceLayer
                     ? bankSurfaceLayer.DrySpecularStrength
                     : resolvedMaterialControls.SpecularStrength);
+            ApplySurfaceLayerDetailProperties(
+                materialProperties,
+                bankSurfaceLayer,
+                inheritedLayerColor,
+                resolvedMaterialControls.BankDetailScaleMultiplier,
+                resolvedMaterialControls.BankDetailNormalStrengthMultiplier,
+                resolvedMaterialControls.BankDetailCavityStrengthMultiplier,
+                resolvedMaterialControls.BankDetailValueFormMultiplier,
+                resolvedMaterialControls.BankDetailFinishVariationMultiplier,
+                resolvedMaterialControls.BankLegacyPixelCellInfluenceMultiplier,
+                GroundBankLayerCavityColorId,
+                GroundBankLayerDetailArrayId,
+                GroundBankLayerDetailAId,
+                GroundBankLayerDetailBId,
+                GroundBankLayerDetailCId);
             materialProperties.SetVector(
                 GroundBankLayerCoverRetentionId,
                 hasBankSurfaceLayer
@@ -4065,6 +4100,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 hasRiverbedSurfaceLayer
                     ? riverbedSurfaceLayer.DrySpecularStrength
                     : resolvedMaterialControls.SpecularStrength);
+            ApplySurfaceLayerDetailProperties(
+                materialProperties,
+                riverbedSurfaceLayer,
+                inheritedLayerColor,
+                resolvedMaterialControls.RiverbedDetailScaleMultiplier,
+                resolvedMaterialControls.RiverbedDetailNormalStrengthMultiplier,
+                resolvedMaterialControls.RiverbedDetailCavityStrengthMultiplier,
+                resolvedMaterialControls.RiverbedDetailValueFormMultiplier,
+                resolvedMaterialControls.RiverbedDetailFinishVariationMultiplier,
+                resolvedMaterialControls.RiverbedLegacyPixelCellInfluenceMultiplier,
+                GroundRiverbedLayerCavityColorId,
+                GroundRiverbedLayerDetailArrayId,
+                GroundRiverbedLayerDetailAId,
+                GroundRiverbedLayerDetailBId,
+                GroundRiverbedLayerDetailCId);
             materialProperties.SetFloat(
                 GroundRiverbedMaterialStrengthId,
                 resolvedMaterialControls.RiverbedMaterialStrength);
@@ -4318,6 +4368,99 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             ApplyPaintedAccentCoverageProperties(materialProperties);
 
             targetRenderer.SetPropertyBlock(materialProperties);
+        }
+
+        private static void ApplySurfaceLayerDetailProperties(
+            MaterialPropertyBlock properties,
+            GroundSurfaceLayerProfile layer,
+            Color fallbackColor,
+            float detailScaleMultiplier,
+            float detailNormalStrengthMultiplier,
+            float detailCavityStrengthMultiplier,
+            float detailValueFormMultiplier,
+            float detailFinishVariationMultiplier,
+            float legacyPixelCellInfluenceMultiplier,
+            int cavityColorId,
+            int textureArrayId,
+            int detailAId,
+            int detailBId,
+            int detailCId)
+        {
+            Texture2DArray textureArray = null;
+            int sliceIndex = -1;
+            bool hasDetail =
+                layer != null &&
+                layer.TryResolveDetail(
+                    out textureArray,
+                    out sliceIndex);
+
+            properties.SetColor(
+                cavityColorId,
+                layer != null ? layer.CavityColor : fallbackColor);
+            // MaterialPropertyBlock.SetTexture rejects null. A missing generated
+            // array is valid during the editor builder's delayed repair window,
+            // so disable detail through DetailA.x and leave any previous texture
+            // binding inert until a valid array resolves.
+            if (hasDetail)
+            {
+                properties.SetTexture(
+                    textureArrayId,
+                    textureArray);
+            }
+            float safeScaleMultiplier = Mathf.Clamp(
+                detailScaleMultiplier,
+                0.25f,
+                4f);
+            properties.SetVector(
+                detailAId,
+                hasDetail
+                    ? new Vector4(
+                        1f,
+                        sliceIndex,
+                        1f / Mathf.Max(
+                            0.01f,
+                            layer.DetailWorldScale * safeScaleMultiplier),
+                        layer.DetailNormalStrength * Mathf.Clamp(
+                            detailNormalStrengthMultiplier,
+                            0f,
+                            2f))
+                    : Vector4.zero);
+            properties.SetVector(
+                detailBId,
+                hasDetail
+                    ? new Vector4(
+                        layer.DetailCavityStrength * Mathf.Clamp(
+                            detailCavityStrengthMultiplier,
+                            0f,
+                            2f),
+                        layer.DetailCavityBias,
+                        layer.DetailValueStrength * Mathf.Clamp(
+                            detailValueFormMultiplier,
+                            0f,
+                            2f),
+                        layer.DetailFormHighlightStrength * Mathf.Clamp(
+                            detailValueFormMultiplier,
+                            0f,
+                            2f))
+                    : new Vector4(0f, 0.5f, 0f, 0f));
+            properties.SetVector(
+                detailCId,
+                new Vector4(
+                    hasDetail
+                        ? layer.FinishVariationStrength * Mathf.Clamp(
+                            detailFinishVariationMultiplier,
+                            0f,
+                            2f)
+                        : 0f,
+                    layer != null
+                        ? Mathf.Clamp01(
+                            layer.LegacyPixelCellInfluence * Mathf.Clamp(
+                                legacyPixelCellInfluenceMultiplier,
+                                0f,
+                                2f))
+                        : 1f,
+                    0f,
+                    0f));
         }
 
         private void ApplyResolvedFeatureMaterialProperties(

@@ -125,7 +125,7 @@ bool FoamTransportInsideGrid(int2 coordinate)
 bool FoamTransportInsideSimulation(int2 coordinate)
 {
     return FoamTransportInsideGrid(coordinate) &&
-        IsFoamColumnInsideSimulation(coordinate.x);
+        IsFoamGridColumnInsideSimulation(coordinate.x);
 }
 
 float4 FoamLoadTransportPacked(int2 coordinate, out float validFluid)
@@ -165,10 +165,56 @@ float FoamTransportLateralSpacing(int x)
     return max(0.0001, _FoamMetricRows[safeX].widthsAndSpacing.w);
 }
 
-float FoamTransportCellArea(int x)
+static const float FoamTransportMinimumCurvatureJacobian = 0.25;
+
+float FoamTransportRawCurvatureJacobian(
+    int x,
+    float lateralMetres)
 {
+    if (!FoamGridUsesFixedMetricLattice())
+    {
+        return 1.0;
+    }
+
+    int safeX = clamp(x, 0, max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[safeX];
+    return 1.0 - metric.topologyData.x * lateralMetres;
+}
+
+float FoamTransportCurvatureJacobian(
+    int x,
+    float lateralMetres)
+{
+    return max(
+        FoamTransportMinimumCurvatureJacobian,
+        FoamTransportRawCurvatureJacobian(x, lateralMetres));
+}
+
+float FoamTransportCellArea(int x, int y)
+{
+    int safeX = clamp(x, 0, max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[safeX];
+    float lateralMetres = FoamLateralMetresAtTexel(y, metric);
     return FoamTransportLongitudinalSpacing(x) *
-        FoamTransportLateralSpacing(x);
+        FoamTransportLateralSpacing(x) *
+        FoamTransportCurvatureJacobian(x, lateralMetres);
+}
+
+float FoamTransportLateralFaceLength(int x, int lowerY)
+{
+    float longitudinalSpacing = FoamTransportLongitudinalSpacing(x);
+    if (!FoamGridUsesFixedMetricLattice())
+    {
+        return longitudinalSpacing;
+    }
+
+    int safeX = clamp(x, 0, max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[safeX];
+    float lowerLateral = FoamLateralMetresAtTexel(lowerY, metric);
+    float upperLateral = FoamLateralMetresAtTexel(lowerY + 1, metric);
+    float faceLateral = 0.5 * (lowerLateral + upperLateral);
+    return longitudinalSpacing *
+        FoamTransportCurvatureJacobian(x, faceLateral);
 }
 
 void FoamResolveLongitudinalFaceFlux(
@@ -310,7 +356,8 @@ float4 FoamResolveLateralFaceFlux(int x, int lowerY)
     float4 donor = faceVelocity >= 0.0
         ? lowerPacked
         : upperPacked;
-    return faceVelocity * FoamTransportLongitudinalSpacing(x) * donor;
+    return faceVelocity *
+        FoamTransportLateralFaceLength(x, lowerY) * donor;
 }
 
 uint FoamTransportFixedPoint(float value)

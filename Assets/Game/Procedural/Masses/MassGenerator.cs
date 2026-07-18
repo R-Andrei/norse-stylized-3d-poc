@@ -122,12 +122,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             IsolatedRailFailure,
             GeometricExcluded,
             StructuralExcluded,
-            CoexistenceExcluded
+            CoexistenceExcluded,
+            MicroTopologySuppressed
         }
 
         public struct EdgeWearDebugEdgeRecord
         {
             public int EdgeIndex;
+            public int GraphEdgeIndex;
             public Vector3 Start;
             public Vector3 End;
             public bool Selected;
@@ -170,6 +172,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float dihedralDegrees)
             {
                 EdgeIndex = edgeIndex;
+                GraphEdgeIndex = edgeIndex;
                 Start = start;
                 End = end;
                 Selected = selected;
@@ -217,6 +220,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float Vertical01;
             public string Classification = string.Empty;
             public int CoincidentBoundarySeamReconciled;
+            public int MicroTopologySuppressed;
+            public int MicroTopologyGeneratedTransition;
             public int StructuralEligible;
             public int GeometricEligible;
             public int CoexistenceEligible;

@@ -37,6 +37,8 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("MeasureTopologyMetrics");
             resetTransportMetricsKernel =
                 computeShader.FindKernel("ResetTransportMetrics");
+            remapPersistentStateKernel =
+                computeShader.FindKernel("RemapPersistentFoamState");
             simulateKernel = computeShader.FindKernel("SimulateFoam");
             buildFilmSourceKernel = computeShader.FindKernel("BuildFoamFilmSource");
             buildFilmSupportKernel = computeShader.FindKernel("BuildFoamFilmSupport");
@@ -46,10 +48,35 @@ namespace ProgrammaticStylized3D.Rivers
             applyBoundaryKernel = computeShader.FindKernel("ApplyBoundary");
         }
 
+        private void ConfigureGridDescriptorComputeParameters()
+        {
+            if (computeShader == null)
+            {
+                return;
+            }
+
+            computeShader.SetVector(
+                FoamGridDescriptorContractId,
+                gridDescriptorGpuData.Contract);
+            computeShader.SetVector(
+                FoamGridDescriptorSpacingId,
+                gridDescriptorGpuData.Spacing);
+            computeShader.SetVector(
+                FoamGridDescriptorLateralId,
+                gridDescriptorGpuData.Lateral);
+            computeShader.SetVector(
+                FoamGridDescriptorLongitudinalId,
+                gridDescriptorGpuData.Longitudinal);
+            computeShader.SetVector(
+                FoamGridDescriptorExtentId,
+                gridDescriptorGpuData.Extent);
+        }
+
         private void ConfigureSharedComputeParameters(
             float transportDeltaTime,
             float lifecycleDeltaTime)
         {
+            ConfigureGridDescriptorComputeParameters();
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetInts(
                 "_FoamFilmDimensions",
@@ -304,6 +331,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void ConfigureVisualShapeParameters(float deltaTime)
         {
+            ConfigureGridDescriptorComputeParameters();
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetInts(
                 "_FoamFilmDimensions",
@@ -826,6 +854,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            ConfigureGridDescriptorComputeParameters();
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat(

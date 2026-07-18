@@ -58,6 +58,11 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundBankLayerPixelContrast("Ground Bank Layer Pixel Contrast", Range(0, 2)) = 0.6
         [HideInInspector] _GroundBankLayerDrySmoothness("Ground Bank Layer Dry Smoothness", Range(0, 1)) = 0.15
         [HideInInspector] _GroundBankLayerDrySpecularStrength("Ground Bank Layer Dry Specular Strength", Range(0, 1)) = 0.1
+        [HideInInspector] _GroundBankLayerCavityColor("Ground Bank Layer Cavity Color", Color) = (0.12, 0.10, 0.08, 1)
+        [HideInInspector] [NoScaleOffset] _GroundBankLayerDetailArray("Ground Bank Layer Detail Array", 2DArray) = "" {}
+        [HideInInspector] _GroundBankLayerDetailA("Ground Bank Layer Detail A", Vector) = (0, 0, 1, 0)
+        [HideInInspector] _GroundBankLayerDetailB("Ground Bank Layer Detail B", Vector) = (0, 0.5, 0, 0)
+        [HideInInspector] _GroundBankLayerDetailC("Ground Bank Layer Detail C", Vector) = (0, 1, 0, 0)
         [HideInInspector] _GroundBankLayerCoverRetention("Ground Bank Layer Cover Retention", Vector) = (1, 1, 1, 1)
         [HideInInspector] _GroundBankCoverRetreatStrength("Ground Bank Cover Retreat Strength", Vector) = (0, 0, 0, 0)
         [HideInInspector] _GroundRiverbedLayerEnabled("Ground Riverbed Layer Enabled", Float) = 0
@@ -68,6 +73,11 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundRiverbedLayerPixelContrast("Ground Riverbed Layer Pixel Contrast", Range(0, 2)) = 0.6
         [HideInInspector] _GroundRiverbedLayerDrySmoothness("Ground Riverbed Layer Dry Smoothness", Range(0, 1)) = 0.15
         [HideInInspector] _GroundRiverbedLayerDrySpecularStrength("Ground Riverbed Layer Dry Specular Strength", Range(0, 1)) = 0.1
+        [HideInInspector] _GroundRiverbedLayerCavityColor("Ground Riverbed Layer Cavity Color", Color) = (0.12, 0.10, 0.08, 1)
+        [HideInInspector] [NoScaleOffset] _GroundRiverbedLayerDetailArray("Ground Riverbed Layer Detail Array", 2DArray) = "" {}
+        [HideInInspector] _GroundRiverbedLayerDetailA("Ground Riverbed Layer Detail A", Vector) = (0, 0, 1, 0)
+        [HideInInspector] _GroundRiverbedLayerDetailB("Ground Riverbed Layer Detail B", Vector) = (0, 0.5, 0, 0)
+        [HideInInspector] _GroundRiverbedLayerDetailC("Ground Riverbed Layer Detail C", Vector) = (0, 1, 0, 0)
         [HideInInspector] _GroundRiverbedMaterialStrength("Ground Riverbed Material Strength", Range(0, 1)) = 1
         [HideInInspector] _GroundRiverbedHydrologyEnabled("Ground Riverbed Hydrology Enabled", Float) = 0
         [HideInInspector] _GroundRiverbedHydrologyWetTintColor("Ground Riverbed Hydrology Wet Tint Color", Color) = (0.22, 0.25, 0.24, 1)
@@ -176,6 +186,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
 
             HLSLPROGRAM
             #pragma target 3.5
+            #pragma require 2darray
             #pragma vertex Vert
             #pragma fragment Frag
             #pragma multi_compile_fog
@@ -197,11 +208,16 @@ Shader "PS3D/Pixel Ground Surface Lit"
             SAMPLER(sampler_BaseMap);
             TEXTURE2D(_GroundPaintedAccentCoverage);
             SAMPLER(sampler_GroundPaintedAccentCoverage);
+            TEXTURE2D_ARRAY(_GroundBankLayerDetailArray);
+            SAMPLER(sampler_GroundBankLayerDetailArray);
+            TEXTURE2D_ARRAY(_GroundRiverbedLayerDetailArray);
+            SAMPLER(sampler_GroundRiverbedLayerDetailArray);
 
             #include "../Includes/PixelSurfaceGroundForwardTypes.hlsl"
             #include "../Includes/PixelSurfaceGroundResponse.hlsl"
             #include "../Includes/PixelSurfaceGroundMacro.hlsl"
             #include "../Includes/PixelSurfaceColorUtility.hlsl"
+            #include "../Includes/PixelSurfaceMaterialDetail.hlsl"
             #include "../Includes/PixelSurfaceGroundMaskDebug.hlsl"
             #include "../Includes/PixelSurfaceGroundForwardPass.hlsl"
             ENDHLSL

@@ -14,6 +14,7 @@
 #pragma kernel ResetTopologyMetrics
 #pragma kernel MeasureTopologyMetrics
 #pragma kernel ResetTransportMetrics
+#pragma kernel RemapPersistentFoamState
 #pragma kernel SimulateFoam
 #pragma kernel BuildFoamFilmSource
 #pragma kernel BuildFoamFilmSupport
@@ -40,14 +41,20 @@ float4 ResolveFoamSegmentInjectionSample(
     float2 physicalCellSpacing,
     FoamMetricRow metric)
 {
-    float startAcrossMetres = FoamAcross01ToMetres(
-        saturate(_FoamInjectionSegmentStartAcrossNormalized * 0.5 + 0.5),
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
-    float endAcrossMetres = FoamAcross01ToMetres(
-        saturate(_FoamInjectionSegmentEndAcrossNormalized * 0.5 + 0.5),
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
+    float startAcrossMetres = _FoamInjectionUsesMetricLateral > 0.5
+        ? _FoamInjectionSegmentStartLateralMetres
+        : FoamAcross01ToMetres(
+            saturate(
+                _FoamInjectionSegmentStartAcrossNormalized * 0.5 + 0.5),
+            metric.widthsAndSpacing.x,
+            metric.widthsAndSpacing.y);
+    float endAcrossMetres = _FoamInjectionUsesMetricLateral > 0.5
+        ? _FoamInjectionSegmentEndLateralMetres
+        : FoamAcross01ToMetres(
+            saturate(
+                _FoamInjectionSegmentEndAcrossNormalized * 0.5 + 0.5),
+            metric.widthsAndSpacing.x,
+            metric.widthsAndSpacing.y);
     float2 segmentStart = float2(
         _FoamInjectionSegmentStartGlobalDistance,
         startAcrossMetres);
@@ -157,8 +164,9 @@ float FoamSampleFilmSourceBilinear(float2 uv)
     int2 baseCoordinate;
     int2 nextCoordinate;
     float2 blend;
+    float2 filmUV = FoamFieldUVToFilmUV(uv);
     FoamResolveFilmBilinearCoordinates(
-        uv,
+        filmUV,
         baseCoordinate,
         nextCoordinate,
         blend);
@@ -178,8 +186,9 @@ float FoamSampleFilmSupportBilinear(float2 uv)
     int2 baseCoordinate;
     int2 nextCoordinate;
     float2 blend;
+    float2 filmUV = FoamFieldUVToFilmUV(uv);
     FoamResolveFilmBilinearCoordinates(
-        uv,
+        filmUV,
         baseCoordinate,
         nextCoordinate,
         blend);
@@ -247,7 +256,10 @@ FoamVisualFilmInfluence FoamResolveVisualFilmInfluenceAtDomainUV(
 
 float FoamResolveVisualFilmSourceAtDomainUV(float2 domainUV)
 {
-    if (!IsFoamUInsideDomain(domainUV.x))
+    bool insideDomain = FoamGridUsesFixedMetricLattice()
+        ? IsFoamGridUInsideDomain(domainUV.x)
+        : IsFoamUInsideDomain(domainUV.x);
+    if (!insideDomain)
     {
         return 0.0;
     }
@@ -274,6 +286,61 @@ float FoamResolveVisualFilmSourceAtDomainUV(float2 domainUV)
 }
 
 
+float FoamResolveFixedFilmSource(int2 filmCoordinate)
+{
+    int startX;
+    int countX;
+    int startY;
+    int countY;
+    FoamResolveFilmStructuralRange1D(
+        filmCoordinate.x,
+        _FoamDimensions.x,
+        startX,
+        countX);
+    FoamResolveFilmStructuralRange1D(
+        filmCoordinate.y,
+        _FoamDimensions.y,
+        startY,
+        countY);
+
+    float weightedSource = 0.0;
+    float representedArea = 0.0;
+    [unroll]
+    for (int localX = 0; localX < 2; localX++)
+    {
+        if (localX >= countX)
+        {
+            continue;
+        }
+        [unroll]
+        for (int localY = 0; localY < 2; localY++)
+        {
+            if (localY >= countY)
+            {
+                continue;
+            }
+
+            int2 structuralCoordinate = int2(
+                startX + localX,
+                startY + localY);
+            float cellArea = FoamTransportCellArea(
+                structuralCoordinate.x,
+                structuralCoordinate.y);
+            float2 fieldUV = FoamTexelCentreUV(
+                (uint2)structuralCoordinate,
+                _FoamDimensions);
+            weightedSource +=
+                FoamResolveVisualFilmSourceAtDomainUV(fieldUV) * cellArea;
+            representedArea += cellArea;
+        }
+    }
+
+    return representedArea > 0.000001
+        ? saturate(weightedSource / representedArea)
+        : 0.0;
+}
+
+
 [numthreads(8, 8, 1)]
 void BuildFoamFilmSource(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -284,8 +351,26 @@ void BuildFoamFilmSource(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(dispatchId.xy);
+    if (FoamGridUsesFixedMetricLattice())
+    {
+        _FoamFilmSourceWrite[coordinate] =
+            FoamResolveFixedFilmSource(coordinate);
+        return;
+    }
+
     float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamFilmDimensions);
     _FoamFilmSourceWrite[coordinate] = FoamResolveVisualFilmSourceAtDomainUV(uv);
+}
+
+
+int FoamResolveFixedFilmOffsetCells(
+    float distanceMetres,
+    float structuralSpacingMetres)
+{
+    float filmSpacingMetres = max(
+        0.0001,
+        structuralSpacingMetres * 2.0);
+    return max(1, (int)round(distanceMetres / filmSpacingMetres));
 }
 
 
@@ -300,21 +385,55 @@ void BuildFoamFilmSupport(uint3 dispatchId : SV_DispatchThreadID)
 
     int2 coordinate = int2(dispatchId.xy);
     int flowStep = _FoamFlowDirection >= 0.0 ? 1 : -1;
+    int alongNear = 1;
+    int alongMid = 2;
+    int alongFar = 3;
+    int acrossNear = 1;
+    int acrossFar = 2;
+    if (FoamGridUsesFixedMetricLattice())
+    {
+        alongNear = FoamResolveFixedFilmOffsetCells(
+            0.30,
+            _FoamGridDescriptorSpacing.z);
+        alongMid = FoamResolveFixedFilmOffsetCells(
+            0.60,
+            _FoamGridDescriptorSpacing.z);
+        alongFar = FoamResolveFixedFilmOffsetCells(
+            0.90,
+            _FoamGridDescriptorSpacing.z);
+        acrossNear = FoamResolveFixedFilmOffsetCells(
+            0.30,
+            _FoamGridDescriptorSpacing.w);
+        acrossFar = FoamResolveFixedFilmOffsetCells(
+            0.60,
+            _FoamGridDescriptorSpacing.w);
+    }
+
     float centre = FoamLoadFilmSource(coordinate);
 
     float along = centre * 0.32;
-    along += FoamLoadFilmSource(coordinate + int2(-flowStep, 0)) * 0.12;
-    along += FoamLoadFilmSource(coordinate + int2(flowStep, 0)) * 0.18;
-    along += FoamLoadFilmSource(coordinate + int2(-flowStep * 2, 0)) * 0.075;
-    along += FoamLoadFilmSource(coordinate + int2(flowStep * 2, 0)) * 0.115;
-    along += FoamLoadFilmSource(coordinate + int2(-flowStep * 3, 0)) * 0.030;
-    along += FoamLoadFilmSource(coordinate + int2(flowStep * 3, 0)) * 0.055;
+    along += FoamLoadFilmSource(
+        coordinate + int2(-flowStep * alongNear, 0)) * 0.12;
+    along += FoamLoadFilmSource(
+        coordinate + int2(flowStep * alongNear, 0)) * 0.18;
+    along += FoamLoadFilmSource(
+        coordinate + int2(-flowStep * alongMid, 0)) * 0.075;
+    along += FoamLoadFilmSource(
+        coordinate + int2(flowStep * alongMid, 0)) * 0.115;
+    along += FoamLoadFilmSource(
+        coordinate + int2(-flowStep * alongFar, 0)) * 0.030;
+    along += FoamLoadFilmSource(
+        coordinate + int2(flowStep * alongFar, 0)) * 0.055;
 
     float acrossRaw = centre * 0.28;
-    acrossRaw += FoamLoadFilmSource(coordinate + int2(0, -1)) * 0.115;
-    acrossRaw += FoamLoadFilmSource(coordinate + int2(0, 1)) * 0.115;
-    acrossRaw += FoamLoadFilmSource(coordinate + int2(0, -2)) * 0.035;
-    acrossRaw += FoamLoadFilmSource(coordinate + int2(0, 2)) * 0.035;
+    acrossRaw += FoamLoadFilmSource(
+        coordinate + int2(0, -acrossNear)) * 0.115;
+    acrossRaw += FoamLoadFilmSource(
+        coordinate + int2(0, acrossNear)) * 0.115;
+    acrossRaw += FoamLoadFilmSource(
+        coordinate + int2(0, -acrossFar)) * 0.035;
+    acrossRaw += FoamLoadFilmSource(
+        coordinate + int2(0, acrossFar)) * 0.035;
 
     // Cross-flow spread should be present, but it must be source-supported and
     // weaker than along-flow continuity. This prevents the low-res helper from
@@ -326,16 +445,22 @@ void BuildFoamFilmSupport(uint3 dispatchId : SV_DispatchThreadID)
     float across = acrossRaw * acrossGate;
 
     float diagonal = 0.0;
-    diagonal += FoamLoadFilmSource(coordinate + int2(-flowStep, -1));
-    diagonal += FoamLoadFilmSource(coordinate + int2(-flowStep, 1));
-    diagonal += FoamLoadFilmSource(coordinate + int2(flowStep, -1));
-    diagonal += FoamLoadFilmSource(coordinate + int2(flowStep, 1));
+    diagonal += FoamLoadFilmSource(
+        coordinate + int2(-flowStep * alongNear, -acrossNear));
+    diagonal += FoamLoadFilmSource(
+        coordinate + int2(-flowStep * alongNear, acrossNear));
+    diagonal += FoamLoadFilmSource(
+        coordinate + int2(flowStep * alongNear, -acrossNear));
+    diagonal += FoamLoadFilmSource(
+        coordinate + int2(flowStep * alongNear, acrossNear));
     diagonal *= 0.042 * acrossGate;
 
     float sheet = max(max(centre, along), max(across * 0.54, diagonal));
     float bridge = smoothstep(0.28, 0.68, along) *
         smoothstep(0.20, 0.56, across);
-    float2 domainUV = FoamTexelCentreUV(dispatchId.xy, _FoamFilmDimensions);
+    float2 domainUV = FoamGridUsesFixedMetricLattice()
+        ? FoamFilmTexelCentreFieldUV(coordinate)
+        : FoamTexelCentreUV(dispatchId.xy, _FoamFilmDimensions);
     FoamVisualFilmInfluence influence =
         FoamResolveVisualFilmInfluenceAtDomainUV(domainUV);
     float spread = max(sheet, bridge * 0.42);
@@ -362,8 +487,9 @@ float FoamSampleVisualOccupancyBilinear(float2 uv)
     int2 baseCoordinate;
     int2 nextCoordinate;
     float2 blend;
+    float2 filmUV = FoamFieldUVToFilmUV(uv);
     FoamResolveFilmBilinearCoordinates(
-        uv,
+        filmUV,
         baseCoordinate,
         nextCoordinate,
         blend);
@@ -387,6 +513,11 @@ bool FoamVisualOccupancyInsideGrid(int2 coordinate)
 
 float2 FoamVisualOccupancyDomainUV(int2 coordinate)
 {
+    if (FoamGridUsesFixedMetricLattice())
+    {
+        return FoamFilmTexelCentreFieldUV(coordinate);
+    }
+
     return ((float2)coordinate + 0.5) /
         max(float2(1.0, 1.0), (float2)_FoamFilmDimensions);
 }
@@ -399,14 +530,51 @@ bool FoamVisualOccupancyInsideSimulation(int2 coordinate)
         return false;
     }
 
-    float2 domainUV = FoamVisualOccupancyDomainUV(coordinate);
-    return domainUV.x * _FoamFieldLength <=
-        _FoamSimulationLength + 0.0001;
+    if (!FoamGridUsesFixedMetricLattice())
+    {
+        float2 domainUV = FoamVisualOccupancyDomainUV(coordinate);
+        return domainUV.x * _FoamFieldLength <=
+            _FoamSimulationLength + 0.0001;
+    }
+
+    int structuralStart;
+    int representedCount;
+    FoamResolveFilmStructuralRange1D(
+        coordinate.x,
+        _FoamDimensions.x,
+        structuralStart,
+        representedCount);
+    [unroll]
+    for (int localX = 0; localX < 2; localX++)
+    {
+        if (localX < representedCount &&
+            IsFoamGridColumnInsideSimulation(structuralStart + localX))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 
 int FoamVisualOccupancyMetricRow(int filmX)
 {
+    if (FoamGridUsesFixedMetricLattice())
+    {
+        int structuralStart = 0;
+        int representedCount = 0;
+        FoamResolveFilmStructuralRange1D(
+            filmX,
+            _FoamDimensions.x,
+            structuralStart,
+            representedCount);
+        int centreOffset = representedCount > 1 ? 1 : 0;
+        return clamp(
+            structuralStart + centreOffset,
+            0,
+            max(0, _FoamDimensions.x - 1));
+    }
+
     float domainU = ((float)filmX + 0.5) /
         max(1.0, (float)_FoamFilmDimensions.x);
     return clamp(
@@ -416,18 +584,60 @@ int FoamVisualOccupancyMetricRow(int filmX)
 }
 
 
-float FoamVisualOccupancyLongitudinalSpacing()
+float FoamVisualOccupancyLongitudinalSpacing(int filmX)
 {
-    return max(
-        0.0001,
-        _FoamFieldLength / max(1.0, (float)_FoamFilmDimensions.x));
+    float resolvedSpacing = 0.0001;
+    if (FoamGridUsesFixedMetricLattice())
+    {
+        int structuralStart = 0;
+        int representedCount = 0;
+        FoamResolveFilmStructuralRange1D(
+            filmX,
+            _FoamDimensions.x,
+            structuralStart,
+            representedCount);
+        float fixedSpacing = 0.0;
+        [unroll]
+        for (int localX = 0; localX < 2; localX++)
+        {
+            if (localX < representedCount)
+            {
+                fixedSpacing += FoamTransportLongitudinalSpacing(
+                    structuralStart + localX);
+            }
+        }
+        resolvedSpacing = max(0.0001, fixedSpacing);
+    }
+    else
+    {
+        resolvedSpacing = max(
+            0.0001,
+            _FoamFieldLength / max(1.0, (float)_FoamFilmDimensions.x));
+    }
+
+    return resolvedSpacing;
 }
 
 
-float FoamVisualOccupancyLateralSpacing(int filmX)
+float FoamVisualOccupancyLateralSpacing(int filmX, int filmY)
 {
     int metricX = FoamVisualOccupancyMetricRow(filmX);
     FoamMetricRow metric = _FoamMetricRows[metricX];
+    if (FoamGridUsesFixedMetricLattice())
+    {
+        int structuralStart;
+        int representedCount;
+        FoamResolveFilmStructuralRange1D(
+            filmY,
+            _FoamDimensions.y,
+            structuralStart,
+            representedCount);
+        return max(
+            0.0001,
+            (float)representedCount *
+                FoamTransportLateralSpacing(metricX));
+    }
+
     float totalWidth = max(
         0.0001,
         metric.widthsAndSpacing.x + metric.widthsAndSpacing.y);
@@ -437,10 +647,55 @@ float FoamVisualOccupancyLateralSpacing(int filmX)
 }
 
 
-float FoamVisualOccupancyCellArea(int filmX)
+float FoamVisualOccupancyCellArea(int2 filmCoordinate)
 {
-    return FoamVisualOccupancyLongitudinalSpacing() *
-        FoamVisualOccupancyLateralSpacing(filmX);
+    float resolvedArea = 0.0001;
+    if (FoamGridUsesFixedMetricLattice())
+    {
+        int startX = 0;
+        int countX = 0;
+        int startY = 0;
+        int countY = 0;
+        FoamResolveFilmStructuralRange1D(
+            filmCoordinate.x,
+            _FoamDimensions.x,
+            startX,
+            countX);
+        FoamResolveFilmStructuralRange1D(
+            filmCoordinate.y,
+            _FoamDimensions.y,
+            startY,
+            countY);
+        float fixedArea = 0.0;
+        [unroll]
+        for (int localX = 0; localX < 2; localX++)
+        {
+            if (localX < countX)
+            {
+                [unroll]
+                for (int localY = 0; localY < 2; localY++)
+                {
+                    if (localY < countY)
+                    {
+                        fixedArea += FoamTransportCellArea(
+                            startX + localX,
+                            startY + localY);
+                    }
+                }
+            }
+        }
+        resolvedArea = max(0.0001, fixedArea);
+    }
+    else
+    {
+        resolvedArea =
+            FoamVisualOccupancyLongitudinalSpacing(filmCoordinate.x) *
+            FoamVisualOccupancyLateralSpacing(
+                filmCoordinate.x,
+                filmCoordinate.y);
+    }
+
+    return resolvedArea;
 }
 
 
@@ -451,13 +706,60 @@ float FoamVisualOccupancyValidFluidAt(int2 coordinate)
         return 0.0;
     }
 
-    float2 domainUV = FoamVisualOccupancyDomainUV(coordinate);
-    float2 materialPixel = FoamUVToTexelCoordinate(
-        domainUV,
-        _FoamDimensions);
-    float boundaryCoverage = SampleBoundaryCoverageBilinear(materialPixel);
-    float obstacleFootprint = SampleObstacleExclusionBilinear(materialPixel);
-    return saturate(boundaryCoverage * (1.0 - obstacleFootprint));
+    if (!FoamGridUsesFixedMetricLattice())
+    {
+        float2 domainUV = FoamVisualOccupancyDomainUV(coordinate);
+        float2 materialPixel = FoamUVToTexelCoordinate(
+            domainUV,
+            _FoamDimensions);
+        float boundaryCoverage = SampleBoundaryCoverageBilinear(materialPixel);
+        float obstacleFootprint = SampleObstacleExclusionBilinear(materialPixel);
+        return saturate(boundaryCoverage * (1.0 - obstacleFootprint));
+    }
+
+    int startX;
+    int countX;
+    int startY;
+    int countY;
+    FoamResolveFilmStructuralRange1D(
+        coordinate.x,
+        _FoamDimensions.x,
+        startX,
+        countX);
+    FoamResolveFilmStructuralRange1D(
+        coordinate.y,
+        _FoamDimensions.y,
+        startY,
+        countY);
+    float validArea = 0.0;
+    float representedArea = 0.0;
+    [unroll]
+    for (int localX = 0; localX < 2; localX++)
+    {
+        if (localX >= countX)
+        {
+            continue;
+        }
+        [unroll]
+        for (int localY = 0; localY < 2; localY++)
+        {
+            if (localY >= countY)
+            {
+                continue;
+            }
+            int2 structuralCoordinate = int2(
+                startX + localX,
+                startY + localY);
+            float cellArea = FoamTransportCellArea(
+                structuralCoordinate.x,
+                structuralCoordinate.y);
+            representedArea += cellArea;
+            validArea += FoamValidFluidAt(structuralCoordinate) * cellArea;
+        }
+    }
+    return representedArea > 0.000001
+        ? saturate(validArea / representedArea)
+        : 0.0;
 }
 
 
@@ -528,8 +830,8 @@ void FoamResolveVisualLongitudinalFaceFlux(
             rightValid).x;
         float faceVelocity = 0.5 * (leftVelocity + rightVelocity);
         float faceLength = 0.5 * (
-            FoamVisualOccupancyLateralSpacing(leftX) +
-            FoamVisualOccupancyLateralSpacing(leftX + 1));
+            FoamVisualOccupancyLateralSpacing(leftX, y) +
+            FoamVisualOccupancyLateralSpacing(leftX + 1, y));
         float donor = faceVelocity >= 0.0
             ? leftOccupancy
             : rightOccupancy;
@@ -556,7 +858,7 @@ void FoamResolveVisualLongitudinalFaceFlux(
         if (faceVelocity > 0.0)
         {
             resolvedFlux = faceVelocity *
-                FoamVisualOccupancyLateralSpacing(leftX) *
+                FoamVisualOccupancyLateralSpacing(leftX, y) *
                 leftOccupancy;
         }
         return;
@@ -579,7 +881,9 @@ void FoamResolveVisualLongitudinalFaceFlux(
         if (faceVelocity < 0.0)
         {
             resolvedFlux = faceVelocity *
-                FoamVisualOccupancyLateralSpacing(rightCoordinate.x) *
+                FoamVisualOccupancyLateralSpacing(
+                    rightCoordinate.x,
+                    y) *
                 rightOccupancy;
         }
     }
@@ -624,8 +928,37 @@ void FoamResolveVisualLateralFaceFlux(
     float donor = faceVelocity >= 0.0
         ? lowerOccupancy
         : upperOccupancy;
-    resolvedFlux = faceVelocity *
-        FoamVisualOccupancyLongitudinalSpacing() * donor;
+    float faceLength = FoamVisualOccupancyLongitudinalSpacing(x);
+    if (FoamGridUsesFixedMetricLattice())
+    {
+        int startX;
+        int countX;
+        int lowerStartY;
+        int lowerCountY;
+        FoamResolveFilmStructuralRange1D(
+            x,
+            _FoamDimensions.x,
+            startX,
+            countX);
+        FoamResolveFilmStructuralRange1D(
+            lowerY,
+            _FoamDimensions.y,
+            lowerStartY,
+            lowerCountY);
+        int structuralLowerY = lowerStartY + lowerCountY - 1;
+        faceLength = 0.0;
+        [unroll]
+        for (int localX = 0; localX < 2; localX++)
+        {
+            if (localX < countX)
+            {
+                faceLength += FoamTransportLateralFaceLength(
+                    startX + localX,
+                    structuralLowerY);
+            }
+        }
+    }
+    resolvedFlux = faceVelocity * faceLength * donor;
 }
 
 
@@ -670,7 +1003,7 @@ void AdvanceFoamVisualOccupancy(uint3 dispatchId : SV_DispatchThreadID)
         coordinate.y,
         northFlux);
 
-    float area = FoamVisualOccupancyCellArea(coordinate.x);
+    float area = FoamVisualOccupancyCellArea(coordinate);
     float transportedOccupancy = currentOccupancy -
         _FoamDeltaTime / max(0.000001, area) *
         ((eastFlux - westFlux) + (northFlux - southFlux));
@@ -753,7 +1086,10 @@ void ApplyBoundary(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
-    if (!IsFoamColumnInsideSimulation(x))
+    bool insideSimulation = FoamGridUsesFixedMetricLattice()
+        ? IsFoamGridColumnInsideSimulation(x)
+        : IsFoamColumnInsideSimulation(x);
+    if (!insideSimulation)
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
         return;
@@ -770,20 +1106,21 @@ void ApplyBoundary(uint3 dispatchId : SV_DispatchThreadID)
 void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
 {
     if (dispatchId.x >= (uint)_FoamRangeCount ||
-        dispatchId.y >= (uint)_FoamDimensions.y)
+        dispatchId.y >= (uint)_FoamRangeCountY)
     {
         return;
     }
 
     int x = _FoamRangeStart + (int)dispatchId.x;
-    int y = (int)dispatchId.y;
-    if (x < 0 || x >= _FoamDimensions.x)
+    int y = _FoamRangeStartY + (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x ||
+        y < 0 || y >= _FoamDimensions.y)
     {
         return;
     }
 
     int2 coordinate = int2(x, y);
-    if (!IsFoamColumnInsideDomain(x))
+    if (!IsFoamGridColumnInsideDomain(x))
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
         return;
@@ -800,17 +1137,15 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     FoamMetricRow metric = _FoamMetricRows[x];
-    float across01 = FoamAcross01AtTexel(y);
-    float lateralMetres = FoamAcross01ToMetres(
-        across01,
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
-    float centreAcrossMetres = FoamAcross01ToMetres(
-        saturate(_FoamInjectionAcrossNormalized * 0.5 + 0.5),
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
+    float lateralMetres = FoamLateralMetresAtTexel(y, metric);
+    float centreAcrossMetres = _FoamInjectionUsesMetricLateral > 0.5
+        ? _FoamInjectionLateralMetres
+        : FoamAcross01ToMetres(
+            saturate(_FoamInjectionAcrossNormalized * 0.5 + 0.5),
+            metric.widthsAndSpacing.x,
+            metric.widthsAndSpacing.y);
     float globalDistance = _FoamGlobalStart +
-        FoamLocalDistanceAtTexel(x);
+        FoamGridLocalDistanceAtTexel(x);
     float2 physicalPosition = float2(globalDistance, lateralMetres);
     float2 physicalCellSpacing = float2(
         max(0.01, metric.widthsAndSpacing.z),
@@ -953,8 +1288,10 @@ float FoamEvaluateShoreRibbonSource(
         : shoreMetres - lateralMetres;
     float centre = sourceEvent.shore.x;
     float crossRiverCellSpacing = max(0.005, physicalCellSpacing.y);
-    float sourceThickness = max(0.5, sourceEvent.shore.y) *
-        crossRiverCellSpacing;
+    float sourceThickness = FoamGridUsesFixedMetricLattice()
+        ? max(0.005, sourceEvent.shore.y)
+        : max(0.5, sourceEvent.shore.y) *
+            crossRiverCellSpacing;
     float halfWidth = sourceThickness * 0.5;
     float feather = crossRiverCellSpacing * 0.5;
     float bandDistance = abs(inwardMetres - centre);
@@ -2024,7 +2361,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
 
     int x = coordinate.x;
     int y = coordinate.y;
-    if (!IsFoamColumnInsideDomain(x))
+    if (!IsFoamGridColumnInsideDomain(x))
     {
         result.clearState = 1.0;
         return result;
@@ -2050,12 +2387,9 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     }
 
     FoamMetricRow metric = _FoamMetricRows[x];
-    float across01 = FoamAcross01AtTexel(y);
-    float lateralMetres = FoamAcross01ToMetres(
-        across01,
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
-    float globalDistance = _FoamGlobalStart + FoamLocalDistanceAtTexel(x);
+    float lateralMetres = FoamLateralMetresAtTexel(y, metric);
+    float globalDistance = _FoamGlobalStart +
+        FoamGridLocalDistanceAtTexel(x);
     float2 physicalPosition = float2(globalDistance, lateralMetres);
     float2 physicalCellSpacing = float2(
         max(0.01, metric.widthsAndSpacing.z),
@@ -2397,7 +2731,7 @@ void BuildCurrentShoreEdges(uint3 dispatchId : SV_DispatchThreadID)
     float u = FoamTexelCentreUV1D(
         outputX,
         _FoamTopologyDimensions.x);
-    if (!IsFoamUInsideDomain(u))
+    if (!IsFoamGridUInsideDomain(u))
     {
         _FoamCurrentShoreEdgesWrite[int2(outputX, 0)] = float2(0.0, 0.0);
         return;
@@ -2411,7 +2745,8 @@ void BuildCurrentShoreEdges(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float globalDistance = _FoamGlobalStart + u * _FoamFieldLength;
+    float globalDistance = _FoamGlobalStart +
+        FoamGridLocalDistanceAtUV(u);
     float liquidFactor = 1.0 - saturate(_FoamFreezeAmount);
     float leftVisible = RiverWaterResolveCurrentVisibleShoreHalfWidth(
         globalDistance,
@@ -2631,7 +2966,7 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
 
     int2 outputCoordinate = int2(dispatchId.xy);
     float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamTopologyDimensions);
-    if (!IsFoamUInsideDomain(uv.x))
+    if (!IsFoamGridUInsideDomain(uv.x))
     {
         _FoamEvolvingMajorWrite[outputCoordinate] = 0.0;
         _FoamEvolvingHostedNegativeWrite[outputCoordinate] = 0.0;
@@ -2663,11 +2998,8 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
         uv.x,
         _FoamDimensions.x);
     FoamMetricRow metric = _FoamMetricRows[metricX];
-    float localDistance = saturate(uv.x) * _FoamFieldLength;
-    float lateralMetres = FoamAcross01ToMetres(
-        saturate(uv.y),
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
+    float localDistance = FoamGridLocalDistanceAtUV(uv.x);
+    float lateralMetres = FoamLateralMetresAtUV(uv.y, metric);
     float support = 0.0;
     float hostedNegative = 0.0;
     float freeWaterNegative = 0.0;
@@ -2842,7 +3174,7 @@ void CaptureGeneratedTopology(uint3 dispatchId : SV_DispatchThreadID)
 
     int2 outputCoordinate = int2(dispatchId.xy);
     float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamTopologyDimensions);
-    if (!IsFoamUInsideDomain(uv.x))
+    if (!IsFoamGridUInsideDomain(uv.x))
     {
         _FoamTopologyTransitionCaptureWrite[outputCoordinate] = 0.0.xxxx;
         return;
@@ -2873,7 +3205,7 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
 
     int2 outputCoordinate = int2(dispatchId.xy);
     float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamTopologyDimensions);
-    if (!IsFoamUInsideDomain(uv.x))
+    if (!IsFoamGridUInsideDomain(uv.x))
     {
         _FoamTopologyWrite[outputCoordinate] = 0.0.xxxx;
         _FoamTopologySourcesWrite[outputCoordinate] = 0.0.xxxx;
@@ -2987,10 +3319,7 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
 
     float2 currentShoreEdges = _FoamCurrentShoreEdgesRead.Load(
         int3(outputCoordinate.x, 0, 0));
-    float lateralMetres = FoamAcross01ToMetres(
-        uv.y,
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
+    float lateralMetres = FoamLateralMetresAtUV(uv.y, metric);
     float leftInsideDistance = lateralMetres - currentShoreEdges.x;
     float rightInsideDistance = currentShoreEdges.y - lateralMetres;
     float nearestCurrentShore = min(
@@ -3076,7 +3405,7 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamTopologyDimensions);
-    if (!IsFoamUInsideDomain(uv.x))
+    if (!IsFoamGridUInsideDomain(uv.x))
     {
         return;
     }
@@ -3266,6 +3595,33 @@ void ResetTransportMetrics(uint3 dispatchId : SV_DispatchThreadID)
 }
 
 [numthreads(8, 8, 1)]
+void RemapPersistentFoamState(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamDimensions.x ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(dispatchId.xy);
+    float4 remapped = 0.0.xxxx;
+    int2 previousCoordinate;
+    if (TryResolvePersistentStateRemapCoordinate(
+            coordinate,
+            previousCoordinate))
+    {
+        remapped = FoamClampPackedMaterialState(
+            _FoamPersistentStateRemapRead.Load(
+                int3(previousCoordinate, 0)));
+    }
+
+    float validFluid = FoamValidFluidAt(coordinate);
+    _FoamStateWrite[coordinate] = FoamClipPackedToValidFluid(
+        remapped,
+        validFluid);
+}
+
+[numthreads(8, 8, 1)]
 void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
 {
     if (dispatchId.x >= (uint)_FoamRangeCount ||
@@ -3293,7 +3649,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         FoamClampPackedMaterialState(
             _FoamStateRead.Load(int3(coordinate, 0))),
         validFluid);
-    float cellArea = FoamTransportCellArea(x);
+    float cellArea = FoamTransportCellArea(x, y);
     FoamAccumulateTransportTriplet(
         FoamTransportPresenceBeforeOffset,
         FoamTransportLifeBeforeOffset,

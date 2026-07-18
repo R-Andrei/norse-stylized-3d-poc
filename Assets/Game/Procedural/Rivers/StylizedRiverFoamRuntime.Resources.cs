@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -571,51 +572,33 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            chunkCount = Mathf.Max(
-                1,
-                Mathf.CeilToInt(domain.LocalLength / ChunkLengthMetres));
-            int desiredStructuralResolution =
-                ResolveStructuralResolution(river.Quality);
-            resolutionPerChunk = desiredStructuralResolution;
-
             int maximumTextureSize = SystemInfo.maxTextureSize;
-            if (!TryResolveChunkedTextureWidth(
-                    chunkCount,
-                    resolutionPerChunk,
-                    16,
+            StylizedRiverFoamGridDescriptor.ValidateFoundation();
+            StylizedRiverFoamTopologyCacheCodec.ValidateFoundation();
+            StylizedRiverFoamTopologyFieldSpace.ValidateFoundation();
+            if (!TryResolveLegacyInitializationDescriptor(
+                    domain,
                     maximumTextureSize,
-                    out resolutionPerChunk,
-                    out fieldWidth))
+                    out StylizedRiverFoamGridDescriptor activeDescriptor))
             {
                 ReportAllocationFailure(maximumTextureSize);
                 initializationPhase = InitializationPhase.Failed;
                 return false;
             }
 
-            fieldHeight = desiredStructuralResolution;
-            filmFieldWidth = Mathf.Max(1, Mathf.CeilToInt(fieldWidth * 0.5f));
-            filmFieldHeight = Mathf.Max(1, Mathf.CeilToInt(fieldHeight * 0.5f));
+            ResolveFixedMetricCandidateDescriptor(
+                domain,
+                maximumTextureSize);
 
-            // Topology uses the same structural grid as persistent material so
-            // narrow structures are not authored on a coarser
-            // hidden lattice and then upsampled.
-            structuralWidth = fieldWidth;
-            structuralHeight = fieldHeight;
-            if (maximumTextureSize < 24 ||
-                fieldHeight > maximumTextureSize ||
-                structuralHeight > maximumTextureSize)
-            {
-                ReportAllocationFailure(maximumTextureSize);
-                initializationPhase = InitializationPhase.Failed;
-                return false;
-            }
+            // P3 makes the descriptor the only allocation-dimension authority,
+            // but deliberately keeps LegacyNormalizedAcross active. Enabling
+            // the prepared fixed-metric candidate before P4-P9 would allow old
+            // cache, topology, source, compute, transport, and render consumers
+            // to observe a mixed coordinate state.
+            ApplyGridDescriptorDimensions(activeDescriptor);
+            gridDescriptorGpuData = gridDescriptor.ToGpuData();
 
-            fieldLength = chunkCount * ChunkLengthMetres;
-            validFieldLength = domain.LocalLength;
-            float longitudinalSpacing =
-                StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
-                    fieldLength,
-                    fieldWidth);
+            float longitudinalSpacing = gridDescriptor.ResolvedDxMetres;
             // Keep one inert outflow sample beyond the exact endpoint so
             // bilinear rendering reaches the visible river end without
             // reintroducing a padded population domain.
@@ -628,6 +611,156 @@ namespace ProgrammaticStylized3D.Rivers
             allocatedQuality = river.Quality;
             initializationMotionTime = river.MotionTime;
             return true;
+        }
+
+        private bool TryResolveLegacyInitializationDescriptor(
+            RiverDomainSnapshot domain,
+            int maximumTextureSize,
+            out StylizedRiverFoamGridDescriptor descriptor)
+        {
+            descriptor = default;
+            int resolvedChunkCount = Mathf.Max(
+                1,
+                Mathf.CeilToInt(domain.LocalLength / ChunkLengthMetres));
+            int desiredStructuralResolution =
+                ResolveStructuralResolution(river.Quality);
+            if (!TryResolveChunkedTextureWidth(
+                    resolvedChunkCount,
+                    desiredStructuralResolution,
+                    16,
+                    maximumTextureSize,
+                    out int resolvedColumnsPerChunk,
+                    out int resolvedFieldWidth))
+            {
+                chunkCount = resolvedChunkCount;
+                return false;
+            }
+
+            int resolvedFieldHeight = desiredStructuralResolution;
+            int resolvedFilmWidth = Mathf.Max(
+                1,
+                Mathf.CeilToInt(resolvedFieldWidth * 0.5f));
+            int resolvedFilmHeight = Mathf.Max(
+                1,
+                Mathf.CeilToInt(resolvedFieldHeight * 0.5f));
+            if (maximumTextureSize < 24 ||
+                resolvedFieldHeight > maximumTextureSize)
+            {
+                chunkCount = resolvedChunkCount;
+                return false;
+            }
+
+            descriptor = StylizedRiverFoamGridDescriptor.CreateLegacyNormalized(
+                river.Quality,
+                resolvedChunkCount,
+                resolvedColumnsPerChunk,
+                resolvedFieldWidth,
+                resolvedFieldHeight,
+                resolvedFilmWidth,
+                resolvedFilmHeight,
+                resolvedChunkCount * ChunkLengthMetres,
+                domain.LocalLength);
+            return true;
+        }
+
+        private void ResolveFixedMetricCandidateDescriptor(
+            RiverDomainSnapshot domain,
+            int maximumTextureSize)
+        {
+            fixedMetricCandidateDescriptor = default;
+            fixedMetricCandidateFailureReason = "Not resolved";
+            if (!TryResolveDomainSurfaceLateralRange(
+                    domain,
+                    out float lateralMinimumMetres,
+                    out float lateralMaximumMetres))
+            {
+                fixedMetricCandidateFailureReason =
+                    "River surface lateral bounds are unavailable.";
+                return;
+            }
+
+            float requestedCellSize = StylizedRiverFoamGridDescriptor
+                .ResolveProvisionalRequestedCellSizeMetres(river.Quality);
+            if (!StylizedRiverFoamGridDescriptor.TryCreateFixedMetricOneStrip(
+                    river.Quality,
+                    requestedCellSize,
+                    requestedCellSize,
+                    domain.LocalLength,
+                    lateralMinimumMetres,
+                    lateralMaximumMetres,
+                    0f,
+                    0,
+                    maximumTextureSize,
+                    out fixedMetricCandidateDescriptor,
+                    out fixedMetricCandidateFailureReason))
+            {
+                return;
+            }
+
+            fixedMetricCandidateFailureReason = "Ready; activation deferred";
+        }
+
+        private static bool TryResolveDomainSurfaceLateralRange(
+            RiverDomainSnapshot domain,
+            out float lateralMinimumMetres,
+            out float lateralMaximumMetres)
+        {
+            lateralMinimumMetres = 0f;
+            lateralMaximumMetres = 0f;
+            if (domain == null || !domain.IsValid || domain.SampleCount < 1)
+            {
+                return false;
+            }
+
+            float maximumLeft = 0f;
+            float maximumRight = 0f;
+            IReadOnlyList<StylizedRiverSplineSample> samples = domain.Samples;
+            for (int index = 0; index < samples.Count; index++)
+            {
+                maximumLeft = Mathf.Max(
+                    maximumLeft,
+                    samples[index].LeftSurfaceHalfWidth);
+                maximumRight = Mathf.Max(
+                    maximumRight,
+                    samples[index].RightSurfaceHalfWidth);
+            }
+
+            if (maximumLeft <= 0f || maximumRight <= 0f ||
+                float.IsNaN(maximumLeft) || float.IsNaN(maximumRight) ||
+                float.IsInfinity(maximumLeft) ||
+                float.IsInfinity(maximumRight))
+            {
+                return false;
+            }
+
+            lateralMinimumMetres = -Mathf.Max(0.05f, maximumLeft);
+            lateralMaximumMetres = Mathf.Max(0.05f, maximumRight);
+            return true;
+        }
+
+        private void ApplyGridDescriptorDimensions(
+            StylizedRiverFoamGridDescriptor descriptor)
+        {
+            if (!descriptor.IsCreated)
+            {
+                throw new InvalidOperationException(
+                    "Cannot allocate River Foam from an empty grid descriptor.");
+            }
+
+            gridDescriptor = descriptor;
+            resolutionPerChunk = descriptor.ColumnsPerChunk;
+            chunkCount = Mathf.Max(
+                1,
+                descriptor.ColumnCount /
+                    Mathf.Max(1, descriptor.ColumnsPerChunk));
+            fieldWidth = descriptor.ColumnCount;
+            fieldHeight = descriptor.RowCount;
+            filmFieldWidth = descriptor.FilmWidth;
+            filmFieldHeight = descriptor.FilmHeight;
+            structuralWidth = descriptor.ColumnCount;
+            structuralHeight = descriptor.RowCount;
+            fieldLength = descriptor.AllocatedLengthMetres;
+            validFieldLength = descriptor.ValidLengthMetres;
         }
 
         private float ResolveInitializationMotionTime()
@@ -701,6 +834,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             resourcesDirty = false;
+            ApplyPersistentStateReplacementBeforeVisibleHoldRelease();
             ReleaseTopologyTransitionVisibleHold();
             simulationAccumulator = 0f;
             lastMaximumTransportCfl = 0f;
@@ -1219,6 +1353,7 @@ namespace ProgrammaticStylized3D.Rivers
             resetTopologyMetricsKernel = -1;
             measureTopologyMetricsKernel = -1;
             resetTransportMetricsKernel = -1;
+            remapPersistentStateKernel = -1;
             simulateKernel = -1;
             buildFilmSourceKernel = -1;
             buildFilmSupportKernel = -1;
@@ -1232,11 +1367,18 @@ namespace ProgrammaticStylized3D.Rivers
             structuralHeight = 0;
             chunkCount = 0;
             resolutionPerChunk = 0;
+            gridDescriptor = default;
+            gridDescriptorGpuData = default;
+            fixedMetricCandidateDescriptor = default;
+            fixedMetricCandidateFailureReason = "Not resolved";
             fieldLength = 0f;
             validFieldLength = 0f;
             simulationFieldLength = 0f;
             minimumTransportLongitudinalSpacing = 0f;
             minimumTransportLateralSpacing = 0f;
+            minimumTransportCurvatureJacobian = 1f;
+            minimumTransportRawJacobian = 1f;
+            maximumAbsoluteTransportCurvatureLateralProduct = 0f;
             allocatedGlobalStart = 0f;
             initializationMotionTime = 0f;
             resourcesDirty = true;
@@ -1264,6 +1406,11 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyTransitionCompletedCount = 0;
                 topologyTransitionRemappedCount = 0;
                 topologyTransitionFlattenedCount = 0;
+                persistentStateReplacementExactCount = 0;
+                persistentStateReplacementClearCount = 0;
+                lastPersistentStateReplacementPolicy =
+                    PersistentStateReplacementPolicy.None;
+                lastPersistentStateReplacementDetail = "None";
             }
             domainVersion = -1;
             topologyMetricsAccumulator = 0f;

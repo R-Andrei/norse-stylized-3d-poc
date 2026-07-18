@@ -29,7 +29,11 @@ namespace ProgrammaticStylized3D.Rivers
                 float segmentEndGlobalDistance = 0f,
                 float segmentEndAcrossNormalized = 0f,
                 float segmentEndRadius = 0f,
-                float segmentEndAmount = 0f)
+                float segmentEndAmount = 0f,
+                bool usesMetricLateral = false,
+                float lateralMetres = 0f,
+                float segmentStartLateralMetres = 0f,
+                float segmentEndLateralMetres = 0f)
             {
                 GlobalDistance = globalDistance;
                 AcrossNormalized = acrossNormalized;
@@ -69,6 +73,16 @@ namespace ProgrammaticStylized3D.Rivers
                 SegmentEndSourceAmount = segmentShape
                     ? segmentEndAmount
                     : sourceAmount;
+                UsesMetricLateral = usesMetricLateral;
+                LateralMetres = usesMetricLateral
+                    ? lateralMetres
+                    : 0f;
+                SegmentStartLateralMetres = usesMetricLateral && segmentShape
+                    ? segmentStartLateralMetres
+                    : LateralMetres;
+                SegmentEndLateralMetres = usesMetricLateral && segmentShape
+                    ? segmentEndLateralMetres
+                    : LateralMetres;
             }
 
             public float GlobalDistance { get; }
@@ -93,6 +107,10 @@ namespace ProgrammaticStylized3D.Rivers
             public float SegmentEndAcrossNormalized { get; }
             public float SegmentEndRadius { get; }
             public float SegmentEndSourceAmount { get; }
+            public bool UsesMetricLateral { get; }
+            public float LateralMetres { get; }
+            public float SegmentStartLateralMetres { get; }
+            public float SegmentEndLateralMetres { get; }
         }
 
         private enum AutomaticFoamSourceEventType
@@ -135,6 +153,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float ShoreInsetMetres;
             public float WidthMetres;
             public float ShoreRibbonThicknessCells;
+            public float ShoreRibbonThicknessMetres;
             public float InwardReachMetres;
             public float FeatherMetres;
             public float SourceAmount;
@@ -206,14 +225,18 @@ namespace ProgrammaticStylized3D.Rivers
         private struct FoamCompositionEvent
         {
             public bool Active;
+            public bool UsesMetricLateral;
             public int EventId;
             public float StartGlobalDistance;
             public float StartAcrossNormalized;
+            public float StartLateralMetres;
             public float Duration;
             public float TravelDistance;
             public float FlowDirection;
             public float AcrossDrift;
+            public float AcrossDriftMetres;
             public float PathWander;
+            public float PathWanderMetres;
             public float BaseRadius;
             public float SourceAmount;
             public float RemainingLife;
@@ -230,6 +253,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float Elapsed;
             public float PreviousGlobalDistance;
             public float PreviousAcrossNormalized;
+            public float PreviousLateralMetres;
             public float PreviousRadius;
             public float PreviousEmissionAmount;
         }

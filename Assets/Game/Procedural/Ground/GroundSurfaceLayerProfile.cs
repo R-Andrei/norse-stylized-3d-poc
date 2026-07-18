@@ -1,13 +1,15 @@
+using ProgrammaticStylized3D.Rendering.PixelSurface;
 using UnityEngine;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
     /// <summary>
-    /// Reusable dry material identity and cover compatibility used when
-    /// River-coupled Ground response replaces or exposes a secondary bank or
-    /// riverbed substrate. Wetness character belongs to the independent
-    /// GroundHydrologyModifierProfile. Spatial placement remains owned by
-    /// GeneratedGround material controls.
+    /// Ground-specific adapter used when a secondary substrate participates in
+    /// Ground rendering. Reusable dry identity resolves from the optional
+    /// StylizedSurfaceMaterialProfile; legacy fields remain a compatibility
+    /// fallback. Cover retention remains Ground-owned, wetness belongs to the
+    /// independent GroundHydrologyModifierProfile, and spatial placement remains
+    /// owned by GeneratedGround material controls.
     /// </summary>
     [CreateAssetMenu(
         fileName = "GSLP_NewGroundSurfaceLayer",
@@ -19,7 +21,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private string displayName = "Surface Layer";
 
-        [Header("Palette")]
+        [Tooltip("Reusable dry material identity. When assigned, palette, structural detail, and dry finish resolve from this generic Pixel Surface profile. Legacy fields below remain the null-reference fallback.")]
+        [SerializeField]
+        private StylizedSurfaceMaterialProfile surfaceMaterial;
+
+        [Header("Legacy Appearance Fallback")]
         [Tooltip("Primary dry colour of this exposed substrate.")]
         [SerializeField]
         private Color baseColor = new Color(0.42f, 0.36f, 0.28f, 1f);
@@ -102,14 +108,70 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ? name
                 : displayName;
 
-        public Color BaseColor => baseColor;
-        public Color DarkColor => darkColor;
-        public Color LightColor => lightColor;
+        public StylizedSurfaceMaterialProfile SurfaceMaterial =>
+            surfaceMaterial;
+        public Color BaseColor =>
+            surfaceMaterial != null
+                ? surfaceMaterial.BaseColor
+                : baseColor;
+        public Color DarkColor =>
+            surfaceMaterial != null
+                ? surfaceMaterial.DarkColor
+                : darkColor;
+        public Color LightColor =>
+            surfaceMaterial != null
+                ? surfaceMaterial.LightColor
+                : lightColor;
+        public Color CavityColor =>
+            surfaceMaterial != null
+                ? surfaceMaterial.CavityColor
+                : darkColor;
         public Color WetColor => wetColor;
-        public float MacroContrast => Mathf.Clamp(macroContrast, 0f, 2f);
+        public float MacroContrast =>
+            surfaceMaterial != null
+                ? surfaceMaterial.MacroContrast
+                : Mathf.Clamp(macroContrast, 0f, 2f);
         public float PixelContrast => Mathf.Clamp(pixelContrast, 0f, 2f);
-        public float DrySmoothness => Mathf.Clamp01(drySmoothness);
-        public float DrySpecularStrength => Mathf.Clamp01(drySpecularStrength);
+        public float LegacyPixelCellInfluence =>
+            surfaceMaterial != null
+                ? surfaceMaterial.LegacyPixelCellInfluence
+                : 1f;
+        public float DetailValueStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.DetailValueStrength
+                : 0f;
+        public float DetailWorldScale =>
+            surfaceMaterial != null
+                ? surfaceMaterial.DetailWorldScale
+                : 1f;
+        public float DetailNormalStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.DetailNormalStrength
+                : 0f;
+        public float DetailCavityStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.DetailCavityStrength
+                : 0f;
+        public float DetailCavityBias =>
+            surfaceMaterial != null
+                ? surfaceMaterial.DetailCavityBias
+                : 0.5f;
+        public float DetailFormHighlightStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.DetailFormHighlightStrength
+                : 0f;
+        public float FinishVariationStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.FinishVariationStrength
+                : 0f;
+        public float DrySmoothness =>
+            surfaceMaterial != null
+                ? surfaceMaterial.DrySmoothness
+                : Mathf.Clamp01(drySmoothness);
+        public float DrySpecularStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.DrySpecularStrength
+                : Mathf.Clamp01(drySpecularStrength);
         public float WetDarkening => Mathf.Clamp(wetDarkening, 0f, 0.75f);
         public float WetTintStrength => Mathf.Clamp01(wetTintStrength);
         public float WetSmoothness => Mathf.Clamp01(wetSmoothness);
@@ -117,6 +179,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float SnowRetention => Mathf.Clamp01(snowRetention);
         public float FrostRetention => Mathf.Clamp01(frostRetention);
         public float PaintedAccentRetention => Mathf.Clamp01(paintedAccentRetention);
+
+        public bool TryResolveDetail(
+            out Texture2DArray textureArray,
+            out int sliceIndex)
+        {
+            textureArray = null;
+            sliceIndex = -1;
+
+            return surfaceMaterial != null &&
+                   surfaceMaterial.TryResolveDetail(
+                       out textureArray,
+                       out sliceIndex);
+        }
 
         public void SetDisplayName(string value)
         {

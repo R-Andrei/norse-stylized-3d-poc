@@ -905,10 +905,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private Mesh generatedMesh;
         private Texture2D generatedFeatureAtlas0;
         private Texture2D generatedFeatureAtlas1;
+        [NonSerialized]
         private bool stableWorldGeometryFingerprintValid;
+        [NonSerialized]
         private GeneratedGeometryStableFingerprint
             stableWorldGeometryFingerprint;
+        [NonSerialized]
         private Mesh stableWorldGeometryFingerprintMesh;
+        [NonSerialized]
         private Matrix4x4 stableWorldGeometryFingerprintMatrix;
         private bool regenerationInProgress;
 #if UNITY_EDITOR
@@ -1441,19 +1445,44 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ? meshFilter.transform.localToWorldMatrix
                 : Matrix4x4.identity;
 
+            bool rejectedRestoredZero =
+                stableWorldGeometryFingerprintValid &&
+                stableWorldGeometryFingerprint.IsDefault;
+            bool meshChanged =
+                stableWorldGeometryFingerprintMesh != currentMesh;
+            bool transformChanged =
+                !stableWorldGeometryFingerprintMatrix.Equals(currentMatrix);
+            string refreshStatus = string.Empty;
             if (!stableWorldGeometryFingerprintValid ||
-                stableWorldGeometryFingerprintMesh != currentMesh ||
-                !stableWorldGeometryFingerprintMatrix.Equals(currentMatrix))
+                rejectedRestoredZero ||
+                meshChanged ||
+                transformChanged)
             {
-                RefreshStableWorldGeometryFingerprint();
+                RefreshStableWorldGeometryFingerprint(
+                    rejectedRestoredZero,
+                    out refreshStatus);
             }
 
             fingerprint = stableWorldGeometryFingerprint;
-            status = stableWorldGeometryFingerprintValid
-                ? "Using the generated owner's exact world-geometry fingerprint."
-                : "The generated owner could not prepare an exact " +
-                  "world-geometry fingerprint.";
-            return stableWorldGeometryFingerprintValid;
+            bool usable =
+                stableWorldGeometryFingerprintValid &&
+                !fingerprint.IsDefault;
+            if (usable)
+            {
+                status = string.IsNullOrEmpty(refreshStatus)
+                    ? "Using the generated owner's exact world-geometry fingerprint."
+                    : refreshStatus;
+            }
+            else
+            {
+                fingerprint = default;
+                status = string.IsNullOrEmpty(refreshStatus)
+                    ? "The generated owner could not prepare an exact " +
+                      "world-geometry fingerprint."
+                    : refreshStatus;
+            }
+
+            return usable;
         }
 
         private void OnEnable()
@@ -2197,22 +2226,53 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
-        private void RefreshStableWorldGeometryFingerprint()
+        private void RefreshStableWorldGeometryFingerprint(
+            bool repairingRestoredZero,
+            out string status)
         {
             using (ComputeFingerprintProfilerMarker.Auto())
             {
-                stableWorldGeometryFingerprintValid =
+                Mesh resolvedMesh = meshFilter != null
+                    ? meshFilter.sharedMesh
+                    : null;
+                Matrix4x4 resolvedMatrix = meshFilter != null
+                    ? meshFilter.transform.localToWorldMatrix
+                    : Matrix4x4.identity;
+                bool computed =
                     GeneratedGeometryStableFingerprintUtility
                         .TryComputeExactWorldTriangleFingerprint(
                             meshFilter,
-                            out stableWorldGeometryFingerprint,
-                            out _);
-                stableWorldGeometryFingerprintMesh = meshFilter != null
-                    ? meshFilter.sharedMesh
-                    : null;
-                stableWorldGeometryFingerprintMatrix = meshFilter != null
-                    ? meshFilter.transform.localToWorldMatrix
-                    : Matrix4x4.identity;
+                            out GeneratedGeometryStableFingerprint
+                                resolvedFingerprint,
+                            out string computeStatus) &&
+                    !resolvedFingerprint.IsDefault;
+
+                // Publish the four-lane transient cache atomically only after
+                // every value has been resolved. Unity hot reload must never
+                // restore a valid flag independently from its readonly struct.
+                stableWorldGeometryFingerprint = computed
+                    ? resolvedFingerprint
+                    : default;
+                stableWorldGeometryFingerprintMesh = resolvedMesh;
+                stableWorldGeometryFingerprintMatrix = resolvedMatrix;
+                stableWorldGeometryFingerprintValid = computed;
+
+                if (computed)
+                {
+                    status = repairingRestoredZero
+                        ? "Recomputed the generated owner's exact world-geometry " +
+                          "fingerprint after rejecting a restored all-zero " +
+                          "transient cache value."
+                        : "Prepared the generated owner's exact world-geometry " +
+                          "fingerprint. " + (computeStatus ?? string.Empty);
+                }
+                else
+                {
+                    status =
+                        "The generated owner could not prepare a usable exact " +
+                        "world-geometry fingerprint. " +
+                        (computeStatus ?? string.Empty);
+                }
             }
         }
 

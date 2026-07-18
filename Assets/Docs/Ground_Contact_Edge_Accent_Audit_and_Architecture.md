@@ -6,7 +6,7 @@
 
 This is the canonical V4 Contact / Edge Accent record for GeneratedMass grounding and explicitly participating GroundModifier boundaries. Its earlier River-bank source architecture is superseded by `Ground_River_Coupled_Surface_Response_Architecture.md`. River banks and riverbeds are never rasterized into the V4 Contact field, never appear in V4 source diagnostics, and never invalidate V4 coverage.
 
-V3M and V3R are accepted. V3S River-Coupled Ground Response is active. V4 begins only after V3S-A5 family acceptance.
+V3M, V3R, and the V3S-A4B.3 River-coupled baseline are accepted. GSU-M1 is implemented and source-audited through GSU-M1.8. GSU-M1.7 supplies generic shared/application authoring and GSU-M1.7.1 repairs its editor-only compile blocker. GSU-M1.8 supersedes the visually rejected 512 Fine Gravel payload with a rounded-pebble 256 runtime source and changes no Contact/Edge Accent source, field, shader, renderer, or geometry. Unity compilation, gameplay visual/performance acceptance, sequential material expansion, and subsequent family acceptance remain. V4 begins only after those gates close.
 
 The latest project source overrides this document whenever they conflict.
 
@@ -657,5 +657,5 @@ After GeneratedMass and modifier coverage is visually accepted, evaluate an expl
 # Next work items
 
 1. Preserve V4 as GeneratedMass plus explicit GroundModifier coverage while V3S is active.
-2. Resume V4-A1 only after V3S-A5 family acceptance.
+2. Resume V4-A1 only after GSU-M1 reusable-material acceptance, including GSU-M1.8 Fine Gravel gameplay acceptance and the subsequent family-acceptance gate.
 3. Validate source alignment, River independence, and invalidation before introducing the normal lit visual effect.

@@ -11,7 +11,7 @@ using UnityEngine.SceneManagement;
 namespace ProgrammaticStylized3D.Rivers.Editor
 {
     /// <summary>
-    /// Patch 4.9D release gate. Non-development player builds are rejected
+    /// River Foam release gate. Non-development player builds are rejected
     /// before build work begins when any enabled authored Foam river in an
     /// enabled build scene lacks one exact, current, complete persistent cache.
     /// Validation never creates, assigns, rebuilds, or saves assets.
@@ -226,6 +226,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Debug.Log(
                     $"[River Foam 4.9D] Release cache valid: {prefix}; " +
                     $"{riverPayloadBytes:N0} bytes, hash {riverPayloadHash}, " +
+                    $"descriptor-v{runtime.FoamGridDescriptorContractVersion}/" +
+                    $"{runtime.FoamGridMapping}-v" +
+                    $"{runtime.FoamGridMappingContractVersion}, " +
                     $"{obstacleSourceCount} exact obstacle source(s).",
                     river);
             }

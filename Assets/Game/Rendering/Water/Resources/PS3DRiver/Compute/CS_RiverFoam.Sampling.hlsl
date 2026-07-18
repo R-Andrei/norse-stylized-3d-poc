@@ -3,7 +3,7 @@ float FoamValidFluidAt(int2 coordinate)
 {
     if (coordinate.x < 0 || coordinate.x >= _FoamDimensions.x ||
         coordinate.y < 0 || coordinate.y >= _FoamDimensions.y ||
-        !IsFoamColumnInsideSimulation(coordinate.x))
+        !IsFoamGridColumnInsideSimulation(coordinate.x))
     {
         return 0.0;
     }
@@ -164,6 +164,7 @@ void ResolveExternalBilinearCoordinates(
 
 float4 SampleStaticWakeBilinear(float2 uv)
 {
+    uv = ResolveFoamExternalFieldUV(uv);
     int2 baseCoordinate;
     int2 nextCoordinate;
     float2 blend;
@@ -186,6 +187,7 @@ float4 SampleStaticWakeBilinear(float2 uv)
 
 float4 SampleRippleBilinear(float2 uv)
 {
+    uv = ResolveFoamExternalFieldUV(uv);
     int2 baseCoordinate;
     int2 nextCoordinate;
     float2 blend;
@@ -207,6 +209,7 @@ float4 SampleRippleBilinear(float2 uv)
 
 float4 SampleWakeBilinear(float2 uv)
 {
+    uv = ResolveFoamExternalFieldUV(uv);
     int2 baseCoordinate;
     int2 nextCoordinate;
     float2 blend;
@@ -228,6 +231,7 @@ float4 SampleWakeBilinear(float2 uv)
 
 float4 SampleStaticPressureBilinear(float2 uv)
 {
+    uv = ResolveFoamExternalFieldUV(uv);
     int2 baseCoordinate;
     int2 nextCoordinate;
     float2 blend;

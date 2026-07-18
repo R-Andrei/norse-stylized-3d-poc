@@ -1034,8 +1034,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamShoreRibbonThicknessCells"),
                         new GUIContent(
-                            "Source Thickness",
-                            "Bank-normal source thickness measured in cross-river Foam cells. One produces one contact-attached source cell; source amount and activity remain separate controls."));
+                            "Compatibility Thickness (Cells)",
+                            "LegacyNormalizedAcross interprets this in source-local cross-river Foam cells. FixedMetricLattice resolves the same authored value to source-local metres when the event is prepared."));
                     EditorGUILayout.PropertyField(
                         Find("foamShoreRibbonOffsetMetres"),
                         new GUIContent(
@@ -1044,8 +1044,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamShoreRibbonOffsetVariationCells"),
                         new GUIContent(
-                            "Offset Variation",
-                            "Deterministic event-to-event offset variation measured in cross-river Foam cells. This should not be used to create separated parallel bands."));
+                            "Compatibility Offset Variation (Cells)",
+                            "LegacyNormalizedAcross interprets this in source-local cross-river Foam cells. FixedMetricLattice resolves it to source-local metres. This should not create separated parallel bands."));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamShoreRibbonInitialPresenceMin"),

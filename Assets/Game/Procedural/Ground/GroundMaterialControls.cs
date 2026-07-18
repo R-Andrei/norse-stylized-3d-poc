@@ -143,12 +143,86 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float outerBankFade = 1f;
 
+    [Header("River-Coupled Bank Material Application")]
+    [InspectorName("Detail Scale Multiplier")]
+    [Tooltip("Multiplies the reusable material's natural world repeat size for this Bank application. Values above one make the authored stones larger; values below one make them finer. One preserves the shared material definition.")]
+    [Range(0.25f, 4f)]
+    [SerializeField]
+    private float bankDetailScaleMultiplier = 1f;
+
+    [InspectorName("Normal Strength Multiplier")]
+    [Tooltip("Multiplies reusable structural-detail normal strength for this Bank application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float bankDetailNormalStrengthMultiplier = 1f;
+
+    [InspectorName("Cavity Strength Multiplier")]
+    [Tooltip("Multiplies reusable cavity and inter-stone separation strength for this Bank application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float bankDetailCavityStrengthMultiplier = 1f;
+
+    [InspectorName("Value / Form Multiplier")]
+    [Tooltip("Multiplies authored per-stone value and form-highlight response for this Bank application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float bankDetailValueFormMultiplier = 1f;
+
+    [InspectorName("Finish Variation Multiplier")]
+    [Tooltip("Multiplies reusable dry finish variation for this Bank application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float bankDetailFinishVariationMultiplier = 1f;
+
+    [InspectorName("Legacy Cell Influence Multiplier")]
+    [Tooltip("Multiplies the reusable material's retained legacy pixel-cell response for this Bank application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float bankLegacyPixelCellInfluenceMultiplier = 1f;
+
     [Header("River-Coupled Riverbed Composition")]
     [InspectorName("Riverbed Material Strength")]
     [Tooltip("Master amount of the selected dry Riverbed Surface Layer on exact Riverbed Support. This does not control submerged-cover exclusion or wetness.")]
     [Range(0f, 1f)]
     [SerializeField]
     private float riverbedMaterialStrength = 1f;
+
+    [Header("River-Coupled Riverbed Material Application")]
+    [InspectorName("Detail Scale Multiplier")]
+    [Tooltip("Multiplies the reusable material's natural world repeat size for this Riverbed application. Values above one make the authored stones larger; values below one make them finer. One preserves the shared material definition.")]
+    [Range(0.25f, 4f)]
+    [SerializeField]
+    private float riverbedDetailScaleMultiplier = 1f;
+
+    [InspectorName("Normal Strength Multiplier")]
+    [Tooltip("Multiplies reusable structural-detail normal strength for this Riverbed application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float riverbedDetailNormalStrengthMultiplier = 1f;
+
+    [InspectorName("Cavity Strength Multiplier")]
+    [Tooltip("Multiplies reusable cavity and inter-stone separation strength for this Riverbed application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float riverbedDetailCavityStrengthMultiplier = 1f;
+
+    [InspectorName("Value / Form Multiplier")]
+    [Tooltip("Multiplies authored per-stone value and form-highlight response for this Riverbed application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float riverbedDetailValueFormMultiplier = 1f;
+
+    [InspectorName("Finish Variation Multiplier")]
+    [Tooltip("Multiplies reusable dry finish variation for this Riverbed application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float riverbedDetailFinishVariationMultiplier = 1f;
+
+    [InspectorName("Legacy Cell Influence Multiplier")]
+    [Tooltip("Multiplies the reusable material's retained legacy pixel-cell response for this Riverbed application. One preserves the shared material definition.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float riverbedLegacyPixelCellInfluenceMultiplier = 1f;
 
     [Header("River-Coupled Riverbed Hydrology")]
     [InspectorName("Riverbed Wetness Strength")]
@@ -525,8 +599,32 @@ public sealed class GroundMaterialControls
     public float OuterBankExtension => Mathf.Clamp(outerBankExtension, 0f, 20f);
     public float OuterBankStrength => Mathf.Clamp01(outerBankStrength);
     public float OuterBankFade => Mathf.Clamp(outerBankFade, 0.05f, 10f);
+    public float BankDetailScaleMultiplier =>
+        Mathf.Clamp(bankDetailScaleMultiplier, 0.25f, 4f);
+    public float BankDetailNormalStrengthMultiplier =>
+        Mathf.Clamp(bankDetailNormalStrengthMultiplier, 0f, 2f);
+    public float BankDetailCavityStrengthMultiplier =>
+        Mathf.Clamp(bankDetailCavityStrengthMultiplier, 0f, 2f);
+    public float BankDetailValueFormMultiplier =>
+        Mathf.Clamp(bankDetailValueFormMultiplier, 0f, 2f);
+    public float BankDetailFinishVariationMultiplier =>
+        Mathf.Clamp(bankDetailFinishVariationMultiplier, 0f, 2f);
+    public float BankLegacyPixelCellInfluenceMultiplier =>
+        Mathf.Clamp(bankLegacyPixelCellInfluenceMultiplier, 0f, 2f);
     public float RiverbedMaterialStrength =>
         Mathf.Clamp01(riverbedMaterialStrength);
+    public float RiverbedDetailScaleMultiplier =>
+        Mathf.Clamp(riverbedDetailScaleMultiplier, 0.25f, 4f);
+    public float RiverbedDetailNormalStrengthMultiplier =>
+        Mathf.Clamp(riverbedDetailNormalStrengthMultiplier, 0f, 2f);
+    public float RiverbedDetailCavityStrengthMultiplier =>
+        Mathf.Clamp(riverbedDetailCavityStrengthMultiplier, 0f, 2f);
+    public float RiverbedDetailValueFormMultiplier =>
+        Mathf.Clamp(riverbedDetailValueFormMultiplier, 0f, 2f);
+    public float RiverbedDetailFinishVariationMultiplier =>
+        Mathf.Clamp(riverbedDetailFinishVariationMultiplier, 0f, 2f);
+    public float RiverbedLegacyPixelCellInfluenceMultiplier =>
+        Mathf.Clamp(riverbedLegacyPixelCellInfluenceMultiplier, 0f, 2f);
     public float RiverbedWetnessStrength =>
         Mathf.Clamp01(riverbedWetnessStrength);
     public float RiverbedToBankWetnessBlendDistance =>
@@ -635,7 +733,19 @@ public sealed class GroundMaterialControls
             outerBankExtension = 0f;
             outerBankStrength = 0.5f;
             outerBankFade = 1f;
+            bankDetailScaleMultiplier = 1f;
+            bankDetailNormalStrengthMultiplier = 1f;
+            bankDetailCavityStrengthMultiplier = 1f;
+            bankDetailValueFormMultiplier = 1f;
+            bankDetailFinishVariationMultiplier = 1f;
+            bankLegacyPixelCellInfluenceMultiplier = 1f;
             riverbedMaterialStrength = 1f;
+            riverbedDetailScaleMultiplier = 1f;
+            riverbedDetailNormalStrengthMultiplier = 1f;
+            riverbedDetailCavityStrengthMultiplier = 1f;
+            riverbedDetailValueFormMultiplier = 1f;
+            riverbedDetailFinishVariationMultiplier = 1f;
+            riverbedLegacyPixelCellInfluenceMultiplier = 1f;
             riverbedWetnessStrength = 1f;
             riverbedToBankWetnessBlendDistance = 0.2f;
             riverbedToBankWetnessBlendSoftness = 0.75f;
@@ -683,7 +793,30 @@ public sealed class GroundMaterialControls
         outerBankExtension = source.outerBankExtension;
         outerBankStrength = source.outerBankStrength;
         outerBankFade = source.outerBankFade;
+        bankDetailScaleMultiplier = source.bankDetailScaleMultiplier;
+        bankDetailNormalStrengthMultiplier =
+            source.bankDetailNormalStrengthMultiplier;
+        bankDetailCavityStrengthMultiplier =
+            source.bankDetailCavityStrengthMultiplier;
+        bankDetailValueFormMultiplier =
+            source.bankDetailValueFormMultiplier;
+        bankDetailFinishVariationMultiplier =
+            source.bankDetailFinishVariationMultiplier;
+        bankLegacyPixelCellInfluenceMultiplier =
+            source.bankLegacyPixelCellInfluenceMultiplier;
         riverbedMaterialStrength = source.riverbedMaterialStrength;
+        riverbedDetailScaleMultiplier =
+            source.riverbedDetailScaleMultiplier;
+        riverbedDetailNormalStrengthMultiplier =
+            source.riverbedDetailNormalStrengthMultiplier;
+        riverbedDetailCavityStrengthMultiplier =
+            source.riverbedDetailCavityStrengthMultiplier;
+        riverbedDetailValueFormMultiplier =
+            source.riverbedDetailValueFormMultiplier;
+        riverbedDetailFinishVariationMultiplier =
+            source.riverbedDetailFinishVariationMultiplier;
+        riverbedLegacyPixelCellInfluenceMultiplier =
+            source.riverbedLegacyPixelCellInfluenceMultiplier;
         riverbedWetnessStrength = source.riverbedWetnessStrength;
         riverbedToBankWetnessBlendDistance =
             source.riverbedToBankWetnessBlendDistance;

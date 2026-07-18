@@ -56,7 +56,7 @@ namespace ProgrammaticStylized3D.Rivers
     /// pressure envelope from this same exact solid-volume source data and then
     /// apply Pressure-specific shaping. Do not introduce a third mesh scanner.
     /// </summary>
-    public static class RiverObstacleExclusionResolver
+    public static partial class RiverObstacleExclusionResolver
     {
         public const int SamplesPerAxis = 3;
         public const int SamplesPerCell = SamplesPerAxis * SamplesPerAxis;
@@ -105,6 +105,67 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            int columnsPerChunk = Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    StylizedRiverFoamGridDescriptor
+                        .LongitudinalChunkLengthMetres /
+                    Mathf.Max(
+                        0.0001f,
+                        fieldLength / Mathf.Max(1, fieldWidth))));
+            if (fieldWidth % columnsPerChunk != 0)
+            {
+                columnsPerChunk = fieldWidth;
+            }
+
+            int chunkCount = Mathf.Max(1, fieldWidth / columnsPerChunk);
+            StylizedRiverFoamGridDescriptor descriptor =
+                StylizedRiverFoamGridDescriptor.CreateLegacyNormalized(
+                    river != null
+                        ? river.Quality
+                        : StylizedRiverQuality.Medium,
+                    chunkCount,
+                    columnsPerChunk,
+                    fieldWidth,
+                    fieldHeight,
+                    Mathf.Max(1, Mathf.CeilToInt(fieldWidth * 0.5f)),
+                    Mathf.Max(1, Mathf.CeilToInt(fieldHeight * 0.5f)),
+                    fieldLength,
+                    fieldLength);
+            return TryBake(
+                river,
+                meshFilter,
+                descriptor,
+                cellOutput,
+                sampleOutput,
+                out status);
+        }
+
+        internal static bool TryBake(
+            StylizedRiver river,
+            MeshFilter meshFilter,
+            StylizedRiverFoamGridDescriptor descriptor,
+            List<RiverObstacleExclusionCell> cellOutput,
+            List<RiverObstacleExclusionSample> sampleOutput,
+            out string status)
+        {
+            int fieldWidth = descriptor.ColumnCount;
+            int fieldHeight = descriptor.RowCount;
+            float fieldLength = descriptor.AllocatedLengthMetres;
+            if (river == null ||
+                meshFilter == null ||
+                meshFilter.sharedMesh == null ||
+                cellOutput == null ||
+                sampleOutput == null ||
+                fieldWidth < 1 ||
+                fieldHeight < 1 ||
+                fieldLength <= 0.0001f ||
+                !river.Domain.IsValid)
+            {
+                status = "A valid river, readable generated mesh, Foam field, and output lists are required.";
+                return false;
+            }
+
             if (!TryReadWorldMesh(
                     meshFilter,
                     out Vector3[] worldVertices,
@@ -118,9 +179,7 @@ namespace ProgrammaticStylized3D.Rivers
             if (!TryResolveCandidateRange(
                     river,
                     worldVertices,
-                    fieldWidth,
-                    fieldHeight,
-                    fieldLength,
+                    descriptor,
                     out int minimumX,
                     out int maximumX,
                     out float minimumAcross,
@@ -141,43 +200,74 @@ namespace ProgrammaticStylized3D.Rivers
 
             for (int x = minimumX; x <= maximumX; x++)
             {
-                float centreU =
-                    StylizedRiverFoamTopologyFieldSpace.TexelCentreUv(
-                        x,
-                        fieldWidth);
+                float centreLocalDistance =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveLocalDistanceAtColumnCentre(
+                            descriptor,
+                            x);
                 float centreGlobalDistance =
                     river.Domain.GlobalDistanceMinimum +
-                    centreU * fieldLength;
+                    centreLocalDistance;
                 StylizedRiverSplineSample centreSample =
                     river.Domain.SampleAtGlobalDistance(
                         Mathf.Clamp(
                             centreGlobalDistance,
                             river.Domain.GlobalDistanceMinimum,
                             river.Domain.GlobalDistanceMaximum));
-                float minimumAcross01 =
-                    StylizedRiverFoamTopologyFieldSpace
-                        .AcrossMetresTo01Clamped(
-                    minimumAcross,
-                    centreSample.LeftSurfaceHalfWidth,
-                    centreSample.RightSurfaceHalfWidth);
-                float maximumAcross01 =
-                    StylizedRiverFoamTopologyFieldSpace
-                        .AcrossMetresTo01Clamped(
-                    maximumAcross,
-                    centreSample.LeftSurfaceHalfWidth,
-                    centreSample.RightSurfaceHalfWidth);
-                int minimumY = Mathf.Clamp(
-                    Mathf.FloorToInt(
-                        Mathf.Min(minimumAcross01, maximumAcross01) *
-                        fieldHeight) - 1,
-                    0,
-                    fieldHeight - 1);
-                int maximumY = Mathf.Clamp(
-                    Mathf.CeilToInt(
-                        Mathf.Max(minimumAcross01, maximumAcross01) *
-                        fieldHeight) + 1,
-                    0,
-                    fieldHeight - 1);
+                int minimumY;
+                int maximumY;
+                if (descriptor.UsesFixedMetricLattice)
+                {
+                    float minimumCellPosition =
+                        (minimumAcross -
+                            descriptor.LateralLatticePhaseMetres) /
+                        Mathf.Max(0.0001f, descriptor.ResolvedDyMetres) -
+                        descriptor.GlobalYBase + 0.5f;
+                    float maximumCellPosition =
+                        (maximumAcross -
+                            descriptor.LateralLatticePhaseMetres) /
+                        Mathf.Max(0.0001f, descriptor.ResolvedDyMetres) -
+                        descriptor.GlobalYBase + 0.5f;
+                    minimumY = Mathf.Clamp(
+                        Mathf.FloorToInt(Mathf.Min(
+                            minimumCellPosition,
+                            maximumCellPosition)) - 1,
+                        0,
+                        fieldHeight - 1);
+                    maximumY = Mathf.Clamp(
+                        Mathf.CeilToInt(Mathf.Max(
+                            minimumCellPosition,
+                            maximumCellPosition)) + 1,
+                        0,
+                        fieldHeight - 1);
+                }
+                else
+                {
+                    float minimumAcross01 =
+                        StylizedRiverFoamTopologyFieldSpace
+                            .AcrossMetresTo01Clamped(
+                                minimumAcross,
+                                centreSample.LeftSurfaceHalfWidth,
+                                centreSample.RightSurfaceHalfWidth);
+                    float maximumAcross01 =
+                        StylizedRiverFoamTopologyFieldSpace
+                            .AcrossMetresTo01Clamped(
+                                maximumAcross,
+                                centreSample.LeftSurfaceHalfWidth,
+                                centreSample.RightSurfaceHalfWidth);
+                    minimumY = Mathf.Clamp(
+                        Mathf.FloorToInt(
+                            Mathf.Min(minimumAcross01, maximumAcross01) *
+                            fieldHeight) - 1,
+                        0,
+                        fieldHeight - 1);
+                    maximumY = Mathf.Clamp(
+                        Mathf.CeilToInt(
+                            Mathf.Max(minimumAcross01, maximumAcross01) *
+                            fieldHeight) + 1,
+                        0,
+                        fieldHeight - 1);
+                }
 
                 for (int y = minimumY; y <= maximumY; y++)
                 {
@@ -193,16 +283,13 @@ namespace ProgrammaticStylized3D.Rivers
                              sampleX < SamplesPerAxis;
                              sampleX++)
                         {
-                            float u = (x + SampleOffsets[sampleX]) /
-                                Mathf.Max(1f, fieldWidth);
-                            float v = (y + SampleOffsets[sampleY]) /
-                                Mathf.Max(1f, fieldHeight);
-
                             if (!TryResolveBaseSurfaceSample(
                                     river,
-                                    fieldLength,
-                                    u,
-                                    v,
+                                    descriptor,
+                                    x,
+                                    y,
+                                    SampleOffsets[sampleX],
+                                    SampleOffsets[sampleY],
                                     out Vector3 basePoint,
                                     out Vector3 up,
                                     out Vector4 waterParameters) ||
@@ -323,6 +410,16 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 GeneratedGeometryStableFingerprint source =
                     sourceFingerprints[index];
+                if (source.IsDefault)
+                {
+                    fingerprint = default;
+                    status =
+                        $"Obstacle source fingerprint {index} is the reserved " +
+                        "all-zero sentinel and cannot participate in the " +
+                        "persistent cache identity.";
+                    return false;
+                }
+
                 sorted.Add(new StylizedRiverFoamTopologyFingerprint(
                     source.Low,
                     source.High));
@@ -332,7 +429,7 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverFoamStableHashBuilder aggregateBuilder =
                 StylizedRiverFoamStableHashBuilder.Create(
                     "PS3D.RiverFoam.ObstacleSourceSet");
-            aggregateBuilder.AddInt32(1);
+            aggregateBuilder.AddInt32(2);
             aggregateBuilder.AddInt32(sorted.Count);
             for (int index = 0; index < sorted.Count; index++)
             {
@@ -341,7 +438,9 @@ namespace ProgrammaticStylized3D.Rivers
 
             fingerprint = aggregateBuilder.Finish();
             status =
-                $"Fingerprint covers {sorted.Count:N0} exact transformed obstacle source(s).";
+                $"Fingerprint contract 2 covers {sorted.Count:N0} exact " +
+                "transformed obstacle source(s); zero-valued source " +
+                "fingerprints are prohibited.";
             return true;
         }
 
@@ -396,14 +495,14 @@ namespace ProgrammaticStylized3D.Rivers
         private static bool TryResolveCandidateRange(
             StylizedRiver river,
             IReadOnlyList<Vector3> worldVertices,
-            int fieldWidth,
-            int fieldHeight,
-            float fieldLength,
+            StylizedRiverFoamGridDescriptor descriptor,
             out int minimumX,
             out int maximumX,
             out float minimumAcross,
             out float maximumAcross)
         {
+            int fieldWidth = descriptor.ColumnCount;
+            int fieldHeight = descriptor.RowCount;
             minimumX = 0;
             maximumX = -1;
             minimumAcross = float.PositiveInfinity;
@@ -447,16 +546,14 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamTopologyFieldSpace
                     .LocalDistanceToContainingTexel(
                         minimumGlobal - globalStart,
-                        fieldWidth,
-                        fieldLength) - 1,
+                        descriptor) - 1,
                 0,
                 fieldWidth - 1);
             maximumX = Mathf.Clamp(
                 StylizedRiverFoamTopologyFieldSpace
                     .LocalDistanceToCeilingTexel(
                         maximumGlobal - globalStart,
-                        fieldWidth,
-                        fieldLength) + 1,
+                        descriptor) + 1,
                 0,
                 fieldWidth - 1);
 
@@ -465,9 +562,11 @@ namespace ProgrammaticStylized3D.Rivers
 
         private static bool TryResolveBaseSurfaceSample(
             StylizedRiver river,
-            float fieldLength,
-            float u,
-            float v,
+            StylizedRiverFoamGridDescriptor descriptor,
+            int x,
+            int y,
+            float sampleXOffset,
+            float sampleYOffset,
             out Vector3 basePoint,
             out Vector3 up,
             out Vector4 waterParameters)
@@ -476,10 +575,35 @@ namespace ProgrammaticStylized3D.Rivers
             up = Vector3.up;
             waterParameters = default;
 
-            u = Mathf.Clamp01(u);
-            v = Mathf.Clamp01(v);
-            float globalDistance =
-                river.Domain.GlobalDistanceMinimum + u * fieldLength;
+            bool usesFixedMetricLattice =
+                descriptor.UsesFixedMetricLattice;
+            float globalDistance;
+            float acrossMetres = 0f;
+            float legacyV = 0f;
+            if (usesFixedMetricLattice)
+            {
+                float localDistance =
+                    descriptor.FieldOrStripStartMetres +
+                    (x + Mathf.Clamp01(sampleXOffset)) *
+                    descriptor.ResolvedDxMetres;
+                globalDistance =
+                    river.Domain.GlobalDistanceMinimum + localDistance;
+                int globalY = descriptor.GlobalYBase + y;
+                acrossMetres =
+                    descriptor.LateralLatticePhaseMetres +
+                    (globalY + Mathf.Clamp01(sampleYOffset) - 0.5f) *
+                    descriptor.ResolvedDyMetres;
+            }
+            else
+            {
+                float u = (x + Mathf.Clamp01(sampleXOffset)) /
+                    Mathf.Max(1f, descriptor.ColumnCount);
+                legacyV = (y + Mathf.Clamp01(sampleYOffset)) /
+                    Mathf.Max(1f, descriptor.RowCount);
+                globalDistance =
+                    river.Domain.GlobalDistanceMinimum +
+                    u * descriptor.AllocatedLengthMetres;
+            }
             if (globalDistance < river.Domain.GlobalDistanceMinimum - 0.0001f ||
                 globalDistance > river.Domain.GlobalDistanceMaximum + 0.0001f)
             {
@@ -492,11 +616,20 @@ namespace ProgrammaticStylized3D.Rivers
                         globalDistance,
                         river.Domain.GlobalDistanceMinimum,
                         river.Domain.GlobalDistanceMaximum));
-            float acrossMetres =
-                StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
-                v,
-                sample.LeftSurfaceHalfWidth,
-                sample.RightSurfaceHalfWidth);
+            if (!usesFixedMetricLattice)
+            {
+                acrossMetres =
+                    StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
+                        legacyV,
+                        sample.LeftSurfaceHalfWidth,
+                        sample.RightSurfaceHalfWidth);
+            }
+            if (acrossMetres < -sample.LeftSurfaceHalfWidth - 0.0001f ||
+                acrossMetres > sample.RightSurfaceHalfWidth + 0.0001f)
+            {
+                return false;
+            }
+
             up = sample.Up.sqrMagnitude > 0.0001f
                 ? sample.Up.normalized
                 : Vector3.up;

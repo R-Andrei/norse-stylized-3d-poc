@@ -6,15 +6,15 @@
 |---|---|
 | Proposed canonical repository path | `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md` |
 | Companion dependency register | `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md` |
-| Date | 2026-07-17 |
+| Date | 2026-07-18 |
 | Project | Norse Stylized 3D PoC |
 | Engine | Unity 6000.5.0f1, URP |
 | Work type | Canonical architecture and implementation plan |
 | Architecture status | Fixed-metric, centreline-relative river-space lattice accepted as the direction |
-| Implementation status | **`RG-METRIC-P0` static snapshot review complete; live Git/Unity baseline blocked; `RG-METRIC-P1` documentation scope lock complete** |
-| Code authorization | **First documentation-only patch authorized on 2026-07-17; no runtime, compute, shader, serialized-asset, or generated-cache implementation was authorized or performed by this patch** |
-| Persistent game-file changes made while producing this document | Documentation only: this plan, its companion dependency register, and the active River Foam queue |
-| Source snapshot used | User-supplied `Assets(71).zip` |
+| Implementation status | **`RG-METRIC-P2` through `RG-METRIC-P10` are Unity-validated and closed. `RG-METRIC-P11` is mechanically verified and complete. Active allocation remains `LegacyNormalizedAcross`; fixed candidate activation remains P12.** |
+| Code authorization | **The user explicitly authorized `RG-METRIC-P11` after P10/P10a compiled, the consolidated Inspector was observed, and the unchanged P9 endpoint returned `Overall: PASS`. P11 authorization covers repository-wide read-only mechanical/consistency audit and canonical documentation closure only. Production compute/render behavior, fixed-metric activation, serialized River data, scenes, prefabs, materials, and cache assets remain outside scope.** |
+| Persistent game-file changes made while producing this document | P2-P10 are installed and Unity-validated. P11 changes only the five canonical status documents. It adds no C#, shader, compute, serialized River field, scene, prefab, material, cache asset, Debug View, resource, kernel, persistent texture/buffer, or active fixed-metric allocation. |
+| Source snapshot used | User-supplied `Assets(72).zip` with accepted P9a, P10, and P10a overlays |
 | Source limitations | No `.git` metadata, package manifest, Library, current `Editor.log`, or complete project root in the supplied snapshot |
 
 ### 0.1 Purpose of this document
@@ -73,10 +73,10 @@ Neither document alone is sufficient for implementation.
 | Canonical upgrade plan | Installed at the proposed `Assets/Docs/` path by documentation patch 01 |
 | Static source review | Complete for all 94 registered paths in the supplied snapshot |
 | Live repository review | `BLOCKED`: supplied archive contains no `.git` metadata, branch, HEAD, upstream, status, diff, or history |
-| Runtime baseline capture | `BLOCKED`: supplied archive contains no runnable project root, current `Editor.log`, profiler capture, or Unity screenshots |
+| Runtime baseline capture | `PARTIAL`: final P9/P10 endpoint report and P10 Inspector capture are supplied; P12 visual/performance baseline and profiler evidence remain pending |
 | Canonical queue reconciliation | Complete for documentation patch 01 |
-| Runtime implementation | Not started |
-| Unity validation | Not started |
+| Runtime implementation | P2-P10 are Unity-validated and closed; P11 completed the full mechanical/consistency audit without executable changes |
+| Unity validation | P2-P10 complete. P11 is documentation-only and requires no additional runtime rerun. P12 owns candidate activation, visual comparison, and performance evidence |
 | Strip-pool production architecture | Planned future phase; not implemented |
 
 ## 1. Authority, precedence, and change control
@@ -990,13 +990,13 @@ For a nominal 32 m × 5 m strip at a 0.15 m target:
 
 ```text
 columns = ceil(32/0.15) = 214
-rows = ceil(5/0.15) = 34
-allocated texels = 7,276
+centreline-lattice rows intersecting [-2.5 m, +2.5 m] = 35
+allocated texels = 214x35 = 7,490
 8x8 launched envelope = 216x40 = 8,640
 current Medium = 96x96 = 9,216
 ```
 
-This predicts approximately 21% fewer allocated texels and 6.25% fewer launched threads per 32-metre region, before accounting for valid-mask waste, resource mix, cache behavior, and GPU access patterns.
+The 35-row result follows the accepted centreline-centred lattice: global Y zero is one cell centre, and both edge-intersecting cells are retained. This predicts approximately 18.7% fewer allocated texels and 6.25% fewer launched threads per 32-metre region, before accounting for valid-mask waste, resource mix, cache behavior, and GPU access patterns.
 
 This is an analytical expectation, not a measured acceptance result.
 
@@ -1060,16 +1060,19 @@ Every phase below is independently reviewable. No phase is complete merely becau
 |---|---|---|
 | `RG-METRIC-P0` | Live repository review and baseline freeze | `BLOCKED` — static snapshot review complete; live Git/Unity evidence unavailable |
 | `RG-METRIC-P1` | Canonical plan reconciliation and scope lock | `COMPLETE` — documentation-only archive patch |
-| `RG-METRIC-P2` | Descriptor, quality mapping, and CPU/GPU contract foundation | `NOT STARTED` |
-| `RG-METRIC-P3` | One-strip allocation and canonical CPU field-space mapping | `NOT STARTED` |
-| `RG-METRIC-P4` | Cache contracts, cache tooling, and initialization compatibility | `NOT STARTED` |
-| `RG-METRIC-P5` | Metric rows, topology, boundary, and obstacle exclusion | `NOT STARTED` |
-| `RG-METRIC-P6` | Obstacle routing, Motion Lane, and external-field integration | `NOT STARTED` |
-| `RG-METRIC-P7` | Automatic/manual source migration and unit policy | `NOT STARTED` |
-| `RG-METRIC-P8` | Persistent transport, CFL, curvature, and topology replacement | `NOT STARTED` |
-| `RG-METRIC-P9` | Film occupancy, shape evaluation, and production rendering | `NOT STARTED` |
-| `RG-METRIC-P10` | Diagnostics, inspector semantics, and documentation | `NOT STARTED` |
-| `RG-METRIC-P11` | Mechanical verification and full consistency audit | `NOT STARTED` |
+| `RG-METRIC-P2` | Descriptor, quality mapping, and CPU/GPU contract foundation | `ACCEPTED FOR CONTINUATION` — user confirmed Patch 02 |
+| `RG-METRIC-P3` | One-strip allocation and canonical CPU field-space mapping | `ACCEPTED FOR CONTINUATION` — user confirmed Patch 03; runtime activation remains deferred |
+| `RG-METRIC-P4` | Cache contracts, cache tooling, and initialization compatibility | `COMPLETE FOR STAGE 1` — legacy rejection, explicit rebuild, stored descriptor metadata, exhaustive proof, and read-only cache metadata Inspector are present |
+| `RG-METRIC-P5` | Metric rows, topology, boundary, and obstacle exclusion | `COMPLETE` — P5.3 generator-4 report reproduced exactly after restart |
+| `RG-METRIC-P5.1` | Determinism, obstacle provenance, and cache-diff diagnostics | `COMPLETE AS EVIDENCE PHASE` — report identified an `Input Fingerprint Gap`; retained as supplemental diagnostics |
+| `RG-METRIC-P5.2` | Obstacle fingerprint repair and true legacy parity | `EVIDENCE COMPLETE` — identity repair, five-build determinism, and frozen legacy raster parity passed; reports exposed dynamic topology-phase dependence and a false CPU/GPU equality gate |
+| `RG-METRIC-P5.3` | Deterministic topology evaluation phase and publication parity | `COMPLETE` — both comprehensive reports passed; current generator-4 payload exact after restart |
+| `RG-METRIC-P6` | Obstacle routing, Motion Lane, and external-field integration | `COMPLETE` — corrected live-resource report passed every ledger gate |
+| `RG-METRIC-P7` | Automatic/manual source migration and unit policy | `COMPLETE` — comprehensive report passed every ledger gate |
+| `RG-METRIC-P8` | Persistent transport, CFL, curvature, and topology replacement | `COMPLETE — UNITY VALIDATED` |
+| `RG-METRIC-P9` | Film occupancy, shape evaluation, and production rendering | `COMPLETE — UNITY VALIDATED`; P9a removed the three D3D11 warning forms and the rerun returned `Overall: PASS` |
+| `RG-METRIC-P10` | Diagnostics, inspector semantics, and documentation | `UNITY-VALIDATED AND CLOSED` |
+| `RG-METRIC-P11` | Mechanical verification and full consistency audit | `MECHANICALLY VERIFIED AND COMPLETE` |
 | `RG-METRIC-P12` | Unity candidate sweep and visual/performance selection | `NOT STARTED` |
 | `RG-METRIC-P13` | Final tier tuning, cache freeze, and contiguous baseline closure | `NOT STARTED` |
 | `RG-STRIP-P0` | Strip/pool architecture review and design | `FUTURE` |
@@ -1125,7 +1128,7 @@ The static portion of `RG-METRIC-P0` was executed against the exact user-supplie
 
 **Static review conclusion:** the 94-path dependency register remains internally consistent with the supplied snapshot, and all registered paths exist. The scan reconfirms that the migration boundary extends beyond allocation into CPU field-space conversion, source dispatch, topology, obstacle systems, compute coordinate reconstruction, production rendering, cache contracts, diagnostics, quality policy, and integration tests.
 
-**Blocking conclusion:** `RG-METRIC-P0` remains `BLOCKED` until the live workspace provides Git evidence and the required Unity/runtime baseline package. No `RG-METRIC-P2` implementation edit is permitted before that evidence is recorded here or in an approved linked baseline record.
+**Blocking conclusion:** `RG-METRIC-P0` remains `BLOCKED` until the live workspace provides Git evidence and the required Unity/runtime baseline package. After this blocker was disclosed, the user explicitly directed continuation to the next patch. `RG-METRIC-P2` was therefore implemented only as a supplied-snapshot changed-files candidate. It is not a substitute for live-workspace reconciliation and cannot be described as Unity validated, merge-ready, or behaviorally accepted until the missing evidence is recorded.
 
 ### 17.2 `RG-METRIC-P1` — Canonical plan reconciliation and scope lock
 
@@ -1157,7 +1160,7 @@ Exact documentation changes:
 2. Added `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md` and its Unity `.meta` file.
 3. Reconciled `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md` so the active queue no longer incorrectly names `4.11C.5.18H.4`.
 4. Recorded `4.11C.5.18H.6.2` as the preserved pre-migration Arc/Semi-Arc source baseline whose Unity acceptance evidence must be captured before coordinate migration.
-5. Recorded the fixed-metric program as active only at the baseline/scope-lock gate. Runtime code remains unmodified and blocked by the incomplete live portion of `RG-METRIC-P0`.
+5. Recorded the fixed-metric program as active only at the baseline/scope-lock gate. At that historical point runtime code remained unmodified pending the live portion of `RG-METRIC-P0`; P0 and all implementation phases through P9 are now closed.
 
 Files classified as review/test-only in Appendix B remain explicitly outside incidental edit scope. No Stage 1 implementation file is authorized merely because it appears in the dependency register.
 
@@ -1185,6 +1188,62 @@ Files classified as review/test-only in Appendix B remain explicitly outside inc
 
 **Rollback checkpoint:** descriptor foundation compiles but old grid remains behaviorally active.
 
+#### `RG-METRIC-P2` execution record — descriptor foundation patch 02
+
+Status: `CLOSED — UNITY-VALIDATED`. The text below records the historical Patch 02 delivery evidence.
+
+The patch establishes the descriptor and ABI without enabling fixed-metric allocation:
+
+1. Added immutable `StylizedRiverFoamGridDescriptor` and `StylizedRiverFoamGridGpuData` contracts.
+2. Added explicit mapping kinds for the current `LegacyNormalizedAcross` field and future `FixedMetricLattice` field.
+3. Centralized the 32-metre longitudinal chunk constant under the descriptor contract.
+4. Added requested/resolved X/Y spacing, lattice phase, global-Y base, represented lateral extent, guard rows, dimensions, film dimensions, and deterministic initialization signature fields.
+5. Added a deterministic fixed-metric candidate constructor with explicit dimension-limit failure instead of silent spatial degradation.
+6. Added provisional Foam-only quality candidates (`0.25/0.15/0.10 m`) and retained `0.20 m` as the intermediate sweep value; these values do not alter current serialized quality behavior.
+7. Represented every active legacy allocation through the descriptor while retaining the existing allocation and normalized lateral coordinate path unchanged.
+8. Added five `float4` CPU/GPU descriptor lanes and a prepared C# binding method. The method is deliberately not invoked while no kernel consumes the descriptor: Unity `ComputeShader` parameter state is shared and fully unused uniforms may be stripped, so premature initialization-only binding would be unsafe and provides no validation value. No runtime parameter call, buffer, texture, kernel, dispatch, or shader-rendering consumer was added.
+9. Added compact public read-only descriptor diagnostics without serialized fields.
+10. Added Editor-only deterministic foundation assertions for GPU stride/offsets, centreline-lattice dimensions, global-Y zero, equality/signature, and CPU/GPU lane order.
+
+Exact implementation files:
+
+- `Game/Procedural/Rivers/StylizedRiverFoamGridDescriptor.cs` and `.meta`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl`
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl`
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Coordinates.hlsl`
+
+Intentional non-changes:
+
+- active dimensions remain `chunkCount * 64/96/128` by `64/96/128`;
+- lateral structural mapping remains normalized per row;
+- no cache contract or fingerprint changes;
+- no source, topology, obstacle, Motion Lane, transport, film, shape, or render sampling changes;
+- no Disturbance or geometry quality changes;
+- no scene, prefab, material, or generated-cache edit.
+
+Mechanical evidence:
+
+- all six changed C# implementation files parse without error under the Tree-sitter C# grammar;
+- all newly introduced type references resolve within the same namespace and required `System`, `System.Diagnostics`, `System.Runtime.InteropServices`, and `UnityEngine` imports are present;
+- all C# descriptor uniform names match the five HLSL declarations exactly;
+- C# and HLSL lane order is `Contract`, `Spacing`, `Lateral`, `Longitudinal`, `Extent`;
+- deterministic independent calculation confirms the 32 m × 5 m, 0.15 m centreline-lattice candidate resolves to 214 columns, global-Y base -17, 35 rows, and a 216 × 40 dispatch envelope;
+- changed C# files contain no malformed multiline string literals and preserve LF line endings;
+- changed HLSL files pass delimiter/include-order/resource-reference checks;
+- no C# compiler, Unity shader importer, or Unity runtime was available at Patch 02 delivery. Subsequent Unity validation closed the phase.
+
+Required Unity gate before `RG-METRIC-P3`:
+
+1. Import with zero C# and compute-shader errors.
+2. Confirm the active grid still reports `LegacyNormalizedAcross` and current field dimensions.
+3. Confirm existing Automatic Birth Source and Final Foam views are visually unchanged.
+4. Confirm no cache regeneration, serialized value reset, new dispatch, or resource allocation appears.
+
 ### 17.4 `RG-METRIC-P3` — One-strip allocation and canonical CPU field-space mapping
 
 **Objective:** Make field dimensions and CPU coordinate conversions metric while preserving controlled initialization.
@@ -1206,6 +1265,60 @@ Files classified as review/test-only in Appendix B remain explicitly outside inc
 
 **Rollback checkpoint:** old-grid baseline remains preserved; metric allocation patch can be reverted independently before dependent GPU behavior is enabled.
 
+#### `RG-METRIC-P3` execution record — one-strip/CPU mapping patch 03
+
+Status: `CLOSED — UNITY-VALIDATED`. The prepared fixed-metric mapping remains intentionally inactive until P12.
+
+The patch closes the safe, independently reversible part of P3:
+
+1. The immutable descriptor is now the only source from which active runtime dimensions, film dimensions, structural dimensions, field lengths, chunk count, and columns-per-chunk are assigned.
+2. Legacy allocation resolution remains available solely to preserve the confirmed runtime while dependent migration phases are incomplete; it returns a descriptor rather than mutating dimension fields directly.
+3. Every initialization also resolves the exact fixed-metric one-strip candidate from the domain's maximum left/right surface reach and provisional quality cell target. There is no silent X/Y scale degradation when the candidate exceeds the hardware dimension limit.
+4. Candidate state is retained as non-serialized diagnostics: availability/failure reason, dimensions, film dimensions, resolved spacing, global-Y interval, represented lateral interval, and structural-cell count.
+5. The descriptor now defines exact cell-centre `s/n`, metric-to-fractional-cell, nearest-cell, containing-cell, allocated-boundary, valid-length, global-Y/local-Y, and lattice-boundary behavior.
+6. The canonical CPU field-space helper now supports descriptor-based metric-position arrays, allocated-cell conversion, valid-water conversion, independent valid/out-of-bank masks, and scalar sampling through the descriptor.
+7. Valid-water classification samples each fixed cell centre against the local left/right surface bank after allocation. Padded X and out-of-bank Y cells remain allocated but invalid.
+8. `BuildMetricBuffer` now uses descriptor-owned X spacing and column centres. Its metric branch uses the uniform fixed `dy`; its active legacy branch preserves the former per-row lateral spacing.
+9. Editor-only deterministic validation covers 0.25/0.20/0.15/0.10-metre candidates, asymmetric lateral ranges, negative/positive global Y, represented boundaries, centre round trips, nearest/containing cells, and dimension-limit rejection.
+10. Fixed-metric runtime activation remains explicitly deferred. This is not a hidden feature flag and cannot be enabled through serialization. P4-P9 must migrate cache, topology/obstacle, external fields, sources, transport, film, compute, and rendering before activation.
+
+Exact implementation files:
+
+- `Game/Procedural/Rivers/StylizedRiverFoamGridDescriptor.cs`
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyFieldSpace.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Topology.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`
+
+Intentional non-changes:
+
+- active mapping remains `LegacyNormalizedAcross`;
+- current active field and film dimensions remain those selected by the legacy quality resolver;
+- no descriptor uniform is bound;
+- no HLSL, compute kernel, renderer, cache, source, obstacle, Motion Lane, topology generator, transport, film, or shape behavior changes;
+- no new allocation, resource, dispatch, serialized field, scene, prefab, material, or generated asset;
+- candidate resolution remains provisional and does not redefine serialized `StylizedRiverQuality` yet.
+
+Mechanical evidence:
+
+- all changed C# files parse without error under the available Tree-sitter C# parser;
+- newly introduced `System`, `System.Collections.Generic`, Unity vector, and existing domain/sample references have matching imports/types in the supplied snapshot;
+- independent numerical tests reproduce 32-metre columns of 128/160/214/320 for 0.25/0.20/0.15/0.10 metres and exact centre/boundary round trips;
+- legacy active allocation remains descriptor-identical to Patch 02 for unchanged domain, quality, and hardware limit;
+- fixed candidate construction is side-effect-free and does not allocate textures, arrays, buffers, or dispatches;
+- line endings are preserved and no malformed multiline string literal was introduced;
+- no C# compiler or Unity runtime was available at Patch 03 delivery. Subsequent Unity validation closed the phase.
+
+Required Unity gate before `RG-METRIC-P4`:
+
+1. Import with zero C# errors.
+2. Confirm active mapping remains `LegacyNormalizedAcross` and active dimensions match Patch 02.
+3. Confirm `FoamFixedMetricCandidateAvailable` is true for the demo and candidate dimensions are physically plausible for its actual domain length/width.
+4. Confirm Automatic Birth Source and Final Foam views are unchanged.
+5. Confirm no cache rebuild, new texture/buffer, dispatch-count change, serialization, or scene/prefab/material change.
+6. Capture the candidate descriptor diagnostics for the P4 cache-contract baseline.
+
 ### 17.5 `RG-METRIC-P4` — Cache contracts, cache tooling, and initialization compatibility
 
 **Objective:** Prevent old coordinate products from being accepted and preserve cache-only Play startup policy.
@@ -1225,6 +1338,44 @@ Files classified as review/test-only in Appendix B remain explicitly outside inc
 **Stop conditions:** cache tooling requires scene/prefab raw edits; cache artifacts cannot distinguish coordinate contracts; cache limit forces silent scale change.
 
 **Rollback checkpoint:** cache contract patch with deterministic incompatibility; no production metric cache declared final yet.
+
+#### `RG-METRIC-P4` execution record — cache-contract patch 04
+
+**Implemented against the supplied snapshot:**
+
+- binary payload format advanced from `2` to `3` because the payload layout now owns the complete immutable grid descriptor;
+- topology generator contract advanced from `1` to `2`;
+- generation and combined fingerprint contracts advanced from `1` to `2`;
+- format `2` / generator `1` products are classified specifically as legacy normalized-lateral coordinate caches;
+- payloads serialize descriptor contract, mapping, mapping contract, quality, requested/resolved spacing, chunk columns, lattice phase, global-Y base, row count, field/strip start, allocated/valid length, structural and film dimensions, guard rows, represented lateral extent, and initialization signature;
+- deserialization reconstructs the descriptor only after validating enum values, exact mapping contract, positive/finite values, 32-metre chunk spacing, structural/film dimensions, global-Y range, lateral extent, and signature;
+- generation fingerprints hash every descriptor field and signature, preventing coordinate products from sharing a stable key across mappings or dimensions;
+- cache asset metadata records descriptor identity and must agree exactly with the validated payload;
+- release validation, explicit validation, startup resolution, and installation reject unsupported, legacy, or descriptor-mismatched cache products before use;
+- contiguous cache limits are checked directly against the descriptor (`8192` per axis and `16,777,216` cells) without invoking a lower physical resolution;
+- explicit Editor preparation, development persistence, and release preflight expose the descriptor/mapping identity;
+- active runtime mapping remains `LegacyNormalizedAcross`; no fixed-metric cache is declared a production result.
+
+**Mechanical verification performed:**
+
+- every changed C# file parsed with the available C# grammar;
+- cache writer/reader descriptor field order and type widths were audited lane by lane;
+- descriptor reconstruction was tested independently for legacy and fixed-metric examples, including each derived invariant and signature failure;
+- current (`3/2`), legacy (`2/1`), and unsupported contract classification was tested;
+- every descriptor field was confirmed to participate in the generation fingerprint;
+- cache startup/validation/install call paths were audited for contract-first failure ordering;
+- no Play Mode generation/save path, compute kernel, HLSL file, runtime allocation, source, transport, film, render, scene, prefab, material, or cache asset was modified.
+
+**Observed P4 Unity evidence and deferred remainder:**
+
+1. the real format-2/generator-1 asset produced `PreparationRequired / CoordinateContract` with one miss, zero installs, zero builds, zero replacements, and zero writes;
+2. explicit Edit Mode preparation stored a format-3/generator-2 descriptor-owned payload of `1,954,946` bytes with hash `E9DB3347A43E97DD` and descriptor identity `descriptor-v1/mapping-0-v0/768212E451E606B9`;
+3. the built-in exact encode/decode/corruption proof passed with the identical byte count and hash;
+4. Unity Debug Inspector did not reveal hidden cache metadata, but the later `StylizedRiverFoamTopologyCacheAssetEditor` now provides the required read-only contract metadata and explicit payload-section analysis;
+5. final exact post-rebuild Play startup, restart persistence, and release-preflight evidence were not supplied before the user authorized P5 continuation;
+6. those remaining P4 checks are still required for final program closure but are not represented as completed.
+
+**Known limitation:** Exact fixed-metric cache installation is structurally supported by the descriptor-aware package, but cannot be executed honestly while `FixedMetricLattice` remains inactive. Runtime proof is deferred to the coordinated activation phase; this patch proves deterministic compatibility and rejection mechanics without mixing coordinate systems.
 
 ### 17.6 `RG-METRIC-P5` — Metric rows, topology, boundary, and obstacle exclusion
 
@@ -1246,7 +1397,767 @@ Files classified as review/test-only in Appendix B remain explicitly outside inc
 
 **Rollback checkpoint:** metric topology/cache baseline independent of source and final rendering tuning.
 
-### 17.7 `RG-METRIC-P6` — Obstacle routing, Motion Lane, and external-field integration
+#### `RG-METRIC-P5` pre-implementation review and scope lock — patch 05
+
+Historical scope-lock state: `MECHANICALLY VERIFIED`. P5 later closed through the Unity-validated P5.3 generator-4 result; the pre-edit scope record remains below.
+
+**Observed P4 Unity evidence accepted for continuation:**
+
+- Play startup classified the assigned old cache as `PreparationRequired / CoordinateContract`; the Layer A Inspector displayed `Miss — Legacy Coordinate Contract`.
+- The startup summary recorded `attempt:1/hit:0/miss:1/install:0/build:0`, zero obstacle/Major/Connector/Pocket builds, zero replacement attempts, and zero writes.
+- Explicit Edit Mode preparation stored a `1,954,946`-byte payload with hash `E9DB3347A43E97DD` and descriptor identity `descriptor-v1/mapping-0-v0/768212E451E606B9`.
+- The exhaustive cache proof passed with the identical byte count and hash.
+- The cache ScriptableObject fields remain intentionally hidden from default serialization UI; `StylizedRiverFoamTopologyCacheAssetEditor` now presents the required read-only metadata and explicit payload-section analysis.
+- The negative legacy-cache Play test correctly allocated no completed Foam resources, so a selected Foam debug view had no source texture to display. The later rebuilt-current-cache and P5.3 reports supplied the exact-load proof and closed the phase.
+
+**Read-only source review performed against the supplied Patch 04 snapshot:**
+
+- canonical documents: this plan, `River_Foam_Fixed_Metric_Dependency_Register.md`, `River_Foam_Active_Blockers_and_Next_Patches.md`, and the Layer A/cache/coordinate sections of `River_Foam_Stage6_Architecture.md`;
+- coordinate and descriptor contracts: `StylizedRiverFoamGridDescriptor.cs`, `FoamTopology/StylizedRiverFoamTopologyFieldSpace.cs`, `StylizedRiverFoamRuntime.State.cs`, `CS_RiverFoam.Structs.hlsl`, `CS_RiverFoam.Coordinates.hlsl`, and `CS_RiverFoam.Resources.hlsl`;
+- metric-row/topology ownership: `StylizedRiverFoamRuntime.Topology.cs`, `StylizedRiverFoamRuntime.Compute.cs`, `StylizedRiverFoamRuntime.Resources.cs`, `StylizedRiverFoamRuntime.TopologyCache.cs`, `CS_RiverFoam.Topology.hlsl`, `CS_RiverFoam.TopologyTransition.hlsl`, and all P5-owned kernels in `CS_RiverFoam.compute`;
+- CPU topology products: `StylizedRiverFoamMajorTopologyGenerator.cs`, `StylizedRiverFoamConnectorTopologyGenerator.cs`, `StylizedRiverFoamPocketTopologyGenerator.cs`, their topology/result contracts, candidate generator, and evolution consumers;
+- boundary and exact obstacle ownership: `StylizedRiverFoamRuntime.Obstacles.cs`, `RiverObstacleExclusionResolver.cs`, obstacle registry/fingerprint call paths, `StylizedRiverFoamRuntime.Injection.cs` object-contact consumer, and cache capture/readback paths;
+- integration/test-only inputs: `RiverDomainSnapshot.cs`, `StylizedRiverGeometry.cs`, `StylizedRiverCorridorGeometry.cs`, disturbance obstacle registry APIs, and the demo scene as read-only evidence.
+
+The supplied archive has no `.git` metadata or runnable Unity project root. Live branch/HEAD/diff/history comparison remains unavailable and must not be represented as complete. Patch 05 is therefore prepared as a changed-files-only continuation against the user-confirmed Patch 04 snapshot.
+
+**Patch 05 implementation decisions:**
+
+1. The active runtime mapping remains `LegacyNormalizedAcross`. P5 prepares complete descriptor-aware topology/boundary/obstacle behavior but does not permit a mixed metric simulation before P6-P9.
+2. Every CPU topology generator receives the immutable grid descriptor rather than independent width/height/field-length arguments. Legacy coordinate evaluation must remain numerically identical; fixed-metric evaluation uses descriptor cell centres and metric-to-cell conversion.
+3. Major placement size, connector radii/path lengths, pocket/free-water radii, prepared-path sampling, and obstacle geometry remain physical metres. Existing normalized lateral placement controls remain normalized authoring coordinates and are converted to metres at the sampled river row.
+4. The static valid-water boundary feather is classified as a physical shoreline transition. Legacy mode keeps the former quality-cell expression exactly. Fixed-metric mode uses the derived pre-migration narrow-river baseline of `0.10 m`, bounded by the existing `0.05 m` minimum, pending P12 visual selection. This avoids tripling the demo transition merely because fixed `dy` is larger than the old normalized-row spacing.
+5. Major upstream-obstacle lateral reach is classified as physical. Legacy mode preserves `max(2, round(height * 0.08))`; fixed mode resolves the same nominal pre-migration reach (`0.40 m`) through `resolvedDy`.
+6. Exact-mesh obstacle samples own complete physical cell rectangles. Legacy cells retain the former normalized-row rectangle. Fixed cells sample descriptor X boundaries and global-Y-centred lateral boundaries.
+7. P5 compute kernels bind the descriptor at their immediate topology dispatch boundary. No descriptor is bound globally or once at initialization because `ComputeShader` parameter state is shared. P6-P9 must bind the descriptor for their own consuming dispatches.
+8. Disturbance texture sampling remains normalized and is not corrected in P5; that is explicitly owned by P6. Source rasterization, transport, topology replacement, film, shape, and production rendering remain unchanged.
+9. No cache contract bump is required if legacy generated bytes remain unchanged. The existing P4 descriptor fingerprint already distinguishes future fixed-metric products. Any discovered legacy-output difference is a stop condition requiring plan revision and a generator-contract decision.
+10. The topology-morphology audit classifies resolution-dependent quantities as follows before final P5 code closure:
+    - Major candidate-mask `*Cells` values remain candidate-local raster coordinates, not Foam field cells. They continue to acquire physical size only through `metresPerCandidateCell`.
+    - Four/eight-neighbour graph traversal, connectedness, boundary detection, and one-cell conservative raster guards remain structural-cell operations. Their purpose is discrete topology/sampling support, not authored physical width.
+    - Opportunity counts, host limits, variant attempts, endpoint sectors, prepared-path point capacities, recycle-anchor counts, and relationship capacities remain semantic bounded counts independent of field resolution.
+    - Coverage and host-remainder fractions remain ratios. On a fixed lattice every valid cell owns the same `resolvedDx × resolvedDy` area, so those ratios are physical-area ratios without additional scaling.
+    - Major minimum newly covered support and its ranking contribution become fixed-mode physical-area equivalents while the legacy path retains the exact former integer-cell calculation. The recorded reference area is `0.02 m²` per legacy-equivalent coverage unit and the former four-cell rejection therefore represents `0.08 m²`.
+    - Connector minimum-component rejection becomes `0.10 m²` in fixed mode while the legacy path retains exactly five cells. Component-to-region identity fallback becomes a `1.50 m` metric search in fixed mode while the legacy path retains the former ten-cell ring search.
+    - Free-water nearest-valid-cell fallback becomes a metric-radius-covered X/Y search in fixed mode using the existing `0.34 m` acceptance radius, while legacy mode retains the former `2 × 2` cell-radius scan.
+    - All existing values already named in metres remain metres. Existing normalized lateral authoring coordinates remain normalized authoring data and are converted at the sampled row.
+
+**Approved Patch 05 implementation files:**
+
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyFieldSpace.cs`
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamMajorTopologyGenerator.cs`
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamConnectorTopologyGenerator.cs`
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamPocketTopologyGenerator.cs`
+- `Game/Procedural/Rivers/RiverObstacleExclusionResolver.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Topology.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Obstacles.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs` only if immediate descriptor binding must be reused by P5 dispatch ownership
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs` only if the P5-owned object-contact dispatch consumes descriptor coordinates
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Coordinates.hlsl`
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl` for contract comments only if required
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+- the three governing River Foam Markdown documents.
+
+**Review/test-only files prohibited from incidental modification:**
+
+- `RiverDomainSnapshot.cs`;
+- `StylizedRiverGeometry.cs`;
+- `StylizedRiverCorridorGeometry.cs`;
+- all Disturbance implementation files;
+- source-event preparation/raster code outside the object-contact field;
+- transport, topology replacement, film, shape, production render, scene, prefab, material, and generated cache assets.
+
+**Patch 05 acceptance evidence required before delivery:**
+
+- changed C# files parse with the strongest available parser and all introduced references/imports are audited;
+- C#/HLSL descriptor and cell-centre formulas are line-by-line consistent;
+- legacy topology/boundary/obstacle calculations remain unchanged under `LegacyNormalizedAcross`;
+- fixed-metric straight, widening, narrowing, asymmetric, bent, padded-end, reverse-flow, small-obstacle, and bank-touching mathematical cases pass deterministic assertions;
+- exact obstacle candidate bounds and 3x3 sample positions stay inside their owning physical cell;
+- all 22 compute kernels remain present and no texture/buffer/kernel/dispatch is added;
+- cache payload layout and contracts remain unchanged;
+- final diff contains only recorded files and no serialized asset.
+
+#### `RG-METRIC-P5` implementation result — Patch 05
+
+Status: `CLOSED — UNITY-VALIDATED THROUGH P5.3`.
+
+**Implemented coordinate ownership:**
+
+1. `StylizedRiverFoamTopologyFieldSpace` now owns descriptor-aware longitudinal column centres, metric lateral row centres, metre-to-nearest/containing/ceiling cell conversion, valid-water classification, fixed-lattice scalar sampling, and the fixed-metric shoreline-feather policy.
+2. Legacy normalized-row calls route through the original formulas. Fixed-metric calls use descriptor `s/n` centres and global-Y lattice indices. Bulk metric-position generation samples the river domain once per X column in legacy mode rather than once per cell, preserving the former preparation-cost shape.
+3. Major, Connector, and Pocket topology runtimes receive the immutable descriptor directly. Their public pre-descriptor overloads remain as compatibility wrappers for existing topology-replacement callers and construct an equivalent legacy descriptor.
+4. Major candidate rasterization, recycle-anchor validation, Connector component identity/path validation, Pocket/free-water cell resolution, hosted/free-water mask resampling, and prepared recycle validation now use descriptor-aware metric positions and metre-to-cell lookup.
+5. The completed topology-morphology audit keeps candidate-local raster coordinates, graph adjacency, conservative one-cell guards, bounded semantic counts, and dimensionless ratios in their original units. Fixed mode converts only quantities that represented physical acceptance/search despite being encoded as field-cell counts: Major minimum new coverage/ranking use `0.02 m²` equivalent units with a `0.08 m²` minimum; Connector minimum components use `0.10 m²`; Connector source-region identity fallback uses `1.50 m`; and Free Water nearest-valid fallback derives X/Y scan radii from its existing `0.34 m` acceptance radius. Every corresponding legacy branch retains the exact former cell-count/ring behavior.
+6. The valid-water boundary and CPU topology fluid context share one shoreline feather resolver. Legacy mode reproduces the former quality-cell formula; fixed mode uses the recorded provisional `0.10 m` physical feather with the existing `0.05 m` floor.
+7. Major upstream-obstacle context preserves the legacy `max(2, round(height × 0.08))` window and resolves a fixed-metric `0.40 m` reach through `resolvedDy` for the future lattice.
+8. Exact obstacle preparation receives the descriptor, uses descriptor X bounds, derives fixed-lattice candidate Y intervals from global-Y indices, and places all nine conservative samples inside the owning physical cell rectangle. Samples outside the current physical banks are rejected.
+9. Runtime metric rows use descriptor `resolvedDx` and, for the future fixed mapping, descriptor `resolvedDy`. The runtime boundary and exact-obstacle bake now consume the same descriptor-owned CPU mapping as generated topology.
+10. `ConfigureTopologyParameters` binds the five-lane descriptor immediately before topology-owned dispatch sequences. The binding is not moved to initialization and is not treated as persistent global `ComputeShader` state.
+11. Dedicated P5 HLSL helpers resolve descriptor-aware topology distance/domain membership and lateral metres. Existing source, transport, film, and other staged legacy helpers remain unchanged until their owning phases. `BuildCurrentShoreEdges`, `BuildEvolvingMajorSupport`, `CaptureGeneratedTopology`, `ComposeTopology`, and `MeasureTopologyMetrics` use the P5 descriptor-aware path.
+
+**Exact changed implementation files:**
+
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyFieldSpace.cs`
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamMajorTopologyGenerator.cs`
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamConnectorTopologyGenerator.cs`
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamPocketTopologyGenerator.cs`
+- `Game/Procedural/Rivers/RiverObstacleExclusionResolver.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Topology.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Obstacles.cs`
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Coordinates.hlsl`
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl`
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+- this plan, the dependency register, and the active-blocker document.
+
+**Intentionally unchanged:**
+
+- active mapping and active `192 × 96` legacy allocation;
+- cache payload format `3`, generator contract `2`, fingerprints, serialized descriptor layout, and generated cache assets;
+- obstacle registry/version/fingerprint ownership;
+- routing, Motion Lane, Disturbance-field sampling, automatic/manual source rasterization, persistent transport, topology replacement semantics, film, shape, production rendering, scenes, prefabs, materials, and serialized `StylizedRiver` fields;
+- compute kernel count, texture/buffer inventory, and dispatch inventory.
+
+**Mechanical evidence:**
+
+- all seven changed C# files parsed with zero syntax-error or missing nodes using the available C# grammar parser;
+- project-wide static class/method call analysis found zero unresolved changed-signature call sites across `3,259` discovered definitions and `18,737` calls;
+- newly introduced descriptor references were scanned for scope and namespace ownership; no malformed multiline C# string literal was introduced;
+- `100,000` randomized legacy formula cases produced zero mismatches for X centres, nearest/containing/ceiling X conversion, asymmetric lateral centres, shoreline feather, and legacy obstacle sample UVs;
+- `10,279,238` fixed-lattice numerical/morphology assertions produced zero failures across `0.25/0.20/0.15/0.10 m` candidates, 5/10/20/40-metre widths, CPU/HLSL centre parity, physical obstacle-cell ownership, straight/widening/narrowing/asymmetric/bent-width profiles, area-equivalent Major/Connector thresholds, metric Connector identity search bounds, and Free Water nearest-search coverage;
+- changed HLSL/compute files have balanced delimiters and preprocessor blocks, no duplicate function definitions, unchanged include ordering, and all `22` compute kernels remain present;
+- no cache codec, cache asset, fingerprint, resource declaration, serialized asset, scene, prefab, or material file changed.
+
+**Unity evidence and blocker:** Patch 05 compiled and executed, but legacy byte parity did not reproduce. The first explicit Patch 05 rebuild produced `1,954,946` bytes with hash `58C8036175508509`; a second explicit rebuild produced `1,954,518` bytes with hash `24BCF968B2B94F28`. Both builds reported the same complete combined input fingerprint `F182CD9FCC93A961B19B60CBD53C5639`, the same descriptor `descriptor-v1/mapping-0-v0/768212E451E606B9`, and five obstacle sources. The second payload was 428 bytes smaller despite the unchanged input key. The exhaustive proof passed for each individual immutable payload, which proves serialization round-trip integrity but does not prove deterministic regeneration. P6 is blocked until the exact changing section and source are identified and corrected or explicitly accepted.
+
+### 17.7 `RG-METRIC-P5.1` — Determinism, obstacle provenance, and cache-diff diagnostics
+
+**Objective:** Convert opaque whole-payload drift into exhaustive, reproducible evidence. The patch must identify whether drift originates in obstacle-source geometry/provenance, input capture, topology generation, collection ordering, prepared path/identity catalogues, scalar fields, or serialization. It must not alter topology generation, cache storage semantics, active mapping, source behavior, transport, rendering, or any serialized scene/prefab/material setting.
+
+**Observed evidence requiring this phase:**
+
+1. The previously accepted Patch 04 cache validated after Patch 05 as `Stale Obstacles`; the source count remained five.
+2. The first Patch 05 rebuild produced `1,954,946` bytes / `58C8036175508509`.
+3. The immediate second rebuild produced `1,954,518` bytes / `24BCF968B2B94F28`.
+4. Both rebuilds reported combined input fingerprint `F182CD9FCC93A961B19B60CBD53C5639`, proving that the current aggregate fingerprint contract did not distinguish the generated payloads.
+5. Both exhaustive round-trip proofs passed, proving each captured package is internally deterministic after capture while leaving cross-generation determinism unresolved.
+
+**Approved implementation scope:**
+
+Exact project file scope:
+
+- modify `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`;
+- modify `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`;
+- modify `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`;
+- modify `Assets/Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheAsset.cs`;
+- modify `Assets/Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheCodec.cs` only to permit the diagnostic partial;
+- modify `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`;
+- create `Assets/Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamCacheDiagnostics.cs`;
+- create `Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.CacheDiagnostics.cs`;
+- create `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CacheDiagnostics.cs`;
+- create `Assets/Game/Procedural/Rivers/Editor/StylizedRiverFoamTopologyCacheAssetEditor.cs`;
+- create the four matching `.meta` files.
+
+Explicit user-triggered non-asset outputs:
+
+- `Library/RiverFoamDiagnostics/<river>_LatestCacheAudit.txt`;
+- `Library/RiverFoamDiagnostics/<river>_ObstacleBaseline.bin`;
+- `Library/RiverFoamDiagnostics/<river>_ObstacleBaseline.txt`;
+- `Library/RiverFoamDiagnostics/<river>_LatestObstacleComparison.txt`.
+
+- add a detailed source-provenance snapshot for every exact obstacle source;
+- record stable source key, source/owner/MeshFilter entity IDs, registry enumeration order, unique-MeshFilter inclusion ownership, duplicate registrations, hierarchy path, owner/provider types, mesh identity, readable-state, vertex/index counts, exact local/world bounds, exact local-mesh fingerprint, exact transform fingerprint, provider-prepared world fingerprint, independently recomputed world fingerprint, provider/direct agreement, and build/captured-obstacle agreement;
+- capture and compare obstacle source sets twice back-to-back and against an explicit baseline stored under `Library/RiverFoamDiagnostics`;
+- add full-payload and payload-section snapshots with byte count, stable hash, exact first-difference offset, byte neighbourhoods, and topology counts/rejection summaries for grid/domain/settings, obstacle input key, obstacle scalar field, Major support/regions/prepared regions, Connector support/relationships/prepared paths/catalogue paths, and Pocket scalar fields/regions/prepared hosted/free-water/weak-span records;
+- add one explicit full audit that performs two independent Edit Mode preparations without storing either result, verifies input fingerprints before comparing generated sections, compares the assigned asset when compatible, writes one latest report under `Library/RiverFoamDiagnostics`, and logs the complete report;
+- add Inspector actions to run the full audit, capture an obstacle baseline, compare against the baseline, copy the latest report, log it again, and reveal the report file;
+- add a read-only custom Inspector for `StylizedRiverFoamTopologyCacheAsset` exposing all cache-contract metadata plus section-digest information without exposing or editing the raw payload byte array;
+- update the canonical plan, dependency register, and active queue;
+- establish the permanent rule that any patch changing a deterministic generation/cache/coordinate contract must ship its owning diagnostics and parity test in the same patch rather than deferring validation observability.
+
+**Diagnostic execution policy:**
+
+- all expensive work is explicit Editor-button work only;
+- no per-frame, startup, automatic import, `InitializeOnLoad`, scene-save, prefab-save, asset-mutation, or Play Mode generation path is added;
+- diagnostic reports are written only below `Library/RiverFoamDiagnostics`;
+- the full audit may release and recreate temporary Foam resources exactly as explicit cache preparation already does, but it must not call `StoreBuild`, `AssetDatabase.SaveAssets`, or mutate the assigned cache asset;
+- source-baseline capture writes a diagnostic baseline file only and never changes generated geometry;
+- report strings are retained in non-serialized runtime memory for Inspector copy/log actions.
+
+**Required report verdicts:**
+
+- obstacle source set stable/changed;
+- provider fingerprint agrees/disagrees with direct exact-world recomputation per source;
+- build A/B domain, obstacle, generation, and combined inputs equal/unequal;
+- build A/B descriptor equal/unequal;
+- build A/B payload equal/unequal;
+- first changed payload section and first byte offset;
+- all changed section hashes/counts;
+- assigned asset equal to build A, build B, both, or neither;
+- final classification: `Exact`, `Obstacle Input Drift`, `Input Fingerprint Gap`, `Topology Generation Drift`, `Serialization Drift`, or `Audit Inconclusive`.
+
+**Verification:**
+
+1. C# compilation and Editor import produce zero errors.
+2. The cache asset Inspector visibly reports format `3`, generator `2`, descriptor contract `1`, mapping `Legacy Normalized Across`, mapping contract `0`, signature, fingerprints, payload size/hash, and build time.
+3. Capturing and immediately comparing an obstacle baseline identifies every source and reports zero changes when no generated geometry changed.
+4. The full audit produces two build records, complete source records, all section digests, first-difference evidence, a saved latest report, Console output, and copyable Inspector text.
+5. The audit does not modify the assigned cache, scene, prefab, material, generated geometry, or serialized River settings.
+6. At this historical P5.1 gate, P6 remained blocked until the report identified the changing section. P5.2/P5.3 later restored deterministic same-input generation and released P6.
+
+**Stop conditions:** any diagnostic requires automatic runtime work; exact source provenance cannot be established; the audit mutates persistent project assets; section hashing cannot distinguish the observed 428-byte payload-size change; report evidence is truncated or unavailable to copy.
+
+**Rollback checkpoint:** Patch 05 code and the currently assigned cache remain untouched; P5.1 consists only of explicit diagnostics/editor presentation and canonical documentation.
+
+#### `RG-METRIC-P5.1` implementation record — diagnostic patch 05.1
+
+Status: `CLOSED — UNITY-VALIDATED THROUGH P5.3`. The diagnostic evidence below identified the drift source and released P6.
+
+Implemented behavior:
+
+1. Added one explicit two-build determinism audit. It captures obstacle provenance before Build A, between Build A and Build B, and after Build B; performs two independent existing Edit Mode cache preparations; does not call `StoreBuild`, `AssetDatabase.SaveAssets`, or any persistent cache-write API; records complete build artifacts; compares raw payload bytes and twenty structured diagnostic sections; compares the assigned asset before/after; writes one exhaustive report; and logs the same report.
+2. Added exact per-registration obstacle evidence: hierarchy/component-stable diagnostic key, session EntityIds retained as provenance, registry enumeration order, unique-MeshFilter inclusion ownership, provider/owner types, mesh identity, readability, exact vertex/index counts, exact local/world bounds including IEEE-754 float bits, local-mesh fingerprint, local-to-world transform fingerprint, provider-prepared exact-world fingerprint, independently recomputed exact-world fingerprint, and provider/direct agreement.
+3. Separated production-relevant obstacle-input equality from provenance-only metadata. Session-local EntityIds, registry order, and status text remain visible but do not by themselves classify unchanged geometry as obstacle drift. Duplicate registrations remain visible, and first-seen unique-MeshFilter ownership remains a production-relevant comparison.
+4. Added explicit obstacle baseline capture and comparison below `Library/RiverFoamDiagnostics`. Baseline capture writes both machine-readable and human-readable records, immediately reads the binary record back, and refuses success unless production-relevant source data survives the round trip exactly.
+5. Added payload-section diagnostics for grid descriptor, domain, input fingerprints, generation settings, obstacle scalar field, Major support/regions/prepared/complete, Connector support/relationships/prepared/catalogue/complete, and Pocket scalar/regions/hosted/free-water/weak-span/complete data. Every section records a byte count, stable FNV-1a 64-bit digest, exact first-difference offset, byte neighbourhood, and semantic count/rejection summary.
+6. Added audit classifications: `Exact`, `Obstacle Input Drift`, `Input Fingerprint Gap`, `Topology Generation Drift`, `Serialization Drift`, and `Audit Inconclusive`. The audit also verifies that each build's stored obstacle fingerprint equals the exact post-build source capture and that the assigned cache metadata and payload remain byte-identical throughout the audit.
+7. Added River Inspector buttons that are now retained under `Actions → Foam Cache & Validation → Historical / Deep Diagnostics`: the P5.1 two-build audit, obstacle baseline capture/comparison, and the shared copy/log/reveal report controls. Expensive actions remain disabled in Play Mode.
+8. Added a normal read-only custom Inspector for `StylizedRiverFoamTopologyCacheAsset`, correcting the P4 validation-UX omission. It exposes storage/payload/generator/grid contracts, mapping name/value, signature, source/build metadata, payload size/hash, and all stable input fingerprints. Payload section decoding occurs only when `Analyze Payload Sections` is pressed; raw payload bytes remain hidden and uneditable.
+9. Added the permanent same-patch diagnostics rule to the canonical plan, dependency register, and active queue. Deterministic generator, coordinate, cache, source-contract, or state-migration patches must carry their own owning evidence surface and parity test rather than deferring observability.
+
+Exact changed project files:
+
+- `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheAsset.cs`
+- `Assets/Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheCodec.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+- `Assets/Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamCacheDiagnostics.cs` and `.meta`
+- `Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.CacheDiagnostics.cs` and `.meta`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CacheDiagnostics.cs` and `.meta`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverFoamTopologyCacheAssetEditor.cs` and `.meta`
+
+Intentional non-changes:
+
+- cache payload format remains `3`; generator contract remains `2`; no serialized cache field or payload layout changed;
+- the codec's only production-file change is `static class` to `static partial class` so the Editor-only diagnostic partial can reuse the exact private serialization contract;
+- active mapping, active field dimensions, topology algorithms, obstacle rasterization, routing, Motion Lane, sources, transport, film, shape, rendering, Disturbance allocation, compute/HLSL, resources, kernels, dispatches, and quality values remain unchanged;
+- no scene, prefab, material, generated cache asset, `.asset`, or serialized `StylizedRiver` field is edited by the patch;
+- no `InitializeOnLoad`, import callback, startup audit, automatic Play Mode generation, per-frame diagnostic, or hidden project-asset write was introduced.
+
+Mechanical verification evidence:
+
+- all seven changed/new C# source files parse with zero syntax-error or missing nodes under the available Tree-sitter C# grammar;
+- both `UNITY_EDITOR`-enabled and disabled preprocessed forms parse with zero syntax errors; all preprocessor blocks balance;
+- the existing cache asset's fifteen serialized fields are byte-for-byte declaration-identical to Patch 05;
+- the existing codec diff is exactly one declaration change: `internal static class` to `internal static partial class`;
+- twenty diagnostic sections are present with unique ordered names;
+- the obstacle baseline writer and reader contain the same ordered 26-lane source contract, plus version, timestamp, aggregate fingerprint, status, and count framing;
+- all introduced project-specific types have declarations in the supplied source and all new public/internal diagnostic methods have matching call sites;
+- a namespace/import scan found and removed a potential `System.Object`/`UnityEngine.Object` ambiguity from the River Inspector file;
+- all four new Unity GUIDs are unique across 315 supplied `.meta` files;
+- exact diff scope is fourteen approved files; no HLSL, compute, scene, prefab, material, cache asset, or unrelated subsystem file differs;
+- existing LF line endings are preserved and changed Markdown files decode as UTF-8 with balanced code fences;
+- no C# compiler or Unity Editor was available at P5.1 delivery. The later P5.2/P5.3 Unity reports closed the diagnostic sequence.
+
+Required Unity evidence before any corrective diagnosis or P6 work:
+
+1. Import with zero C# errors and verify the cache asset's normal Inspector displays format `3`, generator `2`, mapping `0 — Legacy Normalized Across`, descriptor signature, payload identity, and fingerprints.
+2. Capture an obstacle baseline and immediately compare it. The binary round-trip must pass; production-relevant obstacle input should be `EXACT`. Provenance-only differences may be reported separately and must be retained in the evidence.
+3. Run the full audit once. It intentionally performs two cache preparations and may report `Failed`; a failed verdict is diagnostically valid when it identifies the first changed source/section/byte. The assigned cache mutation check must pass.
+4. Copy or provide `Library/RiverFoamDiagnostics/River_Strip_LatestCacheAudit.txt` in full. Do not rebuild/store the assigned cache between applying P5.1 and running the audit unless a separate comparison is explicitly required.
+5. Confirm version control contains no audit-induced scene, prefab, material, generated cache, or serialized River change.
+
+### 17.7A `RG-METRIC-P5.2` — Obstacle fingerprint repair and true legacy parity
+
+**Objective:** Repair the proven exact-geometry identity defect before accepting P5, make every unreliable cache contract explicitly obsolete, and prove in one exhaustive report that the descriptor-owned legacy obstacle path is bit-exact to the frozen pre-P5 path for the same current mesh inputs.
+
+#### Accepted P5.1 evidence
+
+The user supplied the complete baseline, comparison, and determinism reports. They establish the following facts:
+
+1. all five registered obstacle sources remained exact across immediate baseline comparison and the complete audit transaction;
+2. two current non-storing preparations were byte-for-byte exact at `1,954,518` bytes / `E1483A3A22B304FC`, so current same-session generation and serialization are deterministic;
+3. the assigned cache differed first in the obstacle scalar field by one occupied texel (`587` versus `588`), while the substantive Major, Connector, and Pocket products were otherwise stable;
+4. every `GeneratedMass` provider reported success with `00000000000000000000000000000000` while direct exact-world-triangle hashing produced a distinct nonzero fingerprint for each source;
+5. the combined obstacle fingerprint therefore did not identify the source geometry and could remain unchanged while generated obstacle output differed;
+6. the correct classification is `Input Fingerprint Gap`, not same-session topology randomness.
+
+#### Root-cause contract
+
+`GeneratedMass` owned four coupled transient cache lanes:
+
+```text
+valid flag
+128-bit readonly fingerprint
+Mesh reference
+local-to-world matrix
+```
+
+The four fields were not explicitly excluded from Unity hot-reload serialization. The observed state—successful provider result, unchanged mesh/matrix ownership, and a default readonly struct value—is consistent with a restored validity lane whose fingerprint lane was restored as default. P5.2 treats this as a high-confidence root cause while also defending every downstream boundary so the same invalid state cannot be accepted even if another provider later reproduces it.
+
+Required invariants:
+
+- the all-zero 128-bit value is a reserved invalid sentinel;
+- no exact-geometry utility or provider may report success with the sentinel;
+- all four Generated Mass cache lanes are `[NonSerialized]`;
+- a detected valid-plus-zero state forces recomputation;
+- refreshed values are resolved into locals and published only after all lanes are complete;
+- explicit Edit Mode cache validation/preparation independently recomputes direct world-triangle identity and requires provider/direct equality;
+- normal Play Mode startup does not add triangle rescans and continues consuming prepared provider identities;
+- the obstacle-set aggregate includes an explicit contract value `2` and rejects every zero source;
+- cache generator contract advances from `2` to `3` while payload format remains `3`;
+- format-3/generator-2 assets are classified specifically as `Legacy Obstacle Fingerprint Contract` and may not install, validate as current, or rebuild automatically in Play Mode.
+
+#### True legacy obstacle parity
+
+P5.2 adds an Editor-only partial containing a frozen copy of the pre-P5 normalized-lateral obstacle candidate/raster path. It executes only from the explicit comprehensive report action. For each unique source, the reference and P5 descriptor path receive the same:
+
+- river/domain object;
+- exact MeshFilter and transformed triangle data;
+- `192 × 96` or current active legacy dimensions;
+- allocated field length;
+- sample offsets and solid-interval constants.
+
+The audit compares:
+
+- candidate availability and X bounds;
+- exact projected lateral extrema bits;
+- emitted cell count, order, coordinates, and interval offsets;
+- every accepted sample's interval and water-parameter float bits;
+- the complete CPU occupancy scalar;
+- duplicate-cell counts;
+- first mismatch, including source, cell, sample coordinate, reconstructed base point, and Up vector.
+
+The mandatory result while the active mapping is `LegacyNormalizedAcross` is:
+
+```text
+Legacy obstacle parity: EXACT
+cell mismatches = 0
+accepted-sample mismatches = 0
+CPU scalar mismatches = 0
+```
+
+The frozen path is diagnostic-only and is excluded from player compilation by `UNITY_EDITOR`. It must never become a production fallback.
+
+#### One-report validation pipeline
+
+The phase-specific P5.2 action described below has been superseded by the current endpoint regression at `Actions → Foam Cache & Validation → Run Fixed-Metric Consumer Regression (P9)`. Retained closed-phase tools are grouped under `Historical / Deep Diagnostics`.
+
+One user action performed:
+
+1. assigned-cache metadata and current/legacy classification;
+2. exact provider/direct provenance for all sources;
+3. five independent non-storing Edit Mode preparations;
+4. obstacle stability checks after every preparation;
+5. complete payload and twenty-section determinism comparisons;
+6. CPU-emitted obstacle cells versus GPU readback scalar for each build;
+7. frozen pre-P5 versus descriptor-owned legacy-raster parity for each source;
+8. assigned-cache metadata and payload mutation proof;
+9. one final pass/fail ledger with first-difference evidence.
+
+Output:
+
+```text
+Library/RiverFoamDiagnostics/
+  <river>_LatestP52ComprehensiveValidation.txt
+```
+
+The user normally supplies this single report. A second run of the same report is requested only after an Editor restart when the change specifically requires hot-reload/restart persistence evidence. Supplemental P5.1 actions remain available only when the comprehensive report identifies a narrower failure requiring isolation.
+
+#### Exact implementation scope
+
+Modified implementation files:
+
+- `Game/Procedural/Core/GeneratedGeometryStableFingerprint.cs`;
+- `Game/Procedural/Masses/GeneratedMass.cs`;
+- `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.GeneratedSources.cs`;
+- `Game/Procedural/Rivers/RiverObstacleExclusionResolver.cs`;
+- `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.CacheDiagnostics.cs`;
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.CacheDiagnostics.cs`;
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheAsset.cs`;
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheCodec.cs`;
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`;
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.TopologyCache.cs`;
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`.
+
+Created diagnostic-only implementation:
+
+- `Game/Procedural/Rivers/RiverObstacleExclusionResolver.LegacyParityDiagnostics.cs` and its `.meta`.
+
+Modified canonical documents:
+
+- this plan;
+- the dependency register;
+- the active blocker document.
+
+#### Explicit non-changes
+
+- active mapping remains `LegacyNormalizedAcross`;
+- no fixed-metric allocation is activated;
+- no source, routing, Motion Lane, transport, topology replacement, film, shape, or production-render behavior changes;
+- no compute/HLSL file, kernel, texture, buffer, or dispatch changes;
+- no scene, prefab, material, River serialized field, generated cache asset, layer, tag, component, or dependency changes;
+- the expensive report is explicit Editor work only and creates output solely below `Library/RiverFoamDiagnostics`.
+
+#### Mechanical acceptance
+
+Before packaging, the implementation must prove:
+
+- every changed C# file parses in raw, `UNITY_EDITOR`, and player-preprocessed forms;
+- no local function/lambda captures a `ref`, `out`, or `in` parameter;
+- every changed method call matches the changed signature;
+- the fifteen serialized cache-asset fields are unchanged;
+- payload format remains `3` and generator contract is exactly `3`;
+- contract `(3,2)` is classified only as legacy obstacle fingerprint, `(2,1)` only as legacy coordinate, and `(3,3)` as current;
+- all zero provider/utility/aggregate success paths are rejected;
+- the frozen reference is structurally derived from the pre-P5 implementation and has no production caller;
+- no diagnostic path stores the built artifact, saves assets, marks scenes/prefabs dirty, or runs automatically;
+- all existing line endings and new unique metadata GUIDs are valid.
+
+#### P5.2 implementation and mechanical-validation record
+
+The supplied-snapshot implementation completed all recorded P5.2 work. The final post-implementation audit found and corrected one important diagnostic-lifetime hazard before delivery: `TryPrepareTopologyCacheInEditor` always releases `obstacleExclusionCells` and `obstacleExclusionScalar` in its `finally` block. Reading those fields after the preparation returned would therefore have produced an invalid empty CPU/GPU comparison. The final implementation requests a diagnostic capture before each build, snapshots CPU cells against the package's GPU-readback obstacle scalar inside `TryBuildTopologyCache` before resource release, and consumes only that immutable report after the preparation returns. The hook is wrapped in `UNITY_EDITOR`, inactive unless the comprehensive report explicitly requests it, and cannot affect ordinary builds or runtime startup.
+
+Mechanical evidence:
+
+- exact changed-file scope: sixteen files, including twelve C# files, three canonical Markdown documents, and one new `.meta`;
+- all twelve C# files parse in raw, Editor-preprocessed, and player-preprocessed forms;
+- no syntax-error or missing parser nodes;
+- no nested function captures a `ref`, `out`, or `in` parameter;
+- all changed API call arities match their definitions;
+- all fifteen serialized fields on the cache asset are byte-for-byte declaration-identical to P5.1;
+- cache payload/generator contract is exactly `3/3`;
+- `(2,1)`, `(3,2)`, and `(3,3)` are classified as legacy coordinate, legacy obstacle fingerprint, and current respectively;
+- every sentinel success boundary is rejected in utility, Generated Mass, provider collection, and aggregate construction;
+- the frozen pre-P5 `TryBake`, candidate-range, and base-sample formulas are token-equivalent after diagnostic renaming/string formatting normalization;
+- the exact-mesh intersection constants delegated by the frozen path are unchanged from pre-P5;
+- the legacy parity method has exactly one caller, in the Editor-only disturbance diagnostic;
+- the comprehensive report has one Inspector caller, five independent builds, eight final ledger rows, no asset-store/save/dirty call, and no automatic execution hook;
+- no HLSL, compute shader, resource, scene, prefab, material, generated cache asset, or serialized River file changed;
+- existing line-ending styles are preserved and the new Unity GUID is unique;
+- all Markdown files are UTF-8 with balanced fences and record the one-report/two-report maximum validation policy.
+
+A live Unity/C# compiler and Unity shader importer are unavailable in the supplied environment. The implementation is therefore mechanically verified, not Unity-compiled or runtime-validated.
+
+#### Unity gate
+
+Before rebuilding the assigned topology cache, run the comprehensive report once and supply the complete file. Required final ledger:
+
+```text
+Provider/direct fingerprint parity: PASS
+Obstacle stability across five builds: PASS
+Input fingerprint parity: PASS
+Five-build payload/section determinism: PASS
+CPU cells vs GPU obstacle scalar: PASS
+Frozen pre-P5 vs descriptor legacy raster: PASS
+Assigned cache stage/current parity: PASS
+Assigned cache remained unchanged: PASS
+Overall: PASS
+```
+
+Two-report closure sequence:
+
+1. Run Report 1 before rebuilding. A format-3/generator-2 assigned cache is accepted only as the expected `PRE-REBUILD LEGACY OBSTACLE FINGERPRINT` stage; every other ledger line must pass.
+2. Explicitly rebuild the assigned cache once. This is the only separate manual action and does not require pasted Console output.
+3. Close and reopen Unity.
+4. Run the same comprehensive report as Report 2. It must classify the assigned cache as current format `3` / generator `3`, compare its payload and all contract metadata exactly to Build 1, re-prove provider/direct identity after reload, and end with `Overall: PASS`.
+5. Exact Play startup is not requested as a third P5.2 workflow. It becomes a mandatory row in the next owning runtime comprehensive report.
+
+Any failed ledger line blocks P6 and must be diagnosed from the same report before requesting supplemental evidence. P5.2 requires at most the two comprehensive reports above.
+
+#### Permanent validation-pipeline rule
+
+Every future patch must ship the diagnostics needed to validate its own changed contract. The normal user workflow is one Inspector-triggered comprehensive report, or at most two reports when a reload/persistence boundary cannot be proven within one process. A long manual action sequence is permitted only when the required evidence cannot be represented in a complete report, and the plan must state why.
+
+### 17.7B `RG-METRIC-P5.3` — Deterministic topology evaluation phase and publication parity
+
+#### Objective
+
+Close the final P5 blocker by removing live animation phase from the static cached obstacle product, correcting the CPU/GPU validation contract, and invalidating every cache generated under the hidden dynamic-phase contract.
+
+#### Accepted Unity evidence
+
+The two complete P5.2 reports supplied on 2026-07-17 established:
+
+```text
+provider/direct exact-world identity = PASS for all 5 sources
+obstacle input stability across 5 builds = PASS
+five-build payload/section determinism within each Editor session = PASS
+frozen pre-P5 vs descriptor-owned legacy raster = PASS
+assigned cache mutation proof = PASS
+```
+
+The first session produced five identical current builds with `587` occupied obstacle texels. After explicit rebuild and Editor restart, the second session produced five identical current builds with `590` occupied texels while descriptor, domain fingerprint, exact obstacle fingerprint, generation fingerprint, and combined fingerprint remained identical. The assigned generator-3 cache therefore differed from fresh Build 1 after restart despite identical recorded inputs.
+
+Source review traced the omitted input to:
+
+- `StylizedRiverFoamRuntime.Resources.cs::ResolveInitializationDimensions`, which captures `initializationMotionTime = river.MotionTime`;
+- `StylizedRiverFoamRuntime.Topology.cs::ConfigureTopologyParameters`, which binds that value to `_FoamTime` during initialization;
+- `CS_RiverFoam.Topology.hlsl::IsObstacleIntervalSampleInside`, which evaluates each exact obstacle interval against `RiverWaterEvaluateSurfaceHeight(..., _FoamTime, ...)`;
+- `StylizedRiverFoamRuntime.TopologyCache.cs::CreateTopologyCachePackage`, which stores the resulting scalar but has no motion-time lane in its deterministic inputs.
+
+The P5.2 report also proved its CPU/GPU equality rule was invalid: CPU data contains conservative candidate cells and nine exact solid-interval samples; the GPU accepts only the subset whose canonical water height lies inside every sample interval. `738` candidates versus `587/590` accepted cells is therefore not itself a publication mismatch. A valid publication audit must reject GPU-only cells, nonbinary output, malformed candidates, duplicate/out-of-range publication, or repeat instability while treating candidate-only cells as expected interval-test rejections.
+
+#### Read-only review record completed before P5.3 edits
+
+Reviewed complete current implementations and direct contracts:
+
+- `Assets/AGENTS.md`;
+- all three canonical River Foam plan/register/blocker documents;
+- both supplied `LatestP52ComprehensiveValidation` reports;
+- `StylizedRiverFoamRuntime.Resources.cs` allocation-phase time capture and resolver;
+- `StylizedRiverFoamRuntime.Topology.cs` topology parameter binding and dynamic refresh ownership;
+- `StylizedRiverFoamRuntime.Obstacles.cs` candidate upload, dispatch, and scalar readback;
+- `StylizedRiverFoamRuntime.TopologyCache.cs` explicit preparation, package construction, capture timing, startup validation, and installation;
+- `StylizedRiverFoamRuntime.CacheDiagnostics.cs` five-build orchestration, CPU/GPU report, assigned-cache staging, and final ledger;
+- `StylizedRiverFoamTopologyCacheAsset.cs` stored-contract API;
+- `StylizedRiverFoamTopologyCacheCodec.cs` format/generator classification and foundation tests;
+- `StylizedRiverFoamRuntime.Constants.cs` startup-reason contract;
+- `StylizedRiverEditor.Actions.cs` explicit Inspector action surface;
+- `CS_RiverFoam.Resources.hlsl`, `CS_RiverFoam.Topology.hlsl`, and `CS_RiverFoam.compute` obstacle kernel/data contract;
+- all direct `TryValidateStoredContract`, `TryValidateContractVersions`, `ConfigureTopologyParameters`, `RefreshDynamicTopologySources`, and `UpdateObstacleExclusionMask` call sites.
+
+The supplied workspace has no `.git` directory, so branch/status/history comparison remains unavailable and is recorded as a validation limitation rather than inferred.
+
+#### Approved file scope
+
+**Canonical documents**
+
+- `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+
+**Cache/runtime/editor contracts**
+
+- `Assets/Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheAsset.cs`
+- `Assets/Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheCodec.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Topology.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.TopologyCache.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CacheDiagnostics.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+
+**Compute contract**
+
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Topology.hlsl`
+
+No other path is approved. Any required expansion must be recorded here before editing.
+
+#### Invariants and non-goals
+
+1. Active mapping remains `LegacyNormalizedAcross`; fixed-metric allocation remains deferred.
+2. Live water rendering and current-shore animation continue using live/captured `_FoamTime` exactly as before.
+3. Only static obstacle acceptance uses the new canonical topology evaluation time.
+4. Canonical topology evaluation time is exactly `0f`; it is not seeded and is never derived from `river.MotionTime`.
+5. Payload format remains `3`; generator contract advances `3 -> 4`.
+6. Format-3/generator-3 assets are classified explicitly as `Legacy Dynamic Topology Phase` and are never installed or rewritten in Play Mode.
+7. No kernel, dispatch count, texture, buffer, serialized field, scene, prefab, material, source, transport, film, shape, or production-render behavior changes.
+8. Diagnostics remain explicit Editor actions with no automatic, import-time, domain-reload, `OnValidate`, or per-frame work.
+9. Validation remains one comprehensive report before rebuild and the same report once after rebuild/restart.
+
+#### File-by-file implementation sequence
+
+| Step | File(s) | Change | Status |
+|---|---|---|---|
+| 1 | canonical plan | record evidence, scope, invariants, sequence, and gates before implementation | `COMPLETE` |
+| 2 | `StylizedRiverFoamRuntime.Topology.cs`, `CS_RiverFoam.Resources.hlsl`, `CS_RiverFoam.Topology.hlsl` | add topology phase contract/time zero, bind separate compute scalar, and use it only in obstacle interval acceptance | `COMPLETE` |
+| 3 | cache codec/asset/runtime constants/topology-cache callers | advance generator to 4 and classify generator 3 as legacy dynamic topology phase | `COMPLETE` |
+| 4 | runtime diagnostics + Editor action | rename/extend P5.3 report, correct candidate/publication semantics, report evaluation phase for all five builds, and preserve two-stage assigned-cache proof | `COMPLETE` |
+| 5 | dependency register + active blocker | replace stale P5.2 gate with P5.3 ownership and validation | `COMPLETE` |
+| 6 | post-change audit | reread final files/callers, compare against P5.2 base, parse C#/HLSL, verify API arity/contracts/kernels/resources/line endings/package | `COMPLETE` |
+
+#### Implementation and mechanical-validation record
+
+P5.3 is mechanically complete in the supplied snapshot. The implementation adds one separate compute scalar, `_FoamTopologyEvaluationTime`, bound to canonical `0f` only for exact obstacle interval acceptance. Existing `_FoamTime` binding and current-shore/live-water consumers remain unchanged. Payload format remains `3`; generator contract is `4`; generator `3` is rejected explicitly as `Legacy Dynamic Topology Phase`. The P5.3 comprehensive report performs five non-storing builds, validates candidate/publication subset ownership, records phase contract/time per build, preserves frozen pre-P5 raster parity, and proves assigned-cache immutability.
+
+Post-change audit result:
+
+```text
+approved changed files = 12 / 12
+changed C# files parsed = 7 / 7 in raw, Editor, development, and release forms
+C# parser errors or missing nodes = 0
+CS1628 nested ref/out/in capture candidates = 0
+changed API arity mismatches = 0
+cache serialized fields changed = 0
+compute kernels before/after = 22 / 22, same order
+new kernels/dispatches/textures/buffers = 0
+main compute shader changed = no
+line-ending regressions = 0
+scene/prefab/material/cache/meta changes = 0
+static checks = 44 passed / 0 failed
+```
+
+A Unity/C# compiler and Unity shader importer are unavailable in the supplied environment. The candidate is therefore mechanically verified, not Unity-compiled or runtime-validated.
+
+#### Acceptance criteria
+
+The first report may accept an assigned format-3/generator-3 cache only as the expected pre-rebuild legacy stage. All five fresh builds must use:
+
+```text
+topology phase contract = 1
+topology evaluation time = 0 [0x00000000]
+live river motion time = ignored by obstacle cache generation
+```
+
+Required ledger:
+
+```text
+Provider/direct fingerprint parity: PASS
+Obstacle stability across five builds: PASS
+Input fingerprint parity: PASS
+Five-build payload/section determinism: PASS
+CPU candidate/GPU publication parity: PASS
+Frozen pre-P5 vs descriptor legacy raster: PASS
+Topology evaluation phase: PASS
+Assigned cache stage/current parity: PASS
+Assigned cache remained unchanged: PASS
+Overall: PASS
+```
+
+After one explicit rebuild and Editor restart, the same report must classify the assigned asset as format 3 / generator 4 and prove payload plus metadata exact to Build 1. No third report or separate Play checklist is requested unless the comprehensive report cannot isolate a concrete failure.
+
+#### Stop conditions
+
+Stop before P6 if any of the following occurs:
+
+- any fresh build resolves a nonzero or nonidentical topology evaluation time;
+- any GPU-occupied cell is absent from the CPU candidate set;
+- output contains nonbinary obstacle texels, duplicate/out-of-range candidates, or repeat instability;
+- frozen pre-P5/descriptor legacy raster parity regresses;
+- generator-3 cache is accepted as current or installed in Play Mode;
+- assigned cache changes during a non-storing report;
+- current-shore/live rendering time is accidentally frozen;
+- implementation requires a new kernel, resource allocation, serialized field, scene, prefab, or material edit.
+
+### 17.7.4 P6 pre-edit review, decisions, and approved implementation scope
+
+**Status:** `COMPLETE — corrected P6b live-resource report passed`
+
+**Prerequisite evidence:** Both user-supplied P5.3 reports passed. The pre-rebuild report classified format 3 / generator 3 as `Legacy Dynamic Topology Phase`; the post-rebuild report classified format 3 / generator 4 as current and reproduced payload `1,954,946` bytes / `0BA390B87B301420` exactly after Editor restart.
+
+**Repository limitation:** the supplied workspace contains no `.git` directory. Branch, HEAD, status, history, and pre-existing live working-tree diffs cannot be inspected. The immutable comparison baseline for P6 is `/mnt/data/p6base`, copied byte-for-byte from the validated `/mnt/data/p53work` snapshot before the first P6 edit.
+
+**Complete read-only review performed before implementation:**
+
+- governing rules: `Assets/AGENTS.md`;
+- canonical docs: this plan, `River_Foam_Fixed_Metric_Dependency_Register.md`, and `River_Foam_Active_Blockers_and_Next_Patches.md`;
+- routing/Motion Lane owner and lifecycle caller: `StylizedRiverFoamRuntime.Obstacles.cs`, `StylizedRiverFoamRuntime.Lifecycle.cs`, `StylizedRiverFoamRuntime.Resources.cs`, `StylizedRiverFoamRuntime.Members.cs`, `StylizedRiverFoamRuntime.PublicSurface.cs`;
+- compute binding and descriptor owner: `StylizedRiverFoamRuntime.Compute.cs`, `StylizedRiverFoamRuntime.Topology.cs`, `StylizedRiverFoamGridDescriptor.cs`, `CS_RiverFoam.Resources.hlsl`, `CS_RiverFoam.Coordinates.hlsl`;
+- routing/Motion Lane consumers: `CS_RiverFoam.Motion.hlsl`, `CS_RiverFoam.Simulation.hlsl`, `RiverWaterFoamVelocity.hlsl`, `SH_CleanStylizedRiver.shader`, `StylizedRiverFoamRuntime.Binding.cs`;
+- external-field producers/contracts: `StylizedRiverDisturbanceRuntime.Resources.cs`, `StylizedRiverDisturbanceRuntime.PublicSurface.cs`, `CS_RiverDisturbance.compute`;
+- external-field consumers: `CS_RiverFoam.Sampling.hlsl`, `CS_RiverFoam.compute`, and `StylizedRiverFoamRuntime.Topology.cs`;
+- validation UI and retained diagnostic infrastructure: `StylizedRiverEditor.Actions.cs`, `StylizedRiverFoamRuntime.CacheDiagnostics.cs`.
+
+**Recorded findings:**
+
+1. Legacy Motion Lane downstream wavelength is already approximately physical because normalized U is multiplied by `fieldWidth / fieldHeight`; with 32 m chunks and equal legacy structural resolution per chunk/across, the first octave is `32 / 8.5 = 3.7647 m`. Its lateral scale remains normalized to the river rectangle and therefore changes with width.
+2. Legacy fixed-cell Y smoothing uses offsets `1` and `2` rows for two passes. Fixed-metric smoothing must convert explicit physical radii to rows; legacy code must remain byte-identical.
+3. Motion Lane scrolling is authored in metres but stored as cells. Fixed mode can preserve physical scroll speed by dividing by descriptor `ResolvedDxMetres`; legacy retains the existing minimum metric-row spacing fallback.
+4. Routing approach currently scales with total field width (`max(6, round(fieldWidth*0.055))`), so its physical reach grows with river length. Closure/contact/margins/dead-band are also cell-authored. Fixed mode requires metre-owned reaches while legacy remains exact.
+5. Routing is already upstream-only (`releaseCells = 0`) and component-local; P6 must preserve that no-rear/no-wrap topology.
+6. Disturbance fields intentionally keep independent Low/Medium/High dimensions and normalized cross-river mapping. The narrow integration required is Foam physical `(s,n)` to Disturbance normalized `(u,v)`; no Disturbance allocation or generator change is required.
+7. Current external sampling passes Foam UV directly. That is correct only for legacy normalized-across Foam. Fixed mode must reconstruct local distance and lateral metres from the descriptor/metric row, then convert lateral metres back to the Disturbance field's local normalized cross-section.
+8. Motion Lane and routing renderer diagnostics sample `foam.fieldUV`; P6 must bind the descriptor to the material and compute a dedicated motion-field UV. Normal production Foam/state sampling remains owned by P9 and is not changed.
+
+**P6 unit decisions:**
+
+- fixed Motion Lane downstream basis: 32 m repeat domain, preserving the accepted first-octave wavelength and all existing octave coefficients;
+- fixed Motion Lane lateral reference span: 10 m, so wider rivers contain proportionally more independent lateral structure while a 10 m river reproduces the accepted normalized scale;
+- fixed smoothing offsets: 0.20 m near and 0.40 m far, two passes with unchanged weights;
+- fixed routing approach reach: 2.0 m; front-contact closure: 0.35 m; contact-strength reach: 0.50 m; minimum lateral margin: one resolved lateral cell, otherwise 22% of obstacle physical height; centre tie dead-band: max(0.10 m, 10% of obstacle physical height);
+- fixed routing connectivity remains 8-neighbour cell connectivity because connectivity is topological, not a physical morphology radius;
+- Disturbance U uses the Disturbance allocated 32 m-chunk field length; Disturbance V uses the local metric row's left/right surface widths and the physical Foam cell-centre lateral metre coordinate.
+
+**Approved files:**
+
+- modify the three canonical Markdown documents;
+- modify `StylizedRiverFoamRuntime.Obstacles.cs`, `StylizedRiverFoamRuntime.Compute.cs`, `StylizedRiverFoamRuntime.Binding.cs`, `StylizedRiverFoamRuntime.PublicSurface.cs`, `StylizedRiverFoamRuntime.Constants.cs`, `StylizedRiverEditor.Actions.cs`;
+- modify `CS_RiverFoam.Coordinates.hlsl`, `CS_RiverFoam.Sampling.hlsl`, and `SH_CleanStylizedRiver.shader`;
+- create `StylizedRiverFoamRuntime.P6Diagnostics.cs` and its `.meta`.
+
+**Explicit non-goals:** no active mapping switch; no source rasterization; no persistent transport/CFL changes; no topology replacement; no film/shape migration; no normal production Foam UV migration; no Disturbance allocation/generation edit; no scene, prefab, material, cache asset, serialized River field, resource, kernel, dispatch, texture, or buffer addition.
+
+**Implementation sequence:**
+
+1. Add exact legacy/fixed Motion Lane coordinate, smoothing, signature, and scroll branches.
+2. Add exact legacy/fixed routing reach conversion and physical diagnostics while preserving one-sided component stamping.
+3. Add descriptor-aware Foam-to-Disturbance UV mapping and route all four external samplers through it.
+4. Bind descriptor uniforms to the river material and use a dedicated motion/routing debug UV without touching normal Foam sampling.
+5. Add one user-triggered P6 comprehensive report covering legacy parity, fixed physical invariance, routing ownership, external same-point mapping, renderer/compute coordinate parity, and scope/runtime resource invariants.
+6. Run parser/static/API/HLSL/scope/line-ending/package audits, update statuses, and package changed files only.
+
+**Acceptance:** active legacy Motion Lane/routing arrays remain exact against frozen reference functions; fixed candidate wavelength/smoothing/scroll/reaches stay within half-cell tolerance across 5/10/20/40 m widths; external UV is dimension-independent for the same physical point; no GPU field consumer samples a fixed Foam cell by coincident external indices; one P6 report returns `Overall: PASS`.
+
+### 17.7.5 P6 implementation and mechanical verification disposition
+
+P6 is implemented within the exact recorded 13-file scope:
+
+- legacy Motion Lane generation, smoothing, routing formulas, external UV, and renderer-debug UV remain on exact legacy branches;
+- fixed Motion Lane uses physical `(s,n)` cell centres, a 32-m downstream basis, 10-m lateral reference span, descriptor `dx` scroll conversion, and 0.20/0.40-m smoothing offsets;
+- fixed obstacle routing resolves 2.0-m approach, 0.35-m closure, 0.50-m contact, physical lateral margin/dead-band, and zero downstream release;
+- Pressure, Static Wake, Wake, and Ripple samplers map a fixed Foam point to Disturbance UV through physical local distance and local asymmetric surface widths, without changing Disturbance allocation or dimensions;
+- the material receives the existing five-lane descriptor ABI and only Motion Lane/routing/obstacle debug sampling gains fixed-metric UV; normal production Foam state UV remains owned by P9;
+- one Editor-only `LatestP6ComprehensiveValidation` report owns active legacy readiness, fixed physical invariance, no-zero-speed evidence, upstream-only routing, unequal-dimension same-point mapping, source readiness, neutral fallback, and assigned-cache mutation proof.
+
+Mechanical evidence: 13 changed files exactly; five changed/new C# files parsed in raw, Editor, development-player, and release-player forms with zero parser errors; no CS1628 candidates or malformed multiline strings; 22 compute kernels remain in the same order; project-wide RenderTexture/ComputeBuffer/dispatch/FindKernel counts remain `11/15/21/33`; serialized declarations are unchanged; 100,000 randomized legacy routing cases matched; 1,000 fixed-routing reach assertions and 44 fixed coordinate/unequal-dimension assertions passed; no scene, prefab, material, cache asset, source, transport, film, or shape implementation changed. Unity compilation and shader import passed after P6a. The first report exposed an invalid diagnostic lifecycle, corrected by P6b. The corrected report installed the assigned cache without build/write, reached live `Ready`, measured nonzero Motion Lane and obstacle routing with zero rear leakage, proved same-point external-field mapping and fallback creation, then proved cleanup, disabled bindings, and cache immutability. Its final ledger returned `Overall: PASS`; P6 is complete.
+
+### 17.7.6 `RG-METRIC-P6b` — Live diagnostic preparation transaction
+
+**Status:** `COMPLETE — corrected report returned Overall: PASS`
+
+**Observed Unity evidence:** The user-triggered P6 report reached the normal cache build successfully (`1,954,946` bytes / `0BA390B87B301420`) but then reported `Resources ready: True` together with `Active descriptor: Unallocated`, no fixed candidate, empty Motion Lane/routing arrays, sentinel signatures `-2147483648`, and a missing neutral fallback. The synthetic fixed-routing cases and assigned-cache mutation proof passed. This combination proves the diagnostic read state after cleanup rather than while resources were live.
+
+**Complete corrective read-only review:**
+
+- `StylizedRiverFoamRuntime.P6Diagnostics.cs`: report ordering, cache snapshot, runtime-resource reads, final ledger, and signature checks;
+- `StylizedRiverFoamRuntime.TopologyCache.cs`: `TryPrepareTopologyCacheInEditor()` preparation loop, serialization, and unconditional cleanup;
+- `StylizedRiverFoamRuntime.Resources.cs`: `EnsureResources()`, initialization phases, current-cache installation, `AreResourcesCompleteAndCurrent()`, finalization, and `ReleaseResources()` reset contract;
+- `StylizedRiverFoamRuntime.Obstacles.cs`: `EnsureMotionFieldsCurrent()` and Motion Lane/routing telemetry publication;
+- `StylizedRiverFoamRuntime.Binding.cs`: `BindDisabled()` cleanup binding;
+- `StylizedRiverDisturbanceRuntime.GeneratedSources.cs`: exact generated-obstacle registry preparation;
+- `StylizedRiverEditor.Actions.cs`: the existing single-button caller;
+- canonical P6 scope and one-report validation policy in this plan, the dependency register, and active blockers.
+
+**Repository limitation:** `/mnt/data/p6work` has no `.git` directory. Branch, status, history, and HEAD comparison remain unavailable. `/mnt/data/p6base` remains the immutable pre-P6 baseline; the current P6 implementation plus P6a is the corrective comparison source.
+
+**Proven defect:** `TryPrepareTopologyCacheInEditor()` calls `ReleaseResources()` and `BindDisabled()` in its unconditional `finally`. `RunP6ComprehensiveValidationReport()` calls that method and then reads `gridDescriptor`, `fixedMetricCandidateDescriptor`, textures, arrays, and telemetry. `ReleaseResources()` resets all of those values, including both signatures to `int.MinValue`. The report's additional `signature != 0` checks also use the wrong uninitialized sentinel.
+
+**Approved files:**
+
+1. `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`;
+2. `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`;
+3. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`;
+4. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P6Diagnostics.cs`.
+
+**Invariants and non-goals:**
+
+- no P6 production Motion Lane, routing, external-field, renderer, compute, or cache behavior changes;
+- no topology payload build or serialization during the P6 report;
+- no cache, scene, prefab, material, serialized River state, resource contract, kernel, dispatch, texture type, or buffer type change;
+- the assigned generator-4 cache is read-only validation input;
+- all live evidence is captured before cleanup;
+- cleanup is mandatory in `finally`, disables bindings, and leaves the runtime in normal dirty/not-started state;
+- the single-report user workflow is retained.
+
+**Implementation sequence:**
+
+1. Replace cache-building preparation with a P6-owned non-storing live-resource transaction: prepare generated obstacle sources, reset transient Foam resources, and step `EnsureResources()` to `Ready` by installing the assigned current cache.
+2. Keep descriptors, textures, arrays, source readiness, and telemetry alive while every P6 ledger section executes.
+3. Correct Motion Lane and routing readiness checks to reject `int.MinValue`, not zero.
+4. Capture assigned-cache metadata/payload after evidence collection, then release resources and call `BindDisabled()` in guaranteed cleanup.
+5. Add cleanup evidence proving resources/descriptors are released, initialization is reset, bindings are disabled, and the assigned cache remains byte-identical.
+6. Run parser, preprocessor, API/member, control-flow ordering, prohibited-call, lifecycle-contract, scope, line-ending, and package extraction audits.
+
+**Acceptance:** The report must not call `TryPrepareTopologyCacheInEditor()` or `TryBuildTopologyCache()`. It must reach `InitializationPhase.Ready`, prove `AreResourcesCompleteAndCurrent()`, inspect all P6 runtime state before cleanup, then prove cleanup and assigned-cache immutability afterward. The same existing Inspector button must produce one `LatestP6ComprehensiveValidation` file whose final ledger includes live preparation, all five P6 contracts, cleanup, cache immutability, and `Overall: PASS`.
+
+**Implementation disposition:** The P6 report now owns a non-storing assigned-cache installation transaction. It prepares the exact generated-obstacle registry, sets sentinel monitors around cache serialization and explicit-preparation upload telemetry, advances the normal `EnsureResources()` state machine to `Ready`, and evaluates every P6 runtime ledger while descriptors, textures, cached obstacle scalar, Motion Lane, routing, and neutral fallback remain live. It no longer calls either cache-building API. Runtime routing evidence counts occupied cells from the cached obstacle scalar when CPU candidate cells are intentionally absent after cache installation. Both readiness checks now use `int.MinValue`, the actual release sentinel. Cleanup occurs only when the diagnostic owns the transaction; it runs in `finally`, releases resources, restores normal dirty/not-started state, disables renderer bindings, verifies black fallback bindings, and only then performs the assigned-cache byte proof.
+
+**Post-change evidence:** exactly four approved files differ from the reconstructed P6+P6a state; the production P6 C#/HLSL/shader files are byte-identical; the complete P6 static suite remains `25/25`; the P6b lifecycle/semantic suite is `45/45`; raw, Editor-preprocessed, and player-preprocessed C# parse with zero errors; no CS1628 candidate, malformed string, invalid `.Payload` access, cache-build call, topology-build call, wrong `ByteArraysEqual` arity, serialized field, new allocation, kernel, dispatch, scene, prefab, material, or cache-asset edit exists. Unity then compiled/imported the patch, and the corrected report proved: live assigned-cache installation with `build:0` and `writes:0`; active legacy ownership; fixed-candidate readiness; nonzero Motion Lane; obstacle routing with `rearLeak=0`; unequal-dimension external-field same-point mapping; neutral fallback creation; cleanup and disabled bindings; assigned-cache immutability; `Overall: PASS`.
+
+### 17.8 `RG-METRIC-P6` — Obstacle routing, Motion Lane, and external-field integration
 
 **Objective:** Preserve physical flow behavior and correct sampling of fields with independent dimensions.
 
@@ -1264,48 +2175,200 @@ Files classified as review/test-only in Appendix B remain explicitly outside inc
 
 **Rollback checkpoint:** topology/obstacle metric baseline before automatic birth and transport changes.
 
-### 17.8 `RG-METRIC-P7` — Automatic/manual source migration and unit policy
+### 17.9 `RG-METRIC-P7` — Automatic/manual source migration and unit policy
 
-**Objective:** Migrate every source family and authoring unit without preserving accidental cell anisotropy.
+**Status:** `CLOSED — UNITY-VALIDATED`
+
+**Objective:** Migrate every automatic and manual Layer C source path to an explicit physical-unit contract while preserving the active `LegacyNormalizedAcross` result on its exact compatibility branches. Fixed-metric allocation remains deferred; P7 prepares source geometry, dispatch bounds, manual commands, probes, and debug parity so later activation cannot inherit normalized-row anisotropy.
+
+**Read-only evidence reviewed before implementation:**
+
+- canonical architecture and queue: this plan, `River_Foam_Fixed_Metric_Dependency_Register.md`, and `River_Foam_Active_Blockers_and_Next_Patches.md`;
+- repository rules: `Assets/AGENTS.md`;
+- source parameter ownership and validation: `StylizedRiver.cs`, `StylizedRiverEditor.Foam.cs`, `StylizedRiverEditor.Actions.cs`;
+- automatic source preparation and all eight event families: `StylizedRiverFoamRuntime.BirthEvents.cs`, `StylizedRiverFoamRuntime.State.cs`;
+- manual ellipse/stroke/compound command path, automatic GPU upload, dispatch culling, isolated probe, production/debug raster kernels: `StylizedRiverFoamRuntime.Injection.cs`, `StylizedRiverFoamRuntime.Lifecycle.cs`, `StylizedRiverFoamRuntime.BirthDiagnostics.cs`, `CS_RiverFoam.compute`, `CS_RiverFoam.Resources.hlsl`, and `CS_RiverFoam.Coordinates.hlsl`;
+- removed transfer path: `StylizedRiverFoamRuntime.BirthTransfer.cs` confirms no source-transfer texture remains;
+- active descriptor/candidate mapping APIs: `StylizedRiverFoamGridDescriptor.cs` and `StylizedRiverFoamRuntime.RuntimeUpdates.cs`;
+- validated live diagnostic lifecycle: `StylizedRiverFoamRuntime.P6Diagnostics.cs` and the Unity P6 report dated 2026-07-17;
+- comparison state: `/mnt/data/p7base` is the immutable P6+P6a+P6b source baseline. The supplied snapshot has no `.git` directory, so Git status/history/SHA review is unavailable and must not be claimed.
+
+**Interruption-resume audit (2026-07-17):**
+
+- the interrupted workspace is recoverable and remains based on the validated P6+P6a+P6b source baseline; no restart from rollback is required;
+- implementation was incomplete: `StylizedRiverFoamRuntime.P7Diagnostics.cs` and the two remaining canonical document updates were not created, and no P7 validation/package artifact existed;
+- one accidental out-of-scope compute change was found: `EvaluateFoamShape` had been switched to source-range Y uniforms even though its production dispatch does not bind them. P7 must restore that kernel exactly and apply the Y-range migration only to `InjectFoam`;
+- `CS_RiverFoam.Coordinates.hlsl` had its baseline CRLF line endings unintentionally converted to LF. P7 must restore CRLF while retaining only the intended helper addition;
+- the normalized composition API cannot be implemented as a literal metric-command wrapper without changing accepted normalized drift/bend behavior along width-varying river samples. The implementation therefore uses one explicit compatibility mode and one explicit metric mode that share queue/raster infrastructure but preserve distinct unit semantics. This replaces the earlier wrapper wording without changing the objective or approved scope.
+- post-resume range audit found the same distinction in fixed-metric manual raster culling: compatibility ellipse/compound centres and compatibility segment endpoints are converted through each candidate row’s local left/right widths by the GPU, while metric commands remain fixed in lateral metres. Fixed compatibility Y bounds must therefore union every candidate X row; one centre-row conversion can under-bound width-varying rivers. Validation must prove shared anchor placement and independent physical containment, not require compatibility and metric dispatch rectangles to be identical.
+- final semantic audit found and removed one duplicate exact `ResolveCompatibilityManualLateralBounds` method left by the interruption; the validation pipeline now scans exact method signatures across the runtime partial class so this class of compile defect cannot pass packaging.
+- final fixed-range audit found that Shore/Wash source bounds must sample each actual candidate row distance, including longitudinal feather rows outside the authored endpoint interval. Clamping those rows back to the source endpoints could under-bound a width-varying river. Production and validation now evaluate every dispatch column plus padded longitudinal endpoints at their true domain distance.
+- the comprehensive report was strengthened before delivery to validate compatibility and metric compound commands separately, prove `ClearRange` retains independent full-Y ownership, compare every automatic-event GPU lane including build/hold/release progression, and resolve inspected source paths from `Application.dataPath` rather than Unity's working directory.
+
+**Serialized/public source-unit classification:**
+
+- metres: all fields whose names end in `Metres`, `MetresPerSecond`, or physical length/width/reach/offset contracts already documented as metres;
+- seconds: duration, hold, release, rest, and formation timing fields;
+- normalized/unitless: coverage, activity, weights, lifecycle fractions, Presence, Remaining Life, breakup strengths, seeds, progress, and compatibility position controls;
+- compatibility cells: `foamShoreRibbonThicknessCells` and `foamShoreRibbonOffsetVariationCells` remain serialized unchanged. Legacy rasterization continues to interpret them in local cross-river cells. Fixed-metric source preparation resolves them once to source-local metres;
+- compatibility normalized manual position: existing public/serialized normalized entry points remain valid compatibility commands. They share queue/raster infrastructure with new metric entry points, but preserve row-local normalized semantics; metric commands own fixed global-distance/lateral-metre placement and metre drift.
+
+**Approved implementation scope:**
+
+1. `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`;
+2. `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`;
+3. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`;
+4. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.SourceUnits.cs` plus `.meta`;
+5. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs` plus `.meta`;
+6. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`;
+7. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`;
+8. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`;
+9. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`;
+10. `Assets/Game/Procedural/Rivers/StylizedRiver.cs`;
+11. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`;
+12. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`;
+13. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl`;
+14. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Coordinates.hlsl`;
+15. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`.
+
+**Invariants and non-goals:**
+
+- active allocation remains `LegacyNormalizedAcross`; no serialized mapping switch or hidden activation path;
+- no source family, weight, seed, lifecycle value, activity budget, event capacity, ownership rule, or accepted Arc/Semi-Arc path topology is retuned;
+- existing serialized field names/types/defaults remain unchanged; no scene, prefab, material, or cache asset edit;
+- legacy automatic source GPU values and raster formulas remain exact on the legacy branch, including Shore Ribbon cell-authored thickness/offset variation;
+- fixed-metric branches use physical cell centres, physical local-normal spacing, and metric dispatch bounds;
+- debug and production automatic-source kernels continue to call one shared evaluator;
+- no transport, film, shape, topology, routing, Motion Lane, Disturbance allocation, or production Foam-render migration;
+- no new per-frame readback or full-field rebuild; diagnostics are explicit Editor actions only;
+- the P7 report reuses the Unity-validated non-storing live-resource transaction and must inspect live state before cleanup, prove cleanup afterward, and prove assigned-cache immutability.
+
+**Implementation sequence:**
+
+1. Add one centralized source-unit resolver for global-distance/lateral-metre conversion, legacy-exact/fixed-metric X/Y dispatch ranges, Shore Ribbon compatibility-cell resolution, and physical probe layout.
+2. Extend transient CPU source commands/events with explicit metric-lateral values while retaining normalized compatibility fields and without changing serialized data or GPU buffer stride.
+3. Route normalized and metric manual APIs through shared internal command infrastructure with an explicit compatibility/metric unit mode; fixed compatibility dispatch bounds must union row-local normalized-to-metre conversions across every candidate X column, while metric bounds remain fixed in metres. Add metric public APIs and update the existing River manual action to expose the resolved start-anchor values without changing normalized command semantics.
+4. Migrate automatic-source CPU dispatch culling to descriptor-aware metric ranges and preserve the legacy formulas exactly.
+5. Bind metric manual-source uniforms and migrate `InjectFoam`, segment injection, automatic source raster cell centres, and source-domain clipping to descriptor-aware coordinate helpers.
+6. Resolve Shore Ribbon cell-authored thickness/variation deliberately: legacy uses local cells; fixed metric uses source-prepared metres. Preserve Arc/Semi-Arc one-cell normal shell and physical core/feather behavior.
+7. Migrate isolated probe dimensions/gaps to a fixed physical contract only on the fixed branch; preserve the current legacy percentage/cell layout exactly.
+8. Update Inspector text to state compatibility units and show resolved physical placement without changing serialized values.
+9. Add one comprehensive P7 report covering parameter classification, all eight source families, manual ellipse/segment/compound commands, dispatch containment, source cell-centre mapping, Shore Ribbon policy, Arc/Semi-Arc normal spacing, probe layout, flow reversal, debug/production evaluator identity, lifecycle/event-cap invariants, cleanup, and cache immutability.
+10. Run parser/preprocessor, symbol/member/arity, HLSL declaration/binding, CPU/HLSL formula, legacy-equivalence, fixed-metric invariant, resource/kernel/dispatch-count, serialized-field, scope, line-ending, GUID, and package extraction audits.
+
+**Acceptance criteria:**
+
+- Unity imports with zero C# and shader/compute errors;
+- one P7 report reaches live `Ready` state without cache build/write and ends `Overall: PASS`;
+- all eight automatic families report physical bounds, nonzero/minimum footprint, progression/continuity, forward/reversed-flow containment, and source-unit compliance;
+- manual ellipse, segment/stroke, compound, clear-range ownership, and isolated probe metric contracts pass; normalized and metric commands must match at their authored anchors, while each mode’s independently correct width-varying physical bounds are validated rather than forced to share one rectangle;
+- fixed candidate dispatch ranges contain every sampled physical footprint without full-field fallback; legacy ranges are bit/formula equivalent to the baseline;
+- automatic production/debug raster paths are proven to share the same evaluator;
+- assigned cache metadata/payload remain byte-identical and diagnostic cleanup/bindings pass.
+
+**Post-change mechanical evidence:**
+
+- exactly 17 approved paths differ from the immutable P6 baseline: 15 approved implementation/document paths plus the two new `.meta` files; no scene, prefab, material, cache asset, topology, routing, Motion Lane, transport, film, shape, or production-render file changed;
+- nine changed/new C# files parse with zero syntax/missing-node errors in raw, Editor, development-player, and release-player preprocessing modes; no malformed multiline string, CS1628 capture candidate, duplicate exact method signature, invalid cache API use, or changed-call arity defect remains;
+- the seven-`Vector4` automatic-source GPU stride and every serialized River/runtime field declaration remain unchanged; the active mapping remains `LegacyNormalizedAcross` and fixed allocation remains deferred;
+- exact legacy-equivalence tests passed 800,000 automatic-source comparisons, 100,000 manual-source comparisons, and 100,000 isolated-probe comparisons; fixed-metric source/range/round-trip invariants passed 200,000 cases with zero failures;
+- 165 primary static/semantic checks and 34 supplementary HLSL/compute checks passed. Only `EvaluateFoamAutomaticSourceRasterSample`, `FoamEvaluateShoreRibbonSource`, `InjectFoam`, and `ResolveFoamSegmentInjectionSample` differ inside the compute file; `EvaluateFoamShape` and `ClearRange` are byte-identical to P6;
+- kernel order/count, resource declarations, RenderTexture/ComputeBuffer allocation counts, dispatch counts, GUID uniqueness, intended line endings, balanced Markdown fences, and changed-file scope passed;
+- Unity compilation and compute import passed; the Inspector-triggered P7 comprehensive report returned `Overall: PASS`, closing P7.
+
+**Stop conditions:**
+
+- any existing serialized field would require a changed meaning rather than an explicit compatibility resolver;
+- Arc/Semi-Arc accepted front-only path or thin source shell cannot be preserved;
+- a source family needs a new resource, state texture, kernel, dispatch, or event-capacity change;
+- the validator cannot prove it measured live source state before cleanup.
+
+**Rollback checkpoint:** `/mnt/data/p7base` — validated P6 source-metric baseline before source migration.
+
+### 17.10 `RG-METRIC-P8` — Persistent transport, CFL, curvature, and topology replacement
+
+**Status:** `CLOSED — UNITY-VALIDATED`. P8a fixed the real lateral descriptor defect; P8b corrected the validator symbol; the final P8 report proved `1,491` overlap cells, `863` cleared cells, zero GPU remap mismatches, physical topology-transition mapping, cleanup, cache immutability, and `Overall: PASS`.
+
+**Objective:** Make persistent material movement and resource replacement numerically correct under the prepared fixed-metric descriptor while preserving exact active legacy behavior.
+
+**Reviewed implementation evidence:**
+
+- `StylizedRiverFoamRuntime.Lifecycle.cs::ResolveTransportSubsteps` owns the material-tick CFL/substep gate.
+- `StylizedRiverFoamRuntime.Compute.cs::DispatchSimulateRange` owns each conservative substep dispatch and packed-state swap.
+- `CS_RiverFoam.Simulation.hlsl` already carries Presence, life moment, and pattern moment through a first-order finite-volume donor-cell solve and separately records endpoint outflow/clamp attribution.
+- `StylizedRiverFoamRuntime.Topology.cs::BuildMetricBuffer` provides per-column signed centreline curvature and descriptor spacing.
+- `StylizedRiverFoamRuntime.Resources.cs::FinalizeInitialization` releases dimension-change visible holds after the new resource set is complete.
+- `StylizedRiverFoamRuntime.TopologyReplacement.cs` owns the previous generated topology, previous metric rows, and held material textures, but currently maps generated topology through normalized UV and does not remap persistent material.
+- `CS_RiverFoam.TopologyTransition.hlsl` is the previous/current topology mapper.
+
+**Approved files:** the 19 paths listed under the active P8 gate in `River_Foam_Active_Blockers_and_Next_Patches.md`. No other code, asset, or generated file may change.
 
 **Required work:**
 
-- classify and record every serialized/public Foam source parameter;
-- migrate CPU event preparation and dispatch culling to metric ranges;
-- migrate GPU event raster cell centres and local normal spacing;
-- establish physical core/feather behavior for Arc/Semi-Arc;
-- migrate Shore Ribbon cell-authored thickness/variation deliberately;
-- validate all eight automatic source families;
-- migrate manual ellipse, stroke, compound, clear-range, isolated probe, birth transfer, and debug source paths;
-- retain lifecycle, weights, seeds, event ownership, and pattern authority unless explicitly tuned.
+- preserve exact legacy transport formulas and simulation bounds;
+- use descriptor spacing and the fixed curvilinear metric `J = 1 - kappa*n` for fixed cell area, lateral-face length, and downstream CFL;
+- adopt bounded corrected curvature with `J >= 0.25`, while reporting raw and bounded values;
+- expose separate downstream/lateral/total CFL evidence and preserve the 0.90 target / 64-substep stop policy;
+- retain conservative packed transport and endpoint-only outflow under forward and reverse flow;
+- store the complete previous descriptor alongside transition metric rows;
+- map generated topology by physical `(global s,n)` for legacy/fixed previous descriptors;
+- exact-copy persistent material only between compatible integer-aligned fixed lattices; clip to new valid fluid after copy;
+- deliberately clear legacy, spacing-changing, phase-changing, non-integer, unsupported-contract, or curvature-incompatible replacements;
+- add one dirty-time exact-remap kernel with no new persistent resource;
+- add one comprehensive live P8 report and reuse the proven P6/P7 cleanup and cache-immutability transaction.
 
-**Verification:** physical bounds, minimum footprint, progression, continuity, flow reversal, clipping, event-cap saturation, no rectangular macro blocks, exact debug/production source parity.
+**Implemented result:**
 
-**Stop conditions:** accepted Arc/Semi-Arc shape cannot be preserved at candidate scale; a serialized field would change meaning without compatibility; one source family requires an unplanned state/resource change.
+- fixed-only curvilinear cell area and lateral-face geometry use bounded `J = max(0.25, 1 - kappa*n)`;
+- CFL now reports downstream/lateral components and applies `dx*Jmin` only to the fixed downstream component while preserving the existing target and hard limit;
+- previous transition snapshots retain the complete descriptor, GPU descriptor, metric rows, and material-authority state;
+- exact fixed-lattice replacement is policy-gated by contracts, spacing, phase, integer longitudinal/global-Y alignment, and overlapping curvature; unsupported replacements clear explicitly;
+- one dirty-time `RemapPersistentFoamState` kernel copies packed Presence/life moment/pattern moment by exact physical cell identity, clips to current valid fluid, and reuses existing resources;
+- generated-topology transition now maps current physical `(global s,n)` into the previous legacy or fixed descriptor;
+- the single P8 report executes a live synthetic GPU remap/readback in addition to CPU conservation, CFL, curvature, policy, source-contract, cleanup, and cache-immutability gates.
 
-**Rollback checkpoint:** source-metric baseline before transport and render closure.
+**Mechanical audit:** 44/44 primary checks passed; all nine changed C# files parsed in raw/Editor/development/release configurations; the project-owned method declaration/call audit found zero arity or duplicate-signature failures; kernel count changed 22→23 with no existing reorder; production persistent-resource token counts remained unchanged; 100,000 packed-flux and 100,000 CFL/Jacobian reference cases passed. The subsequent P8a/P8b Unity reports closed the real descriptor defect and validator-symbol defect, ending with `Overall: PASS`.
 
-### 17.9 `RG-METRIC-P8` — Persistent transport, CFL, curvature, and topology replacement
+**First Unity report evidence and `RG-METRIC-P8a` correction:**
 
-**Objective:** Make material movement numerically correct under fixed metric coordinates.
+- GPU remap reported `overlap=1491`, `mismatches=1491`, first mismatch `(0,2)`.
+- The C# descriptor lateral vector is `(phase, globalYBase, rowCount, guardRows)`; the fixed HLSL cell-centre resolver incorrectly used `.z` as base and `.w` as row count. With zero guard rows, every row collapsed to one invalid lateral coordinate and no previous cell could resolve.
+- `ApplyGeneratedTopologyTransition` receives texel-centre UV from both production callers and resolves physical `(s,n)` through `FoamGridLocalDistanceAtUV` and `FoamLateralMetresAtUV`; the validator incorrectly required the `AtTexel` helper names.
+- P8a corrects the HLSL lane decode, validates producer/consumer lane agreement, checks the real production UV call path, and retains the one-report validation workflow.
+- Post-correction evidence: exactly two HLSL lane substitutions; legacy branch byte-identical; 7,887 CPU/HLSL lateral cell-centre comparisons passed; the original synthetic remap resolves 1,491 overlap and 863 exterior cells exactly; targeted audit 21/21; full P8 regression 44/44.
 
-**Required work:**
+**Second Unity report evidence and `RG-METRIC-P8b` plan:**
 
-- use descriptor spacing for velocity conversion and CFL;
-- validate conservative flux and endpoint outflow;
-- add curvature diagnostics and adopt bounded or corrected policy;
-- update transport metrics physical interpretation;
-- migrate current/previous descriptor mapping for topology replacement;
-- define clear/remap behavior for incompatible descriptors;
-- validate flow reversal and multi-substep behavior.
+- the real GPU remap passed: `overlap=1491`, `cleared=863`, `mismatches=0`, and `Synthetic GPU packed-state remap=True`;
+- all CFL, conservation, curvature, replacement-policy, kernel/resource, live-state, cleanup, and cache-immutability gates passed;
+- the sole failed boolean was `Current cell resolves one texel-centre physical (s,n) point=False`;
+- repository evidence: `StylizedRiverFoamRuntime.P8Diagnostics.cs::ValidateP8TopologyTransitionMapping` extracts `"void CaptureGeneratedTopologyTransition("`, but `CS_RiverFoam.compute` declares `void CaptureGeneratedTopology(uint3 dispatchId : SV_DispatchThreadID)` and that kernel calls both `FoamTexelCentreUV` and `ApplyGeneratedTopologyTransition`;
+- approved P8b scope: `River_Foam_Active_Blockers_and_Next_Patches.md`, `River_Foam_Fixed_Metric_Dependency_Register.md`, `River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`, and `StylizedRiverFoamRuntime.P8Diagnostics.cs` only;
+- implementation sequence: correct the extracted symbol; report explicit body-found state for `ApplyGeneratedTopologyTransition`, `CaptureGeneratedTopology`, and `ComposeTopology`; make missing inspected symbols an explicit validator-contract failure rather than an indirect physical-mapping failure; run parser/preprocessor, symbol declaration/extraction, scope, line-ending, full P8 regression, and package byte audits;
+- acceptance: the validator must locate both production caller bodies and prove each constructs texel-centre UV before invoking the shared physical transition evaluator; no production file may differ from P8a; Unity exit remains one rerun of the existing P8 comprehensive report.
+- implemented result: extraction now targets `CaptureGeneratedTopology`; missing shared/caller bodies explicitly block `currentPhysicalPoint`; the report prints body-found state for `ApplyGeneratedTopologyTransition`, `CaptureGeneratedTopology`, and `ComposeTopology`.
+- post-change evidence: exact four-file scope; all production files byte-identical to P8a; four C# parser configurations passed; exact extraction returned non-empty body lengths `1236/843/7704`; targeted P8b audit passed 25/25; full P8 regression passed 44/44. Preliminary four-file archive extraction matched byte-for-byte; the final archive is rebuilt from this final documented state before delivery.
 
-**Verification:** no-birth/death conservation; moments; widening/narrowing; bends; obstacle diversion; endpoint outflow; topology replacement; candidate CFL; 40 m curvature stress.
+**Verification:**
 
-**Stop conditions:** conservation exceeds tolerance; an extra substep violates budget; curvature policy is unresolved for required cases; state replacement teleports/duplicates/loses material.
+- exact active legacy branch comparison;
+- no-birth/death Presence, life-moment, and pattern-moment conservation;
+- endpoint outflow accounting and no lateral/bank/obstacle leakage;
+- forward/reverse-flow outlet swap;
+- candidate downstream/lateral/total CFL and multi-substep count;
+- widening/narrowing and obstacle-diversion synthetic fields;
+- 40 m diameter-width / 40 m bend-radius curvature stress (`max abs(kappa*n)=0.5`, raw minimum `J=0.5`);
+- exact fixed-lattice expansion/contraction remap, integer offsets, clipping, and incompatible clear policy;
+- generated-topology physical previous-descriptor mapping;
+- live cleanup, disabled bindings, queue invariants, and assigned-cache byte immutability.
 
-**Rollback checkpoint:** metric source deposition baseline before persistent evolution.
+**Stop conditions:** conservation or moment residual exceeds tolerance; an extra runtime substep violates the existing 64-pass budget; raw required Jacobian is non-positive; required 40 m stress needs clamping; exact remap duplicates/teleports/loses overlapping material; unsupported mappings are silently sampled; active legacy output changes; or the validator cannot prove live measurement before cleanup.
 
-### 17.10 `RG-METRIC-P9` — Film occupancy, shape evaluation, and production rendering
+**Non-goals:** fixed allocation activation; source/film/shape/render migration; recipe/birth/cadence changes; topology generation; routing/Motion Lane/Disturbance allocation; scene/prefab/material/cache/serialized River changes.
+
+**Rollback checkpoint:** `/mnt/data/p8base` — validated P7 source-unit baseline.
+
+### 17.11 `RG-METRIC-P9` — Film occupancy, shape evaluation, and production rendering
 
 **Objective:** Complete visual-layer and production-sampling migration.
 
@@ -1326,49 +2389,207 @@ Files classified as review/test-only in Appendix B remain explicitly outside inc
 
 **Rollback checkpoint:** complete simulation baseline before final render migration.
 
-### 17.11 `RG-METRIC-P10` — Diagnostics, inspector semantics, and documentation
+### 17.12 `RG-METRIC-P10` — Diagnostics, inspector semantics, and documentation
 
-**Objective:** Make the new contract observable and remove stale authoring/documentation semantics.
+**Status:** `MECHANICALLY VERIFIED — UNITY VALIDATION PENDING`.
 
-**Required work:**
+**Objective:** expose the completed P2–P9 coordinate contract compactly, reduce Inspector diagnostic noise, and remove stale fixed-metric status/documentation semantics without changing simulation, rendering, allocation, caches, or serialized River data.
 
-- add compact descriptor, waste, cache, CFL, curvature, source-area, memory, and dispatch diagnostics;
-- update existing debug views rather than proliferating redundant views;
-- update inspector labels/tooltips and compatibility messaging;
-- keep serialized values stable unless migration is approved;
-- update active blockers, Stage 6 architecture, rendering roadmap, handoff, and this plan statuses;
-- mark superseded normalized-lateral instructions explicitly.
+#### Authorization and exact file scope
 
-**Verification:** inspector persistence; no reserialization on inspection; debug/world alignment; documentation cross-reference audit; console remains concise.
+The user authorized P10 after the P9a Unity rerun returned `Overall: PASS`. The approved persistent scope is:
 
-**Stop conditions:** diagnostics require expensive continuous readback beyond accepted policy; inspector changes reset values; documentation contradicts code.
+Documentation:
 
-**Rollback checkpoint:** fully working code with old/new diagnostics compared before docs are finalized.
+- `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`;
+- `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`;
+- `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`;
+- `Docs/River_Foam_Stage6_Architecture.md`;
+- `Docs/River_Rendering_Roadmap.md`.
 
-### 17.12 `RG-METRIC-P11` — Mechanical verification and full consistency audit
+Editor/runtime diagnostics:
 
-**Objective:** Prove the implementation is internally consistent before asking the user for Unity visual validation.
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs`;
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`;
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Diagnostics.cs`;
+- `Game/Procedural/Rivers/Editor/StylizedRiverFoamTopologyCacheAssetEditor.cs`;
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`;
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.CacheDiagnostics.cs`.
 
-**Required work:**
+No file is created, deleted, moved, renamed, generated, or serialized. Production compute/HLSL/render code, `StylizedRiverFoamRuntime.P6Diagnostics.cs` through `.P9Diagnostics.cs`, Debug View definitions, scenes, prefabs, materials, cache assets, and `.meta` files are outside scope.
 
-- run an available real C# parser/compiler over every changed C# file;
-- scan changed C# for required namespaces and malformed multiline strings;
-- preserve line endings;
-- parse/code-generate changed HLSL functions and verify kernel declarations/resources;
-- verify all CPU/GPU struct strides and property bindings;
-- search for old normalized structural-Y formulas and duplicate spacing derivations;
-- compare final diff with approved file scope and every plan item;
-- reread complete changed files and affected callers/consumers/producers;
-- compare against baseline, HEAD, and accepted/superseded implementations;
-- update plan status/evidence.
+#### Reviewed evidence
 
-**Completion condition:** zero unresolved reference, syntax, ABI, stale-formula, scope, or documentation defects.
+- Supplied source authority is `Assets(72).zip` with Patch 09a overlaid. The archive has no `.git` directory, so branch, `HEAD`, status, and commit-history comparison are unavailable. The untouched extracted source and the overlaid working copy are the comparison baseline.
+- The P9a Unity report dated `2026-07-17T20:30:54Z` passed all twelve ledger gates, including actual GPU Film Source, visual-occupancy, and shape paths; cleanup; and assigned-cache immutability. It ended `Overall: PASS`.
+- `StylizedRiverEditor.Actions.cs::DrawFoamLayerACacheActions` currently mixes normal cache lifecycle, the current P9 gate, four closed comprehensive validators, the P5.1 two-build audit, and obstacle-baseline tools in one always-expanded block. The visible heading and main button remain P9-specific after P9 closure.
+- `StylizedRiverFoamRuntime.CacheDiagnostics.cs` stores every explicit Foam report in one common nonserialized state/report/path contract. P6–P9 finalizers already use the same Passed/Failed semantics and latest-report lifecycle; changing those validated report bodies is not justified.
+- `StylizedRiverFoamRuntime.PublicSurface.cs` already exposes active and fixed-candidate descriptor dimensions, spacing, lateral extent, cell count, and activation-deferred state. The Inspector does not currently present that evidence.
+- P8 already records separate downstream/lateral CFL, raw/bounded Jacobian, and maximum `|κn|` fields internally. The public diagnostic surface exposes only total CFL, so the Inspector cannot display the completed metric ownership compactly.
+- `StylizedRiverEditor.Diagnostics.cs` already owns compact source-area, cache, memory, dispatch, cell-iteration, transport-accounting, and shape evidence. No new Debug View or GPU readback is required.
+- `StylizedRiverFoamTopologyCacheAssetEditor.cs` already supplies the read-only cache metadata UI previously deferred from P4. The P4 statements claiming that metadata remains hidden are stale documentation, not a current code defect.
+- `StylizedRiverFoamTopologyCacheAssetEditor.cs` and `StylizedRiverFoamRuntime.CacheDiagnostics.cs` still direct users to the old `Foam Layer A Cache Tools` path; the renamed action group therefore requires text-only updates in both direct callers.
+- `StylizedRiverEditor.DebugViews.cs`, `.Authoring.cs`, `.Foam.cs`, `.UI.cs`, and `StylizedRiver.cs` were reviewed. Current fixed-metric work does not justify a new view, serialized label change, or production authoring change.
+- `Docs/handoff.md` is a generic handoff-production policy, not the live River Foam handoff. Modifying it would not improve fixed-metric status accuracy and is therefore excluded despite the older P10 placeholder list.
 
-**Stop conditions:** Unity-only validation remains pending, but mechanical failures are blockers and cannot be deferred.
+#### Invariants and non-goals
 
-**Rollback checkpoint:** mechanically verified candidate package.
+1. Active mapping remains `LegacyNormalizedAcross`; fixed-metric allocation and candidate selection remain deferred to P12.
+2. No runtime update, dispatch, readback, resource, cache, transport, source, topology, film, shape, or render behavior changes.
+3. No serialized property, default, label-backed value, scene, prefab, material, or cache payload changes.
+4. No new Debug View and no warning-specific validator.
+5. Closed P6–P9 validators remain callable, but historical/deep actions become collapsed by default instead of occupying the normal cache workflow.
+6. Existing report files, report names, pass/fail ledgers, and cache-mutation proofs remain unchanged.
+7. Inspector evidence is read-only and must not request asynchronous readback or cause asset reserialization.
 
-### 17.13 `RG-METRIC-P12` — Unity candidate sweep and visual/performance selection
+#### File-by-file implementation sequence
+
+1. **Canonical plan first:** record this evidence, exact scope, invariants, sequence, risks, and verification before implementation edits.
+2. **Runtime public diagnostics:** expose read-only downstream/lateral CFL and curvature/Jacobian evidence already computed by P8. Add no new state or computation.
+3. **Runtime Diagnostics Inspector:** add compact active-descriptor, fixed-candidate, allocation-comparison, split-CFL, Jacobian/curvature, memory, and dispatch rows by consuming existing/public fields. Reuse current sections; add no view.
+4. **Actions Inspector:** rename the cache foldout to represent cache plus validation; separate normal cache lifecycle from current fixed-metric verification; collapse closed P5.1/P5.3/P6/P7/P8 tools under one historical/deep foldout; correct generic diagnostic-state wording.
+5. **Direct diagnostic guidance:** update the cache-asset Inspector and default runtime diagnostic summary to the renamed River Inspector path; preserve all payload-analysis, report-state, and metadata behavior.
+6. **Documentation:** replace the active-blockers history dump with one compact current ledger and P11 handoff; mark P9/P9a complete; mark P10 implementation state accurately; correct stale P4 metadata-UI statements; add concise fixed-metric status notes to Stage 6 architecture and the rendering roadmap.
+7. **Post-change audit:** compare every changed file against the untouched extracted baseline, reread all changed files and direct diagnostic consumers, verify no out-of-scope file differs, and record final evidence here.
+
+#### Risks and mitigations
+
+- **Inspector repaint or serialization regression:** use only existing nonserialized Editor foldout state and read-only public properties; do not call `serializedObject.ApplyModifiedProperties`, `SetDirty`, cache build, or readback from the new rows.
+- **False allocation claim:** label candidate/active counts as an allocation comparison, not physical waste, because active legacy and candidate fixed grids represent different contracts.
+- **Diagnostic loss:** retain all existing P5.1/P5.3/P6/P7/P8/P9 methods and buttons; only the presentation hierarchy changes.
+- **P-number ambiguity:** keep P labels where they identify immutable report contracts, while headings explain current versus historical ownership.
+- **Scope drift into production:** verify compute kernels, HLSL, render shader, serialized River fields, cache assets, and Debug View files remain byte-identical.
+
+#### Acceptance criteria
+
+- P9 and P9a are documented as closed from the passing Unity report.
+- Normal Inspector flow shows active mapping, fixed-candidate readiness, descriptor dimensions/spacing/extent, allocation comparison, split CFL, Jacobian/curvature, cache state, memory, and dispatch evidence compactly.
+- Historical/deep actions are collapsed by default and remain fully available when opened.
+- No new Debug View, GPU readback, persistent field, serialized value, resource, kernel, or production behavior exists.
+- At P10 delivery, canonical documents agreed that P10 was the current non-behavioral cleanup and P11 was next; P11 now records the completed audit and releases P12.
+- All changed C# files pass an available real parser in Editor and player preprocessing forms; introduced references resolve; multiline strings, braces, duplicate signatures, and required namespaces pass.
+- Final scope and archive extraction are exact; Unity Inspector/compile verification is explicitly pending.
+
+#### Implementation and post-change audit
+
+P10 is implemented in the exact eleven-file scope recorded above. The final source state provides read-only split-CFL and curvilinear-metric properties, compact active/candidate grid evidence, a cache-versus-validation action hierarchy, a collapsed historical/deep diagnostic group, and corrected user-facing action paths. No validator body, report ledger, compute/render path, Debug View, serialized field, resource, scene, prefab, material, cache asset, or `.meta` file changed.
+
+Mechanical evidence:
+
+```text
+Primary P10 audit:                 110 passed / 0 failed
+Independent final audit:             35 passed / 0 failed
+Exact changed files:                11
+Changed C# files:                    6
+Changed C# parser configurations:   24
+River C# files parsed:              89
+River methods indexed:           1,644
+Invocation expressions indexed: 13,704
+Files added / removed:             0 / 0
+```
+
+The audit proved exact scope, LF/UTF-8 integrity, raw plus Editor/development/release parser coverage, no duplicate exact River method signatures, resolution of all new public diagnostic references, preservation and declaration of every P5.1/P5.3/P6/P7/P8/P9 action target, byte identity of P6-P9 report implementations and production compute/HLSL/render/Debug View files, absence of new serialization/readback/dispatch/resource behavior, and removal of stale operational action labels. Unity remains the authority for compilation, Inspector layout, no-dirty/no-reserialization behavior, and the unchanged P9 endpoint rerun.
+
+#### Unity verification
+
+1. Import with zero C# and shader/compute errors or warnings introduced by P10.
+2. Open `Runtime Diagnostics → Foam` and verify the new descriptor/CFL/curvature/resource rows display without changing any serialized value.
+3. Open `Actions → Foam Cache & Validation`; confirm historical/deep diagnostics are collapsed by default and every previous action remains available inside the foldout.
+4. Inspect the River and assigned cache asset without saving; confirm neither becomes dirty or reserialized.
+5. Run the unchanged P9 comprehensive report once and require `Overall: PASS`.
+
+**Stop conditions:** any serialized-value change, unexpected asset dirtiness, missing historical action, new continuous readback, report regression, production diff, or contradiction between Inspector labels and runtime ownership.
+
+**Rollback checkpoint:** the P9a-overlaid supplied source plus the passing final P9 report.
+
+### 17.13 `RG-METRIC-P11` — Mechanical verification and full consistency audit
+
+**Status:** `MECHANICALLY VERIFIED AND COMPLETE`.
+
+**Objective:** prove that the complete P2-P10 implementation is internally consistent before fixed-metric activation and Unity candidate selection.
+
+#### Reviewed evidence
+
+The read-only review used the exact post-P10a source reconstructed from the user-supplied `Assets(72).zip` plus the accepted P9a, P10, and P10a archives. No Git metadata was present in the supplied snapshot, so comparison authority is the byte-exact supplied baseline and accepted patch archives.
+
+The audit reread and indexed:
+
+- all 89 C# files under `Game/Procedural/Rivers`;
+- all 24 compute, HLSL, and River render-shader files under `Game/Rendering/Water/Resources/PS3DRiver`;
+- the grid descriptor, allocation, binding, cache codec/fingerprint, topology, source, obstacle, transport, replacement, film, shape, production render, and Inspector endpoint owners;
+- the five canonical fixed-metric documents;
+- the final Unity 6000.5.0f1 P9 report dated `2026-07-17T22:11:11Z`, which ended `Overall: PASS` after actual GPU film-source, visual-occupancy, and shape execution;
+- the supplied P10 Inspector screenshot, which shows the expected Edit Mode post-cleanup unallocated state and the consolidated Foam diagnostics surface.
+
+#### Exact implementation scope
+
+P11 changes documentation only:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`;
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`;
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`;
+4. `Docs/River_Foam_Stage6_Architecture.md`;
+5. `Docs/River_Rendering_Roadmap.md`.
+
+No C#, compute, HLSL, render shader, Debug View, resource, kernel, serialized field, cache codec/payload, scene, prefab, material, asset, or `.meta` file is modified.
+
+#### Invariants and non-goals
+
+- active runtime mapping remains `LegacyNormalizedAcross`;
+- fixed candidate activation remains P12;
+- no source recipe, birth budget, update cadence, topology, transport, film, shape, or render formula changes;
+- no diagnostic action, GPU readback, warning-specific validator, or Inspector control is added;
+- pre-existing mixed line endings in two untouched Disturbance files are recorded but not normalized or included in scope;
+- historical legacy formulas remain only where explicitly owned by compatibility wrappers, fallback branches, or closed diagnostics.
+
+#### Audit result
+
+```text
+Primary P11 audit:                           24 passed / 0 failed
+River C# files:                              89
+C# parser configurations:                   356
+C# syntax nodes inspected:            2,043,155
+River methods indexed:                    1,641
+C# 9 multiline interpolation defects:         0
+Missing known namespace/imports:               0
+Duplicate exact method signatures:             0
+Compute/HLSL/render files:                     24
+Local shader includes:                         26
+Foam kernels:                             23 / 23
+FindKernel order mismatches:                    0
+CPU/GPU structured-buffer ABI contracts: 10 / 10
+Literal Foam property contracts:          207 / 207
+Stale production normalized-Y formulas:         0
+Unexpected structural-spacing owners:           0
+Scene/prefab/material/cache/meta changes:        0
+```
+
+The ABI audit verified the 80-byte five-`float4` grid descriptor and nine additional CPU/GPU structured-buffer contracts. Kernel pragmas, function bodies, thread-group declarations, and C# `FindKernel` order match exactly. Descriptor lanes are declared once and bound to both compute and production material paths. Cache format `3`, generator contract `4`, descriptor serialization, and descriptor fingerprint identity remain consistent.
+
+The structural-Y search found one normalized formula only in the closed P6 diagnostic where it is the explicit expected legacy-renderer value. All nine direct spacing derivations are accounted for as legacy compatibility constructors/fallbacks, one non-grid opportunity-distribution spacing, closed diagnostics, or explicit fixed/legacy branches. No migrated production consumer retains independent normalized lateral reconstruction or unguarded duplicate structural spacing ownership.
+
+Two Disturbance source files contain pre-existing mixed line endings. Their bytes are identical to the supplied baseline and they are outside fixed-metric and P11 change scope. P11 preserves them unchanged.
+
+#### P10 Unity closure evidence
+
+The post-P10a Unity run compiled sufficiently to render the consolidated Inspector and execute the unchanged P9 endpoint. The report proved:
+
+```text
+Fixed candidate: True; status=Ready; activation deferred
+Actual GPU finite-volume advection: True
+Live runtime state remained untouched: PASS
+Diagnostic cleanup and disabled bindings: PASS
+Assigned cache remained unchanged: PASS
+Overall: PASS
+```
+
+P10 and P10a are therefore closed. P11 introduces no executable change and requires no additional Unity rerun.
+
+**Completion condition:** met. There is no unresolved syntax, reference, ABI, stale-formula, scope, or canonical-document contradiction in the fixed-metric candidate.
+
+**Rollback checkpoint:** the Unity-validated post-P10a implementation plus this documentation-only P11 closure record.
+
+### 17.14 `RG-METRIC-P12` — Unity candidate sweep and visual/performance selection
 
 **Objective:** Select final Foam metric quality mapping using actual runtime evidence.
 
@@ -1388,7 +2609,7 @@ Files classified as review/test-only in Appendix B remain explicitly outside inc
 
 **Rollback checkpoint:** mechanically verified candidates and Unity evidence, before final tuning commit.
 
-### 17.14 `RG-METRIC-P13` — Final tier tuning, cache freeze, and contiguous baseline closure
+### 17.15 `RG-METRIC-P13` — Final tier tuning, cache freeze, and contiguous baseline closure
 
 **Objective:** Freeze the production-ready contiguous metric baseline.
 
@@ -1406,6 +2627,92 @@ Files classified as review/test-only in Appendix B remain explicitly outside inc
 **Completion condition:** all Stage 1 acceptance gates pass and documentation exactly matches implementation.
 
 **Stop conditions:** any final tuning invalidates prior test evidence; unresolved dependency-register item; unverified Unity behavior.
+
+## Implementation record — `RG-METRIC-P9 — Film occupancy, shape evaluation, and production rendering`
+
+### Current objective
+
+Complete the remaining inactive fixed-metric visual-layer and renderer-coordinate migration while preserving exact active `LegacyNormalizedAcross` behavior. P9 owns full-to-half film mapping, represented physical area, visual-occupancy transport geometry, shape/film alignment, production Foam field UV, visual metre-offset conversion, and production/debug same-point parity. Fixed-metric allocation remains deliberately deferred.
+
+### Accepted prerequisite
+
+The final P8 comprehensive report returned `Overall: PASS`. It proved live current-cache installation without build/write, active legacy ownership, fixed-candidate readiness, conservative packed transport, CFL/substep policy, curvilinear area/face metrics, exact GPU persistent-state remap with `1,491` overlap cells and zero mismatches, physical generated-topology transition mapping, cleanup, and assigned-cache immutability. P8 is closed.
+
+### Reviewed evidence
+
+- `StylizedRiverFoamGridDescriptor` defines film dimensions as `ceil(structural/2)` but the compute film path currently maps film texel centres with ordinary normalized UV. Odd structural edges therefore do not resolve the exact centre or represented area of their one-cell terminal groups.
+- `BuildFoamFilmSource` samples only one normalized point per film texel. It does not area-average the one-to-four represented structural cells, so bank-edge, padded-endpoint, odd-width, and odd-height film texels cannot preserve integrated physical coverage.
+- `AdvanceFoamVisualOccupancy` derives film spacing from `fieldLength/filmWidth` and local width/filmHeight. That is not the fixed lattice's exact two-cell grouping, does not represent partial odd-edge cells, and omits the P8 curvature-aware aggregate area/face contract.
+- `EvaluateFoamShape` samples the film texture with structural field UV directly. Standard half-resolution UV is only centre-aligned for even dimensions; odd terminal film groups require explicit structural-to-film mapping.
+- `ApplyBoundary` still uses the legacy simulation-column helper and its dispatch path does not bind the descriptor at the immediate consumer boundary.
+- `RiverWaterFoam.hlsl::RiverWaterEvaluateFoam` reconstructs field Y as `lateralMetres/surfaceHalfWidth`, and converts visual metre offsets with local surface width. Both are incompatible with the fixed centreline lattice.
+- `SH_CleanStylizedRiver.shader` independently reconstructs legacy Foam UV before evaluation and samples shape/film/debug textures with structural UV rather than descriptor-owned field/film coordinates.
+- `RiverWaterFoamVelocity.hlsl`, unrelated water lighting/refraction/disturbance composition, serialized River fields, and existing resource ownership do not require implementation changes.
+- The supplied workspace contains no `.git` metadata. `/mnt/data/p9base` is the immutable validated P8b source checkpoint and `/mnt/data/p9work` is the P9 implementation workspace.
+
+### Approved P9 file scope
+
+Documentation:
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+
+Editor/runtime:
+
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P9Diagnostics.cs` plus `.meta`
+
+Compute/rendering:
+
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Coordinates.hlsl`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+### P9 implementation contract
+
+1. Active legacy film, shape, and production-render formulas remain on exact legacy branches.
+2. A film texel represents structural ranges `[2i, min(2i+2, fullCount))`; its centre, represented count, physical extent, and area derive from those exact ranges. Odd terminal groups represent one structural row/column without half-cell drift.
+3. Fixed film source is the physical-area-weighted average of the represented structural cells. Invalid bank/obstacle/padded cells contribute zero coverage but remain part of represented area, preserving integrated coverage.
+4. Fixed visual-occupancy advection uses aggregate P8 cell area and face lengths for the exact represented structural ranges. Legacy advection remains formula-compatible.
+5. Structural-to-film sampling uses one explicit piecewise mapping that respects partial terminal groups. Shape evaluation and renderer film/debug sampling share that mapping.
+6. Fixed production field UV maps `(global s,n)` through the five-lane descriptor. Metre warp/stretch offsets convert through allocated X length and fixed lateral row span. Legacy `surfaceHalfWidth` behavior remains unchanged.
+7. Fixed production sampling rejects padded longitudinal endpoints and coordinates outside the represented lateral interval rather than saturating onto edge material.
+8. Normal production Foam state, shape, film, Motion Lane/routing debug, and film debug views resolve the same physical river point.
+9. One Inspector-triggered P9 report validates live preparation, exact legacy ownership, odd/even film grouping, integrated area, bank/padded coverage, visual transport geometry, shape mapping, production/debug source identity, unrelated-shader invariants, cleanup, and cache immutability.
+
+### Non-goals
+
+No fixed-metric activation; no source tuning, topology generation, transport-state policy, disturbance allocation, quality-tier selection, birth budget, cadence, scene, prefab, material, cache asset, serialized River-field, lighting, refraction, reflection, wetness, riverbed, or non-Foam shader behavior change. P9 adds no persistent texture, buffer, or per-frame readback.
+
+### File-by-file sequence
+
+1. Record this plan and dependency disposition before implementation.
+2. Add exact film-group/field-to-film coordinate helpers and fixed-only physical aggregation.
+3. Migrate film source, support spacing, visual occupancy geometry, shape sampling, and boundary descriptor ownership.
+4. Add descriptor-owned production field UV, valid-field clipping, metre-offset conversion, and renderer film/debug mapping.
+5. Add one live non-storing P9 comprehensive report and Inspector action.
+6. Run parser/preprocessor/API/signature/kernel/resource/legacy-equivalence/numeric/source-inspection/package audits and record results here.
+
+### Acceptance and stop conditions
+
+P9 may be delivered for Unity validation only if exact legacy reference comparisons pass; odd/even film groups cover every structural cell exactly once; represented area and area-weighted source integrate within tolerance; fixed film advection geometry matches aggregate structural geometry; production/debug mappings resolve identical physical points; unrelated shader regions are byte-identical; no persistent resource or serialized state is added; and the validator proves live-state-before-cleanup semantics. A mismatch in integrated area, a half-cell shift, padded-edge sampling, or an unrelated water-shader diff blocks delivery.
+
+### Post-change consistency and compliance audit
+
+- Exactly the 11 approved P9 paths differ from the immutable validated P8b baseline. No scene, prefab, material, cache asset, serialized River field, persistent texture, persistent buffer, kernel, or resource declaration changed.
+- Active `LegacyNormalizedAcross` film, support, shape, boundary, field-UV, and metre-offset formulas remain on explicit legacy branches. Fixed-only branches own exact two-cell film groups, odd terminal groups, represented physical area, aggregate P8 area/face geometry, descriptor field coordinates, and valid-field clipping.
+- The three changed/new C# files parse with zero syntax/missing-node errors in raw, Editor, development-player, and release-player preprocessing. An independent project scan parsed all 89 River C# files, found no duplicate exact signatures within a containing type, and found no introduced project-method arity mismatch. Unity compilation remains unavailable and is not claimed.
+- All introduced HLSL functions have matching declaration/call arity; braces, parentheses, and preprocessors are balanced; the 23 existing compute kernels retain exact order; `CS_RiverFoam.Resources.hlsl`, shader property declarations, and all shader text outside the approved Foam block remain byte-identical.
+- Numeric validation passed exact film grouping for every structural dimension from 1 through 2,048, 10,000 randomized represented-area cases, and 100,000 fixed renderer cell-centre mappings.
+- The P9 report uses the validated live resource transaction and no cache-build path. It executes the actual `BuildFoamFilmSource`, `AdvanceFoamVisualOccupancy`, and `EvaluateFoamShape` kernels on temporary resources, checks exact source symbols using absolute project paths, measures before cleanup, and separately proves cleanup, disabled bindings, live-reference immutability, and assigned-cache byte immutability.
+- Primary mechanical validation returned 92/92 passes. The independent final audit returned 68/68 passes. The final changed-files archive extracted with all 11 files byte-identical to this documented state.
+
+### Implementation state
+
+`COMPLETE — UNITY VALIDATED`. The initial P9 report passed every ledger gate. P9a removed the three D3D11 warning-prone visual-occupancy helper forms without changing the formulas, and the post-P9a rerun again passed actual GPU film source, visual occupancy, shape mapping, production/debug mapping, resource ownership, cleanup, live-state immutability, assigned-cache immutability, and `Overall: PASS`.
 
 ## 18. Source-family preservation cards
 

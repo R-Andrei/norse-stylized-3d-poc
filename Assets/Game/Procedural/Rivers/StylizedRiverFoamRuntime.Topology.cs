@@ -10,16 +10,24 @@ namespace ProgrammaticStylized3D.Rivers
 {
     public sealed partial class StylizedRiverFoamRuntime
     {
+        // Cacheable topology products must not depend on the live animated
+        // water clock. Contract 1 evaluates exact obstacle intervals at one
+        // canonical phase while current-shore animation continues to use the
+        // ordinary _FoamTime binding.
+        private const int TopologyEvaluationPhaseContractVersion = 1;
+        private const float TopologyEvaluationTimeSeconds = 0f;
+        private float lastConfiguredTopologyEvaluationTime = float.NaN;
+
         private void BuildMetricBuffer()
         {
             using var profilerScope = InitBuildMetricBufferProfilerMarker.Auto();
             metricRows = new FoamMetricRow[fieldWidth];
-            float longitudinalSpacing =
-                StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
-                    fieldLength,
-                    fieldWidth);
+            float longitudinalSpacing = gridDescriptor.ResolvedDxMetres;
             minimumTransportLongitudinalSpacing = longitudinalSpacing;
             minimumTransportLateralSpacing = float.PositiveInfinity;
+            minimumTransportRawJacobian = 1f;
+            minimumTransportCurvatureJacobian = 1f;
+            maximumAbsoluteTransportCurvatureLateralProduct = 0f;
             float curvatureSampleDistance = Mathf.Max(
                 0.5f,
                 longitudinalSpacing * 2f);
@@ -28,10 +36,7 @@ namespace ProgrammaticStylized3D.Rivers
             for (int x = 0; x < fieldWidth; x++)
             {
                 float localDistance =
-                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
-                        x,
-                        fieldWidth,
-                        fieldLength);
+                    gridDescriptor.ResolveLocalDistanceAtColumnCentre(x);
                 float clampedLocalDistance = Mathf.Min(
                     localDistance,
                     validFieldLength);
@@ -42,9 +47,11 @@ namespace ProgrammaticStylized3D.Rivers
                 float left = Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth);
                 float right = Mathf.Max(0.05f, sample.RightSurfaceHalfWidth);
                 float minimumLateralSpacing =
-                    StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
-                        left + right,
-                        fieldHeight);
+                    gridDescriptor.UsesFixedMetricLattice
+                        ? gridDescriptor.ResolvedDyMetres
+                        : StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
+                            left + right,
+                            fieldHeight);
                 minimumTransportLateralSpacing = Mathf.Min(
                     minimumTransportLateralSpacing,
                     minimumLateralSpacing);
@@ -73,6 +80,31 @@ namespace ProgrammaticStylized3D.Rivers
                 float signedCurvature = Vector3.Dot(
                     (nextTangent - previousTangent) / curvatureDistance,
                     topologySide);
+                if (gridDescriptor.UsesFixedMetricLattice)
+                {
+                    float leftCurvatureProduct =
+                        signedCurvature * -left;
+                    float rightCurvatureProduct =
+                        signedCurvature * right;
+                    float rawMinimumJacobian = Mathf.Min(
+                        1f - leftCurvatureProduct,
+                        1f - rightCurvatureProduct);
+                    float maximumAbsoluteProduct = Mathf.Max(
+                        Mathf.Abs(leftCurvatureProduct),
+                        Mathf.Abs(rightCurvatureProduct));
+                    minimumTransportRawJacobian = Mathf.Min(
+                        minimumTransportRawJacobian,
+                        rawMinimumJacobian);
+                    minimumTransportCurvatureJacobian = Mathf.Min(
+                        minimumTransportCurvatureJacobian,
+                        Mathf.Max(
+                            TransportMinimumCurvatureJacobian,
+                            rawMinimumJacobian));
+                    maximumAbsoluteTransportCurvatureLateralProduct =
+                        Mathf.Max(
+                            maximumAbsoluteTransportCurvatureLateralProduct,
+                            maximumAbsoluteProduct);
+                }
                 float previousWidth =
                     previousSample.LeftSurfaceHalfWidth +
                     previousSample.RightSurfaceHalfWidth;
@@ -104,6 +136,13 @@ namespace ProgrammaticStylized3D.Rivers
                         sample.SurfaceHeight,
                         0f)
                 };
+            }
+
+            if (!gridDescriptor.UsesFixedMetricLattice)
+            {
+                minimumTransportRawJacobian = 1f;
+                minimumTransportCurvatureJacobian = 1f;
+                maximumAbsoluteTransportCurvatureLateralProduct = 0f;
             }
 
             metricBuffer?.Release();
@@ -152,10 +191,7 @@ namespace ProgrammaticStylized3D.Rivers
             majorTopology =
                 StylizedRiverFoamMajorTopologyGenerator.Generate(
                     river.Domain,
-                    fieldWidth,
-                    fieldHeight,
-                    fieldLength,
-                    validFieldLength,
+                    gridDescriptor,
                     river.Quality,
                     river.ShoreMotion,
                     river.FoamMajorSupportAmount,
@@ -205,10 +241,7 @@ namespace ProgrammaticStylized3D.Rivers
             connectorTopology =
                 StylizedRiverFoamConnectorTopologyGenerator.Generate(
                     river.Domain,
-                    fieldWidth,
-                    fieldHeight,
-                    fieldLength,
-                    validFieldLength,
+                    gridDescriptor,
                     river.Quality,
                     river.ShoreMotion,
                     river.FoamMajorSupportSeed,
@@ -255,10 +288,7 @@ namespace ProgrammaticStylized3D.Rivers
             pocketTopology =
                 StylizedRiverFoamPocketTopologyGenerator.Generate(
                     river.Domain,
-                    fieldWidth,
-                    fieldHeight,
-                    fieldLength,
-                    validFieldLength,
+                    gridDescriptor,
                     river.Quality,
                     river.ShoreMotion,
                     river.FoamMajorSupportSeed,
@@ -562,6 +592,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void ConfigureTopologyParameters(float deltaTime)
         {
+            ConfigureGridDescriptorComputeParameters();
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetInts(
                 "_FoamTopologyDimensions",
@@ -579,6 +610,11 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamTime",
                 ResolveInitializationMotionTime());
+            lastConfiguredTopologyEvaluationTime =
+                TopologyEvaluationTimeSeconds;
+            computeShader.SetFloat(
+                "_FoamTopologyEvaluationTime",
+                lastConfiguredTopologyEvaluationTime);
             computeShader.SetFloat("_FoamSeed", river.VisualSeed);
             computeShader.SetFloat(
                 "_FoamMotionFlowSpeed",

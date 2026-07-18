@@ -410,6 +410,10 @@ namespace ProgrammaticStylized3D.Rivers
         private int topologyTransitionCompletedCount;
         private int topologyTransitionRemappedCount;
         private int topologyTransitionFlattenedCount;
+        private int persistentStateReplacementExactCount;
+        private int persistentStateReplacementClearCount;
+        private PersistentStateReplacementPolicy lastPersistentStateReplacementPolicy;
+        private string lastPersistentStateReplacementDetail = "None";
         private bool supportWarningReported;
         private bool allocationWarningReported;
         private bool fullyFrozenLastUpdate;
@@ -421,6 +425,10 @@ namespace ProgrammaticStylized3D.Rivers
         private int filmFieldHeight;
         private int chunkCount;
         private int resolutionPerChunk;
+        private StylizedRiverFoamGridDescriptor gridDescriptor;
+        private StylizedRiverFoamGridGpuData gridDescriptorGpuData;
+        private StylizedRiverFoamGridDescriptor fixedMetricCandidateDescriptor;
+        private string fixedMetricCandidateFailureReason = "Not resolved";
         private int structuralWidth;
         private int structuralHeight;
         private float fieldLength;
@@ -428,6 +436,9 @@ namespace ProgrammaticStylized3D.Rivers
         private float simulationFieldLength;
         private float minimumTransportLongitudinalSpacing;
         private float minimumTransportLateralSpacing;
+        private float minimumTransportCurvatureJacobian = 1f;
+        private float minimumTransportRawJacobian = 1f;
+        private float maximumAbsoluteTransportCurvatureLateralProduct;
         private float allocatedGlobalStart;
         private float simulationAccumulator;
         private float topologyMetricsAccumulator;
@@ -440,6 +451,8 @@ namespace ProgrammaticStylized3D.Rivers
         private int lastObstacleRoutingSignature = int.MinValue;
         private float lastEstimatedTransportCellsPerStep;
         private float lastEstimatedLateralTransportCellsPerStep;
+        private float lastDownstreamTransportCfl;
+        private float lastLateralTransportCfl;
         private float lastMaximumTransportCfl;
         private int lastRequiredTransportSubsteps = 1;
         private int lastUsedTransportSubsteps = 1;
@@ -500,6 +513,7 @@ namespace ProgrammaticStylized3D.Rivers
         private int resetTopologyMetricsKernel = -1;
         private int measureTopologyMetricsKernel = -1;
         private int resetTransportMetricsKernel = -1;
+        private int remapPersistentStateKernel = -1;
         private int simulateKernel = -1;
         private int buildFilmSourceKernel = -1;
         private int buildFilmSupportKernel = -1;

@@ -71,16 +71,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float requestedWidth = ResolveGeneratedEdgeWearWidth(
                 maximumDimension,
                 settings.EdgeWearWidth);
+            float minimumStyleWidth = ResolveGeneratedEdgeWearWidth(
+                maximumDimension,
+                EdgeWearMinimumStyleWidthSetting);
+            EdgeWearMicroTopologyNormalizationResult
+                microTopologyNormalization =
+                    NormalizeEdgeWearMicroTopology(
+                        faces,
+                        maximumDimension,
+                        minimumStyleWidth);
+            List<PolygonFace> edgeWearFaces =
+                microTopologyNormalization.Faces ?? faces;
+            Bounds edgeWearBounds = CalculateFaceBounds(edgeWearFaces);
             List<EdgeWearBevelCandidate> candidates =
                 BuildEdgeWearBevelCandidates(
-                    faces,
-                    bounds,
+                    edgeWearFaces,
+                    edgeWearBounds,
                     maximumDimension,
                     recipe,
                     settings,
                     amount01,
                     requestedWidth,
                     includeAllGeometricCandidates,
+                    microTopologyNormalization,
                     out EdgeWearCoverageAudit coverageAudit);
             if (candidates.Count == 0)
             {
@@ -115,7 +128,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             0,
                             noViableCandidateReason,
                             BuildSourceEdgeIndexDebugEdges(
-                                faces,
+                                edgeWearFaces,
                                 coverageAudit));
                 }
                 return null;
@@ -143,7 +156,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 selectedCount);
 
             bool ready = TryBuildChamferTopologyContext(
-                faces,
+                edgeWearFaces,
                 candidates,
                 selectedCount,
                 minimumStableEdgeLength,
@@ -151,11 +164,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 out ChamferTopologyContext context,
                 out string blocker);
 
+            SortedSet<int> materialWidthRecoveryTargets =
+                new SortedSet<int>();
             if (ready)
             {
                 MapEdgeWearCoverageAuditToGraph(
                     coverageAudit,
                     context);
+                materialWidthRecoveryTargets =
+                    CaptureImmutableMaterialWidthRecoveryTargets(
+                        context,
+                        coverageAudit);
             }
 
             LogChamferReadiness(stats, ready, blocker);
@@ -187,7 +206,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         0,
                         readinessAudit.Diagnostic,
                         BuildSourceEdgeIndexDebugEdges(
-                            faces,
+                            edgeWearFaces,
                             coverageAudit));
             }
 
@@ -202,13 +221,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         new ChamferCornerStats();
                     bool cornersReady =
                         TryAuditCertifiedBaselineAugmentation(
-                            faces,
+                            edgeWearFaces,
                             context,
                             recipe,
                             requestedWidth,
                             minimumStableEdgeLength,
                             minimumStableFaceArea,
                             coverageAudit,
+                            materialWidthRecoveryTargets,
                             ref cornerStats,
                             out ChamferCornerSolution cornerSolution,
                             out PlaneCutBevelAuditResult allEdgeAudit,
@@ -254,7 +274,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     BoundedSingleEdgeAuditResult boundedAudit =
                         AuditBoundedSingleEdgeBevel(
-                            faces,
+                            edgeWearFaces,
                             context,
                             boundedEdgeOrdinal,
                             requestedWidth,
@@ -290,7 +310,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ChamferCornerStats cornerStats =
                         new ChamferCornerStats();
                     bool cornersReady = AuditExplicitChamferCornerSolution(
-                        faces,
+                        edgeWearFaces,
                         context,
                         requestedWidth,
                         minimumStableEdgeLength,
@@ -311,7 +331,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         {
                             PlaneCutBevelAuditResult planeCutAudit =
                                 AuditPlaneCutBevelKernel(
-                                    faces,
+                                    edgeWearFaces,
                                     context,
                                     cornerSolution,
                                     minimumStableEdgeLength,
@@ -342,7 +362,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 new ChamferEmissionStats();
                             bool emissionReady =
                                 AuditProvisionalChamferEmission(
-                                    faces,
+                                    edgeWearFaces,
                                     context,
                                     cornerSolution,
                                     minimumStableEdgeLength,
@@ -884,8 +904,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             HashSet<int> focusEdges = focusEdgeIndices == null
                 ? new HashSet<int>()
                 : new HashSet<int>(focusEdgeIndices);
+            EdgeWearMicroTopologyNormalizationResult normalization =
+                coverageAudit == null
+                    ? null
+                    : coverageAudit.MicroTopologyNormalization;
+            int suppressedCount = normalization == null
+                ? 0
+                : normalization.SuppressedEdges.Count;
             EdgeWearDebugEdgeRecord[] records =
-                new EdgeWearDebugEdgeRecord[graph.Edges.Count];
+                new EdgeWearDebugEdgeRecord[
+                    graph.Edges.Count + suppressedCount];
             for (int edgeIndex = 0;
                  edgeIndex < graph.Edges.Count;
                  edgeIndex++)
@@ -924,8 +952,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     : manifold
                         ? "unassessed"
                         : "non-manifold-or-boundary";
+                int displayEdgeIndex = lifecycle != null &&
+                        lifecycle.OriginalSourceEdgeIndex >= 0
+                    ? lifecycle.OriginalSourceEdgeIndex
+                    : normalization != null &&
+                        lifecycle != null &&
+                        lifecycle.MicroTopologyGeneratedTransition
+                        ? normalization.OriginalEdgeCount + edgeIndex
+                        : edgeIndex;
                 records[edgeIndex] = new EdgeWearDebugEdgeRecord(
-                    edgeIndex,
+                    displayEdgeIndex,
                     start,
                     end,
                     selected,
@@ -938,6 +974,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     lifecycle != null
                         ? lifecycle.DihedralDegrees
                         : 0f);
+                records[edgeIndex].GraphEdgeIndex = edgeIndex;
+            }
+
+            for (int suppressedIndex = 0;
+                 suppressedIndex < suppressedCount;
+                 suppressedIndex++)
+            {
+                EdgeWearMicroTopologySuppressedEdge suppressed =
+                    normalization.SuppressedEdges[suppressedIndex];
+                int recordIndex = graph.Edges.Count + suppressedIndex;
+                records[recordIndex] = new EdgeWearDebugEdgeRecord(
+                    suppressed.OriginalSourceEdgeIndex,
+                    suppressed.Start,
+                    suppressed.End,
+                    false,
+                    false,
+                    EdgeWearDebugEdgeState.MicroTopologySuppressed,
+                    "micro-topology-suppressed",
+                    suppressed.Length,
+                    0f);
+                records[recordIndex].GraphEdgeIndex = -1;
             }
             return records;
         }
@@ -968,6 +1025,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             EdgeWearCoverageAudit coverageAudit,
+            ICollection<int> immutableMaterialWidthRecoveryTargets,
             ref ChamferCornerStats stats,
             out ChamferCornerSolution winningSolution,
             out PlaneCutBevelAuditResult winningAudit,
@@ -983,16 +1041,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             winningPreviewSoup = null;
             blocker = string.Empty;
 
+            SortedSet<int> materialWidthRecoveryTargets =
+                immutableMaterialWidthRecoveryTargets == null
+                    ? new SortedSet<int>()
+                    : new SortedSet<int>(
+                        immutableMaterialWidthRecoveryTargets);
             SortedSet<int> baselineProvisionalEdges =
                 CollectSelectedWidthRecoveryProvisionalEdges(
                     context,
                     coverageAudit);
-            SortedSet<int> recoveryEdges =
+            SortedSet<int> nonMaterialRecoveryEdges =
                 CollectSelectedMultiSupportHullRecoveryEdges(
                     context,
                     coverageAudit);
-            baselineProvisionalEdges.UnionWith(recoveryEdges);
-            ChamferPlaneRetentionTrialOutcome baseline =
+            nonMaterialRecoveryEdges.ExceptWith(
+                materialWidthRecoveryTargets);
+            baselineProvisionalEdges.UnionWith(nonMaterialRecoveryEdges);
+
+            ChamferPlaneRetentionTrialOutcome certifiedBaseline =
                 EvaluateChamferPlaneRetentionTrial(
                     sourceFaces,
                     context,
@@ -1004,13 +1070,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     baselineProvisionalEdges,
                     true,
                     false);
-            if (!baseline.FullyValid)
+            if (!certifiedBaseline.FullyValid)
             {
-                blocker = string.IsNullOrEmpty(baseline.Blocker)
+                blocker = string.IsNullOrEmpty(certifiedBaseline.Blocker)
                     ? "the certified edge-wear baseline did not produce a fully certified shell"
-                    : "certified-baseline-failed:" + baseline.Blocker;
-                winningAudit = baseline.PlaneAudit;
-                winningAudit.CoverageAudit = baseline.Coverage;
+                    : "certified-baseline-failed:" +
+                        certifiedBaseline.Blocker;
+                winningAudit = certifiedBaseline.PlaneAudit;
+                winningAudit.CoverageAudit = certifiedBaseline.Coverage;
                 winningAudit.BaselineCertified = 0;
                 winningAudit.BaselineApplied = 0;
                 winningAudit.AugmentationAttempted = 0;
@@ -1019,25 +1086,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
 
-            Dictionary<int, SortedSet<int>> cornerRecoveryParticipants =
-                new Dictionary<int, SortedSet<int>>();
-            CollectCornerInactiveRecoveryEdges(
-                context,
-                coverageAudit,
-                baseline.Coverage,
-                baseline.CornerSolution,
-                recoveryEdges,
-                cornerRecoveryParticipants);
-            if (recoveryEdges.Count > 0 &&
+            bool recoveryRequested =
+                materialWidthRecoveryTargets.Count > 0 ||
+                nonMaterialRecoveryEdges.Count > 0;
+            if (recoveryRequested &&
                 !TryValidateChamferPlaneRetentionRenderChannels(
-                    baseline,
+                    certifiedBaseline,
                     recipe))
             {
-                blocker = string.IsNullOrEmpty(baseline.Blocker)
+                blocker = string.IsNullOrEmpty(certifiedBaseline.Blocker)
                     ? "certified-baseline-render-validation-failed"
-                    : "certified-baseline-failed:" + baseline.Blocker;
-                winningAudit = baseline.PlaneAudit;
-                winningAudit.CoverageAudit = baseline.Coverage;
+                    : "certified-baseline-failed:" +
+                        certifiedBaseline.Blocker;
+                winningAudit = certifiedBaseline.PlaneAudit;
+                winningAudit.CoverageAudit = certifiedBaseline.Coverage;
                 winningAudit.BaselineCertified = 0;
                 winningAudit.BaselineApplied = 0;
                 winningAudit.AugmentationAttempted = 0;
@@ -1045,10 +1107,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 winningAudit.AugmentationFailure = blocker;
                 return false;
             }
-            stats = baseline.CornerStats;
+
+            CaptureMaterialWidthRecoveryBaselineEvidence(
+                coverageAudit,
+                certifiedBaseline.Coverage,
+                materialWidthRecoveryTargets);
+            stats = certifiedBaseline.CornerStats;
             ApplyCertifiedBaselineAugmentationMetadata(
-                ref baseline.PlaneAudit,
-                baseline,
+                ref certifiedBaseline.PlaneAudit,
+                certifiedBaseline,
                 false,
                 false,
                 0,
@@ -1060,36 +1127,136 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 string.Empty,
                 string.Empty);
 
-            if (recoveryEdges.Count == 0)
+            MaterialWidthRecoveryTrialSummary materialSummary =
+                EvaluateMaterialWidthRecoveryTargets(
+                    sourceFaces,
+                    context,
+                    recipe,
+                    requestedWidth,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    coverageAudit,
+                    certifiedBaseline,
+                    materialWidthRecoveryTargets);
+            ChamferPlaneRetentionTrialOutcome recoveryBaseline =
+                materialSummary.Winner ?? certifiedBaseline;
+            bool materialPhaseTerminal = materialSummary.Cancelled ||
+                materialSummary.TimeBudgetExceeded;
+
+            Dictionary<int, SortedSet<int>> cornerRecoveryParticipants =
+                new Dictionary<int, SortedSet<int>>();
+            if (!materialPhaseTerminal)
             {
-                winningSolution = baseline.CornerSolution;
-                winningAudit = baseline.PlaneAudit;
-                winningPreviewSoup = baseline.PreviewSoup;
+                CollectCornerInactiveRecoveryEdges(
+                    context,
+                    coverageAudit,
+                    recoveryBaseline.Coverage,
+                    recoveryBaseline.CornerSolution,
+                    nonMaterialRecoveryEdges,
+                    cornerRecoveryParticipants);
+            }
+            else
+            {
+                nonMaterialRecoveryEdges.Clear();
+            }
+            if (!recoveryRequested &&
+                nonMaterialRecoveryEdges.Count > 0 &&
+                !TryValidateChamferPlaneRetentionRenderChannels(
+                    recoveryBaseline,
+                    recipe))
+            {
+                blocker = string.IsNullOrEmpty(recoveryBaseline.Blocker)
+                    ? "certified-baseline-render-validation-failed"
+                    : "certified-baseline-failed:" +
+                        recoveryBaseline.Blocker;
+                winningAudit = recoveryBaseline.PlaneAudit;
+                winningAudit.CoverageAudit = recoveryBaseline.Coverage;
+                winningAudit.BaselineCertified = 0;
+                winningAudit.BaselineApplied = 0;
+                winningAudit.AugmentationAttempted = 0;
+                winningAudit.AugmentationApplied = 0;
+                winningAudit.AugmentationFailure = blocker;
+                return false;
+            }
+
+            bool materialAttempted = materialSummary.AttemptedCount > 0;
+            bool materialApplied = materialSummary.Winner != null;
+            if (nonMaterialRecoveryEdges.Count == 0)
+            {
+                FinalizeMaterialWidthRecoveryResolutions(
+                    recoveryBaseline.Coverage,
+                    materialWidthRecoveryTargets);
+                string materialFailure = ResolveMaterialWidthRecoveryFailure(
+                    materialSummary,
+                    materialWidthRecoveryTargets);
+                ApplyCertifiedBaselineAugmentationMetadata(
+                    ref recoveryBaseline.PlaneAudit,
+                    certifiedBaseline,
+                    materialAttempted,
+                    materialApplied,
+                    materialSummary.AttemptedCount,
+                    0,
+                    materialSummary.ElapsedMilliseconds,
+                    materialSummary.TimeBudgetExceeded,
+                    materialSummary.Cancelled,
+                    materialFailure,
+                    materialSummary.LastFailure,
+                    materialSummary.ImplicatedEdgeEvidence);
+                if (!string.IsNullOrEmpty(materialFailure))
+                {
+                    recoveryBaseline.PlaneAudit.Diagnostic =
+                        AppendEdgeWearDiagnostic(
+                            recoveryBaseline.PlaneAudit.Diagnostic,
+                            materialFailure +
+                            (materialApplied
+                                ? "; certified material recovery retained"
+                                : "; certified baseline retained"));
+                }
+                stats = recoveryBaseline.CornerStats;
+                winningSolution = recoveryBaseline.CornerSolution;
+                winningAudit = recoveryBaseline.PlaneAudit;
+                winningAudit.CoverageAudit = recoveryBaseline.Coverage;
+                winningPreviewSoup = recoveryBaseline.PreviewSoup;
                 return true;
             }
 
-            SortedSet<int> baselineExclusions =
+            SortedSet<int> certifiedBaselineExclusions =
                 CollectBaselineSelectedExclusions(
                     context,
-                    baseline.Coverage);
-            foreach (int recoveryEdge in recoveryEdges)
+                    recoveryBaseline.Coverage);
+            SortedSet<int> allRecoveryEnabled =
+                new SortedSet<int>(certifiedBaselineExclusions);
+            foreach (int recoveryEdge in nonMaterialRecoveryEdges)
             {
-                baselineExclusions.Remove(recoveryEdge);
+                allRecoveryEnabled.Remove(recoveryEdge);
             }
 
             List<SortedSet<int>> frontier = new List<SortedSet<int>>
             {
-                new SortedSet<int>(baselineExclusions)
+                allRecoveryEnabled
             };
-            foreach (KeyValuePair<int, SortedSet<int>> pair in
-                cornerRecoveryParticipants)
+            foreach (int recoveryEdge in nonMaterialRecoveryEdges)
             {
-                AddCornerRecoveryProtectedStates(
-                    frontier,
-                    baselineExclusions,
-                    pair.Value,
-                    recoveryEdges);
+                SortedSet<int> targetState =
+                    new SortedSet<int>(certifiedBaselineExclusions);
+                targetState.Remove(recoveryEdge);
+                frontier.Add(targetState);
+                if (cornerRecoveryParticipants.TryGetValue(
+                        recoveryEdge,
+                        out SortedSet<int> participants))
+                {
+                    AddCornerRecoveryProtectedStates(
+                        frontier,
+                        targetState,
+                        participants,
+                        new[] { recoveryEdge });
+                }
             }
+
+            SortedSet<int> protectedMaterialEdges =
+                CollectCertifiedMaterialWidthRecoveryEdges(
+                    recoveryBaseline.Coverage,
+                    materialWidthRecoveryTargets);
             HashSet<string> visited = new HashSet<string>();
             ChamferPlaneRetentionTrialOutcome winner = null;
             ChamferPlaneRetentionTrialOutcome lastOutcome = null;
@@ -1141,18 +1308,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         forced,
                         false,
                         true);
+                CopyMaterialWidthRecoveryExecutionEvidence(
+                    coverageAudit,
+                    outcome.Coverage,
+                    materialWidthRecoveryTargets);
                 lastOutcome = outcome;
                 outcome.RecoveredProvisionalCount =
                     CountRecoveredProvisionalEdges(
-                        recoveryEdges,
-                        baseline.Coverage,
+                        nonMaterialRecoveryEdges,
+                        recoveryBaseline.Coverage,
                         outcome.Coverage);
                 if (outcome.FullyValid &&
                     outcome.RecoveredProvisionalCount > 0 &&
                     IsChamferPlaneRetentionTrialAcceptableForRecovery(
                         outcome,
-                        baseline,
-                        recoveryEdges,
+                        recoveryBaseline,
+                        nonMaterialRecoveryEdges,
                         cornerRecoveryParticipants))
                 {
                     if (winner == null ||
@@ -1165,7 +1336,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 if (forced.Count >=
-                    baselineExclusions.Count +
+                    certifiedBaselineExclusions.Count +
                     MaximumAdditionalDeferrals)
                 {
                     continue;
@@ -1184,7 +1355,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     int edgeToDefer = branchEdges[edgeIndex];
                     if (forced.Contains(edgeToDefer) ||
-                        recoveryEdges.Contains(edgeToDefer))
+                        nonMaterialRecoveryEdges.Contains(edgeToDefer) ||
+                        protectedMaterialEdges.Contains(edgeToDefer))
                     {
                         continue;
                     }
@@ -1202,27 +1374,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             stopwatch.Stop();
+            int totalStates = materialSummary.AttemptedCount +
+                evaluatedStates;
+            double totalElapsed = materialSummary.ElapsedMilliseconds +
+                stopwatch.Elapsed.TotalMilliseconds;
+            bool anyAttempted = materialAttempted || evaluatedStates > 0;
             if (winner != null)
             {
-                stats = winner.CornerStats;
-                ApplyCertifiedBaselineAugmentationMetadata(
-                    ref winner.PlaneAudit,
-                    baseline,
-                    true,
-                    true,
-                    evaluatedStates,
-                    frontier.Count,
-                    stopwatch.Elapsed.TotalMilliseconds,
-                    false,
-                    false,
-                    string.Empty,
-                    string.Empty,
-                    lastImplicatedEvidence);
+                CopyMaterialWidthRecoveryExecutionEvidence(
+                    coverageAudit,
+                    winner.Coverage,
+                    materialWidthRecoveryTargets);
+                FinalizeMaterialWidthRecoveryResolutions(
+                    winner.Coverage,
+                    materialWidthRecoveryTargets);
                 ApplyCornerRecoveryResolution(
                     winner.Coverage,
                     cornerRecoveryParticipants.Keys,
                     "certified-recovery",
                     string.Empty);
+                stats = winner.CornerStats;
+                ApplyCertifiedBaselineAugmentationMetadata(
+                    ref winner.PlaneAudit,
+                    certifiedBaseline,
+                    anyAttempted,
+                    true,
+                    totalStates,
+                    frontier.Count,
+                    totalElapsed,
+                    false,
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    lastImplicatedEvidence);
                 winningSolution = winner.CornerSolution;
                 winningAudit = winner.PlaneAudit;
                 winningAudit.CoverageAudit = winner.Coverage;
@@ -1253,54 +1437,605 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             string lastFailure = lastOutcome == null
                 ? string.Empty
                 : lastOutcome.Blocker;
-            bool cornerSearchExhausted = !cancelled &&
+            bool recoverySearchExhausted = !cancelled &&
                 !timeBudgetExceeded &&
                 frontier.Count == 0;
-            if (cornerSearchExhausted)
-            {
-                ApplyCornerRecoveryResolution(
-                    baseline.Coverage,
-                    cornerRecoveryParticipants.Keys,
-                    "proven-infeasible",
-                    string.IsNullOrEmpty(lastFailure)
-                        ? augmentationFailure
-                        : augmentationFailure + ":" + lastFailure);
-            }
-            else
-            {
-                ApplyCornerRecoveryResolution(
-                    baseline.Coverage,
-                    cornerRecoveryParticipants.Keys,
-                    "unresolved",
-                    string.IsNullOrEmpty(lastFailure)
-                        ? augmentationFailure
-                        : augmentationFailure + ":" + lastFailure);
-            }
+            ApplyCornerRecoveryResolution(
+                recoveryBaseline.Coverage,
+                cornerRecoveryParticipants.Keys,
+                recoverySearchExhausted
+                    ? "proven-infeasible"
+                    : "unresolved",
+                string.IsNullOrEmpty(lastFailure)
+                    ? augmentationFailure
+                    : augmentationFailure + ":" + lastFailure);
+            FinalizeMaterialWidthRecoveryResolutions(
+                recoveryBaseline.Coverage,
+                materialWidthRecoveryTargets);
+            string materialPhaseFailure = ResolveMaterialWidthRecoveryFailure(
+                materialSummary,
+                materialWidthRecoveryTargets);
+            string combinedFailure = string.IsNullOrEmpty(materialPhaseFailure)
+                ? augmentationFailure
+                : materialPhaseFailure + ";" + augmentationFailure;
+            string combinedLastFailure = string.IsNullOrEmpty(lastFailure)
+                ? materialSummary.LastFailure
+                : lastFailure;
             ApplyCertifiedBaselineAugmentationMetadata(
-                ref baseline.PlaneAudit,
-                baseline,
-                true,
-                false,
-                evaluatedStates,
+                ref recoveryBaseline.PlaneAudit,
+                certifiedBaseline,
+                anyAttempted,
+                materialApplied,
+                totalStates,
                 frontier.Count,
-                stopwatch.Elapsed.TotalMilliseconds,
-                timeBudgetExceeded,
-                cancelled,
-                augmentationFailure,
-                lastFailure,
-                lastImplicatedEvidence);
-            baseline.PlaneAudit.Diagnostic =
+                totalElapsed,
+                timeBudgetExceeded ||
+                    materialSummary.TimeBudgetExceeded,
+                cancelled || materialSummary.Cancelled,
+                combinedFailure,
+                combinedLastFailure,
+                string.IsNullOrEmpty(lastImplicatedEvidence)
+                    ? materialSummary.ImplicatedEdgeEvidence
+                    : lastImplicatedEvidence);
+            recoveryBaseline.PlaneAudit.Diagnostic =
                 AppendEdgeWearDiagnostic(
-                    baseline.PlaneAudit.Diagnostic,
-                    augmentationFailure +
-                    "; certified baseline retained");
-            winningSolution = baseline.CornerSolution;
-            winningAudit = baseline.PlaneAudit;
-            winningAudit.CoverageAudit = baseline.Coverage;
-            winningPreviewSoup = baseline.PreviewSoup;
+                    recoveryBaseline.PlaneAudit.Diagnostic,
+                    combinedFailure +
+                    (materialApplied
+                        ? "; certified material recovery retained"
+                        : "; certified baseline retained"));
+            stats = recoveryBaseline.CornerStats;
+            winningSolution = recoveryBaseline.CornerSolution;
+            winningAudit = recoveryBaseline.PlaneAudit;
+            winningAudit.CoverageAudit = recoveryBaseline.Coverage;
+            winningPreviewSoup = recoveryBaseline.PreviewSoup;
             blocker = string.Empty;
             return true;
         }
+
+        private sealed class MaterialWidthRecoveryTrialSummary
+        {
+            public ChamferPlaneRetentionTrialOutcome Winner;
+            public int AttemptedCount;
+            public int CompletedCount;
+            public double ElapsedMilliseconds;
+            public bool Cancelled;
+            public bool TimeBudgetExceeded;
+            public string LastFailure = string.Empty;
+            public string ImplicatedEdgeEvidence = string.Empty;
+        }
+
+        private static MaterialWidthRecoveryTrialSummary
+            EvaluateMaterialWidthRecoveryTargets(
+                List<PolygonFace> sourceFaces,
+                ChamferTopologyContext context,
+                MassRecipe recipe,
+                float requestedWidth,
+                float minimumStableEdgeLength,
+                float minimumStableFaceArea,
+                EdgeWearCoverageAudit sourceCoverage,
+                ChamferPlaneRetentionTrialOutcome certifiedBaseline,
+                ICollection<int> materialWidthRecoveryTargets)
+        {
+            MaterialWidthRecoveryTrialSummary summary =
+                new MaterialWidthRecoveryTrialSummary();
+            if (sourceCoverage == null || certifiedBaseline == null ||
+                materialWidthRecoveryTargets == null ||
+                materialWidthRecoveryTargets.Count == 0)
+            {
+                return summary;
+            }
+
+            ChamferPlaneRetentionTrialOutcome workingBaseline =
+                certifiedBaseline;
+            System.Diagnostics.Stopwatch stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            foreach (int targetEdge in materialWidthRecoveryTargets)
+            {
+                if (IsEdgeWearAuditCancellationRequested())
+                {
+                    summary.Cancelled = true;
+                    break;
+                }
+
+                summary.AttemptedCount++;
+                summary.ImplicatedEdgeEvidence =
+                    FormatChamferForcedDeferralKey(
+                        materialWidthRecoveryTargets);
+                SetMaterialWidthRecoveryTrialEvidence(
+                    sourceCoverage,
+                    targetEdge,
+                    true,
+                    false,
+                    false,
+                    false,
+                    string.Empty);
+                SetMaterialWidthRecoveryTrialEvidence(
+                    certifiedBaseline.Coverage,
+                    targetEdge,
+                    true,
+                    false,
+                    false,
+                    false,
+                    string.Empty);
+
+                SortedSet<int> forced =
+                    CollectBaselineSelectedExclusions(
+                        context,
+                        workingBaseline.Coverage);
+                forced.Remove(targetEdge);
+                ChamferPlaneRetentionTrialOutcome outcome =
+                    EvaluateChamferPlaneRetentionTrial(
+                        sourceFaces,
+                        context,
+                        recipe,
+                        requestedWidth,
+                        minimumStableEdgeLength,
+                        minimumStableFaceArea,
+                        sourceCoverage,
+                        forced,
+                        false,
+                        true);
+                bool trialCompleted =
+                    IsMaterialWidthRecoveryTrialCompleted(outcome);
+                if (trialCompleted)
+                {
+                    summary.CompletedCount++;
+                }
+                bool trialSucceeded = trialCompleted &&
+                    IsMaterialWidthRecoveryTrialAcceptable(
+                        outcome,
+                        workingBaseline,
+                        targetEdge);
+                string failure = trialSucceeded
+                    ? string.Empty
+                    : ResolveMaterialWidthRecoveryTrialFailure(
+                        outcome,
+                        targetEdge,
+                        trialCompleted);
+                SetMaterialWidthRecoveryTrialEvidence(
+                    sourceCoverage,
+                    targetEdge,
+                    true,
+                    trialCompleted,
+                    trialSucceeded,
+                    false,
+                    failure);
+                SetMaterialWidthRecoveryTrialEvidence(
+                    certifiedBaseline.Coverage,
+                    targetEdge,
+                    true,
+                    trialCompleted,
+                    trialSucceeded,
+                    false,
+                    failure);
+                SetMaterialWidthRecoveryTrialEvidence(
+                    outcome.Coverage,
+                    targetEdge,
+                    true,
+                    trialCompleted,
+                    trialSucceeded,
+                    false,
+                    failure);
+                if (!trialSucceeded)
+                {
+                    summary.LastFailure = failure;
+                    bool trialCancelled =
+                        IsMaterialWidthRecoveryTrialCancelled(outcome);
+                    bool trialTimeBudgetExceeded =
+                        IsMaterialWidthRecoveryTrialTimeBudgetExceeded(
+                            outcome);
+                    summary.Cancelled |= trialCancelled;
+                    summary.TimeBudgetExceeded |=
+                        trialTimeBudgetExceeded;
+                    if (trialCancelled || trialTimeBudgetExceeded)
+                    {
+                        break;
+                    }
+                    continue;
+                }
+
+                workingBaseline = outcome;
+                summary.Winner = outcome;
+                SetMaterialWidthRecoveryTrialEvidence(
+                    sourceCoverage,
+                    targetEdge,
+                    true,
+                    true,
+                    true,
+                    true,
+                    string.Empty);
+                SetMaterialWidthRecoveryTrialEvidence(
+                    workingBaseline.Coverage,
+                    targetEdge,
+                    true,
+                    true,
+                    true,
+                    true,
+                    string.Empty);
+            }
+            stopwatch.Stop();
+            summary.ElapsedMilliseconds =
+                stopwatch.Elapsed.TotalMilliseconds;
+
+            EdgeWearCoverageAudit finalCoverage = summary.Winner == null
+                ? certifiedBaseline.Coverage
+                : summary.Winner.Coverage;
+            CopyMaterialWidthRecoveryExecutionEvidence(
+                sourceCoverage,
+                finalCoverage,
+                materialWidthRecoveryTargets);
+            return summary;
+        }
+
+        private static bool IsMaterialWidthRecoveryTrialAcceptable(
+            ChamferPlaneRetentionTrialOutcome candidate,
+            ChamferPlaneRetentionTrialOutcome baseline,
+            int targetEdge)
+        {
+            if (candidate == null || !candidate.FullyValid ||
+                candidate.Coverage == null || baseline == null ||
+                !baseline.FullyValid || baseline.Coverage == null ||
+                !candidate.Coverage.RecordByGraphEdge.TryGetValue(
+                    targetEdge,
+                    out EdgeWearEdgeLifecycleRecord targetRecord) ||
+                targetRecord == null || !targetRecord.Built)
+            {
+                return false;
+            }
+
+            foreach (KeyValuePair<int, EdgeWearEdgeLifecycleRecord> pair
+                in baseline.Coverage.RecordByGraphEdge)
+            {
+                EdgeWearEdgeLifecycleRecord baselineRecord = pair.Value;
+                if (baselineRecord == null || !baselineRecord.Built)
+                {
+                    continue;
+                }
+                if (!candidate.Coverage.RecordByGraphEdge.TryGetValue(
+                        pair.Key,
+                        out EdgeWearEdgeLifecycleRecord candidateRecord) ||
+                    candidateRecord == null || !candidateRecord.Built)
+                {
+                    return false;
+                }
+            }
+            return candidate.CertifiedCount > baseline.CertifiedCount;
+        }
+
+        private static void CaptureMaterialWidthRecoveryBaselineEvidence(
+            EdgeWearCoverageAudit sourceCoverage,
+            EdgeWearCoverageAudit baselineCoverage,
+            ICollection<int> targets)
+        {
+            if (sourceCoverage == null || baselineCoverage == null ||
+                targets == null)
+            {
+                return;
+            }
+
+            foreach (int targetEdge in targets)
+            {
+                bool baselineDeferred =
+                    baselineCoverage.RecordByGraphEdge.TryGetValue(
+                        targetEdge,
+                        out EdgeWearEdgeLifecycleRecord baselineRecord) &&
+                    baselineRecord != null &&
+                    baselineRecord.RecoveryBaselineDeferred;
+                if (sourceCoverage.RecordByGraphEdge.TryGetValue(
+                        targetEdge,
+                        out EdgeWearEdgeLifecycleRecord sourceRecord) &&
+                    sourceRecord != null)
+                {
+                    sourceRecord.MaterialWidthRecoveryTarget = true;
+                    sourceRecord.MaterialWidthRecoveryBaselineDeferred =
+                        baselineDeferred;
+                }
+                if (baselineRecord != null)
+                {
+                    baselineRecord.MaterialWidthRecoveryTarget = true;
+                    baselineRecord.MaterialWidthRecoveryBaselineDeferred =
+                        baselineDeferred;
+                }
+            }
+        }
+
+        private static bool IsMaterialWidthRecoveryTrialCancelled(
+            ChamferPlaneRetentionTrialOutcome outcome)
+        {
+            return outcome != null &&
+                (outcome.CornerStats.ConflictSearchCancelled != 0 ||
+                 outcome.PlaneAudit.CoexistenceSearchCancelled != 0);
+        }
+
+        private static bool
+            IsMaterialWidthRecoveryTrialTimeBudgetExceeded(
+                ChamferPlaneRetentionTrialOutcome outcome)
+        {
+            return outcome != null &&
+                (outcome.CornerStats.ConflictSearchTimeBudgetExceeded != 0 ||
+                 outcome.PlaneAudit.SolveTimedOut != 0 ||
+                 outcome.PlaneAudit
+                     .CoexistenceSearchTimeBudgetExceeded != 0);
+        }
+
+        private static bool IsMaterialWidthRecoveryTrialCompleted(
+            ChamferPlaneRetentionTrialOutcome outcome)
+        {
+            if (outcome == null)
+            {
+                return false;
+            }
+
+            return outcome.CornerStats.ConflictSearchCancelled == 0 &&
+                outcome.CornerStats.ConflictSearchTimeBudgetExceeded == 0 &&
+                outcome.PlaneAudit.SolveTimedOut == 0 &&
+                outcome.PlaneAudit.CoexistenceSearchCancelled == 0 &&
+                outcome.PlaneAudit.CoexistenceSearchTimeBudgetExceeded == 0;
+        }
+
+        private static string ResolveIncompleteMaterialWidthRecoveryTrialReason(
+            ChamferPlaneRetentionTrialOutcome outcome)
+        {
+            if (outcome == null)
+            {
+                return "material-width-target-trial-produced-no-outcome";
+            }
+            if (outcome.CornerStats.ConflictSearchCancelled != 0 ||
+                outcome.PlaneAudit.CoexistenceSearchCancelled != 0)
+            {
+                return "material-width-target-trial-cancelled";
+            }
+            if (outcome.CornerStats.ConflictSearchTimeBudgetExceeded != 0)
+            {
+                return "material-width-target-corner-time-budget-exceeded";
+            }
+            if (outcome.PlaneAudit.CoexistenceSearchTimeBudgetExceeded != 0)
+            {
+                return "material-width-target-coexistence-time-budget-exceeded";
+            }
+            if (outcome.PlaneAudit.SolveTimedOut != 0)
+            {
+                return "material-width-target-plane-solve-timed-out";
+            }
+            return "material-width-target-trial-incomplete";
+        }
+
+        private static string ResolveMaterialWidthRecoveryTrialFailure(
+            ChamferPlaneRetentionTrialOutcome outcome,
+            int targetEdge,
+            bool trialCompleted)
+        {
+            if (!trialCompleted)
+            {
+                return ResolveIncompleteMaterialWidthRecoveryTrialReason(
+                    outcome);
+            }
+            if (outcome == null)
+            {
+                return "material-width-target-trial-produced-no-outcome";
+            }
+            if (!outcome.FullyValid)
+            {
+                return string.IsNullOrEmpty(outcome.Blocker)
+                    ? "material-width-target-trial-failed-full-shell-certification"
+                    : outcome.Blocker;
+            }
+            bool targetBuilt = outcome.Coverage != null &&
+                outcome.Coverage.RecordByGraphEdge.TryGetValue(
+                    targetEdge,
+                    out EdgeWearEdgeLifecycleRecord targetRecord) &&
+                targetRecord != null && targetRecord.Built;
+            if (!targetBuilt)
+            {
+                return "material-width-target-trial-did-not-certify-target";
+            }
+            return "material-width-target-trial-would-remove-certified-baseline-edge";
+        }
+
+        private static void SetMaterialWidthRecoveryTrialEvidence(
+            EdgeWearCoverageAudit coverage,
+            int targetEdge,
+            bool attempted,
+            bool trialCompleted,
+            bool trialSucceeded,
+            bool certified,
+            string failure)
+        {
+            if (coverage == null ||
+                !coverage.RecordByGraphEdge.TryGetValue(
+                    targetEdge,
+                    out EdgeWearEdgeLifecycleRecord record) ||
+                record == null)
+            {
+                return;
+            }
+
+            record.MaterialWidthRecoveryTarget = true;
+            record.MaterialWidthRecoveryAttempted |= attempted;
+            record.MaterialWidthRecoveryTrialCompleted |= trialCompleted;
+            record.MaterialWidthRecoveryTrialSucceeded |= trialSucceeded;
+            record.MaterialWidthRecoveryCertified |= certified;
+            if (!string.IsNullOrEmpty(failure))
+            {
+                record.MaterialWidthRecoveryFailure = failure;
+                record.WidthRecoveryEvidence = failure;
+            }
+        }
+
+        private static void CopyMaterialWidthRecoveryExecutionEvidence(
+            EdgeWearCoverageAudit source,
+            EdgeWearCoverageAudit destination,
+            ICollection<int> targets)
+        {
+            if (source == null || destination == null || targets == null)
+            {
+                return;
+            }
+
+            foreach (int targetEdge in targets)
+            {
+                if (!source.RecordByGraphEdge.TryGetValue(
+                        targetEdge,
+                        out EdgeWearEdgeLifecycleRecord sourceRecord) ||
+                    sourceRecord == null ||
+                    !destination.RecordByGraphEdge.TryGetValue(
+                        targetEdge,
+                        out EdgeWearEdgeLifecycleRecord destinationRecord) ||
+                    destinationRecord == null)
+                {
+                    continue;
+                }
+
+                destinationRecord.MaterialWidthRecoveryTarget =
+                    sourceRecord.MaterialWidthRecoveryTarget;
+                destinationRecord.MaterialWidthRecoveryBaselineDeferred =
+                    sourceRecord.MaterialWidthRecoveryBaselineDeferred;
+                destinationRecord.MaterialWidthRecoveryAttempted =
+                    sourceRecord.MaterialWidthRecoveryAttempted;
+                destinationRecord.MaterialWidthRecoveryTrialCompleted =
+                    sourceRecord.MaterialWidthRecoveryTrialCompleted;
+                destinationRecord.MaterialWidthRecoveryTrialSucceeded =
+                    sourceRecord.MaterialWidthRecoveryTrialSucceeded;
+                destinationRecord.MaterialWidthRecoveryCertified =
+                    sourceRecord.MaterialWidthRecoveryCertified;
+                destinationRecord.MaterialWidthRecoveryFailure =
+                    sourceRecord.MaterialWidthRecoveryFailure;
+                destinationRecord.WidthRecoveryEvidence =
+                    sourceRecord.WidthRecoveryEvidence;
+            }
+        }
+
+        private static void FinalizeMaterialWidthRecoveryResolutions(
+            EdgeWearCoverageAudit coverage,
+            ICollection<int> targets)
+        {
+            if (coverage == null || targets == null)
+            {
+                return;
+            }
+
+            foreach (int targetEdge in targets)
+            {
+                if (!coverage.RecordByGraphEdge.TryGetValue(
+                        targetEdge,
+                        out EdgeWearEdgeLifecycleRecord record) ||
+                    record == null)
+                {
+                    continue;
+                }
+
+                record.MaterialWidthRecoveryCertified = record.Built;
+                if (record.Built)
+                {
+                    record.MaterialWidthRecoveryFailure = string.Empty;
+                    record.WidthRecoveryEvidence = string.Empty;
+                    record.WidthRecoveryResolution = "certified-recovery";
+                    continue;
+                }
+                if (!record.MaterialWidthRecoveryAttempted)
+                {
+                    record.WidthRecoveryResolution =
+                        "unresolved:material-width-target-not-attempted";
+                    continue;
+                }
+                if (!record.MaterialWidthRecoveryTrialCompleted)
+                {
+                    record.WidthRecoveryResolution =
+                        "unresolved:material-width-target-trial-incomplete";
+                    if (string.IsNullOrEmpty(
+                            record.MaterialWidthRecoveryFailure))
+                    {
+                        record.MaterialWidthRecoveryFailure =
+                            "material-width-target-trial-incomplete";
+                    }
+                    record.WidthRecoveryEvidence =
+                        record.MaterialWidthRecoveryFailure;
+                    continue;
+                }
+                if (record.MaterialWidthRecoveryTrialSucceeded)
+                {
+                    record.WidthRecoveryResolution =
+                        "unresolved:certified-target-trial-not-committed";
+                    if (string.IsNullOrEmpty(
+                            record.MaterialWidthRecoveryFailure))
+                    {
+                        record.MaterialWidthRecoveryFailure =
+                            "certified-target-trial-not-committed";
+                    }
+                    record.WidthRecoveryEvidence =
+                        record.MaterialWidthRecoveryFailure;
+                    continue;
+                }
+
+                record.FinalReason = "width-recovery-proven-infeasible";
+                record.CoexistenceFailureReason = record.FinalReason;
+                record.WidthRecoveryResolution =
+                    string.IsNullOrEmpty(record.MaterialWidthRecoveryFailure)
+                        ? "proven-infeasible"
+                        : "proven-infeasible:" +
+                            record.MaterialWidthRecoveryFailure;
+                record.WidthRecoveryEvidence =
+                    record.MaterialWidthRecoveryFailure;
+            }
+        }
+
+        private static SortedSet<int>
+            CollectCertifiedMaterialWidthRecoveryEdges(
+                EdgeWearCoverageAudit coverage,
+                ICollection<int> targets)
+        {
+            SortedSet<int> result = new SortedSet<int>();
+            if (coverage == null || targets == null)
+            {
+                return result;
+            }
+            foreach (int targetEdge in targets)
+            {
+                if (coverage.RecordByGraphEdge.TryGetValue(
+                        targetEdge,
+                        out EdgeWearEdgeLifecycleRecord record) &&
+                    record != null && record.Built)
+                {
+                    result.Add(targetEdge);
+                }
+            }
+            return result;
+        }
+
+        private static string ResolveMaterialWidthRecoveryFailure(
+            MaterialWidthRecoveryTrialSummary summary,
+            ICollection<int> targets)
+        {
+            if (targets == null || targets.Count == 0)
+            {
+                return string.Empty;
+            }
+            if (summary == null)
+            {
+                return "material-width-target-trials-unavailable";
+            }
+            if (summary.Cancelled)
+            {
+                return "material-width-target-trials-cancelled";
+            }
+            if (summary.TimeBudgetExceeded)
+            {
+                return
+                    "material-width-target-trials-time-budget-exceeded";
+            }
+            if (summary.AttemptedCount < targets.Count ||
+                summary.CompletedCount < targets.Count)
+            {
+                return "material-width-target-trials-incomplete";
+            }
+            if (summary.Winner == null)
+            {
+                return "material-width-target-trials-failed";
+            }
+            return string.Empty;
+        }
+
 
         private static ChamferPlaneRetentionTrialOutcome
             EvaluateChamferPlaneRetentionTrial(
@@ -2148,6 +2883,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 return EdgeWearDebugEdgeState.Unassessed;
             }
+            if (record.MicroTopologySuppressed)
+            {
+                return EdgeWearDebugEdgeState.MicroTopologySuppressed;
+            }
             if (record.Built)
             {
                 return EdgeWearDebugEdgeState.Certified;
@@ -2162,7 +2901,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     "maximum-feasible-width-below-minimum-scale" ||
                 coexistenceFailure == "global-width-floor-conflict" ||
                 coexistenceFailure == "corner-width-missing" ||
-                coexistenceFailure == "corner-width-inactive")
+                coexistenceFailure == "corner-width-inactive" ||
+                coexistenceFailure == "recovery-baseline-deferred" ||
+                coexistenceFailure ==
+                    "width-recovery-proven-infeasible")
             {
                 return EdgeWearDebugEdgeState.WidthFloorFailure;
             }

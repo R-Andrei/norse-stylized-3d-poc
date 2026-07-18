@@ -67,15 +67,34 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.PropertyField(
                 Find("foamSpawnDistanceNormalized"),
                 new GUIContent(
-                    "Longitudinal Position",
-                    "Normalized position from logical upstream start (0) to " +
-                    "downstream end (1)."));
+                    "Compatibility Longitudinal Position",
+                    "Normalized authoring control from logical upstream start " +
+                    "(0) to downstream end (1). It resolves to global river " +
+                    "distance when the source is submitted."));
             EditorGUILayout.PropertyField(
                 Find("foamSpawnAcrossNormalized"),
                 new GUIContent(
-                    "Across Position",
-                    "Normalized lateral position: -1 left edge, 0 centre, " +
-                    "+1 right edge."));
+                    "Compatibility Across Position",
+                    "Normalized authoring control: -1 left edge, 0 centre, +1 " +
+                    "right edge. It resolves against the local river half-width " +
+                    "when the source is submitted."));
+
+            if (river.TryResolveFoamSpawnMetricPlacement(
+                    out float resolvedGlobalDistance,
+                    out float resolvedLateralMetres,
+                    out float resolvedDriftMetres,
+                    out float resolvedMaximumBendMetres))
+            {
+                DrawReadOnlyRow(
+                    new GUIContent(
+                        "Resolved Metric Placement",
+                        "Physical command values represented by the current " +
+                        "normalized compatibility controls at the source start."),
+                    $"s={resolvedGlobalDistance:0.000} m · " +
+                    $"n={resolvedLateralMetres:0.000} m · " +
+                    $"drift={resolvedDriftMetres:0.000} m · " +
+                    $"bend≤{resolvedMaximumBendMetres:0.000} m");
+            }
 
             EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField(
@@ -118,13 +137,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         new GUIContent("Travel Distance"));
                     EditorGUILayout.PropertyField(
                         Find("foamSpawnRibbonAcrossDrift"),
-                        new GUIContent("Across Drift"));
+                        new GUIContent(
+                            "Compatibility Across Drift",
+                            "Normalized compatibility drift. Metric API callers " +
+                            "provide lateral drift directly in metres."));
                     EditorGUILayout.PropertyField(
                         Find("foamSpawnRibbonPathWander"),
                         new GUIContent(
-                            "Path Bend",
-                            "Deterministic smooth bend applied to the source " +
-                            "path; this is not Foam breakup."));
+                            "Compatibility Path Bend",
+                            "Normalized compatibility bend strength. Metric API " +
+                            "callers provide maximum bend directly in metres; " +
+                            "this is not Foam breakup."));
                 }
             }
 
@@ -397,7 +420,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 DrawDisturbanceTestActions);
             DrawNestedSection(
                 InspectorSection.ActionsFoamLayerACache,
-                "Foam Layer A Cache Tools",
+                "Foam Cache & Validation",
                 DrawFoamLayerACacheActions);
             DrawNestedSection(
                 InspectorSection.ActionsFoamLayerCTests,
@@ -593,6 +616,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 ? river.GetComponent<StylizedRiverFoamRuntime>()
                 : null;
 
+            EditorGUILayout.LabelField(
+                "Cache Lifecycle",
+                EditorStyles.boldLabel);
             DrawReadOnlyRow(
                 new GUIContent("Cache Asset"),
                 river == null
@@ -692,9 +718,212 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 }
             }
 
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Fixed-Metric Consumer Validation",
+                EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "The active runtime remains LegacyNormalizedAcross. The P9 " +
+                "report is the current end-to-end regression for all migrated " +
+                "fixed-metric consumers while activation remains deferred.",
+                EditorStyles.wordWrappedMiniLabel);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Diagnostic State",
+                    "Result of the latest explicit River Foam diagnostic action."),
+                runtime != null
+                    ? runtime.TopologyCacheDiagnosticState
+                    : "Runtime unavailable");
+            if (runtime != null)
+            {
+                EditorGUILayout.HelpBox(
+                    runtime.TopologyCacheDiagnosticSummary,
+                    runtime.TopologyCacheDiagnosticState == "Passed"
+                        ? MessageType.Info
+                        : runtime.TopologyCacheDiagnosticState == "Failed"
+                            ? MessageType.Error
+                            : MessageType.None);
+                DrawReadOnlyRow(
+                    new GUIContent(
+                        "Runs / Passes",
+                        "Non-serialized explicit diagnostic counters for this " +
+                        "Editor runtime instance."),
+                    $"{runtime.TopologyCacheDiagnosticRunCount:N0} / " +
+                    $"{runtime.TopologyCacheDiagnosticPassCount:N0}");
+                DrawReadOnlyRow(
+                    new GUIContent(
+                        "Latest Report File",
+                        "Absolute path to the latest user-triggered diagnostic " +
+                        "text report under Library/RiverFoamDiagnostics."),
+                    string.IsNullOrEmpty(
+                        runtime.TopologyCacheDiagnosticReportPath)
+                        ? "None"
+                        : runtime.TopologyCacheDiagnosticReportPath);
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       Application.isPlaying ||
+                       runtime == null ||
+                       river == null))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run Fixed-Metric Consumer Regression (P9)",
+                            "Runs the validated P9 endpoint report. It installs " +
+                            "the assigned cache into temporary live resources and " +
+                            "verifies structural-to-film grouping, represented " +
+                            "area, actual GPU Film Source, visual occupancy and " +
+                            "shape paths, production/debug mapping, cleanup, and " +
+                            "cache immutability.")))
+                {
+                    runtime.RunP9ComprehensiveValidationReport();
+                    Repaint();
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       string.IsNullOrEmpty(
+                           runtime.TopologyCacheDiagnosticReport)))
+            {
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Copy Latest Diagnostic Report"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        runtime.TopologyCacheDiagnosticReport;
+                }
+                if (GUILayout.Button("Log Latest Diagnostic Report"))
+                {
+                    runtime.LogLatestTopologyCacheDiagnosticReport();
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       string.IsNullOrEmpty(
+                           runtime.TopologyCacheDiagnosticReportPath)))
+            {
+                if (GUILayout.Button("Reveal Latest Diagnostic File"))
+                {
+                    EditorUtility.RevealInFinder(
+                        runtime.TopologyCacheDiagnosticReportPath);
+                }
+            }
+
+            EditorGUILayout.Space(4f);
+            DrawNestedSection(
+                InspectorSection.ActionsFoamHistoricalDiagnostics,
+                "Historical / Deep Diagnostics",
+                DrawFoamHistoricalDiagnostics);
+
             if (river != null)
             {
                 DrawMajorCandidatePreview();
+            }
+        }
+
+        private void DrawFoamHistoricalDiagnostics()
+        {
+            StylizedRiver river = targets.Length == 1
+                ? target as StylizedRiver
+                : null;
+            StylizedRiverFoamRuntime runtime = river != null
+                ? river.GetComponent<StylizedRiverFoamRuntime>()
+                : null;
+
+            EditorGUILayout.LabelField(
+                "Closed phase reports and obstacle-provenance tools remain " +
+                "available for targeted regressions. They are not part of the " +
+                "normal cache workflow.",
+                EditorStyles.wordWrappedMiniLabel);
+
+            using (new EditorGUI.DisabledScope(
+                       Application.isPlaying ||
+                       runtime == null ||
+                       river == null))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run P8 Transport / Replacement Report",
+                            "Reruns the closed P8 conservative transport, CFL, " +
+                            "curvature, persistent replacement, topology mapping, " +
+                            "cleanup, and cache immutability proof.")))
+                {
+                    runtime.RunP8ComprehensiveValidationReport();
+                    Repaint();
+                }
+
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run P7 Source Contract Report",
+                            "Reruns the closed P7 automatic/manual source-unit, " +
+                            "range, evaluator, lifecycle, cleanup, and cache " +
+                            "immutability proof.")))
+                {
+                    runtime.RunP7ComprehensiveValidationReport();
+                    Repaint();
+                }
+
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run P6 Routing / External-Field Report",
+                            "Reruns the closed P6 routing, Motion Lane, external-" +
+                            "field mapping, live transaction, cleanup, and cache " +
+                            "immutability proof.")))
+                {
+                    runtime.RunP6ComprehensiveValidationReport();
+                    Repaint();
+                }
+
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run P5.3 Deterministic Topology Report",
+                            "Reruns the closed P5.3 deterministic topology-phase, " +
+                            "obstacle fingerprint, five-build, legacy-raster, " +
+                            "publication, and assigned-cache proof.")))
+                {
+                    runtime.RunP53ComprehensiveValidationReport();
+                    Repaint();
+                }
+
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run P5.1 Two-Build Audit",
+                            "Runs two independent Edit Mode topology " +
+                            "preparations without storing either artifact. " +
+                            "Captures every obstacle source, compares complete " +
+                            "input keys, section byte counts/hashes, first byte " +
+                            "differences, topology counts, and the assigned " +
+                            "cache. Writes and logs one exhaustive report.")))
+                {
+                    runtime.RunTopologyCacheDeterminismDiagnosticAudit();
+                    Repaint();
+                }
+
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Capture Obstacle Baseline",
+                            "Captures exact per-source local mesh, transform, " +
+                            "provider world, and independently recomputed world " +
+                            "fingerprints under Library/RiverFoamDiagnostics.")))
+                {
+                    runtime.CaptureTopologyObstacleDiagnosticBaseline();
+                    Repaint();
+                }
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Compare Obstacles to Baseline",
+                            "Recaptures every exact obstacle source and reports " +
+                            "added, removed, or changed geometry, transform, " +
+                            "provider, and direct-world fingerprints.")))
+                {
+                    runtime
+                        .CompareTopologyObstaclesAgainstDiagnosticBaseline();
+                    Repaint();
+                }
+                EditorGUILayout.EndHorizontal();
             }
         }
 

@@ -5,10 +5,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 {
     /// <summary>
     /// Explicit Edit Mode transaction for preparing and persisting one River
-    /// Foam topology cache. P1 deliberately gives this type no
-    /// InitializeOnLoad hooks, global polling, Play Mode scans, or automatic
-    /// asset assignment. P3 keeps the transaction to one final topology
-    /// publication, one normal serialization, one storage clone, and one save.
+    /// Foam topology cache. This type deliberately has no InitializeOnLoad
+    /// hooks, global polling, Play Mode scans, or automatic asset assignment.
+    /// The transaction remains one final topology publication, one normal
+    /// serialization, one storage clone, and one save.
     /// </summary>
     internal static class StylizedRiverFoamDevelopmentCacheCoordinator
     {
@@ -71,6 +71,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 $"{state}. {storageSummary} " +
                 $"Payload={artifact.PayloadByteCount:N0} bytes, " +
                 $"hash={artifact.PayloadHash}, " +
+                $"grid=descriptor-v{artifact.GridDescriptorContractVersion}/" +
+                $"mapping-{artifact.GridMappingValue}-v" +
+                $"{artifact.GridMappingContractVersion}/" +
+                $"{artifact.GridInitializationSignature}, " +
                 $"obstacles={runtime.TopologyCacheObstacleSourceCount:N0}, " +
                 $"payloadBuild={artifact.BuildMilliseconds:0.000} ms, " +
                 $"total={transactionStopwatch.Elapsed.TotalMilliseconds:0.000} ms, " +

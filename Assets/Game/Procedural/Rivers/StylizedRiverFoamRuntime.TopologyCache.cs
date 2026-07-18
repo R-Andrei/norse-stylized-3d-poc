@@ -132,7 +132,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             topologyStartupSummaryLogged = true;
             Debug.Log(
-                $"[River Foam P1] Startup '{river.name}': " +
+                $"[River Foam Cache] Startup '{river.name}': " +
                 $"outcome={topologyCacheStartupOutcome}, " +
                 $"reasons={TopologyCacheStartupReasonNames}, " +
                 $"total={topologyStartupValidationTotalMilliseconds:0.000}ms, " +
@@ -301,7 +301,7 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     topologyCacheRoundTripPassCount++;
                     Debug.Log(
-                        $"[River Foam P3] Exhaustive cache proof passed for " +
+                        $"[River Foam Cache Proof] Passed for " +
                         $"'{river.name}': {result.PayloadByteCount:N0} bytes, " +
                         $"hash {result.PayloadHash:X16}.",
                         river);
@@ -309,7 +309,7 @@ namespace ProgrammaticStylized3D.Rivers
                 else
                 {
                     Debug.LogError(
-                        $"[River Foam P3] Exhaustive cache proof failed for " +
+                        $"[River Foam Cache Proof] Failed for " +
                         $"'{river.name}': {topologyCacheRoundTripSummary}",
                         river);
                 }
@@ -387,6 +387,10 @@ namespace ProgrammaticStylized3D.Rivers
                         domainFingerprint,
                         obstacleFingerprint,
                         generationFingerprint);
+#if UNITY_EDITOR
+                CaptureP53CpuGpuObstacleParityIfRequested(
+                    package.ObstacleExclusion);
+#endif
                 byte[] payload =
                     StylizedRiverFoamTopologyCacheCodec.Serialize(package);
                 topologyCacheLastBuildSerializationCount++;
@@ -422,6 +426,7 @@ namespace ProgrammaticStylized3D.Rivers
                     StylizedRiverFoamTopologyCacheCodec.FormatVersion,
                     StylizedRiverFoamTopologyCacheCodec
                         .GeneratorContractVersion,
+                    gridDescriptor,
                     domainFingerprint.ToString(),
                     obstacleFingerprint.ToString(),
                     generationFingerprint.ToString(),
@@ -431,7 +436,7 @@ namespace ProgrammaticStylized3D.Rivers
                     river.name);
 
                 Debug.Log(
-                    $"[River Foam 4.9B] Built cache payload for " +
+                    $"[River Foam Cache] Built payload for " +
                     $"'{river.name}': {payload.Length:N0} bytes, hash " +
                     $"{payloadHash:X16}, inputs {combinedFingerprint}.",
                     river);
@@ -459,7 +464,7 @@ namespace ProgrammaticStylized3D.Rivers
         /// <summary>
         /// Validates the assigned persistent topology cache against the exact
         /// current authored inputs without activating Foam or allocating its GPU
-        /// simulation field. Patch 4.9D build preflight uses this strict path; it
+        /// simulation field. Release build preflight uses this strict path; it
         /// never falls back to mesh scanning, generation, asset creation, or
         /// cache mutation.
         /// </summary>
@@ -515,6 +520,23 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            if (!asset.TryValidateStoredContract(
+                    out bool legacyCoordinateContract,
+                    out bool legacyObstacleFingerprintContract,
+                    out bool legacyDynamicTopologyPhaseContract,
+                    out string contractSummary))
+            {
+                state = legacyCoordinateContract
+                    ? "Legacy Coordinate Contract"
+                    : legacyObstacleFingerprintContract
+                        ? "Legacy Obstacle Fingerprint Contract"
+                        : legacyDynamicTopologyPhaseContract
+                            ? "Legacy Dynamic Topology Phase"
+                            : "Unsupported Cache Contract";
+                summary = contractSummary;
+                return false;
+            }
+
             byte[] payload = asset.GetPayloadReadOnlyReference();
             payloadBytes = payload.Length;
             if (!StylizedRiverFoamTopologyCacheCodec.TryDeserialize(
@@ -541,6 +563,16 @@ namespace ProgrammaticStylized3D.Rivers
                 asset.GeneratorContractVersion ==
                     StylizedRiverFoamTopologyCacheCodec
                         .GeneratorContractVersion &&
+                asset.GridDescriptorContractVersion ==
+                    StylizedRiverFoamGridDescriptor
+                        .DescriptorContractVersion &&
+                asset.GridMappingValue ==
+                    (int)package.GridDescriptor.Mapping &&
+                asset.GridMappingContractVersion ==
+                    package.GridDescriptor.MappingContractVersion &&
+                asset.GridInitializationSignature ==
+                    package.GridDescriptor.InitializationSignature
+                        .ToString("X16") &&
                 asset.PayloadHash == payloadHash &&
                 asset.DomainFingerprint ==
                     package.DomainFingerprint.ToString() &&
@@ -607,7 +639,8 @@ namespace ProgrammaticStylized3D.Rivers
                     .TryCopyObstacleExclusionStableFingerprintsTo(
                         topologyCachePreparedObstacleFingerprints,
                         out obstacleSourceCount,
-                        out obstacleStatus) &&
+                        out obstacleStatus,
+                        verifyDirectGeometry: !Application.isPlaying) &&
                     RiverObstacleExclusionResolver
                         .TryCombineStableSourceFingerprints(
                             topologyCachePreparedObstacleFingerprints,
@@ -625,13 +658,33 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverFoamTopologyFingerprint currentDomain =
                 StylizedRiverFoamTopologyFingerprints.ComputeDomain(
                     river.Domain);
+            int preservedChunkCount = chunkCount;
+            bool descriptorResolved = TryResolveLegacyInitializationDescriptor(
+                river.Domain,
+                SystemInfo.maxTextureSize,
+                out StylizedRiverFoamGridDescriptor currentDescriptor);
+            chunkCount = preservedChunkCount;
+            if (!descriptorResolved)
+            {
+                state = "Grid Inputs Unavailable";
+                summary =
+                    "The current authored river cannot resolve its exact Foam " +
+                    "grid descriptor without changing physical scale.";
+                return false;
+            }
+            if (!TryValidateTopologyCacheGridDescriptor(
+                    currentDescriptor,
+                    out string gridError))
+            {
+                state = "Grid Contract Unsupported";
+                summary = gridError;
+                return false;
+            }
+
             StylizedRiverFoamTopologyFingerprint currentGeneration =
                 StylizedRiverFoamTopologyFingerprints.ComputeGeneration(
                     river,
-                    package.FieldWidth,
-                    package.FieldHeight,
-                    package.FieldLength,
-                    package.ValidFieldLength);
+                    currentDescriptor);
             StylizedRiverFoamTopologyFingerprint currentCombined =
                 StylizedRiverFoamTopologyFingerprints.ComputeCombined(
                     currentDomain,
@@ -651,6 +704,15 @@ namespace ProgrammaticStylized3D.Rivers
                 state = "Stale Obstacles";
                 summary =
                     "The exact transformed static obstacle-source geometry changed.";
+                return false;
+            }
+
+            if (package.GridDescriptor != currentDescriptor)
+            {
+                state = "Stale Grid Contract";
+                summary =
+                    "The cached Foam coordinate descriptor does not match the " +
+                    "current authored allocation and mapping contract.";
                 return false;
             }
 
@@ -723,6 +785,24 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            if (!asset.TryValidateStoredContract(
+                    out bool legacyCoordinateContract,
+                    out bool legacyObstacleFingerprintContract,
+                    out bool legacyDynamicTopologyPhaseContract,
+                    out string contractSummary))
+            {
+                SetTopologyCacheValidationMiss(
+                    legacyCoordinateContract
+                        ? "Miss — Legacy Coordinate Contract"
+                        : legacyObstacleFingerprintContract
+                            ? "Miss — Legacy Obstacle Fingerprint Contract"
+                            : legacyDynamicTopologyPhaseContract
+                                ? "Miss — Legacy Dynamic Topology Phase"
+                                : "Miss — Unsupported Cache Contract",
+                    contractSummary);
+                return false;
+            }
+
             if (!TryCaptureTopologyCacheFingerprints(
                     out StylizedRiverFoamTopologyFingerprint
                         currentDomain,
@@ -765,6 +845,16 @@ namespace ProgrammaticStylized3D.Rivers
                 asset.GeneratorContractVersion ==
                     StylizedRiverFoamTopologyCacheCodec
                         .GeneratorContractVersion &&
+                asset.GridDescriptorContractVersion ==
+                    StylizedRiverFoamGridDescriptor
+                        .DescriptorContractVersion &&
+                asset.GridMappingValue ==
+                    (int)package.GridDescriptor.Mapping &&
+                asset.GridMappingContractVersion ==
+                    package.GridDescriptor.MappingContractVersion &&
+                asset.GridInitializationSignature ==
+                    package.GridDescriptor.InitializationSignature
+                        .ToString("X16") &&
                 asset.PayloadHash == payloadHash.ToString("X16") &&
                 asset.DomainFingerprint ==
                     package.DomainFingerprint.ToString() &&
@@ -799,6 +889,15 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            if (package.GridDescriptor != gridDescriptor)
+            {
+                SetTopologyCacheValidationMiss(
+                    "Miss — Stale Grid Contract",
+                    "The cached Foam coordinate descriptor does not match " +
+                    "the active allocation and mapping contract.");
+                return false;
+            }
+
             if (package.GenerationFingerprint != currentGeneration)
             {
                 SetTopologyCacheValidationMiss(
@@ -821,9 +920,9 @@ namespace ProgrammaticStylized3D.Rivers
             topologyCacheValidationState = "Hit Candidate";
             topologyCacheValidationSummary =
                 "The assigned payload is valid and all stable inputs match. " +
-                "Patch 4.9C startup ownership is reported separately above.";
+                "Cache startup ownership is reported separately above.";
             Debug.Log(
-                $"[River Foam 4.9B] Cache hit candidate for '{river.name}': " +
+                $"[River Foam Cache] Hit candidate for '{river.name}': " +
                 $"{payload.Length:N0} bytes, inputs {currentCombined}.",
                 river);
             return true;
@@ -890,13 +989,17 @@ namespace ProgrammaticStylized3D.Rivers
             domainFingerprint =
                 StylizedRiverFoamTopologyFingerprints.ComputeDomain(
                     river.Domain);
+            if (!TryValidateTopologyCacheGridDescriptor(
+                    gridDescriptor,
+                    out error))
+            {
+                return false;
+            }
+
             generationFingerprint =
                 StylizedRiverFoamTopologyFingerprints.ComputeGeneration(
                     river,
-                    fieldWidth,
-                    fieldHeight,
-                    fieldLength,
-                    validFieldLength);
+                    gridDescriptor);
 
             disturbanceRuntime ??=
                 GetComponent<StylizedRiverDisturbanceRuntime>();
@@ -924,7 +1027,10 @@ namespace ProgrammaticStylized3D.Rivers
                     .TryCopyObstacleExclusionStableFingerprintsTo(
                         topologyCachePreparedObstacleFingerprints,
                         out sourceCount,
-                        out obstacleStatus) &&
+                        out obstacleStatus,
+                        verifyDirectGeometry:
+                            allowMeshFingerprintFallback &&
+                            !Application.isPlaying) &&
                   RiverObstacleExclusionResolver
                     .TryCombineStableSourceFingerprints(
                         topologyCachePreparedObstacleFingerprints,
@@ -987,8 +1093,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        // Retained as a compatibility surface for older Editor callers. P1
-        // deliberately rejects every automatic build or persistence attempt.
+        // Retained as a compatibility surface for older Editor callers. The
+        // cache contract deliberately rejects automatic build or persistence.
         public bool TryBuildAutomaticTopologyCache(
             out StylizedRiverFoamTopologyCacheBuildArtifact artifact)
         {
@@ -1195,21 +1301,6 @@ namespace ProgrammaticStylized3D.Rivers
 
             System.Diagnostics.Stopwatch stopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
-            if (!TryCaptureTopologyCacheFingerprints(
-                    out StylizedRiverFoamTopologyFingerprint currentDomain,
-                    out StylizedRiverFoamTopologyFingerprint currentObstacles,
-                    out StylizedRiverFoamTopologyFingerprint currentGeneration,
-                    out StylizedRiverFoamTopologyFingerprint currentCombined,
-                    out string fingerprintError,
-                    IsAutomaticDevelopmentCacheEnabled))
-            {
-                SetTopologyCacheStartupMiss(
-                    TopologyCacheStartupReason.InputsUnavailable,
-                    "Miss — Inputs Unavailable",
-                    fingerprintError);
-                return TopologyCacheStartupResolution.Miss;
-            }
-
             StylizedRiverFoamTopologyCacheAsset asset =
                 river != null ? river.FoamTopologyCacheAsset : null;
             if (asset == null)
@@ -1236,6 +1327,33 @@ namespace ProgrammaticStylized3D.Rivers
                     TopologyCacheStartupReason.EmptyPayload,
                     "Miss — Empty",
                     "The assigned cache asset contains no payload bytes.");
+                return TopologyCacheStartupResolution.Miss;
+            }
+
+            if (!asset.TryValidateStoredContract(
+                    out bool legacyCoordinateContract,
+                    out bool legacyObstacleFingerprintContract,
+                    out bool legacyDynamicTopologyPhaseContract,
+                    out string contractSummary))
+            {
+                SetTopologyCacheStartupMiss(
+                    legacyCoordinateContract
+                        ? TopologyCacheStartupReason.CoordinateContract
+                        : legacyObstacleFingerprintContract
+                            ? TopologyCacheStartupReason
+                                .ObstacleFingerprintContract
+                            : legacyDynamicTopologyPhaseContract
+                                ? TopologyCacheStartupReason
+                                    .DynamicTopologyPhaseContract
+                                : TopologyCacheStartupReason.CacheContract,
+                    legacyCoordinateContract
+                        ? "Miss — Legacy Coordinate Contract"
+                        : legacyObstacleFingerprintContract
+                            ? "Miss — Legacy Obstacle Fingerprint Contract"
+                            : legacyDynamicTopologyPhaseContract
+                                ? "Miss — Legacy Dynamic Topology Phase"
+                                : "Miss — Unsupported Cache Contract",
+                    contractSummary);
                 return TopologyCacheStartupResolution.Miss;
             }
 
@@ -1266,6 +1384,16 @@ namespace ProgrammaticStylized3D.Rivers
                 asset.GeneratorContractVersion ==
                     StylizedRiverFoamTopologyCacheCodec
                         .GeneratorContractVersion &&
+                asset.GridDescriptorContractVersion ==
+                    StylizedRiverFoamGridDescriptor
+                        .DescriptorContractVersion &&
+                asset.GridMappingValue ==
+                    (int)package.GridDescriptor.Mapping &&
+                asset.GridMappingContractVersion ==
+                    package.GridDescriptor.MappingContractVersion &&
+                asset.GridInitializationSignature ==
+                    package.GridDescriptor.InitializationSignature
+                        .ToString("X16") &&
                 asset.PayloadHash == payloadHash.ToString("X16") &&
                 asset.DomainFingerprint ==
                     package.DomainFingerprint.ToString() &&
@@ -1284,7 +1412,10 @@ namespace ProgrammaticStylized3D.Rivers
                 return TopologyCacheStartupResolution.Miss;
             }
 
+            bool descriptorMatches =
+                package.GridDescriptor == gridDescriptor;
             bool completeCurrentContract =
+                descriptorMatches &&
                 package.FieldWidth == fieldWidth &&
                 package.FieldHeight == fieldHeight &&
                 package.ObstacleExclusion != null &&
@@ -1292,6 +1423,17 @@ namespace ProgrammaticStylized3D.Rivers
                 package.MajorTopology != null &&
                 package.ConnectorTopology != null &&
                 package.PocketTopology != null;
+            if (!descriptorMatches)
+            {
+                SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.GridDescriptorMismatch,
+                    "Miss — Stale Grid Contract",
+                    "The cached Foam coordinate descriptor does not match " +
+                    "the active allocation and mapping contract.");
+                package = null;
+                return TopologyCacheStartupResolution.Miss;
+            }
+
             if (!completeCurrentContract)
             {
                 SetTopologyCacheStartupMiss(
@@ -1299,6 +1441,22 @@ namespace ProgrammaticStylized3D.Rivers
                     "Miss — Incomplete Contract",
                     "The payload does not contain a complete topology graph " +
                     "for the current field dimensions.");
+                package = null;
+                return TopologyCacheStartupResolution.Miss;
+            }
+
+            if (!TryCaptureTopologyCacheFingerprints(
+                    out StylizedRiverFoamTopologyFingerprint currentDomain,
+                    out StylizedRiverFoamTopologyFingerprint currentObstacles,
+                    out StylizedRiverFoamTopologyFingerprint currentGeneration,
+                    out StylizedRiverFoamTopologyFingerprint currentCombined,
+                    out string fingerprintError,
+                    IsAutomaticDevelopmentCacheEnabled))
+            {
+                SetTopologyCacheStartupMiss(
+                    TopologyCacheStartupReason.InputsUnavailable,
+                    "Miss — Inputs Unavailable",
+                    fingerprintError);
                 package = null;
                 return TopologyCacheStartupResolution.Miss;
             }
@@ -1413,7 +1571,9 @@ namespace ProgrammaticStylized3D.Rivers
         {
             System.Diagnostics.Stopwatch stopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
-            if (package == null || package.FieldWidth != fieldWidth ||
+            if (package == null ||
+                package.GridDescriptor != gridDescriptor ||
+                package.FieldWidth != fieldWidth ||
                 package.FieldHeight != fieldHeight ||
                 package.ObstacleExclusion == null ||
                 package.ObstacleExclusion.Length != fieldWidth * fieldHeight ||
@@ -1582,10 +1742,7 @@ namespace ProgrammaticStylized3D.Rivers
         {
             RiverDomainSnapshot domain = river.Domain;
             return new StylizedRiverFoamTopologyCachePackage(
-                fieldWidth,
-                fieldHeight,
-                fieldLength,
-                validFieldLength,
+                gridDescriptor,
                 domain.GlobalDistanceMinimum,
                 domain.GlobalDistanceMaximum,
                 domain.LocalLength,
@@ -1613,6 +1770,47 @@ namespace ProgrammaticStylized3D.Rivers
                 majorTopology,
                 connectorTopology,
                 pocketTopology);
+        }
+
+        private static bool TryValidateTopologyCacheGridDescriptor(
+            StylizedRiverFoamGridDescriptor descriptor,
+            out string error)
+        {
+            if (!descriptor.IsCreated)
+            {
+                error = "The active Foam grid descriptor is unavailable.";
+                return false;
+            }
+            if (descriptor.ColumnCount >
+                    StylizedRiverFoamTopologyCacheCodec.MaximumFieldDimension ||
+                descriptor.RowCount >
+                    StylizedRiverFoamTopologyCacheCodec.MaximumFieldDimension)
+            {
+                error =
+                    $"Foam grid {descriptor.ColumnCount} × " +
+                    $"{descriptor.RowCount} exceeds the contiguous cache " +
+                    $"dimension limit " +
+                    $"{StylizedRiverFoamTopologyCacheCodec.MaximumFieldDimension}. " +
+                    "The runtime will not silently change physical scale; use " +
+                    "the later strip architecture or a deliberately lower " +
+                    "quality tier.";
+                return false;
+            }
+
+            long cellCount = descriptor.StructuralCellCount;
+            if (cellCount >
+                StylizedRiverFoamTopologyCacheCodec.MaximumFieldCellCount)
+            {
+                error =
+                    $"Foam grid contains {cellCount:N0} cells; the contiguous " +
+                    $"cache limit is " +
+                    $"{StylizedRiverFoamTopologyCacheCodec.MaximumFieldCellCount:N0}. " +
+                    "Physical scale was not degraded.";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
         }
 
         private void SetTopologyCacheValidationMiss(

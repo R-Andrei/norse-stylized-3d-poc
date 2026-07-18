@@ -112,7 +112,8 @@ namespace ProgrammaticStylized3D.Rivers
         public bool TryCopyObstacleExclusionStableFingerprintsTo(
             List<GeneratedGeometryStableFingerprint> output,
             out int sourceCount,
-            out string status)
+            out string status,
+            bool verifyDirectGeometry = false)
         {
             if (output == null)
             {
@@ -163,22 +164,58 @@ namespace ProgrammaticStylized3D.Rivers
                 if (provider == null ||
                     !provider.TryGetStableWorldGeometryFingerprint(
                         out fingerprint,
-                        out providerStatus))
+                        out providerStatus) ||
+                    fingerprint.IsDefault)
                 {
                     output.Clear();
                     status =
                         $"Static obstacle source {sourceCount - 1} does not " +
-                        "provide a prepared exact world-geometry fingerprint. " +
+                        "provide a usable prepared exact world-geometry " +
+                        "fingerprint. The all-zero sentinel is invalid. " +
                         (providerStatus ?? string.Empty);
                     return false;
+                }
+
+                if (verifyDirectGeometry)
+                {
+                    if (!GeneratedGeometryStableFingerprintUtility
+                            .TryComputeExactWorldTriangleFingerprint(
+                                meshFilter,
+                                out GeneratedGeometryStableFingerprint
+                                    directFingerprint,
+                                out string directStatus) ||
+                        directFingerprint.IsDefault)
+                    {
+                        output.Clear();
+                        status =
+                            $"Static obstacle source {sourceCount - 1} could " +
+                            "not be independently verified from its exact " +
+                            "world triangles. " + (directStatus ?? string.Empty);
+                        return false;
+                    }
+
+                    if (!fingerprint.Equals(directFingerprint))
+                    {
+                        output.Clear();
+                        status =
+                            $"Static obstacle source {sourceCount - 1} " +
+                            $"provider/direct fingerprint mismatch: provider=" +
+                            $"{fingerprint}, direct={directFingerprint}. " +
+                            (providerStatus ?? string.Empty);
+                        return false;
+                    }
                 }
 
                 output.Add(fingerprint);
             }
 
             output.Sort();
-            status =
-                $"Collected {output.Count:N0} prepared exact obstacle fingerprint(s) without scanning mesh triangles.";
+            status = verifyDirectGeometry
+                ? $"Collected and independently verified {output.Count:N0} " +
+                  "exact obstacle fingerprint(s) from provider and direct " +
+                  "world-triangle geometry."
+                : $"Collected {output.Count:N0} prepared exact obstacle " +
+                  "fingerprint(s) without scanning mesh triangles.";
             return true;
         }
 

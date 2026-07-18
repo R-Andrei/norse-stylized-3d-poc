@@ -8,17 +8,14 @@ namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
     /// Immutable cache payload source. It contains the complete accepted
-    /// prepared topology graph, exact scalar obstacle mask, and Patch 4.9B
-    /// stable cross-session input fingerprints. Storage ownership remains
-    /// independent from the binary codec.
+    /// prepared topology graph, exact scalar obstacle mask, descriptor-aware
+    /// coordinate contract, and stable cross-session input fingerprints.
+    /// Storage ownership remains independent from the binary codec.
     /// </summary>
     internal sealed class StylizedRiverFoamTopologyCachePackage
     {
         public StylizedRiverFoamTopologyCachePackage(
-            int fieldWidth,
-            int fieldHeight,
-            float fieldLength,
-            float validFieldLength,
+            StylizedRiverFoamGridDescriptor gridDescriptor,
             float domainGlobalDistanceMinimum,
             float domainGlobalDistanceMaximum,
             float domainLocalLength,
@@ -47,10 +44,7 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverFoamConnectorTopology connectorTopology,
             StylizedRiverFoamPocketTopology pocketTopology)
         {
-            FieldWidth = fieldWidth;
-            FieldHeight = fieldHeight;
-            FieldLength = fieldLength;
-            ValidFieldLength = validFieldLength;
+            GridDescriptor = gridDescriptor;
             DomainGlobalDistanceMinimum = domainGlobalDistanceMinimum;
             DomainGlobalDistanceMaximum = domainGlobalDistanceMaximum;
             DomainLocalLength = domainLocalLength;
@@ -83,10 +77,11 @@ namespace ProgrammaticStylized3D.Rivers
             PocketTopology = pocketTopology;
         }
 
-        public int FieldWidth { get; }
-        public int FieldHeight { get; }
-        public float FieldLength { get; }
-        public float ValidFieldLength { get; }
+        public StylizedRiverFoamGridDescriptor GridDescriptor { get; }
+        public int FieldWidth => GridDescriptor.ColumnCount;
+        public int FieldHeight => GridDescriptor.RowCount;
+        public float FieldLength => GridDescriptor.AllocatedLengthMetres;
+        public float ValidFieldLength => GridDescriptor.ValidLengthMetres;
         public float DomainGlobalDistanceMinimum { get; }
         public float DomainGlobalDistanceMaximum { get; }
         public float DomainLocalLength { get; }
@@ -151,22 +146,156 @@ namespace ProgrammaticStylized3D.Rivers
 
     /// <summary>
     /// Deterministic binary contract for the complete prepared Foam topology
-    /// graph. Patch 4.9B extends the accepted exact-value 4.9A payload with
+    /// graph. Format 3 owns the exact immutable grid descriptor together with
     /// stable domain, obstacle-source, and generation-input fingerprints. The
-    /// codec remains storage-provider agnostic and still performs no automatic
-    /// startup loading or renderer activation.
+    /// codec remains storage-provider agnostic and performs no automatic
+    /// startup loading, cache generation, or renderer activation.
     /// </summary>
-    internal static class StylizedRiverFoamTopologyCacheCodec
+    internal static partial class StylizedRiverFoamTopologyCacheCodec
     {
         private const uint Magic = 0x31434652u; // "RFC1" in little-endian bytes.
-        internal const int FormatVersion = 2;
-        internal const int GeneratorContractVersion = 1;
+        internal const int FormatVersion = 3;
+        internal const int GeneratorContractVersion = 4;
 
         private const int ChecksumByteCount = sizeof(ulong);
-        private const int MaximumFieldDimension = 8192;
-        private const int MaximumFieldCellCount = 16 * 1024 * 1024;
+        internal const int MaximumFieldDimension = 8192;
+        internal const int MaximumFieldCellCount = 16 * 1024 * 1024;
         private const int MaximumCollectionCount = 4 * 1024 * 1024;
         private const int MaximumLocalMaskCellCount = 1024 * 1024;
+
+        internal static bool TryValidateContractVersions(
+            int formatVersion,
+            int generatorContractVersion,
+            out bool legacyNormalizedCoordinateContract,
+            out bool legacyObstacleFingerprintContract,
+            out bool legacyDynamicTopologyPhaseContract,
+            out string error)
+        {
+            legacyNormalizedCoordinateContract =
+                formatVersion == 2 && generatorContractVersion == 1;
+            legacyObstacleFingerprintContract =
+                formatVersion == 3 && generatorContractVersion == 2;
+            legacyDynamicTopologyPhaseContract =
+                formatVersion == 3 && generatorContractVersion == 3;
+            if (formatVersion == FormatVersion &&
+                generatorContractVersion == GeneratorContractVersion)
+            {
+                error = string.Empty;
+                return true;
+            }
+
+            if (legacyNormalizedCoordinateContract)
+            {
+                error =
+                    "Legacy normalized-lateral Foam topology cache contract " +
+                    $"(format {formatVersion}, generator " +
+                    $"{generatorContractVersion}) is incompatible with the " +
+                    "descriptor-aware cache contract. Rebuild this cache in " +
+                    "Edit Mode.";
+                return false;
+            }
+
+            if (legacyObstacleFingerprintContract)
+            {
+                error =
+                    "Legacy Foam obstacle-fingerprint contract " +
+                    $"(format {formatVersion}, generator " +
+                    $"{generatorContractVersion}) could accept restored " +
+                    "all-zero generated-geometry fingerprints and cannot " +
+                    "prove obstacle identity. Rebuild this cache in Edit Mode.";
+                return false;
+            }
+
+            if (legacyDynamicTopologyPhaseContract)
+            {
+                error =
+                    "Legacy dynamic-topology-phase Foam cache contract " +
+                    $"(format {formatVersion}, generator " +
+                    $"{generatorContractVersion}) evaluated cached obstacle " +
+                    "acceptance at the live water-animation phase and cannot " +
+                    "reproduce a static topology payload across reloads. " +
+                    "Rebuild this cache in Edit Mode.";
+                return false;
+            }
+
+            error =
+                $"Unsupported Foam topology cache contract: format " +
+                $"{formatVersion}, generator {generatorContractVersion}; " +
+                $"expected format {FormatVersion}, generator " +
+                $"{GeneratorContractVersion}.";
+            return false;
+        }
+
+        [Conditional("UNITY_EDITOR")]
+        internal static void ValidateFoundation()
+        {
+            if (!TryValidateContractVersions(
+                    FormatVersion,
+                    GeneratorContractVersion,
+                    out bool currentLegacyCoordinate,
+                    out bool currentLegacyObstacle,
+                    out bool currentLegacyDynamicPhase,
+                    out string currentError) ||
+                currentLegacyCoordinate ||
+                currentLegacyObstacle ||
+                currentLegacyDynamicPhase ||
+                !string.IsNullOrEmpty(currentError))
+            {
+                throw new InvalidOperationException(
+                    "Current River Foam cache contract rejected itself.");
+            }
+
+            if (TryValidateContractVersions(
+                    2,
+                    1,
+                    out bool legacyCoordinate,
+                    out bool legacyObstacleUnexpected,
+                    out bool legacyDynamicUnexpected,
+                    out string legacyError) ||
+                !legacyCoordinate ||
+                legacyObstacleUnexpected ||
+                legacyDynamicUnexpected ||
+                !legacyError.Contains("normalized-lateral"))
+            {
+                throw new InvalidOperationException(
+                    "Legacy River Foam cache contract is not rejected " +
+                    "deterministically.");
+            }
+
+            if (TryValidateContractVersions(
+                    3,
+                    2,
+                    out bool coordinateUnexpected,
+                    out bool legacyObstacle,
+                    out bool dynamicUnexpected,
+                    out string obstacleError) ||
+                coordinateUnexpected ||
+                !legacyObstacle ||
+                dynamicUnexpected ||
+                !obstacleError.Contains("obstacle-fingerprint"))
+            {
+                throw new InvalidOperationException(
+                    "Legacy obstacle-fingerprint cache contract is not " +
+                    "rejected deterministically.");
+            }
+
+            if (TryValidateContractVersions(
+                    3,
+                    3,
+                    out bool dynamicCoordinateUnexpected,
+                    out bool dynamicObstacleUnexpected,
+                    out bool legacyDynamicPhase,
+                    out string dynamicPhaseError) ||
+                dynamicCoordinateUnexpected ||
+                dynamicObstacleUnexpected ||
+                !legacyDynamicPhase ||
+                !dynamicPhaseError.Contains("dynamic-topology-phase"))
+            {
+                throw new InvalidOperationException(
+                    "Legacy dynamic-topology-phase cache contract is not " +
+                    "rejected deterministically.");
+            }
+        }
 
         public static byte[] Serialize(
             StylizedRiverFoamTopologyCachePackage package)
@@ -256,20 +385,16 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion)
-                {
-                    throw new InvalidDataException(
-                        $"Unsupported Foam topology cache format {formatVersion}; " +
-                        $"expected {FormatVersion}.");
-                }
-
                 int generatorVersion = reader.ReadInt32();
-                if (generatorVersion != GeneratorContractVersion)
+                if (!TryValidateContractVersions(
+                        formatVersion,
+                        generatorVersion,
+                        out _,
+                        out _,
+                        out _,
+                        out string contractError))
                 {
-                    throw new InvalidDataException(
-                        $"Unsupported Foam topology generator contract " +
-                        $"{generatorVersion}; expected " +
-                        $"{GeneratorContractVersion}.");
+                    throw new InvalidDataException(contractError);
                 }
 
                 package = ReadPackage(reader);
@@ -402,10 +527,7 @@ namespace ProgrammaticStylized3D.Rivers
             BinaryWriter writer,
             StylizedRiverFoamTopologyCachePackage package)
         {
-            writer.Write(package.FieldWidth);
-            writer.Write(package.FieldHeight);
-            writer.Write(package.FieldLength);
-            writer.Write(package.ValidFieldLength);
+            WriteGridDescriptor(writer, package.GridDescriptor);
             writer.Write(package.DomainGlobalDistanceMinimum);
             writer.Write(package.DomainGlobalDistanceMaximum);
             writer.Write(package.DomainLocalLength);
@@ -438,13 +560,13 @@ namespace ProgrammaticStylized3D.Rivers
         private static StylizedRiverFoamTopologyCachePackage ReadPackage(
             BinaryReader reader)
         {
-            int width = reader.ReadInt32();
-            int height = reader.ReadInt32();
+            StylizedRiverFoamGridDescriptor gridDescriptor =
+                ReadGridDescriptor(reader);
+            int width = gridDescriptor.ColumnCount;
+            int height = gridDescriptor.RowCount;
             ValidateFieldDimensions(width, height);
             int cellCount = checked(width * height);
 
-            float fieldLength = reader.ReadSingle();
-            float validFieldLength = reader.ReadSingle();
             float globalMinimum = reader.ReadSingle();
             float globalMaximum = reader.ReadSingle();
             float localLength = reader.ReadSingle();
@@ -499,10 +621,7 @@ namespace ProgrammaticStylized3D.Rivers
                 cellCount);
 
             return new StylizedRiverFoamTopologyCachePackage(
-                width,
-                height,
-                fieldLength,
-                validFieldLength,
+                gridDescriptor,
                 globalMinimum,
                 globalMaximum,
                 localLength,
@@ -530,6 +649,91 @@ namespace ProgrammaticStylized3D.Rivers
                 major,
                 connector,
                 pocket);
+        }
+
+        private static void WriteGridDescriptor(
+            BinaryWriter writer,
+            StylizedRiverFoamGridDescriptor descriptor)
+        {
+            writer.Write(
+                StylizedRiverFoamGridDescriptor.DescriptorContractVersion);
+            writer.Write((int)descriptor.Mapping);
+            writer.Write(descriptor.MappingContractVersion);
+            writer.Write((int)descriptor.Quality);
+            writer.Write(descriptor.RequestedDxMetres);
+            writer.Write(descriptor.RequestedDyMetres);
+            writer.Write(descriptor.ColumnsPerChunk);
+            writer.Write(descriptor.ResolvedDxMetres);
+            writer.Write(descriptor.ResolvedDyMetres);
+            writer.Write(descriptor.LateralLatticePhaseMetres);
+            writer.Write(descriptor.GlobalYBase);
+            writer.Write(descriptor.RowCount);
+            writer.Write(descriptor.FieldOrStripStartMetres);
+            writer.Write(descriptor.AllocatedLengthMetres);
+            writer.Write(descriptor.ValidLengthMetres);
+            writer.Write(descriptor.ColumnCount);
+            writer.Write(descriptor.FilmWidth);
+            writer.Write(descriptor.FilmHeight);
+            writer.Write(descriptor.AllocationGuardRows);
+            writer.Write(descriptor.RepresentedLateralMinimumMetres);
+            writer.Write(descriptor.RepresentedLateralMaximumMetres);
+            writer.Write(descriptor.InitializationSignature);
+        }
+
+        private static StylizedRiverFoamGridDescriptor ReadGridDescriptor(
+            BinaryReader reader)
+        {
+            int descriptorContractVersion = reader.ReadInt32();
+            int mappingValue = reader.ReadInt32();
+            if (!Enum.IsDefined(
+                    typeof(StylizedRiverFoamGridMapping),
+                    mappingValue))
+            {
+                throw new InvalidDataException(
+                    $"Unknown Foam grid mapping value {mappingValue}.");
+            }
+
+            StylizedRiverFoamGridMapping mapping =
+                (StylizedRiverFoamGridMapping)mappingValue;
+            int mappingContractVersion = reader.ReadInt32();
+            int qualityValue = reader.ReadInt32();
+            if (!Enum.IsDefined(typeof(StylizedRiverQuality), qualityValue))
+            {
+                throw new InvalidDataException(
+                    $"Unknown river quality value {qualityValue}.");
+            }
+
+            if (!StylizedRiverFoamGridDescriptor.TryCreateFromCacheContract(
+                    descriptorContractVersion,
+                    mapping,
+                    mappingContractVersion,
+                    (StylizedRiverQuality)qualityValue,
+                    reader.ReadSingle(),
+                    reader.ReadSingle(),
+                    reader.ReadInt32(),
+                    reader.ReadSingle(),
+                    reader.ReadSingle(),
+                    reader.ReadSingle(),
+                    reader.ReadInt32(),
+                    reader.ReadInt32(),
+                    reader.ReadSingle(),
+                    reader.ReadSingle(),
+                    reader.ReadSingle(),
+                    reader.ReadInt32(),
+                    reader.ReadInt32(),
+                    reader.ReadInt32(),
+                    reader.ReadInt32(),
+                    reader.ReadSingle(),
+                    reader.ReadSingle(),
+                    reader.ReadUInt64(),
+                    out StylizedRiverFoamGridDescriptor descriptor,
+                    out string failureReason))
+            {
+                throw new InvalidDataException(
+                    "Invalid Foam grid descriptor: " + failureReason);
+            }
+
+            return descriptor;
         }
 
         private static void WriteFingerprint(
@@ -1482,6 +1686,12 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverFoamTopologyCachePackage reconstructed,
             out string error)
         {
+            if (source.GridDescriptor != reconstructed.GridDescriptor)
+            {
+                error = "Foam grid descriptor changed during cache round trip.";
+                return false;
+            }
+
             int cellCount = checked(source.FieldWidth * source.FieldHeight);
             Color[] sourcePixels = new Color[cellCount];
             Color[] reconstructedPixels = new Color[cellCount];
@@ -1551,7 +1761,19 @@ namespace ProgrammaticStylized3D.Rivers
                 throw new ArgumentNullException(nameof(package));
             }
 
+            if (!package.GridDescriptor.IsCreated ||
+                package.GridDescriptor.InitializationSignature == 0ul)
+            {
+                throw new InvalidDataException(
+                    "Cache payload is missing a valid Foam grid descriptor.");
+            }
+
             ValidateFieldDimensions(package.FieldWidth, package.FieldHeight);
+            if (package.Quality != package.GridDescriptor.Quality)
+            {
+                throw new InvalidDataException(
+                    "Cache quality does not match its Foam grid descriptor.");
+            }
             if (package.DomainFingerprint == default ||
                 package.ObstacleFingerprint == default ||
                 package.GenerationFingerprint == default)

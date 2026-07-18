@@ -124,7 +124,7 @@ bool IsObstacleIntervalSampleInside(
         lateralMetres,
         visibleHalfWidth,
         surfaceHalfWidth,
-        _FoamTime,
+        _FoamTopologyEvaluationTime,
         _FoamMotionFlowSpeed,
         _FoamMotionWaveHeight,
         _FoamMotionWaveLength,

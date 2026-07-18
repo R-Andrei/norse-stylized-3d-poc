@@ -10,6 +10,67 @@ namespace ProgrammaticStylized3D.Rivers
 {
     public sealed partial class StylizedRiverFoamRuntime
     {
+        private const int FixedMetricMotionLaneAlgorithmContract = 1;
+        private const int FixedMetricObstacleRoutingContract = 1;
+        private const float MotionLaneDownstreamBasisMetres = 32f;
+        private const float MotionLaneLateralReferenceSpanMetres = 10f;
+        private const float MotionLaneNearSmoothingOffsetMetres = 0.20f;
+        private const float MotionLaneFarSmoothingOffsetMetres = 0.40f;
+        private const float ObstacleRoutingApproachReachMetres = 2.00f;
+        private const float ObstacleRoutingFrontClosureMetres = 0.35f;
+        private const float ObstacleRoutingContactReachMetres = 0.50f;
+        private const float ObstacleRoutingMinimumCoreHalfWidthMetres = 0.10f;
+        private const float ObstacleRoutingMinimumOuterHalfWidthMetres = 0.20f;
+        private const float ObstacleRoutingCentreDeadBandMetres = 0.10f;
+
+        private int lastObstacleRoutingInfluencedCellCount;
+        private int lastObstacleRoutingRearLeakCellCount;
+        private float lastObstacleRoutingMaximumApproachMetres;
+        private float lastObstacleRoutingMaximumLateralMarginMetres;
+        private int lastMotionLaneNearSmoothingRows;
+        private int lastMotionLaneFarSmoothingRows;
+
+        private readonly struct FoamObstacleRoutingPolicy
+        {
+            public FoamObstacleRoutingPolicy(
+                int approachCells,
+                int frontCells,
+                int releaseCells,
+                int frontClosureCells,
+                int lateralMarginCells,
+                int contactCells,
+                float centreDeadBandRows,
+                float minimumCoreHalfWidthRows,
+                float minimumOuterHalfWidthRows,
+                float longitudinalSpacingMetres,
+                float lateralSpacingMetres)
+            {
+                ApproachCells = approachCells;
+                FrontCells = frontCells;
+                ReleaseCells = releaseCells;
+                FrontClosureCells = frontClosureCells;
+                LateralMarginCells = lateralMarginCells;
+                ContactCells = contactCells;
+                CentreDeadBandRows = centreDeadBandRows;
+                MinimumCoreHalfWidthRows = minimumCoreHalfWidthRows;
+                MinimumOuterHalfWidthRows = minimumOuterHalfWidthRows;
+                LongitudinalSpacingMetres = longitudinalSpacingMetres;
+                LateralSpacingMetres = lateralSpacingMetres;
+            }
+
+            public int ApproachCells { get; }
+            public int FrontCells { get; }
+            public int ReleaseCells { get; }
+            public int FrontClosureCells { get; }
+            public int LateralMarginCells { get; }
+            public int ContactCells { get; }
+            public float CentreDeadBandRows { get; }
+            public float MinimumCoreHalfWidthRows { get; }
+            public float MinimumOuterHalfWidthRows { get; }
+            public float LongitudinalSpacingMetres { get; }
+            public float LateralSpacingMetres { get; }
+        }
+
         private struct FoamObstacleRoutingComponent
         {
             public int Id;
@@ -109,21 +170,14 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             Color[] pixels = new Color[fieldWidth * fieldHeight];
-            float edgeCells = river.Quality switch
-            {
-                StylizedRiverQuality.Low => 1.5f,
-                StylizedRiverQuality.Medium => 2.0f,
-                StylizedRiverQuality.High => 2.5f,
-                _ => 2.0f
-            };
 
             for (int x = 0; x < fieldWidth; x++)
             {
                 float localDistance =
-                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
-                        x,
-                        fieldWidth,
-                        fieldLength);
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveLocalDistanceAtColumnCentre(
+                            gridDescriptor,
+                            x);
                 if (localDistance > simulationFieldLength + 0.0001f)
                 {
                     continue;
@@ -150,23 +204,23 @@ namespace ProgrammaticStylized3D.Rivers
                     rightVisible,
                     rightSurface,
                     animatedEnvelope);
-                float edgeWidth = Mathf.Max(
-                    0.05f,
-                    StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
-                        leftSurface + rightSurface,
-                        fieldHeight) * edgeCells);
+                float edgeWidth =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveBoundaryFeatherWidthMetres(
+                            gridDescriptor,
+                            river.Quality,
+                            leftSurface,
+                            rightSurface);
 
                 for (int y = 0; y < fieldHeight; y++)
                 {
-                    float across01 =
-                        StylizedRiverFoamTopologyFieldSpace.Across01AtTexel(
-                            y,
-                            fieldHeight);
                     float lateral =
-                        StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
-                        across01,
-                        leftSurface,
-                        rightSurface);
+                        StylizedRiverFoamTopologyFieldSpace
+                            .ResolveLateralMetresAtRowCentre(
+                                gridDescriptor,
+                                y,
+                                leftSurface,
+                                rightSurface);
                     float foamReach = lateral < 0f
                         ? leftFoamReach
                         : rightFoamReach;
@@ -280,9 +334,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             float longitudinalSpacing =
-                minimumTransportLongitudinalSpacing > 0.0001f
-                    ? minimumTransportLongitudinalSpacing
-                    : fieldLength / Mathf.Max(1, fieldWidth);
+                ResolveMotionLaneLongitudinalSpacingMetres();
             float baseFoamSpeed =
                 ResolveBaseFoamDownstreamSpeedMetresPerSecond();
             float scrollMetres = baseFoamSpeed *
@@ -297,12 +349,43 @@ namespace ProgrammaticStylized3D.Rivers
             lastMotionLaneScrollCells = motionLaneScrollCells;
         }
 
+        private float ResolveMotionLaneLongitudinalSpacingMetres()
+        {
+            if (gridDescriptor.UsesFixedMetricLattice)
+            {
+                return Mathf.Max(
+                    0.0001f,
+                    gridDescriptor.ResolvedDxMetres);
+            }
+
+            return minimumTransportLongitudinalSpacing > 0.0001f
+                ? minimumTransportLongitudinalSpacing
+                : fieldLength / Mathf.Max(1, fieldWidth);
+        }
+
         private int ResolveMotionLaneFieldSignature()
         {
             int hash = 17;
             hash = AccumulateHash(hash, fieldWidth);
             hash = AccumulateHash(hash, fieldHeight);
-            hash = AccumulateHash(hash, 3); // 4.11C.5.16A.1 independent downstream/across-river frequency algorithm.
+            if (gridDescriptor.UsesFixedMetricLattice)
+            {
+                hash = AccumulateHash(
+                    hash,
+                    100 + FixedMetricMotionLaneAlgorithmContract);
+                hash = AccumulateHash(
+                    hash,
+                    unchecked((int)gridDescriptor.InitializationSignature));
+                hash = AccumulateHash(
+                    hash,
+                    unchecked((int)(gridDescriptor.InitializationSignature >> 32)));
+            }
+            else
+            {
+                // Exact legacy signature lane. Do not change while the active
+                // runtime mapping remains LegacyNormalizedAcross.
+                hash = AccumulateHash(hash, 3);
+            }
             hash = AccumulateHash(hash, river != null ? river.VisualSeed : 0);
             hash = AccumulateHash(
                 hash,
@@ -327,6 +410,18 @@ namespace ProgrammaticStylized3D.Rivers
             int hash = 23;
             hash = AccumulateHash(hash, fieldWidth);
             hash = AccumulateHash(hash, fieldHeight);
+            if (gridDescriptor.UsesFixedMetricLattice)
+            {
+                hash = AccumulateHash(
+                    hash,
+                    100 + FixedMetricObstacleRoutingContract);
+                hash = AccumulateHash(
+                    hash,
+                    unchecked((int)gridDescriptor.InitializationSignature));
+                hash = AccumulateHash(
+                    hash,
+                    unchecked((int)(gridDescriptor.InitializationSignature >> 32)));
+            }
             hash = AccumulateHash(hash, obstacleGeometryVersion);
             hash = AccumulateHash(hash, obstacleExclusionCells.Count);
             hash = AccumulateHash(hash, obstacleExclusionSamples.Count);
@@ -365,31 +460,72 @@ namespace ProgrammaticStylized3D.Rivers
             float seed = river != null
                 ? river.VisualSeed * 0.01371f
                 : 23.17f;
-            float aspect = fieldHeight > 0
-                ? Mathf.Max(1f, (float)fieldWidth / fieldHeight)
-                : 1f;
-
-            for (int y = 0; y < fieldHeight; y++)
+            if (gridDescriptor.UsesFixedMetricLattice)
             {
-                float v = ((float)y + 0.5f) / Mathf.Max(1, fieldHeight);
-                for (int x = 0; x < fieldWidth; x++)
+                for (int y = 0; y < fieldHeight; y++)
                 {
-                    float u = ((float)x + 0.5f) / Mathf.Max(1, fieldWidth);
-                    float raw = MotionFractalLaneNoise(
-                        u,
-                        v,
-                        aspect,
-                        directionChangeFrequency,
-                        acrossRiverCoherence,
-                        seed);
-                    motionLaneRawValues[y * fieldWidth + x] = Mathf.Clamp(raw, -1f, 1f);
+                    float lateralMetres =
+                        gridDescriptor.ResolveLateralMetresAtRowCentre(y);
+                    for (int x = 0; x < fieldWidth; x++)
+                    {
+                        float localDistanceMetres =
+                            gridDescriptor.ResolveLocalDistanceAtColumnCentre(x);
+                        float raw = MotionFractalLaneNoiseMetric(
+                            localDistanceMetres,
+                            lateralMetres,
+                            directionChangeFrequency,
+                            acrossRiverCoherence,
+                            seed);
+                        motionLaneRawValues[y * fieldWidth + x] =
+                            Mathf.Clamp(raw, -1f, 1f);
+                    }
                 }
-            }
 
-            SmoothMotionLaneAcrossWidth(
-                motionLaneRawValues,
-                fieldWidth,
-                fieldHeight);
+                lastMotionLaneNearSmoothingRows = ResolveMetricRowOffset(
+                    MotionLaneNearSmoothingOffsetMetres,
+                    gridDescriptor.ResolvedDyMetres);
+                lastMotionLaneFarSmoothingRows = ResolveMetricRowOffset(
+                    MotionLaneFarSmoothingOffsetMetres,
+                    gridDescriptor.ResolvedDyMetres);
+                SmoothMotionLaneAcrossWidth(
+                    motionLaneRawValues,
+                    fieldWidth,
+                    fieldHeight,
+                    lastMotionLaneNearSmoothingRows,
+                    lastMotionLaneFarSmoothingRows);
+            }
+            else
+            {
+                float aspect = fieldHeight > 0
+                    ? Mathf.Max(1f, (float)fieldWidth / fieldHeight)
+                    : 1f;
+
+                for (int y = 0; y < fieldHeight; y++)
+                {
+                    float v = ((float)y + 0.5f) / Mathf.Max(1, fieldHeight);
+                    for (int x = 0; x < fieldWidth; x++)
+                    {
+                        float u = ((float)x + 0.5f) /
+                            Mathf.Max(1, fieldWidth);
+                        float raw = MotionFractalLaneNoise(
+                            u,
+                            v,
+                            aspect,
+                            directionChangeFrequency,
+                            acrossRiverCoherence,
+                            seed);
+                        motionLaneRawValues[y * fieldWidth + x] =
+                            Mathf.Clamp(raw, -1f, 1f);
+                    }
+                }
+
+                lastMotionLaneNearSmoothingRows = 1;
+                lastMotionLaneFarSmoothingRows = 2;
+                SmoothMotionLaneAcrossWidth(
+                    motionLaneRawValues,
+                    fieldWidth,
+                    fieldHeight);
+            }
 
             float neutralCoverage = river != null
                 ? river.FoamLowLateralMotionCoverage
@@ -438,6 +574,80 @@ namespace ProgrammaticStylized3D.Rivers
             motionLaneTexture.Apply(false, false);
             motionLaneFieldSignature = signature;
             lastMotionLaneSignature = signature;
+        }
+
+        private static float MotionFractalLaneNoiseMetric(
+            float localDistanceMetres,
+            float lateralMetres,
+            float directionChangeFrequency,
+            float acrossRiverCoherence,
+            float seed)
+        {
+            float u = localDistanceMetres /
+                MotionLaneDownstreamBasisMetres;
+            float v = lateralMetres /
+                MotionLaneLateralReferenceSpanMetres + 0.5f;
+            return MotionFractalLaneNoise(
+                u,
+                v,
+                1f,
+                directionChangeFrequency,
+                acrossRiverCoherence,
+                seed);
+        }
+
+        private static int ResolveMetricRowOffset(
+            float requestedMetres,
+            float lateralSpacingMetres)
+        {
+            return Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    requestedMetres /
+                    Mathf.Max(0.0001f, lateralSpacingMetres)));
+        }
+
+        private static void SmoothMotionLaneAcrossWidth(
+            float[] values,
+            int width,
+            int height,
+            int nearOffsetRows,
+            int farOffsetRows)
+        {
+            if (values == null || width <= 0 || height <= 0 ||
+                values.Length != width * height)
+            {
+                return;
+            }
+
+            int nearOffset = Mathf.Max(1, nearOffsetRows);
+            int farOffset = Mathf.Max(nearOffset, farOffsetRows);
+            float[] buffer = new float[values.Length];
+            for (int pass = 0; pass < 2; pass++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    int y0 = Mathf.Max(0, y - farOffset);
+                    int y1 = Mathf.Max(0, y - nearOffset);
+                    int y2 = Mathf.Min(height - 1, y + nearOffset);
+                    int y3 = Mathf.Min(height - 1, y + farOffset);
+                    for (int x = 0; x < width; x++)
+                    {
+                        int index = y * width + x;
+                        float centre = values[index];
+                        float near = values[y1 * width + x] +
+                            values[y2 * width + x];
+                        float far = values[y0 * width + x] +
+                            values[y3 * width + x];
+                        buffer[index] = Mathf.Clamp(
+                            centre * 0.52f + near * 0.19f + far * 0.05f,
+                            -1f,
+                            1f);
+                    }
+                }
+
+                Array.Copy(buffer, values, values.Length);
+            }
         }
 
         private static void SmoothMotionLaneAcrossWidth(
@@ -501,10 +711,24 @@ namespace ProgrammaticStylized3D.Rivers
             EnsureObstacleRoutingScratch(cellCount);
             BuildObstacleRoutingOccupancy(cellCount);
             BuildObstacleRoutingComponents();
+            lastObstacleRoutingInfluencedCellCount = 0;
+            lastObstacleRoutingRearLeakCellCount = 0;
+            lastObstacleRoutingMaximumApproachMetres = 0f;
+            lastObstacleRoutingMaximumLateralMarginMetres = 0f;
 
             for (int index = 0; index < obstacleRoutingComponents.Count; index++)
             {
                 StampObstacleRoutingComponent(obstacleRoutingComponents[index]);
+            }
+
+            for (int index = 0; index < cellCount; index++)
+            {
+                float influence = Mathf.HalfToFloat(
+                    obstacleRoutingHalfData[index * 2 + 1]);
+                if (influence > 0.001f)
+                {
+                    lastObstacleRoutingInfluencedCellCount++;
+                }
             }
 
             obstacleRoutingTexture.SetPixelData(obstacleRoutingHalfData, 0);
@@ -693,36 +917,34 @@ namespace ProgrammaticStylized3D.Rivers
             int minS = Mathf.Min(flowSign * component.MinX, flowSign * component.MaxX);
             int maxS = Mathf.Max(flowSign * component.MinX, flowSign * component.MaxX);
             int componentWidth = Mathf.Max(1, maxS - minS + 1);
-            int componentHeight = Mathf.Max(1, component.MaxY - component.MinY + 1);
+            int componentHeight = Mathf.Max(
+                1,
+                component.MaxY - component.MinY + 1);
+            FoamObstacleRoutingPolicy policy = ResolveObstacleRoutingPolicy(
+                componentWidth,
+                componentHeight);
 
             // Obstacle routing is a collision-shadow, not a proximity halo.
-            // The bounds below are only a cheap iteration window.  Written
+            // The bounds below are only a cheap iteration window. Written
             // influence is constrained by ResolveComponentCollisionRiskInfluence
             // so side-passing material is not redirected just because it is
             // close to the obstacle.
-            int approachCells = Mathf.Max(
-                6,
-                Mathf.RoundToInt(fieldWidth * 0.055f));
-            int frontCells = Mathf.Max(
-                1,
-                Mathf.RoundToInt(componentWidth * 0.28f));
-            int releaseCells = 0;
-            int frontClosureCells = Mathf.Clamp(
-                Mathf.RoundToInt(componentWidth * 0.08f),
-                1,
-                2);
-            int lateralMarginCells = Mathf.Max(
-                1,
-                Mathf.RoundToInt(componentHeight * 0.22f));
             float tieSide = ResolveComponentTieSide(
                 component,
                 flowSign,
-                approachCells);
+                policy.ApproachCells);
 
-            int startS = minS - approachCells;
-            int endS = maxS + releaseCells;
-            int startY = Mathf.Max(0, component.MinY - lateralMarginCells);
-            int endY = Mathf.Min(fieldHeight - 1, component.MaxY + lateralMarginCells);
+            int startS = minS - policy.ApproachCells;
+            int endS = maxS + policy.ReleaseCells;
+            int startY = Mathf.Max(
+                0,
+                component.MinY - policy.LateralMarginCells);
+            int endY = Mathf.Min(
+                fieldHeight - 1,
+                component.MaxY + policy.LateralMarginCells);
+            lastObstacleRoutingMaximumLateralMarginMetres = Mathf.Max(
+                lastObstacleRoutingMaximumLateralMarginMetres,
+                policy.LateralMarginCells * policy.LateralSpacingMetres);
 
             for (int s = startS; s <= endS; s++)
             {
@@ -740,11 +962,7 @@ namespace ProgrammaticStylized3D.Rivers
                         y,
                         minS,
                         maxS,
-                        approachCells,
-                        frontCells,
-                        releaseCells,
-                        frontClosureCells,
-                        lateralMarginCells,
+                        policy,
                         flowSign);
                     if (influence <= 0.001f)
                     {
@@ -754,10 +972,113 @@ namespace ProgrammaticStylized3D.Rivers
                     float direction = ResolveComponentRoutingSide(
                         component,
                         y,
-                        tieSide);
+                        tieSide,
+                        policy.CentreDeadBandRows);
+                    if (s > maxS)
+                    {
+                        lastObstacleRoutingRearLeakCellCount++;
+                    }
+                    lastObstacleRoutingMaximumApproachMetres = Mathf.Max(
+                        lastObstacleRoutingMaximumApproachMetres,
+                        Mathf.Max(0, minS - s) *
+                        policy.LongitudinalSpacingMetres);
                     WriteObstacleRoutingCell(x, y, direction, influence);
                 }
             }
+        }
+
+        private FoamObstacleRoutingPolicy ResolveObstacleRoutingPolicy(
+            int componentWidth,
+            int componentHeight)
+        {
+            if (!gridDescriptor.UsesFixedMetricLattice)
+            {
+                int legacyApproachCells = Mathf.Max(
+                    6,
+                    Mathf.RoundToInt(fieldWidth * 0.055f));
+                int legacyFrontCells = Mathf.Max(
+                    1,
+                    Mathf.RoundToInt(componentWidth * 0.28f));
+                int legacyFrontClosureCells = Mathf.Clamp(
+                    Mathf.RoundToInt(componentWidth * 0.08f),
+                    1,
+                    2);
+                int legacyLateralMarginCells = Mathf.Max(
+                    1,
+                    Mathf.RoundToInt(componentHeight * 0.22f));
+                int legacyContactCells = Mathf.Max(
+                    2,
+                    Mathf.Min(5, legacyApproachCells / 4));
+                float legacyDeadBandRows = Mathf.Max(
+                    0.75f,
+                    componentHeight * 0.10f);
+                float legacyLongitudinalSpacing = fieldLength /
+                    Mathf.Max(1, fieldWidth);
+                float legacyLateralSpacing = metricRows.Length > 0
+                    ? Mathf.Max(0.0001f, metricRows[0].WidthsAndSpacing.w)
+                    : 1f;
+                return new FoamObstacleRoutingPolicy(
+                    legacyApproachCells,
+                    legacyFrontCells,
+                    0,
+                    legacyFrontClosureCells,
+                    legacyLateralMarginCells,
+                    legacyContactCells,
+                    legacyDeadBandRows,
+                    0.5f,
+                    0.75f,
+                    legacyLongitudinalSpacing,
+                    legacyLateralSpacing);
+            }
+
+            return ResolveFixedMetricObstacleRoutingPolicy(
+                gridDescriptor.ResolvedDxMetres,
+                gridDescriptor.ResolvedDyMetres,
+                componentWidth,
+                componentHeight);
+        }
+
+        private static FoamObstacleRoutingPolicy
+            ResolveFixedMetricObstacleRoutingPolicy(
+                float longitudinalSpacingMetres,
+                float lateralSpacingMetres,
+                int componentWidth,
+                int componentHeight)
+        {
+            float dx = Mathf.Max(0.0001f, longitudinalSpacingMetres);
+            float dy = Mathf.Max(0.0001f, lateralSpacingMetres);
+            int approachCells = Mathf.Max(
+                1,
+                Mathf.CeilToInt(ObstacleRoutingApproachReachMetres / dx));
+            int frontCells = Mathf.Max(
+                1,
+                Mathf.CeilToInt(componentWidth * 0.28f));
+            int frontClosureCells = Mathf.Max(
+                1,
+                Mathf.CeilToInt(ObstacleRoutingFrontClosureMetres / dx));
+            float componentHeightMetres = componentHeight * dy;
+            int lateralMarginCells = Mathf.Max(
+                1,
+                Mathf.CeilToInt(
+                    componentHeightMetres * 0.22f / dy));
+            int contactCells = Mathf.Max(
+                1,
+                Mathf.CeilToInt(ObstacleRoutingContactReachMetres / dx));
+            float centreDeadBandRows = Mathf.Max(
+                ObstacleRoutingCentreDeadBandMetres / dy,
+                componentHeight * 0.10f);
+            return new FoamObstacleRoutingPolicy(
+                approachCells,
+                frontCells,
+                0,
+                frontClosureCells,
+                lateralMarginCells,
+                contactCells,
+                centreDeadBandRows,
+                ObstacleRoutingMinimumCoreHalfWidthMetres / dy,
+                ObstacleRoutingMinimumOuterHalfWidthMetres / dy,
+                dx,
+                dy);
         }
 
         private float ResolveComponentTieSide(
@@ -813,11 +1134,7 @@ namespace ProgrammaticStylized3D.Rivers
             int y,
             int minS,
             int maxS,
-            int approachCells,
-            int frontCells,
-            int releaseCells,
-            int frontClosureCells,
-            int lateralMarginCells,
+            FoamObstacleRoutingPolicy policy,
             int flowSign)
         {
             float centerY = (component.MinY + component.MaxY) * 0.5f;
@@ -840,20 +1157,22 @@ namespace ProgrammaticStylized3D.Rivers
             // band touches the obstacle/negative topology boundary instead
             // of stopping one row short.  The lateral collision corridor below
             // still prevents this from recreating a broad side halo.
-            int closureLeadingS = rowLeadingS + Mathf.Max(0, frontClosureCells);
+            int closureLeadingS = rowLeadingS +
+                Mathf.Max(0, policy.FrontClosureCells);
             if (s >= closureLeadingS)
             {
                 return 0f;
             }
 
             int upstreamDistance = Mathf.Max(1, rowLeadingS - s);
-            if (upstreamDistance > approachCells)
+            if (upstreamDistance > policy.ApproachCells)
             {
                 return 0f;
             }
 
             float approachRaw = Mathf.Clamp01(
-                1f - ((float)upstreamDistance / Mathf.Max(1, approachCells)));
+                1f - ((float)upstreamDistance /
+                Mathf.Max(1, policy.ApproachCells)));
             float approachEase = Mathf.Pow(Smooth01(approachRaw), 2.75f);
 
             float footprintHalfWidth = halfHeight;
@@ -869,11 +1188,17 @@ namespace ProgrammaticStylized3D.Rivers
             // collision overlap so side-passing material can continue downstream
             // almost untouched.
             float approachCoreHalfWidth = Mathf.Lerp(
-                Mathf.Max(0.5f, halfHeight * 0.10f),
-                Mathf.Max(0.5f, footprintHalfWidth * 0.88f),
+                Mathf.Max(
+                    policy.MinimumCoreHalfWidthRows,
+                    halfHeight * 0.10f),
+                Mathf.Max(
+                    policy.MinimumCoreHalfWidthRows,
+                    footprintHalfWidth * 0.88f),
                 approachEase);
             float approachOuterHalfWidth = Mathf.Lerp(
-                Mathf.Max(0.75f, halfHeight * 0.24f),
+                Mathf.Max(
+                    policy.MinimumOuterHalfWidthRows,
+                    halfHeight * 0.24f),
                 directOuterHalfWidth,
                 approachEase);
             float collisionCorridor = RoundedCorridorFactor(
@@ -888,13 +1213,12 @@ namespace ProgrammaticStylized3D.Rivers
             float approachCap = Mathf.Lerp(0.035f, 0.58f, approachEase);
             float influence = approachCap * collisionCorridor;
 
-            int contactCells = Mathf.Max(2, Mathf.Min(5, approachCells / 4));
             int contactDistance = Mathf.Max(1, rowLeadingS - s);
-            if (contactDistance <= contactCells)
+            if (contactDistance <= policy.ContactCells)
             {
                 float contactT = Mathf.Clamp01(
                     1f - ((float)(contactDistance - 1) /
-                    Mathf.Max(1, contactCells - 1)));
+                    Mathf.Max(1, policy.ContactCells - 1)));
                 contactT = Mathf.Pow(Smooth01(contactT), 0.55f);
                 float contactInfluence = Mathf.Lerp(0.70f, 1f, contactT) *
                     directFootprint;
@@ -962,12 +1286,11 @@ namespace ProgrammaticStylized3D.Rivers
         private float ResolveComponentRoutingSide(
             FoamObstacleRoutingComponent component,
             int y,
-            float tieSide)
+            float tieSide,
+            float deadBandRows)
         {
             float centerY = (component.MinY + component.MaxY) * 0.5f;
-            float deadBand = Mathf.Max(
-                0.75f,
-                (component.MaxY - component.MinY + 1) * 0.10f);
+            float deadBand = Mathf.Max(0f, deadBandRows);
             if (y > centerY + deadBand)
             {
                 return 1f;
@@ -1323,9 +1646,7 @@ namespace ProgrammaticStylized3D.Rivers
                 RiverObstacleExclusionResolver.TryBake(
                     river,
                     obstacleExclusionMeshFilters[index],
-                    fieldWidth,
-                    fieldHeight,
-                    fieldLength,
+                    gridDescriptor,
                     obstacleExclusionCells,
                     obstacleExclusionSamples,
                     out _);

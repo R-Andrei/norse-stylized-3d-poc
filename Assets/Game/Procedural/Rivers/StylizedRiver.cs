@@ -417,6 +417,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamProgressiveRibbonPathWander = 0f;
         private const float MaximumFoamProgressiveRibbonPathWander = 1f;
         private const float DefaultFoamProgressiveRibbonPathWander = 0.35f;
+        private const float FoamSpawnMaximumBendAcross = 0.35f;
         private const float MinimumFoamSpawnScale = 0.03f;
         private const float MaximumFoamSpawnScale = 1.25f;
         private const float DefaultFoamSpawnScale = 0.18f;
@@ -1039,7 +1040,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.05f)]
         [SerializeField] private float foamShoreRibbonLengthMaxMetres = 7.00f;
 
-        [Tooltip("Bank-normal Shore Ribbon source thickness measured in cross-river Foam cells. One produces one contact-attached source cell before the small matching antialias feather.")]
+        [Tooltip("Compatibility Shore Ribbon thickness. LegacyNormalizedAcross interprets this in source-local cross-river Foam cells. FixedMetricLattice resolves the same authored value to source-local metres before rasterization.")]
         [Range(0.5f, 4f)]
         [SerializeField] private float foamShoreRibbonThicknessCells = 1f;
 
@@ -1047,7 +1048,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamShoreRibbonOffsetMetres = 0.030f;
 
-        [Tooltip("Deterministic event-to-event Shore Ribbon offset variation measured in cross-river Foam cells. Zero keeps every ribbon at the base Source Offset.")]
+        [Tooltip("Compatibility deterministic offset variation. LegacyNormalizedAcross interprets this in source-local cross-river Foam cells. FixedMetricLattice resolves it to source-local metres when the event is prepared.")]
         [Range(0f, 0.5f)]
         [SerializeField] private float foamShoreRibbonOffsetVariationCells = 0.25f;
 
@@ -1868,10 +1869,12 @@ namespace ProgrammaticStylized3D.Rivers
 
 
         [FormerlySerializedAs("foamTestDistanceNormalized")]
+        [Tooltip("Compatibility normalized longitudinal position. The source command resolves it to global river distance when submitted.")]
         [HideInInspector, SerializeField, Range(0f, 1f)]
         private float foamSpawnDistanceNormalized = 0.5f;
 
         [FormerlySerializedAs("foamTestAcrossNormalized")]
+        [Tooltip("Compatibility normalized lateral position. The source command resolves it against the local left/right river half-width when submitted.")]
         [HideInInspector, SerializeField, Range(-1f, 1f)]
         private float foamSpawnAcrossNormalized;
 
@@ -1912,7 +1915,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamSpawnRibbonTravelDistance =
             DefaultFoamProgressiveRibbonTravelDistance;
 
-        [Tooltip("Total normalized lateral drift from event start to event end. Negative moves toward the left river edge; positive moves toward the right river edge.")]
+        [Tooltip("Compatibility normalized lateral drift from event start to event end. Metric command callers provide drift directly in metres.")]
         [FormerlySerializedAs("foamTestProgressiveRibbonAcrossDrift")]
         [HideInInspector, SerializeField]
         [Range(
@@ -1921,7 +1924,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamSpawnRibbonAcrossDrift =
             DefaultFoamProgressiveRibbonAcrossDrift;
 
-        [Tooltip("Strength of deterministic smooth bend added to the composition path. Zero follows only downstream travel and Across Drift; one uses the full bounded bend.")]
+        [Tooltip("Compatibility normalized bend strength. Zero follows only downstream travel and Across Drift; metric command callers provide the maximum bend directly in metres.")]
         [FormerlySerializedAs("foamTestProgressiveRibbonPathWander")]
         [HideInInspector, SerializeField]
         [Range(
@@ -4413,6 +4416,91 @@ namespace ProgrammaticStylized3D.Rivers
                 foamSpawnRibbonTravelDistance,
                 foamSpawnRibbonAcrossDrift,
                 foamSpawnRibbonPathWander);
+        }
+
+        public bool TryResolveFoamSpawnMetricPlacement(
+            out float globalDistance,
+            out float lateralMetres,
+            out float driftMetres,
+            out float maximumBendMetres)
+        {
+            globalDistance = 0f;
+            lateralMetres = 0f;
+            driftMetres = 0f;
+            maximumBendMetres = 0f;
+            if (!Domain.IsValid)
+            {
+                return false;
+            }
+
+            globalDistance = Mathf.Lerp(
+                Domain.GlobalDistanceMinimum,
+                Domain.GlobalDistanceMaximum,
+                Mathf.Clamp01(foamSpawnDistanceNormalized));
+            StylizedRiverSplineSample sample =
+                Domain.SampleAtGlobalDistance(globalDistance);
+            float startAcross = Mathf.Clamp(
+                foamSpawnAcrossNormalized,
+                -1f,
+                1f);
+            lateralMetres = startAcross < 0f
+                ? startAcross * sample.LeftHalfWidth
+                : startAcross * sample.RightHalfWidth;
+            float targetAcross = Mathf.Clamp(
+                startAcross + FoamSpawnRibbonAcrossDrift,
+                -1f,
+                1f);
+            float targetLateral = targetAcross < 0f
+                ? targetAcross * sample.LeftHalfWidth
+                : targetAcross * sample.RightHalfWidth;
+            driftMetres = targetLateral - lateralMetres;
+            maximumBendMetres = FoamSpawnRibbonPathWander *
+                FoamSpawnMaximumBendAcross * Mathf.Max(
+                    sample.LeftHalfWidth,
+                    sample.RightHalfWidth);
+            return true;
+        }
+
+        public bool StartFoamSpawnMetric(
+            float globalDistance,
+            float lateralMetres,
+            float scale,
+            float amount,
+            float remainingLife,
+            float duration,
+            float travelDistanceMetres,
+            float lateralDriftMetres,
+            float maximumBendMetres)
+        {
+            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
+            return runtime != null && runtime.StartFoamCompositionMetric(
+                globalDistance,
+                lateralMetres,
+                scale,
+                amount,
+                remainingLife,
+                duration,
+                travelDistanceMetres,
+                lateralDriftMetres,
+                maximumBendMetres);
+        }
+
+        public bool EmitFoamMetric(
+            float globalDistance,
+            float lateralMetres,
+            float radiusMetres,
+            float amount,
+            float initialRemainingLife,
+            float elongation)
+        {
+            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
+            return runtime != null && runtime.EmitMetric(
+                globalDistance,
+                lateralMetres,
+                radiusMetres,
+                amount,
+                initialRemainingLife,
+                elongation);
         }
 
         public bool ClearAndEmitFoamIsolatedLifeProbe(

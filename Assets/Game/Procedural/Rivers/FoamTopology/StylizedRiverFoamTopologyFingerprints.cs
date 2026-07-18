@@ -5,8 +5,8 @@ using UnityEngine;
 namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
-    /// Stable 128-bit content fingerprint used by Patch 4.9B cache validation
-    /// and Patch 4.9C cache-first startup.
+    /// Stable 128-bit content fingerprint used by explicit cache validation
+    /// and cache-first startup.
     /// It deliberately excludes session-local revision counters and runtime
     /// timings. Values are hashed from exact IEEE-754 bits and explicit integer
     /// fields so unchanged authored/cache inputs reproduce across sessions.
@@ -150,8 +150,8 @@ namespace ProgrammaticStylized3D.Rivers
     internal static class StylizedRiverFoamTopologyFingerprints
     {
         private const int DomainFingerprintContractVersion = 1;
-        private const int GenerationFingerprintContractVersion = 1;
-        private const int CombinedFingerprintContractVersion = 1;
+        private const int GenerationFingerprintContractVersion = 2;
+        private const int CombinedFingerprintContractVersion = 2;
 
         public static StylizedRiverFoamTopologyFingerprint ComputeDomain(
             RiverDomainSnapshot domain)
@@ -198,10 +198,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         public static StylizedRiverFoamTopologyFingerprint ComputeGeneration(
             StylizedRiver river,
-            int fieldWidth,
-            int fieldHeight,
-            float fieldLength,
-            float validFieldLength)
+            StylizedRiverFoamGridDescriptor descriptor)
         {
             StylizedRiverFoamStableHashBuilder builder =
                 StylizedRiverFoamStableHashBuilder.Create(
@@ -215,11 +212,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             builder.AddBoolean(true);
-            builder.AddInt32((int)river.Quality);
-            builder.AddInt32(fieldWidth);
-            builder.AddInt32(fieldHeight);
-            builder.AddSingle(fieldLength);
-            builder.AddSingle(validFieldLength);
+            AddGridDescriptor(ref builder, descriptor);
             builder.AddSingle(river.ShoreMotion);
             builder.AddInt32(river.FoamMajorSupportSeed);
             builder.AddSingle(river.FoamMajorSupportAmount);
@@ -235,6 +228,37 @@ namespace ProgrammaticStylized3D.Rivers
             builder.AddSingle(river.FoamConnectorWeakSpanAmount);
             builder.AddSingle(river.FoamFreeWaterEventAmount);
             return builder.Finish();
+        }
+
+        private static void AddGridDescriptor(
+            ref StylizedRiverFoamStableHashBuilder builder,
+            StylizedRiverFoamGridDescriptor descriptor)
+        {
+            builder.AddInt32(
+                StylizedRiverFoamGridDescriptor.DescriptorContractVersion);
+            builder.AddInt32((int)descriptor.Mapping);
+            builder.AddInt32(descriptor.MappingContractVersion);
+            builder.AddInt32((int)descriptor.Quality);
+            builder.AddSingle(descriptor.RequestedDxMetres);
+            builder.AddSingle(descriptor.RequestedDyMetres);
+            builder.AddInt32(descriptor.ColumnsPerChunk);
+            builder.AddSingle(descriptor.ResolvedDxMetres);
+            builder.AddSingle(descriptor.ResolvedDyMetres);
+            builder.AddSingle(descriptor.LateralLatticePhaseMetres);
+            builder.AddInt32(descriptor.GlobalYBase);
+            builder.AddInt32(descriptor.RowCount);
+            builder.AddSingle(descriptor.FieldOrStripStartMetres);
+            builder.AddSingle(descriptor.AllocatedLengthMetres);
+            builder.AddSingle(descriptor.ValidLengthMetres);
+            builder.AddInt32(descriptor.ColumnCount);
+            builder.AddInt32(descriptor.FilmWidth);
+            builder.AddInt32(descriptor.FilmHeight);
+            builder.AddInt32(descriptor.AllocationGuardRows);
+            builder.AddSingle(
+                descriptor.RepresentedLateralMinimumMetres);
+            builder.AddSingle(
+                descriptor.RepresentedLateralMaximumMetres);
+            builder.AddUInt64(descriptor.InitializationSignature);
         }
 
         public static StylizedRiverFoamTopologyFingerprint ComputeCombined(

@@ -1,6 +1,6 @@
 # Ground Visual Design and Architecture
 
-## Actual Ground mission and active milestone — 2026-07-15
+## Actual Ground mission and active milestone — 2026-07-18
 
 Ground is not complete. Painted Accents are one accepted layer inside a larger restrained-stylized terrain system.
 
@@ -19,7 +19,7 @@ playable terrain shape
 → runtime surface state later
 ```
 
-V3M Broad Macro Patch Completion is accepted through V3M-A1.3.4, V3R Ground Elevation Readability is accepted through V3R-A1, and V3S is accepted through A3B.2 Independent Shore Hydrology. A2C.4 is the frozen River-coupled isolation baseline. A4A proved exact Riverbed Support, custom dry substrate, and submerged-cover exclusion in Unity, but exposed residual primary Ground at the Bank/Riverbed boundary and a dry Riverbed. **V3S-A4A.1 Normalized Bank/Riverbed Composition and Region-Oriented Authoring** and **V3S-A4B Exact-Support Riverbed Hydrology** are implemented and source/compliance audited; Unity validation is pending. V3S owns reusable Bank and Riverbed Surface Layers, grass/snow/frost/Painted Accent retention, independent Shore hydrology, exact submerged-bed composition, independent exact-support Riverbed hydrology, and optional later profile detail through the Ground shader. No new debug view is part of A4A.1/A4B. **V4 Contact / Edge Accents** is queued after V3S and is restricted to GeneratedMass grounding plus explicitly participating GroundModifier boundaries. River banks and riverbeds are not Contact Accent sources. The canonical V3S plan is `Ground_River_Coupled_Surface_Response_Architecture.md`. The completed Painted Accent architecture below remains authoritative for that feature only and must not be read as a declaration that the Ground visual stack is finished.
+V3M Broad Macro Patch Completion and V3R Ground Elevation Readability are accepted. V3S River-coupled placement, composition, cover response, hydrology, submerged finish, waterline highlight, and inward Riverbed transition are Unity-validated and frozen through A4B.3. **GSU-M1 Reusable Stylized Surface Material Foundation** is implemented and source-audited through GSU-M1.8. GSU-M1.3.1 guards transient missing-array transport; GSU-M1.7 adds inline shared-material editing and neutral Bank/Riverbed application multipliers; GSU-M1.7.1 corrects the Unity 6.5 `EntityId` compile blocker. Unity evidence rejects both earlier Fine Gravel payloads. GSU-M1.7's 512² source remained blocky, insufficiently varied, and an unjustified standard runtime tier for the isometric camera. **GSU-M1.8 Rounded-Pebble Source Reauthor and 256 Runtime Restoration** replaces it with independently placed rounded multi-scale pebbles, variable recessed gaps, broad face variation, and a 256² shipped source/runtime slice. Generic Pixel Surface profiles still own dry material identity; Ground Surface Layers add only Ground cover compatibility; River banks and beds remain consumers. No River, shader, renderer, geometry, or Inspector code changes in GSU-M1.8. Unity compilation, array rebuild, gameplay visual acceptance, and profiling remain pending. Family tuning follows material acceptance. **V4 Contact / Edge Accents** remains queued afterward and excludes River sources. The canonical implementation plan is `Ground_Generation_Surface_Upgrade_Plan.md`; the frozen River contract remains in `Ground_River_Coupled_Surface_Response_Architecture.md`.
 
 Semantic region masks and independent visual macro composition are separate responsibilities. River-, exposure-, damp-, vegetation-, compaction-, rocky-, and standing-water response may bias macro appearance, but none of those semantic fields alone satisfies the broad macro-composition layer.
 
@@ -60,19 +60,42 @@ The implementation order is:
 
 ```text
 V3S-A0/A1 — canonical docs and Riverbed Support debug proof
-V3S-A2A   — reusable surface-layer library and main-Inspector authoring
+V3S-A2A   — reusable Ground adapter library and main-Inspector authoring
 V3S-A2B   — Bank Surface Layer core material-composition proof
 V3S-A2C   — metre-based outward Bank material extension
 V3S-A2C.4 — explicit renderer role and ordinary-Ground River-data isolation
 V3S-A3A   — Bank surface-cover retention
 V3S-A3B   — independent Shore hydrology modifier
 V3S-A4A   — exact dry Riverbed Surface Layer composition and submerged-cover exclusion
-V3S-A4B   — separately approved independent Riverbed hydrology
-V3S-A5    — optional profile detail extension
+V3S-A4B.3 — frozen River-coupled appearance baseline
+GSU-M1    — generic reusable stylized material profiles and packed detail
+GSU-M1.7  — River-facing reusable-material authoring (512 Fine Gravel payload superseded)
+GSU-M1.8  — Rounded-pebble Fine Gravel reauthor and 256 runtime restoration
+GSU-M2+   — sequential material expansion
 V3S-A6    — Snowfield/Grassland/WetMudflat tuning and acceptance
 ```
 
 River-coupled response is direct material interpretation and introduces no generated Contact texture. V4 remains a separate static generated field for GeneratedMass and selected GroundModifier boundaries only.
+
+### GSU-M1 reusable stylized material doctrine
+
+Reusable surface appearance is a material concern, not a River-corridor concern. `StylizedSurfaceMaterialProfile` owns palette, cavity, packed local form, natural scale, dry finish, and suppression of legacy pixel-cell variation. `StylizedSurfaceDetailLibrary` owns stable detail IDs and the generated packed `Texture2DArray`. `GroundSurfaceLayerProfile` becomes a Ground adapter that references the generic material and retains vegetation, snow, frost, and Painted Accent compatibility. Hydrology remains independent. Consumer code owns projection and placement.
+
+The packed contract is linear RGBA: RG signed form slope, B cavity, and A authored form/value/finish variation. Ground and River-corridor consumers use world-XZ projection through the existing normalized Bank/Riverbed weights. Future roads and walls must reuse the same profile and evaluator rather than introduce named material branches. Fine Gravel is the first material. GSU-M1.8 keeps the one-sample contract and the GSU-M1.7 cavity shoulder/core evaluator, but replaces the rejected polygonal 512 payload with a 256² runtime source authored from independently placed rounded pebbles at higher offline resolution. The standard material-library tier is 256²; a future higher tier requires gameplay evidence and a separate library rather than raising every slice. GSU-M1.3.1 continues preventing a transient missing generated array from aborting shared Ground/River property setup. Unity validation must preserve River visibility and prove gameplay-camera material quality and performance. Later materials are sequential content updates that should not require shader edits. Editor source references remain outside runtime profile schema; the generated array is the intended player payload.
+
+#### Fine Gravel visual contract — GSU-M1.8
+
+- Rounded oval, pill, and soft rounded-rectangle silhouettes; no acute protruding polygon corners.
+- Three scale populations with small infill stones breaking large gap networks.
+- Broad top/side form and restrained local face variation rather than uniformly inflated domes.
+- Variable near-contact spacing with a narrow deep cavity core and softer contact shoulder.
+- Standard shipped/runtime resolution 256²; higher internal authoring resolution is not a runtime tier.
+- Production isometric camera is authoritative; offline/Inspector previews are diagnostic only.
+
+
+Fine Gravel is not a River-specific surface. `SSMP_FineGravel` is a reusable dry material consumed through `GSLP_FineGravel` today and intended for later roads, paths, walls, or other Pixel Surface adapters. Its authored target is a dense field of small irregular pebbles with narrow recessed gaps, multiple size populations, varied aspect/orientation, local planar form, restrained per-stone value shifts, lighting-driven pseudo-volume, low dry gloss, and zero legacy square-cell contribution. The 256² shipped source must preserve useful definition under production-camera mip selection without reading as uniform cellular scales, polygonal cobblestones, photogrammetry, a continuous cracked shell, or high-frequency pixel noise. Higher offline authoring resolution is a generation aid only and is not shipped as the standard runtime tier.
+
+The generic material remains the source of truth. The existing Bank and Riverbed authoring sections now expose that shared definition inline with an explicit all-consumers warning, while `This River Application` supplies only neutral multipliers for scale, normal, cavity, value/form, finish variation, and legacy-cell contribution. River placement, wetness, cover, geometry, and UV3 semantics remain independent. The hidden asset Preview pane is optional diagnostic assistance only; production-camera scene rendering is the acceptance evidence.
 
 V3S-A2B proves the selected Bank Surface Layer's complete dry palette and finish. V3S-A2C.1 corrects spatial ownership: all core and outer Bank composition is restricted to the River corridor bank domain. Corridor `UV3.y` starts at zero where Riverbed Support ends and increases outward; `UV3.z` marks valid bank vertices through the corridor handoff. V3S-A2C.4 makes that ownership explicit per renderer and removes the separate broad River-derived exposure, dampness, vegetation, and shore data from ordinary Ground. Metre-based Extension, Strength, and Fade therefore support tight contact, wave-wash allowance, or a broad sand/soil/snow-retreat margin without generating disconnected patches on ordinary Ground or analysing waves. A3A independently resolves vegetation, snow, frost, and Painted Accent retention. A3B keeps Shore wetness separate from substrate identity: the reusable hydrology modifier owns wet character, while metre-based wetness reach remains independent from Bank reach. Surface-layer wet fields are legacy hidden data and are not active hydrology authoring. A4A uses exact role-gated `UV3.x` Riverbed Support to apply dry Riverbed substrate and force terrestrial cover out of submerged support. A4A.1 replaces sequential partial Bank/Riverbed composition with one normalized primary/Bank/Riverbed weight triplet shared by albedo, smoothness, and specular, and exposes explicit Primary/Bank/Custom Riverbed source ownership. A4B applies inherited or custom Hydrology Modifier character on exact support through one strength control; it has no reach/fade field and adds no debug view.
 
@@ -3108,8 +3131,8 @@ The active direction is now style calibration and shared doctrine layers.
 | 5 | V3 — Shader Feature Stack + Painted Accent Lines | Implemented as the first stackable doctrine layer and as the migration away from the old single `_GroundFeatureMode` proof-feature slot; V3D refines the raw accent-line mask from large strips into smaller clustered micro-strokes, and V3E upgrades those strokes into curved visual-relief terrain folds. |
 | 6 | V3M — Broad Macro Patch Completion | Accepted through V3M-A1.3.4. |
 | 7 | V3R — Ground Elevation Readability | Accepted through V3R-A1. |
-| 8 | V3S — River-Coupled Ground Response | Active: reusable Bank/Riverbed Surface Layers, bank composition, cover retreat, shore hydrology, exact wet riverbed composition, optional detail, and family acceptance. |
-| 9 | V4 — Contact / Edge Accent Layer | Queued after V3S: GeneratedMass grounding plus explicitly participating GroundModifier boundaries only. |
+| 8 | V3S / GSU-M1 — River Response and Reusable Materials | River-coupled placement/hydrology is accepted through A4B.3. The generic foundation, null-array guard, River-facing shared/application authoring, and EntityId compile correction are implemented. GSU-M1.6 and the GSU-M1.7 512 payload are visually rejected; GSU-M1.8 supplies the rounded-pebble 256 runtime replacement. Unity compile, gameplay visual/performance acceptance, and sequential material expansion remain. |
+| 9 | V4 — Contact / Edge Accent Layer | Queued after reusable-material expansion and family acceptance: GeneratedMass grounding plus explicitly participating GroundModifier boundaries only. |
 | 10 | V5 — Sparse Motif Layer | Add reusable sparse chips, cracks, scuffs, stains, snow scratches, stones, and debris hints. |
 | 11 | V6 — Feature Stack Authoring Polish | Add richer editor warnings, cost summaries, and feature-combination guidance after more stack layers exist. |
 | 12 | Later | Runtime Surface State Stub | Revisit wetness, snow depth, compression, footprints, and disturbance after static style acceptance. |

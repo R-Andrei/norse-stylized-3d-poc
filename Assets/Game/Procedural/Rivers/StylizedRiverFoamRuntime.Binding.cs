@@ -12,6 +12,25 @@ namespace ProgrammaticStylized3D.Rivers
                 : Texture2D.blackTexture;
         }
 
+        private void BindGridDescriptorToMaterialPropertyBlock()
+        {
+            propertyBlock.SetVector(
+                FoamGridDescriptorContractId,
+                gridDescriptorGpuData.Contract);
+            propertyBlock.SetVector(
+                FoamGridDescriptorSpacingId,
+                gridDescriptorGpuData.Spacing);
+            propertyBlock.SetVector(
+                FoamGridDescriptorLateralId,
+                gridDescriptorGpuData.Lateral);
+            propertyBlock.SetVector(
+                FoamGridDescriptorLongitudinalId,
+                gridDescriptorGpuData.Longitudinal);
+            propertyBlock.SetVector(
+                FoamGridDescriptorExtentId,
+                gridDescriptorGpuData.Extent);
+        }
+
         private bool BindTopologyTransitionHold()
         {
             TopologyTransitionSnapshot snapshot = topologyTransitionSnapshot;
@@ -33,6 +52,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             propertyBlock ??= new MaterialPropertyBlock();
             surfaceRenderer.GetPropertyBlock(propertyBlock);
+            BindGridDescriptorToMaterialPropertyBlock();
             propertyBlock.SetFloat(FoamEnabledId, 1f);
             propertyBlock.SetTexture(FoamPreviousId, snapshot.PreviousState);
             propertyBlock.SetTexture(FoamCurrentId, snapshot.CurrentState);
@@ -184,6 +204,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             propertyBlock ??= new MaterialPropertyBlock();
             surfaceRenderer.GetPropertyBlock(propertyBlock);
+            BindGridDescriptorToMaterialPropertyBlock();
             propertyBlock.SetFloat(FoamEnabledId, 1f);
             propertyBlock.SetTexture(FoamPreviousId, previousState);
             propertyBlock.SetTexture(FoamCurrentId, currentState);
@@ -344,6 +365,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             propertyBlock ??= new MaterialPropertyBlock();
             surfaceRenderer.GetPropertyBlock(propertyBlock);
+            BindGridDescriptorToMaterialPropertyBlock();
             propertyBlock.SetFloat(FoamEnabledId, 0f);
             propertyBlock.SetTexture(FoamPreviousId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamCurrentId, Texture2D.blackTexture);

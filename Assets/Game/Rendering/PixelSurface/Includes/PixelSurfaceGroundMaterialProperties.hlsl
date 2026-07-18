@@ -37,6 +37,10 @@
                 float _GroundBankLayerPixelContrast;
                 float _GroundBankLayerDrySmoothness;
                 float _GroundBankLayerDrySpecularStrength;
+                half4 _GroundBankLayerCavityColor;
+                float4 _GroundBankLayerDetailA;
+                float4 _GroundBankLayerDetailB;
+                float4 _GroundBankLayerDetailC;
                 float4 _GroundBankLayerCoverRetention;
                 float4 _GroundBankCoverRetreatStrength;
                 float _GroundRiverbedLayerEnabled;
@@ -47,6 +51,10 @@
                 float _GroundRiverbedLayerPixelContrast;
                 float _GroundRiverbedLayerDrySmoothness;
                 float _GroundRiverbedLayerDrySpecularStrength;
+                half4 _GroundRiverbedLayerCavityColor;
+                float4 _GroundRiverbedLayerDetailA;
+                float4 _GroundRiverbedLayerDetailB;
+                float4 _GroundRiverbedLayerDetailC;
                 float _GroundRiverbedMaterialStrength;
                 float _GroundRiverbedHydrologyEnabled;
                 half4 _GroundRiverbedHydrologyWetTintColor;

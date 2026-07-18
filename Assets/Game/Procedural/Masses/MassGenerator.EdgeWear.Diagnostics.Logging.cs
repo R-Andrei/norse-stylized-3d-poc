@@ -908,6 +908,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             ? "none"
                             : planeCutAudit
                                 .AugmentationImplicatedEdgeEvidence) + "}" +
+                ",materialRecovery=" +
+                    FormatMaterialWidthRecoveryAudit(
+                        planeCutAudit.CoverageAudit) +
                 ",planeTransaction=" +
                     "attempted:" +
                         planeCutAudit.AttemptedPlanesBuilt +
@@ -982,27 +985,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         planeCutAudit.MaterializedEdgeCoverageValid +
                 ",planeEdges=" +
                     "active:{" +
-                        (string.IsNullOrEmpty(planeCutAudit.ActiveEdgeEvidence)
-                            ? "none"
-                            : planeCutAudit.ActiveEdgeEvidence) + "}" +
+                        FormatCanonicalPlaneEdgeEvidence(
+                            planeCutAudit.ActiveEdgeEvidence,
+                            planeCutAudit.CoverageAudit) + "}" +
                     ",attempted:{" +
-                        (string.IsNullOrEmpty(
-                                planeCutAudit.AttemptedEdgeEvidence)
-                            ? "none"
-                            : planeCutAudit.AttemptedEdgeEvidence) + "}" +
+                        FormatCanonicalPlaneEdgeEvidence(
+                            planeCutAudit.AttemptedEdgeEvidence,
+                            planeCutAudit.CoverageAudit) + "}" +
                     ",certified:{" +
-                        (string.IsNullOrEmpty(planeCutAudit.BuiltEdgeEvidence)
-                            ? "none"
-                            : planeCutAudit.BuiltEdgeEvidence) + "}" +
+                        FormatCanonicalPlaneEdgeEvidence(
+                            planeCutAudit.BuiltEdgeEvidence,
+                            planeCutAudit.CoverageAudit) + "}" +
                     ",trialRejected:{" +
-                        (string.IsNullOrEmpty(
-                                planeCutAudit.TrialRejectedEdgeEvidence)
-                            ? "none"
-                            : planeCutAudit.TrialRejectedEdgeEvidence) + "}" +
+                        FormatCanonicalPlaneEdgeEvidence(
+                            planeCutAudit.TrialRejectedEdgeEvidence,
+                            planeCutAudit.CoverageAudit) + "}" +
                     ",deferred:{" +
-                        (string.IsNullOrEmpty(planeCutAudit.DeferredEdgeEvidence)
-                            ? "none"
-                            : planeCutAudit.DeferredEdgeEvidence) + "}" +
+                        FormatCanonicalPlaneEdgeEvidence(
+                            planeCutAudit.DeferredEdgeEvidence,
+                            planeCutAudit.CoverageAudit) + "}" +
+                ",planeGraphEdges=" +
+                    "active:{" +
+                        FormatRawPlaneEdgeEvidence(
+                            planeCutAudit.ActiveEdgeEvidence) + "}" +
+                    ",attempted:{" +
+                        FormatRawPlaneEdgeEvidence(
+                            planeCutAudit.AttemptedEdgeEvidence) + "}" +
+                    ",certified:{" +
+                        FormatRawPlaneEdgeEvidence(
+                            planeCutAudit.BuiltEdgeEvidence) + "}" +
+                    ",trialRejected:{" +
+                        FormatRawPlaneEdgeEvidence(
+                            planeCutAudit.TrialRejectedEdgeEvidence) + "}" +
+                    ",deferred:{" +
+                        FormatRawPlaneEdgeEvidence(
+                            planeCutAudit.DeferredEdgeEvidence) + "}" +
                 ",planeMesh=" +
                     planeCutAudit.PreviewTriangleCount + "/" +
                     planeCutAudit.PreviewDegenerateTriangleCount + "/" +
@@ -1015,6 +1032,200 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 (string.IsNullOrEmpty(planeCutAudit.Diagnostic)
                     ? string.Empty
                     : ",planeTrace=" + planeCutAudit.Diagnostic);
+        }
+
+        private static string FormatMaterialWidthRecoveryAudit(
+            EdgeWearCoverageAudit audit)
+        {
+            SortedSet<int> eligible = new SortedSet<int>();
+            SortedSet<int> baselineDeferred = new SortedSet<int>();
+            SortedSet<int> attempted = new SortedSet<int>();
+            SortedSet<int> completed = new SortedSet<int>();
+            SortedSet<int> certified = new SortedSet<int>();
+            SortedDictionary<int, string> failed =
+                new SortedDictionary<int, string>();
+            if (audit != null)
+            {
+                for (int recordIndex = 0;
+                     recordIndex < audit.Records.Count;
+                     recordIndex++)
+                {
+                    EdgeWearEdgeLifecycleRecord record =
+                        audit.Records[recordIndex];
+                    if (record == null ||
+                        !record.MaterialWidthRecoveryTarget)
+                    {
+                        continue;
+                    }
+
+                    int sourceEdgeIndex =
+                        ResolveEdgeWearDisplaySourceEdgeIndex(
+                            audit,
+                            record);
+                    eligible.Add(sourceEdgeIndex);
+                    if (record.MaterialWidthRecoveryBaselineDeferred)
+                    {
+                        baselineDeferred.Add(sourceEdgeIndex);
+                    }
+                    if (record.MaterialWidthRecoveryAttempted)
+                    {
+                        attempted.Add(sourceEdgeIndex);
+                    }
+                    if (record.MaterialWidthRecoveryTrialCompleted)
+                    {
+                        completed.Add(sourceEdgeIndex);
+                    }
+                    if (record.MaterialWidthRecoveryCertified &&
+                        record.Built)
+                    {
+                        certified.Add(sourceEdgeIndex);
+                    }
+                    else
+                    {
+                        string reason =
+                            !record.MaterialWidthRecoveryAttempted
+                                ? "not-attempted"
+                                : string.IsNullOrEmpty(
+                                    record.MaterialWidthRecoveryFailure)
+                                    ? record.WidthRecoveryResolution
+                                    : record.MaterialWidthRecoveryFailure;
+                        failed[sourceEdgeIndex] =
+                            SanitizeMaterialWidthRecoveryEvidence(reason);
+                    }
+                }
+            }
+
+            return "eligible:{" +
+                    FormatSortedEdgeIndices(eligible) + "}" +
+                ",baselineDeferred:{" +
+                    FormatSortedEdgeIndices(baselineDeferred) + "}" +
+                ",attempted:{" +
+                    FormatSortedEdgeIndices(attempted) + "}" +
+                ",completed:{" +
+                    FormatSortedEdgeIndices(completed) + "}" +
+                ",certified:{" +
+                    FormatSortedEdgeIndices(certified) + "}" +
+                ",failed:{" +
+                    FormatMaterialWidthRecoveryFailures(failed) + "}";
+        }
+
+        private static string FormatSortedEdgeIndices(
+            IEnumerable<int> indices)
+        {
+            if (indices == null)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            foreach (int index in indices)
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(index);
+            }
+            return builder.Length == 0 ? "none" : builder.ToString();
+        }
+
+        private static string FormatMaterialWidthRecoveryFailures(
+            SortedDictionary<int, string> failures)
+        {
+            if (failures == null || failures.Count == 0)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            foreach (KeyValuePair<int, string> pair in failures)
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append('|');
+                }
+                builder.Append(pair.Key);
+                builder.Append('=');
+                builder.Append(string.IsNullOrEmpty(pair.Value)
+                    ? "unspecified"
+                    : pair.Value);
+            }
+            return builder.ToString();
+        }
+
+        private static string SanitizeMaterialWidthRecoveryEvidence(
+            string evidence)
+        {
+            if (string.IsNullOrEmpty(evidence))
+            {
+                return "unspecified";
+            }
+            return evidence
+                .Replace("\r", " ")
+                .Replace("\n", " ")
+                .Replace("|", "/")
+                .Replace("{", "(")
+                .Replace("}", ")");
+        }
+
+        private static string FormatRawPlaneEdgeEvidence(
+            string evidence)
+        {
+            return string.IsNullOrEmpty(evidence)
+                ? "none"
+                : evidence;
+        }
+
+        private static string FormatCanonicalPlaneEdgeEvidence(
+            string graphEvidence,
+            EdgeWearCoverageAudit coverageAudit)
+        {
+            if (string.IsNullOrEmpty(graphEvidence))
+            {
+                return "none";
+            }
+            if (coverageAudit == null)
+            {
+                return graphEvidence;
+            }
+
+            string[] tokens = graphEvidence.Split('/');
+            List<int> canonical = new List<int>(tokens.Length);
+            HashSet<int> seen = new HashSet<int>();
+            for (int tokenIndex = 0;
+                 tokenIndex < tokens.Length;
+                 tokenIndex++)
+            {
+                if (!int.TryParse(
+                        tokens[tokenIndex],
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out int graphEdgeIndex))
+                {
+                    continue;
+                }
+
+                int displayIndex = graphEdgeIndex;
+                if (coverageAudit.RecordByGraphEdge.TryGetValue(
+                        graphEdgeIndex,
+                        out EdgeWearEdgeLifecycleRecord record) &&
+                    record != null)
+                {
+                    displayIndex =
+                        ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverageAudit,
+                            record);
+                }
+                if (seen.Add(displayIndex))
+                {
+                    canonical.Add(displayIndex);
+                }
+            }
+
+            if (canonical.Count == 0)
+            {
+                return "none";
+            }
+            canonical.Sort();
+            return string.Join("/", canonical);
         }
 
         private static void LogPlaneCutBevelAudit(
@@ -2342,6 +2553,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.AppendLine(FormatEdgeWearCoverageSummary(
                 audit.CoverageAudit));
             builder.AppendLine();
+            builder.AppendLine("[Micro Topology Normalization]");
+            builder.AppendLine(FormatEdgeWearMicroTopologyNormalization(
+                audit.CoverageAudit));
+            builder.AppendLine();
             builder.AppendLine("[Artistic Selection Audit]");
             AppendEdgeWearArtisticSelectionAudit(
                 builder,
@@ -2641,7 +2856,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearArtisticEdgeAuditRecord target =
                     new EdgeWearArtisticEdgeAuditRecord
                     {
-                        SourceEdgeIndex = source.SourceEdgeIndex,
+                        SourceEdgeIndex =
+                            ResolveEdgeWearDisplaySourceEdgeIndex(
+                                coverage,
+                                source),
                         CandidateIndex = source.CandidateIndex,
                         Start = source.Start,
                         End = source.End,
@@ -2658,6 +2876,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         Classification = source.Classification.ToString(),
                         CoincidentBoundarySeamReconciled =
                             source.CoincidentBoundarySeamReconciled ? 1 : 0,
+                        MicroTopologySuppressed =
+                            source.MicroTopologySuppressed ? 1 : 0,
+                        MicroTopologyGeneratedTransition =
+                            source.MicroTopologyGeneratedTransition ? 1 : 0,
                         StructuralEligible =
                             source.StructuralEligible ? 1 : 0,
                         GeometricEligible = source.GeometricEligible ? 1 : 0,
@@ -3159,6 +3381,212 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.Append(maximum.ToString("G9"));
         }
 
+        private static int ResolveEdgeWearDisplayGraphEdgeIndex(
+            EdgeWearCoverageAudit audit,
+            int graphEdgeIndex)
+        {
+            if (graphEdgeIndex < 0 || audit == null ||
+                audit.MicroTopologyNormalization == null)
+            {
+                return graphEdgeIndex;
+            }
+            EdgeWearMicroTopologyNormalizationResult normalization =
+                audit.MicroTopologyNormalization;
+            return normalization.
+                OriginalSourceEdgeIndexByNormalizedGraphEdge.TryGetValue(
+                    graphEdgeIndex,
+                    out int originalIndex)
+                ? originalIndex
+                : normalization.OriginalEdgeCount + graphEdgeIndex;
+        }
+
+        private static int ResolveEdgeWearDisplaySourceEdgeIndex(
+            EdgeWearCoverageAudit audit,
+            EdgeWearEdgeLifecycleRecord record)
+        {
+            if (record == null)
+            {
+                return -1;
+            }
+            if (record.OriginalSourceEdgeIndex >= 0)
+            {
+                return record.OriginalSourceEdgeIndex;
+            }
+            if (record.MicroTopologyGeneratedTransition &&
+                record.SourceEdgeIndex >= 0 &&
+                audit != null &&
+                audit.MicroTopologyNormalization != null)
+            {
+                return audit.MicroTopologyNormalization.OriginalEdgeCount +
+                    record.SourceEdgeIndex;
+            }
+            return record.SourceEdgeIndex;
+        }
+
+        private static string FormatEdgeWearMicroTopologyCompact(
+            EdgeWearMicroTopologyNormalizationResult normalization)
+        {
+            if (normalization == null)
+            {
+                return "notCaptured";
+            }
+            return (normalization.Applied ? "applied" : "unchanged") +
+                ":" + normalization.AppliedComponentCount + "/" +
+                normalization.EligibleComponentCount +
+                ":suppressed{" +
+                    FormatEdgeWearMicroTopologySuppressedIds(
+                        normalization) + "}";
+        }
+
+        private static string FormatEdgeWearMicroTopologyNormalization(
+            EdgeWearCoverageAudit audit)
+        {
+            EdgeWearMicroTopologyNormalizationResult normalization =
+                audit == null ? null : audit.MicroTopologyNormalization;
+            if (normalization == null)
+            {
+                return "notCaptured";
+            }
+            return "attempted=" + (normalization.Attempted ? "1" : "0") +
+                ",applied=" + (normalization.Applied ? "1" : "0") +
+                ",seedThreshold=" +
+                    normalization.Threshold.ToString("G9") +
+                ",componentThreshold=" +
+                    normalization.ComponentThreshold.ToString("G9") +
+                ",components=" + normalization.AppliedComponentCount + "/" +
+                    normalization.EligibleComponentCount +
+                ",candidates=" + normalization.CandidateCollapseCount +
+                ",vertices=" + normalization.OriginalVertexCount + "/" +
+                    normalization.NormalizedVertexCount +
+                ",edges=" + normalization.OriginalEdgeCount + "/" +
+                    normalization.NormalizedEdgeCount +
+                ",faces=" + normalization.OriginalFaceCount + "/" +
+                    normalization.NormalizedFaceCount +
+                ",suppressed={" +
+                    FormatEdgeWearMicroTopologySuppressedIds(
+                        normalization) + "}" +
+                ",generatedTransitions=" +
+                    normalization.GeneratedTransitionKeys.Count +
+                ",volume=" + normalization.OriginalVolume.ToString("G12") +
+                    "/" + normalization.NormalizedVolume.ToString("G12") +
+                ",loss=" + normalization.VolumeLoss.ToString("G12") +
+                    "/" +
+                    normalization.VolumeLossFraction.ToString("G12") +
+                ",elapsedMs=" +
+                    normalization.ElapsedMilliseconds.ToString("G9") +
+                ",diagnostic={" + normalization.Diagnostic + "}" +
+                ",componentEvidence=" +
+                    FormatEdgeWearMicroTopologyComponentEvidence(
+                        normalization);
+        }
+
+        private static string FormatEdgeWearMicroTopologyComponentEvidence(
+            EdgeWearMicroTopologyNormalizationResult normalization)
+        {
+            if (normalization == null ||
+                normalization.Components.Count == 0)
+            {
+                return "[none]";
+            }
+
+            StringBuilder builder = new StringBuilder();
+            builder.Append('[');
+            for (int componentIndex = 0;
+                 componentIndex < normalization.Components.Count;
+                 componentIndex++)
+            {
+                if (componentIndex > 0)
+                {
+                    builder.Append('|');
+                }
+                EdgeWearMicroTopologyComponentRecord component =
+                    normalization.Components[componentIndex];
+                builder.Append("component:");
+                builder.Append(componentIndex);
+                builder.Append(":edges{");
+                builder.Append(FormatEdgeWearIndexList(
+                    component.EdgeIndices));
+                builder.Append("}:seeds{");
+                builder.Append(FormatEdgeWearIndexList(
+                    component.SeedEdgeIndices));
+                builder.Append("}:vertices{");
+                builder.Append(FormatEdgeWearIndexList(
+                    component.VertexIndices));
+                builder.Append("}:diameter:");
+                builder.Append(component.Diameter.ToString("G9"));
+                builder.Append(":candidateEligible:");
+                builder.Append(component.CandidateEligible ? '1' : '0');
+                builder.Append(":applied:");
+                builder.Append(component.Applied ? '1' : '0');
+                builder.Append(":selectedVertex:");
+                builder.Append(component.SelectedCanonicalGraphVertexIndex);
+                builder.Append(":selectedDisplacement:");
+                builder.Append(
+                    component.SelectedSquaredDisplacement.ToString("G12"));
+                builder.Append(":selectedVolumeLoss:");
+                builder.Append(component.SelectedVolumeLoss.ToString("G12"));
+                builder.Append(":blocker{");
+                builder.Append(string.IsNullOrEmpty(component.Blocker)
+                    ? "none"
+                    : component.Blocker);
+                builder.Append("}:attempts[");
+                for (int attemptIndex = 0;
+                     attemptIndex < component.Attempts.Count;
+                     attemptIndex++)
+                {
+                    if (attemptIndex > 0)
+                    {
+                        builder.Append(';');
+                    }
+                    EdgeWearMicroTopologyCollapseAttemptRecord attempt =
+                        component.Attempts[attemptIndex];
+                    builder.Append("vertex:");
+                    builder.Append(attempt.CanonicalGraphVertexIndex);
+                    builder.Append("@position:");
+                    builder.Append(FormatPlaneCutVector(
+                        attempt.CanonicalPosition));
+                    builder.Append(":succeeded:");
+                    builder.Append(attempt.Succeeded ? '1' : '0');
+                    builder.Append(":displacement:");
+                    builder.Append(
+                        attempt.SquaredDisplacement.ToString("G12"));
+                    builder.Append(":volume:");
+                    builder.Append(attempt.NormalizedVolume.ToString("G12"));
+                    builder.Append(":loss:");
+                    builder.Append(attempt.VolumeLoss.ToString("G12"));
+                    builder.Append(":blocker{");
+                    builder.Append(string.IsNullOrEmpty(attempt.Blocker)
+                        ? "none"
+                        : attempt.Blocker);
+                    builder.Append('}');
+                }
+                builder.Append(']');
+            }
+            builder.Append(']');
+            return builder.ToString();
+        }
+
+        private static string FormatEdgeWearMicroTopologySuppressedIds(
+            EdgeWearMicroTopologyNormalizationResult normalization)
+        {
+            if (normalization == null ||
+                normalization.SuppressedEdges.Count == 0)
+            {
+                return "none";
+            }
+            List<int> ids = new List<int>(
+                normalization.SuppressedEdges.Count);
+            for (int i = 0;
+                 i < normalization.SuppressedEdges.Count;
+                 i++)
+            {
+                ids.Add(normalization.SuppressedEdges[i].
+                    OriginalSourceEdgeIndex);
+            }
+            ids.Sort();
+            return string.Join("/", ids);
+        }
+
         private static string FormatEdgeWearCoverageSummary(
             EdgeWearCoverageAudit audit)
         {
@@ -3173,6 +3601,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     (audit.RequireAllGeometricCandidates ? "1" : "0") +
                 ",rawSource=" + audit.RawSourceEdgeCount +
                 ",source=" + audit.SourceEdgeCount +
+                ",microTopology=" +
+                    FormatEdgeWearMicroTopologyCompact(
+                        audit.MicroTopologyNormalization) +
                 ",coincidentSeamPairs=" +
                     audit.CoincidentBoundarySeamPairCount +
                 ",graphVertexAliases=" +
@@ -3333,7 +3764,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 };
                 if (include)
                 {
-                    indices.Add(record.SourceEdgeIndex);
+                    indices.Add(ResolveEdgeWearDisplaySourceEdgeIndex(
+                        audit,
+                        record));
                 }
             }
 
@@ -3399,9 +3832,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     int category = ResolveEdgeWearViabilityExclusionCategory(
                         record.FinalReason);
                     counts[category]++;
-                    if (record.SourceEdgeIndex >= 0)
+                    int displayEdgeIndex =
+                        ResolveEdgeWearDisplaySourceEdgeIndex(
+                            audit,
+                            record);
+                    if (displayEdgeIndex >= 0)
                     {
-                        edgeIds[category].Add(record.SourceEdgeIndex);
+                        edgeIds[category].Add(displayEdgeIndex);
                     }
                 }
             }
@@ -3644,42 +4081,58 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     if (category == 0)
                     {
                         star++;
-                        starEdges.Add(record.SourceEdgeIndex);
+                        starEdges.Add(ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverage,
+                            record));
                     }
                     else if (category == 1)
                     {
                         pair++;
-                        pairEdges.Add(record.SourceEdgeIndex);
+                        pairEdges.Add(ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverage,
+                            record));
                     }
                     else if (category == 2)
                     {
                         band++;
-                        bandEdges.Add(record.SourceEdgeIndex);
+                        bandEdges.Add(ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverage,
+                            record));
                     }
                     else if (category == 3)
                     {
                         widthFloor++;
-                        widthEdges.Add(record.SourceEdgeIndex);
+                        widthEdges.Add(ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverage,
+                            record));
                     }
                     else if (category == 4)
                     {
                         conservation++;
-                        conservationEdges.Add(record.SourceEdgeIndex);
+                        conservationEdges.Add(ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverage,
+                            record));
                     }
                     else if (category == 5)
                     {
                         cornerMissing++;
-                        cornerMissingEdges.Add(record.SourceEdgeIndex);
+                        cornerMissingEdges.Add(ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverage,
+                            record));
                     }
                     else if (category == 6)
                     {
                         cornerInactive++;
-                        cornerInactiveEdges.Add(record.SourceEdgeIndex);
+                        cornerInactiveEdges.Add(ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverage,
+                            record));
                     }
                     else
                     {
                         other++;
-                        otherEdges.Add(record.SourceEdgeIndex);
+                        otherEdges.Add(ResolveEdgeWearDisplaySourceEdgeIndex(
+                            coverage,
+                            record));
                     }
                 }
             }
@@ -3862,7 +4315,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<EdgeWearEdgeLifecycleRecord> ordered =
                 new List<EdgeWearEdgeLifecycleRecord>(audit.Records);
             ordered.Sort((left, right) =>
-                left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+                ResolveEdgeWearDisplaySourceEdgeIndex(audit, left).CompareTo(
+                    ResolveEdgeWearDisplaySourceEdgeIndex(audit, right)));
             builder.Append("thresholds={minimumDihedral:");
             builder.Append(
                 EdgeWearMinimumViableDihedralDegrees.ToString("G9"));
@@ -3906,7 +4360,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearEdgeViabilityRecord record =
                     lifecycle.Viability;
                 builder.Append("edge=");
-                builder.Append(lifecycle.SourceEdgeIndex);
+                builder.Append(
+                    ResolveEdgeWearDisplaySourceEdgeIndex(audit, lifecycle));
                 builder.Append(",state=");
                 builder.Append(lifecycle.ViabilityState);
                 builder.Append(",structural=");
@@ -3949,6 +4404,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(",widthRecoveryProvisional:");
                 builder.Append(
                     record.WidthRecoveryProvisional ? '1' : '0');
+                builder.Append(",materialWidthRecoveryEligible:");
+                builder.Append(
+                    record.MaterialWidthRecoveryEligible ? '1' : '0');
+                builder.Append(",materialWidthRecoveryRequiredLength:");
+                builder.Append(
+                    record.MaterialWidthRecoveryRequiredLength
+                        .ToString("G9"));
                 builder.Append(",multiSupportHullRecovery:");
                 builder.Append(
                     record.MultiSupportHullRecovery ? '1' : '0');
@@ -4027,11 +4489,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(
                     record.IsolatedMaximumBoundaryDiagnosticRailIndex);
                 builder.Append(",originalAdjacentEdge:");
-                builder.Append(
-                    record.IsolatedMaximumBoundaryOriginalAdjacentEdgeIndex);
+                builder.Append(ResolveEdgeWearDisplayGraphEdgeIndex(
+                    audit,
+                    record.IsolatedMaximumBoundaryOriginalAdjacentEdgeIndex));
                 builder.Append(",resolvedBoundaryEdge:");
-                builder.Append(
-                    record.IsolatedMaximumBoundaryResolvedEdgeIndex);
+                builder.Append(ResolveEdgeWearDisplayGraphEdgeIndex(
+                    audit,
+                    record.IsolatedMaximumBoundaryResolvedEdgeIndex));
                 builder.Append(",originalRawParameter:");
                 builder.Append(
                     record.IsolatedMaximumBoundaryOriginalRawParameter
@@ -4066,6 +4530,53 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ? "none"
                     : record.IsolatedDiagnostic);
                 builder.Append('}');
+                builder.Append(",widthRecovery={eligible:");
+                builder.Append(
+                    record.MaterialWidthRecoveryEligible ? '1' : '0');
+                builder.Append(",target:");
+                builder.Append(
+                    lifecycle.MaterialWidthRecoveryTarget ? '1' : '0');
+                builder.Append(",baselineDeferred:");
+                builder.Append(
+                    lifecycle.MaterialWidthRecoveryBaselineDeferred
+                        ? '1'
+                        : '0');
+                builder.Append(",currentDeferred:");
+                builder.Append(
+                    lifecycle.RecoveryBaselineDeferred ? '1' : '0');
+                builder.Append(",attempted:");
+                builder.Append(
+                    lifecycle.MaterialWidthRecoveryAttempted ? '1' : '0');
+                builder.Append(",completed:");
+                builder.Append(
+                    lifecycle.MaterialWidthRecoveryTrialCompleted
+                        ? '1'
+                        : '0');
+                builder.Append(",trialSucceeded:");
+                builder.Append(
+                    lifecycle.MaterialWidthRecoveryTrialSucceeded
+                        ? '1'
+                        : '0');
+                builder.Append(",certified:");
+                builder.Append(
+                    lifecycle.MaterialWidthRecoveryCertified ? '1' : '0');
+                builder.Append(",failure:{");
+                builder.Append(string.IsNullOrEmpty(
+                        lifecycle.MaterialWidthRecoveryFailure)
+                    ? "none"
+                    : SanitizeMaterialWidthRecoveryEvidence(
+                        lifecycle.MaterialWidthRecoveryFailure));
+                builder.Append("},resolution:{");
+                builder.Append(string.IsNullOrEmpty(
+                        lifecycle.WidthRecoveryResolution)
+                    ? "none"
+                    : lifecycle.WidthRecoveryResolution);
+                builder.Append("},evidence:{");
+                builder.Append(string.IsNullOrEmpty(
+                        lifecycle.WidthRecoveryEvidence)
+                    ? "none"
+                    : lifecycle.WidthRecoveryEvidence);
+                builder.Append("}}");
                 builder.Append(",cornerRecovery={provisional:");
                 builder.Append(
                     lifecycle.CornerRecoveryProvisional ? '1' : '0');
@@ -4122,7 +4633,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<EdgeWearEdgeLifecycleRecord> ordered =
                 new List<EdgeWearEdgeLifecycleRecord>(audit.Records);
             ordered.Sort((left, right) =>
-                left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+                ResolveEdgeWearDisplaySourceEdgeIndex(audit, left).CompareTo(
+                    ResolveEdgeWearDisplaySourceEdgeIndex(audit, right)));
             builder.Append("count=");
             builder.AppendLine(ordered.Count.ToString());
             for (int recordIndex = 0;
@@ -4131,7 +4643,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 EdgeWearEdgeLifecycleRecord record = ordered[recordIndex];
                 builder.Append("edge=");
-                builder.Append(record.SourceEdgeIndex);
+                builder.Append(
+                    ResolveEdgeWearDisplaySourceEdgeIndex(audit, record));
                 builder.Append(",segment=");
                 builder.Append(FormatPlaneCutVector(record.Start));
                 builder.Append("->");
@@ -4153,6 +4666,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(",coincidentSeamReconciled=");
                 builder.Append(
                     record.CoincidentBoundarySeamReconciled ? '1' : '0');
+                builder.Append(",microSuppressed=");
+                builder.Append(record.MicroTopologySuppressed ? '1' : '0');
+                builder.Append(",microGeneratedTransition=");
+                builder.Append(
+                    record.MicroTopologyGeneratedTransition ? '1' : '0');
+                builder.Append(",graphEdge=");
+                builder.Append(record.SourceEdgeIndex);
                 builder.Append(",structural=");
                 builder.Append(record.StructuralEligible ? '1' : '0');
                 builder.Append(",geometric=");
@@ -4672,26 +5192,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ",meshTriangles:" + audit.PreviewTriangleCount +
                 ",meshValid:" + audit.PreviewGeometryValid +
                 ",edges=active:{" +
-                    (string.IsNullOrEmpty(audit.ActiveEdgeEvidence)
-                        ? "none"
-                        : audit.ActiveEdgeEvidence) + "}" +
+                    FormatCanonicalPlaneEdgeEvidence(
+                        audit.ActiveEdgeEvidence,
+                        audit.CoverageAudit) + "}" +
                     ",attempted:{" +
-                    (string.IsNullOrEmpty(audit.AttemptedEdgeEvidence)
-                        ? "none"
-                        : audit.AttemptedEdgeEvidence) + "}" +
+                    FormatCanonicalPlaneEdgeEvidence(
+                        audit.AttemptedEdgeEvidence,
+                        audit.CoverageAudit) + "}" +
                     ",certified:{" +
-                    (string.IsNullOrEmpty(audit.BuiltEdgeEvidence)
-                        ? "none"
-                        : audit.BuiltEdgeEvidence) + "}" +
+                    FormatCanonicalPlaneEdgeEvidence(
+                        audit.BuiltEdgeEvidence,
+                        audit.CoverageAudit) + "}" +
                     ",trialRejected:{" +
-                    (string.IsNullOrEmpty(
-                            audit.TrialRejectedEdgeEvidence)
-                        ? "none"
-                        : audit.TrialRejectedEdgeEvidence) + "}" +
+                    FormatCanonicalPlaneEdgeEvidence(
+                        audit.TrialRejectedEdgeEvidence,
+                        audit.CoverageAudit) + "}" +
                     ",deferred:{" +
-                    (string.IsNullOrEmpty(audit.DeferredEdgeEvidence)
-                        ? "none"
-                        : audit.DeferredEdgeEvidence) + "}" +
+                    FormatCanonicalPlaneEdgeEvidence(
+                        audit.DeferredEdgeEvidence,
+                        audit.CoverageAudit) + "}" +
+                ",graphEdges=active:{" +
+                    FormatRawPlaneEdgeEvidence(
+                        audit.ActiveEdgeEvidence) + "}" +
+                    ",attempted:{" +
+                    FormatRawPlaneEdgeEvidence(
+                        audit.AttemptedEdgeEvidence) + "}" +
+                    ",certified:{" +
+                    FormatRawPlaneEdgeEvidence(
+                        audit.BuiltEdgeEvidence) + "}" +
+                    ",trialRejected:{" +
+                    FormatRawPlaneEdgeEvidence(
+                        audit.TrialRejectedEdgeEvidence) + "}" +
+                    ",deferred:{" +
+                    FormatRawPlaneEdgeEvidence(
+                        audit.DeferredEdgeEvidence) + "}" +
                 ",telemetry=path:" + relativePath +
                     ",write:" + writeSucceeded +
                     (string.IsNullOrEmpty(writeFailure)

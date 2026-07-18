@@ -1726,3 +1726,186 @@ EW-B4.2R13A.7-comprehensive
 ```
 
 Unity compilation and one-click runtime validation remain required before R13A.7 can replace the R13A.4/R13A.6 stable incomplete baseline.
+
+## EW-B4.2R13A.8 — micro-topology normalization
+
+### Runtime evidence that requires the change
+
+The R13A.7 Unity suite compiled and retained current preview, topology `33/33`, artistic preview `33/33`, and comprehensive evidence. It resolved only `3/5` positive fixtures, with zero certified recoveries. The current discrete construction contract labelled seed `8889` maximum-width edges `13` and `23` complete-infeasible, but visual inspection and their audit values contradict feature-level exclusion: both are long, near-right-angle, high-silhouette edges. Their common blocker is the microscopic triangular transition formed by original edges `14/24/30`. Edge `24` is the seed edge (`length≈0.002811`, below the canonical minimum style width); collapsing it alone aliases edges `14` and `30`, so the complete bounded triangle must be treated as one micro component.
+
+The user explicitly authorizes complete removal of topology at this invisible scale when it is required to build meaningful bevels. This authorization is local to the edge-wear working topology and does not modify the base Generated Mass mesh.
+
+### Detection and bounded component expansion
+
+`NormalizeEdgeWearMicroTopology` runs once after the explicit non-`None` edge-wear gate and before candidate viability. It first builds the original source graph solely to preserve stable IDs. Internal manifold edges at or below the minimum useful style scale are seeds. A seed expands through connected internal edges no longer than the global minimum certified bevel footprint; the whole component diameter must also remain within that footprint. Components are capped at six vertices and eight edges.
+
+This two-scale rule is deliberate. On seed `8889`, edge `24` is the sub-style seed, while adjacent edges `14` and `30` are still far below the minimum bevel footprint and form the same invisible triangular source face. Treating only edge `24` as removable would produce a duplicate remapped edge and is correctly rejected. Treating `14/24/30` as one component removes the complete micro sliver without touching edges `13`, `23`, or any other meaningful source edge. Edge `40` is substantially larger than the component limit and cannot enter normalization.
+
+### Deterministic collapse and certification
+
+For each component, the normalizer tries every existing component vertex as the canonical retained point. It remaps component vertices, removes duplicates from the retained point cloud, and rebuilds a temporary convex base hull with the existing supporting-plane extractor and facet ordering utilities. It rejects any candidate that:
+
+- retains fewer than four points or four faces;
+- emits an invalid, degenerate, non-convex, open, or non-manifold hull;
+- expands original bounds or increases volume beyond tolerance;
+- loses more than `0.25%` of original volume;
+- collapses, aliases, or removes any source edge outside the authorized component.
+
+The winning candidate minimizes total squared displacement, then volume loss, then original graph-vertex index. If no candidate certifies, that component is skipped and the original source faces remain authoritative. No partial normalization is committed.
+
+### Identity, diagnostics, and downstream ownership
+
+Normalized graph indices remain internal solver IDs. Every surviving normalized edge carries its original source-edge ID through endpoint-remap provenance. Suppressed component edges remain visible in lifecycle and source-edge overlays as `M` with final reason `micro-topology-suppressed`. Any hull transition edge with no original provenance is marked `micro-topology-generated-transition`, structural-ineligible, and assigned only a synthetic non-colliding diagnostic ID. Public artistic records, fixture lookup, comprehensive ranking evidence, viability summaries, and lifecycle reports all use stable original IDs.
+
+Each eligible component emits one compact exhaustive record: component and seed edge IDs, graph vertices, diameter, bounded eligibility, every canonical-vertex attempt, squared displacement, resulting volume and volume loss, exact rejection blocker, and selected candidate. This evidence is required so a failed normalization cannot degrade into another opaque geometry blocker.
+
+The normalized faces then own the entire explicit edge-wear transaction: viability, artistic ranking, corner widths, coexistence, plane construction, triangulation, and render-channel validation. The production score formula and deterministic strength variation remain stable by using original source-edge identity when normalization is active.
+
+### Suite semantics
+
+The seed-8889 maximum-width edges `13` and `23` are now visually required fixtures and may pass only as certified recoveries; a discrete infeasibility label is no longer accepted for them. The edge-40 negative fixture accepts any definitive inactive, uncertified, unmaterialized exclusion reason rather than one hard-coded reason, but rejects unresolved/provisional states and rejects micro suppression. The two seed-2223 edge-13 corner fixtures remain a separate unresolved class unless this patch independently changes their certified outcome.
+
+Contracts advance to:
+
+```text
+EW-B4.2R13A.8-suite
+EW-B4.2R13A.8-topology
+EW-B4.2R13A.8-preview
+EW-B4.2R13A.8-comprehensive
+```
+
+All normalization work remains explicit editor preview/audit-only. No scene, prefab, material, shader, UV, shared mesh infrastructure, production score, normal/tangent semantic, layer, tag, component, serialized default, or production generation-contract change is included. R13A.8 subsequently passed Unity compilation, current-preview validation, both `33/33` matrices, comprehensive evidence, and the seed-8889 positive/negative fixtures; its only remaining failures were the two seed-2223 width-recovery fixtures addressed by R13A.9.
+
+
+## EW-B4.2R13A.9 — material width-recovery closure
+
+### R13A.8 runtime result and corrected blocker
+
+R13A.8 runtime validation retained current preview, topology `33/33`, artistic preview `33/33`, comprehensive evidence, and the edge-40 negative fixture. Micro-topology component `14/24/30` normalized successfully and seed-8889 edges `13` and `23` became selected, active, and certified while edge `39` remained certified. The only unresolved positive fixtures are seed `2223`, source edge `13`, at default and maximum width.
+
+The earlier corner-inactivation hypothesis is superseded. Current code and runtime evidence show that edge `13` is isolated-certified below the ordinary requested-width-fraction gate, receives `WidthRecoveryProvisional`, and is then deliberately forced to width zero in the immutable certified baseline. Because R13A.7/R13A.8 excluded every width-provisional edge from augmentation triggers, that target was never evaluated by the recovery frontier. Its reported `corner-width-inactive` state was therefore baseline recovery deferral, not a missing corner-conflict event.
+
+### Material-significance gate
+
+R13A.9 preserves every raw width-provisional edge as a forced-zero baseline exclusion. A provisional edge may enter augmentation only when all of the following are true:
+
+- isolated construction already certified a positive width at or above the canonical absolute minimum;
+- the edge remains selected and artistically eligible;
+- its source length is at least two complete requested bevel footprints, where one footprint is the existing `requestedWidth * 2 + guard` viability footprint.
+
+This gate is seed-independent. The two seed-2223 edge-13 fixtures are long enough to qualify. Tiny seed-8889 edge `40` does not support two complete footprints and therefore remains baseline-only even though it is close to the ordinary width-fraction boundary. No production seed or source-edge branch is introduced.
+
+### Certified baseline and target-wise frontier
+
+The immutable baseline still forces every raw width-provisional and retained-hull recovery edge off, then requires a complete certified shell. Recovery does not replace this baseline.
+
+The bounded augmentation frontier now starts with:
+
+1. one state that re-enables all recognized recovery targets;
+2. one state per target that re-enables only that target while retaining every other baseline exclusion;
+3. existing participant-deferral variants only for finalized corner targets.
+
+This target-wise seed is necessary because an all-at-once provisional state can fail for an unrelated recovery edge and conceal a viable target. Search remains capped at 128 states and five seconds with cancellation between states. No width schedule, hull constructor, plane-cut kernel, geometry tolerance, or nested search is added.
+
+A material width-recovery result may commit only if the target is built in a fully certified shell, total certified count does not decrease, and every baseline-certified edge remains built. Unlike corner recovery, material width recovery authorizes no baseline-edge exchange. The existing score and certified-width ordering applies only after these hard guards pass.
+
+### Lifecycle and diagnostic semantics
+
+`ChamferCornerSolution` now retains the exact externally forced deferral set. A width-provisional edge forced off in the certified baseline is labelled `recovery-baseline-deferred`; it is no longer misrepresented as an organic corner-width collapse. Search-only forced deferrals use `augmentation-forced-deferred`. Genuine corner-inactive capture continues to require an exact zeroing conflict.
+
+Viability evidence records the material width-recovery length threshold and eligibility. Lifecycle evidence records baseline deferral, terminal recovery resolution, and failure evidence. Complete frontier exhaustion produces `width-recovery-proven-infeasible`; cancellation, time-budget exhaustion, or remaining states preserves unresolved status. A winning shell marks only targets actually built as `certified-recovery`.
+
+The existing `planeEdges` fields now map internal graph IDs through canonical source-edge provenance. Separate `planeGraphEdges`/`graphEdges` fields preserve the raw internal IDs for geometry debugging. This removes the R13A.8 ambiguity where normalized graph indices appeared to contradict micro-suppressed canonical source IDs.
+
+### Scope and performance
+
+R13A.9 changes only explicit edge-wear preview/audit selection, bounded augmentation orchestration, lifecycle evidence, editor fixture semantics, and canonical documentation. The base Generated Mass mesh, micro-topology implementation, bounded single-edge geometry, plane-cut kernel, artistic score, normals, tangents, scenes, prefabs, materials, shaders, serialized defaults, and `EdgeWearEvaluationMode.None` path are unchanged.
+
+Active-gameplay impact is zero. Explicit evaluation adds a bounded number of initial frontier states and report fields, but no additional geometry algorithm or larger search budget. Contracts advance to:
+
+```text
+EW-B4.2R13A.9-suite
+EW-B4.2R13A.9-topology
+EW-B4.2R13A.9-preview
+EW-B4.2R13A.9-comprehensive
+```
+
+Unity runtime validation rejected R13A.9 as incomplete. Current preview, both `33/33` matrices, comprehensive evidence, canonical diagnostics, micro normalization, seed-8889 edges `13/23/39`, and the edge-40 negative fixture remained correct. However, both seed-2223 edge-13 fixtures remained unresolved with no material target execution, while seed `7778` maximum entered the generic branch frontier and exhausted the five-second augmentation budget. R13A.9 is therefore historical evidence, not an accepted recovery baseline.
+
+
+## EW-B4.2R13A.9a — immutable material-recovery target execution
+
+### R13A.9 runtime diagnosis
+
+R13A.9 computed valid material-significance evidence during isolated viability, but later rediscovered targets through mutable lifecycle state. The collector required a record to remain `Selected` after certified-baseline and coexistence mutations. Seed-2223 edge `13` had already been reset to inactive selection state by that point, so the target disappeared before augmentation even though its immutable evidence remained valid. The same mixed frontier admitted unrelated material candidates into branch expansion, producing the seed-7778 five-second timeout.
+
+R13A.9a removes both failure modes. Material target identity is captured exactly once immediately after graph mapping, when `context.SelectedEdges`, stable graph provenance, isolated viability, and artistic eligibility are simultaneously authoritative. The target set is then passed explicitly through baseline certification and recovery; it is never reconstructed from trial-mutated `Candidate`, `Selected`, `CoexistenceEligible`, or final-reason fields.
+
+### Immutable material-significance predicate
+
+A selected graph edge becomes an immutable material target only when all of the following already hold:
+
+- isolated rail and bounded construction succeeded;
+- requested-width fraction is below the ordinary `0.25` viability threshold;
+- isolated certified width remains at or above the canonical minimum certified width;
+- the edge is artistically eligible;
+- source length supports at least two complete requested bevel footprints.
+
+The predicate remains seed-independent. Reported seed-2223 edge `13` satisfies it at default and maximum width. Seed-8889 edge `40` fails the two-footprint length requirement and never enters the immutable target set. All raw width-provisional edges, including material targets, remain forced off in the immutable certified baseline.
+
+### One-trial sequential material phase
+
+Material recovery is no longer part of the 128-state branch frontier. Targets execute in deterministic graph-edge order. For each target:
+
+1. derive the exclusion set from the current certified working baseline;
+2. remove only that target from the exclusions;
+3. execute one complete-shell trial with kernel conflict recursion disabled and render-channel validation enabled;
+4. accept only when the target is built, the shell is fully certified, certified count increases, and every edge built by the working baseline remains built;
+5. when accepted, promote that result to the working baseline before evaluating the next material target.
+
+This sequential commit allows multiple independent material targets to accumulate without a combinatorial search. A failed target creates no child states and authorizes no baseline-edge exchange. Cancellation or any trial timeout terminates the material phase immediately and retains the latest certified working baseline.
+
+### Separation from non-material recovery
+
+Retained-hull and exact corner-participant recovery remain under the existing bounded non-material frontier. They are collected only after the material phase. Any material target already certified is added to the protected-edge set and cannot become a branch victim. If the material phase times out or is cancelled, non-material recovery does not continue in the same evaluation.
+
+The existing non-material limits remain unchanged:
+
+```text
+maximum states: 128
+maximum elapsed time: 5000 ms
+maximum additional deferrals: 8
+```
+
+No width schedule, rail solve, retained-point hull, plane constructor, topology tolerance, search budget, or production score changes. The only added geometry call site is the scheduler's direct invocation of the already-existing complete-shell trial evaluator, once per immutable material target.
+
+### Lifecycle and report contract
+
+Each material target carries bounded execution state:
+
+- immutable target membership;
+- certified-baseline deferral;
+- attempted;
+- completed without cancellation or timeout;
+- trial succeeded under strict baseline preservation;
+- certified in the committed working baseline;
+- exact terminal failure evidence.
+
+The compact evaluation summary emits canonical source-edge sets for `eligible`, `baselineDeferred`, `attempted`, `completed`, `certified`, and `failed`. A non-certified target always appears in `failed`, including an explicit `not-attempted` state. Detailed lifecycle output retains both historical baseline deferral and current trial deferral so the two cannot be conflated.
+
+`width-recovery-proven-infeasible` may be assigned only after the target's exact full-shell trial completes without cancellation or timeout and fails the strict target-plus-baseline certification contract. Zero-execution and incomplete trials remain unresolved.
+
+### Scope and current status
+
+R13A.9a modifies only selection evidence ownership, orchestration scheduling, lifecycle/report fields, editor contract labels, and canonical documentation. It does not modify the geometry kernel, micro-topology normalization, base Generated Mass mesh, scenes, prefabs, materials, shaders, shared mesh infrastructure, serialized defaults, production score, normals, tangents, or `EdgeWearEvaluationMode.None`.
+
+Contracts advance to:
+
+```text
+EW-B4.2R13A.9a-suite
+EW-B4.2R13A.9a-topology
+EW-B4.2R13A.9a-preview
+EW-B4.2R13A.9a-comprehensive
+```
+
+Implementation and static validation are complete. Unity compilation and the complete one-click suite remain mandatory before acceptance. R13A.8 remains the accepted runtime recovery baseline until that evidence exists.

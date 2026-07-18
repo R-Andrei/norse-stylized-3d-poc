@@ -97,7 +97,63 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverFoamMajorTopology majorTopology,
             StylizedRiverFoamConnectorTopology connectorTopology)
         {
+            int columnsPerChunk = Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    StylizedRiverFoamGridDescriptor
+                        .LongitudinalChunkLengthMetres /
+                    Mathf.Max(0.0001f, fieldLength / Mathf.Max(1, width))));
+            if (width % columnsPerChunk != 0)
+            {
+                columnsPerChunk = width;
+            }
+
+            int chunkCount = Mathf.Max(1, width / columnsPerChunk);
+            StylizedRiverFoamGridDescriptor descriptor =
+                StylizedRiverFoamGridDescriptor.CreateLegacyNormalized(
+                    quality,
+                    chunkCount,
+                    columnsPerChunk,
+                    width,
+                    height,
+                    Mathf.Max(1, Mathf.CeilToInt(width * 0.5f)),
+                    Mathf.Max(1, Mathf.CeilToInt(height * 0.5f)),
+                    fieldLength,
+                    validFieldLength);
+            return Generate(
+                domain,
+                descriptor,
+                quality,
+                shoreMotion,
+                seed,
+                interiorPocketAmount,
+                edgeCavityAmount,
+                connectorWeakSpanAmount,
+                freeWaterEventAmount,
+                obstacleMask,
+                majorTopology,
+                connectorTopology);
+        }
+
+        internal static StylizedRiverFoamPocketTopology Generate(
+            RiverDomainSnapshot domain,
+            StylizedRiverFoamGridDescriptor descriptor,
+            StylizedRiverQuality quality,
+            float shoreMotion,
+            int seed,
+            float interiorPocketAmount,
+            float edgeCavityAmount,
+            float connectorWeakSpanAmount,
+            float freeWaterEventAmount,
+            float[] obstacleMask,
+            StylizedRiverFoamMajorTopology majorTopology,
+            StylizedRiverFoamConnectorTopology connectorTopology)
+        {
             Stopwatch stopwatch = Stopwatch.StartNew();
+            int width = descriptor.ColumnCount;
+            int height = descriptor.RowCount;
+            float fieldLength = descriptor.AllocatedLengthMetres;
+            float validFieldLength = descriptor.ValidLengthMetres;
             int cellCount = Mathf.Max(0, width * height);
             float[] pressure = new float[cellCount];
             int reasonCount = Enum.GetValues(
@@ -146,10 +202,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool[] validCells = new bool[cellCount];
             StylizedRiverFoamMajorTopologyGenerator.BuildFluidContext(
                 domain,
-                width,
-                height,
-                fieldLength,
-                validFieldLength,
+                descriptor,
                 quality,
                 shoreMotion,
                 obstacleMask,
@@ -159,10 +212,7 @@ namespace ProgrammaticStylized3D.Rivers
             Vector2[] metricPositions =
                 StylizedRiverFoamTopologyFieldSpace.BuildMetricPositions(
                     domain,
-                    width,
-                    height,
-                    fieldLength,
-                    validFieldLength);
+                    descriptor);
             float[] connectorDistance = BuildDistanceFromSources(
                 width,
                 height,
@@ -494,6 +544,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 feasibleFreeWaterRegions = BuildFreeWaterNegativeEventRegions(
                     domain,
+                    descriptor,
                     width,
                     height,
                     fieldLength,
@@ -545,6 +596,7 @@ namespace ProgrammaticStylized3D.Rivers
             MergeMaximum(independentPressure, freeWaterPressure);
             StylizedRiverFoamPreparedHostedNegativeRegion[]
                 preparedHostedRegions = BuildPreparedHostedRegions(
+                    descriptor,
                     feasibleInteriorRegions,
                     selectedInteriorCount,
                     feasibleCavityRegions,
@@ -557,6 +609,7 @@ namespace ProgrammaticStylized3D.Rivers
                     majorTopology);
             StylizedRiverFoamPreparedFreeWaterRegion[]
                 preparedFreeWaterRegions = BuildPreparedFreeWaterRegions(
+                    descriptor,
                     feasibleFreeWaterRegions,
                     selectedFreeWaterCount,
                     width,
@@ -905,6 +958,7 @@ namespace ProgrammaticStylized3D.Rivers
         private static List<PreparedNegativeRegion>
             BuildFreeWaterNegativeEventRegions(
                 RiverDomainSnapshot domain,
+                StylizedRiverFoamGridDescriptor descriptor,
                 int width,
                 int height,
                 float fieldLength,
@@ -921,6 +975,7 @@ namespace ProgrammaticStylized3D.Rivers
             List<FreeWaterOpportunity> opportunities =
                 BuildFreeWaterOpportunities(
                     domain,
+                    descriptor,
                     width,
                     height,
                     fieldLength,
@@ -1062,6 +1117,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private static List<FreeWaterOpportunity> BuildFreeWaterOpportunities(
             RiverDomainSnapshot domain,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -1163,6 +1219,7 @@ namespace ProgrammaticStylized3D.Rivers
                     TryAddFreeWaterOpportunity(
                         opportunities,
                         domain,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -1184,6 +1241,7 @@ namespace ProgrammaticStylized3D.Rivers
                     TryAddFreeWaterOpportunity(
                         opportunities,
                         domain,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -1208,6 +1266,7 @@ namespace ProgrammaticStylized3D.Rivers
         private static void TryAddFreeWaterOpportunity(
             List<FreeWaterOpportunity> opportunities,
             RiverDomainSnapshot domain,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -1257,6 +1316,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (!TryResolveFreeWaterCell(
                     proposedPosition,
+                    descriptor,
                     width,
                     height,
                     fieldLength,
@@ -1291,6 +1351,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private static bool TryResolveFreeWaterCell(
             Vector2 position,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -1304,20 +1365,37 @@ namespace ProgrammaticStylized3D.Rivers
         {
             cellIndex = -1;
             resolvedPosition = position;
-            int approximateX = StylizedRiverFoamTopologyFieldSpace
-                .LocalDistanceToNearestTexel(
-                    position.x,
-                    width,
-                    fieldLength);
-            float across01 = StylizedRiverFoamTopologyFieldSpace
-                .AcrossMetresTo01Clamped(
-                    position.y,
-                    leftWidth,
-                    rightWidth);
-            int approximateY = StylizedRiverFoamTopologyFieldSpace
-                .Across01ToNearestTexel(
-                    across01,
-                    height);
+            int approximateX;
+            int approximateY;
+            if (descriptor.UsesFixedMetricLattice)
+            {
+                if (!descriptor.TryMetricToNearestCell(
+                        position,
+                        out Vector2Int nearestCell))
+                {
+                    return false;
+                }
+
+                approximateX = nearestCell.x;
+                approximateY = nearestCell.y;
+            }
+            else
+            {
+                approximateX = StylizedRiverFoamTopologyFieldSpace
+                    .LocalDistanceToNearestTexel(
+                        position.x,
+                        width,
+                        fieldLength);
+                float across01 = StylizedRiverFoamTopologyFieldSpace
+                    .AcrossMetresTo01Clamped(
+                        position.y,
+                        leftWidth,
+                        rightWidth);
+                approximateY = StylizedRiverFoamTopologyFieldSpace
+                    .Across01ToNearestTexel(
+                        across01,
+                        height);
+            }
             int approximateIndex = approximateX + approximateY * width;
             if (validCells[approximateIndex])
             {
@@ -1337,9 +1415,22 @@ namespace ProgrammaticStylized3D.Rivers
                 FreeWaterNearestSampleRadiusMetres *
                 FreeWaterNearestSampleRadiusMetres;
             float bestDistanceSquared = float.PositiveInfinity;
-            const int searchRadius = 2;
-            for (int offsetY = -searchRadius;
-                 offsetY <= searchRadius;
+            int searchRadiusX = descriptor.UsesFixedMetricLattice
+                ? Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(
+                        FreeWaterNearestSampleRadiusMetres /
+                        Mathf.Max(0.0001f, descriptor.ResolvedDxMetres)))
+                : 2;
+            int searchRadiusY = descriptor.UsesFixedMetricLattice
+                ? Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(
+                        FreeWaterNearestSampleRadiusMetres /
+                        Mathf.Max(0.0001f, descriptor.ResolvedDyMetres)))
+                : 2;
+            for (int offsetY = -searchRadiusY;
+                 offsetY <= searchRadiusY;
                  offsetY++)
             {
                 int y = approximateY + offsetY;
@@ -1348,8 +1439,8 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
-                for (int offsetX = -searchRadius;
-                     offsetX <= searchRadius;
+                for (int offsetX = -searchRadiusX;
+                     offsetX <= searchRadiusX;
                      offsetX++)
                 {
                     int x = approximateX + offsetX;
@@ -2551,6 +2642,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private static StylizedRiverFoamPreparedHostedNegativeRegion[]
             BuildPreparedHostedRegions(
+                StylizedRiverFoamGridDescriptor descriptor,
                 List<PreparedNegativeRegion> interiorRegions,
                 int selectedInteriorCount,
                 List<PreparedNegativeRegion> cavityRegions,
@@ -2572,6 +2664,7 @@ namespace ProgrammaticStylized3D.Rivers
                 result,
                 interiorRegions,
                 selectedInteriorCount,
+                descriptor,
                 width,
                 height,
                 fieldLength,
@@ -2582,6 +2675,7 @@ namespace ProgrammaticStylized3D.Rivers
                 result,
                 cavityRegions,
                 selectedCavityCount,
+                descriptor,
                 width,
                 height,
                 fieldLength,
@@ -2734,6 +2828,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private static StylizedRiverFoamPreparedFreeWaterRegion[]
             BuildPreparedFreeWaterRegions(
+                StylizedRiverFoamGridDescriptor descriptor,
                 List<PreparedNegativeRegion> prepared,
                 int selectedCount,
                 int width,
@@ -2777,6 +2872,7 @@ namespace ProgrammaticStylized3D.Rivers
                     localPressure,
                     resolution,
                     metresPerCell,
+                    descriptor,
                     width,
                     height,
                     fieldLength,
@@ -2793,6 +2889,7 @@ namespace ProgrammaticStylized3D.Rivers
                         localPressure,
                         resolution,
                         metresPerCell,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -2825,6 +2922,7 @@ namespace ProgrammaticStylized3D.Rivers
                 float[] localPressure,
                 int resolution,
                 float metresPerCell,
+                StylizedRiverFoamGridDescriptor descriptor,
                 int width,
                 int height,
                 float fieldLength,
@@ -2898,6 +2996,7 @@ namespace ProgrammaticStylized3D.Rivers
                         centreLocalDistance,
                         centreAcrossNormalized,
                         orientation,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -2932,6 +3031,7 @@ namespace ProgrammaticStylized3D.Rivers
                     homeDistance,
                     region.AcrossNormalized,
                     region.Orientation,
+                    descriptor,
                     width,
                     height,
                     fieldLength,
@@ -2987,6 +3087,7 @@ namespace ProgrammaticStylized3D.Rivers
             float centreLocalDistance,
             float centreAcrossNormalized,
             float orientationRadians,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -3055,6 +3156,7 @@ namespace ProgrammaticStylized3D.Rivers
                         centreAcrossMetres + deltaAcross);
                     float fluid = SampleRegionSourcePressure(
                         fluidCoverage,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -3065,6 +3167,7 @@ namespace ProgrammaticStylized3D.Rivers
                         obstacleMask.Length >= width * height
                         ? SampleRegionSourcePressure(
                             obstacleMask,
+                            descriptor,
                             width,
                             height,
                             fieldLength,
@@ -3097,6 +3200,7 @@ namespace ProgrammaticStylized3D.Rivers
             List<StylizedRiverFoamPreparedHostedNegativeRegion> destination,
             List<PreparedNegativeRegion> prepared,
             int selectedCount,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -3134,6 +3238,7 @@ namespace ProgrammaticStylized3D.Rivers
                     region,
                     localPressure,
                     resolution,
+                    descriptor,
                     width,
                     height,
                     fieldLength,
@@ -3503,6 +3608,7 @@ namespace ProgrammaticStylized3D.Rivers
             PreparedNegativeRegion region,
             float[] localPressure,
             int resolution,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -3537,6 +3643,7 @@ namespace ProgrammaticStylized3D.Rivers
                         domain);
                     float value = SampleRegionSourcePressure(
                         sourcePressure,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -3576,6 +3683,7 @@ namespace ProgrammaticStylized3D.Rivers
             float[] localPressure,
             int resolution,
             float metresPerCell,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -3608,6 +3716,7 @@ namespace ProgrammaticStylized3D.Rivers
                         sine * localX + cosine * localY);
                     float value = SampleRegionSourcePressure(
                         sourcePressure,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -3680,6 +3789,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private static float SampleRegionSourcePressure(
             float[] source,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -3689,10 +3799,7 @@ namespace ProgrammaticStylized3D.Rivers
         {
             return StylizedRiverFoamTopologyFieldSpace.SampleScalarAtMetric(
                 source,
-                width,
-                height,
-                fieldLength,
-                validFieldLength,
+                descriptor,
                 metricPosition,
                 domain);
         }

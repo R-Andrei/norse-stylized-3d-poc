@@ -1347,14 +1347,150 @@ float2 RiverWaterFoamResolveSurfaceWarpMetres(
         clamp(lateral * strength, -0.34, 0.34));
 }
 
+bool RiverWaterFoamUsesFixedMetricLattice(float4 gridContract)
+{
+    return (int)round(gridContract.z) == 1;
+}
+
+float2 RiverWaterFoamResolveFieldUV(
+    float globalDistance,
+    float lateralMetres,
+    float surfaceHalfWidth,
+    float globalStart,
+    float fieldLength,
+    float4 gridContract,
+    float4 gridSpacing,
+    float4 gridLateral,
+    float4 gridLongitudinal)
+{
+    if (!RiverWaterFoamUsesFixedMetricLattice(gridContract))
+    {
+        return float2(
+            saturate((globalDistance - globalStart) /
+                max(0.001, fieldLength)),
+            saturate(lateralMetres /
+                max(0.001, surfaceHalfWidth) * 0.5 + 0.5));
+    }
+
+    float localDistanceMetres = globalDistance - globalStart;
+    float globalY = (lateralMetres - gridLateral.x) /
+        max(0.0001, gridSpacing.w);
+    return saturate(float2(
+        (localDistanceMetres - gridLongitudinal.x) /
+            max(0.0001, gridLongitudinal.y),
+        (globalY - gridLateral.y + 0.5) /
+            max(1.0, gridLateral.z)));
+}
+
+bool RiverWaterFoamPointInsideValidField(
+    float globalDistance,
+    float lateralMetres,
+    float globalStart,
+    float4 gridContract,
+    float4 gridLongitudinal,
+    float4 gridExtent)
+{
+    if (!RiverWaterFoamUsesFixedMetricLattice(gridContract))
+    {
+        return true;
+    }
+
+    float localDistanceMetres = globalDistance - globalStart;
+    float longitudinalMinimum = gridLongitudinal.x;
+    float longitudinalMaximum = longitudinalMinimum +
+        max(0.0, gridLongitudinal.z);
+    return localDistanceMetres >= longitudinalMinimum - 0.0001 &&
+        localDistanceMetres <= longitudinalMaximum + 0.0001 &&
+        lateralMetres >= gridExtent.x - 0.0001 &&
+        lateralMetres <= gridExtent.y + 0.0001;
+}
+
+bool RiverWaterFoamFieldUVInsideValidSample(
+    float2 fieldUV,
+    float4 gridContract,
+    float4 gridLongitudinal)
+{
+    if (!RiverWaterFoamUsesFixedMetricLattice(gridContract))
+    {
+        return true;
+    }
+
+    float validU = max(0.0, gridLongitudinal.z) /
+        max(0.0001, gridLongitudinal.y);
+    return fieldUV.x >= -0.0001 &&
+        fieldUV.x <= validU + 0.0001 &&
+        fieldUV.y >= -0.0001 &&
+        fieldUV.y <= 1.0001;
+}
+
+
+float RiverWaterFoamFieldUVToFilmUV1D(
+    float fieldUV,
+    int structuralCount,
+    int filmCount)
+{
+    int safeStructuralCount = max(1, structuralCount);
+    int safeFilmCount = max(1, filmCount);
+    float structuralPosition =
+        saturate(fieldUV) * (float)safeStructuralCount;
+    int filmIndex = min(
+        (int)floor(structuralPosition * 0.5),
+        safeFilmCount - 1);
+    int structuralStart = max(0, filmIndex * 2);
+    int representedCount = clamp(
+        safeStructuralCount - structuralStart,
+        1,
+        2);
+    float localPosition = saturate(
+        (structuralPosition - (float)structuralStart) /
+        (float)representedCount);
+    return ((float)filmIndex + localPosition) /
+        (float)safeFilmCount;
+}
+
+float2 RiverWaterFoamFieldUVToFilmUV(
+    float2 fieldUV,
+    float2 structuralDimensions,
+    float2 filmDimensions,
+    float4 gridContract)
+{
+    if (!RiverWaterFoamUsesFixedMetricLattice(gridContract))
+    {
+        return saturate(fieldUV);
+    }
+
+    int2 structural = max(int2(1, 1), (int2)round(structuralDimensions));
+    int2 film = max(int2(1, 1), (int2)round(filmDimensions));
+    return float2(
+        RiverWaterFoamFieldUVToFilmUV1D(
+            fieldUV.x,
+            structural.x,
+            film.x),
+        RiverWaterFoamFieldUVToFilmUV1D(
+            fieldUV.y,
+            structural.y,
+            film.y));
+}
+
 float2 RiverWaterFoamMetresToFieldUV(
     float2 metres,
     float fieldLength,
-    float surfaceHalfWidth)
+    float surfaceHalfWidth,
+    float4 gridContract,
+    float4 gridSpacing,
+    float4 gridLateral,
+    float4 gridLongitudinal)
 {
+    if (!RiverWaterFoamUsesFixedMetricLattice(gridContract))
+    {
+        return float2(
+            metres.x / max(0.001, fieldLength),
+            metres.y / max(0.001, surfaceHalfWidth * 2.0));
+    }
+
     return float2(
-        metres.x / max(0.001, fieldLength),
-        metres.y / max(0.001, surfaceHalfWidth * 2.0));
+        metres.x / max(0.0001, gridLongitudinal.y),
+        metres.y / max(0.0001, gridLateral.z * gridSpacing.w));
 }
 
 float4 RiverWaterFoamSampleInterpolatedState(
@@ -1476,6 +1612,7 @@ struct RiverWaterFoamResult
     float surfaceEnergy;
     float2 strandPattern;
     float strandResolution;
+    float validField;
     float2 fieldUV;
     float2 materialUV;
 };
@@ -1496,6 +1633,11 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float strandScale,
     float strandReach,
     float freezeAmount,
+    float4 gridContract,
+    float4 gridSpacing,
+    float4 gridLateral,
+    float4 gridLongitudinal,
+    float4 gridExtent,
     RiverWaterFoamSurfaceInfluence surfaceInfluence)
 {
     RiverWaterFoamResult result;
@@ -1508,6 +1650,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     result.surfaceEnergy = 0.0;
     result.strandPattern = 0.0;
     result.strandResolution = 0.0;
+    result.validField = 0.0;
     result.fieldUV = 0.0;
     result.materialUV = 0.0;
 
@@ -1515,6 +1658,18 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     {
         return result;
     }
+    if (!RiverWaterFoamPointInsideValidField(
+            globalDistance,
+            lateralMetres,
+            globalStart,
+            gridContract,
+            gridLongitudinal,
+            gridExtent))
+    {
+        return result;
+    }
+
+    result.validField = 1.0;
 
     float liquidFactor = 1.0 - saturate(freezeAmount);
     float surfaceEnergy = RiverWaterFoamResolveSurfaceEnergy(
@@ -1532,9 +1687,16 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         1.35,
         surfaceEnergy);
 
-    float2 fieldUV = float2(
-        saturate((globalDistance - globalStart) / fieldLength),
-        saturate(lateralMetres / max(0.001, surfaceHalfWidth) * 0.5 + 0.5));
+    float2 fieldUV = RiverWaterFoamResolveFieldUV(
+        globalDistance,
+        lateralMetres,
+        surfaceHalfWidth,
+        globalStart,
+        fieldLength,
+        gridContract,
+        gridSpacing,
+        gridLateral,
+        gridLongitudinal);
     // The current committed Layer C state is the production presentation
     // authority. Point-velocity residual backtracing was retired after Unity
     // validation proved that it oscillated around conservative closed faces.
@@ -1613,18 +1775,29 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float2 warpUV = RiverWaterFoamMetresToFieldUV(
         warpMetres,
         fieldLength,
-        surfaceHalfWidth);
-    float2 visualFoamUV = saturate(foamUV - warpUV);
+        surfaceHalfWidth,
+        gridContract,
+        gridSpacing,
+        gridLateral,
+        gridLongitudinal);
+    float2 visualFoamUVRaw = foamUV - warpUV;
+    bool visualFoamSampleValid = RiverWaterFoamFieldUVInsideValidSample(
+        visualFoamUVRaw,
+        gridContract,
+        gridLongitudinal);
+    float2 visualFoamUV = saturate(visualFoamUVRaw);
 
-    float4 visualState = RiverWaterFoamSampleInterpolatedState(
-        TEXTURE2D_ARGS(
-            previousFoam,
-            previousFoamSampler),
-        TEXTURE2D_ARGS(
-            currentFoam,
-            currentFoamSampler),
-        visualFoamUV,
-        blend);
+    float4 visualState = visualFoamSampleValid
+        ? RiverWaterFoamSampleInterpolatedState(
+            TEXTURE2D_ARGS(
+                previousFoam,
+                previousFoamSampler),
+            TEXTURE2D_ARGS(
+                currentFoam,
+                currentFoamSampler),
+            visualFoamUV,
+            blend)
+        : 0.0.xxxx;
 
     float visualSoftVisibility;
     float visualStrandSoftVisibility;
@@ -1699,26 +1872,44 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float2 stretchUV = RiverWaterFoamMetresToFieldUV(
             stretchDirection * stretchMetres,
             fieldLength,
-            surfaceHalfWidth);
+            surfaceHalfWidth,
+            gridContract,
+            gridSpacing,
+            gridLateral,
+            gridLongitudinal);
 
-        float4 leadState = RiverWaterFoamSampleInterpolatedState(
-            TEXTURE2D_ARGS(
-                previousFoam,
-                previousFoamSampler),
-            TEXTURE2D_ARGS(
-                currentFoam,
-                currentFoamSampler),
-            saturate(visualFoamUV - stretchUV),
-            blend);
-        float4 trailState = RiverWaterFoamSampleInterpolatedState(
-            TEXTURE2D_ARGS(
-                previousFoam,
-                previousFoamSampler),
-            TEXTURE2D_ARGS(
-                currentFoam,
-                currentFoamSampler),
-            saturate(visualFoamUV + stretchUV),
-            blend);
+        float2 leadFoamUVRaw = visualFoamUVRaw - stretchUV;
+        float2 trailFoamUVRaw = visualFoamUVRaw + stretchUV;
+        bool leadSampleValid = RiverWaterFoamFieldUVInsideValidSample(
+            leadFoamUVRaw,
+            gridContract,
+            gridLongitudinal);
+        bool trailSampleValid = RiverWaterFoamFieldUVInsideValidSample(
+            trailFoamUVRaw,
+            gridContract,
+            gridLongitudinal);
+        float4 leadState = leadSampleValid
+            ? RiverWaterFoamSampleInterpolatedState(
+                TEXTURE2D_ARGS(
+                    previousFoam,
+                    previousFoamSampler),
+                TEXTURE2D_ARGS(
+                    currentFoam,
+                    currentFoamSampler),
+                saturate(leadFoamUVRaw),
+                blend)
+            : 0.0.xxxx;
+        float4 trailState = trailSampleValid
+            ? RiverWaterFoamSampleInterpolatedState(
+                TEXTURE2D_ARGS(
+                    previousFoam,
+                    previousFoamSampler),
+                TEXTURE2D_ARGS(
+                    currentFoam,
+                    currentFoamSampler),
+                saturate(trailFoamUVRaw),
+                blend)
+            : 0.0.xxxx;
 
         float leadSoftVisibility;
         float leadStrandSoftVisibility;

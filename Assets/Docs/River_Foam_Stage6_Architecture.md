@@ -1,5 +1,27 @@
 # Current accepted Chipping baseline — `4.11C.5.17D.1C`
 
+## Fixed-metric River Foam coordinate status — P11
+
+The coordinate-consumer migration through `RG-METRIC-P9` and the P10/P10a diagnostic/Inspector cleanup are Unity-validated and closed. The final endpoint report passed actual GPU Film Source, visual-occupancy, and shape execution; production/debug same-point mapping; resource ownership; cleanup; and assigned-cache immutability.
+
+`RG-METRIC-P11` completed the repository-wide mechanical and consistency audit without finding a production defect. CPU/GPU descriptor lanes, structured-buffer ABI, all 23 kernels and C# lookups, shader properties/bindings, cache schema/fingerprints, fixed-versus-legacy branches, migrated coordinate consumers, Inspector actions, and canonical statuses are consistent.
+
+The active runtime still uses `LegacyNormalizedAcross`. A complete `FixedMetricLattice` candidate descriptor is prepared but deliberately inactive until the P12 visual/performance sweep. P11 changes documentation only; it does not change source geometry, transport, topology, film, shape, rendering, resources, caches, scenes, prefabs, materials, or serialized River values.
+
+Current Inspector ownership is:
+
+```text
+Runtime Diagnostics → Foam
+  active descriptor + fixed candidate + CFL/curvature + memory/dispatch evidence
+
+Actions → Foam Cache & Validation
+  normal cache lifecycle + current P9 endpoint regression
+  Historical / Deep Diagnostics (collapsed by default)
+```
+
+No new Debug View is introduced. Fixed-metric activation and quality selection remain P12; final tuning/cache freeze remain P13.
+
+
 Static Chipping work is complete for the current milestone and is Unity-validated as a whole.
 
 Accepted production sequence:
@@ -1120,7 +1142,7 @@ Missing / incompatible
   do not retry, generate, read back, or save during Play.
 ```
 
-The authoring workflow is **Actions → Foam Layer A Cache Tools → Prepare / Rebuild Foam Topology Cache**. It runs outside Play, reuses the existing obstacle/Major/Connector/Pocket generators, builds one payload, stores the assigned cache once, and calls `SaveAssets` once. A matching next Play entry must install the exact cache with zero topology builds.
+The authoring workflow is **Actions → Foam Cache & Validation → Prepare / Rebuild Foam Topology Cache**. It runs outside Play, reuses the existing obstacle/Major/Connector/Pocket generators, builds one payload, stores the assigned cache once, and calls `SaveAssets` once. A matching next Play entry must install the exact cache with zero topology builds.
 
 One compact `[River Foam P1] Startup` summary is emitted per startup outcome. It records total wall time, field dimensions, cache outcome/reason flags, phase counts/times, topology-build counts, registry event counts, dirty cycles, restarts, and Play cache-write attempts. Detailed per-event success logging remains prohibited.
 

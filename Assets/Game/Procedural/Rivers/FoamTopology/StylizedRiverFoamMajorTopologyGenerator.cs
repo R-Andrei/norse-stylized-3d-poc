@@ -17,6 +17,8 @@ namespace ProgrammaticStylized3D.Rivers
         private const int MaximumLongitudinalOpportunityCount = 48;
         private const int PlacementVariantCount = 3;
         private const float MajorCoverageThreshold = 0.15f;
+        private const float MajorCoverageReferenceAreaSquareMetres = 0.02f;
+        private const float MinimumNewCoverageUnits = 4f;
         private const float GoldenRatioConjugate = 0.61803398875f;
         private const int MaximumRecycleAnchorCount = 6;
         private const int RecycleAnchorAttemptCount = 15;
@@ -40,7 +42,59 @@ namespace ProgrammaticStylized3D.Rivers
             int seed,
             float[] obstacleMask)
         {
+            int columnsPerChunk = Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    StylizedRiverFoamGridDescriptor
+                        .LongitudinalChunkLengthMetres /
+                    Mathf.Max(0.0001f, fieldLength / Mathf.Max(1, width))));
+            if (width % columnsPerChunk != 0)
+            {
+                columnsPerChunk = width;
+            }
+
+            int chunkCount = Mathf.Max(1, width / columnsPerChunk);
+            StylizedRiverFoamGridDescriptor descriptor =
+                StylizedRiverFoamGridDescriptor.CreateLegacyNormalized(
+                    quality,
+                    chunkCount,
+                    columnsPerChunk,
+                    width,
+                    height,
+                    Mathf.Max(1, Mathf.CeilToInt(width * 0.5f)),
+                    Mathf.Max(1, Mathf.CeilToInt(height * 0.5f)),
+                    fieldLength,
+                    validFieldLength);
+            return Generate(
+                domain,
+                descriptor,
+                quality,
+                shoreMotion,
+                amount,
+                size,
+                sizeVariation,
+                recycleTerritoryDeviationPercent,
+                seed,
+                obstacleMask);
+        }
+
+        internal static StylizedRiverFoamMajorTopology Generate(
+            RiverDomainSnapshot domain,
+            StylizedRiverFoamGridDescriptor descriptor,
+            StylizedRiverQuality quality,
+            float shoreMotion,
+            float amount,
+            float size,
+            float sizeVariation,
+            float recycleTerritoryDeviationPercent,
+            int seed,
+            float[] obstacleMask)
+        {
             Stopwatch stopwatch = Stopwatch.StartNew();
+            int width = descriptor.ColumnCount;
+            int height = descriptor.RowCount;
+            float fieldLength = descriptor.AllocatedLengthMetres;
+            float validFieldLength = descriptor.ValidLengthMetres;
             int cellCount = Mathf.Max(0, width * height);
             float[] support = new float[cellCount];
             int rejectionReasonCount = Enum.GetValues(
@@ -81,10 +135,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool[] validCells = new bool[cellCount];
             int validCellCount = BuildFluidContext(
                 domain,
-                width,
-                height,
-                fieldLength,
-                validFieldLength,
+                descriptor,
                 quality,
                 shoreMotion,
                 obstacleMask,
@@ -215,6 +266,7 @@ namespace ProgrammaticStylized3D.Rivers
                         orientation,
                         requestedDiameter,
                         domain,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -289,6 +341,7 @@ namespace ProgrammaticStylized3D.Rivers
                         bestEvaluation,
                         opportunity.StableId,
                         domain,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -369,6 +422,7 @@ namespace ProgrammaticStylized3D.Rivers
                 CandidateEvaluation acceptedPlacement,
                 uint stableId,
                 RiverDomainSnapshot domain,
+                StylizedRiverFoamGridDescriptor descriptor,
                 int width,
                 int height,
                 float fieldLength,
@@ -448,6 +502,7 @@ namespace ProgrammaticStylized3D.Rivers
                         orientation,
                         metresPerCell,
                         domain,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -492,6 +547,7 @@ namespace ProgrammaticStylized3D.Rivers
                     acceptedPlacement.OrientationRadians,
                     fallbackScale,
                     domain,
+                    descriptor,
                     width,
                     height,
                     fieldLength,
@@ -553,6 +609,7 @@ namespace ProgrammaticStylized3D.Rivers
             float orientationRadians,
             float metresPerCandidateCell,
             RiverDomainSnapshot domain,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -569,16 +626,14 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamTopologyFieldSpace
                     .LocalDistanceToContainingTexel(
                         centreLocalDistance - alongRadius,
-                        width,
-                        fieldLength) - 1,
+                        descriptor) - 1,
                 0,
                 width - 1);
             int maximumX = Mathf.Clamp(
                 StylizedRiverFoamTopologyFieldSpace
                     .LocalDistanceToCeilingTexel(
                         centreLocalDistance + alongRadius,
-                        width,
-                        fieldLength) + 1,
+                        descriptor) + 1,
                 0,
                 width - 1);
 
@@ -595,10 +650,10 @@ namespace ProgrammaticStylized3D.Rivers
             for (int x = minimumX; x <= maximumX; x++)
             {
                 float localDistance =
-                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
-                        x,
-                        width,
-                        fieldLength);
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveLocalDistanceAtColumnCentre(
+                            descriptor,
+                            x);
                 float clampedDistance = Mathf.Clamp(
                     localDistance,
                     0f,
@@ -615,14 +670,13 @@ namespace ProgrammaticStylized3D.Rivers
 
                 for (int y = 0; y < height; y++)
                 {
-                    float across01 =
-                        StylizedRiverFoamTopologyFieldSpace.Across01AtTexel(
-                            y,
-                            height);
-                    float acrossMetres = StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
-                        across01,
-                        sample.LeftSurfaceHalfWidth,
-                        sample.RightSurfaceHalfWidth);
+                    float acrossMetres =
+                        StylizedRiverFoamTopologyFieldSpace
+                            .ResolveLateralMetresAtRowCentre(
+                                descriptor,
+                                y,
+                                sample.LeftSurfaceHalfWidth,
+                                sample.RightSurfaceHalfWidth);
                     float deltaAcross = acrossMetres - centreAcrossMetres;
                     float principalMajorMetres =
                         cosineOrientation * deltaAlong +
@@ -884,6 +938,7 @@ namespace ProgrammaticStylized3D.Rivers
             float orientationRadians,
             float requestedDiameter,
             RiverDomainSnapshot domain,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -947,16 +1002,14 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamTopologyFieldSpace
                     .LocalDistanceToContainingTexel(
                         minimumLocalDistance,
-                        width,
-                        fieldLength) - 1,
+                        descriptor) - 1,
                 0,
                 width - 1);
             int maximumX = Mathf.Clamp(
                 StylizedRiverFoamTopologyFieldSpace
                     .LocalDistanceToCeilingTexel(
                         maximumLocalDistance,
-                        width,
-                        fieldLength) + 1,
+                        descriptor) + 1,
                 0,
                 width - 1);
 
@@ -975,10 +1028,10 @@ namespace ProgrammaticStylized3D.Rivers
             for (int x = minimumX; x <= maximumX; x++)
             {
                 float localDistance =
-                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
-                        x,
-                        width,
-                        fieldLength);
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveLocalDistanceAtColumnCentre(
+                            descriptor,
+                            x);
                 float clampedLocalDistance = Mathf.Clamp(
                     localDistance,
                     0f,
@@ -996,14 +1049,13 @@ namespace ProgrammaticStylized3D.Rivers
 
                 for (int y = 0; y < height; y++)
                 {
-                    float across01 =
-                        StylizedRiverFoamTopologyFieldSpace.Across01AtTexel(
-                            y,
-                            height);
-                    float acrossMetres = StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
-                        across01,
-                        sample.LeftSurfaceHalfWidth,
-                        sample.RightSurfaceHalfWidth);
+                    float acrossMetres =
+                        StylizedRiverFoamTopologyFieldSpace
+                            .ResolveLateralMetresAtRowCentre(
+                                descriptor,
+                                y,
+                                sample.LeftSurfaceHalfWidth,
+                                sample.RightSurfaceHalfWidth);
                     float deltaAcross = acrossMetres - centreAcrossMetres;
                     float principalMajorMetres =
                         cosineOrientation * deltaAlong +
@@ -1074,6 +1126,11 @@ namespace ProgrammaticStylized3D.Rivers
             float outsideDomainRatio = outsideDomainWeight / totalWeight;
             float overlapRatio = overlapWeight / effectiveWeight;
             int coveredCellCountAfter = coveredCellCount + newCoveredCells;
+            float newCoverageUnits = descriptor.UsesFixedMetricLattice
+                ? newCoveredCells * descriptor.ResolvedDxMetres *
+                    descriptor.ResolvedDyMetres /
+                    MajorCoverageReferenceAreaSquareMetres
+                : newCoveredCells;
             float spacingScore = EvaluateSpacing(
                 opportunity.CentreLocalDistance,
                 centreAcrossNormalized,
@@ -1105,7 +1162,7 @@ namespace ProgrammaticStylized3D.Rivers
                         .BankClipping;
             }
             else if (crowdingFailure || overlapRatio > 0.34f ||
-                     newCoveredCells < 4)
+                     newCoverageUnits < MinimumNewCoverageUnits)
             {
                 rejectionReason =
                     StylizedRiverFoamMajorPlacementRejectionReason
@@ -1137,9 +1194,10 @@ namespace ProgrammaticStylized3D.Rivers
             float leeContext = HasUpstreamObstacle(
                 opportunity.CentreLocalDistance,
                 centreAcrossNormalized,
+                domain,
+                descriptor,
                 width,
                 height,
-                fieldLength,
                 validFieldLength,
                 obstacleMask)
                     ? 1f
@@ -1150,7 +1208,7 @@ namespace ProgrammaticStylized3D.Rivers
                 shape.AspectRatio,
                 acceptedPlacements);
             float score =
-                newCoveredCells * 0.01f +
+                newCoverageUnits * 0.01f +
                 spacingScore * 0.18f +
                 lateralBalanceScore +
                 bankContext * 0.055f +
@@ -1266,9 +1324,10 @@ namespace ProgrammaticStylized3D.Rivers
         private static bool HasUpstreamObstacle(
             float centreLocalDistance,
             float centreAcrossNormalized,
+            RiverDomainSnapshot domain,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
-            float fieldLength,
             float validFieldLength,
             float[] obstacleMask)
         {
@@ -1280,16 +1339,41 @@ namespace ProgrammaticStylized3D.Rivers
             int centreX = StylizedRiverFoamTopologyFieldSpace
                 .LocalDistanceToContainingTexel(
                     centreLocalDistance,
-                    width,
-                    fieldLength);
-            int centreY = StylizedRiverFoamTopologyFieldSpace
-                .SignedAcrossNormalizedToContainingTexel(
-                    centreAcrossNormalized,
-                    height);
-            float longitudinalSpacing =
-                StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
-                    fieldLength,
-                    width);
+                    descriptor);
+            int centreY;
+            if (descriptor.UsesFixedMetricLattice)
+            {
+                StylizedRiverSplineSample centreSample =
+                    domain.SampleAtOrientedDistance(Mathf.Clamp(
+                        centreLocalDistance,
+                        0f,
+                        validFieldLength));
+                float centreLateralMetres =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .SignedNormalizedToMetres(
+                            centreAcrossNormalized,
+                            Mathf.Max(0.05f, centreSample.LeftHalfWidth),
+                            Mathf.Max(0.05f, centreSample.RightHalfWidth));
+                centreY = descriptor.TryMetricToContainingCell(
+                        new Vector2(
+                            centreLocalDistance,
+                            centreLateralMetres),
+                        out Vector2Int centreCell)
+                    ? centreCell.y
+                    : Mathf.Clamp(
+                        descriptor.ResolveNearestGlobalY(
+                            centreLateralMetres) - descriptor.GlobalYBase,
+                        0,
+                        height - 1);
+            }
+            else
+            {
+                centreY = StylizedRiverFoamTopologyFieldSpace
+                    .SignedAcrossNormalizedToContainingTexel(
+                        centreAcrossNormalized,
+                        height);
+            }
+            float longitudinalSpacing = descriptor.ResolvedDxMetres;
             int upstreamCells = Mathf.Clamp(
                 Mathf.CeilToInt(3.2f / longitudinalSpacing),
                 1,
@@ -1298,17 +1382,22 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.FloorToInt(0.35f / longitudinalSpacing),
                 0,
                 upstreamCells);
-            int lateralCells = Mathf.Max(2, Mathf.RoundToInt(height * 0.08f));
+            int lateralCells = descriptor.UsesFixedMetricLattice
+                ? Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(
+                        0.40f / Mathf.Max(0.0001f, descriptor.ResolvedDyMetres)))
+                : Mathf.Max(2, Mathf.RoundToInt(height * 0.08f));
 
             for (int x = Mathf.Max(0, centreX - upstreamCells);
                  x <= Mathf.Max(0, centreX - immediateCells);
                  x++)
             {
                 float localDistance =
-                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
-                        x,
-                        width,
-                        fieldLength);
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveLocalDistanceAtColumnCentre(
+                            descriptor,
+                            x);
                 if (localDistance > validFieldLength)
                 {
                     continue;
@@ -1330,23 +1419,16 @@ namespace ProgrammaticStylized3D.Rivers
 
         internal static int BuildFluidContext(
             RiverDomainSnapshot domain,
-            int width,
-            int height,
-            float fieldLength,
-            float validFieldLength,
+            StylizedRiverFoamGridDescriptor descriptor,
             StylizedRiverQuality quality,
             float shoreMotion,
             float[] obstacleMask,
             float[] fluidCoverage,
             bool[] validCells)
         {
-            float edgeCells = quality switch
-            {
-                StylizedRiverQuality.Low => 1.5f,
-                StylizedRiverQuality.Medium => 2f,
-                StylizedRiverQuality.High => 2.5f,
-                _ => 2f
-            };
+            int width = descriptor.ColumnCount;
+            int height = descriptor.RowCount;
+            float validFieldLength = descriptor.ValidLengthMetres;
             float animatedEnvelope = Mathf.Lerp(
                 0.25f,
                 0.90f,
@@ -1356,10 +1438,10 @@ namespace ProgrammaticStylized3D.Rivers
             for (int x = 0; x < width; x++)
             {
                 float localDistance =
-                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
-                        x,
-                        width,
-                        fieldLength);
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveLocalDistanceAtColumnCentre(
+                            descriptor,
+                            x);
                 if (localDistance > validFieldLength + 0.0001f)
                 {
                     continue;
@@ -1384,22 +1466,23 @@ namespace ProgrammaticStylized3D.Rivers
                     rightVisible,
                     rightSurface,
                     animatedEnvelope);
-                float edgeWidth = Mathf.Max(
-                    0.05f,
-                    StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
-                        leftSurface + rightSurface,
-                        height) * edgeCells);
+                float edgeWidth =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveBoundaryFeatherWidthMetres(
+                            descriptor,
+                            quality,
+                            leftSurface,
+                            rightSurface);
 
                 for (int y = 0; y < height; y++)
                 {
-                    float across01 =
-                        StylizedRiverFoamTopologyFieldSpace.Across01AtTexel(
-                            y,
-                            height);
-                    float lateral = StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
-                        across01,
-                        leftSurface,
-                        rightSurface);
+                    float lateral =
+                        StylizedRiverFoamTopologyFieldSpace
+                            .ResolveLateralMetresAtRowCentre(
+                                descriptor,
+                                y,
+                                sample.LeftSurfaceHalfWidth,
+                                sample.RightSurfaceHalfWidth);
                     float reach = lateral < 0f ? leftReach : rightReach;
                     float coverage = Mathf.Clamp01(
                         (reach - Mathf.Abs(lateral)) / edgeWidth);

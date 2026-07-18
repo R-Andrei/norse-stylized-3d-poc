@@ -13,6 +13,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private const float EdgeWearMinimumViableDihedralDegrees = 15f;
         private const float EdgeWearMinimumFootprintLengthMultiplier = 2f;
         private const float EdgeWearMinimumFeasibleWidthFraction = 0.25f;
+        private const float EdgeWearMaterialWidthRecoveryFootprintMultiplier =
+            2f;
         private const float EdgeWearMinimumStyleWidthSetting = 0.05f;
         private const float EdgeWearMinimumCentralSpanWidthMultiplier = 0.5f;
 
@@ -25,13 +27,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float amount01,
             float requestedWidth,
             bool includeAllGeometricCandidates,
+            EdgeWearMicroTopologyNormalizationResult
+                microTopologyNormalization,
             out EdgeWearCoverageAudit coverageAudit)
         {
             bool maximumCoverageMode =
                 settings.EdgeWearCoverage >= 2f - 0.0001f;
             coverageAudit = new EdgeWearCoverageAudit(
                 maximumCoverageMode,
-                includeAllGeometricCandidates);
+                includeAllGeometricCandidates)
+            {
+                MicroTopologyNormalization = microTopologyNormalization
+            };
             System.Diagnostics.Stopwatch viabilityStopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
 
@@ -73,7 +80,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
-            coverageAudit.RawSourceEdgeCount = edgeIndexByKey.Count;
+            coverageAudit.RawSourceEdgeCount =
+                microTopologyNormalization != null &&
+                microTopologyNormalization.OriginalEdgeCount > 0
+                    ? microTopologyNormalization.OriginalEdgeCount
+                    : edgeIndexByKey.Count;
+            AddEdgeWearMicroTopologySuppressedRecords(
+                coverageAudit,
+                microTopologyNormalization);
             coverageAudit.CoincidentBoundarySeamPairCount =
                 coincidentBoundarySeamPairCount;
 
@@ -122,7 +136,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         Vertical01 = Mathf.InverseLerp(
                             bounds.min.y,
                             bounds.max.y,
-                            midpoint.y)
+                            midpoint.y),
+                        OriginalSourceEdgeIndex =
+                            microTopologyNormalization == null
+                                ? -1
+                                : microTopologyNormalization.
+                                    ResolveOriginalSourceEdgeIndex(
+                                        edgeKey,
+                                        -1),
+                        MicroTopologyGeneratedTransition =
+                            microTopologyNormalization != null &&
+                            microTopologyNormalization.
+                                GeneratedTransitionKeys.Contains(edgeKey)
                     };
                 EdgeWearEdgeViabilityRecord viability =
                     new EdgeWearEdgeViabilityRecord
@@ -143,6 +168,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 coverageAudit.Records.Add(lifecycle);
                 coverageAudit.RecordByKey[edgeKey] = lifecycle;
                 coverageAudit.ViabilityByKey[edgeKey] = viability;
+
+                if (lifecycle.MicroTopologyGeneratedTransition)
+                {
+                    lifecycle.ViabilityState =
+                        EdgeWearViabilityState.StructuralIneligible;
+                    lifecycle.CandidateReason =
+                        "micro-topology-generated-transition";
+                    lifecycle.FinalReason = lifecycle.CandidateReason;
+                    viability.FailureReason = lifecycle.CandidateReason;
+                    continue;
+                }
 
                 if (edge.FaceIndices.Count != 2)
                 {
@@ -354,12 +390,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 lifecycle.ArtisticCharacterBoost = characterBoost;
                 lifecycle.ArtisticRandomScore = random;
 
+                int deterministicVariationIdentity =
+                    lifecycle.OriginalSourceEdgeIndex >= 0
+                        ? lifecycle.OriginalSourceEdgeIndex
+                        : provisionalCandidateIndex;
                 float deterministicVariation = Mathf.Lerp(
                     0.90f,
                     1.08f,
                     Hash01(
                         settings.SurfaceSeed + 0x29AF,
-                        provisionalCandidateIndex));
+                        deterministicVariationIdentity));
                 float strength = Mathf.Clamp01(
                     amount01 *
                     Mathf.Lerp(0.86f, 1.06f, random) *
@@ -517,6 +557,59 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 viabilityStopwatch.Elapsed.TotalMilliseconds;
             RecalculateEdgeWearCoverageAudit(coverageAudit);
             return candidates;
+        }
+
+        private static void AddEdgeWearMicroTopologySuppressedRecords(
+            EdgeWearCoverageAudit audit,
+            EdgeWearMicroTopologyNormalizationResult normalization)
+        {
+            if (audit == null || normalization == null ||
+                normalization.SuppressedEdges.Count == 0)
+            {
+                return;
+            }
+
+            for (int suppressedIndex = 0;
+                 suppressedIndex < normalization.SuppressedEdges.Count;
+                 suppressedIndex++)
+            {
+                EdgeWearMicroTopologySuppressedEdge suppressed =
+                    normalization.SuppressedEdges[suppressedIndex];
+                EdgeKey key = new EdgeKey(
+                    suppressed.Start,
+                    suppressed.End);
+                EdgeWearEdgeViabilityRecord viability =
+                    new EdgeWearEdgeViabilityRecord
+                    {
+                        Key = key,
+                        SourceEdgeIndex = -1,
+                        Evaluated = true,
+                        Viable = false,
+                        FailureReason = "micro-topology-suppressed"
+                    };
+                EdgeWearEdgeLifecycleRecord lifecycle =
+                    new EdgeWearEdgeLifecycleRecord
+                    {
+                        Key = key,
+                        SourceEdgeIndex = -1,
+                        OriginalSourceEdgeIndex =
+                            suppressed.OriginalSourceEdgeIndex,
+                        MicroTopologySuppressed = true,
+                        Start = suppressed.Start,
+                        End = suppressed.End,
+                        Midpoint =
+                            (suppressed.Start + suppressed.End) * 0.5f,
+                        Length = suppressed.Length,
+                        Viability = viability,
+                        ViabilityState =
+                            EdgeWearViabilityState.StructuralIneligible,
+                        CandidateReason = "micro-topology-suppressed",
+                        FinalReason = "micro-topology-suppressed"
+                    };
+                audit.Records.Add(lifecycle);
+                audit.RecordByKey[key] = lifecycle;
+                audit.ViabilityByKey[key] = viability;
+            }
         }
 
         private static EdgeWearEdgeAggregate
@@ -904,6 +997,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 EdgeWearEdgeLifecycleRecord record =
                     audit.Records[recordIndex];
+                if (record.MicroTopologySuppressed)
+                {
+                    record.SourceEdgeIndex = -1;
+                    continue;
+                }
                 if (!graph.EdgeByKey.TryGetValue(
                         record.Key,
                         out int graphEdgeIndex))
@@ -913,6 +1011,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
                 record.SourceEdgeIndex = graphEdgeIndex;
+                if (record.OriginalSourceEdgeIndex < 0 &&
+                    !record.MicroTopologyGeneratedTransition)
+                {
+                    record.OriginalSourceEdgeIndex = graphEdgeIndex;
+                }
                 audit.RecordByGraphEdge[graphEdgeIndex] = record;
                 if (record.Viability != null)
                 {
@@ -1069,6 +1172,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     viability.IsolatedMaximumCertifiedWidth +
                         PointMergeDistance >=
                     viability.MinimumRequiredCertifiedWidth;
+                viability.MaterialWidthRecoveryRequiredLength =
+                    viability.RequiredFootprintLength *
+                    EdgeWearMaterialWidthRecoveryFootprintMultiplier;
+                viability.MaterialWidthRecoveryEligible =
+                    IsEdgeWearMaterialWidthRecoveryEligible(lifecycle);
                 viability.MultiSupportHullRecovery =
                     isolated.MultiSupportHullPointCount > 0 &&
                     isolated.GeometryValid == 1;
@@ -1100,6 +1208,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     EdgeWearViabilityState.ViableUnselected;
                 lifecycle.FinalReason = "viable-unselected";
             }
+        }
+
+        private static bool IsEdgeWearMaterialWidthRecoveryEligible(
+            EdgeWearEdgeLifecycleRecord lifecycle)
+        {
+            if (lifecycle == null || lifecycle.Viability == null)
+            {
+                return false;
+            }
+
+            EdgeWearEdgeViabilityRecord viability = lifecycle.Viability;
+            return viability.WidthRecoveryProvisional &&
+                viability.IsolatedSucceeded &&
+                viability.IsolatedConstructionValid &&
+                !viability.FeasibleWidthFractionValid &&
+                viability.IsolatedMaximumCertifiedWidth +
+                    PointMergeDistance >=
+                    viability.MinimumRequiredCertifiedWidth &&
+                lifecycle.ArtisticEligible &&
+                lifecycle.Length + PointMergeDistance >=
+                    viability.MaterialWidthRecoveryRequiredLength;
         }
 
         private static string ResolveEdgeWearIsolatedViabilityFailure(
@@ -1268,6 +1397,51 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return true;
         }
 
+        private static SortedSet<int>
+            CaptureImmutableMaterialWidthRecoveryTargets(
+                ChamferTopologyContext context,
+                EdgeWearCoverageAudit audit)
+        {
+            SortedSet<int> targets = new SortedSet<int>();
+            if (context == null || audit == null)
+            {
+                return targets;
+            }
+
+            for (int recordIndex = 0;
+                 recordIndex < audit.Records.Count;
+                 recordIndex++)
+            {
+                audit.Records[recordIndex].MaterialWidthRecoveryTarget = false;
+            }
+
+            for (int selectedIndex = 0;
+                 selectedIndex < context.SelectedEdges.Count;
+                 selectedIndex++)
+            {
+                int graphEdgeIndex =
+                    context.SelectedEdges[selectedIndex].GraphEdgeIndex;
+                if (!audit.RecordByGraphEdge.TryGetValue(
+                        graphEdgeIndex,
+                        out EdgeWearEdgeLifecycleRecord record) ||
+                    record == null || record.Viability == null)
+                {
+                    continue;
+                }
+
+                record.Viability.MaterialWidthRecoveryEligible =
+                    IsEdgeWearMaterialWidthRecoveryEligible(record);
+                if (!record.Viability.MaterialWidthRecoveryEligible)
+                {
+                    continue;
+                }
+
+                record.MaterialWidthRecoveryTarget = true;
+                targets.Add(graphEdgeIndex);
+            }
+            return targets;
+        }
+
         private static void MapEdgeWearCoverageAuditToGraph(
             EdgeWearCoverageAudit audit,
             ChamferTopologyContext context)
@@ -1389,17 +1563,37 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 if (width <= PointMergeDistance)
                 {
-                    CaptureFinalCornerInactiveRecoveryEvidence(
-                        record,
-                        solution,
-                        selected.GraphEdgeIndex);
-                    SetEdgeWearCornerWidthCoexistenceIneligibility(
-                        record,
-                        width,
-                        "corner-width-inactive");
+                    bool forcedDeferred =
+                        solution.ForcedDeferredEdges.Contains(
+                            selected.GraphEdgeIndex);
+                    bool recoveryBaselineDeferred = forcedDeferred &&
+                        record.Viability != null &&
+                        record.Viability.WidthRecoveryProvisional;
+                    if (recoveryBaselineDeferred)
+                    {
+                        record.RecoveryBaselineDeferred = true;
+                        SetEdgeWearCornerWidthCoexistenceIneligibility(
+                            record,
+                            width,
+                            "recovery-baseline-deferred");
+                    }
+                    else
+                    {
+                        CaptureFinalCornerInactiveRecoveryEvidence(
+                            record,
+                            solution,
+                            selected.GraphEdgeIndex);
+                        SetEdgeWearCornerWidthCoexistenceIneligibility(
+                            record,
+                            width,
+                            forcedDeferred
+                                ? "augmentation-forced-deferred"
+                                : "corner-width-inactive");
+                    }
                     continue;
                 }
 
+                record.RecoveryBaselineDeferred = false;
                 record.SolvedWidth = width;
                 record.ArtisticSolvedWidthFraction =
                     record.Viability == null ||
@@ -1578,7 +1772,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     !baseline.GeometricEligible)
                 {
                     audit.RecoveredGeometricEdgeIndices.Add(
-                        record.SourceEdgeIndex);
+                        record.OriginalSourceEdgeIndex >= 0
+                            ? record.OriginalSourceEdgeIndex
+                            : record.SourceEdgeIndex);
                 }
             }
 
@@ -1598,7 +1794,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     !current.GeometricEligible)
                 {
                     audit.CollateralLostEdgeIndices.Add(
-                        baseline.SourceEdgeIndex);
+                        baseline.OriginalSourceEdgeIndex);
                     continue;
                 }
 
@@ -1607,7 +1803,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         current))
                 {
                     audit.CollateralChangedEdgeIndices.Add(
-                        baseline.SourceEdgeIndex);
+                        baseline.OriginalSourceEdgeIndex);
                 }
             }
 
@@ -1760,6 +1956,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     audit.CornerWidthInactiveExclusionCount++;
                     audit.CoexistencePreShellExclusionCount++;
                 }
+                else if (record.ViabilityState ==
+                        EdgeWearViabilityState.CoexistenceIneligible &&
+                    (string.Equals(
+                         coexistenceReason,
+                         "recovery-baseline-deferred",
+                         StringComparison.Ordinal) ||
+                     string.Equals(
+                         coexistenceReason,
+                         "augmentation-forced-deferred",
+                         StringComparison.Ordinal)))
+                {
+                    audit.CoexistencePreShellExclusionCount++;
+                }
                 if (record.WidthReduced)
                 {
                     audit.WidthReducedCount++;
@@ -1788,7 +1997,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     audit.RejectedCount++;
                 }
-                if (record.SourceEdgeIndex < 0)
+                if (record.SourceEdgeIndex < 0 &&
+                    !record.MicroTopologySuppressed)
                 {
                     audit.UnmappedCount++;
                 }
@@ -2373,7 +2583,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 corners,
                 widthByEdge,
                 sharedSpans,
-                cornerConflicts);
+                cornerConflicts,
+                forcedDeferredEdges);
             return true;
         }
 

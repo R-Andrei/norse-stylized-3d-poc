@@ -689,11 +689,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                       $"{runtime.MaterialStepsLastFrame} steps last frame"
                     : unavailable);
             DrawReadOnlyRow(
-                new GUIContent("Maximum CFL"),
+                new GUIContent(
+                    "Step CFL",
+                    "Whole material-step transport demand before subdivision."),
                 runtime != null
-                    ? $"{runtime.TransportStepCfl:0.000} step / " +
-                      $"{runtime.MaximumTransportCfl:0.000} per substep / " +
+                    ? $"total {runtime.TransportStepCfl:0.000} / " +
+                      $"downstream {runtime.TransportDownstreamStepCfl:0.000} / " +
+                      $"lateral {runtime.TransportLateralStepCfl:0.000}"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Per-Substep CFL",
+                    "Maximum resolved CFL after the current subdivision policy."),
+                runtime != null
+                    ? $"{runtime.MaximumTransportCfl:0.000} / " +
                       $"{runtime.TransportCflTarget:0.000} target"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Curvilinear Metric",
+                    "Minimum raw and bounded Jacobian plus the maximum absolute " +
+                    "curvature-lateral product used by fixed transport."),
+                runtime != null
+                    ? $"raw Jmin {runtime.MinimumTransportRawJacobian:0.000} / " +
+                      $"bounded {runtime.MinimumTransportBoundedJacobian:0.000} / " +
+                      $"max |κn| " +
+                      $"{runtime.MaximumAbsoluteTransportCurvatureLateralProduct:0.000}"
                     : unavailable);
             DrawReadOnlyRow(
                 new GUIContent("Substeps"),
@@ -1141,6 +1162,21 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 out StylizedRiverFoamRuntime runtime,
                 out string unavailable);
 
+            long activeStructuralCellCount = runtime != null
+                ? (long)runtime.StructuralWidth * runtime.StructuralHeight
+                : 0L;
+            long candidateStructuralCellCount = runtime != null
+                ? runtime.FoamFixedMetricCandidateStructuralCellCount
+                : 0L;
+            string cellCountComparison = runtime == null
+                ? unavailable
+                : activeStructuralCellCount <= 0L ||
+                  candidateStructuralCellCount <= 0L
+                    ? "Unavailable"
+                    : $"candidate {candidateStructuralCellCount:N0} / " +
+                      $"active {activeStructuralCellCount:N0} / " +
+                      $"{candidateStructuralCellCount / (double)activeStructuralCellCount:0.00}×";
+
             DrawReadOnlyRow(
                 new GUIContent("Runtime State"),
                 runtime != null
@@ -1148,6 +1184,72 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         ? runtime.IsSleeping ? "Sleeping" : "Active"
                         : "Component disabled"
                     : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Active Grid Contract",
+                    "Current runtime coordinate mapping and immutable descriptor " +
+                    "contract identifiers."),
+                runtime != null
+                    ? $"{runtime.FoamGridMapping} / descriptor-v" +
+                      $"{runtime.FoamGridDescriptorContractVersion} / mapping-v" +
+                      $"{runtime.FoamGridMappingContractVersion} / " +
+                      runtime.FoamGridInitializationSignature
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Active Grid Geometry",
+                    "Current structural dimensions and descriptor-owned spacing."),
+                runtime != null
+                    ? $"{runtime.StructuralWidth} × {runtime.StructuralHeight} / " +
+                      $"dx {runtime.FoamGridResolvedDxMetres:0.000} m / " +
+                      $"dy {runtime.FoamGridResolvedDyMetres:0.000} m"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Active Lateral Contract",
+                    "Global lattice row base/count and represented lateral " +
+                    "extent of the current descriptor."),
+                runtime != null
+                    ? $"rows {runtime.FoamGridGlobalYBase} + " +
+                      $"{runtime.FoamGridRowCount} / " +
+                      $"{runtime.FoamGridRepresentedLateralMinimumMetres:0.000}…" +
+                      $"{runtime.FoamGridRepresentedLateralMaximumMetres:0.000} m"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Fixed Candidate",
+                    "Prepared fixed-metric descriptor state. Runtime activation " +
+                    "remains deliberately deferred to the candidate sweep."),
+                runtime != null
+                    ? runtime.FoamFixedMetricCandidateAvailable
+                        ? $"{runtime.FoamFixedMetricCandidateStatus} / activation " +
+                          (runtime.FoamFixedMetricRuntimeActivationDeferred
+                              ? "deferred"
+                              : "allowed")
+                        : runtime.FoamFixedMetricCandidateStatus
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Fixed Candidate Geometry",
+                    "Structural/film dimensions, spacing, and represented lateral " +
+                    "extent of the prepared candidate."),
+                runtime != null && runtime.FoamFixedMetricCandidateAvailable
+                    ? $"{runtime.FoamFixedMetricCandidateWidth} × " +
+                      $"{runtime.FoamFixedMetricCandidateHeight} / film " +
+                      $"{runtime.FoamFixedMetricCandidateFilmWidth} × " +
+                      $"{runtime.FoamFixedMetricCandidateFilmHeight} / " +
+                      $"dx {runtime.FoamFixedMetricCandidateResolvedDxMetres:0.000} m / " +
+                      $"dy {runtime.FoamFixedMetricCandidateResolvedDyMetres:0.000} m / " +
+                      $"{runtime.FoamFixedMetricCandidateLateralMinimumMetres:0.000}…" +
+                      $"{runtime.FoamFixedMetricCandidateLateralMaximumMetres:0.000} m"
+                    : unavailable);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Candidate / Active Cells",
+                    "Allocation comparison only. The active legacy and prepared " +
+                    "fixed grids use different coordinate contracts, so this is " +
+                    "not reported as physical waste."),
+                cellCountComparison);
             DrawReadOnlyRow(
                 new GUIContent("Layer C State Textures"),
                 runtime != null

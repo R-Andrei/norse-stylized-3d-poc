@@ -483,7 +483,12 @@ namespace ProgrammaticStylized3D.Rivers
                 DomainVersion = domainVersion,
                 GlobalStart = allocatedGlobalStart,
                 FieldLength = fieldLength,
-                ValidFieldLength = validFieldLength
+                ValidFieldLength = validFieldLength,
+                Descriptor = gridDescriptor,
+                DescriptorGpuData = gridDescriptorGpuData,
+                MetricRows = (FoamMetricRow[])metricRows.Clone(),
+                MaterialLifetimeAuthorityActive =
+                    materialLifetimeAuthorityActive
             };
             topologyTransitionElapsed = 0f;
             topologyTransitionStartedCount++;
@@ -546,6 +551,27 @@ namespace ProgrammaticStylized3D.Rivers
                 evolvingWeakSpanNegativeTexture);
         }
 
+        private void ConfigureTopologyTransitionGridDescriptor(
+            int kernel,
+            StylizedRiverFoamGridGpuData descriptor)
+        {
+            computeShader.SetVector(
+                "_FoamTopologyTransitionGridDescriptorContract",
+                descriptor.Contract);
+            computeShader.SetVector(
+                "_FoamTopologyTransitionGridDescriptorSpacing",
+                descriptor.Spacing);
+            computeShader.SetVector(
+                "_FoamTopologyTransitionGridDescriptorLateral",
+                descriptor.Lateral);
+            computeShader.SetVector(
+                "_FoamTopologyTransitionGridDescriptorLongitudinal",
+                descriptor.Longitudinal);
+            computeShader.SetVector(
+                "_FoamTopologyTransitionGridDescriptorExtent",
+                descriptor.Extent);
+        }
+
         private void ConfigureTopologyTransitionInputs(int kernel)
         {
             TopologyTransitionSnapshot snapshot = topologyTransitionSnapshot;
@@ -578,6 +604,9 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.SetFloat(
                     "_FoamTopologyTransitionValidLength",
                     validFieldLength);
+                ConfigureTopologyTransitionGridDescriptor(
+                    kernel,
+                    gridDescriptorGpuData);
                 computeShader.SetBuffer(
                     kernel,
                     "_FoamTopologyTransitionMetricRows",
@@ -590,13 +619,9 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             bool sameMapping = snapshot.DomainVersion == domainVersion &&
-                snapshot.Width == structuralWidth &&
-                snapshot.Height == structuralHeight &&
+                snapshot.Descriptor == gridDescriptor &&
                 Mathf.Abs(snapshot.GlobalStart - allocatedGlobalStart) <
-                    0.0001f &&
-                Mathf.Abs(snapshot.FieldLength - fieldLength) < 0.0001f &&
-                Mathf.Abs(snapshot.ValidFieldLength - validFieldLength) <
-                    0.0001f;
+                    TransportLatticeAlignmentTolerance;
             computeShader.SetFloat(
                 "_FoamTopologyTransitionEnabled",
                 1f);
@@ -619,6 +644,9 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamTopologyTransitionValidLength",
                 snapshot.ValidFieldLength);
+            ConfigureTopologyTransitionGridDescriptor(
+                kernel,
+                snapshot.DescriptorGpuData);
             computeShader.SetBuffer(
                 kernel,
                 "_FoamTopologyTransitionMetricRows",
@@ -693,6 +721,280 @@ namespace ProgrammaticStylized3D.Rivers
             boundaryTexture = null;
         }
 
+        private PersistentStateReplacementPolicy
+            ResolvePersistentStateReplacementPolicy(
+                TopologyTransitionSnapshot snapshot,
+                out int offsetX,
+                out int offsetY,
+                out string detail)
+        {
+            offsetX = 0;
+            offsetY = 0;
+            detail = "No held persistent state.";
+            if (snapshot == null || !snapshot.HoldsVisibleResources ||
+                snapshot.CurrentState == null)
+            {
+                return PersistentStateReplacementPolicy.None;
+            }
+
+            return ResolvePersistentStateReplacementPolicyContract(
+                snapshot.Descriptor,
+                snapshot.GlobalStart,
+                snapshot.MetricRows,
+                gridDescriptor,
+                allocatedGlobalStart,
+                metricRows,
+                out offsetX,
+                out offsetY,
+                out detail);
+        }
+
+        private static PersistentStateReplacementPolicy
+            ResolvePersistentStateReplacementPolicyContract(
+                StylizedRiverFoamGridDescriptor previous,
+                float previousGlobalStart,
+                FoamMetricRow[] previousMetricRows,
+                StylizedRiverFoamGridDescriptor current,
+                float currentGlobalStart,
+                FoamMetricRow[] currentMetricRows,
+                out int offsetX,
+                out int offsetY,
+                out string detail)
+        {
+            offsetX = 0;
+            offsetY = 0;
+            if (!previous.IsCreated || !current.IsCreated ||
+                !previous.UsesFixedMetricLattice ||
+                !current.UsesFixedMetricLattice)
+            {
+                detail =
+                    "Persistent material is cleared unless both descriptors " +
+                    "use the fixed metric lattice.";
+                return PersistentStateReplacementPolicy.ClearLegacyMapping;
+            }
+
+            if (previous.MappingContractVersion !=
+                    current.MappingContractVersion ||
+                previous.Mapping != current.Mapping)
+            {
+                detail =
+                    "Persistent material is cleared for unsupported descriptor " +
+                    "or mapping contracts.";
+                return PersistentStateReplacementPolicy.
+                    ClearUnsupportedContract;
+            }
+
+            if (Mathf.Abs(previous.ResolvedDxMetres -
+                    current.ResolvedDxMetres) >
+                    TransportLatticeAlignmentTolerance ||
+                Mathf.Abs(previous.ResolvedDyMetres -
+                    current.ResolvedDyMetres) >
+                    TransportLatticeAlignmentTolerance ||
+                Mathf.Abs(previous.LateralLatticePhaseMetres -
+                    current.LateralLatticePhaseMetres) >
+                    TransportLatticeAlignmentTolerance)
+            {
+                detail =
+                    "Persistent material is cleared when spacing or lateral " +
+                    "lattice phase changes.";
+                return PersistentStateReplacementPolicy.
+                    ClearSpacingOrPhaseMismatch;
+            }
+
+            float previousOrigin = previousGlobalStart +
+                previous.FieldOrStripStartMetres;
+            float currentOrigin = currentGlobalStart +
+                current.FieldOrStripStartMetres;
+            float offsetXFloat = (currentOrigin - previousOrigin) /
+                Mathf.Max(0.0001f, previous.ResolvedDxMetres);
+            int resolvedOffsetX = Mathf.RoundToInt(offsetXFloat);
+            if (Mathf.Abs(offsetXFloat - resolvedOffsetX) >
+                TransportLatticeAlignmentTolerance)
+            {
+                detail =
+                    "Persistent material is cleared when longitudinal lattice " +
+                    "origins are not integer aligned.";
+                return PersistentStateReplacementPolicy.
+                    ClearNonIntegerAlignment;
+            }
+
+            int resolvedOffsetY = current.GlobalYBase -
+                previous.GlobalYBase;
+            if (!ArePersistentStateCurvatureRowsCompatible(
+                    previous,
+                    previousMetricRows,
+                    current,
+                    currentMetricRows,
+                    resolvedOffsetX))
+            {
+                detail =
+                    "Persistent material is cleared when overlapping physical " +
+                    "rows changed centreline curvature.";
+                return PersistentStateReplacementPolicy.
+                    ClearCurvatureMismatch;
+            }
+
+            offsetX = resolvedOffsetX;
+            offsetY = resolvedOffsetY;
+            detail =
+                $"Exact fixed-lattice copy; offsets=({offsetX},{offsetY}).";
+            return PersistentStateReplacementPolicy.ExactFixedLatticeCopy;
+        }
+
+        private static bool ArePersistentStateCurvatureRowsCompatible(
+            StylizedRiverFoamGridDescriptor previous,
+            FoamMetricRow[] previousMetricRows,
+            StylizedRiverFoamGridDescriptor current,
+            FoamMetricRow[] currentMetricRows,
+            int offsetX)
+        {
+            if (previousMetricRows == null || currentMetricRows == null ||
+                previousMetricRows.Length != previous.ColumnCount ||
+                currentMetricRows.Length != current.ColumnCount)
+            {
+                return false;
+            }
+
+            for (int currentX = 0;
+                 currentX < currentMetricRows.Length;
+                 currentX++)
+            {
+                int previousX = currentX + offsetX;
+                if (previousX < 0 ||
+                    previousX >= previousMetricRows.Length)
+                {
+                    continue;
+                }
+
+                float previousCurvature =
+                    previousMetricRows[previousX].TopologyData.x;
+                float currentCurvature =
+                    currentMetricRows[currentX].TopologyData.x;
+                if (Mathf.Abs(previousCurvature - currentCurvature) >
+                    TransportCurvatureCompatibilityTolerance)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void ApplyPersistentStateReplacementBeforeVisibleHoldRelease()
+        {
+            TopologyTransitionSnapshot snapshot = topologyTransitionSnapshot;
+            if (snapshot == null || !snapshot.HoldsVisibleResources)
+            {
+                return;
+            }
+
+            PersistentStateReplacementPolicy policy =
+                ResolvePersistentStateReplacementPolicy(
+                    snapshot,
+                    out int offsetX,
+                    out int offsetY,
+                    out string detail);
+            snapshot.ReplacementPolicy = policy;
+            snapshot.ReplacementOffsetX = offsetX;
+            snapshot.ReplacementOffsetY = offsetY;
+            snapshot.ReplacementDetail = detail;
+            lastPersistentStateReplacementPolicy = policy;
+            lastPersistentStateReplacementDetail = detail;
+
+            if (policy !=
+                PersistentStateReplacementPolicy.ExactFixedLatticeCopy)
+            {
+                if (policy != PersistentStateReplacementPolicy.None)
+                {
+                    persistentStateReplacementClearCount++;
+                }
+                return;
+            }
+
+            if (computeShader == null || remapPersistentStateKernel < 0 ||
+                snapshot.CurrentState == null ||
+                currentState == null || previousState == null ||
+                metricBuffer == null || boundaryTexture == null ||
+                obstacleExclusionTexture == null)
+            {
+                lastPersistentStateReplacementPolicy =
+                    PersistentStateReplacementPolicy.ClearUnsupportedContract;
+                lastPersistentStateReplacementDetail =
+                    "Exact fixed-lattice remap resources were unavailable; " +
+                    "new persistent state remains deliberately clear.";
+                persistentStateReplacementClearCount++;
+                return;
+            }
+
+            ConfigureGridDescriptorComputeParameters();
+            computeShader.SetInts(
+                "_FoamDimensions",
+                fieldWidth,
+                fieldHeight);
+            computeShader.SetFloat(
+                "_FoamGlobalStart",
+                allocatedGlobalStart);
+            computeShader.SetInts(
+                "_FoamTopologyTransitionDimensions",
+                snapshot.Width,
+                snapshot.Height);
+            computeShader.SetFloat(
+                "_FoamTopologyTransitionGlobalStart",
+                snapshot.GlobalStart);
+            computeShader.SetFloat(
+                "_FoamTopologyTransitionFieldLength",
+                snapshot.FieldLength);
+            computeShader.SetFloat(
+                "_FoamTopologyTransitionValidLength",
+                snapshot.ValidFieldLength);
+            ConfigureTopologyTransitionGridDescriptor(
+                remapPersistentStateKernel,
+                snapshot.DescriptorGpuData);
+            computeShader.SetInt(
+                "_FoamPersistentStateRemapEnabled",
+                1);
+            computeShader.SetBuffer(
+                remapPersistentStateKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                remapPersistentStateKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                remapPersistentStateKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
+            computeShader.SetTexture(
+                remapPersistentStateKernel,
+                "_FoamPersistentStateRemapRead",
+                snapshot.CurrentState);
+
+            computeShader.SetTexture(
+                remapPersistentStateKernel,
+                "_FoamStateWrite",
+                currentState);
+            Dispatch(
+                remapPersistentStateKernel,
+                fieldWidth,
+                fieldHeight);
+            computeShader.SetTexture(
+                remapPersistentStateKernel,
+                "_FoamStateWrite",
+                previousState);
+            Dispatch(
+                remapPersistentStateKernel,
+                fieldWidth,
+                fieldHeight);
+            computeShader.SetInt(
+                "_FoamPersistentStateRemapEnabled",
+                0);
+
+            materialLifetimeAuthorityActive =
+                snapshot.MaterialLifetimeAuthorityActive;
+            persistentStateReplacementExactCount++;
+        }
+
         private void ReleaseTopologyTransitionVisibleHold()
         {
             TopologyTransitionSnapshot snapshot = topologyTransitionSnapshot;
@@ -720,6 +1022,7 @@ namespace ProgrammaticStylized3D.Rivers
             retiredTopologyTransitionReleaseFrame = Time.frameCount + 2;
             snapshot.GeneratedTexture = null;
             snapshot.MetricBuffer = null;
+            snapshot.MetricRows = Array.Empty<FoamMetricRow>();
         }
 
         private void ReleaseHeldTopologyTransitionTextures(
@@ -821,6 +1124,8 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyTransitionSnapshot.GeneratedTexture = null;
                 topologyTransitionSnapshot.MetricBuffer?.Release();
                 topologyTransitionSnapshot.MetricBuffer = null;
+                topologyTransitionSnapshot.MetricRows =
+                    Array.Empty<FoamMetricRow>();
                 topologyTransitionSnapshot = null;
             }
 

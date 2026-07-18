@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: GSLP_FineGravel
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GroundSurfaceLayerProfile
   displayName: Fine Gravel
+  surfaceMaterial: {fileID: 11400000, guid: 050c8ef78b7f494fb8247f5700e77d95, type: 2}
   baseColor: {r: 0.43, g: 0.41, b: 0.37, a: 1}
   darkColor: {r: 0.27, g: 0.26, b: 0.24, a: 1}
   lightColor: {r: 0.59, g: 0.57, b: 0.52, a: 1}

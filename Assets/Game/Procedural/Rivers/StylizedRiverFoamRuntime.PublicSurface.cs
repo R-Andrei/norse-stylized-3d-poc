@@ -9,13 +9,94 @@ namespace ProgrammaticStylized3D.Rivers
         public int FieldHeight => currentState != null ? currentState.height : 0;
         public int StructuralWidth => structuralWidth;
         public int StructuralHeight => structuralHeight;
+        public int FoamGridDescriptorContractVersion =>
+            StylizedRiverFoamGridDescriptor.DescriptorContractVersion;
+        public int FoamGridMappingContractVersion =>
+            gridDescriptor.MappingContractVersion;
+        public string FoamGridMapping => gridDescriptor.IsCreated
+            ? gridDescriptor.Mapping.ToString()
+            : "Unallocated";
+        public string FoamGridInitializationSignature =>
+            gridDescriptor.IsCreated
+                ? gridDescriptor.InitializationSignature.ToString("X16")
+                : "—";
+        public float FoamGridRequestedDxMetres =>
+            gridDescriptor.RequestedDxMetres;
+        public float FoamGridRequestedDyMetres =>
+            gridDescriptor.RequestedDyMetres;
+        public float FoamGridResolvedDxMetres =>
+            gridDescriptor.ResolvedDxMetres;
+        public float FoamGridResolvedDyMetres =>
+            gridDescriptor.ResolvedDyMetres;
+        public int FoamGridColumnsPerChunk =>
+            gridDescriptor.ColumnsPerChunk;
+        public int FoamGridGlobalYBase => gridDescriptor.GlobalYBase;
+        public int FoamGridRowCount => gridDescriptor.RowCount;
+        public float FoamGridLateralLatticePhaseMetres =>
+            gridDescriptor.LateralLatticePhaseMetres;
+        public float FoamGridRepresentedLateralMinimumMetres =>
+            gridDescriptor.RepresentedLateralMinimumMetres;
+        public float FoamGridRepresentedLateralMaximumMetres =>
+            gridDescriptor.RepresentedLateralMaximumMetres;
+        public float FoamGridProvisionalRequestedCellSizeMetres =>
+            river != null
+                ? StylizedRiverFoamGridDescriptor
+                    .ResolveProvisionalRequestedCellSizeMetres(river.Quality)
+                : 0f;
+        public bool FoamFixedMetricCandidateAvailable =>
+            fixedMetricCandidateDescriptor.IsCreated;
+        public string FoamFixedMetricCandidateStatus =>
+            fixedMetricCandidateFailureReason;
+        public int FoamFixedMetricCandidateWidth =>
+            fixedMetricCandidateDescriptor.ColumnCount;
+        public int FoamFixedMetricCandidateHeight =>
+            fixedMetricCandidateDescriptor.RowCount;
+        public int FoamFixedMetricCandidateFilmWidth =>
+            fixedMetricCandidateDescriptor.FilmWidth;
+        public int FoamFixedMetricCandidateFilmHeight =>
+            fixedMetricCandidateDescriptor.FilmHeight;
+        public float FoamFixedMetricCandidateResolvedDxMetres =>
+            fixedMetricCandidateDescriptor.ResolvedDxMetres;
+        public float FoamFixedMetricCandidateResolvedDyMetres =>
+            fixedMetricCandidateDescriptor.ResolvedDyMetres;
+        public int FoamFixedMetricCandidateGlobalYBase =>
+            fixedMetricCandidateDescriptor.GlobalYBase;
+        public int FoamFixedMetricCandidateGlobalYMaximum =>
+            fixedMetricCandidateDescriptor.GlobalYMaximum;
+        public float FoamFixedMetricCandidateLateralMinimumMetres =>
+            fixedMetricCandidateDescriptor.RepresentedLateralMinimumMetres;
+        public float FoamFixedMetricCandidateLateralMaximumMetres =>
+            fixedMetricCandidateDescriptor.RepresentedLateralMaximumMetres;
+        public long FoamFixedMetricCandidateStructuralCellCount =>
+            fixedMetricCandidateDescriptor.StructuralCellCount;
+        public bool FoamFixedMetricRuntimeActivationDeferred => true;
         public int TopologyWidth => topologyTexture != null ? topologyTexture.width : 0;
         public int TopologyHeight => topologyTexture != null ? topologyTexture.height : 0;
         public bool MajorTopologyAvailable => majorTopology != null;
         public float FoamMotionLaneScrollCells => lastMotionLaneScrollCells;
         public float FoamMotionLaneScrollMetres =>
             lastMotionLaneScrollCells *
-            Mathf.Max(0f, minimumTransportLongitudinalSpacing);
+            Mathf.Max(0f, ResolveMotionLaneLongitudinalSpacingMetres());
+        public float FoamMotionLaneDownstreamBasisMetres =>
+            MotionLaneDownstreamBasisMetres;
+        public float FoamMotionLaneLateralReferenceSpanMetres =>
+            MotionLaneLateralReferenceSpanMetres;
+        public float FoamMotionLaneNearSmoothingOffsetMetres =>
+            MotionLaneNearSmoothingOffsetMetres;
+        public float FoamMotionLaneFarSmoothingOffsetMetres =>
+            MotionLaneFarSmoothingOffsetMetres;
+        public int FoamMotionLaneNearSmoothingRows =>
+            lastMotionLaneNearSmoothingRows;
+        public int FoamMotionLaneFarSmoothingRows =>
+            lastMotionLaneFarSmoothingRows;
+        public int FoamObstacleRoutingInfluencedCellCount =>
+            lastObstacleRoutingInfluencedCellCount;
+        public int FoamObstacleRoutingRearLeakCellCount =>
+            lastObstacleRoutingRearLeakCellCount;
+        public float FoamObstacleRoutingMaximumApproachMetres =>
+            lastObstacleRoutingMaximumApproachMetres;
+        public float FoamObstacleRoutingMaximumLateralMarginMetres =>
+            lastObstacleRoutingMaximumLateralMarginMetres;
         public float FoamBaseDownstreamSpeedMetresPerSecond =>
             ResolveBaseFoamDownstreamSpeedMetresPerSecond();
         public float FoamMaximumLateralSpeedMetresPerSecond =>
@@ -934,9 +1015,18 @@ namespace ProgrammaticStylized3D.Rivers
         public float EstimatedLateralTransportCellsPerStep =>
             lastEstimatedLateralTransportCellsPerStep;
         public float TransportStepCfl => lastMaximumTransportCfl;
+        public float TransportDownstreamStepCfl =>
+            lastDownstreamTransportCfl;
+        public float TransportLateralStepCfl => lastLateralTransportCfl;
         public float MaximumTransportCfl =>
             lastMaximumTransportCfl /
             Mathf.Max(1, lastUsedTransportSubsteps);
+        public float MinimumTransportRawJacobian =>
+            minimumTransportRawJacobian;
+        public float MinimumTransportBoundedJacobian =>
+            minimumTransportCurvatureJacobian;
+        public float MaximumAbsoluteTransportCurvatureLateralProduct =>
+            maximumAbsoluteTransportCurvatureLateralProduct;
         public int TransportSubstepsRequired =>
             lastRequiredTransportSubsteps;
         public int TransportSubstepsUsed => lastUsedTransportSubsteps;

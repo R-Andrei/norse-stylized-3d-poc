@@ -1609,18 +1609,23 @@ private readonly struct EdgeWearTopologyStats
             public readonly Dictionary<int, float> WidthByEdge;
             public readonly Dictionary<int, ChamferSharedEdgeSpan> SharedSpans;
             public readonly List<ChamferCornerConflictRecord> Conflicts;
+            public readonly HashSet<int> ForcedDeferredEdges;
 
             public ChamferCornerSolution(
                 Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
                 Dictionary<int, float> widthByEdge,
                 Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
-                List<ChamferCornerConflictRecord> conflicts)
+                List<ChamferCornerConflictRecord> conflicts,
+                ICollection<int> forcedDeferredEdges)
             {
                 Corners = corners;
                 WidthByEdge = widthByEdge;
                 SharedSpans = sharedSpans;
                 Conflicts = conflicts ??
                     new List<ChamferCornerConflictRecord>();
+                ForcedDeferredEdges = forcedDeferredEdges == null
+                    ? new HashSet<int>()
+                    : new HashSet<int>(forcedDeferredEdges);
             }
         }
 
@@ -1933,6 +1938,93 @@ private readonly struct EdgeWearTopologyStats
             }
         }
 
+        private sealed class EdgeWearMicroTopologySuppressedEdge
+        {
+            public int OriginalSourceEdgeIndex = -1;
+            public Vector3 Start;
+            public Vector3 End;
+            public float Length;
+        }
+
+        private sealed class EdgeWearMicroTopologyCollapseAttemptRecord
+        {
+            public int CanonicalGraphVertexIndex = -1;
+            public Vector3 CanonicalPosition;
+            public bool Succeeded;
+            public double SquaredDisplacement;
+            public double NormalizedVolume;
+            public double VolumeLoss;
+            public string Blocker = string.Empty;
+        }
+
+        private sealed class EdgeWearMicroTopologyComponentRecord
+        {
+            public readonly List<int> EdgeIndices = new List<int>();
+            public readonly List<int> SeedEdgeIndices = new List<int>();
+            public readonly List<int> VertexIndices = new List<int>();
+            public readonly List<EdgeWearMicroTopologyCollapseAttemptRecord>
+                Attempts =
+                    new List<EdgeWearMicroTopologyCollapseAttemptRecord>();
+            public float Diameter;
+            public bool CandidateEligible;
+            public bool Applied;
+            public int SelectedCanonicalGraphVertexIndex = -1;
+            public double SelectedSquaredDisplacement;
+            public double SelectedVolumeLoss;
+            public string Blocker = string.Empty;
+        }
+
+        private sealed class EdgeWearMicroTopologyNormalizationResult
+        {
+            public List<PolygonFace> Faces;
+            public EdgeWearTopologyGraph OriginalGraph;
+            public bool Attempted;
+            public bool Applied;
+            public float Threshold;
+            public float ComponentThreshold;
+            public int OriginalVertexCount;
+            public int OriginalEdgeCount;
+            public int OriginalFaceCount;
+            public int NormalizedVertexCount;
+            public int NormalizedEdgeCount;
+            public int NormalizedFaceCount;
+            public int EligibleComponentCount;
+            public int AppliedComponentCount;
+            public int CandidateCollapseCount;
+            public double OriginalVolume;
+            public double NormalizedVolume;
+            public double VolumeLoss;
+            public double VolumeLossFraction;
+            public double ElapsedMilliseconds;
+            public string Diagnostic = string.Empty;
+            public readonly Dictionary<EdgeKey, int>
+                OriginalSourceEdgeIndexByNormalizedKey =
+                    new Dictionary<EdgeKey, int>();
+            public readonly Dictionary<int, int>
+                OriginalSourceEdgeIndexByNormalizedGraphEdge =
+                    new Dictionary<int, int>();
+            public readonly HashSet<EdgeKey> GeneratedTransitionKeys =
+                new HashSet<EdgeKey>();
+            public readonly List<EdgeWearMicroTopologySuppressedEdge>
+                SuppressedEdges =
+                    new List<EdgeWearMicroTopologySuppressedEdge>();
+
+            public readonly List<EdgeWearMicroTopologyComponentRecord>
+                Components =
+                    new List<EdgeWearMicroTopologyComponentRecord>();
+
+            public int ResolveOriginalSourceEdgeIndex(
+                EdgeKey key,
+                int normalizedGraphEdgeIndex)
+            {
+                return OriginalSourceEdgeIndexByNormalizedKey.TryGetValue(
+                        key,
+                        out int originalIndex)
+                    ? originalIndex
+                    : normalizedGraphEdgeIndex;
+            }
+        }
+
 private readonly struct EdgeWearSelectedGraphEdge
         {
             public readonly int GraphEdgeIndex;
@@ -2005,6 +2097,8 @@ private struct EdgeWearGraphBuildStats
             public bool IsolatedConstructionValid;
             public bool FeasibleWidthFractionValid;
             public bool WidthRecoveryProvisional;
+            public bool MaterialWidthRecoveryEligible;
+            public float MaterialWidthRecoveryRequiredLength;
             public bool MultiSupportHullRecovery;
             public bool EndpointSpanValid;
             public bool Viable;
@@ -2062,6 +2156,7 @@ private struct EdgeWearGraphBuildStats
         {
             public readonly EdgeKey Key;
             public readonly int SourceEdgeIndex;
+            public readonly int OriginalSourceEdgeIndex;
             public readonly int FaceA;
             public readonly int FaceB;
             public readonly BoundedEdgeClassification Classification;
@@ -2076,6 +2171,10 @@ private struct EdgeWearGraphBuildStats
             {
                 Key = record.Key;
                 SourceEdgeIndex = record.SourceEdgeIndex;
+                OriginalSourceEdgeIndex =
+                    record.OriginalSourceEdgeIndex >= 0
+                        ? record.OriginalSourceEdgeIndex
+                        : record.SourceEdgeIndex;
                 FaceA = Mathf.Min(record.FaceA, record.FaceB);
                 FaceB = Mathf.Max(record.FaceA, record.FaceB);
                 Classification = record.Classification;
@@ -2109,6 +2208,8 @@ private struct EdgeWearGraphBuildStats
             public readonly Dictionary<int, EdgeWearEdgeViabilityRecord>
                 ViabilityByGraphEdge =
                     new Dictionary<int, EdgeWearEdgeViabilityRecord>();
+            public EdgeWearMicroTopologyNormalizationResult
+                MicroTopologyNormalization;
             public int RawSourceEdgeCount;
             public int SourceEdgeCount;
             public int CoincidentBoundarySeamPairCount;
@@ -2184,6 +2285,8 @@ private struct EdgeWearGraphBuildStats
                     MaximumCoverageMode,
                     RequireAllGeometricCandidates)
                 {
+                    MicroTopologyNormalization =
+                        MicroTopologyNormalization,
                     RawSourceEdgeCount = RawSourceEdgeCount,
                     SourceEdgeCount = SourceEdgeCount,
                     CoincidentBoundarySeamPairCount =
@@ -2308,6 +2411,9 @@ private struct EdgeWearGraphBuildStats
         {
             public EdgeKey Key;
             public int SourceEdgeIndex = -1;
+            public int OriginalSourceEdgeIndex = -1;
+            public bool MicroTopologySuppressed;
+            public bool MicroTopologyGeneratedTransition;
             public int CandidateIndex = -1;
             public Vector3 Start;
             public Vector3 End;
@@ -2366,6 +2472,16 @@ private struct EdgeWearGraphBuildStats
             public bool Candidate;
             public bool Selected;
             public bool WidthInactive;
+            public bool MaterialWidthRecoveryTarget;
+            public bool MaterialWidthRecoveryBaselineDeferred;
+            public bool RecoveryBaselineDeferred;
+            public bool MaterialWidthRecoveryAttempted;
+            public bool MaterialWidthRecoveryTrialCompleted;
+            public bool MaterialWidthRecoveryTrialSucceeded;
+            public bool MaterialWidthRecoveryCertified;
+            public string MaterialWidthRecoveryFailure = string.Empty;
+            public string WidthRecoveryResolution = string.Empty;
+            public string WidthRecoveryEvidence = string.Empty;
             public bool CornerRecoveryProvisional;
             public int CornerRecoveryCollapsedSourceEdgeIndex = -1;
             public float CornerRecoveryLastPositiveWidth;

@@ -3,6 +3,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using ProgrammaticStylized3D.Rendering.PixelSurface;
 
 namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 {
@@ -33,6 +34,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private static List<GroundHydrologyModifierProfile>
             cachedHydrologyModifierProfiles;
 
+        private static readonly Dictionary<EntityId, bool>
+            SharedSurfaceMaterialFoldouts =
+                new Dictionary<EntityId, bool>();
+
         private static bool sharedStyleSaveUpdateRegistered;
         private static double sharedStyleSaveDeadline;
 
@@ -43,6 +48,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             EditorApplication.quitting += FlushPendingSharedStyleSaves;
             EditorApplication.projectChanged +=
                 InvalidateSurfaceLayerProfileCache;
+            StylizedSurfaceMaterialProfile.EditorProfileChanged +=
+                RefreshLoadedGroundsUsingSurfaceMaterial;
         }
 
         private SerializedProperty recipe;
@@ -102,7 +109,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty riverbedHydrologySource;
         private SerializedProperty riverbedHydrologyModifier;
         private SerializedProperty bankMaterialStrength;
+        private SerializedProperty bankDetailScaleMultiplier;
+        private SerializedProperty bankDetailNormalStrengthMultiplier;
+        private SerializedProperty bankDetailCavityStrengthMultiplier;
+        private SerializedProperty bankDetailValueFormMultiplier;
+        private SerializedProperty bankDetailFinishVariationMultiplier;
+        private SerializedProperty bankLegacyPixelCellInfluenceMultiplier;
         private SerializedProperty riverbedMaterialStrength;
+        private SerializedProperty riverbedDetailScaleMultiplier;
+        private SerializedProperty riverbedDetailNormalStrengthMultiplier;
+        private SerializedProperty riverbedDetailCavityStrengthMultiplier;
+        private SerializedProperty riverbedDetailValueFormMultiplier;
+        private SerializedProperty riverbedDetailFinishVariationMultiplier;
+        private SerializedProperty riverbedLegacyPixelCellInfluenceMultiplier;
         private SerializedProperty riverbedWetnessStrength;
         private SerializedProperty riverbedToBankWetnessBlendDistance;
         private SerializedProperty riverbedToBankWetnessBlendSoftness;
@@ -517,9 +536,57 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             bankMaterialStrength =
                 groundMaterialControls.FindPropertyRelative("bankMaterialStrength");
 
+            bankDetailScaleMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankDetailScaleMultiplier");
+
+            bankDetailNormalStrengthMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankDetailNormalStrengthMultiplier");
+
+            bankDetailCavityStrengthMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankDetailCavityStrengthMultiplier");
+
+            bankDetailValueFormMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankDetailValueFormMultiplier");
+
+            bankDetailFinishVariationMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankDetailFinishVariationMultiplier");
+
+            bankLegacyPixelCellInfluenceMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankLegacyPixelCellInfluenceMultiplier");
+
             riverbedMaterialStrength =
                 groundMaterialControls.FindPropertyRelative(
                     "riverbedMaterialStrength");
+
+            riverbedDetailScaleMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedDetailScaleMultiplier");
+
+            riverbedDetailNormalStrengthMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedDetailNormalStrengthMultiplier");
+
+            riverbedDetailCavityStrengthMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedDetailCavityStrengthMultiplier");
+
+            riverbedDetailValueFormMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedDetailValueFormMultiplier");
+
+            riverbedDetailFinishVariationMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedDetailFinishVariationMultiplier");
+
+            riverbedLegacyPixelCellInfluenceMultiplier =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedLegacyPixelCellInfluenceMultiplier");
 
             riverbedWetnessStrength =
                 groundMaterialControls.FindPropertyRelative(
@@ -3754,6 +3821,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 outerBankExtension,
                 outerBankStrength,
                 outerBankFade,
+                bankDetailScaleMultiplier,
+                bankDetailNormalStrengthMultiplier,
+                bankDetailCavityStrengthMultiplier,
+                bankDetailValueFormMultiplier,
+                bankDetailFinishVariationMultiplier,
+                bankLegacyPixelCellInfluenceMultiplier,
                 vegetationRetreatStrength,
                 snowMeltStrength,
                 frostRetreatStrength,
@@ -3778,6 +3851,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 bankSurfaceLayer,
                 riverbedSurfaceLayer,
                 riverbedMaterialStrength,
+                riverbedDetailScaleMultiplier,
+                riverbedDetailNormalStrengthMultiplier,
+                riverbedDetailCavityStrengthMultiplier,
+                riverbedDetailValueFormMultiplier,
+                riverbedDetailFinishVariationMultiplier,
+                riverbedLegacyPixelCellInfluenceMultiplier,
                 riverbedHydrologySource,
                 shoreHydrologyModifier,
                 riverbedHydrologyModifier,
@@ -3877,6 +3956,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 materialControls.FindPropertyRelative("outerBankExtension"),
                 materialControls.FindPropertyRelative("outerBankStrength"),
                 materialControls.FindPropertyRelative("outerBankFade"),
+                materialControls.FindPropertyRelative(
+                    "bankDetailScaleMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "bankDetailNormalStrengthMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "bankDetailCavityStrengthMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "bankDetailValueFormMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "bankDetailFinishVariationMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "bankLegacyPixelCellInfluenceMultiplier"),
                 materialControls.FindPropertyRelative("vegetationRetreatStrength"),
                 materialControls.FindPropertyRelative("snowMeltStrength"),
                 materialControls.FindPropertyRelative("frostRetreatStrength"),
@@ -3902,6 +3993,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 sharedBankSurfaceLayer,
                 materialControls.FindPropertyRelative("riverbedSurfaceLayer"),
                 materialControls.FindPropertyRelative("riverbedMaterialStrength"),
+                materialControls.FindPropertyRelative(
+                    "riverbedDetailScaleMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "riverbedDetailNormalStrengthMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "riverbedDetailCavityStrengthMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "riverbedDetailValueFormMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "riverbedDetailFinishVariationMultiplier"),
+                materialControls.FindPropertyRelative(
+                    "riverbedLegacyPixelCellInfluenceMultiplier"),
                 materialControls.FindPropertyRelative("riverbedHydrologySource"),
                 sharedShoreHydrologyModifier,
                 materialControls.FindPropertyRelative("riverbedHydrologyModifier"),
@@ -4000,6 +4103,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             SerializedProperty extension,
             SerializedProperty extensionStrength,
             SerializedProperty extensionFade,
+            SerializedProperty detailScaleMultiplier,
+            SerializedProperty detailNormalStrengthMultiplier,
+            SerializedProperty detailCavityStrengthMultiplier,
+            SerializedProperty detailValueFormMultiplier,
+            SerializedProperty detailFinishVariationMultiplier,
+            SerializedProperty legacyPixelCellInfluenceMultiplier,
             SerializedProperty vegetationRetreat,
             SerializedProperty snowRetreat,
             SerializedProperty frostRetreat,
@@ -4039,11 +4148,31 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 "Reusable dry substrate exposed across the River bank. Inherit Primary Ground disables secondary Bank material composition.",
                 bankLayer,
                 ref showBankSurfaceLayerSettings,
-                "Layer Settings");
+                "Material & Layer Settings");
 
             bool hasBankLayer =
                 bankLayer != null &&
                 bankLayer.objectReferenceValue != null;
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "This River Application",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "These neutral multipliers affect only this Bank application. Shared palette, packed detail, cavity shaping, natural scale, and dry finish remain owned by the reusable material definition above.",
+                MessageType.None);
+            using (new EditorGUI.DisabledScope(!hasBankLayer))
+            {
+                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.PropertyField(detailScaleMultiplier);
+                EditorGUILayout.PropertyField(detailNormalStrengthMultiplier);
+                EditorGUILayout.PropertyField(detailCavityStrengthMultiplier);
+                EditorGUILayout.PropertyField(detailValueFormMultiplier);
+                EditorGUILayout.PropertyField(detailFinishVariationMultiplier);
+                EditorGUILayout.PropertyField(
+                    legacyPixelCellInfluenceMultiplier);
+                changed |= EditorGUI.EndChangeCheck();
+            }
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
@@ -4178,6 +4307,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             SerializedProperty bankLayer,
             SerializedProperty customRiverbedLayer,
             SerializedProperty materialStrength,
+            SerializedProperty detailScaleMultiplier,
+            SerializedProperty detailNormalStrengthMultiplier,
+            SerializedProperty detailCavityStrengthMultiplier,
+            SerializedProperty detailValueFormMultiplier,
+            SerializedProperty detailFinishVariationMultiplier,
+            SerializedProperty legacyPixelCellInfluenceMultiplier,
             SerializedProperty hydrologySource,
             SerializedProperty shoreHydrologyModifierProperty,
             SerializedProperty customRiverbedHydrologyModifier,
@@ -4254,7 +4389,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Reusable dry substrate applied only on Ground Riverbed Support.",
                     customRiverbedLayer,
                     ref showRiverbedSurfaceLayerSettings,
-                    "Layer Settings",
+                    "Material & Layer Settings",
                     "No Custom Riverbed Surface Layer",
                     "Select or create a custom Riverbed substrate.");
             }
@@ -4293,6 +4428,42 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     MessageType.Info);
             }
 
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "This River Application",
+                EditorStyles.miniBoldLabel);
+            if (resolvedSurfaceSource ==
+                GroundRiverbedSurfaceSource.InheritBankSurfaceLayer &&
+                hasResolvedRiverbedLayer)
+            {
+                EditorGUILayout.HelpBox(
+                    "The shared material definition is editable in the River Bank subsection because this Riverbed inherits that layer. The multipliers below remain Riverbed-specific.",
+                    MessageType.None);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "These neutral multipliers affect only this Riverbed application. Shared material identity remains owned by the selected reusable material.",
+                    MessageType.None);
+            }
+
+            using (new EditorGUI.DisabledScope(!hasResolvedRiverbedLayer))
+            {
+                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.PropertyField(detailScaleMultiplier);
+                EditorGUILayout.PropertyField(detailNormalStrengthMultiplier);
+                EditorGUILayout.PropertyField(detailCavityStrengthMultiplier);
+                EditorGUILayout.PropertyField(detailValueFormMultiplier);
+                EditorGUILayout.PropertyField(detailFinishVariationMultiplier);
+                EditorGUILayout.PropertyField(
+                    legacyPixelCellInfluenceMultiplier);
+                changed |= EditorGUI.EndChangeCheck();
+            }
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Material Coverage",
+                EditorStyles.miniBoldLabel);
             using (new EditorGUI.DisabledScope(!hasResolvedRiverbedLayer))
             {
                 EditorGUI.BeginChangeCheck();
@@ -4892,27 +5063,71 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField(
-                "Palette",
+                "Reusable Material",
                 EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("baseColor"));
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("darkColor"));
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("lightColor"));
+            SerializedProperty surfaceMaterialProperty =
+                layerObject.FindProperty("surfaceMaterial");
+            EditorGUILayout.PropertyField(surfaceMaterialProperty);
+            StylizedSurfaceMaterialProfile surfaceMaterial =
+                surfaceMaterialProperty != null
+                    ? surfaceMaterialProperty.objectReferenceValue as
+                        StylizedSurfaceMaterialProfile
+                    : null;
 
-            EditorGUILayout.Space(2f);
-            EditorGUILayout.LabelField(
-                "Surface Character",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("macroContrast"));
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("pixelContrast"));
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("drySmoothness"));
-            EditorGUILayout.PropertyField(
-                layerObject.FindProperty("drySpecularStrength"));
+            if (surfaceMaterial != null)
+            {
+                string materialPath =
+                    AssetDatabase.GetAssetPath(surfaceMaterial);
+                EditorGUILayout.LabelField(
+                    new GUIContent("Material Definition Stored In", materialPath),
+                    new GUIContent(
+                        $"Stylized Surface Material — {surfaceMaterial.name}",
+                        materialPath));
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Select Material Asset"))
+                    {
+                        Selection.activeObject = surfaceMaterial;
+                    }
+
+                    if (GUILayout.Button("Ping Material Asset"))
+                    {
+                        EditorGUIUtility.PingObject(surfaceMaterial);
+                    }
+                }
+
+                EditorGUILayout.HelpBox(
+                    "Palette, structural detail, cavity, natural scale, and dry finish are owned by the reusable material asset. This Ground layer retains only cover compatibility.",
+                    MessageType.Info);
+
+                DrawStylizedSurfaceMaterialInlineEditor(surfaceMaterial);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "No reusable material is assigned. The legacy serialized appearance below remains active for compatibility.",
+                    MessageType.None);
+
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.LabelField(
+                    "Legacy Appearance Fallback",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.PropertyField(
+                    layerObject.FindProperty("baseColor"));
+                EditorGUILayout.PropertyField(
+                    layerObject.FindProperty("darkColor"));
+                EditorGUILayout.PropertyField(
+                    layerObject.FindProperty("lightColor"));
+                EditorGUILayout.PropertyField(
+                    layerObject.FindProperty("macroContrast"));
+                EditorGUILayout.PropertyField(
+                    layerObject.FindProperty("pixelContrast"));
+                EditorGUILayout.PropertyField(
+                    layerObject.FindProperty("drySmoothness"));
+                EditorGUILayout.PropertyField(
+                    layerObject.FindProperty("drySpecularStrength"));
+            }
 
 
             EditorGUILayout.Space(2f);
@@ -4937,6 +5152,117 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 QueueSurfaceLayerSave(profile);
                 RefreshLoadedGroundsUsingSurfaceLayer(profile);
                 InvalidateSurfaceLayerProfileCache();
+            }
+        }
+
+        private static void DrawStylizedSurfaceMaterialInlineEditor(
+            StylizedSurfaceMaterialProfile profile)
+        {
+            if (profile == null)
+            {
+                return;
+            }
+
+            EntityId foldoutKey = profile.GetEntityId();
+            bool expanded =
+                SharedSurfaceMaterialFoldouts.TryGetValue(
+                    foldoutKey,
+                    out bool storedExpanded) &&
+                storedExpanded;
+            expanded = EditorGUILayout.Foldout(
+                expanded,
+                "Shared Material Definition",
+                true);
+            SharedSurfaceMaterialFoldouts[foldoutKey] = expanded;
+
+            if (!expanded)
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.HelpBox(
+                $"Editing Shared Material — changes every Ground, River, road, wall, or other consumer of {profile.name}.",
+                MessageType.Warning);
+
+            SerializedObject materialObject = new SerializedObject(profile);
+            materialObject.UpdateIfRequiredOrScript();
+            EditorGUI.BeginChangeCheck();
+
+            EditorGUILayout.LabelField(
+                "Palette",
+                EditorStyles.miniBoldLabel);
+            DrawSerializedProperties(
+                materialObject,
+                "baseColor",
+                "darkColor",
+                "lightColor",
+                "cavityColor");
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Broad Response",
+                EditorStyles.miniBoldLabel);
+            DrawSerializedProperties(
+                materialObject,
+                "macroContrast",
+                "legacyPixelCellInfluence",
+                "detailValueStrength");
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Structural Detail",
+                EditorStyles.miniBoldLabel);
+            DrawSerializedProperties(
+                materialObject,
+                "detailEnabled",
+                "detailLibrary",
+                "detailEntryId",
+                "detailWorldScale",
+                "detailNormalStrength",
+                "detailCavityStrength",
+                "detailCavityBias",
+                "detailFormHighlightStrength");
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Dry Finish",
+                EditorStyles.miniBoldLabel);
+            DrawSerializedProperties(
+                materialObject,
+                "drySmoothness",
+                "drySpecularStrength",
+                "finishVariationStrength");
+
+            bool changed = EditorGUI.EndChangeCheck();
+            bool applied = materialObject.ApplyModifiedProperties();
+            if (changed || applied)
+            {
+                EditorUtility.SetDirty(profile);
+                profile.NotifyEditorChanged();
+                SceneView.RepaintAll();
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        private static void DrawSerializedProperties(
+            SerializedObject source,
+            params string[] propertyNames)
+        {
+            if (source == null || propertyNames == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < propertyNames.Length; index++)
+            {
+                SerializedProperty property =
+                    source.FindProperty(propertyNames[index]);
+                if (property != null)
+                {
+                    EditorGUILayout.PropertyField(property);
+                }
             }
         }
 
@@ -6703,6 +7029,26 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
 
             SceneView.RepaintAll();
+        }
+
+        private static void RefreshLoadedGroundsUsingSurfaceMaterial(
+            StylizedSurfaceMaterialProfile profile)
+        {
+            if (profile == null)
+            {
+                return;
+            }
+
+            List<GroundSurfaceLayerProfile> layers =
+                GetSurfaceLayerProfiles();
+            for (int index = 0; index < layers.Count; index++)
+            {
+                GroundSurfaceLayerProfile layer = layers[index];
+                if (layer != null && layer.SurfaceMaterial == profile)
+                {
+                    RefreshLoadedGroundsUsingSurfaceLayer(layer);
+                }
+            }
         }
 
         private static void RefreshLoadedGroundsUsingSurfaceLayer(

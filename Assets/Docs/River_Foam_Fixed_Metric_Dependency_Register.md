@@ -2,15 +2,14 @@
 
 ## 1. Document identity
 
-- Date: 2026-07-17
-- Work type: Canonical dependency register and static pre-implementation audit
-- Implementation status: No runtime implementation; static `RG-METRIC-P0` review complete for the supplied snapshot; live repository and Unity baseline pending
-- Canonical repository path: `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
-- Source snapshot: User-supplied `Assets(71).zip`, used as the authoritative supplied-file snapshot for documentation patch 01
+- Date: 2026-07-18
+- Work type: Dependency audit and migration tracking register
+- Implementation status: `RG-METRIC-P2` through `RG-METRIC-P10` are Unity-validated and closed. `RG-METRIC-P11` is mechanically verified and complete with no executable change. Active fixed-metric allocation remains deliberately deferred to P12.
+- Source snapshot: user-supplied `Assets(72).zip` with accepted P9a, P10, and P10a overlays; no `.git` metadata is present
 - Prior design sources:
   - `River Foam Fixed-Metric Resolution Handoff`
   - Follow-up audit response accepting the coordinate-contract corrections
-- Persistent changes in documentation patch 01: this register, the fixed-metric upgrade plan, their Unity `.meta` files, and the reconciled active River Foam queue; no code, shader, scene, prefab, material, cache, or generated-data changes
+- Persistent repository changes: canonical documentation; validated P2–P9 descriptor, cache, topology, routing, source, transport, replacement, film, shape, and production-render foundations; P10/P10a read-only diagnostic/Inspector presentation cleanup; and P11 documentation-only audit closure
 
 ## 2. Purpose
 
@@ -24,6 +23,406 @@ It identifies every dependency discoverable by static inspection of the supplied
 4. deferred explicitly to the later strip/pooling architecture.
 
 This is not an implementation plan and does not authorize code changes.
+
+
+### 2.1 Current implementation disposition
+
+Patch 04 establishes deterministic cache ownership of the coordinate contract while the active field remains `LegacyNormalizedAcross`. It does not activate the fixed-metric candidate.
+
+Implemented dependency items through P4:
+
+- immutable descriptor identity, dimensions, requested/resolved spacing, lattice fields, and deterministic signature;
+- active legacy allocation assigned exclusively from the descriptor;
+- exact one-strip candidate calculation from domain length and maximum asymmetric surface widths;
+- explicit hardware-dimension failure without silent metric scale reduction;
+- fixed-lattice cell-centre, fractional, nearest, containing, global/local-Y, allocated-boundary, and valid-length conversions;
+- fixed-lattice metric-position generation and independent valid/out-of-bank mask generation;
+- descriptor-owned X metric-row spacing/centres and prepared fixed `dy` metric-row behavior;
+- provisional Foam-only quality-candidate mapping;
+- five-lane C#/HLSL descriptor ABI, still intentionally unbound;
+- active/candidate read-only descriptor diagnostics;
+- payload format `3`, generator contract `2`, and generation/combined fingerprint contract `2`;
+- complete descriptor serialization, deterministic reconstruction, metadata parity, and generation fingerprint ownership;
+- specific rejection of format-2/generator-1 normalized-lateral cache products;
+- explicit stale-grid, unsupported-contract, metadata, domain, obstacle, generation, and combined-key failure states;
+- contiguous cache-limit enforcement without changing physical cell scale;
+- descriptor-aware explicit preparation, development persistence, startup resolution, installation, and release preflight;
+- Editor-only deterministic assertions for descriptor candidates, cache contract classification, and asymmetric/boundary conversions.
+
+Current remaining program dependencies:
+
+- P12 fixed-metric candidate activation, visual comparison, and performance/memory selection;
+- P13 final tier tuning, cache freeze, and contiguous Stage 1 baseline closure.
+
+The read-only cache metadata Inspector deferred during P4 now exists in `StylizedRiverFoamTopologyCacheAssetEditor.cs`; no P4 metadata-presentation blocker remains.
+
+
+### 2.1.1 Patch 06 dependency disposition
+
+P6 closes these inactive fixed-metric dependencies while preserving active legacy behavior:
+
+- Motion Lane physical coordinate generation, 32-m downstream basis, 10-m lateral reference span, descriptor-owned metre-to-cell scroll, and 0.20/0.40-m smoothing offsets;
+- obstacle-routing approach, closure, contact, lateral margin, centre dead-band, and minimum corridor widths under a physical unit policy, with zero downstream release;
+- physical Foam `(s,n)` to Disturbance normalized UV conversion for Pressure, Static Wake, Wake, and Ripple, independent of external texture dimensions;
+- descriptor-aware Motion Lane/routing/obstacle renderer-debug UV without migrating normal production Foam sampling;
+- one user-triggered comprehensive report with assigned-cache mutation proof.
+
+Disturbance allocation, quality, generation, and renderer ownership remained unchanged. The corrected single P6 report reached live `Ready`, proved current-cache installation without build/write, validated all P6 contracts, proved cleanup/binding disablement, and returned `Overall: PASS`. P7 source, P8 transport/replacement, and P9 production-render consumers subsequently closed.
+
+### 2.1.2 Patch 07 dependency disposition
+
+P7 closes the following inactive fixed-metric source dependencies while preserving exact active legacy behavior:
+
+- centralized global-distance/lateral-metre conversion and descriptor-aware source X/Y bounds;
+- explicit compatibility-normalized versus metric-lateral transient manual commands without serialized-field or GPU-stride changes;
+- all eight automatic source-family dispatch ranges, including fixed physical Y culling and exact legacy Arc/Semi-Arc and Free-Water formulas;
+- Shore Ribbon compatibility-cell thickness/variation resolved to source-local metres only for fixed metric;
+- descriptor-aware manual ellipse, compound, and segment placement and bounded Y dispatch;
+- fixed physical isolated-probe patch/gap layout with exact legacy percentage/cell layout retained;
+- descriptor-aware automatic/manual cell centres and domain clipping;
+- one comprehensive report that validates all source families, manual commands, coordinate/probe mapping, production/debug evaluator identity, lifecycle/capacity invariants, cleanup, and cache immutability.
+- row-union ownership for normalized compatibility ellipse/compound/segment commands on width-varying rivers, while metric commands retain fixed lateral-metre bounds; anchor equivalence is required, rectangle equality is not;
+- Shore/Wash fixed range ownership across every actual candidate row and padded longitudinal endpoint, preventing endpoint-clamped width under-bounds;
+- independent `ClearRange` full-Y ownership and full automatic GPU-lane parity, including build/hold/release progression values.
+
+P7 did not activate fixed allocation, retune source recipes, scale birth budgets, migrate transport/film/shape/rendering, or change serialized River data. P8 and P9 subsequently closed those consumer migrations. Birth-density/capacity scaling remains a P12 decision.
+
+### 2.1.3 Patch 08 closed dependency disposition
+
+P8 owns the inactive fixed-metric persistent-material and replacement dependencies while preserving exact active legacy behavior:
+
+- descriptor simulation bounds and `dx/dy` physical finite-volume interpretation;
+- fixed curvilinear Jacobian correction for cell area, lateral-face length, and downstream CFL;
+- separate downstream/lateral/total CFL evidence with the existing target and substep hard limit;
+- conservative packed Presence/life-moment/pattern-moment transport and endpoint outflow under forward/reverse flow;
+- complete previous/current descriptor ownership for generated-topology transitions;
+- exact integer-aligned fixed-lattice persistent-state remap with deliberate clear for unsupported mappings;
+- one dirty-time remap kernel using existing held/new state textures and no persistent allocation;
+- one comprehensive live P8 report with cleanup and cache immutability.
+
+P8 closure evidence is complete. P8a corrected the lateral descriptor-lane consumer, and P8b corrected the stale topology-validator symbol. The final Unity report copied all 1,491 expected overlap cells, cleared 863 exterior cells, reported zero remap mismatches, passed transport/CFL/curvature/topology/resource/cleanup/cache gates, and ended `Overall: PASS`.
+
+P8 did not activate fixed allocation or change source budgets, cadence, topology generation, routing, Motion Lane, Disturbance allocation, scenes, prefabs, materials, cache assets, or serialized River fields. P9 subsequently closed film, shape, and production-render consumers. Activation/performance/final tuning remain P12.
+
+### 2.2 Patch 05 closed dependency record
+
+Patch 05 owns the following dependency closures while preserving the active legacy mapping:
+
+- descriptor-authoritative CPU metric positions and metre-to-cell addressing for Major, Connector, Pocket, free-water, and prepared-path topology work;
+- physical shoreline coverage with legacy-exact behavior and a provisional fixed-metric 0.10-metre feather baseline;
+- exact-mesh obstacle candidate intervals and physical 3x3 per-cell sampling;
+- descriptor-aware P5 GPU cell centres for current shore edges, evolving generated topology, topology capture/composition, and exact obstacle occupancy;
+- immediate per-dispatch descriptor binding for P5-owned kernels only;
+- cache capture/readback dimensional parity without a payload or generator-contract change.
+
+Patch 05 explicitly does not close routing, Motion Lane, Disturbance same-point sampling, automatic/manual source rasterization, persistent transport, topology replacement, film, shape, or production rendering. Those remain owned by P6-P9.
+
+Patch 05 implementation disposition:
+
+- CPU topology field-space conversion is descriptor-aware for Major, Connector, Pocket, free-water, prepared-path, and local-mask work;
+- the legacy public generator APIs remain as compatibility wrappers, while active runtime generation passes the immutable descriptor directly;
+- boundary/fluid coverage shares one legacy-exact or fixed-physical feather contract;
+- exact obstacle preparation uses descriptor X/global-Y ownership and nine in-cell physical samples;
+- metric rows expose descriptor `dx/dy`, and topology-owned compute sequences bind the descriptor immediately before dispatch;
+- dedicated P5 HLSL helpers migrate only current shore edges, evolving topology, topology capture/composition, and topology metrics; source, transport, film, and production-render helpers remain staged;
+- all mechanical tests recorded in the canonical plan passed; repeated explicit builds initially exposed same-input payload drift. P5.1-P5.3 subsequently isolated and corrected the hidden topology-phase input, and the final generator-4 reports closed deterministic legacy reproduction before P6.
+
+
+### 2.3 Patch 05.1 closed diagnostic record
+
+Observed Unity evidence requires a separate diagnostic dependency closure:
+
+```text
+Build A = 1,954,946 bytes / 58C8036175508509
+Build B = 1,954,518 bytes / 24BCF968B2B94F28
+combined inputs for both = F182CD9FCC93A961B19B60CBD53C5639
+descriptor for both = descriptor-v1/mapping-0-v0/768212E451E606B9
+obstacle source count for both = 5
+```
+
+The dependency register therefore treats deterministic-generation observability as a mandatory owner of every later coordinate/cache/generator patch. P5.1 adds:
+
+- exact per-obstacle provenance with hierarchy/component-stable diagnostic keys plus source, owner, and MeshFilter session EntityIds;
+- hierarchy, provider/owner type, mesh identity, readability, exact counts and bounds;
+- independent local-mesh, transform, provider-world, and direct-world fingerprints;
+- provider/direct parity and build/captured-obstacle fingerprint parity;
+- explicit source baselines and comparisons stored only under `Library/RiverFoamDiagnostics`, including immediate machine-baseline readback and production-relevant equality proof;
+- two independent non-storing cache preparations from one Inspector action;
+- complete payload byte/hash/first-difference evidence;
+- section-level digests and topology inventory for descriptor, domain, inputs, generation settings, obstacle scalar field, Major, Connector, and Pocket products;
+- assigned-cache comparison plus a before/after metadata-and-payload mutation proof;
+- final diagnostic classification;
+- a read-only cache-asset Inspector with explicitly triggered section analysis;
+- copy, Console, and reveal-file actions.
+
+P5.1 implementation is closed. It changed no active mapping, generator algorithm, source behavior, transport, rendering, serialized River setting, scene, prefab, material, or assigned cache asset. The patch added four explicit Editor-only diagnostic files, a read-only cache-asset Inspector, six River Inspector actions, twenty cache sections, a 26-lane versioned obstacle baseline with immediate binary round-trip proof, production-relevant versus provenance-only obstacle comparison, provider/direct/build-capture agreement, assigned-cache mutation proof, complete local report outputs, and canonical documentation. All seven changed/new C# files and both `UNITY_EDITOR` preprocessed forms parsed without syntax errors; the cache asset's fifteen serialized fields remained unchanged; the codec's only production change was `static` to `static partial`; four new GUIDs were unique across 315 supplied metadata files. P5.2/P5.3 then completed the Unity closure and released P6.
+
+Permanent rule: any future deterministic generator, cache, coordinate, source-geometry, or state-migration patch must include the diagnostic and parity evidence required to validate its own behavior in the same patch. Diagnostic ownership may not be deferred.
+
+### 2.4 Patch 05.2 fingerprint/parity dependency disposition
+
+The complete P5.1 report closed the broad determinism question and exposed a narrower contract failure:
+
+```text
+live obstacle snapshots = exact
+current Build A/B payloads = exact
+provider fingerprints = five all-zero sentinels
+independent direct fingerprints = five distinct nonzero values
+assigned/current first difference = one obstacle scalar texel
+classification = Input Fingerprint Gap
+```
+
+P5.2 therefore adds or updates these mandatory dependencies:
+
+#### Shared exact-geometry identity — **U/T**
+
+- `Game/Procedural/Core/GeneratedGeometryStableFingerprint.cs`
+  - reserve all-zero as invalid;
+  - reject all-zero exact-world computation results;
+  - expose an explicit `IsDefault` check for all providers and consumers.
+- `Game/Procedural/Masses/GeneratedMass.cs`
+  - mark the four coupled fingerprint cache lanes `[NonSerialized]`;
+  - reject restored valid-plus-zero state;
+  - recompute before returning;
+  - publish refreshed fingerprint, mesh, matrix, and validity only after complete local resolution.
+
+Mandatory tests:
+
+- every provider returns a nonzero identity;
+- provider identity equals independent direct exact-world-triangle identity;
+- the same equality survives one Editor restart when persistence/hot-reload proof is requested;
+- no mesh or transform change is hidden behind an unchanged provider identity.
+
+#### River obstacle identity collection — **U/T**
+
+- `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.GeneratedSources.cs`
+  - reject a provider success containing the sentinel;
+  - independently verify provider/direct identity during explicit Edit Mode cache validation/preparation;
+  - retain prepared-provider-only behavior during normal Play startup.
+- `Game/Procedural/Rivers/RiverObstacleExclusionResolver.cs`
+  - reject zero source identities;
+  - advance the obstacle-source-set aggregate to contract `2`;
+  - retain source-order independence through deterministic sorting.
+
+Mandatory tests:
+
+- five current sources produce five nonzero provider/direct-equal identities;
+- aggregate identity changes when any source's exact local mesh or transform changes;
+- aggregate identity is stable under registry enumeration reordering;
+- aggregate construction cannot succeed with any zero lane.
+
+#### Cache compatibility and startup — **U/T**
+
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheCodec.cs`
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheAsset.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.TopologyCache.cs`
+
+Historical P5.2 contract changes, now superseded by P5.3:
+
+```text
+payload format = 3 (unchanged)
+generator contract = 3
+format 2 / generator 1 = Legacy Coordinate Contract
+format 3 / generator 2 = Legacy Obstacle Fingerprint Contract
+format 3 / generator 3 = P5.2 current; P5.3 reclassifies it as Legacy Dynamic Topology Phase
+```
+
+Mandatory tests:
+
+- old generator-2 assets are rejected before input validation or installation;
+- Play Mode performs zero generation and zero writes for the legacy asset;
+- explicit P5.2 Editor rebuild created generator 3; P5.3 requires generator 4;
+- rebuilt cache validates and installs exactly;
+- cache metadata and payload remain unchanged during diagnostics.
+
+#### Frozen legacy-raster parity — **U/T, Editor-only**
+
+- new `Game/Procedural/Rivers/RiverObstacleExclusionResolver.LegacyParityDiagnostics.cs`
+- `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.CacheDiagnostics.cs`
+
+The diagnostic compares the frozen pre-P5 normalized-lateral raster and the P5 descriptor-owned legacy path against the same mesh and river state. It owns candidate bounds, exact accepted sample intervals, water parameters, cell order/offsets, CPU occupancy, duplicate counts, and first mismatch reconstruction.
+
+It is not a production dependency. It must remain excluded from player builds and must never become a runtime fallback.
+
+#### One-report validation ownership — **U/T, Editor-only**
+
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.CacheDiagnostics.cs`
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+
+The primary report performs five non-storing preparations and includes:
+
+- provider/direct identity;
+- obstacle stability;
+- input-key stability;
+- payload and section determinism;
+- CPU emitted cells versus GPU obstacle scalar;
+- frozen pre-P5 versus P5 legacy parity;
+- assigned-cache mutation proof;
+- one final ledger.
+
+Primary output:
+
+```text
+Library/RiverFoamDiagnostics/<river>_LatestP52ComprehensiveValidation.txt
+```
+
+The P5.2 closure uses at most two reports: Report 1 is run before rebuilding and permits the expected generator-2 legacy stage; after one explicit rebuild and Editor restart, Report 2 requires the assigned generator-3 payload and metadata to match Build 1 exactly while re-proving provider/direct identity across reload. Supplemental reports are requested only when the comprehensive report cannot isolate a detected failure.
+
+#### P5.2 explicit non-dependencies
+
+P5.2 must not alter:
+
+- active field mapping or dimensions;
+- topology generation outside exact obstacle identity and Editor parity observation;
+- source rasterization, routing, Motion Lane, Disturbance field content, transport, film, shape, or production rendering;
+- compute/HLSL resources, kernels, textures, buffers, or dispatches;
+- scenes, prefabs, materials, serialized River fields, or generated cache assets in the distributed patch.
+
+This P5.2 closure condition was superseded by P5.3. Both P5.3 comprehensive reports later passed, the assigned cache was rebuilt under generator contract 4, and P6 was released.
+
+Permanent validation rule: every later migration patch must include one comprehensive report, or at most two when a process/reload boundary prevents complete evidence in one transaction. Longer manual validation sequences require a recorded reason proving why report automation cannot capture the evidence.
+
+### 2.5 Patch 05.3 deterministic topology-phase dependency disposition
+
+P5.2 closed provider identity and same-session generation questions, then exposed a cross-reload hidden input:
+
+```text
+five builds before restart = identical, obstacle nonzero 587
+five builds after restart = identical, obstacle nonzero 590
+recorded domain/obstacle/generation/combined inputs = identical
+frozen pre-P5 vs P5 descriptor raster = exact
+```
+
+The following dependencies become mandatory owners in P5.3.
+
+#### Topology evaluation phase — **U/T**
+
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Topology.cs`
+  - owns topology phase contract `1`;
+  - binds `_FoamTopologyEvaluationTime = 0f` every time topology parameters are configured;
+  - retains `_FoamTime = ResolveInitializationMotionTime()` for current-shore/live topology behavior;
+  - records the configured topology time for explicit Editor validation.
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl`
+  - declares one scalar `_FoamTopologyEvaluationTime`;
+  - adds no texture, buffer, sampler, UAV, kernel, or dispatch.
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Topology.hlsl`
+  - `IsObstacleIntervalSampleInside` must use `_FoamTopologyEvaluationTime` when evaluating exact intervals against `RiverWaterEvaluateSurfaceHeight`;
+  - every other `_FoamTime` consumer remains unchanged.
+
+Mandatory tests:
+
+- all five builds report contract `1`, time `0`, float bits `0x00000000`;
+- all five payloads and all section digests are exact;
+- the result remains exact after explicit rebuild and Editor restart;
+- current-shore/live rendering time is not frozen.
+
+#### Cache compatibility — **U/T**
+
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheCodec.cs`
+- `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheAsset.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.TopologyCache.cs`
+
+Contract matrix:
+
+```text
+format 2 / generator 1 = Legacy Coordinate Contract
+format 3 / generator 2 = Legacy Obstacle Fingerprint Contract
+format 3 / generator 3 = Legacy Dynamic Topology Phase
+format 3 / generator 4 = current
+```
+
+Generator-3 assets must be rejected before deserialization, fingerprint comparison, installation, replacement, or Play Mode write. Payload format remains 3 because the byte layout is unchanged; generator semantics change because obstacle acceptance is now canonical rather than live-phase-dependent.
+
+#### CPU candidate / GPU publication ownership — **U/T, Editor-only**
+
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.CacheDiagnostics.cs`
+
+The CPU interval list is a conservative candidate set. GPU occupancy is an accepted subset after nine interval tests at topology time zero. The diagnostic must compare ownership rather than require set equality.
+
+Passing contract:
+
+```text
+candidate coordinates unique and in range
+GPU output length equals field cell count
+GPU scalar contains only exact 0/1 values
+GPU-only occupied cells = 0
+candidate-only cells = permitted and reported
+five-build accepted scalar and payload = exact
+```
+
+Duplicate or out-of-range CPU candidates remain failures. Candidate-only cells are not failures because they are rejected by the canonical water-height interval test.
+
+#### One/two-report validation ownership — **U/T, Editor-only**
+
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.CacheDiagnostics.cs`
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+
+Primary output:
+
+```text
+Library/RiverFoamDiagnostics/<river>_LatestP53ComprehensiveValidation.txt
+```
+
+Report 1 may accept generator 3 only as the explicit pre-rebuild legacy dynamic-phase stage. Report 2, after one explicit rebuild and one Editor restart, must classify generator 4 as current and prove assigned payload/metadata exact to Build 1. No third routine report or long manual checklist is permitted unless this comprehensive report cannot isolate a failure.
+
+#### P5.3 explicit non-dependencies
+
+P5.3 must not alter:
+
+- active grid mapping, descriptor dimensions, or fixed-metric activation;
+- CPU obstacle candidate generation or frozen pre-P5/P5 descriptor raster parity;
+- current-shore animation or normal live water rendering time;
+- routing, Motion Lane, Disturbance fields, sources, transport, film, shape, or production rendering;
+- kernel list, dispatch dimensions/count, texture/buffer allocation, or serialized River state;
+- scenes, prefabs, materials, generated topology cache assets, or unrelated assets in the distributed patch.
+
+Closure result: both P5.3 comprehensive reports returned `Overall: PASS`, and the assigned format-3/generator-4 asset was exact after restart. P6 was released.
+
+### 2.1.4 Patch 09 closed dependency disposition
+
+P9 owns the remaining inactive fixed-metric visual-layer and production-render dependencies while preserving exact active legacy behavior:
+
+- exact full-to-half structural grouping, odd terminal groups, and represented-cell ownership;
+- physical-area-weighted film source and bank/padded clipping;
+- physical film support spacing and aggregate visual-occupancy finite-volume geometry;
+- structural-to-film sampling shared by shape evaluation and renderer debug views;
+- descriptor-owned production Foam field UV and visual metre-offset conversion;
+- valid allocated/represented clipping without edge saturation;
+- production/debug same-physical-point evidence;
+- one comprehensive live P9 report with cleanup and cache immutability.
+
+P9 does not activate fixed allocation, change persistent resources, retune source recipes, alter unrelated water rendering, or modify serialized River data. Quality selection and visual/performance candidate sweeps remain P12.
+
+Closure disposition: the final Unity report executed the actual GPU film-source, visual-occupancy, and shape paths with zero mismatches; passed odd-edge/represented-area, production/debug mapping, resource ownership, cleanup, live-state, and assigned-cache gates; and ended `Overall: PASS`. P9a then removed the three D3D11 warning-prone visual-occupancy helper forms without changing the formulas. The post-P9a rerun again ended `Overall: PASS`. No P9 dependency remains open.
+
+### 2.1.5 Patch 10 closed dependency disposition
+
+P10 owns only observability and presentation cleanup:
+
+- publish already-computed split CFL and curvilinear Jacobian/`|κn|` values through the read-only runtime surface;
+- show active and prepared-candidate descriptor geometry, contract identity, cell-count comparison, cache state, memory, dispatch, and source-area evidence in existing Inspector diagnostic groups;
+- rename the normal cache action group to `Foam Cache & Validation` and align the cache-asset/default diagnostic guidance with that path;
+- retain P9 as the visible endpoint regression while collapsing closed P5.1/P5.3/P6/P7/P8 actions under one historical/deep foldout;
+- remove obsolete active P8/P9 instructions and align canonical status documents.
+
+P10 adds no serialized data, Debug View, GPU readback, report kernel, periodic logging, production resource, compute/render behavior, cache payload, scene, prefab, or material change. Its primary mechanical audit passed 110/110 checks and an independent final audit passed 35/35 across the exact 11-file scope, 24 changed-file parser configurations, and all 89 River C# files.
+
+P10a corrected one C# 9-incompatible multiline interpolation expression in the Fixed Candidate read-only row without changing its output. Unity then compiled, the supplied Inspector capture showed the intended Foam diagnostics/action organization and expected post-cleanup unallocated Edit Mode state, and the unchanged P9 endpoint report again ended `Overall: PASS`. P10/P10a are closed. Fixed-metric activation remains P12.
+
+### 2.1.6 Patch 11 closed dependency disposition
+
+P11 audited the complete post-P10a dependency chain and found no production defect. The audit covered:
+
+- 89 River C# files across 356 parser configurations, with zero C# 9 multiline-interpolation defects, missing known imports, or duplicate exact method signatures;
+- 24 compute/HLSL/shader files, 26 local includes, all 23 Foam kernels in exact order, and exact C# `FindKernel` parity;
+- ten structured-buffer ABI contracts, all five descriptor publication lanes, compute/material descriptor bindings, and 207 declared literal Foam properties;
+- payload format `3`, generator contract `4`, descriptor serialization, reconstruction, and fingerprint identity;
+- production searches for stale normalized structural-Y reconstruction and duplicate spacing ownership;
+- active legacy ownership, deferred fixed activation, P8/P9 endpoint presence, P10 Inspector actions, canonical status, and protected serialized-file scope.
+
+No executable, shader, compute, cache, resource, serialized, scene, prefab, material, asset, or `.meta` change was required. P11 changes only the five canonical status documents and releases P12.
 
 ## 3. Completeness statement and limits
 
@@ -56,26 +455,6 @@ Within the supplied source snapshot, this register is intended to be an **exhaus
 - cache, editor, preflight, diagnostics, scene, river-domain, disturbance, obstacle, and documentation integration points.
 
 It cannot prove dependencies that are absent from the supplied snapshot, created dynamically by external packages, injected through unpublished tooling, or visible only in runtime data. The archive contains no `.git` metadata and no complete project root, package manifest, Library, or current `Editor.log`. A final pre-implementation repository audit must repeat the reference scan against the live workspace.
-
-### 3.3 Static execution record for documentation patch 01
-
-The complete 94-path file register in this document was re-read from the supplied snapshot before the first documentation patch was produced.
-
-| Check | Result |
-|---|---|
-| Registered paths present | 94 of 94 |
-| Missing paths | 0 |
-| Aggregate bytes reviewed | 3,804,092 |
-| Aggregate lines reviewed | 95,910 |
-| Existing line endings | 62 LF files and 32 CRLF files |
-| Normalized-lateral indicator files | 22 |
-| Field-dimension indicator files | 32 |
-| Relevant spacing indicator files | 20 |
-| Cache-contract indicator files | 6 |
-| Shared-quality indicator files | 18 |
-| Curvature indicator files | 12 |
-
-This establishes static inventory completeness only. Git-only dependencies, package dependencies outside the archive, runtime registrations, generated caches, active serialized state, and Unity-only behavior remain pending live verification.
 
 ## 4. Classification legend
 
@@ -322,6 +701,23 @@ Mandatory tests:
 - obstacle-adjacent topology;
 - deterministic output and cache parity.
 
+#### P5 morphology classification record
+
+| Quantity | Classification | P5 treatment | Required regression evidence |
+|---|---|---|---|
+| Major candidate `CentroidCells`, half extents, minimum neck, and support feather | Candidate-local raster coordinates | Preserve. The candidate raster is resolution-independent from the Foam field and receives physical scale through `metresPerCandidateCell`. | Identical candidate generation for a fixed candidate seed; physical placed diameter/radii unchanged. |
+| Four/eight-neighbour traversal, connectedness, boundary detection, one-cell raster guards | Structural sampling/connectivity | Preserve as cells. These operations define discrete adjacency or conservative sample support, not authored physical width. | No disconnected one-cell seams; deterministic component and boundary identity. |
+| Major minimum new coverage and coverage ranking | Physical area in fixed mode; exact legacy cell count in legacy mode | Legacy remains four cells and `cells × 0.01`. Fixed mode uses `0.02 m²` per equivalent coverage unit, giving a `0.08 m²` minimum and area-stable ranking. | Legacy cache bytes unchanged; fixed 0.10/0.15/0.20/0.25-metre candidates resolve equivalent physical acceptance. |
+| Maximum Major coverage | Fraction of valid water | Preserve as ratio. Equal-area fixed cells make the current valid-cell ratio a physical-area ratio. | Equivalent covered-area fraction across widths and candidate spacings. |
+| Connector minimum Major component | Physical area in fixed mode; exact legacy count in legacy mode | Legacy remains five cells. Fixed mode requires `ceil(0.10 m² / (dx × dy))` cells. | Stable removal of tiny raster fragments across candidate spacings. |
+| Major-region to Connector-component fallback association | Physical radius in fixed mode; exact legacy ring count in legacy mode | Legacy retains ten cell rings. Fixed mode selects the nearest labelled cell within `1.50 m`. | Stable component IDs and source-region ownership under fixed candidate spacing changes. |
+| Free-water nearest-valid-cell fallback | Physical radius in fixed mode; exact legacy scan in legacy mode | Legacy retains a two-cell X/Y radius. Fixed mode derives independent X/Y search radii from the existing `0.34 m` acceptance radius and still applies the exact metric distance test. | No missed valid sample within 0.34 m; no event slides around an occupied obstacle cell. |
+| Opportunity, host, endpoint, variant, relationship, prepared-point, and recycle-anchor counts | Semantic bounded counts | Preserve. These are authored/computational budgets, not spatial widths. | Counts remain bounded and deterministic; performance budget unchanged. |
+| Coverage, containment, host remainder, and overlap fractions | Dimensionless ratios | Preserve. | Equivalent ratios for equivalent physical topology. |
+| `FreeWaterEvolutionMaskResolution` and prepared `OffsetCells`/`CentroidCells` | Local normalized/candidate raster coordinates | Preserve. They are private prepared-shape representations and are converted through stored physical metres-per-cell. | Prepared-mask round trip and physical resampling parity. |
+| Existing values named `*Metres` | Physical metres | Preserve as metres and convert only at the descriptor/raster boundary. | Physical extents unchanged across grid candidates. |
+| Existing normalized lateral anchors | Normalized authoring coordinates | Preserve as authoring data; convert to signed metres at the sampled river row. | Same logical bank/centre placement on widening, narrowing, and asymmetric domains. |
+
 ### 7.5 Boundary and shore support
 
 **Class: U/D/T**
@@ -401,6 +797,21 @@ Mandatory tests:
 - no one-cell holes;
 - stable cache fingerprinting;
 - rebuild after obstacle transform/version changes.
+
+### 7.6.4 P6 recorded unit policy and validation ownership
+
+P5.3 is complete. P6 owns the following decisions without activating the fixed grid:
+
+- Motion Lane downstream noise uses a 32 m physical basis; the accepted first-octave wavelength remains `32 / 8.5 = 3.7647 m`.
+- Motion Lane lateral noise uses a 10 m physical reference span; wide rivers deliberately contain more independent lateral structure.
+- fixed smoothing uses 0.20 m and 0.40 m offsets with the existing two-pass weights; legacy offsets remain exactly one and two rows.
+- fixed routing uses 2.0 m approach, 0.35 m front closure, 0.50 m contact reach, a minimum one-cell/22%-height lateral margin, and max(0.10 m, 10%-height) centre dead-band.
+- Disturbance allocation and generation remain unchanged. Foam maps each physical cell centre to Disturbance UV through local distance and local left/right surface widths.
+- normal production Foam UV migration remains P9; P6 changes only Motion Lane/routing debug sampling in the renderer.
+- validation is one explicit P6 report by default. Supplemental visual evidence is requested only when the report cannot establish a shader-visible alignment failure.
+- P6b correction: the report must own a non-storing live-resource transaction. It prepares generated obstacle sources, installs the assigned current cache through the normal initialization state machine, inspects descriptors/textures/telemetry while they remain live, and only then releases resources and disables bindings in `finally`. Calling `TryPrepareTopologyCacheInEditor()` is prohibited because that method serializes a payload and unconditionally releases the state before returning.
+- validator validity is an acceptance contract: every runtime ledger line must name the live state it measured; released sentinel state may only appear in the dedicated post-cleanup proof. Motion Lane and routing signatures use `int.MinValue` as the uninitialized sentinel.
+- P6b is Unity-validated and closed. The corrected live report monitors and forbids cache serialization, evaluates cached-scalar routing occupancy, captures evidence before cleanup, avoids altering foreign preparation state, proves resource/binding cleanup afterward, and returned `Overall: PASS`.
 
 ### 7.7 Obstacle routing and pressure support
 
@@ -564,6 +975,18 @@ Mandatory source-family tests:
 - no cell-shaped rectangular blocks at accepted metric quality;
 - no accidental physical widening of Shore Ribbon;
 - accepted Arc/Semi-Arc C-shape preserved.
+
+### 7.10.1 P7 recorded source-unit and range policy
+
+- Every source parameter is classified as metres, seconds, normalized/unitless, or compatibility cells.
+- `foamShoreRibbonThicknessCells` and `foamShoreRibbonOffsetVariationCells` remain serialized unchanged. Legacy uses local cross-river cells; fixed source preparation resolves them once using descriptor-owned local-normal spacing.
+- Existing normalized public/manual entry points remain compatibility paths. New metric entry points own global distance, lateral metres, metre drift, and metre bend.
+- Automatic fixed ranges are bounded in both X and Y and must contain the physical source footprint. Legacy dispatch formulas remain exact.
+- Production and debug automatic-source kernels call the same shared evaluator; `InjectFoam` alone owns source-range Y dispatch.
+- Validation uses one live comprehensive report by default and must prove its own preparation, measurement-before-cleanup, cleanup, and assigned-cache immutability.
+- Compatibility manual bounds union every candidate row's local normalized-to-metre conversion; metric bounds remain fixed in metres. Shared authored-anchor placement is validated independently of dispatch-rectangle equality.
+- Fixed Shore/Wash bounds evaluate every candidate row and padded endpoint at its actual domain distance; they do not clamp longitudinal feather rows to the source endpoints.
+- The report proves all automatic GPU lanes, compatibility and metric compound paths, independent full-Y `ClearRange` ownership, and source inspection through absolute project paths.
 
 ### 7.11 Manual injection and isolated probes
 
@@ -983,6 +1406,11 @@ Dependencies:
 
 Primary files:
 
+- `FoamTopology/StylizedRiverFoamCacheDiagnostics.cs`
+- `FoamTopology/StylizedRiverFoamTopologyCacheAsset.cs`
+- `Editor/StylizedRiverFoamTopologyCacheAssetEditor.cs`
+- `StylizedRiverFoamRuntime.CacheDiagnostics.cs`
+- `StylizedRiverDisturbanceRuntime.CacheDiagnostics.cs`
 - `StylizedRiverFoamRuntime.BirthDiagnostics.cs`
 - `StylizedRiverFoamRuntime.PublicSurface.cs`
 - `StylizedRiverFoamRuntime.Compute.cs`
@@ -1002,7 +1430,19 @@ Required diagnostic additions or corrections:
 - maximum `abs(curvature * lateralOffset)`;
 - contiguous cache-limit headroom;
 - CFL components separately;
-- Stage 1 whole-rectangle waste.
+- Stage 1 whole-rectangle waste;
+- per-obstacle source provenance and direct/provider fingerprint parity;
+- same-input repeated-build payload and section parity;
+- first full-payload and section byte differences;
+- assigned-cache versus generated-build identity;
+- explicit saved/copyable reports under `Library/RiverFoamDiagnostics`.
+
+Diagnostic execution requirements:
+
+- expensive diagnostics are explicit Edit Mode actions only;
+- payload section analysis is explicit and never runs per Inspector repaint;
+- no diagnostic may mutate a scene, prefab, material, generated source, River setting, or assigned cache asset;
+- future deterministic contract patches ship their owning diagnostics in the same patch.
 
 ### 7.23 Memory and performance accounting
 
@@ -1202,6 +1642,13 @@ Every kernel in `CS_RiverFoam.compute` must be classified and tested. None may b
 
 The following is the file-level audit boundary. “Review/Test” does not mean the file will necessarily be modified; it means it may not be excluded from validation.
 
+### 9.0 Mandatory update — shared exact generated-geometry identity
+
+- **U/T** `Game/Procedural/Core/GeneratedGeometryStableFingerprint.cs`
+- **U/T** `Game/Procedural/Masses/GeneratedMass.cs`
+
+These shared files are in P5.2 scope only for the exact-world fingerprint sentinel and transient cache repair. No Mass generation, topology, edge-wear, material, scene, or prefab behavior is authorized.
+
 ### 9.1 Mandatory update or conditional update — River Foam runtime
 
 - **U/T** `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs`
@@ -1245,6 +1692,7 @@ The following is the file-level audit boundary. “Review/Test” does not mean 
 - **U/T** `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyFieldSpace.cs`
 - **U/T** `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyFingerprints.cs`
 - **U/T** `Game/Procedural/Rivers/RiverObstacleExclusionResolver.cs`
+- **U/T, Editor-only** `Game/Procedural/Rivers/RiverObstacleExclusionResolver.LegacyParityDiagnostics.cs`
 
 ### 9.3 Mandatory update or conditional update — compute and rendering
 
@@ -1268,6 +1716,10 @@ The following is the file-level audit boundary. “Review/Test” does not mean 
 ### 9.4 Mandatory update or conditional update — authoring, diagnostics, and cache tooling
 
 - **U/R/T** `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+- **U/T** `Game/Procedural/Rivers/Editor/StylizedRiverFoamTopologyCacheAssetEditor.cs`
+- **U/T** `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamCacheDiagnostics.cs`
+- **U/T** `Game/Procedural/Rivers/FoamTopology/StylizedRiverFoamTopologyCacheAsset.cs`
+- **U/T** `Game/Procedural/Rivers/StylizedRiverFoamRuntime.CacheDiagnostics.cs`
 - **U/T** `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Authoring.cs`
 - **U/T** `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
 - **U/T** `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Diagnostics.cs`
@@ -1298,9 +1750,10 @@ These files should not be modified automatically. They are required integration-
 - **T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.Constants.cs`
 - **T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.ContinuousSources.cs`
 - **T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.Contracts.cs`
+- **T/U** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.CacheDiagnostics.cs`
 - **T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.Diagnostics.cs`
 - **T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.Dispatch.cs`
-- **T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.GeneratedSources.cs`
+- **U/T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.GeneratedSources.cs`
 - **T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.Impact.cs`
 - **T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.Members.cs`
 - **T** `Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.PublicSurface.cs`

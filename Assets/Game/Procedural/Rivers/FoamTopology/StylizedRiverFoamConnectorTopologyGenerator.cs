@@ -23,6 +23,8 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MajorRasterSuppressionStart = 0.16f;
         private const float EndpointGateRadiusMetres = 0.46f;
         private const int MinimumComponentCellCount = 5;
+        private const float MinimumComponentAreaSquareMetres = 0.10f;
+        private const float MaximumComponentIdentitySearchRadiusMetres = 1.50f;
         private const int EndpointSectorCount = 12;
         private const int MaximumEndpointsPerComponent = 10;
         private const int BaselineMaximumPairAttempts = 48;
@@ -59,7 +61,59 @@ namespace ProgrammaticStylized3D.Rivers
             float[] obstacleMask,
             StylizedRiverFoamMajorTopology majorTopology)
         {
+            int columnsPerChunk = Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    StylizedRiverFoamGridDescriptor
+                        .LongitudinalChunkLengthMetres /
+                    Mathf.Max(0.0001f, fieldLength / Mathf.Max(1, width))));
+            if (width % columnsPerChunk != 0)
+            {
+                columnsPerChunk = width;
+            }
+
+            int chunkCount = Mathf.Max(1, width / columnsPerChunk);
+            StylizedRiverFoamGridDescriptor descriptor =
+                StylizedRiverFoamGridDescriptor.CreateLegacyNormalized(
+                    quality,
+                    chunkCount,
+                    columnsPerChunk,
+                    width,
+                    height,
+                    Mathf.Max(1, Mathf.CeilToInt(width * 0.5f)),
+                    Mathf.Max(1, Mathf.CeilToInt(height * 0.5f)),
+                    fieldLength,
+                    validFieldLength);
+            return Generate(
+                domain,
+                descriptor,
+                quality,
+                shoreMotion,
+                seed,
+                connectorAmount,
+                connectorDirectness,
+                connectorLengthPreference,
+                obstacleMask,
+                majorTopology);
+        }
+
+        internal static StylizedRiverFoamConnectorTopology Generate(
+            RiverDomainSnapshot domain,
+            StylizedRiverFoamGridDescriptor descriptor,
+            StylizedRiverQuality quality,
+            float shoreMotion,
+            int seed,
+            float connectorAmount,
+            float connectorDirectness,
+            float connectorLengthPreference,
+            float[] obstacleMask,
+            StylizedRiverFoamMajorTopology majorTopology)
+        {
             Stopwatch stopwatch = Stopwatch.StartNew();
+            int width = descriptor.ColumnCount;
+            int height = descriptor.RowCount;
+            float fieldLength = descriptor.AllocatedLengthMetres;
+            float validFieldLength = descriptor.ValidLengthMetres;
             int cellCount = Mathf.Max(0, width * height);
             float[] connectorSupport = new float[cellCount];
             int reasonCount = Enum.GetValues(
@@ -102,10 +156,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool[] validCells = new bool[cellCount];
             StylizedRiverFoamMajorTopologyGenerator.BuildFluidContext(
                 domain,
-                width,
-                height,
-                fieldLength,
-                validFieldLength,
+                descriptor,
                 quality,
                 shoreMotion,
                 obstacleMask,
@@ -115,10 +166,7 @@ namespace ProgrammaticStylized3D.Rivers
             Vector2[] metricPositions =
                 StylizedRiverFoamTopologyFieldSpace.BuildMetricPositions(
                     domain,
-                    width,
-                    height,
-                    fieldLength,
-                    validFieldLength);
+                    descriptor);
             int[] componentLabels = new int[cellCount];
             for (int index = 0; index < componentLabels.Length; index++)
             {
@@ -128,6 +176,7 @@ namespace ProgrammaticStylized3D.Rivers
             List<MajorComponent> components = ExtractMajorComponents(
                 width,
                 height,
+                descriptor,
                 majorSupport,
                 validCells,
                 metricPositions,
@@ -137,8 +186,9 @@ namespace ProgrammaticStylized3D.Rivers
                 componentLabels,
                 width,
                 height,
-                fieldLength,
+                descriptor,
                 domain,
+                metricPositions,
                 majorTopology.Regions);
 
             List<ConnectorEndpoint> endpoints = ExtractEndpoints(
@@ -418,6 +468,7 @@ namespace ProgrammaticStylized3D.Rivers
                         startBinding,
                         endBinding,
                         domain,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -454,14 +505,26 @@ namespace ProgrammaticStylized3D.Rivers
                         pair.EndEndpoint.StableId,
                         domain.GlobalDistanceMinimum +
                             pair.StartEndpoint.Position.x,
-                        StylizedRiverFoamTopologyFieldSpace.SignedAcrossNormalizedAtTexel(
-                            pair.StartEndpoint.CellIndex / width,
-                            height),
+                        descriptor.UsesFixedMetricLattice
+                            ? StylizedRiverFoamTopologyFieldSpace
+                                .ResolveAcrossNormalized(
+                                    domain,
+                                    pair.StartEndpoint.Position)
+                            : StylizedRiverFoamTopologyFieldSpace
+                                .SignedAcrossNormalizedAtTexel(
+                                    pair.StartEndpoint.CellIndex / width,
+                                    height),
                         domain.GlobalDistanceMinimum +
                             pair.EndEndpoint.Position.x,
-                        StylizedRiverFoamTopologyFieldSpace.SignedAcrossNormalizedAtTexel(
-                            pair.EndEndpoint.CellIndex / width,
-                            height),
+                        descriptor.UsesFixedMetricLattice
+                            ? StylizedRiverFoamTopologyFieldSpace
+                                .ResolveAcrossNormalized(
+                                    domain,
+                                    pair.EndEndpoint.Position)
+                            : StylizedRiverFoamTopologyFieldSpace
+                                .SignedAcrossNormalizedAtTexel(
+                                    pair.EndEndpoint.CellIndex / width,
+                                    height),
                         pathLength,
                         evolutionSeed,
                         Hash01(evolutionSeed, 40u),
@@ -480,6 +543,7 @@ namespace ProgrammaticStylized3D.Rivers
                         pairs,
                         components,
                         domain,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -802,6 +866,7 @@ namespace ProgrammaticStylized3D.Rivers
         private static List<MajorComponent> ExtractMajorComponents(
             int width,
             int height,
+            StylizedRiverFoamGridDescriptor descriptor,
             float[] majorSupport,
             bool[] validCells,
             Vector2[] metricPositions,
@@ -810,6 +875,16 @@ namespace ProgrammaticStylized3D.Rivers
             int cellCount = width * height;
             int[] queue = new int[cellCount];
             List<MajorComponent> components = new();
+            int minimumComponentCellCount = descriptor.UsesFixedMetricLattice
+                ? Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(
+                        MinimumComponentAreaSquareMetres /
+                        Mathf.Max(
+                            0.000001f,
+                            descriptor.ResolvedDxMetres *
+                            descriptor.ResolvedDyMetres)))
+                : MinimumComponentCellCount;
 
             for (int seedIndex = 0; seedIndex < cellCount; seedIndex++)
             {
@@ -840,7 +915,7 @@ namespace ProgrammaticStylized3D.Rivers
                     TryQueue(x, y + 1);
                 }
 
-                if (cells.Count < MinimumComponentCellCount)
+                if (cells.Count < minimumComponentCellCount)
                 {
                     for (int index = 0; index < cells.Count; index++)
                     {
@@ -887,8 +962,9 @@ namespace ProgrammaticStylized3D.Rivers
             int[] componentLabels,
             int width,
             int height,
-            float fieldLength,
+            StylizedRiverFoamGridDescriptor descriptor,
             RiverDomainSnapshot domain,
+            Vector2[] metricPositions,
             IReadOnlyList<StylizedRiverFoamMajorRegion> regions)
         {
             for (int regionIndex = 0; regionIndex < regions.Count; regionIndex++)
@@ -896,22 +972,67 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamMajorRegion region = regions[regionIndex];
                 float localDistance = region.CentreGlobalDistance -
                     domain.GlobalDistanceMinimum;
-                int x = StylizedRiverFoamTopologyFieldSpace
-                    .LocalDistanceToNearestTexel(
+                int x;
+                int y;
+                Vector2 regionPosition = Vector2.zero;
+                if (descriptor.UsesFixedMetricLattice)
+                {
+                    StylizedRiverSplineSample sample =
+                        domain.SampleAtOrientedDistance(Mathf.Clamp(
+                            localDistance,
+                            0f,
+                            domain.LocalLength));
+                    float lateralMetres =
+                        StylizedRiverFoamTopologyFieldSpace
+                            .SignedNormalizedToMetres(
+                                region.CentreAcrossNormalized,
+                                Mathf.Max(0.05f, sample.LeftHalfWidth),
+                                Mathf.Max(0.05f, sample.RightHalfWidth));
+                    regionPosition = new Vector2(
                         localDistance,
+                        lateralMetres);
+                    if (!StylizedRiverFoamTopologyFieldSpace
+                            .TryMetricToNearestCell(
+                                domain,
+                                descriptor,
+                                regionPosition,
+                                out Vector2Int nearestCell))
+                    {
+                        continue;
+                    }
+
+                    x = nearestCell.x;
+                    y = nearestCell.y;
+                }
+                else
+                {
+                    x = StylizedRiverFoamTopologyFieldSpace
+                        .LocalDistanceToNearestTexel(
+                            localDistance,
+                            width,
+                            descriptor.AllocatedLengthMetres);
+                    y = StylizedRiverFoamTopologyFieldSpace
+                        .SignedAcrossNormalizedToNearestTexel(
+                            region.CentreAcrossNormalized,
+                            height);
+                }
+                int componentIndex = descriptor.UsesFixedMetricLattice
+                    ? FindNearestComponentLabelMetric(
+                        x,
+                        y,
                         width,
-                        fieldLength);
-                int y = StylizedRiverFoamTopologyFieldSpace
-                    .SignedAcrossNormalizedToNearestTexel(
-                        region.CentreAcrossNormalized,
-                        height);
-                int componentIndex = FindNearestComponentLabel(
-                    x,
-                    y,
-                    width,
-                    height,
-                    componentLabels,
-                    10);
+                        height,
+                        componentLabels,
+                        metricPositions,
+                        descriptor,
+                        regionPosition)
+                    : FindNearestComponentLabel(
+                        x,
+                        y,
+                        width,
+                        height,
+                        componentLabels,
+                        10);
                 if (componentIndex >= 0 && componentIndex < components.Count)
                 {
                     components[componentIndex].SourceRegionIds.Add(
@@ -948,6 +1069,70 @@ namespace ProgrammaticStylized3D.Rivers
 
                 component.StableId = stableId;
             }
+        }
+
+
+        private static int FindNearestComponentLabelMetric(
+            int centreX,
+            int centreY,
+            int width,
+            int height,
+            int[] labels,
+            Vector2[] metricPositions,
+            StylizedRiverFoamGridDescriptor descriptor,
+            Vector2 targetPosition)
+        {
+            int direct = labels[centreX + centreY * width];
+            if (direct >= 0)
+            {
+                return direct;
+            }
+
+            int radiusX = Mathf.Max(
+                1,
+                Mathf.CeilToInt(
+                    MaximumComponentIdentitySearchRadiusMetres /
+                    Mathf.Max(0.0001f, descriptor.ResolvedDxMetres)));
+            int radiusY = Mathf.Max(
+                1,
+                Mathf.CeilToInt(
+                    MaximumComponentIdentitySearchRadiusMetres /
+                    Mathf.Max(0.0001f, descriptor.ResolvedDyMetres)));
+            float maximumDistanceSquared =
+                MaximumComponentIdentitySearchRadiusMetres *
+                MaximumComponentIdentitySearchRadiusMetres;
+            float bestDistanceSquared = float.PositiveInfinity;
+            int bestLabel = -1;
+
+            for (int y = Mathf.Max(0, centreY - radiusY);
+                 y <= Mathf.Min(height - 1, centreY + radiusY);
+                 y++)
+            {
+                for (int x = Mathf.Max(0, centreX - radiusX);
+                     x <= Mathf.Min(width - 1, centreX + radiusX);
+                     x++)
+                {
+                    int index = x + y * width;
+                    int label = labels[index];
+                    if (label < 0)
+                    {
+                        continue;
+                    }
+
+                    float distanceSquared =
+                        (metricPositions[index] - targetPosition).sqrMagnitude;
+                    if (distanceSquared > maximumDistanceSquared ||
+                        distanceSquared >= bestDistanceSquared)
+                    {
+                        continue;
+                    }
+
+                    bestDistanceSquared = distanceSquared;
+                    bestLabel = label;
+                }
+            }
+
+            return bestLabel;
         }
 
         private static int FindNearestComponentLabel(
@@ -2538,6 +2723,7 @@ namespace ProgrammaticStylized3D.Rivers
                 IReadOnlyList<ComponentPair> pairs,
                 IReadOnlyList<MajorComponent> components,
                 RiverDomainSnapshot domain,
+                StylizedRiverFoamGridDescriptor descriptor,
                 int width,
                 int height,
                 float fieldLength,
@@ -2644,6 +2830,7 @@ namespace ProgrammaticStylized3D.Rivers
                         startBinding,
                         endBinding,
                         domain,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -2676,6 +2863,7 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverFoamConnectorEndpointBinding startBinding,
             StylizedRiverFoamConnectorEndpointBinding endBinding,
             RiverDomainSnapshot domain,
+            StylizedRiverFoamGridDescriptor descriptor,
             int width,
             int height,
             float fieldLength,
@@ -2802,6 +2990,7 @@ namespace ProgrammaticStylized3D.Rivers
                     startBinding,
                     endBinding,
                     domain,
+                    descriptor,
                     width,
                     height,
                     fieldLength,
@@ -2844,6 +3033,7 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamConnectorEndpointBinding startBinding,
                 StylizedRiverFoamConnectorEndpointBinding endBinding,
                 RiverDomainSnapshot domain,
+                StylizedRiverFoamGridDescriptor descriptor,
                 int width,
                 int height,
                 float fieldLength,
@@ -2945,6 +3135,7 @@ namespace ProgrammaticStylized3D.Rivers
                         startMajor,
                         endMajor,
                         domain,
+                        descriptor,
                         width,
                         height,
                         fieldLength,
@@ -2967,6 +3158,7 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamPreparedMajorRegion startMajor,
                 StylizedRiverFoamPreparedMajorRegion endMajor,
                 RiverDomainSnapshot domain,
+                StylizedRiverFoamGridDescriptor descriptor,
                 int width,
                 int height,
                 float fieldLength,
@@ -3018,6 +3210,7 @@ namespace ProgrammaticStylized3D.Rivers
                     identityPath,
                     variantPath,
                     domain,
+                    descriptor,
                     width,
                     height,
                     fieldLength,
@@ -3096,6 +3289,7 @@ namespace ProgrammaticStylized3D.Rivers
                 Vector2[] identityPath,
                 Vector2[] variantPath,
                 RiverDomainSnapshot domain,
+                StylizedRiverFoamGridDescriptor descriptor,
                 int width,
                 int height,
                 float fieldLength,
@@ -3145,11 +3339,8 @@ namespace ProgrammaticStylized3D.Rivers
                         !StylizedRiverFoamTopologyFieldSpace
                             .TryMetricToCellPosition(
                                 domain,
+                                descriptor,
                                 samplePosition,
-                                width,
-                                height,
-                                fieldLength,
-                                validFieldLength,
                                 out Vector2 cellPosition))
                     {
                         return StylizedRiverFoamConnectorPathVariantAvailability

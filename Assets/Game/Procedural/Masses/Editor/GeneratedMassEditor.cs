@@ -1527,7 +1527,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-B4.2R13A.7-suite");
+            builder.AppendLine("contract=EW-B4.2R13A.9a-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -1890,7 +1890,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             reportBuilder.AppendLine(
                 "GeneratedMass comprehensive artistic selection evidence");
             reportBuilder.AppendLine(
-                "contract=EW-B4.2R13A.7-comprehensive");
+                "contract=EW-B4.2R13A.9a-comprehensive");
             reportBuilder.Append("cases=");
             reportBuilder.AppendLine(expectedCaseCount.ToString());
             reportBuilder.Append("scenariosPerCase=");
@@ -3635,6 +3635,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append(edge.Classification);
                 builder.Append(",seam:");
                 builder.Append(edge.CoincidentBoundarySeamReconciled);
+                builder.Append(",microSuppressed:");
+                builder.Append(edge.MicroTopologySuppressed);
+                builder.Append(",microGeneratedTransition:");
+                builder.Append(edge.MicroTopologyGeneratedTransition);
                 builder.Append("},normals={ownerA:");
                 builder.Append(FormatEdgeWearArtisticVector(
                     edge.OwnerNormalA));
@@ -3900,7 +3904,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             StringBuilder builder = new StringBuilder(524288);
             builder.AppendLine(
-                "seed,widthName,width,sourceEdge,candidateIndex,start,end,midpoint,ownerNormalA,ownerNormalB,bevelNormal,faceA,faceB,faceCount,length,dihedral,vertical01,classification,seamReconciled,structural,geometric,coexistence,artistic,lengthGate,angleGate,baseGate,filterReason,candidateReason,finalReason,score,minimumLength,lengthScore,angleScore,randomScore,baseSuppression,upwardBoost,characterBoost,axisVertical,axisAbsX,axisAbsY,axisAbsZ,silhouette,feasibleWidthFraction,solvedWidthFraction,localDensity,degreeA,degreeB,selectionRank,selectionThreshold,selectionDelta,deterministicVariation,strength,depthMultiplier,requestedWidth,requiredFootprint,lengthToWidthRatio,localityFloor,localityCeiling,localityMargin,localityGuard,localityMinimumRemoval,localityLimitingVertex,localityLimitingPosition,maximumLocallyFeasibleWidth,feasibleWidthFractionRaw,isolatedSucceeded,isolatedAttempts,isolatedLastWidth,isolatedMaximumWidth,isolatedMaximumFraction,endpointConsumptionA,endpointConsumptionB,remainingSpan,minimumSpan,isolatedOpen,isolatedNonManifold,isolatedTJunction,isolatedInvalidFace,isolatedDiagnostic,viabilityFailure,solvedWidth,materializedWidth,materializedScale,widthReduced,candidate,selected,widthInactive,active,attempted,certified,trialRejected,deferred,rejected");
+                "seed,widthName,width,sourceEdge,candidateIndex,start,end,midpoint,ownerNormalA,ownerNormalB,bevelNormal,faceA,faceB,faceCount,length,dihedral,vertical01,classification,seamReconciled,microSuppressed,microGeneratedTransition,structural,geometric,coexistence,artistic,lengthGate,angleGate,baseGate,filterReason,candidateReason,finalReason,score,minimumLength,lengthScore,angleScore,randomScore,baseSuppression,upwardBoost,characterBoost,axisVertical,axisAbsX,axisAbsY,axisAbsZ,silhouette,feasibleWidthFraction,solvedWidthFraction,localDensity,degreeA,degreeB,selectionRank,selectionThreshold,selectionDelta,deterministicVariation,strength,depthMultiplier,requestedWidth,requiredFootprint,lengthToWidthRatio,localityFloor,localityCeiling,localityMargin,localityGuard,localityMinimumRemoval,localityLimitingVertex,localityLimitingPosition,maximumLocallyFeasibleWidth,feasibleWidthFractionRaw,isolatedSucceeded,isolatedAttempts,isolatedLastWidth,isolatedMaximumWidth,isolatedMaximumFraction,endpointConsumptionA,endpointConsumptionB,remainingSpan,minimumSpan,isolatedOpen,isolatedNonManifold,isolatedTJunction,isolatedInvalidFace,isolatedDiagnostic,viabilityFailure,solvedWidth,materializedWidth,materializedScale,widthReduced,candidate,selected,widthInactive,active,attempted,certified,trialRejected,deferred,rejected");
             for (int caseIndex = 0;
                  caseIndex < analyses.Count;
                  caseIndex++)
@@ -3950,6 +3954,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         edge.Classification);
                     AppendEdgeWearArtisticCsv(builder,
                         edge.CoincidentBoundarySeamReconciled.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.MicroTopologySuppressed.ToString());
+                    AppendEdgeWearArtisticCsv(builder,
+                        edge.MicroTopologyGeneratedTransition.ToString());
                     AppendEdgeWearArtisticCsv(builder,
                         edge.StructuralEligible.ToString());
                     AppendEdgeWearArtisticCsv(builder,
@@ -5785,31 +5793,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 NegativeExclusionChecksPassed = 0;
                 StringBuilder builder = new StringBuilder(3072);
                 builder.AppendLine(
-                    "policy=editor-only canonical source-edge fixtures over topology cases; positive fixtures resolve as certified or complete-current-discrete-schedule infeasible");
+                    "policy=editor-only canonical source-edge fixtures over topology cases; visually required 8889 edges 13/23 require certified recovery; 2223 edge 13 resolves through material width recovery or finite target-aware augmentation exhaustion; remaining positive fixtures resolve as certified or complete-current-discrete-schedule infeasible");
                 EvaluateOutlierRecoveryExpectation(
                     2223,
                     "maximum",
                     36,
+                    false,
                     builder);
                 EvaluateOutlierRecoveryExpectation(
                     2223,
                     "default",
                     13,
+                    false,
                     builder);
                 EvaluateOutlierRecoveryExpectation(
                     2223,
                     "maximum",
                     13,
+                    false,
                     builder);
                 EvaluateOutlierRecoveryExpectation(
                     8889,
                     "maximum",
                     13,
+                    true,
                     builder);
                 EvaluateOutlierRecoveryExpectation(
                     8889,
                     "maximum",
                     23,
+                    true,
                     builder);
                 EvaluateNegativeEdgeExclusionExpectation(
                     8889,
@@ -5823,6 +5836,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 int shapeSeed,
                 string widthName,
                 int sourceEdgeIndex,
+                bool requireCertifiedRecovery,
                 StringBuilder builder)
             {
                 OutlierRecoveryChecksRun++;
@@ -5875,12 +5889,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                          record.FinalReason,
                          "corner-recovery-proven-infeasible",
                          StringComparison.Ordinal) ||
+                     string.Equals(
+                         record.FinalReason,
+                         "width-recovery-proven-infeasible",
+                         StringComparison.Ordinal) ||
                      (!string.IsNullOrEmpty(record.IsolatedDiagnostic) &&
                       (record.IsolatedDiagnostic.Contains(
                            "scheduleResolution:complete-infeasible") ||
                        record.IsolatedDiagnostic.Contains(
                            "scheduleResolution:complete-rail-infeasible"))));
-                bool passed = certifiedRecovery || provenInfeasible;
+                bool passed = certifiedRecovery ||
+                    (!requireCertifiedRecovery && provenInfeasible);
                 if (passed)
                 {
                     OutlierRecoveryChecksPassed++;
@@ -5906,6 +5925,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append(sourceEdgeIndex);
                 builder.Append(",passed=");
                 builder.Append(passed ? '1' : '0');
+                builder.Append(",requireCertified=");
+                builder.Append(requireCertifiedRecovery ? '1' : '0');
                 builder.Append(",resolution=");
                 builder.Append(certifiedRecovery
                     ? "certified-recovery"
@@ -5966,10 +5987,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     record.Active == 0 &&
                     record.CertifiedBuilt == 0 &&
                     record.MaterializedWidth <= 0f &&
-                    string.Equals(
-                        record.FinalReason,
-                        "corner-width-inactive",
-                        StringComparison.Ordinal);
+                    IsDefinitiveNegativeEdgeExclusion(record);
                 if (passed)
                 {
                     NegativeExclusionChecksPassed++;
@@ -6001,6 +6019,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         : record.FinalReason);
                 }
                 builder.AppendLine();
+            }
+
+            private static bool IsDefinitiveNegativeEdgeExclusion(
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord record)
+            {
+                if (record == null ||
+                    record.MicroTopologySuppressed != 0 ||
+                    string.IsNullOrEmpty(record.FinalReason))
+                {
+                    return false;
+                }
+
+                string reason = record.FinalReason;
+                if (string.Equals(reason, "none",
+                        StringComparison.Ordinal) ||
+                    string.Equals(reason, "not-selected-by-coverage",
+                        StringComparison.Ordinal) ||
+                    string.Equals(reason, "selected",
+                        StringComparison.Ordinal) ||
+                    reason.Contains("unresolved") ||
+                    reason.Contains("provisional"))
+                {
+                    return false;
+                }
+
+                return record.StructuralEligible == 0 ||
+                    record.GeometricEligible == 0 ||
+                    record.CoexistenceEligible == 0 ||
+                    record.ArtisticEligible == 0 ||
+                    reason.Contains("inactive") ||
+                    reason.Contains("excluded") ||
+                    reason.Contains("ineligible") ||
+                    reason.Contains("too-short") ||
+                    reason.Contains("below-minimum") ||
+                    reason.Contains("filtered");
             }
 
             private MassGenerator.EdgeWearArtisticEdgeAuditRecord
@@ -6132,8 +6185,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
-                ? "EW-B4.2R13A.7-topology"
-                : "EW-B4.2R13A.7-preview";
+                ? "EW-B4.2R13A.9a-topology"
+                : "EW-B4.2R13A.9a-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *
@@ -9852,6 +9905,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     new Color(0.42f, 0.68f, 1f, 0.82f),
                 MassGenerator.EdgeWearDebugEdgeState.StructuralExcluded =>
                     new Color(0.55f, 0.58f, 0.62f, 0.78f),
+                MassGenerator.EdgeWearDebugEdgeState.
+                    MicroTopologySuppressed =>
+                    new Color(0.75f, 0.42f, 1f, 0.95f),
                 _ => new Color(0.72f, 0.76f, 0.82f, 0.82f)
             };
         }
@@ -9870,6 +9926,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 MassGenerator.EdgeWearDebugEdgeState.CoexistenceExcluded => "X",
                 MassGenerator.EdgeWearDebugEdgeState.GeometricExcluded => "G",
                 MassGenerator.EdgeWearDebugEdgeState.StructuralExcluded => "B",
+                MassGenerator.EdgeWearDebugEdgeState.
+                    MicroTopologySuppressed => "M",
                 _ => "?"
             };
         }
@@ -9892,10 +9950,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             int railCount = CountSourceEdgeDebugState(
                 records,
                 MassGenerator.EdgeWearDebugEdgeState.IsolatedRailFailure);
+            int microCount = CountSourceEdgeDebugState(
+                records,
+                MassGenerator.EdgeWearDebugEdgeState.
+                    MicroTopologySuppressed);
             int otherCount = Mathf.Max(
                 0,
                 totalCount - certifiedCount - artisticCount -
-                    widthCount - railCount);
+                    widthCount - railCount - microCount);
             string focusEvidence = highlightSearchEdges
                 ? BuildCurrentSearchFocusEvidence(mass)
                 : "disabled";
@@ -9912,7 +9974,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 new Rect(22f, 40f, 368f, 18f),
                 "C " + certifiedCount + "  A " + artisticCount +
                     "  W " + widthCount + "  R " + railCount +
-                    "  Other " + otherCount,
+                    "  M " + microCount + "  Other " + otherCount,
                 EditorStyles.miniLabel);
             GUI.Label(
                 new Rect(22f, 60f, 368f, 18f),
@@ -9979,9 +10041,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 MassGenerator.EdgeWearDebugEdgeRecord record =
                     records[recordIndex];
                 bool focus = highlightSearchEdges &&
+                    record.GraphEdgeIndex >= 0 &&
                     IsCurrentSearchFocusEdge(
                         mass,
-                        record.EdgeIndex);
+                        record.GraphEdgeIndex);
                 Vector3 start =
                     mass.transform.TransformPoint(record.Start);
                 Vector3 end =

@@ -271,6 +271,15 @@ namespace ProgrammaticStylized3D.Rivers
         private FoamSourceEventGpuData BuildAutomaticFoamSourceGpuData(
             AutomaticFoamSourceEvent sourceEvent)
         {
+            return BuildAutomaticFoamSourceGpuData(
+                sourceEvent,
+                gridDescriptor);
+        }
+
+        private FoamSourceEventGpuData BuildAutomaticFoamSourceGpuData(
+            AutomaticFoamSourceEvent sourceEvent,
+            StylizedRiverFoamGridDescriptor descriptor)
+        {
             float startStorageGlobal =
                 WorldGlobalDistanceToFoamStorageGlobalDistance(
                     sourceEvent.StartGlobalDistance);
@@ -365,7 +374,10 @@ namespace ProgrammaticStylized3D.Rivers
                 shoreData = new Vector4(
                     sourceEvent.ShoreInsetMetres,
                     sourceEvent.Type == AutomaticFoamSourceEventType.ShoreRibbon
-                        ? sourceEvent.ShoreRibbonThicknessCells
+                        ? (descriptor.IsCreated &&
+                           descriptor.UsesFixedMetricLattice
+                            ? sourceEvent.ShoreRibbonThicknessMetres
+                            : sourceEvent.ShoreRibbonThicknessCells)
                         : sourceEvent.WidthMetres,
                     sourceEvent.InwardReachMetres,
                     sourceEvent.FeatherMetres);
@@ -415,99 +427,18 @@ namespace ProgrammaticStylized3D.Rivers
             AutomaticFoamSourceEvent sourceEvent,
             RenderTexture target)
         {
-            float startStorageGlobal =
-                WorldGlobalDistanceToFoamStorageGlobalDistance(
-                    sourceEvent.StartGlobalDistance);
-            float endStorageGlobal =
-                WorldGlobalDistanceToFoamStorageGlobalDistance(
-                    sourceEvent.EndGlobalDistance);
-            float padding = Mathf.Max(
-                sourceEvent.FeatherMetres * 2f,
-                Mathf.Max(sourceEvent.WidthMetres, sourceEvent.InwardReachMetres) * 1.25f);
-            if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
-                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc)
-            {
-                float longitudinalCellSpacing = fieldWidth > 0
-                    ? Mathf.Max(0.01f, fieldLength / fieldWidth)
-                    : 0.01f;
-                // Arc/Semi-Arc start/end bounds already include the complete
-                // upstream bridge and straight downstream wake arms. Keep only
-                // a small raster safety margin instead of re-expanding by the
-                // obstacle half-length on both sides.
-                padding = longitudinalCellSpacing * 2f;
-            }
-            else if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck)
-            {
-                padding = Mathf.Max(
-                    padding,
-                    Mathf.Max(
-                        sourceEvent.ObjectAlongHalfLengthMetres,
-                        sourceEvent.ObjectAcrossHalfWidthMetres) +
-                    sourceEvent.ObjectContactOffsetMetres +
-                    sourceEvent.WidthMetres * 4f +
-                    sourceEvent.FeatherMetres * 2f);
-            }
-            int startX = Mathf.Clamp(
-                GlobalDistanceToX(Mathf.Min(startStorageGlobal, endStorageGlobal) - padding) - 2,
-                0,
-                fieldWidth - 1);
-            int endX = Mathf.Clamp(
-                GlobalDistanceToX(Mathf.Max(startStorageGlobal, endStorageGlobal) + padding) + 2,
-                0,
-                fieldWidth - 1);
-            int countX = endX - startX + 1;
-            if (countX <= 0)
+            ConfigureGridDescriptorComputeParameters();
+            if (!TryResolveAutomaticSourceDispatchRange(
+                    sourceEvent,
+                    out P7SourceDispatchRange dispatchRange))
             {
                 return;
             }
 
-            int startY = 0;
-            int countY = fieldHeight;
-            if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
-                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc)
-            {
-                int centreY = StylizedRiverFoamTopologyFieldSpace
-                    .SignedAcrossNormalizedToNearestTexel(
-                        sourceEvent.CentreAcrossNormalized,
-                        fieldHeight);
-                float sourceLateralCellSpacing = Mathf.Max(
-                    0.01f,
-                    sourceEvent.ObjectSourceLateralCellSpacingMetres);
-                float lateralExtent = Mathf.Max(
-                    sourceLateralCellSpacing,
-                    sourceEvent.LateralPaddingMetres);
-                int padY = Mathf.CeilToInt(
-                    lateralExtent / sourceLateralCellSpacing) + 2;
-                startY = Mathf.Clamp(centreY - padY, 0, fieldHeight - 1);
-                int endY = Mathf.Clamp(centreY + padY, 0, fieldHeight - 1);
-                countY = Mathf.Max(1, endY - startY + 1);
-            }
-            else if (sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterLaceConnector ||
-                sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterTornFragment ||
-                sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterCrossLaceConnector)
-            {
-                float centreAcross01 = Mathf.Clamp01(
-                    sourceEvent.CentreAcrossNormalized * 0.5f + 0.5f);
-                int centreY = Mathf.Clamp(
-                    Mathf.RoundToInt(centreAcross01 * Mathf.Max(0, fieldHeight - 1)),
-                    0,
-                    fieldHeight - 1);
-                float centreWorldDistance =
-                    (sourceEvent.StartGlobalDistance + sourceEvent.EndGlobalDistance) * 0.5f;
-                StylizedRiverSplineSample sample = river != null && river.Domain.IsValid
-                    ? river.Domain.SampleAtGlobalDistance(centreWorldDistance)
-                    : default;
-                float visibleHalfWidth = river != null && river.Domain.IsValid
-                    ? sample.GetVisibleHalfWidth(
-                        sourceEvent.CentreAcrossNormalized < 0f ? -1f : 1f)
-                    : 1f;
-                float normalizedPad = Mathf.Clamp01(
-                    sourceEvent.LateralPaddingMetres / Mathf.Max(0.10f, visibleHalfWidth));
-                int padY = Mathf.CeilToInt(normalizedPad * 0.5f * fieldHeight) + 3;
-                startY = Mathf.Clamp(centreY - padY, 0, fieldHeight - 1);
-                int endY = Mathf.Clamp(centreY + padY, 0, fieldHeight - 1);
-                countY = Mathf.Max(1, endY - startY + 1);
-            }
+            int startX = dispatchRange.StartX;
+            int countX = dispatchRange.CountX;
+            int startY = dispatchRange.StartY;
+            int countY = dispatchRange.CountY;
 
             bool debugWriteAvailable =
                 IsAutomaticBirthSourcesDebugActive &&
@@ -689,38 +620,15 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            int patchWidth = Mathf.Clamp(
-                Mathf.RoundToInt(fieldWidth * 0.035f),
-                3,
-                10);
-            int patchHeight = Mathf.Clamp(
-                Mathf.RoundToInt(fieldHeight * 0.075f),
-                3,
-                10);
-            int gap = Mathf.Clamp(
-                Mathf.RoundToInt(fieldWidth * 0.018f),
-                2,
-                8);
+            ResolveP7LifeProbeLayout(
+                pendingIsolatedLifeProbeDistanceNormalized,
+                pendingIsolatedLifeProbeAcrossNormalized,
+                out int centreX,
+                out int centreY,
+                out int patchWidth,
+                out int patchHeight,
+                out int gap);
             int step = patchWidth + gap;
-            int groupHalfWidth = patchWidth + gap + patchWidth / 2 + 2;
-
-            int centreX = Mathf.RoundToInt(
-                Mathf.Clamp01(pendingIsolatedLifeProbeDistanceNormalized) *
-                Mathf.Max(0, fieldWidth - 1));
-            centreX = Mathf.Clamp(
-                centreX,
-                groupHalfWidth,
-                Mathf.Max(groupHalfWidth, fieldWidth - 1 - groupHalfWidth));
-
-            int centreY = Mathf.RoundToInt(
-                Mathf.Clamp01(
-                    pendingIsolatedLifeProbeAcrossNormalized * 0.5f + 0.5f) *
-                Mathf.Max(0, fieldHeight - 1));
-            int halfHeight = Mathf.Max(1, patchHeight / 2);
-            centreY = Mathf.Clamp(
-                centreY,
-                halfHeight + 1,
-                Mathf.Max(halfHeight + 1, fieldHeight - halfHeight - 2));
 
             LifeProbeRect rectA = MakeLifeProbeRect(
                 centreX - step,
@@ -856,8 +764,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void DispatchInjection(PendingInjection injection, RenderTexture target)
         {
-            float minimumGlobal;
-            float maximumGlobal;
+            ConfigureGridDescriptorComputeParameters();
             float storageGlobalDistance =
                 WorldGlobalDistanceToFoamStorageGlobalDistance(
                     injection.GlobalDistance);
@@ -867,36 +774,17 @@ namespace ProgrammaticStylized3D.Rivers
             float storageSegmentEndGlobalDistance =
                 WorldGlobalDistanceToFoamStorageGlobalDistance(
                     injection.SegmentEndGlobalDistance);
-
-            if (injection.SegmentShape)
+            if (!TryResolveManualInjectionDispatchRange(
+                    injection,
+                    out P7SourceDispatchRange dispatchRange))
             {
-                float segmentPadding = Mathf.Max(
-                    injection.SegmentStartRadius,
-                    injection.SegmentEndRadius);
-                minimumGlobal = Mathf.Min(
-                    storageSegmentStartGlobalDistance,
-                    storageSegmentEndGlobalDistance) - segmentPadding;
-                maximumGlobal = Mathf.Max(
-                    storageSegmentStartGlobalDistance,
-                    storageSegmentEndGlobalDistance) + segmentPadding;
-            }
-            else
-            {
-                float alongRadius = injection.Radius * injection.Elongation *
-                    (injection.CompoundShape ? 1.25f : 1f);
-                minimumGlobal = storageGlobalDistance - alongRadius;
-                maximumGlobal = storageGlobalDistance + alongRadius;
+                return;
             }
 
-            int startX = Mathf.Clamp(
-                GlobalDistanceToX(minimumGlobal) - 2,
-                0,
-                fieldWidth - 1);
-            int endX = Mathf.Clamp(
-                GlobalDistanceToX(maximumGlobal) + 2,
-                0,
-                fieldWidth - 1);
-            int countX = endX - startX + 1;
+            int startX = dispatchRange.StartX;
+            int countX = dispatchRange.CountX;
+            int startY = dispatchRange.StartY;
+            int countY = dispatchRange.CountY;
 
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
@@ -905,10 +793,20 @@ namespace ProgrammaticStylized3D.Rivers
                 simulationFieldLength);
             computeShader.SetInt("_FoamRangeStart", startX);
             computeShader.SetInt("_FoamRangeCount", countX);
+            computeShader.SetInt("_FoamRangeStartY", startY);
+            computeShader.SetInt("_FoamRangeCountY", countY);
             computeShader.SetFloat("_FoamGlobalStart", river.Domain.GlobalDistanceMinimum);
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetFloat("_FoamInjectionGlobalDistance", storageGlobalDistance);
-            computeShader.SetFloat("_FoamInjectionAcrossNormalized", injection.AcrossNormalized);
+            computeShader.SetFloat(
+                "_FoamInjectionAcrossNormalized",
+                injection.AcrossNormalized);
+            computeShader.SetFloat(
+                "_FoamInjectionUsesMetricLateral",
+                injection.UsesMetricLateral ? 1f : 0f);
+            computeShader.SetFloat(
+                "_FoamInjectionLateralMetres",
+                injection.LateralMetres);
             computeShader.SetFloat("_FoamInjectionRadius", injection.Radius);
             computeShader.SetFloat("_FoamInjectionAmount", injection.SourceAmount);
             computeShader.SetFloat(
@@ -939,6 +837,9 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamInjectionSegmentStartAcrossNormalized",
                 injection.SegmentStartAcrossNormalized);
             computeShader.SetFloat(
+                "_FoamInjectionSegmentStartLateralMetres",
+                injection.SegmentStartLateralMetres);
+            computeShader.SetFloat(
                 "_FoamInjectionSegmentStartRadius",
                 injection.SegmentStartRadius);
             computeShader.SetFloat(
@@ -950,6 +851,9 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamInjectionSegmentEndAcrossNormalized",
                 injection.SegmentEndAcrossNormalized);
+            computeShader.SetFloat(
+                "_FoamInjectionSegmentEndLateralMetres",
+                injection.SegmentEndLateralMetres);
             computeShader.SetFloat(
                 "_FoamInjectionSegmentEndRadius",
                 injection.SegmentEndRadius);
@@ -963,7 +867,7 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamObstacleExclusionRead",
                 obstacleExclusionTexture);
 
-            DispatchInjectionToState(target, countX);
+            DispatchInjectionToState(target, countX, countY);
 
             if (injection.IsManual)
             {
@@ -973,7 +877,10 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        private void DispatchInjectionToState(RenderTexture target, int countX)
+        private void DispatchInjectionToState(
+            RenderTexture target,
+            int countX,
+            int countY)
         {
             if (target == null)
             {
@@ -981,7 +888,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             computeShader.SetTexture(injectKernel, "_FoamStateWrite", target);
-            Dispatch(injectKernel, countX, fieldHeight);
+            Dispatch(injectKernel, countX, countY);
         }
 
         private float SampleInjectionBoundaryCoverage(PendingInjection injection)
@@ -991,10 +898,42 @@ namespace ProgrammaticStylized3D.Rivers
                 return -1f;
             }
 
-            float u = Mathf.Clamp01(
-                (injection.GlobalDistance - river.Domain.GlobalDistanceMinimum) /
-                fieldLength);
-            float v = Mathf.Clamp01(injection.AcrossNormalized * 0.5f + 0.5f);
+            float u;
+            float v;
+            if (gridDescriptor.IsCreated &&
+                gridDescriptor.UsesFixedMetricLattice)
+            {
+                float localDistance = injection.GlobalDistance -
+                    river.Domain.GlobalDistanceMinimum;
+                u = Mathf.Clamp01(
+                    (localDistance -
+                        gridDescriptor.FieldOrStripStartMetres) /
+                    Mathf.Max(
+                        0.0001f,
+                        gridDescriptor.AllocatedLengthMetres));
+                float lateralMetres = injection.UsesMetricLateral
+                    ? injection.LateralMetres
+                    : ResolveSourceLateralMetres(
+                        injection.GlobalDistance,
+                        injection.AcrossNormalized);
+                v = Mathf.Clamp01(
+                    (lateralMetres -
+                        gridDescriptor.RepresentedLateralMinimumMetres) /
+                    Mathf.Max(
+                        0.0001f,
+                        gridDescriptor.RepresentedLateralMaximumMetres -
+                        gridDescriptor.RepresentedLateralMinimumMetres));
+            }
+            else
+            {
+                u = Mathf.Clamp01(
+                    (injection.GlobalDistance -
+                        river.Domain.GlobalDistanceMinimum) /
+                    fieldLength);
+                v = Mathf.Clamp01(
+                    injection.AcrossNormalized * 0.5f + 0.5f);
+            }
+
             return Mathf.Clamp01(boundaryTexture.GetPixelBilinear(u, v).r);
         }
     }

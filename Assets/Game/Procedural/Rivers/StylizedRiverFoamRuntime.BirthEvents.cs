@@ -93,18 +93,24 @@ namespace ProgrammaticStylized3D.Rivers
                 0f,
                 0f,
                 0f);
+            float startLateralApproximation =
+                ResolveAcrossMetresApproximation(startAcross);
 
             foamCompositionEvents[slotIndex] = new FoamCompositionEvent
             {
                 Active = true,
+                UsesMetricLateral = false,
                 EventId = eventId,
                 StartGlobalDistance = startGlobalDistance,
                 StartAcrossNormalized = startAcross,
+                StartLateralMetres = startLateralApproximation,
                 Duration = resolvedDuration,
                 TravelDistance = resolvedTravelDistance,
                 FlowDirection = flowDirection,
                 AcrossDrift = resolvedDrift,
+                AcrossDriftMetres = 0f,
                 PathWander = resolvedWander,
+                PathWanderMetres = 0f,
                 BaseRadius = resolvedHalfWidth,
                 SourceAmount = resolvedAmount,
                 RemainingLife = Mathf.Clamp01(remainingLife),
@@ -121,30 +127,190 @@ namespace ProgrammaticStylized3D.Rivers
                 Elapsed = 0f,
                 PreviousGlobalDistance = startGlobalDistance,
                 PreviousAcrossNormalized = startAcross,
+                PreviousLateralMetres = startLateralApproximation,
                 PreviousRadius = startRadius,
                 PreviousEmissionAmount = 0f
             };
 
+            ActivateFoamCompositionEvent(
+                eventId,
+                Mathf.Clamp01(distanceNormalized),
+                startAcross,
+                "Remaining Life / full-field direct simulation");
+            return true;
+        }
+
+        public bool StartFoamCompositionMetric(
+            float startGlobalDistance,
+            float startLateralMetres,
+            float scale,
+            float amount,
+            float remainingLife,
+            float duration,
+            float travelDistance,
+            float acrossDriftMetres,
+            float pathWanderMetres)
+        {
+            if (river == null)
+            {
+                river = GetComponent<StylizedRiver>();
+            }
+
+            if (river == null || !river.FoamEnabled ||
+                river.FreezeAmount >= 0.999f ||
+                !river.Domain.IsValid)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            int slotIndex = FindFreeFoamCompositionSlot();
+            if (slotIndex < 0)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            float clampedStartGlobalDistance = Mathf.Clamp(
+                startGlobalDistance,
+                river.Domain.GlobalDistanceMinimum,
+                river.Domain.GlobalDistanceMaximum);
+            float startAcross = ResolveSourceAcrossNormalized(
+                clampedStartGlobalDistance,
+                startLateralMetres);
+            float clampedStartLateralMetres = ResolveSourceLateralMetres(
+                clampedStartGlobalDistance,
+                startAcross);
+            float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
+            float availableDownstreamDistance = Mathf.Max(
+                0f,
+                flowDirection > 0f
+                    ? river.Domain.GlobalDistanceMaximum -
+                        clampedStartGlobalDistance
+                    : clampedStartGlobalDistance -
+                        river.Domain.GlobalDistanceMinimum);
+            float resolvedTravelDistance = Mathf.Min(
+                Mathf.Clamp(
+                    travelDistance,
+                    ProgressiveRibbonMinimumTravelDistance,
+                    ProgressiveRibbonMaximumTravelDistance),
+                availableDownstreamDistance);
+            float resolvedAmount = Mathf.Clamp01(amount);
+            if (resolvedTravelDistance <= 0.01f ||
+                resolvedAmount <= 0.0001f)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            int eventId = ++foamCompositionSequence;
+            float resolvedHalfWidth = Mathf.Clamp(
+                scale,
+                ProgressiveRibbonMinimumHalfWidth,
+                ProgressiveRibbonMaximumHalfWidth);
+            float sourceFillFeatureSize =
+                ResolveSourceFillFeatureSize(resolvedHalfWidth);
+            float resolvedDuration = Mathf.Clamp(
+                duration,
+                ProgressiveRibbonMinimumDuration,
+                ProgressiveRibbonMaximumDuration);
+            float resolvedDriftMetres = Mathf.Clamp(
+                acrossDriftMetres,
+                -16f,
+                16f);
+            float resolvedWanderMetres = Mathf.Clamp(
+                Mathf.Abs(pathWanderMetres),
+                0f,
+                16f);
+            float sourceKey =
+                river.VisualSeed * 0.613f +
+                clampedStartGlobalDistance * 1009.17f +
+                clampedStartLateralMetres * 503.31f +
+                resolvedHalfWidth * 311.73f +
+                resolvedTravelDistance * 67.19f +
+                resolvedDriftMetres * 59.7f +
+                resolvedWanderMetres * 37.1f;
+            float shapeSeed = sourceKey + 37.719f;
+            float patternSeed = sourceKey + ProgressivePatternSeedSalt;
+            float sourceFillSeed = sourceKey + ProgressiveSourceFillSeedSalt;
+            float bendSign = Hash01(shapeSeed + 11.3f) < 0.5f ? -1f : 1f;
+            float startRadius = ResolveProgressiveRibbonRadius(
+                resolvedHalfWidth,
+                0f,
+                0f,
+                0f,
+                0f);
+
+            foamCompositionEvents[slotIndex] = new FoamCompositionEvent
+            {
+                Active = true,
+                UsesMetricLateral = true,
+                EventId = eventId,
+                StartGlobalDistance = clampedStartGlobalDistance,
+                StartAcrossNormalized = startAcross,
+                StartLateralMetres = clampedStartLateralMetres,
+                Duration = resolvedDuration,
+                TravelDistance = resolvedTravelDistance,
+                FlowDirection = flowDirection,
+                AcrossDrift = 0f,
+                AcrossDriftMetres = resolvedDriftMetres,
+                PathWander = 0f,
+                PathWanderMetres = resolvedWanderMetres,
+                BaseRadius = resolvedHalfWidth,
+                SourceAmount = resolvedAmount,
+                RemainingLife = Mathf.Clamp01(remainingLife),
+                AmountEnvelopeFloor = 0f,
+                RadiusEnvelopeFloor = 0f,
+                PatternSeed = patternSeed,
+                ShapeSeed = shapeSeed,
+                SourceFillSeed = sourceFillSeed,
+                SourceFillFeatureSize = sourceFillFeatureSize,
+                BendSign = bendSign,
+                WidthPhase = 0f,
+                StrokeAspect = ManualSourceStrokeAspect,
+                WidthVariation = 0f,
+                Elapsed = 0f,
+                PreviousGlobalDistance = clampedStartGlobalDistance,
+                PreviousAcrossNormalized = startAcross,
+                PreviousLateralMetres = clampedStartLateralMetres,
+                PreviousRadius = startRadius,
+                PreviousEmissionAmount = 0f
+            };
+
+            ActivateFoamCompositionEvent(
+                eventId,
+                GlobalDistanceToNormalized(clampedStartGlobalDistance),
+                startAcross,
+                "Remaining Life / full-field direct simulation");
+            return true;
+        }
+
+        private void ActivateFoamCompositionEvent(
+            int eventId,
+            float startDistanceNormalized,
+            float startAcrossNormalized,
+            string authorityStatus)
+        {
             materialLifetimeAuthorityActive = true;
             materialLifetimeEmptyMetricReadbacks = 0;
-            lifetimeAuthorityStatus =
-                "Remaining Life / full-field direct simulation";
+            lifetimeAuthorityStatus = authorityStatus;
             activeFoamCompositionEventCount++;
             foamCompositionStartedCount++;
             latestFoamCompositionEventId = eventId;
             latestFoamCompositionProgress = 0f;
             latestFoamCompositionHeadDistanceNormalized =
-                Mathf.Clamp01(distanceNormalized);
+                Mathf.Clamp01(startDistanceNormalized);
             latestFoamCompositionPreviousDistanceNormalized =
                 latestFoamCompositionHeadDistanceNormalized;
-            latestFoamCompositionHeadAcrossNormalized = startAcross;
-            latestFoamCompositionPreviousAcrossNormalized = startAcross;
+            latestFoamCompositionHeadAcrossNormalized =
+                Mathf.Clamp(startAcrossNormalized, -1f, 1f);
+            latestFoamCompositionPreviousAcrossNormalized =
+                latestFoamCompositionHeadAcrossNormalized;
             lastFoamCompositionSegmentLength = 0f;
             simulationAccumulator = Mathf.Max(
                 simulationAccumulator,
                 1f / Mathf.Max(1f, ResolveUpdateRate()));
             idleSince = 0.0;
-            return true;
         }
 
         private bool AdvanceFoamCompositionEvents(
@@ -185,6 +351,7 @@ namespace ProgrammaticStylized3D.Rivers
                     compositionEvent,
                     progress,
                     out float headGlobalDistance,
+                    out float headLateralMetres,
                     out float headAcrossNormalized);
                 float envelope = ResolveProgressiveRibbonEnvelope(progress);
                 float amountEnvelope = Mathf.Lerp(
@@ -207,12 +374,10 @@ namespace ProgrammaticStylized3D.Rivers
                 float segmentLength = Vector2.Distance(
                     new Vector2(
                         compositionEvent.PreviousGlobalDistance,
-                        ResolveAcrossMetresApproximation(
-                            compositionEvent.PreviousAcrossNormalized)),
+                        compositionEvent.PreviousLateralMetres),
                     new Vector2(
                         headGlobalDistance,
-                        ResolveAcrossMetresApproximation(
-                            headAcrossNormalized)));
+                        headLateralMetres));
 
                 bool shouldEmit = segmentLength > 0.0001f &&
                     (compositionEvent.PreviousEmissionAmount > 0.0001f ||
@@ -229,6 +394,7 @@ namespace ProgrammaticStylized3D.Rivers
                         CreateFoamCompositionSegment(
                             compositionEvent,
                             headGlobalDistance,
+                            headLateralMetres,
                             headAcrossNormalized,
                             headRadius,
                             headAmount);
@@ -254,6 +420,8 @@ namespace ProgrammaticStylized3D.Rivers
                     compositionEvent.PreviousGlobalDistance = headGlobalDistance;
                     compositionEvent.PreviousAcrossNormalized =
                         headAcrossNormalized;
+                    compositionEvent.PreviousLateralMetres =
+                        headLateralMetres;
                     compositionEvent.PreviousRadius = headRadius;
                     compositionEvent.PreviousEmissionAmount = headAmount;
                 }
@@ -281,20 +449,24 @@ namespace ProgrammaticStylized3D.Rivers
         private PendingInjection CreateFoamCompositionSegment(
             FoamCompositionEvent compositionEvent,
             float headGlobalDistance,
+            float headLateralMetres,
             float headAcrossNormalized,
             float headRadius,
             float headAmount)
         {
-            float previousAcrossMetres = ResolveAcrossMetresApproximation(
-                compositionEvent.PreviousAcrossNormalized);
-            float headAcrossMetres = ResolveAcrossMetresApproximation(
-                headAcrossNormalized);
+            float previousLateralMetres = compositionEvent.UsesMetricLateral
+                ? compositionEvent.PreviousLateralMetres
+                : ResolveAcrossMetresApproximation(
+                    compositionEvent.PreviousAcrossNormalized);
+            float resolvedHeadLateralMetres = compositionEvent.UsesMetricLateral
+                ? headLateralMetres
+                : ResolveAcrossMetresApproximation(headAcrossNormalized);
             Vector2 start = new Vector2(
                 compositionEvent.PreviousGlobalDistance,
-                previousAcrossMetres);
+                previousLateralMetres);
             Vector2 end = new Vector2(
                 headGlobalDistance,
-                headAcrossMetres);
+                resolvedHeadLateralMetres);
             Vector2 axis = end - start;
             float maximumRadius = Mathf.Max(
                 compositionEvent.PreviousRadius,
@@ -313,8 +485,18 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             float centreGlobalDistance = (start.x + end.x) * 0.5f;
-            float centreAcross = ResolveAcrossNormalizedApproximation(
-                (start.y + end.y) * 0.5f);
+            float centreLateralMetres = (start.y + end.y) * 0.5f;
+            float centreAcross = compositionEvent.UsesMetricLateral
+                ? ResolveSourceAcrossNormalized(
+                    centreGlobalDistance,
+                    centreLateralMetres)
+                : ResolveAcrossNormalizedApproximation(centreLateralMetres);
+            float startAcross = compositionEvent.UsesMetricLateral
+                ? ResolveSourceAcrossNormalized(start.x, start.y)
+                : ResolveAcrossNormalizedApproximation(start.y);
+            float endAcross = compositionEvent.UsesMetricLateral
+                ? ResolveSourceAcrossNormalized(end.x, end.y)
+                : ResolveAcrossNormalizedApproximation(end.y);
             float maximumAmount = Mathf.Max(
                 compositionEvent.PreviousEmissionAmount,
                 headAmount);
@@ -335,13 +517,17 @@ namespace ProgrammaticStylized3D.Rivers
                 false,
                 true,
                 start.x,
-                ResolveAcrossNormalizedApproximation(start.y),
+                startAcross,
                 compositionEvent.PreviousRadius,
                 compositionEvent.PreviousEmissionAmount,
                 end.x,
-                ResolveAcrossNormalizedApproximation(end.y),
+                endAcross,
                 headRadius,
-                headAmount);
+                headAmount,
+                compositionEvent.UsesMetricLateral,
+                centreLateralMetres,
+                start.y,
+                end.y);
         }
 
         private void CompleteFoamCompositionEvent(
@@ -356,22 +542,43 @@ namespace ProgrammaticStylized3D.Rivers
             FoamCompositionEvent compositionEvent,
             float progress,
             out float globalDistance,
+            out float lateralMetres,
             out float acrossNormalized)
         {
             globalDistance = compositionEvent.StartGlobalDistance +
                 compositionEvent.FlowDirection *
                 compositionEvent.TravelDistance * progress;
-            float bend =
+            if (!compositionEvent.UsesMetricLateral)
+            {
+                float bend =
+                    Mathf.Sin(progress * Mathf.PI) *
+                    compositionEvent.BendSign *
+                    ProgressiveRibbonMaximumBendAcross *
+                    compositionEvent.PathWander;
+                acrossNormalized = Mathf.Clamp(
+                    compositionEvent.StartAcrossNormalized +
+                    compositionEvent.AcrossDrift * progress +
+                    bend,
+                    -1f,
+                    1f);
+                lateralMetres =
+                    ResolveAcrossMetresApproximation(acrossNormalized);
+                return;
+            }
+
+            float bendMetres =
                 Mathf.Sin(progress * Mathf.PI) *
                 compositionEvent.BendSign *
-                ProgressiveRibbonMaximumBendAcross *
-                compositionEvent.PathWander;
-            acrossNormalized = Mathf.Clamp(
-                compositionEvent.StartAcrossNormalized +
-                compositionEvent.AcrossDrift * progress +
-                bend,
-                -1f,
-                1f);
+                compositionEvent.PathWanderMetres;
+            lateralMetres = compositionEvent.StartLateralMetres +
+                compositionEvent.AcrossDriftMetres * progress +
+                bendMetres;
+            acrossNormalized = ResolveSourceAcrossNormalized(
+                globalDistance,
+                lateralMetres);
+            lateralMetres = ResolveSourceLateralMetres(
+                globalDistance,
+                acrossNormalized);
         }
 
         private static float ResolveSourceFillFeatureSize(float sourceRadius)
@@ -2858,10 +3065,12 @@ namespace ProgrammaticStylized3D.Rivers
             float widthJitter = Mathf.Lerp(0.94f, 1.06f, Hash01(seed + 7.1f));
             float reachJitter = Mathf.Lerp(0.92f, 1.08f, Hash01(seed + 7.7f));
             float offsetJitter = Mathf.Lerp(0.85f, 1.15f, Hash01(seed + 8.3f));
-            float approximateCrossCellSpacing = Mathf.Max(
-                0.005f,
-                visibleHalfWidth * 2f / Mathf.Max(1, fieldHeight));
+            float approximateCrossCellSpacing =
+                ResolveSourceLateralSpacingMetres(
+                    globalDistance,
+                    sideSign);
             float shoreRibbonThicknessCells = 0f;
+            float shoreRibbonThicknessMetres = 0f;
             float sourceKey = river.VisualSeed * 0.317f +
                 globalDistance * 13.731f +
                 sideSign * 29.137f +
@@ -2932,8 +3141,10 @@ namespace ProgrammaticStylized3D.Rivers
                         eventScale);
                     shoreRibbonThicknessCells =
                         river.FoamShoreRibbonThicknessCells;
-                    width = shoreRibbonThicknessCells *
+                    shoreRibbonThicknessMetres =
+                        shoreRibbonThicknessCells *
                         approximateCrossCellSpacing;
+                    width = shoreRibbonThicknessMetres;
                     float offsetVariationMetres =
                         river.FoamShoreRibbonOffsetVariationCells *
                         approximateCrossCellSpacing;
@@ -3061,6 +3272,7 @@ namespace ProgrammaticStylized3D.Rivers
                 shoreInset,
                 width,
                 shoreRibbonThicknessCells,
+                shoreRibbonThicknessMetres,
                 inwardReach,
                 feather,
                 amount,
@@ -3083,6 +3295,7 @@ namespace ProgrammaticStylized3D.Rivers
             float shoreInsetMetres,
             float widthMetres,
             float shoreRibbonThicknessCells,
+            float shoreRibbonThicknessMetres,
             float inwardReachMetres,
             float featherMetres,
             float amount,
@@ -3141,6 +3354,10 @@ namespace ProgrammaticStylized3D.Rivers
                 ShoreRibbonThicknessCells = sourceType ==
                     AutomaticFoamSourceEventType.ShoreRibbon
                         ? Mathf.Clamp(shoreRibbonThicknessCells, 0.5f, 4f)
+                        : 0f,
+                ShoreRibbonThicknessMetres = sourceType ==
+                    AutomaticFoamSourceEventType.ShoreRibbon
+                        ? Mathf.Max(0.005f, shoreRibbonThicknessMetres)
                         : 0f,
                 InwardReachMetres = sourceType ==
                     AutomaticFoamSourceEventType.ShoreRibbon
@@ -3346,6 +3563,8 @@ namespace ProgrammaticStylized3D.Rivers
 
             int eventId = ++foamCompositionSequence;
             float startAcross = Mathf.Clamp(startAcrossNormalized, -1f, 1f);
+            float startLateralMetres =
+                ResolveAcrossMetresApproximation(startAcross);
             float resolvedRadius = Mathf.Max(0.020f, baseRadius);
             float sourceFillFeatureSize =
                 ResolveSourceFillFeatureSize(resolvedRadius);
@@ -3366,14 +3585,18 @@ namespace ProgrammaticStylized3D.Rivers
             foamCompositionEvents[slotIndex] = new FoamCompositionEvent
             {
                 Active = true,
+                UsesMetricLateral = false,
                 EventId = eventId,
                 StartGlobalDistance = clampedStartGlobalDistance,
                 StartAcrossNormalized = startAcross,
+                StartLateralMetres = startLateralMetres,
                 Duration = resolvedDuration,
                 TravelDistance = resolvedTravelDistance,
                 FlowDirection = flowDirection,
                 AcrossDrift = resolvedDrift,
+                AcrossDriftMetres = 0f,
                 PathWander = resolvedWander,
+                PathWanderMetres = 0f,
                 BaseRadius = resolvedRadius,
                 SourceAmount = resolvedAmount,
                 RemainingLife = Mathf.Clamp01(remainingLife),
@@ -3390,6 +3613,7 @@ namespace ProgrammaticStylized3D.Rivers
                 Elapsed = 0f,
                 PreviousGlobalDistance = clampedStartGlobalDistance,
                 PreviousAcrossNormalized = startAcross,
+                PreviousLateralMetres = startLateralMetres,
                 PreviousRadius = startRadius,
                 PreviousEmissionAmount = Mathf.Clamp01(
                     resolvedAmount * Mathf.Clamp01(amountEnvelopeFloor))

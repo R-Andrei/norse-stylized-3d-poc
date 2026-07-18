@@ -21,6 +21,12 @@ namespace ProgrammaticStylized3D.Geometry
         public ulong Low { get; }
         public ulong High { get; }
 
+        /// <summary>
+        /// The all-zero value is reserved as an invalid/uninitialized sentinel.
+        /// Exact geometry providers must never publish it as a successful result.
+        /// </summary>
+        public bool IsDefault => Low == 0ul && High == 0ul;
+
         public bool Equals(GeneratedGeometryStableFingerprint other)
         {
             return Low == other.Low && High == other.High;
@@ -120,6 +126,15 @@ namespace ProgrammaticStylized3D.Geometry
             }
 
             fingerprint = builder.Finish();
+            if (fingerprint.IsDefault)
+            {
+                status =
+                    "Exact world-space triangle hashing produced the reserved " +
+                    "all-zero sentinel and was rejected.";
+                fingerprint = default;
+                return false;
+            }
+
             status = "Prepared the exact world-space triangle fingerprint.";
             return true;
         }

@@ -514,25 +514,32 @@ namespace ProgrammaticStylized3D.Rivers
             float lateralSpacing = Mathf.Max(
                 0.0001f,
                 minimumTransportLateralSpacing);
-            float lateralSpeed = baseSpeed * Mathf.Max(
+            float curvatureJacobian = gridDescriptor.UsesFixedMetricLattice
+                ? Mathf.Max(
+                    TransportMinimumCurvatureJacobian,
+                    minimumTransportCurvatureJacobian)
+                : 1f;
+            float lateralSpeedRatio = Mathf.Max(
                 0f,
                 river != null ? river.FoamMaximumLateralSpeedRatio : 0f);
 
+            ResolveTransportCflContract(
+                materialStepDuration,
+                baseSpeed,
+                lateralSpeedRatio,
+                longitudinalSpacing,
+                lateralSpacing,
+                curvatureJacobian,
+                out lastDownstreamTransportCfl,
+                out lastLateralTransportCfl,
+                out maximumCfl,
+                out requiredSubsteps,
+                out usedSubsteps,
+                out transportSafetyLimitExceeded);
             lastEstimatedTransportCellsPerStep =
-                baseSpeed * materialStepDuration / longitudinalSpacing;
+                lastDownstreamTransportCfl;
             lastEstimatedLateralTransportCellsPerStep =
-                lateralSpeed * materialStepDuration / lateralSpacing;
-            maximumCfl = lastEstimatedTransportCellsPerStep +
-                lastEstimatedLateralTransportCellsPerStep;
-            requiredSubsteps = Mathf.Max(
-                1,
-                Mathf.CeilToInt(maximumCfl / TransportTargetCfl));
-
-            transportSafetyLimitExceeded =
-                requiredSubsteps > MaximumTransportSubsteps;
-            usedSubsteps = transportSafetyLimitExceeded
-                ? 0
-                : requiredSubsteps;
+                lastLateralTransportCfl;
 
             if (transportSafetyLimitExceeded)
             {
@@ -548,9 +555,48 @@ namespace ProgrammaticStylized3D.Rivers
             transportSafetyStatus =
                 $"CFL {cflPerSubstep:0.000} / " +
                 $"{usedSubsteps} substep" +
-                (usedSubsteps == 1 ? string.Empty : "s");
+                (usedSubsteps == 1 ? string.Empty : "s") +
+                $" (x={lastDownstreamTransportCfl:0.000}, " +
+                $"y={lastLateralTransportCfl:0.000}, " +
+                $"Jmin={curvatureJacobian:0.000})";
         }
 
+        private static void ResolveTransportCflContract(
+            float materialStepDuration,
+            float baseSpeedMetresPerSecond,
+            float maximumLateralSpeedRatio,
+            float longitudinalSpacingMetres,
+            float lateralSpacingMetres,
+            float minimumCurvatureJacobian,
+            out float downstreamCfl,
+            out float lateralCfl,
+            out float maximumCfl,
+            out int requiredSubsteps,
+            out int usedSubsteps,
+            out bool safetyLimitExceeded)
+        {
+            float effectiveLongitudinalSpacing = Mathf.Max(
+                0.0001f,
+                Mathf.Max(0.0001f, longitudinalSpacingMetres) *
+                Mathf.Max(
+                    TransportMinimumCurvatureJacobian,
+                    minimumCurvatureJacobian));
+            float lateralSpeed = Mathf.Max(0f, baseSpeedMetresPerSecond) *
+                Mathf.Max(0f, maximumLateralSpeedRatio);
+            downstreamCfl = Mathf.Max(0f, baseSpeedMetresPerSecond) *
+                Mathf.Max(0f, materialStepDuration) /
+                effectiveLongitudinalSpacing;
+            lateralCfl = lateralSpeed *
+                Mathf.Max(0f, materialStepDuration) /
+                Mathf.Max(0.0001f, lateralSpacingMetres);
+            maximumCfl = downstreamCfl + lateralCfl;
+            requiredSubsteps = Mathf.Max(
+                1,
+                Mathf.CeilToInt(maximumCfl / TransportTargetCfl));
+            safetyLimitExceeded =
+                requiredSubsteps > MaximumTransportSubsteps;
+            usedSubsteps = safetyLimitExceeded ? 0 : requiredSubsteps;
+        }
 
         public bool EmitIsolatedLifeProbe(
             float distanceNormalized,
@@ -640,7 +686,68 @@ namespace ProgrammaticStylized3D.Rivers
                 river.Domain.GlobalDistanceMinimum,
                 river.Domain.GlobalDistanceMaximum,
                 Mathf.Clamp01(distanceNormalized));
+            return QueueManualInjection(
+                globalDistance,
+                Mathf.Clamp(acrossNormalized, -1f, 1f),
+                0f,
+                false,
+                radius,
+                amount,
+                initialRemainingLife,
+                elongation);
+        }
 
+        public bool EmitMetric(
+            float globalDistance,
+            float lateralMetres,
+            float radius,
+            float amount,
+            float initialRemainingLife,
+            float elongation)
+        {
+            if (river == null)
+            {
+                river = GetComponent<StylizedRiver>();
+            }
+
+            if (river == null || !river.FoamEnabled ||
+                river.FreezeAmount >= 0.999f ||
+                !river.Domain.IsValid)
+            {
+                return false;
+            }
+
+            float clampedGlobalDistance = Mathf.Clamp(
+                globalDistance,
+                river.Domain.GlobalDistanceMinimum,
+                river.Domain.GlobalDistanceMaximum);
+            float acrossNormalized = ResolveSourceAcrossNormalized(
+                clampedGlobalDistance,
+                lateralMetres);
+            float clampedLateralMetres = ResolveSourceLateralMetres(
+                clampedGlobalDistance,
+                acrossNormalized);
+            return QueueManualInjection(
+                clampedGlobalDistance,
+                acrossNormalized,
+                clampedLateralMetres,
+                true,
+                radius,
+                amount,
+                initialRemainingLife,
+                elongation);
+        }
+
+        private bool QueueManualInjection(
+            float globalDistance,
+            float acrossNormalized,
+            float lateralMetres,
+            bool usesMetricLateral,
+            float radius,
+            float amount,
+            float initialRemainingLife,
+            float elongation)
+        {
             float resolvedAmount = Mathf.Clamp01(amount);
             if (resolvedAmount <= 0.0001f)
             {
@@ -666,7 +773,7 @@ namespace ProgrammaticStylized3D.Rivers
             pendingInjections.Add(
                 new PendingInjection(
                     globalDistance,
-                    Mathf.Clamp(acrossNormalized, -1f, 1f),
+                    acrossNormalized,
                     resolvedRadius,
                     resolvedAmount,
                     resolvedRemainingLife,
@@ -677,7 +784,20 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceFillFeatureSize,
                     shapeSeed,
                     ManualTestShapeVariety,
-                    false));
+                    false,
+                    false,
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    usesMetricLateral,
+                    lateralMetres,
+                    lateralMetres,
+                    lateralMetres));
             idleSince = 0.0;
             return true;
         }
@@ -697,6 +817,8 @@ namespace ProgrammaticStylized3D.Rivers
             simulationAccumulator = 0f;
             lastEstimatedTransportCellsPerStep = 0f;
             lastEstimatedLateralTransportCellsPerStep = 0f;
+            lastDownstreamTransportCfl = 0f;
+            lastLateralTransportCfl = 0f;
             lastMaximumTransportCfl = 0f;
             lastRequiredTransportSubsteps = 1;
             lastUsedTransportSubsteps = 1;
