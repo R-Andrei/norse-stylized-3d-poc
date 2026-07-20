@@ -2,12 +2,12 @@
 
 ## Status
 
-- **Domain:** procedural vegetation, wind response, interaction, and snow accumulation
-- **Current implementation:** exploratory document only; no canonical vegetation runtime yet
-- **Purpose:** outline a plausible shared architecture for dense stylized vegetation that remains reactive, snow-aware, and performant without requiring a large authored asset library
-- **Authority:** existing project files and framework documents remain authoritative until a vegetation runtime is actually implemented
+- **Domain:** exploratory procedural vegetation, vegetation response to external wind, interaction, and snow accumulation
+- **Current implementation:** historical exploratory document; V0 benchmark implementation is tracked elsewhere
+- **Purpose:** preserve early alternatives and long-term vegetation ideas
+- **Authority:** `Docs/Vegetation_Rendering_and_Interaction_Architecture.md` is the canonical vegetation architecture and implementation plan. Where this document conflicts with it, the canonical document governs.
 
-This document is intentionally earlier and looser than the river Foam architecture. It describes a likely direction, identifies the strongest architectural patterns, and records alternatives and curiosities worth remembering later. It does **not** lock exact data formats, class names, shader contracts, or pass-by-pass implementation work.
+This document is intentionally earlier and looser than the canonical vegetation architecture. It describes a likely direction, identifies the strongest architectural patterns, and records alternatives and curiosities worth remembering later. It does **not** lock exact data formats, class names, shader contracts, or pass-by-pass implementation work.
 
 ---
 
@@ -67,7 +67,7 @@ A useful mental model is:
 ```text
 small procedural family library
     + chunked instance placement
-    + shared wind field
+    + shared external Weather/Wind field
     + shared interaction field
     + shared environmental state inputs
     + fixed-cost vegetation shader logic
@@ -92,7 +92,7 @@ The final vegetation result does not need to represent a physically exact set of
 Instead, it can represent several layers of abstraction:
 
 - **instance families:** visible clumps, stalks, shrubs, saplings, branch clusters, and ground cover patches;
-- **wind response:** broad directional sway, gusting, turbulence, and local phase variation;
+- **wind response:** vegetation-specific response to externally supplied direction, gusting, turbulence, and local phase variation;
 - **interaction response:** flattening, bending away, rebound, trampling memory, shockwaves, and ability-driven pulses;
 - **environmental state:** snow load, wetness, frost, seasonal tint, and exclusion masks;
 - **coverage logic:** where vegetation exists, how dense it is, and what family dominates that zone.
@@ -214,23 +214,19 @@ That transition is important. Dense vegetation is often affordable only if it gr
 
 ## 7. Wind architecture
 
-### 7.1 Preferred direction: one shared wind field
+### 7.1 Preferred direction: one shared external Weather/Wind field
 
-The framework docs already point toward wind as a shared field. Vegetation should follow that principle.
+Wind is not owned by vegetation. `Docs/Weather_Wind_Architecture.md` now defines the shared Weather-owned XZ wind domain, CPU query contract, GPU target field, and gameplay-anchor-centred dynamic response cache.
 
-A likely wind stack is:
+Vegetation owns only family-specific response:
 
-- global prevailing direction and strength;
-- low-frequency gust modulation;
-- medium-frequency turbulence or curl noise;
-- optional local modifiers from terrain, rivers, cliffs, or authored volumes.
+- blade or branch stiffness;
+- root-to-tip weighting;
+- family response amplitude;
+- deterministic local response variation;
+- composition with interaction fields.
 
-The field does not need to be a large full-resolution simulation immediately. Early versions may use:
-
-- one global vector plus sampled world-space noise;
-- a few layered directional bands;
-- a compact chunked vector texture;
-- or a hybrid where the "field" is analytic rather than stored.
+The rejected temporary vegetation provider and its analytical traveling-front recovery are superseded. The initial Weather implementation is XZ-only because the game camera and current consumers are top-down ground-domain systems. Future wind lines and gameplay effects must consume the same Weather source rather than creating separate vegetation or VFX wind state.
 
 ### 7.2 Multiple motion bands
 
@@ -374,6 +370,69 @@ These are interesting, but none should be treated as mandatory for a first imple
 
 ## 10. Rendering and shading model
 
+The canonical implementation now establishes the first shared-lighting contract in `Docs/Vegetation_Rendering_and_Interaction_Architecture.md` under `VEG-V1C`. Vegetation consumes ordinary URP scene lighting rather than referencing the time-of-day controller directly:
+
+- ambient lighting comes from Unity/URP ambient spherical harmonics, which reflect the time-of-day system's published `RenderSettings` state;
+- the main directional light provides sun direction, colour, and intensity;
+- point and spot lights use URP additional-light attenuation;
+- thin two-sided grass uses a wrapped two-sided diffuse response rather than PBR;
+- authored root/body/tip colours remain the vegetation albedo language;
+- real grass shadow casting and real-time shadow receiving remain excluded from the first pass.
+
+The current pass is intentionally texture-free and fixed-cost apart from the bounded URP additional-light loop. PBR, specular response, translucency, and patch-edge shadow illusions remain later decisions. `VEG-V1E` adds an analytical wind-deformed lighting normal from the existing vertex displacement, without an additional Weather sample or fragment-light cost.
+
+
+### Wind-deformed lighting normals and bend-side body shading
+
+`VEG-V1E.2` is the current bend-reactive body-lighting contract. It preserves the `VEG-V1E.1` analytical normal implementation: the vertex shader returns the existing response-scaled full-tip Weather displacement before the accepted `rootToTip²` position weighting, differentiates that quadratic bend analytically as `up + (2t/H) × A_tip`, and crosses the tangent with the blade lateral direction to obtain the lighting normal.
+
+- `Wind Normal Response` remains material-only, ranges from `0` to `4`, and defaults to `0.70`.
+- `0` preserves the prior static-normal lighting path; `1` applies the complete analytical wind slope; values above `1` provide bounded stylized normal-tilt exaggeration without changing deformation.
+- `Wind Bend Shading Response` is a separate material-only control in `0..2`, default `1`. It controls explicit curvature contrast rather than moving the diffuse boundary.
+- The shader projects existing full-tip displacement onto the undeformed card normal, divides by blade height, and flips the sign for the rendered back face. Positive rendered-side bend is concave; negative is convex; bend within the card plane produces no response.
+- The response fades in over `3%..30%` signed normal bend and grows from root to tip with `t²(3-2t)`.
+- At response `1`, the concave face darkens by up to `30%` and the convex face brightens by up to `12%`; response `2` doubles those bounded amounts to a body multiplier range of `0.40..1.24`.
+- The multiplier affects only `authored body colour × resolved ambient/direct lighting`. The punctual graphic edge accent is added afterward unchanged.
+- Roots remain unchanged and upper vertices react progressively with bend.
+- The update adds no Weather texture sample, sine, light loop, shadow sample, geometry, buffer, or draw call. It adds one scalar varying and low-cost vertex/fragment arithmetic.
+- This is a stylized curvature cue, not real self-shadowing.
+
+
+### Grass-owned macro patch composition
+
+`VEG-V1F` adds a spatially coherent colour-composition layer above independent per-cluster micro variation. The grass field owns this pattern rather than following Ground by default.
+
+- One signed dark/neutral/light macro value is evaluated in world space when each accepted cluster is built.
+- The value is stored in the existing unused `VariationPhase.w` channel; the instance record remains three `Vector4` values and 48 bytes.
+- Scale, seed, transition softness, and neutral separation define the baked field and require a vegetation rebuild.
+- Dark and light strengths are material-only controls. They scale the complete root/base/tip body colour while leaving the punctual edge accent separate.
+- Existing independent cluster colour variation remains as the micro layer.
+- No procedural noise, texture, texture sample, extra buffer, draw call, or fragment noise evaluation is added at runtime.
+- Ground's exact macro pattern is not reused because the current Ground implementation exposes only a shader-side evaluator, not a reusable CPU/cache result. Exact matching would not reduce active runtime computation and would add cross-subsystem coupling.
+- Optional Ground influence, patch-driven size/stiffness/density, and authored mask input remain later decisions.
+
+### Punctual-local-light blade-edge accent
+
+`VEG-V1C.9` is the current contract. It retains VEG-V1C.6 lighting ownership and response, preserves the expanded authored edge-width ceiling and accepted edge-mask shape, measures the linear normalized blade footprint before clipping, and rejects narrow accents from the effective light-selected band inside each punctual-light evaluation.
+
+`VEG-V1C.8` is rejected and superseded because it differentiated a saturated post-clip edge-distance field and applied one authored-width gate before the light-facing side selector. Subpixel bands could be falsely classified as wide, while the final bright band could be materially narrower than the tested authored band.
+
+`VEG-V1C.7` remains rejected and superseded because its `fwidth` denominator, broad `1.0..1.5 px` transition, squared stability, and altered edge filter removed or weakened coherent game-camera accents.
+
+- Ambient SH remains broad and never produces an edge term.
+- The main sun and every directional light affect ordinary blade-body lighting only. They never produce the stylized edge accent and are never globally reduced by the accent master.
+- Only punctual point and spot lights may produce the accent. `Local Edge Activation Threshold` evaluates normalized, unpowered punctual-light energy; below that threshold the accent is exactly zero.
+- `Local Edge Falloff Power` shapes final graphic edge radiance once. A value of `1` follows normalized URP distance attenuation; higher values make the edge weaken faster without multiplying close-range distance attenuation above `1`.
+- Ordinary local-light body illumination continues to use the full URP attenuation curve and is not narrowed or bounded by the edge-falloff control.
+- `Stylized Edge Accent` remains the single master. Its nonlinear response is restrained below `1`, while `1` retains the established maximum edge gain of `4`. The coupled punctual body-fill restraint uses the same shaped response.
+- The edge-side selector has a directional dead zone. The opposite edge and nearly perpendicular light/blade orientations receive zero instead of a symmetric residual.
+- Eligible strong local lights retain additive post-albedo radiance, HDR-capable light colour, and the `Edge Highlight Whiteness` control.
+- `Edge Accent Width` remains an authored normalized silhouette width and now supports `0.01..0.50`; existing serialized values are preserved. Screen-space derivatives antialias the boundary without widening the authored line.
+- `Minimum Stable Accent Pixels` is evaluated per eligible punctual light. The shader differentiates the unsaturated normalized blade coordinate before clipping, converts that gradient to pixels per signed unit, narrows the authored band by the actual lateral light alignment at the side-selector midpoint, and fades only effective bands below the configured `1.0..1.2 px` range. Ordinary local-light body illumination does not use this gate.
+- A master strength of `0` preserves the accepted VEG-V1C body-lighting result exactly.
+- The custom additional-light path uses Unity 6.5 `_CLUSTER_LIGHT_LOOP` / `USE_CLUSTER_LIGHT_LOOP` compatibility while retaining the ordinary Forward light loop.
+- This remains a light-directional vegetation response, not a camera Fresnel outline, ambient glow, or sun-driven field outline.
+
 The vegetation shader should probably carry more responsibility than the geometry.
 
 Likely responsibilities:
@@ -515,38 +574,43 @@ The point is not to reproduce a conventional open-world vegetation stack in mini
 
 This is not a committed roadmap, only a likely sane order.
 
-### V0 - visual probes
+### V0 - visual and rendering benchmark
 
-- build a few procedural or baked clump archetypes;
-- test instanced placement density;
-- test shader-only wind on representative terrain;
-- test whether the camera distance favors bold ribbons, cards, shells, or mixed families.
+- follow the canonical V0 plan in `Docs/Vegetation_Rendering_and_Interaction_Architecture.md`;
+- compare opaque strips, crossed cards, and hybrid clusters;
+- test 12/16/20 clusters per square metre;
+- consume the shared Weather XZ wind domain;
+- validate silhouette readability, overdraw, and 1440p cost.
 
-### V1 - shared wind foundation
+### V1 - production static vegetation renderer
 
-- define canonical wind inputs;
-- give all near-field vegetation one coherent wind language;
-- validate silhouette readability and overdraw.
+- add vegetation profiles, Ground sampling, deterministic placement, chunking, culling, and LOD;
+- continue consuming external wind inputs only.
 
-### V2 - interaction field
+### V2 - stylized lighting and patch-edge shadowing
+
+- shared URP ambient, sun, and local-light response begins in the benchmark through `VEG-V1C`;
+- later add internal depth shading and Ground-edge anchoring without a grass ShadowCaster pass.
+
+### V3 - immediate interaction field
 
 - add one shared vegetation interaction field;
 - stamp player motion and one strong ability into it;
 - validate parting, bend, flattening, and rebound.
 
-### V3 - snow integration
+### V4 - persistent trails and snow integration
 
 - add shader-driven snow response;
 - test ordinary winter scenes, exposed ridges, and interaction-driven shedding;
 - confirm that the result reads as intentional rather than as white paint.
 
-### V4 - chunking, LOD, and world integration
+### V5 - world and ecosystem integration
 
 - connect coverage generation to terrain, rivers, rocks, and exclusion zones;
 - add chunk-based culling and quality scaling;
 - introduce distant coverage language.
 
-### V5 - optional specialization
+### V6 - optional specialization
 
 - family-specific motion tuning;
 - shrub and sapling variants;
@@ -561,7 +625,7 @@ If the project wants a strong result with the least risk, the best current recom
 
 1. use a small generated or baked library of bold vegetation clumps rather than many unique assets;
 2. render them through instancing and chunked placement;
-3. drive them with one shared wind field and one shared vegetation interaction field;
+3. drive them with one shared external Weather/Wind field and one shared vegetation interaction field;
 4. treat snow primarily as a shared shading and state problem rather than a per-plant geometry simulation;
 5. let far vegetation become stylized coverage rather than insisting on literal distant plants.
 
@@ -572,4 +636,4 @@ This direction aligns with the framework's broader preferences:
 - stylized coherence instead of realism for its own sake;
 - bounded cost instead of unscalable simulation.
 
-The next concrete step, if desired later, would be a narrower architecture document for a first playable vegetation slice rather than a full final system.
+The concrete implementation sequence is now defined by `Docs/Vegetation_Rendering_and_Interaction_Architecture.md`. This exploratory document should not be used as an implementation ledger.

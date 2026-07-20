@@ -8,12 +8,11 @@ struct PS3D_StylizedSurfaceDetail
     float cavityCore;
     float formSigned;
     float finishSigned;
-    float3 authoredColor;
-    float authoredColorStrength;
-    float authoredLightingStrength;
+    float textureFormStrength;
+    float sceneLightingResponse;
     float roughness;
-    float roughnessStrength;
-    float authoredPayload;
+    float roughnessVariationStrength;
+    float textureFormPayload;
 };
 
 PS3D_StylizedSurfaceDetail PS3D_ZeroStylizedSurfaceDetail()
@@ -24,12 +23,11 @@ PS3D_StylizedSurfaceDetail PS3D_ZeroStylizedSurfaceDetail()
     result.cavityCore = 0.0;
     result.formSigned = 0.0;
     result.finishSigned = 0.0;
-    result.authoredColor = float3(0.0, 0.0, 0.0);
-    result.authoredColorStrength = 0.0;
-    result.authoredLightingStrength = 1.0;
-    result.roughness = 1.0;
-    result.roughnessStrength = 0.0;
-    result.authoredPayload = 0.0;
+    result.textureFormStrength = 0.0;
+    result.sceneLightingResponse = 1.0;
+    result.roughness = 0.5;
+    result.roughnessVariationStrength = 0.0;
+    result.textureFormPayload = 0.0;
     return result;
 }
 
@@ -58,36 +56,32 @@ PS3D_StylizedSurfaceDetail PS3D_DecodeStylizedSurfaceDetail(
     result.cavityCore =
         smoothstep(0.66, 0.98, cavityRaw) * cavityStrength;
 
-    result.authoredPayload = step(0.5, detailC.z);
-    float authoredVariation = packedSample.a * 2.0 - 1.0;
+    result.textureFormPayload = step(0.5, detailC.z);
+    float packedVariation = packedSample.a * 2.0 - 1.0;
     result.formSigned =
-        authoredVariation * max(0.0, detailB.z) *
-        (1.0 - result.authoredPayload);
+        packedVariation * max(0.0, detailB.z) *
+        (1.0 - result.textureFormPayload);
     result.finishSigned =
-        authoredVariation * max(0.0, detailC.x) *
-        (1.0 - result.authoredPayload);
+        packedVariation * max(0.0, detailC.x) *
+        (1.0 - result.textureFormPayload);
     result.roughness = saturate(packedSample.a);
-    result.roughnessStrength =
-        saturate(detailC.w) * result.authoredPayload;
+    result.roughnessVariationStrength =
+        saturate(detailC.w) * result.textureFormPayload;
     return result;
 }
 
-PS3D_StylizedSurfaceDetail PS3D_AssignAuthoredSurfaceColor(
+PS3D_StylizedSurfaceDetail PS3D_AssignStylizedSurfaceTextureForm(
     PS3D_StylizedSurfaceDetail detail,
-    float4 authoredSample,
-    float4 authoredA,
-    float4 authoredTint)
+    float4 formSample,
+    float4 formA)
 {
-    float enabled = step(0.5, authoredA.x);
-    float3 tintedColor = lerp(
-        authoredSample.rgb,
-        authoredSample.rgb * authoredTint.rgb,
-        saturate(authoredTint.a));
-    detail.authoredColor = tintedColor;
-    detail.authoredColorStrength =
-        saturate(authoredA.z) * enabled;
-    detail.authoredLightingStrength =
-        saturate(authoredA.w);
+    float enabled = step(0.5, formA.x);
+    float strength = saturate(formA.z) * enabled;
+    float normalizedForm = saturate(formSample.r);
+    detail.formSigned =
+        (normalizedForm * 2.0 - 1.0) * strength;
+    detail.textureFormStrength = strength;
+    detail.sceneLightingResponse = saturate(formA.w);
     return detail;
 }
 
@@ -147,45 +141,19 @@ half3 PS3D_ResolveStylizedSurfacePalette(
         (half)saturate(detail.cavityCore));
 }
 
-half3 PS3D_ResolveStylizedSurfaceAuthoredColor(
-    half3 paletteColor,
-    half3 darkColor,
-    half3 cavityColor,
-    PS3D_StylizedSurfaceDetail detail)
-{
-    half3 authored = (half3)detail.authoredColor;
-    authored = lerp(
-        authored,
-        authored * darkColor,
-        (half)saturate(detail.cavity * 0.18));
-    authored = lerp(
-        authored,
-        cavityColor,
-        (half)saturate(detail.cavityCore * 0.45));
-    return lerp(
-        paletteColor,
-        authored,
-        (half)saturate(detail.authoredColorStrength));
-}
-
 half PS3D_ResolveStylizedSurfaceDrySmoothness(
     half profileSmoothness,
     PS3D_StylizedSurfaceDetail detail)
 {
-    half paletteSmoothness = saturate(
+    half roughnessVariation =
+        (0.5h - (half)detail.roughness) *
+        0.5h *
+        (half)detail.roughnessVariationStrength;
+    return saturate(
         profileSmoothness +
-        (half)detail.finishSigned -
+        (half)detail.finishSigned +
+        roughnessVariation -
         (half)detail.cavity * 0.08h);
-    half authoredSmoothness = saturate(
-        lerp(
-            profileSmoothness,
-            (half)(1.0 - detail.roughness),
-            (half)detail.roughnessStrength) -
-        (half)detail.cavity * 0.08h);
-    return lerp(
-        paletteSmoothness,
-        authoredSmoothness,
-        (half)detail.authoredPayload);
 }
 
 #endif // PS3D_PIXELSURFACEMATERIALDETAIL_HLSL

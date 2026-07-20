@@ -148,7 +148,7 @@ namespace ProgrammaticStylized3D.Rivers
             return river.FoamGridMode == StylizedRiverFoamGridMode.FixedMetric &&
                 !Mathf.Approximately(
                     allocatedFoamRequestedCellSizeMetres,
-                    river.FoamFixedMetricRequestedCellSizeMetres);
+                    ResolveEffectiveFoamRequestedCellSizeMetres());
         }
 
         private void RecordTopologyStartupRestartReasons()
@@ -437,6 +437,20 @@ namespace ProgrammaticStylized3D.Rivers
                         pendingStartupCachePackage = null;
                         pendingStartupCacheStaleObstacles = false;
                         pendingStartupCacheStaleSettings = false;
+                        if (P12CandidateSweepAllowsTransientTopologyGeneration)
+                        {
+                            BeginP12CandidateSweepTransientTopologyGeneration();
+                            topologyCacheStartupState =
+                                "P12 Sweep Transient Generation";
+                            topologyCacheStartupSummary =
+                                "The explicit P12 sweep is generating topology " +
+                                "for the active test descriptor without reading, " +
+                                "writing, or replacing the assigned cache asset.";
+                            initializationPhase =
+                                InitializationPhase.BuildObstacleExclusion;
+                            break;
+                        }
+
                         TopologyCacheStartupResolution resolution =
                             TryResolveAssignedTopologyCacheForStartup(
                                 out StylizedRiverFoamTopologyCachePackage
@@ -488,7 +502,7 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.BuildObstacleExclusion:
-                    if (!editorTopologyPreparationInProgress)
+                    if (!DevelopmentTopologyGenerationInProgress)
                     {
                         topologyCacheStartupOutcome =
                             TopologyCacheStartupOutcome.PreparationRequired;
@@ -508,7 +522,7 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.BuildMajorTopology:
-                    if (!editorTopologyPreparationInProgress)
+                    if (!DevelopmentTopologyGenerationInProgress)
                     {
                         topologyCacheStartupOutcome =
                             TopologyCacheStartupOutcome.PreparationRequired;
@@ -527,7 +541,7 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.BuildConnectorTopology:
-                    if (!editorTopologyPreparationInProgress)
+                    if (!DevelopmentTopologyGenerationInProgress)
                     {
                         topologyCacheStartupOutcome =
                             TopologyCacheStartupOutcome.PreparationRequired;
@@ -546,7 +560,7 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.BuildPocketTopology:
-                    if (!editorTopologyPreparationInProgress)
+                    if (!DevelopmentTopologyGenerationInProgress)
                     {
                         topologyCacheStartupOutcome =
                             TopologyCacheStartupOutcome.PreparationRequired;
@@ -651,8 +665,9 @@ namespace ProgrammaticStylized3D.Rivers
             allocatedQuality = river.Quality;
             allocatedFoamGridMode = river.FoamGridMode;
             allocatedFoamRequestedCellSizeMetres =
-                river.FoamFixedMetricRequestedCellSizeMetres;
-            initializationMotionTime = river.MotionTime;
+                ResolveEffectiveFoamRequestedCellSizeMetres();
+            initializationMotionTime =
+                ResolveEffectiveFoamInitializationMotionTime();
             return true;
         }
 
@@ -723,7 +738,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             float requestedCellSize =
-                river.FoamFixedMetricRequestedCellSizeMetres;
+                ResolveEffectiveFoamRequestedCellSizeMetres();
             if (!StylizedRiverFoamGridDescriptor.TryCreateFixedMetricOneStrip(
                     river.Quality,
                     requestedCellSize,
@@ -1281,6 +1296,7 @@ namespace ProgrammaticStylized3D.Rivers
             shapeProductDebugActiveLastUpdate = false;
 
             ReleaseMajorEvolutionResources();
+            ReleaseFoamChipStraddleAdmissionResources();
 
             if (boundaryTexture != null)
             {

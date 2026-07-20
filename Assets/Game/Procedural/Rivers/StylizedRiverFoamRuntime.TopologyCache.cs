@@ -1079,11 +1079,23 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void CompleteDevelopmentTopologyGeneration()
         {
+            bool completedP12Sweep =
+                CompleteP12CandidateSweepTransientTopologyGeneration();
             bool completedExplicitly =
                 explicitTopologyGenerationInProgress;
             explicitTopologyGenerationInProgress = false;
             activeTopologyObstacleStale = false;
-            if (completedExplicitly)
+            if (completedP12Sweep)
+            {
+                topologyCacheLoadedForActiveResources = false;
+                topologyCacheStartupState =
+                    "Generated for P12 Sweep";
+                topologyCacheStartupSummary =
+                    "The explicit P12 sweep generated transient topology for " +
+                    "the active test descriptor. The assigned cache asset was " +
+                    "not read, written, or replaced.";
+            }
+            else if (completedExplicitly)
             {
                 topologyCacheLoadedForActiveResources = false;
                 topologyCacheStartupState = "Generated Explicitly";

@@ -262,7 +262,10 @@ namespace ProgrammaticStylized3D.Rivers
 
                     FoamSourceEventGpuData gpuData =
                         automaticFoamSourceEventGpuData[index];
-                    bool hasNewDeposition = gpuData.Deposit.z < 0.5f ||
+                    bool persistentObjectEmitter =
+                        IsPersistentAutomaticSourceEmitter(sourceEvent.Type);
+                    bool hasNewDeposition = persistentObjectEmitter ||
+                        gpuData.Deposit.z < 0.5f ||
                         gpuData.Header.z > gpuData.Deposit.y + 0.000001f;
                     if (hasNewDeposition)
                     {
@@ -298,23 +301,51 @@ namespace ProgrammaticStylized3D.Rivers
                 gridDescriptor);
         }
 
+        private static bool IsPersistentAutomaticSourceEmitter(
+            AutomaticFoamSourceEventType sourceType)
+        {
+            return sourceType == AutomaticFoamSourceEventType.ObjectContactArc ||
+                sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
+        }
+
         private static void ResolveAutomaticSourceDepositionState(
             AutomaticFoamSourceEvent sourceEvent,
             float elapsed,
             out float phaseOrSide,
             out float progress)
         {
-            bool objectContactCycle =
-                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
-                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc;
-            if (objectContactCycle)
+            if (IsPersistentAutomaticSourceEmitter(sourceEvent.Type))
             {
-                float buildDuration = Mathf.Max(
+                float buildEnd = Mathf.Max(
                     0.0001f,
                     sourceEvent.ObjectBuildDuration);
-                phaseOrSide = 0f;
-                progress = Mathf.Clamp01(
-                    Mathf.Clamp(elapsed, 0f, buildDuration) / buildDuration);
+                float holdEnd = buildEnd + Mathf.Max(
+                    0f,
+                    sourceEvent.ObjectHoldDuration);
+                if (elapsed < buildEnd)
+                {
+                    phaseOrSide = 0f;
+                    progress = Mathf.Clamp01(elapsed / buildEnd);
+                }
+                else if (elapsed < holdEnd)
+                {
+                    phaseOrSide = 1f;
+                    progress = sourceEvent.ObjectHoldDuration > 0.0001f
+                        ? Mathf.Clamp01(
+                            (elapsed - buildEnd) /
+                            sourceEvent.ObjectHoldDuration)
+                        : 1f;
+                }
+                else
+                {
+                    phaseOrSide = 2f;
+                    progress = Mathf.Clamp01(
+                        (elapsed - holdEnd) /
+                        Mathf.Max(
+                            0.0001f,
+                            sourceEvent.ObjectReleaseDuration));
+                }
+
                 return;
             }
 

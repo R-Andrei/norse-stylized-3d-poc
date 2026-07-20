@@ -523,6 +523,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private const int CurrentSurfaceStyleMigrationVersion = 1;
         public const int CurrentPaintedAccentProductionBakeFormatRevision = 1;
+        private const int DefaultVegetationCoverageResolution = 128;
+        private const int MinimumVegetationCoverageResolution = 8;
+        private const int MaximumVegetationCoverageResolution = 512;
+        private const float MinimumVegetationCoverageBrushRadius = 0.05f;
 
         [SerializeField]
         private GroundRecipe recipe = new GroundRecipe();
@@ -619,6 +623,34 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private float paintedAccentProductionCoveredTexelFraction;
 
         [SerializeField, HideInInspector]
+        private int vegetationCoverageResolution =
+            DefaultVegetationCoverageResolution;
+
+        [SerializeField, HideInInspector]
+        private byte[] vegetationCoveragePixels = Array.Empty<byte>();
+
+        [SerializeField, HideInInspector]
+        private int vegetationCoverageRevision;
+
+        [SerializeField, HideInInspector]
+        private bool vegetationCoverageInitialized;
+
+        [SerializeField, HideInInspector]
+        private bool vegetationCoveragePaintMode;
+
+        [SerializeField, HideInInspector]
+        private float vegetationCoverageBrushRadius = 3f;
+
+        [SerializeField, HideInInspector]
+        private float vegetationCoverageBrushStrength = 0.5f;
+
+        [SerializeField, HideInInspector]
+        private bool vegetationCoverageEraseMode;
+
+        [SerializeField, HideInInspector]
+        private bool showVegetationCoverageOverlay = true;
+
+        [SerializeField, HideInInspector]
         private GroundModifier[] modifiers = Array.Empty<GroundModifier>();
 
         [SerializeField, HideInInspector]
@@ -628,6 +660,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private MeshRenderer meshRenderer;
         private MeshCollider meshCollider;
         private Mesh generatedMesh;
+#if UNITY_EDITOR
+        private readonly List<Vector3> vegetationCoverageRaycastVertices =
+            new List<Vector3>();
+        private readonly List<int> vegetationCoverageRaycastTriangles =
+            new List<int>();
+        private readonly List<int> vegetationCoverageRaycastSubmeshTriangles =
+            new List<int>();
+        private int vegetationCoverageRaycastGeometryRevision = int.MinValue;
+#endif
         private GroundHeightFieldSnapshot baseSurface =
             GroundHeightFieldSnapshot.Empty;
         [SerializeField, HideInInspector]
@@ -1082,6 +1123,31 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public GroundSnowfieldVariant SnowfieldVariant => snowfieldVariant;
         public int ModifierCount => modifiers != null ? modifiers.Length : 0;
         public int RiverCount => rivers != null ? rivers.Length : 0;
+        public bool VegetationCoverageInitialized =>
+            vegetationCoverageInitialized;
+        public int VegetationCoverageRevision =>
+            vegetationCoverageRevision;
+        public int VegetationCoverageResolution =>
+            ResolveVegetationCoverageResolution();
+        public int VegetationCoverageByteCount =>
+            vegetationCoveragePixels != null
+                ? vegetationCoveragePixels.Length
+                : 0;
+        public bool VegetationCoverageStorageValid =>
+            !vegetationCoverageInitialized || HasValidVegetationCoverageStorage();
+        public bool VegetationCoveragePaintMode => vegetationCoveragePaintMode;
+        public float VegetationCoverageBrushRadius =>
+            Mathf.Max(
+                MinimumVegetationCoverageBrushRadius,
+                vegetationCoverageBrushRadius);
+        public float VegetationCoverageBrushStrength =>
+            Mathf.Clamp01(vegetationCoverageBrushStrength);
+        public bool VegetationCoverageEraseMode =>
+            vegetationCoverageEraseMode;
+        public bool ShowVegetationCoverageOverlay =>
+            showVegetationCoverageOverlay;
+        public int VegetationCoverageSurfaceRevision =>
+            groundGeometryRevision;
         public Material SharedMaterial =>
             meshRenderer != null
                 ? meshRenderer.sharedMaterial
@@ -2981,6 +3047,529 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return true;
         }
 
+        public float CalculateVegetationCoverageFraction()
+        {
+            if (!vegetationCoverageInitialized ||
+                !HasValidVegetationCoverageStorage())
+            {
+                return 1f;
+            }
+
+            long accumulatedCoverage = 0L;
+            for (int index = 0; index < vegetationCoveragePixels.Length; index++)
+            {
+                accumulatedCoverage += vegetationCoveragePixels[index];
+            }
+
+            double maximumCoverage =
+                vegetationCoveragePixels.Length * 255.0;
+            return maximumCoverage > 0.0
+                ? Mathf.Clamp01((float)(accumulatedCoverage / maximumCoverage))
+                : 1f;
+        }
+
+        public bool TrySampleVegetationCoverage(
+            Vector3 worldPosition,
+            out float coverage)
+        {
+            coverage = 1f;
+
+            if (!TryWorldToVegetationCoverageCoordinates(
+                    worldPosition,
+                    out float gridX,
+                    out float gridZ))
+            {
+                return false;
+            }
+
+            if (!vegetationCoverageInitialized ||
+                !HasValidVegetationCoverageStorage())
+            {
+                return true;
+            }
+
+            int resolution = ResolveVegetationCoverageResolution();
+            int x0 = Mathf.Clamp(Mathf.FloorToInt(gridX), 0, resolution - 1);
+            int z0 = Mathf.Clamp(Mathf.FloorToInt(gridZ), 0, resolution - 1);
+            int x1 = Mathf.Min(x0 + 1, resolution - 1);
+            int z1 = Mathf.Min(z0 + 1, resolution - 1);
+            float tx = Mathf.Clamp01(gridX - x0);
+            float tz = Mathf.Clamp01(gridZ - z0);
+
+            float c00 = ResolveVegetationCoveragePixel(x0, z0, resolution);
+            float c10 = ResolveVegetationCoveragePixel(x1, z0, resolution);
+            float c01 = ResolveVegetationCoveragePixel(x0, z1, resolution);
+            float c11 = ResolveVegetationCoveragePixel(x1, z1, resolution);
+
+            float lower = Mathf.Lerp(c00, c10, tx);
+            float upper = Mathf.Lerp(c01, c11, tx);
+            coverage = Mathf.Lerp(lower, upper, tz);
+            return true;
+        }
+
+        public void InitializeVegetationCoverage(bool full)
+        {
+            int resolution = ResolveVegetationCoverageResolution();
+            vegetationCoverageResolution = resolution;
+            byte value = full ? byte.MaxValue : byte.MinValue;
+            vegetationCoveragePixels =
+                new byte[resolution * resolution];
+
+            if (value != byte.MinValue)
+            {
+                for (int index = 0;
+                     index < vegetationCoveragePixels.Length;
+                     index++)
+                {
+                    vegetationCoveragePixels[index] = value;
+                }
+            }
+
+            vegetationCoverageInitialized = true;
+            IncrementVegetationCoverageRevision();
+        }
+
+        public void FillVegetationCoverage(float value)
+        {
+            int resolution = ResolveVegetationCoverageResolution();
+            byte byteValue = (byte)Mathf.Clamp(
+                Mathf.RoundToInt(Mathf.Clamp01(value) * 255f),
+                byte.MinValue,
+                byte.MaxValue);
+
+            if (!vegetationCoverageInitialized ||
+                !HasValidVegetationCoverageStorage())
+            {
+                vegetationCoverageResolution = resolution;
+                vegetationCoveragePixels =
+                    new byte[resolution * resolution];
+                for (int index = 0;
+                     index < vegetationCoveragePixels.Length;
+                     index++)
+                {
+                    vegetationCoveragePixels[index] = byteValue;
+                }
+
+                vegetationCoverageInitialized = true;
+                IncrementVegetationCoverageRevision();
+                return;
+            }
+
+            bool changed = false;
+            for (int index = 0;
+                 index < vegetationCoveragePixels.Length;
+                 index++)
+            {
+                if (vegetationCoveragePixels[index] == byteValue)
+                {
+                    continue;
+                }
+
+                vegetationCoveragePixels[index] = byteValue;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                IncrementVegetationCoverageRevision();
+            }
+        }
+
+        public bool PaintVegetationCoverage(
+            Vector3 worldPosition,
+            float radius,
+            float strength,
+            bool erase)
+        {
+            if (!vegetationCoverageInitialized ||
+                !HasValidVegetationCoverageStorage())
+            {
+                return false;
+            }
+
+            if (!TryResolveVegetationCoverageDomain(
+                    out float halfSize,
+                    out float domainSize))
+            {
+                return false;
+            }
+
+            if (!TryWorldToVegetationCoverageCoordinates(
+                    worldPosition,
+                    out float centerGridX,
+                    out float centerGridZ))
+            {
+                return false;
+            }
+
+            float clampedRadius = Mathf.Max(
+                MinimumVegetationCoverageBrushRadius,
+                radius);
+            float clampedStrength = Mathf.Clamp01(strength);
+            if (clampedStrength <= 0f)
+            {
+                return false;
+            }
+
+            int resolution = ResolveVegetationCoverageResolution();
+            Vector3 lossyScale = transform.lossyScale;
+            float minimumHorizontalScale = Mathf.Max(
+                0.0001f,
+                Mathf.Min(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.z)));
+            float localRadius = clampedRadius / minimumHorizontalScale;
+            float gridRadius = localRadius / domainSize * (resolution - 1);
+
+            int minimumX = Mathf.Clamp(
+                Mathf.FloorToInt(centerGridX - gridRadius) - 1,
+                0,
+                resolution - 1);
+            int maximumX = Mathf.Clamp(
+                Mathf.CeilToInt(centerGridX + gridRadius) + 1,
+                0,
+                resolution - 1);
+            int minimumZ = Mathf.Clamp(
+                Mathf.FloorToInt(centerGridZ - gridRadius) - 1,
+                0,
+                resolution - 1);
+            int maximumZ = Mathf.Clamp(
+                Mathf.CeilToInt(centerGridZ + gridRadius) + 1,
+                0,
+                resolution - 1);
+
+            Vector2 worldCenter = new Vector2(worldPosition.x, worldPosition.z);
+            bool changed = false;
+            for (int z = minimumZ; z <= maximumZ; z++)
+            {
+                float normalizedZ = z / (float)(resolution - 1);
+                float localZ = Mathf.Lerp(-halfSize, halfSize, normalizedZ);
+
+                for (int x = minimumX; x <= maximumX; x++)
+                {
+                    float normalizedX = x / (float)(resolution - 1);
+                    float localX = Mathf.Lerp(-halfSize, halfSize, normalizedX);
+                    Vector3 texelWorld = transform.TransformPoint(
+                        new Vector3(localX, 0f, localZ));
+                    float distance = Vector2.Distance(
+                        worldCenter,
+                        new Vector2(texelWorld.x, texelWorld.z));
+                    if (distance > clampedRadius)
+                    {
+                        continue;
+                    }
+
+                    float normalizedDistance =
+                        Mathf.Clamp01(distance / clampedRadius);
+                    float falloff = 1f - normalizedDistance;
+                    falloff = falloff * falloff * (3f - 2f * falloff);
+                    int delta = Mathf.Max(
+                        1,
+                        Mathf.RoundToInt(
+                            byte.MaxValue * clampedStrength * falloff));
+                    int pixelIndex = z * resolution + x;
+                    int previousValue = vegetationCoveragePixels[pixelIndex];
+                    int nextValue = erase
+                        ? Mathf.Max(byte.MinValue, previousValue - delta)
+                        : Mathf.Min(byte.MaxValue, previousValue + delta);
+                    if (nextValue == previousValue)
+                    {
+                        continue;
+                    }
+
+                    vegetationCoveragePixels[pixelIndex] = (byte)nextValue;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                IncrementVegetationCoverageRevision();
+            }
+
+            return changed;
+        }
+
+#if UNITY_EDITOR
+        public bool TryGetVegetationCoverageTexelWorldPosition(
+            int x,
+            int z,
+            out Vector3 worldPosition,
+            out float coverage)
+        {
+            worldPosition = Vector3.zero;
+            coverage = 1f;
+
+            int resolution = ResolveVegetationCoverageResolution();
+            if (x < 0 || x >= resolution || z < 0 || z >= resolution ||
+                !TryResolveVegetationCoverageDomain(
+                    out float halfSize,
+                    out float ignoredDomainSize))
+            {
+                return false;
+            }
+
+            float normalizedX = x / (float)(resolution - 1);
+            float normalizedZ = z / (float)(resolution - 1);
+            float localX = Mathf.Lerp(-halfSize, halfSize, normalizedX);
+            float localZ = Mathf.Lerp(-halfSize, halfSize, normalizedZ);
+            float localHeight = 0f;
+            if (baseSurface != null && baseSurface.IsValid &&
+                baseSurface.TrySample(
+                    new Vector2(localX, localZ),
+                    out GroundSurfaceSample sample))
+            {
+                localHeight = sample.Height;
+            }
+
+            worldPosition = transform.TransformPoint(
+                new Vector3(localX, localHeight, localZ));
+            if (vegetationCoverageInitialized &&
+                HasValidVegetationCoverageStorage())
+            {
+                coverage = ResolveVegetationCoveragePixel(
+                    x,
+                    z,
+                    resolution);
+            }
+
+            return true;
+        }
+
+        public bool TryRaycastVegetationCoverageSurface(
+            Ray worldRay,
+            out Vector3 worldPosition)
+        {
+            worldPosition = Vector3.zero;
+            CacheComponents();
+            if (generatedMesh == null || generatedMesh.vertexCount < 3)
+            {
+                return false;
+            }
+
+            RefreshVegetationCoverageRaycastCache();
+            if (vegetationCoverageRaycastVertices.Count < 3 ||
+                vegetationCoverageRaycastTriangles.Count < 3)
+            {
+                return false;
+            }
+
+            Vector3 localOrigin = transform.InverseTransformPoint(worldRay.origin);
+            Vector3 localDirection =
+                transform.InverseTransformDirection(worldRay.direction);
+            if (localDirection.sqrMagnitude <= 0.0000001f)
+            {
+                return false;
+            }
+            localDirection.Normalize();
+
+            float closestWorldDistance = float.PositiveInfinity;
+            Vector3 closestWorldPoint = Vector3.zero;
+            for (int index = 0;
+                 index + 2 < vegetationCoverageRaycastTriangles.Count;
+                 index += 3)
+            {
+                int index0 = vegetationCoverageRaycastTriangles[index];
+                int index1 = vegetationCoverageRaycastTriangles[index + 1];
+                int index2 = vegetationCoverageRaycastTriangles[index + 2];
+                if (index0 < 0 ||
+                    index1 < 0 ||
+                    index2 < 0 ||
+                    index0 >= vegetationCoverageRaycastVertices.Count ||
+                    index1 >= vegetationCoverageRaycastVertices.Count ||
+                    index2 >= vegetationCoverageRaycastVertices.Count ||
+                    !TryIntersectVegetationCoverageTriangle(
+                        localOrigin,
+                        localDirection,
+                        vegetationCoverageRaycastVertices[index0],
+                        vegetationCoverageRaycastVertices[index1],
+                        vegetationCoverageRaycastVertices[index2],
+                        out float localDistance))
+                {
+                    continue;
+                }
+
+                Vector3 localPoint =
+                    localOrigin + localDirection * localDistance;
+                Vector3 candidateWorldPoint =
+                    transform.TransformPoint(localPoint);
+                float worldDistance = Vector3.Dot(
+                    candidateWorldPoint - worldRay.origin,
+                    worldRay.direction.normalized);
+                if (worldDistance < 0f ||
+                    worldDistance >= closestWorldDistance)
+                {
+                    continue;
+                }
+
+                closestWorldDistance = worldDistance;
+                closestWorldPoint = candidateWorldPoint;
+            }
+
+            if (float.IsPositiveInfinity(closestWorldDistance))
+            {
+                return false;
+            }
+
+            worldPosition = closestWorldPoint;
+            return true;
+        }
+
+#endif
+        private int ResolveVegetationCoverageResolution()
+        {
+            return Mathf.Clamp(
+                vegetationCoverageResolution,
+                MinimumVegetationCoverageResolution,
+                MaximumVegetationCoverageResolution);
+        }
+
+        private bool HasValidVegetationCoverageStorage()
+        {
+            int resolution = ResolveVegetationCoverageResolution();
+            return vegetationCoveragePixels != null &&
+                vegetationCoveragePixels.Length == resolution * resolution;
+        }
+
+        private bool TryResolveVegetationCoverageDomain(
+            out float halfSize,
+            out float domainSize)
+        {
+            if (baseSurface != null &&
+                baseSurface.IsValid &&
+                baseSurface.HalfSize > 0f)
+            {
+                halfSize = baseSurface.HalfSize;
+                domainSize = halfSize * 2f;
+                return true;
+            }
+
+            halfSize = PatchSize * 0.5f;
+            domainSize = halfSize * 2f;
+            return halfSize > 0f;
+        }
+
+        private bool TryWorldToVegetationCoverageCoordinates(
+            Vector3 worldPosition,
+            out float gridX,
+            out float gridZ)
+        {
+            gridX = 0f;
+            gridZ = 0f;
+            if (!TryResolveVegetationCoverageDomain(
+                    out float halfSize,
+                    out float domainSize))
+            {
+                return false;
+            }
+
+            Vector3 localPoint = transform.InverseTransformPoint(worldPosition);
+            const float boundaryTolerance = 0.0001f;
+            if (localPoint.x < -halfSize - boundaryTolerance ||
+                localPoint.x > halfSize + boundaryTolerance ||
+                localPoint.z < -halfSize - boundaryTolerance ||
+                localPoint.z > halfSize + boundaryTolerance)
+            {
+                return false;
+            }
+
+            int resolution = ResolveVegetationCoverageResolution();
+            float normalizedX = Mathf.Clamp01(
+                (localPoint.x + halfSize) / domainSize);
+            float normalizedZ = Mathf.Clamp01(
+                (localPoint.z + halfSize) / domainSize);
+            gridX = normalizedX * (resolution - 1);
+            gridZ = normalizedZ * (resolution - 1);
+            return true;
+        }
+
+        private float ResolveVegetationCoveragePixel(
+            int x,
+            int z,
+            int resolution)
+        {
+            int index = z * resolution + x;
+            return vegetationCoveragePixels[index] / 255f;
+        }
+
+        private void IncrementVegetationCoverageRevision()
+        {
+            vegetationCoverageRevision =
+                vegetationCoverageRevision == int.MaxValue
+                    ? 1
+                    : vegetationCoverageRevision + 1;
+        }
+
+#if UNITY_EDITOR
+        private void RefreshVegetationCoverageRaycastCache()
+        {
+            if (vegetationCoverageRaycastGeometryRevision ==
+                    groundGeometryRevision &&
+                vegetationCoverageRaycastVertices.Count ==
+                    generatedMesh.vertexCount)
+            {
+                return;
+            }
+
+            vegetationCoverageRaycastVertices.Clear();
+            vegetationCoverageRaycastTriangles.Clear();
+            vegetationCoverageRaycastSubmeshTriangles.Clear();
+            generatedMesh.GetVertices(vegetationCoverageRaycastVertices);
+
+            for (int submesh = 0;
+                 submesh < generatedMesh.subMeshCount;
+                 submesh++)
+            {
+                vegetationCoverageRaycastSubmeshTriangles.Clear();
+                generatedMesh.GetTriangles(
+                    vegetationCoverageRaycastSubmeshTriangles,
+                    submesh,
+                    true);
+                vegetationCoverageRaycastTriangles.AddRange(
+                    vegetationCoverageRaycastSubmeshTriangles);
+            }
+
+            vegetationCoverageRaycastGeometryRevision =
+                groundGeometryRevision;
+        }
+
+        private static bool TryIntersectVegetationCoverageTriangle(
+            Vector3 rayOrigin,
+            Vector3 rayDirection,
+            Vector3 vertex0,
+            Vector3 vertex1,
+            Vector3 vertex2,
+            out float distance)
+        {
+            distance = 0f;
+            Vector3 edge1 = vertex1 - vertex0;
+            Vector3 edge2 = vertex2 - vertex0;
+            Vector3 cross = Vector3.Cross(rayDirection, edge2);
+            float determinant = Vector3.Dot(edge1, cross);
+            if (Mathf.Abs(determinant) <= 0.0000001f)
+            {
+                return false;
+            }
+
+            float inverseDeterminant = 1f / determinant;
+            Vector3 originOffset = rayOrigin - vertex0;
+            float u = Vector3.Dot(originOffset, cross) * inverseDeterminant;
+            if (u < 0f || u > 1f)
+            {
+                return false;
+            }
+
+            Vector3 q = Vector3.Cross(originOffset, edge1);
+            float v = Vector3.Dot(rayDirection, q) * inverseDeterminant;
+            if (v < 0f || u + v > 1f)
+            {
+                return false;
+            }
+
+            distance = Vector3.Dot(edge2, q) * inverseDeterminant;
+            return distance >= 0f;
+        }
+
+#endif
+
         public bool TrySampleSurface(
             Vector3 worldPosition,
             out float height,
@@ -4043,12 +4632,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 bankSurfaceLayer,
                 inheritedLayerColor,
                 resolvedMaterialControls.BankDetailScaleMultiplier,
-                resolvedMaterialControls.BankAuthoredColorStrengthMultiplier,
-                resolvedMaterialControls.BankAuthoredColorLightingMultiplier,
+                resolvedMaterialControls.BankTextureFormStrengthMultiplier,
+                resolvedMaterialControls.BankSceneLightingResponseMultiplier,
                 resolvedMaterialControls.BankDetailNormalStrengthMultiplier,
                 resolvedMaterialControls.BankDetailCavityStrengthMultiplier,
                 resolvedMaterialControls.BankDetailValueFormMultiplier,
-                resolvedMaterialControls.BankDetailFinishVariationMultiplier,
+                resolvedMaterialControls.BankRoughnessVariationMultiplier,
                 resolvedMaterialControls.BankLegacyPixelCellInfluenceMultiplier,
                 GroundBankLayerCavityColorId,
                 GroundBankLayerDetailArrayId,
@@ -4122,12 +4711,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 riverbedSurfaceLayer,
                 inheritedLayerColor,
                 resolvedMaterialControls.RiverbedDetailScaleMultiplier,
-                resolvedMaterialControls.RiverbedAuthoredColorStrengthMultiplier,
-                resolvedMaterialControls.RiverbedAuthoredColorLightingMultiplier,
+                resolvedMaterialControls.RiverbedTextureFormStrengthMultiplier,
+                resolvedMaterialControls.RiverbedSceneLightingResponseMultiplier,
                 resolvedMaterialControls.RiverbedDetailNormalStrengthMultiplier,
                 resolvedMaterialControls.RiverbedDetailCavityStrengthMultiplier,
                 resolvedMaterialControls.RiverbedDetailValueFormMultiplier,
-                resolvedMaterialControls.RiverbedDetailFinishVariationMultiplier,
+                resolvedMaterialControls.RiverbedRoughnessVariationMultiplier,
                 resolvedMaterialControls.RiverbedLegacyPixelCellInfluenceMultiplier,
                 GroundRiverbedLayerCavityColorId,
                 GroundRiverbedLayerDetailArrayId,
@@ -4397,12 +4986,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundSurfaceLayerProfile layer,
             Color fallbackColor,
             float detailScaleMultiplier,
-            float authoredColorStrengthMultiplier,
-            float authoredColorLightingMultiplier,
+            float textureFormStrengthMultiplier,
+            float sceneLightingResponseMultiplier,
             float detailNormalStrengthMultiplier,
             float detailCavityStrengthMultiplier,
             float detailValueFormMultiplier,
-            float detailFinishVariationMultiplier,
+            float roughnessVariationMultiplier,
             float legacyPixelCellInfluenceMultiplier,
             int cavityColorId,
             int textureArrayId,
@@ -4422,10 +5011,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     out sliceIndex);
             Texture2DArray authoredColorArray = null;
             int authoredColorSliceIndex = -1;
-            bool hasAuthoredColor =
+            bool hasTextureForm =
                 hasDetail &&
                 layer != null &&
-                layer.TryResolveAuthoredColor(
+                layer.TryResolveTextureForm(
                     out authoredColorArray,
                     out authoredColorSliceIndex);
 
@@ -4442,7 +5031,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     textureArrayId,
                     textureArray);
             }
-            if (hasAuthoredColor)
+            if (hasTextureForm)
             {
                 properties.SetTexture(
                     authoredColorArrayId,
@@ -4450,29 +5039,25 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
             properties.SetVector(
                 authoredColorAId,
-                hasAuthoredColor
+                hasTextureForm
                     ? new Vector4(
                         1f,
                         authoredColorSliceIndex,
-                        layer.AuthoredColorStrength * Mathf.Clamp(
-                            authoredColorStrengthMultiplier,
+                        layer.TextureFormStrength * Mathf.Clamp(
+                            textureFormStrengthMultiplier,
                             0f,
                             2f),
                         Mathf.Clamp01(
-                            layer.AuthoredColorLightingStrength * Mathf.Clamp(
-                                authoredColorLightingMultiplier,
+                            layer.SceneLightingResponse * Mathf.Clamp(
+                                sceneLightingResponseMultiplier,
                                 0f,
                                 2f)))
                     : Vector4.zero);
-            Color authoredTint = layer != null
-                ? layer.AuthoredColorTint
-                : Color.white;
-            authoredTint.a = hasAuthoredColor && layer != null
-                ? layer.AuthoredColorTintStrength
-                : 0f;
+            // The legacy tint property remains written for serialized shader
+            // compatibility, but palette colors are now the sole color authority.
             properties.SetColor(
                 authoredColorTintId,
-                authoredTint);
+                new Color(1f, 1f, 1f, 0f));
 
             float safeScaleMultiplier = Mathf.Clamp(
                 detailScaleMultiplier,
@@ -4515,7 +5100,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 new Vector4(
                     hasDetail
                         ? layer.FinishVariationStrength * Mathf.Clamp(
-                            detailFinishVariationMultiplier,
+                            roughnessVariationMultiplier,
                             0f,
                             2f)
                         : 0f,
@@ -4526,9 +5111,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                                 0f,
                                 2f))
                         : 1f,
-                    hasAuthoredColor ? 1f : 0f,
-                    hasAuthoredColor && layer != null
-                        ? layer.AuthoredRoughnessStrength
+                    hasTextureForm ? 1f : 0f,
+                    hasTextureForm && layer != null
+                        ? layer.RoughnessVariationStrength * Mathf.Clamp(
+                            roughnessVariationMultiplier,
+                            0f,
+                            2f)
                         : 0f));
         }
 
@@ -5434,6 +6022,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             appliedGroundGeometrySignature = 0;
             groundGeometryInitialized = false;
             groundGeometryRevision = 0;
+#if UNITY_EDITOR
+            vegetationCoverageRaycastGeometryRevision = int.MinValue;
+            vegetationCoverageRaycastVertices.Clear();
+            vegetationCoverageRaycastTriangles.Clear();
+            vegetationCoverageRaycastSubmeshTriangles.Clear();
+#endif
             currentSnapshotSignature = 0;
             currentPaintedAccentDomainSignature = 0;
             paintedAccentRuntimeCoverageStatus =

@@ -11,9 +11,9 @@
 | Engine | Unity 6000.5.0f1, URP |
 | Work type | Canonical architecture and implementation plan |
 | Architecture status | Fixed-metric, centreline-relative river-space lattice accepted as the direction |
-| Implementation status | **`RG-METRIC-P2` through `RG-METRIC-P10` are Unity-validated and closed. `RG-METRIC-P11` is complete. `RG-METRIC-P12` source activation and candidate evidence tooling are mechanically verified; Unity candidate evidence is pending.** |
+| Implementation status | **`RG-METRIC-P2` through `RG-METRIC-P12d` are closed. The P12d Unity matrix passed all 12 cases and selected `0.15 m`. P12e is Unity-imported. Unity rejected P12f because it detected two contours and fragmented candidate removal. Unity partially accepted `RG-METRIC-P12g`: Current remains exact and the Presence-Amplitude single exterior eligibility contour is correct, but doubled-diameter production admission is rejected as over-broad. `RG-METRIC-P12h` is Unity-rejected because one projected reach still produced a second permission area beyond the displayed eligibility mask. `RG-METRIC-P12i` proved exact Candidate × Eligibility ownership but is Unity-rejected because eligibility remained stippled and fractional. `RG-METRIC-P12j` is Unity-rejected because its clean Presence/life silhouette does not include patterned erosion or structural Strand shaping and therefore does not coincide with rendered Foam. `RG-METRIC-P12k` is mechanically implemented: Presence-Amplitude eligibility and removal will use the exact no-Chip rendered mask `foam.mask × strandKeep`; Current remains unchanged.** |
 | Code authorization | **The user explicitly authorized direct P12 fixed-metric activation and practical Play Mode testing, including temporary visible River breakage. Authorization covers source-default and Inspector selection, real allocation/invalidation ownership, active-selection diagnostics, and read-only candidate evidence. Scene/prefab/material/cache-asset raw edits and automatic cache writes remain outside scope.** |
-| Persistent game-file changes made while producing this document | P12 adds two serialized River enum fields, production descriptor selection/invalidation ownership, active-selection diagnostics, one Editor-only P12 report, and canonical status updates. It does not edit scenes, prefabs, materials, cache assets, shaders, compute/HLSL, resources, kernels, source recipes, topology algorithms, or persistent GPU allocations. |
+| Persistent game-file changes made while producing this document | P12 adds two serialized River enum fields, production descriptor selection/invalidation ownership, active-selection diagnostics, and one Editor-only P12 report. P12a/P12b add committed-state presentation ownership, hybrid source-deposition history, lateral face/flux evidence, and report clipboard actions. P12c restores Object Arc/Semi-Arc phase `0/1/2` persistent emission and removes the D3D11 warning-producing helper. P12d adds the nonserialized complete runtime sweep. P12e adds two serialized A/B enums and uniform-selected render/transport branches. P12f is rejected. P12g reuses the existing Presence-footprint uniform for mode-specific Chip eligibility, candidate admission, and removal. P12h is rejected. P12i removes reach-derived admission entirely. P12j is rejected. P12k replaces its surrogate clean silhouette with exact pre-Chip rendered-mask ownership and retires the unused clean-silhouette plumbing; it adds no control, resource, kernel, dispatch, cache, scene, prefab, material, or amplitude compression. |
 | Source snapshot used | User-supplied `Assets(72).zip` with accepted P9a, P10, and P10a overlays |
 | Source limitations | No `.git` metadata, package manifest, Library, current `Editor.log`, or complete project root in the supplied snapshot |
 
@@ -73,11 +73,103 @@ Neither document alone is sufficient for implementation.
 | Canonical upgrade plan | Installed at the proposed `Assets/Docs/` path by documentation patch 01 |
 | Static source review | Complete for all 94 registered paths in the supplied snapshot |
 | Live repository review | `BLOCKED`: supplied archive contains no `.git` metadata, branch, HEAD, upstream, status, diff, or history |
-| Runtime baseline capture | `PARTIAL`: final P9/P10 endpoint report and P10 Inspector capture are supplied; P12 visual/performance baseline and profiler evidence remain pending |
+| Runtime baseline capture | P12d completed the 12-case runtime matrix; `0.15 m` is selected. P12e is imported and visually exercised; P12f is rejected; P12g eligibility is Unity-accepted but production admission is rejected; P12k exact pre-Chip rendered-mask evidence is pending. |
 | Canonical queue reconciliation | Complete for documentation patch 01 |
-| Runtime implementation | P2-P10 are Unity-validated and closed; P11 is complete; P12 source activation and candidate evidence tooling are mechanically verified |
-| Unity validation | P2-P10 complete. P12 requires cache rebuild, fixed/legacy visual comparison, candidate snapshots, and one final P9 endpoint on the selected candidate |
+| Runtime implementation | P2-P12d are closed. P12e A/B options are present. P12k exact pre-Chip rendered-mask correction is mechanically implemented. |
+| Unity validation | P2-P12d complete. P12k requires warning-free import, unchanged Current-mode Chipping, and proof that Presence-Amplitude grey support, yellow eligibility, magenta removal, and Final use the same exact pre-Chip rendered geometry while Production Chip never removes outside that exact mask at `0.15 m`. |
 | Strip-pool production architecture | Planned future phase; not implemented |
+
+## RG-METRIC-P12d — One-button fixed-spacing and lateral-response sweep
+
+### Objective
+
+Replace the manual candidate workflow with one bounded Play Mode state machine that tests the real runtime at `0.25`, `0.20`, `0.15`, and `0.10 m`, each at lateral ratios `0`, authored, and `1`, then restores authored ownership and writes one combined disk-plus-clipboard report.
+
+### Accepted implementation
+
+- `StylizedRiverFoamRuntime.P12Sweep.cs` owns nonserialized effective-value overrides, the 12-case state machine, timeout/cancellation handling, deterministic reset, evidence capture, report construction, cache-mutation proof, and authored-runtime restoration.
+- `Resources.cs` uses the effective requested spacing at the same production descriptor/allocation gates and permits transient topology generation only while the explicit sweep is active.
+- `TopologyCache.cs` completes that transient generation without reading, writing, or replacing the assigned cache asset.
+- `Compute.cs`, `Binding.cs`, `Lifecycle.cs`, and `PublicSurface.cs` use the effective lateral ratio so the zero/authored/max cases exercise the real transport and rendering contracts.
+- Every case reinitializes the real runtime, clears material/source state, warms for two seconds, and captures at least five seconds and 30 frames. Initialization Motion Time is frozen to the suite-start value across all cases for comparable topology generation.
+- The report records descriptor dimensions/signature, topology counts and startup cost, CFL/substeps/Jacobian/curvature, persistent memory, dispatch/cell/CPU work, lane face cancellation, material-weighted lateral speed/movement, zero-ratio isolation, assigned-cache immutability, and restoration.
+- The Inspector exposes Run, Cancel, progress/status, and `Copy P12 Sweep Report to Clipboard`; the existing single-candidate P12, P7, and P9 reports remain unchanged and available.
+
+### Non-goals
+
+No serialized River change, cache write, scene/prefab/material edit, source/lifecycle/Film/Shape/render retuning, visual-winner selection, or overall Foam-amount tuning. P13 remains the owner of final amount/tier/cache freeze.
+
+### Unity status
+
+The complete 12-case matrix returned `Overall: PASS`, restored authored runtime ownership, and left the assigned cache unchanged. Visual review rejected `0.20 m`; `0.15 m` is selected.
+
+
+## RG-METRIC-P12e — Presence-amplitude rendering and TVD transport A/B
+
+### Objective
+
+Test the two proven contributors to fat Layer C blobs independently while retaining the accepted result as an exact baseline: weak-Presence visual amplification and first-order donor-cell numerical diffusion.
+
+### Accepted implementation
+
+- `Foam > Runtime & Quality > Material Transport Scheme` exposes `Donor Cell (Current)` and `TVD Superbee`.
+- `Foam > Layer E — Rendering > General Composition > Presence Footprint` exposes `Current` and `Presence-Amplitude`.
+- Donor Cell returns the exact former face donor before any higher-order neighbour read.
+- TVD Superbee reconstructs only interior-face packed states with a bounded componentwise limiter and the existing per-substep CFL contract. The same face velocity/area flux transports Presence, life moment, and pattern moment conservatively; closed faces and endpoint behavior remain unchanged.
+- Presence-Amplitude is render-only: the resolved base footprint is capped by raw committed Presence before the existing patterned opaque-body evaluation. Current preserves the former renderer exactly.
+- Both options are serialized, independently selectable, live-switchable, and included in P12 reports. They add no resource, kernel, dispatch, cache, topology, source, Film, Shape, or Debug View.
+
+### Acceptance and limits
+
+Mechanical validation must prove exact default compatibility, shader call/binding completeness, unchanged 23-kernel/resource contracts, bounded reconstruction, packed-state invariants, conservation under periodic model cases, and a non-amplifying Presence cap. Unity must still establish warning-free import, actual GPU behavior, visual value, and cost. TVD is not represented as a formal zero-support-growth guarantee.
+
+### Status
+
+Implementation and static/model/package validation are complete. Unity import succeeded and visual review retained Presence-Amplitude for further testing, but Chip edge eligibility did not follow much of its rendered perimeter.
+
+
+## RG-METRIC-P12g — Mode-specific single-contour Chip admission
+
+### Objective
+
+Reject P12f's hardened-mask derivative and per-pixel candidate clipping. Preserve the accepted Current path exactly. Give Presence-Amplitude one monotonic exterior edge coordinate, admit complete connected edge candidates, and remove them coherently from the hardened pre-Chip mask. Do not alter Presence amplitude, transport, source/lifecycle behavior, candidate identity, or Current output.
+
+### Approved implementation
+
+- Keep the existing `_FoamPresenceFootprintMode` selection owner; add no control.
+- Current remains `preChipSoftVisibility` with edge start `0.06`, existing derivative normalization, candidate × edge-band selection, and soft-mask reconstruction exactly.
+- Presence-Amplitude uses `preChipSoftVisibility` with calibrated edge start `0.148228`, where the unchanged hardening function reaches the existing `preChipMask = 0.08` rendered-support boundary.
+- `Chip Eligibility Composite` remains the narrow candidate-independent exterior band.
+- Presence-Amplitude accumulates complete connected candidates admitted by Chip Edge Width plus each candidate's current bounded projected contour diameter; it does not multiply final candidate geometry by the narrow band.
+- Presence-Amplitude carves the admitted selection directly from the hardened pre-Chip mask; Current keeps the accepted soft-mask reconstruction.
+- Presence-Amplitude remains `baseMask = min(baseMask, presence)` exactly. No compression, new threshold control, diagnostic, resource, kernel, dispatch, or serialized state is allowed.
+
+## RG-METRIC-P12h — Edge-attached Presence Chip bites
+
+### Objective
+
+Preserve P12g's accepted single exterior eligibility contour and direct hardened-mask carving. Reject only its over-broad production permission, which used Edge Width plus two projected candidate reaches and produced magenta interior removal far beyond the yellow eligibility band.
+
+### Contract
+
+- Current remains byte-identical: soft edge start `0.06`, candidate × edge-band selection, Interior Access, and soft-mask reconstruction.
+- Presence-Amplitude eligibility remains byte-identical: monotonic `preChipSoftVisibility`, calibrated start `0.148228`, and the same candidate-independent yellow exterior band.
+- Presence-Amplitude production evaluates the unchanged analytical candidate field inside `Chip Edge Width + one projected candidate reach`; this is broader than narrow-band clipping but deliberately narrower than P12g complete-candidate admission.
+- Presence-Amplitude direct hardened-mask carving remains unchanged.
+- Presence-Amplitude remains `baseMask = min(baseMask, presence)` exactly. No compression, control, candidate, transport, source, lifecycle, Film, Shape, resource, kernel, dispatch, or serialized-state change is allowed.
+
+### Unity acceptance
+
+Require warning-free import, unchanged Current behavior, the unchanged one exterior yellow contour, coherent magenta bites visibly attached to nearby eligible edges, and no broad detached interior Production Chip regions.
+
+### Acceptance
+
+Mechanical validation must prove Current and eligibility byte/model equivalence, one-reach permission as a strict subset of P12g, unchanged direct-carve boundedness, stable shader signatures/calls, and no protected-file/resource/property change. Unity must import without warnings, preserve the one yellow exterior contour, show coherent magenta bites attached to nearby eligible edges, remove broad detached interior Production Chip regions, and leave Current mode visually unchanged.
+
+### Status
+
+Implementation and final mechanical/package validation are complete. Primary audit gates pass 46/46 and the independent audit passes 18/18; 593 protected files remain byte-identical; eligibility and Chip application are byte-identical; the only executable HLSL change removes one extra projected reach; randomized one-reach, direct-carve, HLSL parse, and archive-byte gates pass. Unity import and visual validation remain pending.
+
 
 ## 1. Authority, precedence, and change control
 
@@ -4134,6 +4226,8 @@ Unity 6000.5.0f1 compilation, D3D11 import, explicit fixed-cache rebuild, Play M
 
 ## Implementation record — `RG-METRIC-P12b — Deposit-once automatic sources, stable committed-state ownership, and effective lateral-flux evidence`
 
+> **Unity disposition:** The committed-state, broad-flicker, and lateral-evidence portions were retained, but the global automatic-source deposit-once policy was rejected. It silenced the accepted Object Arc/Semi-Arc Hold and Release emitter phases. The source-ownership portions below are historical implementation evidence and are superseded by the hybrid P12c contract.
+
 ### Objective and acceptance criteria
 
 Correct the two code-audited Layer C ownership defects exposed by the active fixed-metric candidate, and add transport-facing lateral evidence without changing overall Foam quantity tuning:
@@ -4268,3 +4362,274 @@ Unity 6000.5.0f1 compilation, D3D11 compute import, real GPU source behavior, La
 The final full-file reread found that the provisional CPU packing had replaced the existing Object Arc/Semi-Arc normalized material-step reveal width in `FoamSourceEventGpuData.Shore.z` with zero. The evaluator bodies were byte-identical, but their packed reveal-feather input would have changed from the accepted `material tick / Build duration` value to the shader's `0.0001` floor. That violates the recorded invariant that source geometry and Build reveal behavior remain unchanged.
 
 Before packaging, restore the exact existing material-step-progress calculation and continue packing it into `Shore.z`. Current and previous source contributions will use the same preserved reveal width; only phase/progress history and the positive-difference deposition gate remain new. Extend the final mechanical audit to require the preserved calculation and CPU/GPU comments.
+
+## Corrective implementation plan — `RG-METRIC-P12c — Persistent Object Emitters and Shader Import Repair`
+
+### Status
+
+- Read-only review: **complete**.
+- Plan recorded before implementation: **complete**.
+- Implementation: **complete**.
+- Mechanical validation: **complete — 43/43 primary gates and 22/22 independent gates passed**.
+- Unity compilation, D3D11 import, P7/P9/P12 reports, and visual lifecycle validation: **pending**.
+- Mechanical/static validation: **pending**.
+- Unity C# compilation, D3D11 import, P7/P9/P12 reports, and visual validation: **pending**.
+
+### Objective
+
+Correct the P12b regression without discarding its accepted fixes:
+
+1. restore the accepted Object Contact Arc/Semi-Arc emitter lifecycle—progressive Build, continuously emitting full Hold, progressive source Release, then Rest;
+2. retain deposit-once current-minus-previous coverage ownership for Shore Ribbon, Inward Wash, Contact Fleck, and all Free-Water source families;
+3. remove the sixteen D3D11 definite-assignment warnings introduced by the extracted automatic-source contribution helper;
+4. retain the dedicated previous-committed presentation texture, even-substep ownership correction, source-event ABI, effective lateral face/flux evidence, report clipboard actions, and all fixed-metric coordinate behavior;
+5. leave overall Foam amount, source weights, source strengths, durations, geometry, transport, lifecycle, Film, Shape, and final rendering untuned.
+
+### Reviewed evidence
+
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs::ResolveAutomaticSourceDepositionState` currently forces Object Arc/Semi-Arc to phase `0` and clamps progress to Build for the complete event.
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs::DispatchAutomaticFoamSourceEvents` currently dispatches only when current progress exceeds previous progress, so Object Hold and Release perform no source rasterization.
+- `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute::EvaluateFoamAutomaticSourceRasterSample` currently applies the positive current-minus-previous gate to every source family, which also rejects Object Hold and Release.
+- The accepted pre-P12b implementation in the reconstructed post-P12a source resolves Object Arc/Semi-Arc phase `0/1/2` for Build/Hold/Release and dispatches every active material tick.
+- `CS_RiverFoam.compute::FoamResolveObjectRibbonPhaseMask` already implements cumulative Build, full Hold, and progressive Release, including reverse-order Semi-Arc release. No object-source geometry evaluator requires modification.
+- Unity D3D11 reports sixteen warnings from `FoamEvaluateAutomaticSourceContribution`: eight conditional evaluator calls used by two kernels. The same evaluator calls imported without those warnings when they were inline before P12b.
+- The user confirmed the original broad dead-edge back-and-forth flicker is solved; any remaining death-transition artifact is deferred. The accepted persistent object-emitter lifecycle takes precedence over global deposit-once ownership.
+
+### Approved scope
+
+Modify exactly these existing files:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+6. `Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+8. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+9. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+10. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+11. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.P12Diagnostics.cs`
+12. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+
+No file will be created, deleted, renamed, or serialized. No scene, prefab, material, cache asset, `.meta`, serialized River field, source recipe, GPU-event lane, buffer, texture, kernel, dispatch, resource declaration, render shader, or shared include will change.
+
+### Implementation sequence
+
+1. Restore phase resolution for Object Arc/Semi-Arc from the accepted post-P12a implementation: Build=`0`, Hold=`1`, Release=`2`, each with its own normalized progress.
+2. Dispatch Object Arc/Semi-Arc on every active material tick; retain progress-change dispatch suppression for nonpersistent source families.
+3. In the raster sample, classify Arc/Semi-Arc as persistent emitters. Use their current phase-shaped contribution directly. Apply positive current-minus-previous deposition gating only to nonpersistent source families.
+4. Remove `FoamEvaluateAutomaticSourceContribution`. Inline the existing source-family selection for current contribution and for the nonpersistent previous contribution so D3D11 sees the same definite-assignment structure that imported cleanly before P12b. Do not change any of the eight evaluator bodies or formulas.
+5. Replace the P7 global deposit-once contract with a hybrid ownership regression that requires:
+   - nonpersistent Build frontier advances;
+   - repeated nonpersistent Build interior deposits zero;
+   - Object Build progresses in phase `0`;
+   - Object Hold is phase `1` and remains dispatchable/emitting;
+   - Object Release is phase `2`, remains dispatchable, and shrinks progressively;
+   - Rest is represented by event completion/no dispatch;
+   - current absolute birth target and production/debug evaluator identity remain unchanged.
+6. Update P12 ledger wording from global deposit-once ownership to hybrid automatic-source ownership.
+7. Restore Inspector/tooltips/debug descriptions and canonical status documents to the accepted persistent Object emitter lifecycle while retaining deposit-once ownership for all other automatic source families.
+
+### Invariants and non-goals
+
+- Preserve the exact Arc/Semi-Arc geometry, path order, reveal feather, Build/Release masks, source amount, Remaining Life, pattern, event timing, cycle scheduling, rear exclusion, and deterministic side selection.
+- Preserve the P12b source-event ABI at eight `float4` lanes / 128 bytes.
+- Preserve manual injection behavior byte-for-byte.
+- Preserve P12b committed-state resource ownership and effective lateral metrics byte-for-byte.
+- Preserve all 23 compute kernels, thread-group declarations, resource declarations, and C# `FindKernel` order.
+- Do not address overall Foam quantity or minor death-transition aesthetics in this patch.
+
+### Acceptance criteria
+
+- Object Arc/Semi-Arc GPU data resolves correct Build/Hold/Release phase and normalized progress at boundaries and representative interior times.
+- CPU dispatch does not suppress active Object Hold or Release.
+- GPU contribution gating bypasses current-minus-previous only for Arc/Semi-Arc and retains it for the other six source families.
+- All eight source evaluator bodies remain byte-identical.
+- The warning-producing helper is absent; no equivalent helper with conditional `out` return ownership is introduced.
+- P7 hybrid ownership validation and P12 ledger use accurate semantics.
+- Changed C# parses under C# 9-compatible checks; no missing imports, duplicate signatures, or multiline interpolation defects exist.
+- Kernel/resource/ABI parity, protected-file byte identity, deterministic phase/deposition model tests, and archive extraction byte comparison pass.
+- Unity must subsequently report zero C# errors and zero shader/compute errors or warnings, P7/P9/P12 must pass, and visual review must confirm the persistent Object emitter cycle.
+
+### P12c scope correction — source-event ABI comments
+
+The post-implementation contract reread found two direct ABI comments that still describe positive current-minus-previous coverage as the gate for every automatic source. P12c exempts persistent Object Arc/Semi-Arc emitters, so those comments would be false even though the eight-lane layout is unchanged.
+
+Add these existing files as comment-only scope before further implementation:
+
+13. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+14. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl`
+
+Permitted change: state that previous phase/progress gates nonpersistent source families, while Object Arc/Semi-Arc use current phase-shaped persistent emission. Prohibited change: field order, lane count, type, stride, allocation, binding, or executable HLSL/C# behavior.
+
+### P12c validation correction — P7 active-selection gate
+
+The final validation-path reread found that P7 still requires `activeLegacy` and prints `ACTIVE LEGACY OWNERSHIP VERDICT`. That was correct while fixed allocation was inactive, but P12 now authoritatively activates either the authored Fixed Metric or Legacy selection. Requiring legacy would make the requested P7 report fail for the actual P12 fixed candidate before source validation runs.
+
+Within the already approved `StylizedRiverFoamRuntime.P7Diagnostics.cs` scope:
+
+- replace the legacy-only gate with `FoamGridSelectionMatchesActive` plus a created/current descriptor;
+- retain the prepared fixed-candidate readiness requirement;
+- run source validation for either correctly authored active mapping;
+- update report/ledger wording to `Active descriptor matches authored selection`;
+- do not change preparation, resources, cache ownership, source evaluation, or cleanup.
+
+
+### P12c final mechanical-validation record
+
+The final post-implementation audit passed `43 / 43` primary gates and `22 / 22` independent gates. It verified exactly `14` changed existing files, no created/deleted/renamed file, and `583` protected files byte-identical to the immutable post-P12b baseline.
+
+The audit additionally proved:
+
+- all `90` River C# files are lexically balanced, with zero C# 9 multiline-interpolation defects in changed code;
+- Object Arc/Semi-Arc phase resolution returns Build=`0`, Hold=`1`, and Release=`2` with correct normalized progress;
+- persistent Object events dispatch on every active material tick at `8`, `12`, and `16 Hz`, while the other six source families retain progress-change/deposit-frontier ownership;
+- the warning-producing `FoamEvaluateAutomaticSourceContribution` helper is absent; current and nonpersistent-previous source-family selection is inline with initialized values;
+- all eight automatic-source evaluator bodies plus `FoamResolveObjectRibbonPhaseMask` are byte-identical;
+- the source-event ABI remains exactly eight `float4` lanes / `128` bytes in matching CPU/GPU order;
+- all `23` compute kernels remain present in exact order, and resource declarations are unchanged;
+- manual-injection bodies, committed-state resource ownership, topology replacement, compute binding, simulation include, source recipes, serialized River declarations, and all ten report clipboard labels remain unchanged;
+- `100,000` randomized object phase-mask cases are monotonic in the accepted Build and Release directions;
+- P7 now checks the active descriptor against the authored selection rather than incorrectly requiring Legacy while P12 Fixed Metric is active.
+
+The changed-files archive must contain these exact `14` `Assets/...` entries and reproduce every final source byte on clean extraction. Unity 6000.5.0f1 compilation and D3D11 import remain authoritative for confirming that all sixteen reported warnings are gone and that Object Build/Hold/Release/Rest behavior is visually restored.
+
+
+## RG-METRIC-P12i — Exact Presence Chip eligibility ownership
+
+### Objective
+
+Make the displayed Presence-Amplitude `Chip Eligibility Composite` mask the sole and exact production permission. Do not derive any wider or alternate production region from it.
+
+### Accepted implementation
+
+- Current remains arithmetic-identical, including Interior Access.
+- Presence-Amplitude edge selection is `saturate(chipCandidateField * chipEligibility.edgeBand)`.
+- Presence-Amplitude Interior Access and every projected-reach admission path are disabled.
+- Presence-Amplitude direct hardened-mask carving remains, but its input is already clipped to the exact eligibility mask.
+- The invariant `chipProductionSelection <= chipEdgeEligibility` holds per fragment.
+- No amplitude compression, control, candidate formula, transport, source, lifecycle, Film, Shape, resource, kernel, dispatch, cache, scene, prefab, or material change is included.
+
+
+## RG-METRIC-P12j — Clean binary Presence Chip eligibility
+
+### Objective
+
+Replace the noisy/fractional Presence-Amplitude eligibility signal while preserving exact Candidate × Eligibility production ownership and the complete Current compatibility path.
+
+### Approved implementation
+
+- Produce a transient clean silhouette from Presence-Amplitude base coverage multiplied by the existing near-death life gate before patterned erosion.
+- Carry that scalar through existing render-only spatial coupling; add no texture, buffer, sample, kernel, dispatch, property, or serialized field.
+- Use Euclidean screen-gradient magnitude for Presence-Amplitude edge-width estimation.
+- Use binary meaningful-support permission so a permitted faint fringe can be fully removed by the unchanged analytical candidate.
+- Keep `chipProductionSelection <= chipEdgeEligibility` per fragment and disable Presence-Amplitude Interior Access.
+- Preserve Current arithmetic and behavior.
+
+### Status
+
+Mechanically implemented and validated; Unity import and visual acceptance pending.
+
+### Exact pre-Chip rendered-mask ownership — P12k
+
+P12j is rejected because its clean Presence/life silhouette is produced before material-pattern erosion and structural Strand shaping. No threshold or fixed offset can make that surrogate coincide with rendered Foam because the omitted stages vary spatially.
+
+For Presence-Amplitude, P12k resolves the existing structural Strand keep first and constructs:
+
+```text
+preChipRenderedMask = saturate(foam.mask × strandKeep)
+```
+
+Eligibility uses the existing visible-support boundary `RiverWaterFoamResolveBaseCoverage(preChipRenderedMask)` with the `0.08` mask threshold and Euclidean screen-gradient normalization. Production remains exactly Candidate × Eligibility. Final and Production Chip diagnostics use exact differences from the same mask. Current remains the protected compatibility path. P12j clean-silhouette plumbing is retired.
+
+
+
+## RG-METRIC-P12l — Binary Candidate × Eligibility implementation record
+
+### Objective
+
+For Presence-Amplitude only, replace fractional Chip attenuation with an exact logical region intersection and complete removal:
+
+```text
+candidateSelected = chipCandidateField >= 0.5
+eligibilitySelected = chipEligibility.edgeBand >= 0.5
+productionSelected = candidateSelected AND eligibilitySelected
+```
+
+### Invariants
+
+- `Current` remains unchanged.
+- P12k `preChipRenderedMask` remains the authoritative Presence-Amplitude no-Chip geometry.
+- No expanded region, projected reach, Interior Access, support-intensity multiplication, transparency, interpolation, or additional permission field is permitted.
+- Presence-Amplitude debug views report the exact binary masks used by production.
+
+### Validation
+
+- Extract and compare the complete Current branch against the immutable post-P12k baseline.
+- Prove the eight binary truth-table combinations for candidate/eligibility/pre-Chip support and complete selected removal.
+- Prove `productionSelected == candidateSelected * eligibilitySelected` and `finalMask == 0` for every selected pixel.
+- Prove Presence-Amplitude Candidate, Eligibility, and Production debug inputs equal production masks exactly.
+- Verify no C#, compute, property, resource, kernel, serialized, scene, prefab, material, cache, or `.meta` change.
+- Unity import and direct debug/Final comparison remain authoritative.
+
+
+## RG-METRIC-P12m — Any-Support Binary Chip Selection implementation record
+
+### Objective
+
+Replace P12l midpoint-contour selection with the approved absolute any-support rule for Presence-Amplitude only:
+
+```text
+candidateSelected   = chipCandidateField > 0.0 ? 1 : 0
+eligibilitySelected = chipEligibility.edgeBand > 0.0 ? 1 : 0
+productionSelected  = candidateSelected × eligibilitySelected
+finalFoamMask       = productionSelected == 1 ? 0 : preChipRenderedMask
+```
+
+### Reviewed cause
+
+P12l's Candidate and Eligibility sources are antialiased continuous fields. Its independent `>= 0.5` comparisons discard positive field support below each midpoint contour. The application path already removes all Foam after selection, so no application, geometry, caller, or resource change is required.
+
+### Invariants
+
+- `Current` remains byte-identical.
+- P12k `preChipRenderedMask` remains the authoritative Presence-Amplitude no-Chip geometry.
+- Candidate generation, readability/subpixel/lifecycle gates, Eligibility geometry, Edge Width, Strands, controls, transport, sources, Film, Shape, resources, kernels, dispatches, caches, scenes, prefabs, materials, properties, serialized fields, and Debug View identities remain unchanged.
+- No epsilon, midpoint threshold, fractional attenuation, expanded reach, inferred permission, Interior Access, or secondary authorization field participates in Presence-Amplitude.
+
+### Risk
+
+Any positive antialias, readability, or subpixel tail becomes full binary authority in Presence-Amplitude. This can expose hard raster edges, candidate pop-in, or isolated distant pixels. That consequence follows the approved any-support rule and is not pre-emptively retuned in P12m.
+
+### Validation
+
+- Compare the Current selection/application blocks and protected shader caller byte-for-byte against the supplied pre-edit archive.
+- Prove one million randomized cases and explicit `0`, smallest-positive, `1e-12`, `1e-8`, `1e-6`, `0.001`, `0.499999`, `0.5`, and `1.0` boundaries.
+- Prove `productionSelected == candidateSelected * eligibilitySelected` and selected `finalFoamMask == 0`.
+- Verify mode-specific Inspector descriptions, unchanged function signatures/call sites, unchanged shader properties/resources/kernels/serialized fields, balanced shader syntax/preprocessor structure, exact seven-file scope, and reproducible changed-file archive.
+- Unity shader import and same-camera Candidate, Eligibility, Production, `Foam Chip And Strand Probe`, Final, and Current comparison remain authoritative.
+
+### Status
+
+Implementation complete in source; static consistency/compliance validation recorded in the P12m patch report. Unity import and visual acceptance pending.
+
+
+## P12n implementation record — Optional Candidate-Straddle Chip Admission A/B
+
+P12m corrected any-support binary thresholds but Unity evidence still showed sparse Production because complete analytical candidates were clipped by the derivative Eligibility band. P12n does not replace P12m. It adds a second selectable Presence-Amplitude route for direct comparison.
+
+Implemented contract:
+
+1. `Chip Application = Rendered Edge Band (Current)` preserves P12m and is the default.
+2. `Chip Application = Candidate Straddle (Experimental)` is active only with Presence-Amplitude.
+3. One low-frequency guarded RFloat cache stores binary admission by deterministic candidate lattice identity. Default refresh is `4 Hz`; authoring range is `1–8 Hz`.
+4. Entry requires centre support `<= 0.08` and at least two of eight irregular-perimeter support contacts. Retention requires centre support `< 0.46` and at least one contact. Inactive/dormant candidates and impossible centre states return before perimeter work; the perimeter loop exits once the required count is reached.
+5. The support evaluator uses interpolated previous/current state plus fixed-world-footprint pattern/lifecycle/Strand shaping. It is camera-independent and intentionally does not reproduce screen derivatives or surface deformation.
+6. Final candidate geometry remains the existing render-frame analytical candidate. Experimental Production is the complete admitted candidate at that fragment, and application still removes only exact pre-Chip rendered Foam. Experimental candidate evaluation uses every positive exact pre-Chip rendered-mask pixel rather than the preserved route’s `0.08` BaseCoverage gate.
+7. Cache unavailable/unsupported falls back to Rendered Edge Band. Switching away stops dispatch and invalidates hysteresis history.
+8. Existing Candidate, Eligibility, Production, and final-mask debug identities are reused with route-specific meanings.
+
+Actual project delta: `15` modified files and `4` created files, exactly matching approved scope. No scene, prefab, material, fixed spacing, Layer C state, Film, Shape, source, transport, cache asset, layer, tag, shader target, render pass, or draw call changed.
+
+Offline validation passes: source-scope reconciliation; delimiter and preprocessor balance; new GUID uniqueness; compute kernel declaration/implementation/resolution; C# property-to-HLSL contract; render function signature/call parity; guarded lattice uniqueness/index coverage; exhaustive entry/retention Boolean equivalence; protected P12m fallback presence; byte-identical accepted Current application block. Unity compilation/import, measured GPU cost, and visual A/B result are pending.

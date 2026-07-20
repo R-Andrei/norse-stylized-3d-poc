@@ -44,6 +44,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     EdgeWearEvaluationMode.UnifiedPreviewBatchAudit;
             bool buildSourceEdgeIndexDebug =
                 evaluationMode == EdgeWearEvaluationMode.SourceEdgeIndexDebug;
+            bool runCornerDamageTransactionAudit =
+                evaluationMode ==
+                    EdgeWearEvaluationMode.CornerDamageTransactionAudit;
             bool runUnifiedEvaluation =
                 applyUnifiedBoundedPreview ||
                 runUnifiedBatchAudit ||
@@ -58,7 +61,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             MassSurfaceFeatureSettings settings = surfaceFeatures.Value;
             float amount01 = Mathf.Clamp01(settings.EdgeWearAmount * 0.5f);
-            if (amount01 <= 0.0001f)
+            if (amount01 <= 0.0001f &&
+                !runCornerDamageTransactionAudit)
             {
                 return null;
             }
@@ -83,6 +87,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<PolygonFace> edgeWearFaces =
                 microTopologyNormalization.Faces ?? faces;
             Bounds edgeWearBounds = CalculateFaceBounds(edgeWearFaces);
+            if (runCornerDamageTransactionAudit)
+            {
+                CaptureCornerDamageTransactionAudit(
+                    EvaluateCornerDamageTransaction(
+                        edgeWearFaces,
+                        microTopologyNormalization,
+                        edgeWearBounds,
+                        maximumDimension,
+                        recipe));
+                return null;
+            }
+
             List<EdgeWearBevelCandidate> candidates =
                 BuildEdgeWearBevelCandidates(
                     edgeWearFaces,

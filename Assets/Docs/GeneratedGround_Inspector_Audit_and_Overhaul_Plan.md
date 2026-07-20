@@ -1,4 +1,187 @@
+## 2026-07-21 — GSU-M2.7C.5C Inspector ownership
+
+M2.7C.5C remains a project-level Editor evidence workflow and adds no Generated Ground Inspector controls, foldouts, debug views, serialized fields, scene overlays, or runtime bindings.
+
+The active command is:
+
+`Tools > PS3D > Run Generated Mass River-Rock Material Refinement`
+
+It generates the frozen 18-rock library twice, validates exact IDs/settings and deterministic fingerprints, writes Neutral/Moderate/Strong material comparisons plus processed data audits and burial evidence under `Library/SurfaceMaterialDiagnostics/GeneratedMassRiverRockProjection`, writes one report, and copies the report to the clipboard.
+
+Inspector/runtime ownership remains deferred:
+
+- M2.7C.5C selects material response and burial treatment only.
+- M2.7C.5D assembles and visually accepts a seamless tile without runtime Inspector integration.
+- M2.7C.5E may expose the accepted material through the existing Ground material/profile architecture after explicit approval.
+
+Earlier Inspector audit history follows below.
+
+## 2026-07-21 — GSU-M2.7C.5B.2 Inspector ownership
+
+The focused Uneven Broad expansion remains a project-level Editor evidence workflow. The only active command remains:
+
+```text
+Tools > PS3D > Run Generated Mass River-Rock Family Sweep
+```
+
+The command now generates 32 Terrain/Squat Uneven Broad sources, preserves seven frozen accepted IDs, writes raw and processed channel evidence, performs the accepted-anchor 4 × 4 burial comparison, runs the complete build twice, writes one report under `Library/SurfaceMaterialDiagnostics/GeneratedMassRiverRockProjection`, and copies that report to the clipboard.
+
+M2.7C.5B.2 adds no `GeneratedGround` field, foldout, selector, action button, debug view, Scene overlay, serialized asset, material profile, layer, or runtime binding. Source selection remains evidence-only. Inspector/runtime ownership remains reserved for M2.7C.5E after source refinement and seamless tile acceptance.
+
+The authoritative progression is M2.7C.5B.2 focused selection → M2.7C.5C selected-rock material/burial refinement → M2.7C.5D seamless tile assembly → M2.7C.5E runtime Ground integration.
+
+Previous Inspector history follows below.
+
+## 2026-07-20 — GSU-M2.7C.5B Inspector ownership and stale-tool retirement
+
+M2.7C.5B remains a project-level Editor evidence workflow. The only active river-rock evidence command is:
+
+```text
+Tools > PS3D > Run Generated Mass River-Rock Family Sweep
+```
+
+It generates the labelled Terrain/Squat catalog, runs deterministic validation twice, writes the complete report and evidence under `Library/SurfaceMaterialDiagnostics/GeneratedMassRiverRockProjection`, and copies the report to the clipboard.
+
+The old donor-extraction command and its two scripts are retired. Historical M2.7B Inspector sections below describe superseded evidence and must not be treated as an active menu or workflow. The previously retired handmade candidate-synthesis commands likewise remain absent.
+
+This patch adds no GeneratedGround foldout, field, selector, debug view, Scene overlay, serialized recipe, or runtime binding. Stable source-rock IDs remain evidence-only until M2.7C.5C selection/refinement and M2.7C.5D tile acceptance are complete. Runtime Inspector integration is reserved for M2.7C.5E.
+
+---
+
+## 2026-07-20 — GSU-M2.7C.5A Inspector ownership note
+
+The failed handmade sparse-riverbed candidate generator is retired and no Inspector integration is added. The replacement is an explicit Editor menu evidence action that projects real Generated Mass meshes into local `Library` outputs. No GeneratedGround control, serialized field, profile, layer, or runtime binding is authorized until the projected individual-rock catalog is visually accepted.
+
+Historical Inspector material notes continue below.
+
+## 2026-07-20 — M2.7C.4 note
+
+This patch does not change the Generated Ground runtime inspector. It only updates the local sparse-riverbed synthesis evidence generator and the canonical planning docs. The inspector-facing implication is simply that any future inspector integration must not inherit the rejected M2.7C.3 rock grammar. If these candidates later pass visual review, the accepted M2.7C.4 grammar becomes the minimum baseline for any real inspector/runtime integration work.
+
+Earlier inspector audit content continues below.
+
 # GeneratedGround Inspector and Painted Accent Production Architecture
+
+
+## GSU-M2.7C.3 Inspector contract — facet-owned synthesis remains a project-level evidence action
+
+The only approved entry point remains:
+
+```text
+Tools > PS3D > Run Sparse Riverbed Candidate Synthesis
+```
+
+The action performs two complete deterministic Editor-only runs, enforces coverage and 32x32 occupied-block budgets, validates final placed-stone structure rather than source-motif averages, writes one report, copies it to the clipboard, and writes the existing candidate evidence plus `FinalStructureDebug.png` under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`.
+
+GSU-M2.7C.3 adds no `GeneratedGround` foldout, debug view, Scene overlay, component, candidate selector, density control, macro-region control, facet control, burial/contact control, seed control, or River-specific field. Candidate definitions and diagnostic thresholds remain internal evidence-generation contracts. The generated candidates cannot appear in Bank, Riverbed, road, wall, or ordinary Ground selectors until a later separately approved runtime integration patch promotes one visually accepted result.
+
+### Superseded direction
+
+The M2.7C.2 Inspector contract remains historical. Its single menu location and no-runtime/no-Inspector ownership are preserved, while its candidate definitions and source-motif candidate validation are superseded by M2.7C.3.
+
+## GSU-M2.7C.2 Inspector contract — feature-rich synthesis remains a project-level evidence action
+
+The single approved entry point remains:
+
+```text
+Tools > PS3D > Run Sparse Riverbed Candidate Synthesis
+```
+
+GSU-M2.7C.2 adds no `GeneratedGround` foldout, debug view, Scene overlay, component, candidate selector, density slider, stone-feature control, seed control, or River-specific authoring field. Crown, edge, burial, facet, and local-feature selection are deterministic Editor-generation internals and are reported through the copied synthesis report and Library-only evidence images.
+
+The evidence candidates cannot appear in Bank, Riverbed, road, wall, or ordinary Ground selectors. Only a later separately approved integration patch may promote one accepted result through the existing reusable material/layer selector contract.
+
+### Superseded direction
+
+The M2.7C.1 Inspector contract remains historical only. The menu location and no-runtime/no-Inspector ownership are preserved, but its candidate definitions and smooth-crown evidence are superseded by M2.7C.2.
+
+
+## GSU-M2.7C.1 Inspector contract — procedural synthesis remains a project-level evidence action
+
+Procedural rounded-stone candidate generation remains available only through:
+
+```text
+Tools > PS3D > Run Sparse Riverbed Candidate Synthesis
+```
+
+The action performs two complete deterministic runs, validates motif bounds, fingerprints, measured coverage, quiet areas, seam metrics, and mip occupancy, writes one report, copies it to the clipboard, and writes candidate plus motif-catalog evidence under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`.
+
+GSU-M2.7C.1 adds no `GeneratedGround` foldout, debug view, Scene overlay, component, source field, candidate selector, density slider, seed control, or per-River setting. Procedural evidence candidates are not `GroundSurfaceLayerProfile` assets and cannot appear in Bank, Riverbed, road, wall, or ordinary Ground selectors. Only a separately approved later integration patch may add one accepted reusable material through the existing selector contract.
+
+## GSU-M2.7C Inspector contract — superseded donor-stamp evidence action
+
+Sparse riverbed candidate synthesis is invoked only through:
+
+```text
+Tools > PS3D > Run Sparse Riverbed Candidate Synthesis
+```
+
+The action runs the accepted Stone-Ground-only synthesis twice, validates deterministic fingerprints and measured coverage, writes one comprehensive report, copies it to the clipboard, and writes candidate color/mask/height/cavity/normal/roughness/repeat/mip/placement evidence under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`.
+
+M2.7C adds no `GeneratedGround` foldout, debug view, Scene overlay, component, source-map field, candidate selector, density slider, seed control, or per-River setting. The three evidence candidates are not `GroundSurfaceLayerProfile` assets and must not appear in Bank, Riverbed, road, wall, or ordinary Ground selectors. Only an explicitly accepted and later integrated M2.7D material may enter the existing surface-layer selector.
+
+## GSU-M2.7B Inspector contract — extraction remains outside GeneratedGround
+
+Donor extraction is a single explicit project-level Editor action:
+
+```text
+Tools > PS3D > Run Sparse Riverbed Donor Extraction
+```
+
+It writes one comprehensive report, copies the report to the clipboard, and writes accepted/rejected evidence images under `Library/SurfaceMaterialDiagnostics/SparseRiverbedDonors`. No `GeneratedGround` selection, component, top-level foldout, debug view, Scene overlay, source-map field, per-River control, or serialized extraction setting is added. Dense donor coverage is diagnostic input only; no Inspector value inherits or exposes it as final synthesis density.
+
+M2.7B donor review is complete. Its extracted catalogs remain historical evidence only; GSU-M2.7C.1 procedural generation owns the active candidate evidence. Only a later accepted reusable Ground layer may enter the existing surface-layer selector.
+
+## GSU-M2.7A.1 Inspector contract — no placeholder material for empty libraries
+
+A detail library with zero logical entries exposes no selectable material entry. The required one-slice generated packed backing is internal array storage and must not appear as a `GroundSurfaceLayerProfile`, `StylizedSurfaceMaterialProfile`, detail-entry popup option, Ground selector item, debug view, or GeneratedGround control.
+
+The existing material-profile editor continues showing no selectable detail entry when the assigned library is logically empty. Runtime resolution remains false for every stable ID, so current Ground layers without retained detail entries render through their ordinary fallback or selected retained surface rather than the internal backing slice. The retirement migration report is the only user-facing evidence for this transient empty-library state; no new GeneratedGround button, foldout, component, or scene workflow is introduced.
+
+## GSU-M2.7A Inspector contract — direct imported candidates retired
+
+Stone Ground 01 and Black Gravel 01 are removed from the reusable Ground-layer selector after the retirement migration succeeds. The migration never rewrites a current selection silently: if a scene, prefab, shared style, or other asset still references either retired layer/material, it aborts before mutation and copies a report listing every referencer. The author must select Pale Sand or another retained layer and rerun the cleanup.
+
+Donor source maps remain under editor-only ArtSources and are not exposed in `GeneratedGround`, `GroundSurfaceLayerProfile`, or ordinary material-selection controls. The active procedural sparse-riverbed synthesizer owns candidate generation through dedicated Editor diagnostics and does not consume those donor maps; GeneratedGround will receive only an accepted later reusable layer. No new top-level GeneratedGround foldout, debug view, scene component, or per-River donor control is authorized by GSU-M2.7A.
+
+The existing shared material editor and array validation infrastructure remain available for retained materials and later synthesized candidates. Direct full-cover imported material-set assets are historical only and must not reappear in selector lists.
+
+## 2026-07-20 — GSU-M2.6 Black Gravel 01 selector contract
+
+Black Gravel 01 adds no Inspector control or section. After the one-time import creates `GSLP_BlackGravel01`, the existing `GeneratedGround` surface-layer selector discovers it through the normal `GroundSurfaceLayerProfile` asset query and displays:
+
+```text
+Black Gravel 01 — GSLP_BlackGravel01
+```
+
+Shared material editing uses the existing single-palette and structural-detail controls. Ground-local Bank/Riverbed multipliers retain their current capability-aware visibility. No material-specific branch, debug view, top-level foldout, source-map field, or migration control is added to `GeneratedGroundEditor`.
+
+
+## 2026-07-19 — GSU-M2.4.1 transition control removal
+
+The four M2.4 material-transition controls and whole-stone diagnostic output are removed. The replacement binary substrate boundary has no author-facing tuning: authored texture-form materials use the fixed combined-support cut, while prepacked/continuous materials keep smooth interpolation. The dedicated material Inspector and GeneratedGround inline material editor therefore return to the accepted M2.3 control contract, and `Run Surface Material Validation` returns to the M2.3 palette/form/seam/control-integrity report.
+
+No new Inspector section, debug view, material field, River multiplier, asset workflow, or validation button is introduced.
+
+## 2026-07-19 — GSU-M2.3 single-palette control contract
+
+The dedicated `StylizedSurfaceMaterialProfile` Inspector and GeneratedGround's inline `Shared Material Definition` expose one `Palette` section only. `Payload Mode`, `Authored Color`, and authored tint controls are hidden compatibility data. Imported material-set entries are detected automatically from the selected detail-library entry and expose only `Texture Form Strength`, `Scene Lighting Response`, and `Roughness Variation` in their structural/finish groups. Prepacked entries continue to expose packed value/form and finish variation instead.
+
+Bank and Riverbed `This River Application` panels are capability-aware. They show a multiplier only when the resolved reusable material has a nonzero coefficient for that behavior: detail scale, texture form, scene-lighting response, normal, cavity, packed value/form, roughness or finish variation, and legacy cell influence. A selected material with no active application coefficients produces one explanatory message rather than inert controls. Shared palette colours, cavity bias, natural scale, and dry-finish baselines remain material-owned.
+
+The existing one-button `Run Surface Material Validation` action remains the sole surface-material diagnostic workflow and clipboard handoff. Its report now includes automatic source-mode resolution, grayscale form percentiles, Dark/Base/Light band coverage, periodic seam evidence, source/form 3x3 diagnostics, and a Control Integrity section. No new top-level GeneratedGround group, debug view, scene component, prefab workflow, or manual multi-run validation is introduced.
+
+## 2026-07-19 — GSU-M2.2 authored-colour palette controls
+
+Inside the existing `Shared Material Definition`, Authored Color materials label the four existing fields as `Palette (Applied to Authored Color)`. Base, Dark, Light, and Cavity Color are the primary authored-surface colour controls; they grade the imported value structure instead of being bypassed at Authored Color Strength 1. The existing authored tint remains an optional secondary tint. The dedicated `StylizedSurfaceMaterialProfile` Inspector mirrors the same label, explanation, and preview response.
+
+No new top-level foldout, profile field, material-specific branch, debug view, River control, asset workflow, or serialized migration is added. The controls continue editing the shared reusable material and therefore affect every Ground, River, road, wall, or other consumer of that profile.
+
+## 2026-07-19 — GSU-M2.1 validation extension
+
+The existing **Run Surface Material Validation** action remains the only GeneratedGround-facing control. It now rebuilds stale authored-colour arrays using the periodic generation algorithm, reports pre/post opposite-edge mean and p95 ratios for every authored-colour mip, fails output above the recorded thresholds, writes source-derived and generated mip 0–3 three-by-three PNGs under `Library/SurfaceMaterialDiagnostics`, saves the complete text report, and copies that report to the clipboard. Shared Bank/Riverbed material entries emit one diagnostic set even when both regions use the same material.
+
+No new Inspector button, top-level group, foldout, debug view, serialized control, profile schema, scene workflow, or runtime diagnostic is introduced. The additional work occurs only when the existing validation action or stale-library rebuild runs in the Editor.
 
 ## 2026-07-19 — GSU-M2.0 Inspector extension
 

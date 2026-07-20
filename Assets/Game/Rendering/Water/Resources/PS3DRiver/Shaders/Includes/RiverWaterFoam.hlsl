@@ -55,6 +55,7 @@ struct RiverWaterFoamChipEligibility
     float visibleSupport;
     float edgeBand;
     float interiorRegion;
+    float estimatedInwardPixels;
 };
 
 struct RiverWaterFoamSelectionDiagnostics
@@ -65,43 +66,105 @@ struct RiverWaterFoamSelectionDiagnostics
     float chipProductionSelection;
 };
 
+float RiverWaterFoamResolveChipStraddleAdmission(
+    int2 cell,
+    float2 admissionOrigin,
+    float2 admissionDimensions)
+{
+    int2 origin = (int2)round(admissionOrigin);
+    int2 dimensions = max(
+        int2(1, 1),
+        (int2)round(admissionDimensions));
+    int2 localCell = cell - origin;
+    if (localCell.x < 0 || localCell.y < 0 ||
+        localCell.x >= dimensions.x ||
+        localCell.y >= dimensions.y)
+    {
+        return 0.0;
+    }
+
+    return _FoamChipStraddleAdmission.Load(
+        int3(localCell, 0)) > 0.5
+        ? 1.0
+        : 0.0;
+}
+
 RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
     float preChipSoftVisibility,
     float preChipMask,
+    float preChipRenderedMask,
+    float presenceFootprintMode,
     float edgeWidthPixels)
 {
     RiverWaterFoamChipEligibility result;
     result.visibleSupport = RiverWaterFoamResolveBaseCoverage(preChipMask);
     result.edgeBand = 0.0;
     result.interiorRegion = result.visibleSupport;
+    result.estimatedInwardPixels = 0.0;
 
     float widthPixels = max(0.0, edgeWidthPixels);
+
     [branch]
-    if (widthPixels <= 0.0001 || result.visibleSupport <= 0.0001)
+    if (presenceFootprintMode <= 0.5)
+    {
+        // Protected compatibility path: exact accepted Current arithmetic.
+        if (widthPixels <= 0.0001 || result.visibleSupport <= 0.0001)
+        {
+            return result;
+        }
+
+        float edgeSource = saturate(preChipSoftVisibility);
+        float edgeGradientPerPixel = max(
+            fwidth(edgeSource),
+            0.001);
+        float estimatedInwardPixels = max(
+            0.0,
+            edgeSource - 0.06) / edgeGradientPerPixel;
+        float edgeMembership = 1.0 - smoothstep(
+            widthPixels - 0.5,
+            widthPixels + 0.5,
+            estimatedInwardPixels);
+        edgeMembership = saturate(edgeMembership);
+
+        result.edgeBand = result.visibleSupport * edgeMembership;
+        result.interiorRegion = result.visibleSupport * (1.0 - edgeMembership);
+        result.estimatedInwardPixels = estimatedInwardPixels;
+        return result;
+    }
+
+    // Presence-Amplitude eligibility is derived from the exact no-Chip mask
+    // that final composition would render after structural Strand shaping.
+    // The 0.08 boundary is the existing start of normal Foam coverage.
+    float edgeSource = saturate(preChipRenderedMask);
+    float renderedCoverage = RiverWaterFoamResolveBaseCoverage(edgeSource);
+    float supportGate = step(0.0001, renderedCoverage);
+    result.visibleSupport = supportGate;
+    result.interiorRegion = supportGate;
+
+    if (widthPixels <= 0.0001 || supportGate <= 0.5)
     {
         return result;
     }
 
-    // softVisibility already follows the complete pre-Chip production path.
-    // Dividing its inward scalar rise by the local screen derivative removes
-    // the previous dependence on how quickly Presence happened to saturate.
-    // This is a local projected edge coordinate, not a global distance field.
-    float edgeSource = saturate(preChipSoftVisibility);
+    static const float VisibleMaskStart = 0.08;
+    float2 edgeGradient = float2(
+        ddx(edgeSource),
+        ddy(edgeSource));
     float edgeGradientPerPixel = max(
-        fwidth(edgeSource),
+        length(edgeGradient),
         0.001);
-    static const float VisibleSoftEdgeStart = 0.06;
     float estimatedInwardPixels = max(
         0.0,
-        edgeSource - VisibleSoftEdgeStart) / edgeGradientPerPixel;
+        edgeSource - VisibleMaskStart) / edgeGradientPerPixel;
     float edgeMembership = 1.0 - smoothstep(
         widthPixels - 0.5,
         widthPixels + 0.5,
         estimatedInwardPixels);
     edgeMembership = saturate(edgeMembership);
 
-    result.edgeBand = result.visibleSupport * edgeMembership;
-    result.interiorRegion = result.visibleSupport * (1.0 - edgeMembership);
+    result.edgeBand = supportGate * edgeMembership;
+    result.interiorRegion = supportGate * (1.0 - edgeMembership);
+    result.estimatedInwardPixels = estimatedInwardPixels;
     return result;
 }
 
@@ -399,6 +462,12 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
     float lateralMetres,
     float preChipSoftVisibility,
     float preChipMask,
+    float preChipRenderedMask,
+    float presenceFootprintMode,
+    float chipApplicationMode,
+    float chipStraddleAdmissionAvailable,
+    float2 chipStraddleAdmissionOrigin,
+    float2 chipStraddleAdmissionDimensions,
     float evaluateChipSelection,
     float evaluateChipCandidates,
     float evaluateCandidatesOutsideMaterial,
@@ -447,20 +516,41 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
         RiverWaterFoamResolveChipEligibility(
             preChipSoftVisibility,
             preChipMask,
+            preChipRenderedMask,
+            presenceFootprintMode,
             chipEdgeWidthPixels);
     float activation = saturate(chipActivation);
     float interiorAccess = saturate(chipInteriorAccess);
+    float effectiveInteriorAccess = presenceFootprintMode > 0.5
+        ? 0.0
+        : interiorAccess;
     float chipInteriorCandidates = 0.0;
-    float productionPermissionEnabled =
-        (max(0.0, chipEdgeWidthPixels) > 0.0001 ||
-            interiorAccess > 0.0001)
+    float chipStraddleCandidates = 0.0;
+    float chipStraddleRouteActive =
+        presenceFootprintMode > 0.5 &&
+        chipApplicationMode > 0.5 &&
+        chipStraddleAdmissionAvailable > 0.5
         ? 1.0
         : 0.0;
+    float productionPermissionEnabled =
+        (chipStraddleRouteActive > 0.5 ||
+            max(0.0, chipEdgeWidthPixels) > 0.0001 ||
+            effectiveInteriorAccess > 0.0001)
+        ? 1.0
+        : 0.0;
+    // Candidate Straddle is already authorized at candidate identity level.
+    // Evaluate it on every positive exact pre-Chip Foam pixel so no faint
+    // rendered fringe can survive merely because BaseCoverage is below its
+    // established 0.08 visibility threshold. The P12m/Current routes retain
+    // their exact existing visible-support gate.
+    float candidateMaterialSupport = chipStraddleRouteActive > 0.5
+        ? step(0.000001, saturate(preChipRenderedMask))
+        : chipEligibility.visibleSupport;
     float candidateFieldRequired =
         (evaluateChipCandidates > 0.5 &&
             activation > 0.0001 &&
             ((productionPermissionEnabled > 0.5 &&
-                chipEligibility.visibleSupport > 0.0001) ||
+                candidateMaterialSupport > 0.0001) ||
                 evaluateCandidatesOutsideMaterial > 0.5))
         ? 1.0
         : 0.0;
@@ -785,19 +875,33 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
                     result.chipCandidateField,
                     activeCandidate);
 
+                [branch]
+                if (chipStraddleRouteActive > 0.5 &&
+                    activeCandidate > 0.0)
+                {
+                    float straddleAdmitted =
+                        RiverWaterFoamResolveChipStraddleAdmission(
+                            (int2)cell,
+                            chipStraddleAdmissionOrigin,
+                            chipStraddleAdmissionDimensions);
+                    chipStraddleCandidates = max(
+                        chipStraddleCandidates,
+                        activeCandidate * straddleAdmitted);
+                }
+
                 // Interior Access is commonly zero, so its identity hash and
                 // admission work are skipped entirely unless that optional
                 // permission is authored. Admitted candidates retain their
                 // complete connected contour instead of becoming pixel noise.
                 [branch]
-                if (interiorAccess > 0.0001)
+                if (effectiveInteriorAccess > 0.0001)
                 {
                     float interiorHash = RiverWaterFoamHash21(
                         cell + float2(11.89, 73.43));
                     float interiorAdmitted = lerp(
-                        step(interiorHash, interiorAccess),
+                        step(interiorHash, effectiveInteriorAccess),
                         1.0,
-                        step(0.9999, interiorAccess));
+                        step(0.9999, effectiveInteriorAccess));
                     chipInteriorCandidates = max(
                         chipInteriorCandidates,
                         activeCandidate * interiorAdmitted);
@@ -809,23 +913,60 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
     [branch]
     if (evaluateChipSelection > 0.5)
     {
-        float edgeSelection = saturate(
-            result.chipCandidateField * chipEligibility.edgeBand);
-        float interiorSelection = saturate(
-            chipInteriorCandidates * chipEligibility.interiorRegion);
+        [branch]
+        if (presenceFootprintMode > 0.5)
+        {
+            float candidateSelected = result.chipCandidateField > 0.0
+                ? 1.0
+                : 0.0;
 
-        // One canonical material-permission model owns both territories.
-        // Edge Width defines the projected boundary band; Interior Access may
-        // admit complete deterministic candidates only in its complementary
-        // established-body region. No independent material-depth threshold
-        // remains.
-        result.chipEdgeEligibility = saturate(
-            chipEligibility.edgeBand);
-        result.chipInteriorEligibility = saturate(
-            chipEligibility.interiorRegion * interiorAccess);
-        result.chipProductionSelection = saturate(max(
-            edgeSelection,
-            interiorSelection));
+            [branch]
+            if (chipStraddleRouteActive > 0.5)
+            {
+                // Experimental A/B route: the low-frequency cache admits a
+                // deterministic candidate identity only when its centre and
+                // irregular perimeter straddle subcell Layer E support. The
+                // complete admitted analytical candidate is then applied to
+                // the exact pre-Chip rendered Foam mask.
+                float admittedCandidateSelected =
+                    chipStraddleCandidates > 0.0 ? 1.0 : 0.0;
+                result.chipCandidateField = candidateSelected;
+                result.chipEdgeEligibility = admittedCandidateSelected;
+                result.chipInteriorEligibility = 0.0;
+                result.chipProductionSelection = admittedCandidateSelected;
+            }
+            else
+            {
+                // Protected P12m A/B route: exact binary any-support
+                // intersection of the current analytical Candidate and
+                // derivative-based rendered Edge Band.
+                float eligibilitySelected = chipEligibility.edgeBand > 0.0
+                    ? 1.0
+                    : 0.0;
+                float productionSelected =
+                    candidateSelected * eligibilitySelected;
+                result.chipCandidateField = candidateSelected;
+                result.chipEdgeEligibility = eligibilitySelected;
+                result.chipInteriorEligibility = 0.0;
+                result.chipProductionSelection = productionSelected;
+            }
+        }
+        else
+        {
+            // Protected compatibility path: exact accepted Current arithmetic.
+            float edgeSelection = saturate(
+                result.chipCandidateField * chipEligibility.edgeBand);
+            float interiorSelection = saturate(
+                chipInteriorCandidates * chipEligibility.interiorRegion);
+
+            result.chipEdgeEligibility = saturate(
+                chipEligibility.edgeBand);
+            result.chipInteriorEligibility = saturate(
+                chipEligibility.interiorRegion * effectiveInteriorAccess);
+            result.chipProductionSelection = saturate(max(
+                edgeSelection,
+                interiorSelection));
+        }
     }
 
 
@@ -1180,12 +1321,51 @@ float RiverWaterFoamResolveStructuralStrandKeep(
     return max(keep, exactCore);
 }
 
+float RiverWaterFoamResolvePreChipRenderedMask(
+    float hardenedShape,
+    float coherentSoftVisibility,
+    float strandSoftVisibility,
+    float2 strandPattern,
+    float strandResolution,
+    float strandStrength,
+    float strandDensity,
+    float strandReach)
+{
+    float shape = saturate(hardenedShape);
+    float coherentSoftShape = saturate(coherentSoftVisibility);
+    if (shape <= 0.0001)
+    {
+        return shape;
+    }
+    if (coherentSoftShape <= 0.0001)
+    {
+        return 0.0;
+    }
+
+    float strandSoftShape = saturate(strandSoftVisibility);
+    float exactCore = step(0.999, coherentSoftShape);
+    float resolvedStrandStrength =
+        saturate(strandStrength) * saturate(strandResolution);
+    float strandAA = max(fwidth(strandSoftShape), 0.001);
+    float strandKeep = RiverWaterFoamResolveStructuralStrandKeep(
+        strandSoftShape,
+        strandPattern.x,
+        resolvedStrandStrength,
+        strandDensity,
+        strandReach,
+        strandAA,
+        exactCore);
+    return saturate(shape * strandKeep);
+}
+
 float RiverWaterFoamApplyChipAndStrands(
     float hardenedShape,
     float coherentSoftVisibility,
     float strandSoftVisibility,
     float2 strandPattern,
     float strandResolution,
+    float presenceFootprintMode,
+    float preChipRenderedMask,
     float productionChipSelection,
     float strandStrength,
     float strandDensity,
@@ -1194,10 +1374,29 @@ float RiverWaterFoamApplyChipAndStrands(
 {
     float shape = saturate(hardenedShape);
     float coherentSoftShape = saturate(coherentSoftVisibility);
-    float strandSoftShape = saturate(strandSoftVisibility);
     float productionChip = saturate(productionChipSelection);
-    float strand = saturate(strandStrength);
     productionChipRemovedMask = 0.0;
+
+    // Presence-Amplitude already owns the exact no-Chip rendered mask after
+    // structural Strands. Production is binary: selected pixels are removed
+    // completely, and unselected pixels preserve the exact pre-Chip mask.
+    [branch]
+    if (presenceFootprintMode > 0.5)
+    {
+        float exactPreChipMask = saturate(preChipRenderedMask);
+        float productionSelected = productionChip >= 0.5
+            ? 1.0
+            : 0.0;
+        productionChipRemovedMask = productionSelected *
+            step(0.0001, exactPreChipMask);
+        return productionSelected > 0.5
+            ? 0.0
+            : exactPreChipMask;
+    }
+
+    // Protected compatibility path: exact accepted Current arithmetic.
+    float strandSoftShape = saturate(strandSoftVisibility);
+    float strand = saturate(strandStrength);
 
     [branch]
     if (shape <= 0.0001)
@@ -1214,9 +1413,6 @@ float RiverWaterFoamApplyChipAndStrands(
     float postChipSoftShape = coherentSoftShape;
     float postChipMask = shape;
 
-    // Production Chip changes the soft body before Strands, then reconstructs
-    // the accepted hardened mask through a ratio so neutral regions remain
-    // exactly equivalent to the accepted baseline.
     [branch]
     if (productionChip > 0.0001)
     {
@@ -1233,7 +1429,7 @@ float RiverWaterFoamApplyChipAndStrands(
         productionChipRemovedMask = saturate(shape - postChipMask);
     }
 
-    // Strands own structural anisotropic lineification after Chipping.
+    // Current preserves the accepted structural Strand order after Chipping.
     float resolvedStrandStrength = strand * saturate(strandResolution);
     float strandAA = max(fwidth(strandSoftShape), 0.001);
     float strandKeep = RiverWaterFoamResolveStructuralStrandKeep(
@@ -1542,6 +1738,7 @@ float RiverWaterFoamResolveStateMask(
     float lateralMetres,
     float sharpness,
     float finalVisibilityMode,
+    float presenceFootprintMode,
     float strandStrength,
     float strandScale,
     float strandReach,
@@ -1579,6 +1776,18 @@ float RiverWaterFoamResolveStateMask(
         baseMask = RiverWaterFoamSharpenCoverage(
             presence,
             sharpness);
+        patternedPresence = presence;
+    }
+
+    [branch]
+    if (presenceFootprintMode > 0.5)
+    {
+        // Presence-Amplitude is a render-only A/B option. It never grants more
+        // base footprint authority than the committed Layer C amount. The
+        // existing patterned/lifecycle hardening still owns the surviving
+        // opaque stylized body; weak donor-cell tails are no longer promoted
+        // into near-full coverage by the meaningful-footprint branch.
+        baseMask = min(baseMask, presence);
         patternedPresence = presence;
     }
 
@@ -1629,6 +1838,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float interpolation,
     float sharpness,
     float finalVisibilityMode,
+    float presenceFootprintMode,
     float strandStrength,
     float strandScale,
     float strandReach,
@@ -1746,6 +1956,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         storedLateralMetres,
         sharpness,
         finalVisibilityMode,
+        presenceFootprintMode,
         strandStrength,
         strandScale,
         strandReach,
@@ -1813,6 +2024,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         storedLateralMetres - warpMetres.y,
         sharpness,
         finalVisibilityMode,
+        presenceFootprintMode,
         strandStrength,
         strandScale,
         strandReach,
@@ -1925,6 +2137,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             storedLateralMetres - warpMetres.y - stretchDirection.y * stretchMetres,
             sharpness,
             finalVisibilityMode,
+            presenceFootprintMode,
             strandStrength,
             strandScale,
             strandReach,
@@ -1950,6 +2163,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             storedLateralMetres - warpMetres.y + stretchDirection.y * stretchMetres,
             sharpness,
             finalVisibilityMode,
+            presenceFootprintMode,
             strandStrength,
             strandScale,
             strandReach,

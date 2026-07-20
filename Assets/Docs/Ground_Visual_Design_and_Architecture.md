@@ -1,8 +1,286 @@
+## 2026-07-21 — GSU-M2.7C.5C: Frozen river-rock material-response architecture
+
+M2.7C.5C ends source-rock exploration. The authoritative projected river-rock library is frozen to 18 Uneven Broad Generated Mass sources:
+
+- Terrain: `T-05`, `T-08`, `T-09`, `T-10`, `T-11`, `T-12`, `T-13`, `T-14`, `T-15`.
+- Squat: `S-00`, `S-03`, `S-04`, `S-08`, `S-09`, `S-10`, `S-12`, `S-13`, `S-14`.
+
+Their archetype, shape seed, surface seed, rotation, burial fraction, recipe fields, silhouette, and projected raw geometry are immutable until a separately approved source-library revision. Unified edge-wear fallback remains acceptable and is not a source rejection condition.
+
+The processed material architecture is now:
+
+1. raw projected height remains the audit source;
+2. a three-pass edge-aware height supplies broad volume;
+3. a one-pass edge-aware height supplies restrained plane structure;
+4. processed normals blend those two height-derived normal scales and do not use raw mesh normals for final response;
+5. final material variation is deterministic low-frequency per-rock variation keyed by the frozen surface seed, not triangle-interpolated vertex colour;
+6. processed exposure is derived primarily from the processed normal with only a restrained raw-exposure contribution;
+7. root darkening is a directional, broken burial-support field derived from low height, side-facing normal, deterministic contact sectors, and restrained raw crevice support;
+8. processed wear excludes the outer projected silhouette band and uses native or convex fallback wear only on interior structure.
+
+The evidence tool presents the same frozen library under Neutral, Moderate, and Strong stylized response levels. These are offline selection previews; they do not bake scene lighting into neutral geometry data and do not create runtime assets.
+
+Authoritative progression:
+
+- **M2.7C.5C:** accept one response level and burial range for the frozen library.
+- **M2.7C.5D:** assemble only the frozen accepted rocks into a seamless sparse riverbed tile.
+- **M2.7C.5E:** integrate an accepted tile through the ordinary Ground material architecture.
+
+Earlier architecture history follows below.
+
+## 2026-07-21 — GSU-M2.7C.5B.2: Focused Uneven-Broad source-rock architecture
+
+M2.7C.5B.2 narrows the accepted Generated Mass river-rock direction to one proven recipe profile: `UB / Uneven Broad`. The prior six-profile sweep remains historical evidence; seven of eight Uneven Broad entries were visually accepted while no other profile supplied a selected source.
+
+The active evidence catalog now contains 32 entries: 16 Terrain Boulders and 16 Squat Boulders. Seven accepted sources are frozen as immutable anchors with exact IDs and generation settings: `T-12`, `T-13`, `T-14`, `T-15`, `S-12`, `S-13`, and `S-14`. New entries may vary deterministic shape/surface seeds only while retaining the same Uneven Broad geometry recipe.
+
+Projection evidence now separates source truth from presentation cleanup:
+
+- raw mask and raw projected height remain authoritative;
+- raw mesh normals, variation, exposure, crevice, and native edge wear remain available for audit;
+- processed height uses mask-constrained, range-aware filtering;
+- processed normals are derived from processed height;
+- processed variation receives strong low-pass filtering;
+- processed exposure and crevice receive moderate low-pass filtering;
+- processed fallback wear derives only from interior convex height/normal response when native edge wear is absent;
+- no mask-distance outline, perimeter ring, painted crack, or silhouette blur is allowed.
+
+The burial evidence uses accepted sources `S-12`, `S-14`, `T-13`, and `T-15`, each shown at 8%, 18%, 28%, and 38% burial. This replaces the previous comparison built from two unaccepted repeated sources.
+
+Authoritative progression:
+
+1. **M2.7C.5B.2 — focused source expansion and cleanup:** select approximately 12–20 sources from raw and processed evidence.
+2. **M2.7C.5C — selected-rock material and burial refinement:** freeze the final source library and tune processed normals, variation, exposure, crevice, root darkening, and native/fallback wear without changing source silhouettes.
+3. **M2.7C.5D — seamless sparse riverbed assembly:** rasterize only accepted sources into a periodic tile with approved rotation, scale, burial, quiet-space, repeat, seam, and mip contracts.
+4. **M2.7C.5E — runtime material integration:** promote only an accepted tile through the ordinary reusable Ground material/profile architecture and validate camera appearance, memory, and shader cost.
+
+No runtime material, Ground selector, Inspector control, scene object, profile, texture-array entry, or shader branch is introduced by M2.7C.5B.2.
+
+Previous architecture history follows below.
+
+## 2026-07-20 — GSU-M2.7C.5B architecture: curated Generated Mass river-rock families
+
+The authoritative sparse-riverbed rock source remains projected Generated Mass geometry. M2.7C.5B narrows the evidence catalog to `TerrainBoulder` and `SquatBoulder`, the only families visually accepted as useful foundations in M2.7C.5A. Flat Slab, Polished Stone, Layered Stone, and Broken Chunk remain valid Generated Mass archetypes, but they are excluded from the river-rock sweep and are not removed from the Mass library.
+
+The remaining M2.7B donor-extraction scripts and menu action are retired. Donor extraction, imported-stamp synthesis, and handmade 2D stone grammar are historical only and have no active code path.
+
+### Curated source-rock contract
+
+- 48 deterministic evidence entries: 24 Terrain and 24 Squat.
+- Six profile groups: Broad Low, Compact High, Long Low, Uneven Broad, Worn, and Restrained.
+- Stable IDs `T-00`–`T-23` and `S-00`–`S-23` identify complete recipe/settings records.
+- Terrain anchors preserve shape seeds 5727, 8889, and 7319. Squat anchors preserve 5727 and 2223.
+- Geometry variation comes from the existing Mass recipe fields and edge-wear settings; burial is a separate projection dimension, not fake source diversity.
+- Unified edge-wear preview geometry is preferred. Ordinary Generated Mass geometry remains a labelled fallback and is not automatically rejected.
+
+### Evidence interpretation
+
+The neutral preview is the geometry-selection view. The stylized preview demonstrates stronger response available from real projected normals, variation, crevice, height, and edge-wear data. Stylized response remains diagnostic and does not bake lighting into neutral material data.
+
+Selective root darkening is derived only from low projected height, crevice response, and side-facing normal response. Mask-distance outlines and full perimeter darkening remain prohibited. Edge-wear emphasis originates from projected real edge-wear channels rather than a generic silhouette border.
+
+### Authoritative progression
+
+1. **M2.7C.5B — Curated family sweep:** select approximately 12–20 stable source-rock IDs.
+2. **M2.7C.5C — Selected-rock refinement:** freeze IDs and complete recipe settings; refine material response, wear visibility, burial ranges, variation, and selective root darkening.
+3. **M2.7C.5D — Seamless sparse assembly:** rasterize accepted meshes into a periodic tile with approved scale, rotation, burial, quiet-region, seam, repeat, and mip contracts.
+4. **M2.7C.5E — Runtime integration:** only after tile acceptance, create the reusable Ground material/profile/library payload and validate production-camera appearance and runtime cost.
+
+No runtime integration, Ground selector entry, profile, layer, shader branch, scene object, prefab, or Inspector control is added by M2.7C.5B.
+
+---
+
+## 2026-07-20 — GSU-M2.7C.5A architecture change: Generated Mass is the new rock source
+
+The handmade 2D sparse-riverbed stone grammar is retired. It failed repeated visual review because its silhouettes, interior cuts, contact bands, and height logic did not read as rocks.
+
+The active evidence architecture now uses real `Generated Mass` geometry as the source of truth. The Editor-only projection baker rasterizes the topmost visible triangles of deterministic Generated Mass meshes after rotation and burial. The resulting evidence channels come from actual mesh geometry and generated vertex data: silhouette, height, normals, surface variation, exposure, crevice, and generated convex edge wear.
+
+This phase deliberately stops at individual-rock catalogs and burial comparison. Sparse tile assembly and runtime integration remain blocked until at least twelve projected entries are visually accepted as rocks. Runtime files, shaders, material arrays, Ground, and River are unchanged.
+
+Historical architecture below is retained only as superseded context where it discusses M2.7C.x handmade motifs.
+
+## 2026-07-20 — Addendum: M2.7C.4 Visual Correction for Sparse Riverbed Stones
+
+M2.7C.4 exists because the previous procedural sparse-riverbed candidates still failed the most basic visual gate: they did not convincingly read as rocks. The rejection criteria were not ambiguous. The stones were criticized for: uniform perimeter borders, hard interior diagonal lines, flat interior masses, and an overall look closer to abstract symbols than embedded stones.
+
+Visual direction locked by this addendum:
+- Stones must read first as rock masses, not as outlined motifs.
+- Contours may remain stylized, but must present asymmetric, believable rock edges rather than clean capsules.
+- Internal structure should come from localized planes, shoulders, depressions, and subtle lobes; it must not be dominated by center-spanning slashes.
+- Burial/contact treatment should read as selective embedding into substrate, not as a complete ring around every stone.
+- Preview shading should expose form and tonal variation inside the stone body instead of separating a border band from a flat center.
+
+Architectural implication:
+- Sparse distribution, quiet regions, determinism, and tiling remain valid.
+- The failing part was the stone grammar itself. M2.7C.4 therefore changes the motif geometry and preview logic without changing runtime integration scope.
+
+Earlier architecture notes continue below.
+
 # Ground Visual Design and Architecture
+
+
+## 2026-07-20 — GSU-M2.7C.3 Facet-Owned Sparse Riverbed Synthesis Architecture
+
+GSU-M2.7C.3 supersedes the rejected M2.7C.2 final stone-height and placement architecture while preserving its deterministic Editor-only evidence boundary.
+
+Final stone height is now facet-owned. Each rounded analytic silhouette contains three to six broad deterministic outward-facing planes sharing a crown-profile apex; their continuous lower envelope defines the primary crown. Flattened-dome and low-slab profiles add explicit planar caps. Crown profiles remain restrained broad biases, not the dominant dome. A narrow profile-specific rounded shoulder returns the planar interior to the silhouette boundary; the full stone is no longer multiplied by the broad inside-distance field. Local ridges, creases, depressions, lobes, notches, cuts, edge profiles, tilt, relief, and embedding remain bounded secondary structure. Final normal derivation is deliberately stronger than M2.7C.2, and the evidence preview uses an oblique diagnostic light so planar sectors are not hidden by a near-overhead preview.
+
+Burial and contact are directional. Each motif derives a buried/downhill sector from its burial profile and edge orientation. Broad substrate depression, narrow cavity, and inside contact are concentrated in that sector. Exposed/high sectors retain only a low bounded contribution, preventing a complete uniform perimeter halo.
+
+Quiet composition is an enforced construction constraint. Three candidate definitions own explicit maximum occupied 32x32 macro-block budgets. A proposed stamp is rejected before commit when its stone mask would exceed the budget. Candidate proposal density is driven by 5 / 7 / 8 seed-derived toroidal elliptical macro regions with bounded radii, aspect, rotation, and strength. Region centres use deterministic best-candidate separation on the torus to reduce large overlapping clumps and obvious repeated cluster anchors; the superseded directional three-sine density field is removed.
+
+The candidate coverage contract is:
+
+- Quiet Embedded Stones: 6–8%, target 7%, at most 71 occupied macro blocks;
+- Mixed Sparse Riverbed: 8–10.5%, target 9%, at most 87 occupied macro blocks;
+- Structured Sparse Stones: 10–12.5%, target 11%, at most 107 occupied macro blocks.
+
+Source-motif residual and curvature remain catalog diagnostics only. Candidate acceptance is measured from the final combined placed-stone height field after scale, relief, embedding, substrate combination, and overlap resolution. Interior stone height is normalized, compared with a local wrapped smooth baseline, and must reach residual RMS 0.018 plus 12% high-curvature participation. A `FinalStructureDebug` image exposes the measured field alongside color, height, normals, cavity, placement, repeat, and mip evidence. Preview stone value has a bounded floor so evidence lighting no longer creates a complete dark perimeter merely because height approaches the silhouette edge; directional cavity remains the intended embedding signal.
+
+All outputs remain under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`. No array entry, profile, Ground layer, shader branch, Inspector control, scene object, renderer, draw call, texture sample, runtime allocation, or per-frame behavior is introduced. Runtime promotion remains blocked until visual acceptance.
+
+### Superseded direction
+
+GSU-M2.7C.2 remains historical evidence. Its deterministic generation, coverage, seams, and output production worked, but two quiet-block gates failed and visual review rejected its dome-owned pill/capsule forms, substantially perimeter-complete contact, and recognizable repeated compositions. Its source-motif candidate metrics did not measure final placed geometry.
+
+## 2026-07-20 — GSU-M2.7C.2 Feature-Rich Procedural Stone Synthesis Architecture
+
+GSU-M2.7C.2 is the active sparse-riverbed evidence direction. It preserves rounded analytic silhouettes and Editor-only deterministic synthesis, but replaces the M2.7C.1 single smooth-crown model with explicit per-rock recipes.
+
+Every procedural rock owns:
+
+- one rounded silhouette family;
+- one crown profile;
+- one edge profile;
+- one burial profile;
+- one to three broad local structural modifiers;
+- multiple bounded facet planes.
+
+The supported crown vocabulary is rounded dome, flattened dome, offset shoulder, twin shoulder, one-sided rise, and low slab top. The edge vocabulary is soft even, mixed hardness, one-side buried, shoulder-and-drop, broad local chip, and flattened side. Local modifiers include planar facets, diagonal ridges, shallow creases, local depressions, secondary rounded lobes, rounded notches, and buried-side cuts.
+
+Silhouette deformation remains separate from height deformation. Structural features may create planar faces, shoulders, ridges, and local breaks in height, but may not introduce acute star-like silhouette points. Final normals are derived from the complete height field after all rock, burial, contact, and substrate operations.
+
+The candidate coverage contract is now deliberately lower:
+
+- Quiet Buried Pebbles: 6–9%;
+- Mixed Feature Riverbed: 9–12.5%;
+- Structured Embedded Stones: 12–15.5%.
+
+All outputs remain evidence under `Library`. No candidate is a reusable runtime material until a later explicitly approved promotion patch.
+
+### Superseded direction
+
+GSU-M2.7C.1 remains historical evidence. Its deterministic procedural catalog and seam handling passed Unity validation, but its 11.51%, 15.81%, and 19.32% candidates were visually rejected as too dense and too uniformly smooth. GSU-M2.7C.2 supersedes its stone-height model and candidate definitions.
+
+
+## 2026-07-20 — GSU-M2.7C.1 Procedural Rounded-Stone Synthesis Architecture
+
+GSU-M2.7C.1 is the authoritative sparse-riverbed evidence direction. It generates all stone motifs procedurally and consumes zero purchased donor pixels or extracted stamps. M2.7B extraction remains historical evidence only, and the visually rejected M2.7C donor-stamp synthesizer is superseded.
+
+Procedural stones start from rounded ellipses or superellipses with exponent at or above the ellipse range. Low-amplitude broad radial harmonics, one optional wide shallow flattening/chip, bounded aspect, and analytic distance-field antialiasing provide variation without acute points or star-like silhouettes. Five bounded families are generated: rounded pebble, broad oval, low embedded slab, softly angular rounded stone, and small rounded chipped accent. Height uses an independently shifted rounded crown, restrained broad faceting, tilt, relief, and embedding rather than one common mound formula.
+
+The substrate is deterministic and periodic but materially structured: integer-period sediment patches, restrained fine variation, shallow pits, and limited ripple response. Stone contact uses a broad shallow depression plus a narrow low-strength cavity. It does not generate a fixed dark outline. Final normals are derived from the complete periodic height field.
+
+Three evidence candidates differ in stone-family mix, size mix, embedding/relief, substrate treatment, and measured coverage: Rounded Pebble Sediment, Mixed Rounded Riverbed, and Embedded Stone Sediment. They remain Editor-only outputs under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`. No array entry, reusable profile, Ground layer, shader branch, scene object, draw call, texture sample, mesh, renderer, or runtime work is added before visual acceptance.
+
+## 2026-07-20 — GSU-M2.7C Sparse Riverbed Candidate Synthesis Architecture — Superseded
+
+M2.7C was an Editor-only material-data synthesis and evidence phase. It consumes only the visually accepted Stone Ground 01 extraction catalog. Black Gravel 01 contributes no placements or visible area because its accepted extraction sheets contain excessive crescent, shell, disconnected, and fragmentary forms for the first sparse-riverbed synthesis pass.
+
+The dense donor source composition is not copied. One deterministic 512×512 calm periodic substrate is shared by three candidates. Each candidate places a bounded subset of isolated Stone Ground stamps using deterministic toroidal positions, broad periodic density gating, restrained discrete rotations/scales, spacing rejection, overlap rejection, and explicit final coverage targets. The three evidence candidates target approximately 11%, 16%, and 20% visible stone coverage so the substrate remains the dominant material identity.
+
+Each accepted placement contributes a closed stone mask and donor-derived local form. The synthesizer partially embeds the form into the substrate, generates a narrow contact depression, derives final normals from the combined periodic height field, and creates semantic roughness rather than copying photographic donor roughness. This phase writes only color, mask, height, cavity, normal, roughness, placement, repeat, mip, fingerprint, and measurement evidence under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`.
+
+M2.7C creates no `StylizedSurfaceDetailLibrary` entry, texture-array slice, reusable material profile, Ground layer, shader branch, scene object, prefab, runtime allocation, draw call, texture sample, mesh, renderer, or per-frame work. Runtime semantic packing and reusable Ground integration belong to M2.7D and remain blocked until one synthesized candidate is visually accepted. If all donor-based candidates fail, the recorded fallback is procedural stone-motif generation using the same substrate, coverage, seam, mip, and evidence contract.
+
+## 2026-07-20 — GSU-M2.7B Donor Extraction Architecture
+
+Stone Ground 01 and Black Gravel 01 remain editor-only donor sources. M2.7B does not restore either source as a runtime material and does not inherit their dense source coverage. It extracts a bounded catalog of reusable source motifs from height, ambient-occlusion, and normal data. Final sparse coverage remains entirely owned by M2.7C synthesis over a separately generated calm substrate.
+
+The extractor is Editor-only and deterministic. It reads donor image bytes without changing importers, area-reduces them to a 512×512 analysis field, labels high-confidence 8-connected stone-support components, measures separation and shape quality, rejects edge-truncated and ambiguous regions, and retains a size-stratified quality catalog. Accepted records remain in memory only; all reports and contact sheets are written under `Library/SurfaceMaterialDiagnostics/SparseRiverbedDonors`.
+
+M2.7B adds no runtime texture, array entry, material profile, Ground layer, shader branch, mesh, renderer, draw call, texture sample, scene object, or per-frame work. M2.7C historically consumed the deterministic extractor API. GSU-M2.7C.1 supersedes that dependency and generates procedural motifs without donor pixels or stamps.
+
+## 2026-07-20 — Empty Logical Surface Library Backing Contract
+
+A `StylizedSurfaceDetailLibrary` may contain zero logical material entries. This state is required after direct Stone Ground 01 and Black Gravel 01 runtime entries are retired and before synthesized riverbed candidates are created.
+
+The generated packed-detail `Texture2DArray` still has one internal neutral backing slice because Unity texture arrays require nonzero depth. The slice encodes flat slope, zero cavity, centred value/finish variation, and neutral roughness. It is structural storage only: no serialized `Entry` represents it, no stable ID resolves to it, no material profile selects it, and it never appears in Ground or material selectors. An empty logical library has no generated texture-form array and an empty texture-form slice mapping.
+
+Logical material identity remains stable-ID based. Runtime consumers continue disabling structural detail when a material entry does not resolve; they do not fall back to backing slice zero. The neutral slice therefore adds no material behavior, shader branch, texture sample, draw call, per-frame CPU work, or user-facing placeholder. It exists only so the shared generated-array asset remains structurally valid until a later visually accepted synthesized material is promoted.
+
+## 2026-07-20 — Direct Imported Gravel Retired; Sparse Synthesized Riverbed Direction
+
+Direct full-cover Stone Ground 01 and Black Gravel 01 runtime materials are rejected and retired. Their uniform high-frequency stone carpets do not match the project’s subdued stylized Ground language from the production isometric camera. They must not be restored as selectable Ground layers or used as templates for another direct purchased-material import.
+
+The purchased source maps remain editor-only historical donor data. The active riverbed-gravel direction is a deterministic Editor synthesizer that:
+
+1. generates rounded procedural stone motifs from smoothed ellipse/superellipse foundations;
+2. enforces bounded aspect, broad perturbations, and no acute/star-like silhouettes;
+3. generates a calm continuous sand/soil substrate with sediment patches and shallow features;
+4. places procedural motifs sparsely with periodic placement, broad density patches, and substantial quiet areas;
+5. embeds stones through coherent form, broad depression, restrained contact cavity, normal, roughness, and semantic stone-mask fields;
+6. promotes only a visually accepted candidate into ordinary shared 256² Ground material arrays in a later patch.
+
+The runtime contract remains one Ground mesh, one renderer, shared texture arrays, no spawned pebble meshes, no decals, no per-chunk material generation, and no per-frame procedural analysis. Material identity comes from substrate-plus-feature structure: Pale Sand uses broad calm variation; sparse river sediment uses an explicit embedded-stone feature layer; mud, compacted soil, snow, and other surfaces must receive similarly characteristic features rather than differing only by palette.
+
+The existing packed-detail and texture-form array transport, periodic mip generation, seam metrics, and validation/report helpers remain shared infrastructure for later promotion. Importer normalization and source-map sampling remain available to other retained material workflows, but M2.7C.1 does not use donor source data. Retaining those helpers does not preserve the rejected direct-import workflow.
+
+## 2026-07-20 — GSU-M2.6 Black Gravel 01 reusable material
+
+Black Gravel 01 is an additional reusable authored-material-set surface. Its canonical identities are:
+
+```text
+Display name: Black Gravel 01
+Detail stable ID: black-gravel-01
+Reusable material: SSMP_BlackGravel01
+Ground layer: GSLP_BlackGravel01
+```
+
+The six purchased/source maps remain under `Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01`. Base color contributes normalized grayscale texture form only; it does not own runtime hue. Normal contributes packed slopes, height and AO contribute packed cavity response, and roughness contributes bounded finish variation. The uniformly black metallic map is retained for provenance but is not assigned because the current Ground material contract is dielectric.
+
+Black Gravel 01 uses the existing 256² generated-array tier, single-palette color authority, periodic texture-form generation, and M2.4.1 substrate transition. It adds no shader path, texture sample, draw call, geometry, or runtime CPU work. Its smaller source fragments justify a larger initial world repeat (`1.50 m`) than Stone Ground 01 so the production-camera result can be evaluated before considering any resolution change.
+
+The normal-green convention and packed-detail repeat quality remain Unity visual gates. The source files are not modified to hide seams; any future correction must be generated deterministically while preserving source provenance.
+
+
+## GSU-M2.5 — Stone Ground 01 canonical material identity
+
+The accepted imported stone material is now canonicalized as **Stone Ground 01**. Its reusable assets are `SSMP_StoneGround01` and `GSLP_StoneGround01`, and its detail-library stable ID is `stone-ground-01`. The accepted layer/material assets are renamed through Unity `AssetDatabase.MoveAsset`, preserving their existing GUIDs and all scene/style references.
+
+The obsolete Fine Gravel proof assets are removed from active authoring: the original packed Fine Gravel layer/material, the A5 Worn Edge variant, and the A5 Strong Rim variant. Their detail-library entries are removed and the generated arrays are rebuilt. Historical sections below retain the old names only as implementation history. Purchased Stone Ground 01 source maps remain editor-only inputs and are not deleted.
+
+
+## 2026-07-19 — GSU-M2.4.1 simple binary substrate boundary
+
+The failed M2.4 whole-stone scatter is removed. Imported texture-form materials now use the smallest non-interpolating substrate rule: Bank and Riverbed support are combined first, then the combined secondary substrate is selected with one fixed binary cut and only derivative-width antialiasing at the exact contour. Bank and Riverbed retain their original relative weighting inside the selected substrate, so hydrology and finish may still differ without exposing ordinary Ground between them.
+
+No stone segmentation, centroid metadata, prominence, runtime hashing, scatter, cavity-lock metadata, additional texture sample, texture, draw call, or authoring control remains. Prepacked/continuous materials retain the accepted smooth substrate interpolation. M2.1 periodic form generation, M2.3 single-palette authority, V1A.6 vegetation coverage, River masks, UV3, geometry, and Painted Accent behavior remain unchanged.
+
+## 2026-07-19 — GSU-M2.3 single-palette texture-form architecture
+
+Reusable surface colour now has one authority: `Base Color`, `Dark Color`, `Light Color`, and `Cavity Color`. A detail-library entry automatically determines whether it uses prepacked palette detail or a full imported material set; authors no longer select a payload mode. Imported base colour is reduced editor-side to linear luminance, normalized by its 5th percentile / median / 95th percentile, encoded as a grayscale texture-form array, and periodically repaired with the accepted M2.1 mip process. Source hue is discarded before runtime.
+
+Both source types feed the same palette and cavity resolver. Prepacked alpha retains its existing signed value/form and finish semantics. Imported texture form contributes signed Dark/Base/Light variation, while its packed detail slice continues to provide normal, cavity, and roughness. `Texture Form Strength`, `Scene Lighting Response`, and `Roughness Variation` are structural/finish controls rather than a second colour system. Dry Smoothness always remains the baseline and imported roughness supplies bounded centred variation only.
+
+The serialized payload and authored-tint fields remain hidden compatibility data so existing assets deserialize without migration. Existing shader property names and the optional second array sample also remain for compatibility; no texture sample, branch class, draw call, array dimension, memory layout, River mask, hydrology, geometry, UV3, or source asset changes. Palette Detail materials preserve their existing one-array path.
+
+## 2026-07-19 — GSU-M2.2 authored-colour palette control
+
+Authored Color remains a coordinated sRGB colour payload plus linear packed detail, but the authored image no longer bypasses the reusable palette. Its sampled luminance now selects between the material's existing Dark, Base, and Light colours; restrained source chroma is retained so per-stone variation survives. The existing cavity shoulder/core response then uses Dark and Cavity Color. `Authored Color Strength` still blends between the ordinary palette result and the palette-graded authored result, while Authored Color Tint remains an optional additional tint.
+
+The editor generation path preserves encoded source colour explicitly: source pixels are read as `Color32`, reduced and seam-repaired in encoded values, and uploaded as raw RGBA32 mip data into the sRGB array. This corrects the M2.1 dark-output regression without changing source assets, runtime resolution, memory, sample count, projection, hydrology, River masks, or packed detail. Palette Detail materials remain unchanged.
+
+## 2026-07-19 — GSU-M2.1 periodic authored-colour generation
+
+GSU-M2.1 corrects only the editor-generated authored-colour payload. Authored base colour is reduced to the 256² runtime tier with a weighted area filter, measured for opposite-edge discontinuity, and repaired only when a repeat boundary exceeds the recorded mean or p95 ratio limit. Repair is confined to a narrow edge band with smooth falloff; the purchased source remains unchanged. Every authored-colour mip is then constructed explicitly, measured, and conditionally repaired before it is written to the non-readable sRGB array.
+
+This is a generated-material correction, not a River response. World-XZ projection, Bank/Riverbed composition, UV3, hydrology, normals, lighting, material profiles, texture dimensions, runtime sample count, and draw-call architecture remain unchanged. `PaletteDetail` entries keep their existing source-mip copy path. This historical candidate was later accepted and canonicalized as `Stone Ground 01` by GSU-M2.5.
 
 ## 2026-07-19 — GSU-M2.0 authored-colour material path
 
-GSU-M2.0 adds an optional authored stylized colour payload to the reusable surface-material profile. Palette-detail materials retain their previous one-sample path. Authored-colour materials use a coordinated 256² sRGB colour-array slice plus the existing 256² linear packed-detail slice (`RG` slope, `B` cavity/contact, `A` roughness). Purchased high-resolution maps are editor-only source inputs and are not referenced by runtime profiles. The first temporary consumer is `Fine Gravel — Imported Stone Ground 01`; it is not canonical until Unity visual and performance acceptance.
+GSU-M2.0 adds an optional authored stylized colour payload to the reusable surface-material profile. Palette-detail materials retain their previous one-sample path. Authored-colour materials use a coordinated 256² sRGB colour-array slice plus the existing 256² linear packed-detail slice (`RG` slope, `B` cavity/contact, `A` roughness). Purchased high-resolution maps are editor-only source inputs and are not referenced by runtime profiles. The first consumer was historically named `Fine Gravel — Imported Stone Ground 01`; GSU-M2.5 canonicalizes it as `Stone Ground 01`.
 
 The art rule is explicit: illustrated stone colour, worn edges, and broad form may be authored into the colour payload; restrained dynamic lighting, normal response, cavity, roughness, and hydrology reinforce that artwork rather than attempting to regenerate it from a flat palette.
 

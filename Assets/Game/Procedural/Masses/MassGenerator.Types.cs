@@ -39,7 +39,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EdgeBevelPlane,
             VertexJunctionPlane,
             BoundedEdgeBevel,
-            BoundedEndpointCap
+            BoundedEndpointCap,
+            CornerDamageCap
         }
 
         private sealed class TriangleSoup

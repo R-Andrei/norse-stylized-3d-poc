@@ -22,7 +22,7 @@ The architecture now establishes:
 - certified topology, convexity, containment, bounds, volume, face quality, triangulation, normals, tangents, and render channels;
 - stable seed-8889 positive/negative fixtures, including edges `13/23/39`, suppressed component `14/24/30`, and excluded edge `40`.
 
-The accepted R13A.9a uniform baseline and V1A.2b macro extension are closed. V1A.2 completed owner/support construction-width backoff and retained the reported meaningful edge; V1A.2a closed stable-floor classification before corner solving; V1A.2b closed the corresponding editor-only fixture proof. Edge wear as a complete visual feature remains open beginning with along-edge micro irregularity, followed by chips, artistic normal shaping, and final rendering finish.
+The accepted R13A.9a uniform baseline and V1A.2b macro extension remain closed. V1A.2 completed owner/support construction-width backoff and retained the reported meaningful edge; V1A.2a closed stable-floor classification before corner solving; V1A.2b closed the corresponding editor-only fixture proof. The later EW-V2A multi-plane geometric Micro path is retired after runtime evidence showed high dirty-time cost and a repeated wide-end/narrow-middle result. EW-V1A.2c/d/e protected-Macro recovery experiments are likewise rejected and removed after failing functionally and producing an unresponsive 256-state editor case. EW-V1A.2f restores the complete V1A.2b recovery system and normalizes public Macro Strength to the certified effective amplitude. EW-S1 is rejected and removed. EW-V1A.3b is the accepted and frozen Macro-width/recovery boundary. `EW-C1A-RO2` completed the ownership/construction audit and approved one transactional corner cut after micro-topology normalization but before bevel-candidate construction. `EW-C1A.1` is implemented as a diagnostic-only transaction; Unity compilation and explicit report acceptance remain pending before promotion.
 
 The legacy construction and repair paths and the earlier bounded/plane experiments remain documented as architecture history and diagnostic comparison evidence. Any pre-R13A section that speaks of a future geometry direction is historical unless repeated by the current contract near the end of this document.
 
@@ -1945,23 +1945,24 @@ The accepted R13A.9a shell is the zero-irregularity reference for every later vi
 ### Next phases
 
 ```text
-EW-V1  deterministic macro irregularity between edges
-EW-V2  bounded smooth width variation along one edge
-EW-V3  localized chips/notches after V2 continuity is stable
-EW-V4  artistic bevel-normal shaping
-EW-V5  final material/rendering finish
+EW-V1A  deterministic macro irregularity between edges [accepted]
+EW-S1   shader-only broad bevel normal/material breakup [active]
+EW-C1   sparse corner damage [next]
+EW-C2   sparse localized edge chips/notches [later]
+EW-F1   face/crack and final material/rendering finish [later]
 ```
 
 ### Recovery architecture constraints on irregularity
 
 - Macro Variation Coverage or Strength at zero must reproduce the R13A.9a requested/resolved/materialized widths and edge identity.
 - V1 may vary the requested width per canonical source edge but retains one constant width along each edge. Coverage chooses a deterministic canonical-edge subset; Strength controls the downward variation of participants. Existing corner, viability, recovery, and full-shell certification judge the real varied widths.
-- V2/V3 may add subdivisions only through explicit source-edge provenance and bounded tier budgets. They may not bypass endpoint ownership, micro-topology normalization, recovery fallback, or final shell certification.
-- Artistic normal work must preserve the existing finite-unit normal/tangent integrity contract; visual shaping is not permission to weaken technical validation.
+- Universal geometric along-edge taper is retired. EW-S1 uses no subdivisions, planes, topology mutation, or recovery state.
+- Sparse corner/chip geometry may add bounded local topology only through explicit source-edge/vertex provenance and tier budgets. It may not bypass endpoint ownership, micro-topology normalization, recovery fallback, or final shell certification.
+- Shader normal work must preserve the existing finite-unit mesh normal/tangent integrity contract; lighting-normal perturbation is not permission to weaken technical geometry validation.
 - Rendering finish remains downstream of valid geometry and normals.
 - No visual phase may add per-frame mesh work or silently change production `EdgeWearEvaluationMode.None`.
 
-`EW-V1A.1` exposes Macro Variation Coverage and Macro Variation Strength for explicit editor geometry evaluation. Coverage `1` preserves the V1A all-edge multiplier stream; zero on either control restores exact uniform requests. Its Unity suite passed, but active Width testing exposed the incomplete construction-width schedule corrected by EW-V1A.2. The dormant serialized Micro Variation value remains hidden and unconsumed until EW-V2. Production evaluation is unchanged.
+`EW-V1A.1` exposes Macro Variation Coverage and Macro Variation Strength for explicit editor geometry evaluation. Coverage `1` preserves the V1A all-edge multiplier stream; zero on either control restores exact uniform requests. Its Unity suite passed, but active Width testing exposed the incomplete construction-width schedule corrected by EW-V1A.2. Geometric Micro authoring and construction are removed. EW-S1 material-only controls do not enter geometry settings or recovery. Production evaluation is unchanged.
 
 
 ### EW-V1A.1 integration with the frozen recovery system
@@ -1973,7 +1974,7 @@ EW-V5  final material/rendering finish
 - Corner displacement limits use the maximum request of the active participating edges; per-edge clamp scales are measured against each edge's own request. When Coverage or Strength is zero these reduce exactly to the uniform-width contract.
 - Downward-only sampling cannot demand a width broader than the accepted baseline, but narrower requests may truthfully change footprint or feasibility outcomes. Full shell, recovery, canonical identity, and negative-exclusion certification remain mandatory.
 - Direct V1A.1 suite evidence is additive: zero-by-Strength parity, zero-by-Coverage parity, repeated determinism, full-Coverage compatibility, participant bounds, and active distribution are checked before the existing `33/33`, `5/5`, unresolved-zero, negative-exclusion, comprehensive, state-preservation, timeout, and render-integrity contracts.
-- Inspector cleanup is an authoring correction only: ordinary Coverage is labelled Bevel Coverage, dormant Micro Variation is hidden, and every visible Edge Wear control has a current geometry or shader consumer.
+- Inspector cleanup is authoritative: ordinary Coverage is labelled Bevel Coverage, geometric Micro controls are removed, and every visible Edge Wear control has a current geometry or shader consumer.
 
 
 ### EW-V1A.2 full construction-width schedule
@@ -2037,4 +2038,229 @@ The V1A freeze preserves these mandatory properties:
 - certified-baseline fallback, material/corner recovery protections, topology/quality gates, and negative exclusions remain unchanged;
 - width remains constant along each edge, so no V2/V3 profile behavior is implied.
 
-Runtime acceptance: current preview passed with `31/31` selected/active/certified; both matrices passed `33/33`; recovery passed `5/5`; unresolved was `0`; negative exclusion passed `1/1`; and no cancellation or terminal failure occurred. The next architecture work belongs to EW-V2 and requires a separate plan.
+Runtime acceptance: current preview passed with `31/31` selected/active/certified; both matrices passed `33/33`; recovery passed `5/5`; unresolved was `0`; negative exclusion passed `1/1`; and no cancellation or terminal failure occurred. EW-S1 preserves this geometry/recovery result and moves along-edge visual breakup to the fragment shader. The next geometry architecture work is sparse corner damage.
+
+## EW-S1 recovery boundary
+
+EW-S1 intentionally has no recovery algorithm.
+
+- The complete EW-V2A multi-plane profile constructor, isolation audit, effective-depth tiers, selective admission, additional-plane budget, and Micro-specific matrix contracts are removed by restoring the accepted V1A.2b generator/diagnostic source.
+- Scalar plane-cut bevel construction, Macro width variation, micro-topology normalization, corner solving, coexistence search, material-width recovery, stable-floor classification, topology certification, render-channel certification, outlier fixtures, and edge-40 exclusion remain unchanged.
+- The new surface controls are material-only fields on `GeneratedMass`. They are not members of `MassSurfaceFeatureSettings`, `ProductionGenerationState`, or `FeatureAtlasGenerationState`, and they do not participate in source-edge debug freshness or geometry fingerprints.
+- The fragment shader evaluates broad variation only when `_GeneratedMassGeometryEdgeWearEnabled`, UV2.z, and Edge Surface Variation Strength are all nonzero. Strength zero returns before analytic wave evaluation and preserves the accepted V1A.2b normal/albedo/smoothness path.
+- Shader variation cannot rescue invalid geometry and cannot conceal topology failures. If no bevel face exists, UV2.z is zero and EW-S1 has no effect.
+- Sparse corner damage and chips must use separate bounded geometry plans and must preserve the existing recovery/fixture contract.
+## EW-V1A.2c certified-baseline corner-retention ordering
+
+### Runtime evidence that opened the patch
+
+The accepted V1A.2b run at Macro Strength `0.55` certified seed 8889 source edge `38`. The EW-S1 validation run at Strength `0.67` reduced that edge's requested width only from `0.0185500644` to `0.0184908062`, while its isolated maximum certified width remained `0.012897186`; nevertheless, the final shell classified it as `corner-width-inactive` and the Macro retention contract reported `unprovenLosses:{38}`.
+
+### Proven ownership defect
+
+The certified baseline was created before material-width target trials, but corner-inactive recovery candidates were collected only after the material phase selected its working baseline. Material trials inherit baseline-selected exclusions through `CollectBaselineSelectedExclusions`; a corner-collapsed edge could therefore become an inherited exclusion before corner recovery inspected the original conflict. The corner collector also required `CornerRecoveryProvisional` before it called `ApplyCornerRecoveryProvisionalEvidence`, even though the exact `ChamferCornerConflictRecord` was already available.
+
+### Corrected recovery order
+
+1. Create and fully certify the scalar baseline.
+2. Collect corner-inactive recovery edges and participant sets from that original baseline immediately.
+3. Run material-width target recovery with its existing target and baseline-loss contracts.
+4. Merge any additional corner-inactive records from the post-material baseline into the preserved original set.
+5. Run the existing bounded augmentation frontier with material-certified edges protected and conflict participants as the only permitted baseline exchanges.
+6. Mark an edge `corner-recovery-proven-infeasible` only when the bounded frontier exhausts without cancellation, timeout, or remaining states.
+
+No corner math, shared-edge scale search, conflict participant calculation, plane kernel, acceptance predicate, search budget, or production path changes in EW-V1A.2c.
+
+### Validation contract
+
+The one-click suite now includes a full-coverage Strength sweep at `0`, `0.25`, `0.55`, `0.67`, and `1`. Each sample compares against the exact zero-Strength baseline. A sample passes only when every baseline-certified artistic edge is still materialized or has complete isolated or corner-recovery infeasibility proof. Current-setting retention remains a separate required check.
+
+Status: superseded after Unity proved that the collector still inspected only a current-strength baseline. It did not construct the zero-strength certified set that defines Macro retention.
+
+
+## EW-V1A.2d generator-owned protected Macro retention
+
+### Why EW-V1A.2c could not recover edge 38
+
+`TryAuditCertifiedBaselineAugmentation` called its first current-strength trial `certifiedBaseline`. The editor created the real Strength-zero result later and only for contract comparison. Consequently, the generator had no protected set against which to recognize edge `38` as a loss. The EW-V1A.2c early collector therefore remained empty for that edge and no restoration state entered the frontier.
+
+### Protected baseline ownership
+
+For nonzero Macro Coverage and Strength:
+
+1. Construct a local settings value with the same authoring values and Macro Strength exactly zero.
+2. Rerun candidate construction, isolated viability, artistic selection, graph mapping, and material-recovery target capture on the same normalized source faces.
+3. Run the complete existing certified-baseline augmentation path without a protected baseline argument.
+4. Treat only a fully valid shell with a non-null preview as the protected baseline. Failure to certify this baseline is a hard evaluation failure.
+5. Build the requested-strength result through the existing material and corner recovery path.
+6. Compare certified graph-edge identities before accepting the result.
+
+### Local restoration
+
+For each protected loss, gather exact `ChamferCornerConflictRecord.ParticipatingSelectedEdges`. If the current corner solution has no exact conflict record, gather only selected graph edges incident to the lost edge's two endpoint vertices. The lost edge itself is always included.
+
+The requested widths of that finite participant set are blended toward the protected widths at factors `0.25`, `0.5`, `0.75`, and `1`. Every trial rebuilds and validates the complete corner and plane shell with render-channel validation enabled. Acceptance requires all protected baseline edges and all edges already certified by the requested-strength result. No participant may be exchanged away merely to restore the target.
+
+If every local factor fails, the already-certified zero-Macro protected outcome is returned. This is a safety fallback, not proof that Macro distribution succeeded; diagnostics identify it and the independent distribution contract remains authoritative.
+
+### Evidence
+
+Coverage lifecycle records now carry protected-baseline membership/width, initial-loss state, restoration attempt/certification, selected factor, participant set, and resolution. The unified audit summarizes the protected set, losses, restored edges, participant set, factor, and `retained`, `local-restoration`, or `full-zero-baseline-fallback` resolution.
+
+No cancellation, timeout, missing evidence, or failed local trial is classified as geometric infeasibility.
+
+Status: source implementation complete; Unity validation pending.
+
+
+## EW-V1A.2e asymmetric protected-width search
+
+EW-V1A.2d runtime evidence retained edge `38` but selected `full-zero-baseline-fallback`; the final audit reported Macro Strength `0`, participants `0`, varied `0`, and `macroDistribution=0`. The uniform `0.25/0.5/0.75/1` path is therefore superseded.
+
+The corrected protected search uses the certified requested-Macro outcome as its state origin. This preserves every unrelated requested-Macro width and all already committed material/non-material recovery. The pre-recovery source audit is not a valid trial origin.
+
+For each protected loss:
+
+1. The lost graph edge is mandatory.
+2. Exact conflict participants are used; endpoint-star participants remain fallback evidence.
+3. The mandatory loss and each selected optional participant target the protected lifecycle record's positive solved width, then materialized width, then isolated maximum certified width, then requested width.
+4. For each adjusted edge only, current local and isolated certified-width ceilings are raised to that independently certified protected target when the current-strength preflight stopped lower.
+5. Optional participants are enumerated as asymmetric binary subsets, capped at eight.
+6. States are ordered by total normalized deviation from the current requested-Macro widths, then adjusted count and graph-edge key.
+7. The first fully certified minimum-cost state that retains all protected and current built edges and preserves nonzero variation wins.
+
+The unified evidence labels internal graph-edge participants/adjustments separately from displayed source-edge losses. `full-zero-baseline-fallback` remains available only as explicit safety output and must fail the nonzero Macro distribution contract.
+
+Status: rejected and removed from active code by EW-V1A.2f. Runtime evidence showed the asymmetric subset search could evaluate 256 complete shell states for one case, remain synchronous for more than one minute, ignore cancellation until the case returned, and still select full-zero fallback.
+## EW-V1A.2f recovery boundary
+
+EW-V1A.2f removes every recovery mechanism introduced by EW-V1A.2c/d/e. The active architecture is again the accepted EW-S1/V1A.2b scalar path:
+
+- no independent zero-Macro candidate or shell certification;
+- no protected baseline edge set;
+- no protected lifecycle clone or telemetry;
+- no uniform-factor or asymmetric-subset restoration search;
+- no full-zero-baseline fallback;
+- no Macro-specific recovery frontier beyond the accepted V1A.2b material/corner recovery already required by scalar bevel construction.
+
+Macro Strength is normalized before it reaches the unchanged viability and recovery architecture. The public `0..1` control becomes effective amplitude `0..0.55` exactly once in `ResolveEdgeWearMacroRequestedWidth`. At control `1`, the solver therefore receives the previously Unity-certified old Strength `0.55` request. Downward-only sampling, width schedules, corner solving, material-width recovery, stable-floor proof, shell certification, topology gates, and negative exclusions are otherwise unchanged.
+
+Validation fail-fast is an editor workflow boundary, not a recovery rule. A failed current preview or Macro contract writes a report and stops before matrices; a failed topology matrix stops before the artistic matrix. Normal successful validation still runs the complete suite.
+
+
+## EW-V1A.3b restored dihedral-biased request boundary
+
+EW-V1A.3b restores the complete EW-V1A.3 request and recovery behavior. It does not add, remove, or weaken a recovery mechanism. The complete EW-V1A.3b Unity suite passed, so this request and recovery boundary is accepted and frozen.
+
+- The existing deterministic Macro sample is initialized before structural classification so early-ineligible diagnostic records retain stable nonzero values.
+- Once structural classification succeeds and proves a convex edge, the same resolver is evaluated with measured dihedral. The resulting multiplier, requested width, footprint requirement, and length-to-width ratio are applied together before any width-dependent viability gate.
+- The angle permission uses a normalized smoothstep from `15°` to `90°` and retains `0.35` of downward-reduction permission at the sharp endpoint. It can only reduce the amount of narrowing as dihedral increases; it cannot request a width broader than the uniform base width.
+- Hash salts, participation semantics, sampled `0.55..1` stream, normalized effective Strength `0..0.55`, minimum-style floor, isolated schedules, corner solve, material-width recovery, stable-floor proof, shell certification, topology gates, outlier fixtures, and negative exclusions remain unchanged.
+- No protected baseline, duplicate shell, asymmetric subset search, fallback state, extra plane, or geometric within-edge profile is restored.
+- Removing EW-S1 shader breakup has no recovery consequence. The uniform UV2.z bevel response remains, while object-space wave, normal perturbation, material variation, and smoothness variation are deleted.
+
+
+## EW-V1A.3a rejected recovery experiment
+
+EW-V1A.3a changed the existing conflict-cluster reduction from uniform scaling to dihedral-priority scaling and added a global endpoint materialized-scale comparison. The supplied Unity report failed topology at `28/33`, including time-budget exhaustion, state-budget exhaustion, a collapsed bevel band, and one reported hierarchy inversion. That experiment is removed by EW-V1A.3b.
+
+The restored recovery rule is the previously certified EW-V1A.3 rule: every edge in an implicated conflict cluster receives the same bounded reduction factor, and every existing isolated, locality, foreign-source-vertex, rail, topology, manifold, face-quality, and render certification remains authoritative.
+
+The narrow seed-8889 source edge `10` is reduced before conflict recovery by isolated certification. Its wider attempts fail the existing foreign-source-vertex and exact-rail contracts; EW-V1A.3b records this as a deferred construction limitation rather than weakening recovery invariants.
+
+
+
+## EW-V1A.3b accepted freeze and EW-C1A boundary
+
+
+
+The accepted Unity report records current preview pass, Macro zero parity, angle mapping, determinism, distribution, and retention; topology `33/33`; artistic preview `33/33`; outlier resolution `5/5`; negative exclusion `1/1`; cancellation `0`; and terminal reason `none`.
+
+
+
+The following recovery behavior is frozen:
+
+
+
+- continuous dihedral-biased requested width;
+
+- isolated width schedules and certified floors;
+
+- corner/shared-width solving;
+
+- material-width recovery;
+
+- uniform conflict-cluster reduction;
+
+- locality, foreign-source-vertex, rail, manifold, topology, face-quality, render, and negative-exclusion contracts.
+
+
+
+EW-C1A must not modify these systems as an implicit corner-damage recovery mechanism. The completed ordering audit approves a transactional pre-bevel half-space cut after micro-topology normalization and before bevel candidate construction. Any corner cut must reject the trial when it cannot preserve original-edge descendant identity, creates anything other than one cap, violates manifold/topology/face-quality/render certification, exceeds the approved local volume loss, or prevents the later bevel shell from preserving unrelated frozen edge-wear results.
+
+## EW-C1A pre-bevel corner-damage recovery boundary
+
+**Decision:** pre-bevel cut approved. Post-bevel raw cutting is rejected.
+
+C1A inserts between accepted micro-topology normalization and `BuildEdgeWearBevelCandidates`. It does not weaken, replace, or bypass any frozen V1A.3b recovery rule. The damaged source polyhedron becomes the input to the existing isolated-width, corner/shared-width, material-recovery, coexistence, plane-shell, topology, face-quality, and render-certification systems.
+
+### Transaction boundary
+
+Each depth trial operates on a fresh clone of the normalized `PolygonFace` list. The accepted source list is unchanged until one trial passes all requirements. The existing exact clipping primitives are reused, but C1A requires a structured success/failure wrapper because `ClipPolyhedron` currently has no return result or descendant-edge evidence. The implemented wrapper is `TryClipCornerDamageTransaction`; it assigns `PolygonFaceProvenanceKind.CornerDamageCap`, preserves the source clone on failure, and returns the clipped clone, one cap, exact numerical-repair telemetry, and a concrete blocker. `EvaluateCornerDamageTransaction` owns candidate ranking and the four bounded attempts, while `AuditCornerDamageIdentityMapping` proves untouched, shortened-descendant, and generated cap-ring identities.
+
+The trial schedule is fixed:
+
+```text
+1.000000
+0.750000
+0.562500
+0.421875
+```
+
+A failed trial is discarded completely. No partial face, intersection point, provenance assignment, or identity-map mutation survives.
+
+### Required trial certification
+
+The cut result must prove:
+
+- one and only one cap face;
+- at least three unique cap vertices;
+- exact cap-plane residual within the existing exact-intersection tolerance;
+- closed manifold topology, zero open edges, zero non-manifold edges, and zero T-junctions;
+- finite, planar, simple, convex, outward-wound faces above the minimum area;
+- positive volume loss no greater than `12%` of normalized source volume;
+- no source-bound expansion beyond tolerance;
+- every untouched original edge still maps to its frozen original ID;
+- every shortened incident original edge maps to its parent original ID;
+- no new edge aliases an original ID;
+- accepted vertex/triangle budgets remain intact.
+
+### Recovery identity boundary
+
+The current `EdgeWearMicroTopologyNormalizationResult` exact-key map remains authoritative for untouched original edges. C1A adds result-owned maps for the three shortened original-edge descendants and generated cap-ring edges. These maps are consumed before Macro sampling and candidate diagnostics.
+
+Cap-ring edges are not ordinary recovery participants in C1A.1. In C1A.2 they receive a dedicated constant requested width and bypass Macro variation. Once passed to the existing shell, all normal viability, corner, conflict, and render rules apply; no cap-ring-specific topology exception is permitted.
+
+### Unrelated bevel preservation
+
+Because the cut precedes candidate construction, preservation cannot be defined by comparing raw post-bevel polygons. It is defined by stable original edge identity:
+
+```text
+unaffected original edge that was certified by the undamaged V1A.3b baseline
+    -> remains present in damaged source identity map
+    -> remains geometrically eligible unless its local corner star was cut
+    -> remains active/certified in the final shell or reports an explicit local corner-star reason
+```
+
+Edges incident to the selected damaged corner may change length, dihedral, or eligibility. All other original edges are protected from silent loss.
+
+### Normal and tangent boundary
+
+Recovery owns polygon geometry and authored face-plane normals only. It does not calculate the final Unity tangent channel. Final triangle topology is produced first; `BuildMeshData` then assigns authored or geometric render normals; `MeshBuilder.ApplyToMesh` recalculates tangents after final UV and index assignment. Corner damage therefore cannot run after final normals/tangents.
+
+### Staged promotion
+
+- `EW-C1A.1` is implemented as `EdgeWearEvaluationMode.CornerDamageTransactionAudit`. `ApplyGeneratedEdgeWearBevels` captures the transaction immediately after normalization and returns before `BuildEdgeWearBevelCandidates`, so it is diagnostic-only and cannot replace the accepted preview mesh. The Inspector writes `Library/GeneratedMassCornerDamageTransactionAudit.txt` and copies the report to the clipboard.
+- `EW-C1A.2` may render the damaged corner only after eligible cap-ring edges are bevelled.
+- `EW-C1A.3` must pass disabled/default/maximum policies over the 11 accepted seeds before freeze.
+
+No production `EdgeWearEvaluationMode.None` promotion is included in C1A unless separately planned and approved.

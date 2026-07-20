@@ -186,8 +186,14 @@ namespace ProgrammaticStylized3D.Rivers
                     ? (float)river.FoamFinalVisibilityMode
                     : 0f);
             propertyBlock.SetFloat(
+                FoamPresenceFootprintModeId,
+                river != null
+                    ? (float)river.FoamPresenceFootprintMode
+                    : 0f);
+            propertyBlock.SetFloat(
                 FoamDebugViewId,
                 river != null ? (float)river.FoamDebugView : 0f);
+            BindFoamChipStraddleAdmission(propertyBlock, false);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
             return true;
         }
@@ -246,7 +252,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ResolveBaseFoamDownstreamSpeedMetresPerSecond());
             propertyBlock.SetFloat(
                 FoamMaximumLateralSpeedRatioId,
-                river.FoamMaximumLateralSpeedRatio);
+                ResolveEffectiveFoamMaximumLateralSpeedRatio());
             propertyBlock.SetFloat(
                 FoamObstacleSlowdownStrengthId,
                 river.FoamObstacleSlowdownStrength);
@@ -347,7 +353,11 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(
                 FoamFinalVisibilityModeId,
                 (float)river.FoamFinalVisibilityMode);
+            propertyBlock.SetFloat(
+                FoamPresenceFootprintModeId,
+                (float)river.FoamPresenceFootprintMode);
             propertyBlock.SetFloat(FoamDebugViewId, (float)river.FoamDebugView);
+            BindFoamChipStraddleAdmission(propertyBlock, true);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }
 
@@ -426,7 +436,9 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamStrandReachId, 0.55f);
             propertyBlock.SetFloat(FoamSharpnessId, 1f);
             propertyBlock.SetFloat(FoamFinalVisibilityModeId, 0f);
+            propertyBlock.SetFloat(FoamPresenceFootprintModeId, 0f);
             propertyBlock.SetFloat(FoamDebugViewId, 0f);
+            BindFoamChipStraddleAdmission(propertyBlock, false);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }
 

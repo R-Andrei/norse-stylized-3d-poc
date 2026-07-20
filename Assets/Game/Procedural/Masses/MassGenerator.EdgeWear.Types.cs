@@ -1974,6 +1974,109 @@ private readonly struct EdgeWearTopologyStats
             public string Blocker = string.Empty;
         }
 
+        private sealed class CornerDamageCandidateRecord
+        {
+            public int GraphVertexIndex = -1;
+            public Vector3 Position;
+            public bool Eligible;
+            public string Blocker = string.Empty;
+            public int IncidentFaceCount;
+            public int IncidentEdgeCount;
+            public int ConvexIncidentEdgeCount;
+            public float MaximumIncidentDihedral;
+            public float MinimumIncidentEdgeLength;
+            public float SharpnessScore;
+            public float SizeScore;
+            public float UpwardExposureScore;
+            public float RandomScore;
+            public float Score;
+            public readonly List<int> IncidentFaceIndices =
+                new List<int>();
+            public readonly List<int> IncidentGraphEdgeIndices =
+                new List<int>();
+            public readonly List<int> IncidentOriginalEdgeIndices =
+                new List<int>();
+        }
+
+        private sealed class CornerDamageEdgeIdentityRecord
+        {
+            public string Kind = string.Empty;
+            public int OutputGraphEdgeIndex = -1;
+            public int ParentOriginalEdgeA = -1;
+            public int ParentOriginalEdgeB = -1;
+            public int GeneratedIdentity = -1;
+            public Vector3 Start;
+            public Vector3 End;
+        }
+
+        private sealed class CornerDamageTrialRecord
+        {
+            public int TrialIndex = -1;
+            public float DepthFactor;
+            public float Depth;
+            public Vector3 PlanePoint;
+            public float PlaneDistance;
+            public bool Succeeded;
+            public string Blocker = string.Empty;
+            public int FaceCount;
+            public int CapFaceCount;
+            public int CapVertexCount;
+            public float CapArea;
+            public float MaximumCapPlaneResidual;
+            public int OpenEdgeCount;
+            public int NonManifoldEdgeCount;
+            public int TJunctionCount;
+            public int InvalidFaceCount;
+            public int NonPlanarFaceCount;
+            public int NonConvexFaceCount;
+            public int WindingFailureCount;
+            public int BoundsValid;
+            public int OutputVertexCount;
+            public int OutputTriangleCount;
+            public int BudgetValid;
+            public double SourceVolume;
+            public double ResultVolume;
+            public double VolumeLoss;
+            public double VolumeLossFraction;
+            public int ExactConstructionFailureCount;
+            public string ExactConstructionFailure = string.Empty;
+            public int UntouchedOriginalEdgeCount;
+            public int ShortenedDescendantEdgeCount;
+            public int CapRingEdgeCount;
+            public int MissingOriginalEdgeCount;
+            public int AmbiguousIdentityCount;
+            public readonly List<CornerDamageEdgeIdentityRecord>
+                IdentityRecords =
+                    new List<CornerDamageEdgeIdentityRecord>();
+        }
+
+        private sealed class CornerDamageTransactionAuditResult
+        {
+            public bool Attempted;
+            public bool GraphAvailable;
+            public bool CandidateFound;
+            public bool Succeeded;
+            public int ShapeSeed;
+            public int NormalizedVertexCount;
+            public int NormalizedEdgeCount;
+            public int NormalizedFaceCount;
+            public int EligibleCandidateCount;
+            public int SelectedGraphVertexIndex = -1;
+            public Vector3 SelectedPosition;
+            public Vector3 OutwardNormal;
+            public float BaseDepth;
+            public float MinimumStableEdgeLength;
+            public float MinimumStableFaceArea;
+            public float MaximumDimension;
+            public double SourceVolume;
+            public int AcceptedTrialIndex = -1;
+            public string Diagnostic = string.Empty;
+            public readonly List<CornerDamageCandidateRecord> Candidates =
+                new List<CornerDamageCandidateRecord>();
+            public readonly List<CornerDamageTrialRecord> Trials =
+                new List<CornerDamageTrialRecord>();
+        }
+
         private sealed class EdgeWearMicroTopologyNormalizationResult
         {
             public List<PolygonFace> Faces;

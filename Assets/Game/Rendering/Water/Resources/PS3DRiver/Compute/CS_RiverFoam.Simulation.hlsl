@@ -112,9 +112,10 @@ float4 FoamPreservePersistentMaterialState(
 
 
 
-// Patch 4.11C.5.16B — first-order conservative donor-cell transport.
-// Every flux carries the complete packed material vector so Presence,
-// Presence*RemainingLife, and Presence*Pattern remain attached.
+// Conservative packed-state transport. Donor Cell is the exact accepted
+// first-order baseline; the optional TVD branch changes only interior face
+// reconstruction. Every flux carries Presence, Presence*RemainingLife, and
+// Presence*Pattern together so the normalized material properties remain attached.
 
 bool FoamTransportInsideGrid(int2 coordinate)
 {
@@ -217,6 +218,122 @@ float FoamTransportLateralFaceLength(int x, int lowerY)
         FoamTransportCurvatureJacobian(x, faceLateral);
 }
 
+static const int FoamTransportSchemeTvdSuperbee = 1;
+
+bool FoamTransportUsesTvdSuperbee()
+{
+    return _FoamTransportScheme == FoamTransportSchemeTvdSuperbee;
+}
+
+float FoamTransportSuperbeeSlopeComponent(
+    float backwardDifference,
+    float forwardDifference)
+{
+    float slope = 0.0;
+    if (backwardDifference * forwardDifference > 0.0)
+    {
+        float direction = backwardDifference >= 0.0 ? 1.0 : -1.0;
+        float backwardMagnitude = abs(backwardDifference);
+        float forwardMagnitude = abs(forwardDifference);
+        float candidateA = min(
+            backwardMagnitude * 2.0,
+            forwardMagnitude);
+        float candidateB = min(
+            backwardMagnitude,
+            forwardMagnitude * 2.0);
+        slope = direction * max(candidateA, candidateB);
+    }
+
+    return slope;
+}
+
+float4 FoamTransportSuperbeeSlope(
+    float4 previousPacked,
+    float4 centrePacked,
+    float4 nextPacked)
+{
+    float4 backwardDifference = centrePacked - previousPacked;
+    float4 forwardDifference = nextPacked - centrePacked;
+    return float4(
+        FoamTransportSuperbeeSlopeComponent(
+            backwardDifference.x,
+            forwardDifference.x),
+        FoamTransportSuperbeeSlopeComponent(
+            backwardDifference.y,
+            forwardDifference.y),
+        FoamTransportSuperbeeSlopeComponent(
+            backwardDifference.z,
+            forwardDifference.z),
+        FoamTransportSuperbeeSlopeComponent(
+            backwardDifference.w,
+            forwardDifference.w));
+}
+
+float4 FoamLoadTransportPackedOrFallback(
+    int2 coordinate,
+    float4 fallbackPacked)
+{
+    if (!FoamTransportInsideSimulation(coordinate))
+    {
+        return fallbackPacked;
+    }
+
+    float validFluid;
+    float4 packed = FoamLoadTransportPacked(coordinate, validFluid);
+    return validFluid > FoamMaterialStateEpsilon
+        ? packed
+        : fallbackPacked;
+}
+
+float4 FoamResolveInteriorFaceDonor(
+    int2 negativeCoordinate,
+    int2 positiveCoordinate,
+    int2 axis,
+    float faceVelocity,
+    float4 negativePacked,
+    float4 positivePacked)
+{
+    float4 donor = faceVelocity >= 0.0
+        ? negativePacked
+        : positivePacked;
+    if (!FoamTransportUsesTvdSuperbee())
+    {
+        return donor;
+    }
+
+    float reconstructionScale = 0.5 * (1.0 - saturate(
+        _FoamTransportReconstructionCourant));
+
+    float4 reconstructed = donor;
+    if (faceVelocity >= 0.0)
+    {
+        float4 previousPacked = FoamLoadTransportPackedOrFallback(
+            negativeCoordinate - axis,
+            negativePacked);
+        float4 slope = FoamTransportSuperbeeSlope(
+            previousPacked,
+            negativePacked,
+            positivePacked);
+        reconstructed = negativePacked + slope * reconstructionScale;
+    }
+    else
+    {
+        float4 nextPacked = FoamLoadTransportPackedOrFallback(
+            positiveCoordinate + axis,
+            positivePacked);
+        float4 slope = FoamTransportSuperbeeSlope(
+            negativePacked,
+            positivePacked,
+            nextPacked);
+        reconstructed = positivePacked - slope * reconstructionScale;
+    }
+
+    float4 faceMinimum = min(negativePacked, positivePacked);
+    float4 faceMaximum = max(negativePacked, positivePacked);
+    return FoamClampPackedMaterialState(
+        clamp(reconstructed, faceMinimum, faceMaximum));
+}
+
 void FoamResolveLongitudinalFaceFlux(
     int leftX,
     int y,
@@ -260,9 +377,13 @@ void FoamResolveLongitudinalFaceFlux(
         float faceLength = 0.5 * (
             FoamTransportLateralSpacing(leftX) +
             FoamTransportLateralSpacing(leftX + 1));
-        float4 donor = faceVelocity >= 0.0
-            ? leftPacked
-            : rightPacked;
+        float4 donor = FoamResolveInteriorFaceDonor(
+            leftCoordinate,
+            rightCoordinate,
+            int2(1, 0),
+            faceVelocity,
+            leftPacked,
+            rightPacked);
         resolvedFlux = faceVelocity * faceLength * donor;
         return;
     }
@@ -361,9 +482,13 @@ float4 FoamResolveLateralFaceFlux(
         upperCoordinate,
         upperValid).y;
     faceVelocity = 0.5 * (lowerVelocity + upperVelocity);
-    float4 donor = faceVelocity >= 0.0
-        ? lowerPacked
-        : upperPacked;
+    float4 donor = FoamResolveInteriorFaceDonor(
+        lowerCoordinate,
+        upperCoordinate,
+        int2(0, 1),
+        faceVelocity,
+        lowerPacked,
+        upperPacked);
     donorPresence = donor.x;
     faceLength = FoamTransportLateralFaceLength(x, lowerY);
     return faceVelocity * faceLength * donor;

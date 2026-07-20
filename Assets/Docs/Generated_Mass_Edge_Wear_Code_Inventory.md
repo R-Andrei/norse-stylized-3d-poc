@@ -10,11 +10,12 @@ Docs/Generated_Mass_Feature_Implementation_Checklist.md
 
 ## Current accepted baseline and next ownership
 
-- `EW-V1A.2b` is the accepted and frozen deterministic per-edge macro-width irregularity baseline. Its Unity suite passed current preview, macro zero parity/determinism/distribution/retention, both `33/33` matrices, recovery `5/5`, unresolved `0`, and negative exclusion `1/1`, with no cancellation or terminal failure.
+- `EW-V1A.3b` is the accepted and frozen deterministic scalar, dihedral-biased Macro-width, recovery, and uniform bevel-response baseline. Its complete Unity suite passed current preview, Macro zero parity/angle mapping/determinism/distribution/retention, both `33/33` matrices, recovery `5/5`, negative exclusion `1/1`, cancellation `0`, and terminal reason `none`.
+- `EW-V1A.2f` remains the historical scalar safety predecessor; EW-V1A.3b preserves its hashes and scalar construction, biases convex requested width by dihedral, and removes the rejected EW-S1 breakup.
 - `EW-B4.2R13A.9a` remains the exact uniform basic-bevel/recovery fallback when Macro Variation Coverage or Strength is zero.
 - Ordinary production remains `EdgeWearEvaluationMode.None`; the accepted bevel remains explicit editor preview/audit geometry with `geometryCommit=disabled`.
-- `edgeWearMacroVariationCoverage` owns deterministic participation and the migration-stable `edgeWearMacroVariation` field owns Strength. The dormant `edgeWearMicroVariation` value remains hidden and unconsumed.
-- The next feature owner is `EW-V2` smooth within-edge irregularity. No along-edge profile/segment owner exists yet; do not describe the current constant-width-per-edge shell as having taper, lobes, drift, chips, or notches.
+- `edgeWearMacroVariationCoverage` owns deterministic participation and the migration-stable `edgeWearMacroVariation` field owns normalized control Strength. The resolver maps control `0..1` to effective amplitude `0..0.55`, then applies a `15°..90°` smooth dihedral permission ending at `0.35`.
+- Universal geometric within-edge profiling and EW-S1 object-space normal/material breakup are removed. Width remains constant along each edge. The uniform UV2.z visual response remains. `EW-C1A-RO2` is complete and approves pre-bevel corner removal. `EW-C1A.1 — Pre-bevel corner-cut transaction and provenance proof` is implemented as an explicit diagnostic-only evaluation mode; geometry commit and visual corner damage remain inactive until C1A.2.
 
 ## Dependency boundary
 
@@ -1639,7 +1640,7 @@ Unity runtime validation accepted R13A.9a: current preview passed; topology and 
 
 ### `GeneratedMass.cs`
 
-The existing `edgeWearMacroVariation` serialized field is retained as Strength for migration stability. New `edgeWearMacroVariationCoverage` defaults to one, so existing V1A Strength values preserve all-edge behavior. Source-index debug freshness and `CreateSurfaceFeatureSettings` include both controls. The dormant Micro Variation backing field remains hidden and unconsumed; its visible Inspector control is removed.
+The existing `edgeWearMacroVariation` serialized field is retained as Strength for migration stability. `edgeWearMacroVariationCoverage` defaults to one, so existing V1A Strength values preserve all-edge behavior. Source-index debug freshness and `CreateSurfaceFeatureSettings` include both geometry controls. Geometric Micro fields and settings transport are removed. Four material-only fields now own Edge Surface Variation Strength/Scale, Edge Normal Breakup, and Edge Material Breakup; they bind only through the material property block and feature-recipe matching.
 
 ### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
 
@@ -1665,7 +1666,7 @@ Public debug, artistic-edge audit, and batch-case records expose macro evidence.
 
 ### `Editor/GeneratedMassEditor.cs`
 
-The Edge Wear Inspector distinguishes **Bevel Coverage**, **Macro Variation Coverage**, and **Macro Variation Strength**. Macro controls are grouped with Geometry Edge-Wear Inputs. The unconsumed Micro Variation control and editor property dependency are removed while its raw serialized property remains excluded from generic fallback drawing. Matrix snapshots preserve Coverage and Strength. V1A.1 checks zero-by-Strength parity, zero-by-Coverage parity, repeated determinism, full-Coverage compatibility, participant bounds, and active distribution before the existing safety suite. V1A.2 adds construction-width retention. Matrix CSV gains Coverage, Strength, and participant-count columns; comprehensive edge CSV remains unchanged.
+The Edge Wear Inspector distinguishes **Bevel Coverage**, **Macro Variation Coverage**, and **Macro Variation Strength** under geometry. The Visual Response group owns **Edge Surface Variation Strength**, **Edge Surface Variation Scale**, **Edge Normal Breakup**, and **Edge Material Breakup**. No geometric Micro control or fallback drawing remains. Matrix snapshots preserve geometry Coverage and Macro Strength only. V1A.1 checks zero-by-Strength parity, zero-by-Coverage parity, repeated determinism, full-Coverage compatibility, participant bounds, and active distribution before the existing safety suite. V1A.2 adds construction-width retention. Matrix CSV gains Coverage, Strength, and participant-count columns; comprehensive edge CSV remains unchanged.
 
 ### Unchanged ownership
 
@@ -1730,4 +1731,298 @@ The frozen authoring and geometry ownership is:
 - The complete construction-width schedule, stable-floor classification, certified-baseline recovery, micro-topology normalization, topology/quality gates, and render-channel contracts remain authoritative.
 - Seed-8889 source edge `10` remains retained through certified width reduction; edges `13/23/39` remain certified, edge `40` remains excluded, and micro component `14/24/30` remains suppressed.
 
-V1A does not own within-edge taper, swell, narrowing drift, localized chips/notches, artistic normal shaping, or final material/rendering finish. Those responsibilities remain with EW-V2 through EW-V5.
+V1A does not own geometric within-edge taper, swell, narrowing drift, localized chips/notches, corner damage, or face/crack finish. Universal geometric taper is retired. EW-S1 owns shader-only bevel normal/material breakup; sparse corner damage and chips remain later geometry responsibilities.
+
+## EW-S1 historical code inventory — rejected and removed by EW-V1A.3
+
+### Removed EW-V2A ownership
+
+The following files are restored to their accepted V1A.2b implementation versions:
+
+- `MassSurfaceFeatureGenerator.cs`
+- `MassGenerator.cs`
+- `MassGenerator.EdgeWear.Orchestration.cs`
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+This removes multi-plane within-edge profile records and constants, profile candidate planning, extra-plane budgeting, profile shell wrapping, isolation/depth backoff, selective admission, Micro-specific report fields/fingerprints/contracts, and the editor isolation hook. Scalar plane-cut construction and the complete V1A.2b recovery/validation suite remain authoritative.
+
+### `GeneratedMass.cs`
+
+- Removes the serialized geometric Micro field and `_GeneratedMassEdgeWearMicroVariation` property binding.
+- Adds serialized material-only controls: `edgeWearSurfaceVariationStrength`, `edgeWearSurfaceVariationScale`, `edgeWearNormalBreakup`, and `edgeWearMaterialBreakup`.
+- Adds matching public properties, feature-recipe values/matching, and material-property-block bindings.
+- Does not add the controls to `MassSurfaceFeatureSettings`, production generation state, source-edge debug freshness, or feature-atlas state.
+
+### `Editor/GeneratedMassEditor.cs`
+
+- Removes the geometric Micro property dependency and all EW-V2A suite/admission controls by restoring V1A.2b editor diagnostics.
+- Adds four common-sense controls under `Edge Wear > Visual Response > Along-Edge Surface Breakup`.
+- Keeps the existing one-click geometry suite and clipboard/report workflow.
+
+### `PixelSurfaceGeneratedMassFeatures.hlsl`
+
+- `ResolveGeneratedMassEdgeWearSurfaceVariation` evaluates two broad analytic waves from normalized object-space position and Surface Seed phase only when the generated-mass bevel mask and variation Strength are nonzero.
+- `ApplyGeneratedMassGeometryEdgeWearNormal` projects the analytic gradient into the bevel tangent plane and applies a bounded lighting-normal perturbation.
+- `ApplyGeneratedMassGeometryEdgeWearResponse` preserves the exact prior branch at zero variation; otherwise it varies bevel value and the existing brightness/tint response.
+- `ResolveGeneratedMassEdgeWearSmoothnessOffset` adds bounded signed smoothness variation.
+- No texture sample, feature atlas, mesh channel, or geometry mutation is introduced.
+
+### `PixelSurfaceForwardPass.hlsl`
+
+The fragment pass resolves the surface variation once, applies the normal before stylized value shaping and PBR input construction, passes the same variation to the worn-edge albedo response, and adds its smoothness offset to the profile smoothness. Zero Strength leaves every original return value unchanged.
+
+### `SH_PixelSurfaceLit.shader`
+
+- Removes `_GeneratedMassEdgeWearMicroVariation`.
+- Adds hidden properties and matching per-pass CBUFFER entries for Surface Variation Strength/Scale, Normal Breakup, and Material Breakup.
+- Shared Ground impact is gated out by `_GeneratedMassGeometryEdgeWearEnabled == 0` and UV2.z zero-path behavior.
+
+### Unchanged ownership
+
+`MassGenerator.MeshOutput.cs`, `MassGenerator.Types.cs`, UV2.z bevel marking, authored bevel normals/surface groups, feature atlases, scenes, prefabs, materials, recipes as serialized assets, mesh channels, vertex/triangle budgets, production `EdgeWearEvaluationMode.None`, and active-gameplay geometry remain unchanged.
+## EW-V1A.2c full-range Macro retention inventory
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+`TryAuditCertifiedBaselineAugmentation` now creates `cornerRecoveryParticipants` and calls `CollectCornerInactiveRecoveryEdges` against the original `certifiedBaseline` before `EvaluateMaterialWidthRecoveryTargets`. The same collector runs again against the post-material `recoveryBaseline`; both calls merge into the same recovery-edge and participant sets.
+
+`CollectCornerInactiveRecoveryEdges` now accepts an exact non-null `ChamferCornerConflictRecord` as sufficient source evidence. It no longer requires `EdgeWearEdgeLifecycleRecord.CornerRecoveryProvisional` to already be true before `ApplyCornerRecoveryProvisionalEvidence` populates that state. All existing geometric eligibility, feasible-width, non-material-provisional, zero-width, and exact `corner-width-inactive` gates remain.
+
+The existing full-shell recovery frontier, material-edge protection, conflict-participant baseline-loss allowance, state/time budgets, certification, and resolution methods are unchanged.
+
+### `Editor/GeneratedMassEditor.cs`
+
+`EvaluateMacroVariationContract` retains the current-setting zero parity, determinism, distribution, and retention checks and adds a fixed full-coverage Strength sweep: `0`, `0.25`, `0.55`, `0.67`, `1`. The report emits `retentionCurrent`, `retentionSweep`, and compact per-sample `baseline/certified/proven-infeasible/unproven` evidence.
+
+`HasCompleteBoundedWidthProof` also recognizes exact `corner-recovery-proven-infeasible` records when the edge remains geometrically eligible, has positive requested and isolated-certified width, and is inactive, uncertified, and unmaterialized. The label is produced only by exhausted bounded corner-recovery search; incomplete/cancelled/timed-out search remains unresolved.
+
+Contract labels advance to `EW-V1A.2c`. No shader, Inspector control, serialized setting, Macro hash, width formula, corner formula, plane-construction, or production-generation owner changes.
+
+Status: rejected and removed from active code by EW-V1A.2f after Unity proved that the generator still lacked the true zero-strength protected baseline.
+
+
+## EW-V1A.2d protected Macro solve inventory
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+- `EdgeWearEdgeViabilityRecord.CloneForMacroProtection` and `EdgeWearCoverageAudit.CloneForMacroProtection` provide a deep viability clone only for width-overriding protected trials. Existing ordinary `CloneForTrial` behavior remains unchanged.
+- `EdgeWearEdgeLifecycleRecord` adds diagnostic-only protected baseline width/membership, initial loss, restoration attempt/certification, factor, participant, and resolution fields.
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+- `BuildMacroProtectionTrialCoverage` blends only the bounded participant set from requested-strength widths toward protected widths.
+- `ApplyMacroProtectedRequestedWidth` updates requested width and dependent footprint/fraction evidence without changing the canonical Macro hash or sampled identity.
+- Corner equations, conflict recording, candidate score/order, and scalar plane ownership remain unchanged.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+- `TryEvaluateMacroProtectedBaseline` reruns zero-strength candidate construction, isolated viability, artistic selection, graph mapping, material-target capture, and the complete augmentation path before the requested-strength solve.
+- `TryAuditCertifiedBaselineAugmentation` accepts that independently certified outcome as an optional final retention gate; the zero path calls the ordinary overload and cannot recurse into protection.
+- `ApplyMacroProtectedRetention` compares built graph-edge sets, collects exact conflict or endpoint-star participants, evaluates four deterministic local factors, and requires the union of protected and current built edges.
+- A failed local schedule returns the certified zero baseline with explicit fallback evidence. Existing material-width and corner-recovery evidence is preserved/merged.
+- EW-V1A.2c early and post-material corner candidate collection remains integrated as the ordinary current-strength recovery path; protected-Macro retention is a final independent acceptance gate, not duplicate ownership of that frontier.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+- The evaluation summary adds `macroProtection` with protected, initial-loss, restored, attempted, factor, participant, and resolution evidence.
+- Per-edge audit records export the same lifecycle state and protected baseline width.
+
+### `Editor/GeneratedMassEditor.cs`
+
+- Contract labels advance to `EW-V1A.2d`.
+- The existing fixed Strength sweep `0/0.25/0.55/0.67/1` remains the runtime acceptance gate. Current retention and sweep retention must both pass.
+
+### Unchanged owners
+
+`MassSurfaceFeatureGenerator.cs`, `MassGenerator.cs`, plane-cut kernel, junction solver, mesh output, PixelSurface shader response, scenes, prefabs, materials, recipes as serialized assets, metadata, production `EdgeWearEvaluationMode.None`, and active-gameplay generation remain unchanged.
+
+Status: rejected and removed from active code by EW-V1A.2f after Unity proved that full-zero fallback erased Macro distribution.
+
+
+## EW-V1A.2e local Macro preservation inventory
+
+### `MassGenerator.EdgeWear.Types.cs`
+
+Protected lifecycle telemetry adds evaluated-state count, adjusted graph-edge set, and explicit full-zero-fallback state. No public or serialized contract changes.
+
+### `MassGenerator.EdgeWear.Orchestration.cs`
+
+- `ApplyMacroProtectedRetention` now starts trials from `currentOutcome.Coverage`, preserving committed requested-Macro and recovery state.
+- `BuildMacroProtectedRestorationStates` makes initial losses mandatory and enumerates deterministic asymmetric optional-participant subsets, capped at eight.
+- `BuildAsymmetricMacroProtectionTrialCoverage` changes only the selected local graph edges and raises only their current local/isolated certified-width ceilings when needed to reach the independently certified protected target.
+- `ResolveMacroProtectedCertifiedWidth` targets positive protected solved/materialized/certified width rather than protected requested width.
+- State order minimizes normalized deviation from current requested-Macro widths.
+- Acceptance still requires the union of protected/current built edges and full shell/render certification, plus preservation of nonzero current variation.
+- The EW-V1A.2d uniform factor path is removed. The existing `SelectionAndCorners.cs` width mutation helper remains unchanged.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+Overall and per-edge evidence now exports source-edge protected/loss/restored sets, graph participant/adjusted sets, state count, factor, resolution, and full-zero-fallback flag.
+
+### `Editor/GeneratedMassEditor.cs`
+
+Contract labels advance to `EW-V1A.2e`. A nonzero current result containing `full-zero-baseline-fallback` cannot pass Macro distribution, even if another aggregate field is malformed.
+
+### Unchanged owners
+
+Macro hash/sampling, candidate scoring, selection, corner equations, `SelectionAndCorners.cs`, plane-cut kernel, junction solver, EW-S1 shader response, mesh output, assets, and production evaluation remain unchanged.
+
+Status: rejected and removed from active code by EW-V1A.2f after a 256-state case remained synchronous for more than one minute, cancellation could not interrupt the top-level state loop, and no mixed state prevented full-zero fallback.
+## EW-V1A.2f remove-protection and normalized-strength inventory
+
+### Exact EW-S1 restorations
+
+`MassGenerator.EdgeWear.Types.cs` and `MassGenerator.EdgeWear.Orchestration.cs` are restored byte-for-byte from the accepted EW-S1 package. This removes deep Macro-protection clones, protected lifecycle records, duplicate zero-strength evaluation, protected-set comparison, restoration-state construction, complete-shell state enumeration, and full-zero fallback.
+
+`MassGenerator.EdgeWear.SelectionAndCorners.cs` is restored to EW-S1 and receives only the normalized-amplitude constant plus the single canonical multiplication inside `ResolveEdgeWearMacroRequestedWidth`. Candidate construction, participation and width identities, corner equations, conflict records, width schedules, material/corner recovery, and scalar geometry ownership are unchanged.
+
+`MassGenerator.EdgeWear.Diagnostics.Logging.cs` is restored to EW-S1 and adds only explicit `controlStrength` and `effectiveStrength` fields to the Macro summary. No Macro-protection summary or per-edge protection evidence remains.
+
+### `GeneratedMass.cs`
+
+The existing serialized `edgeWearMacroVariation` field remains the public `0..1` Strength control. Its tooltip states that control `1` maps to the Unity-certified maximum downward-only amplitude. No serialized migration, field rename, asset edit, or automatic value rewrite occurs.
+
+### `Editor/GeneratedMassEditor.cs`
+
+- Contract labels advance to `EW-V1A.2f`.
+- The one-click topology and artistic matrices force Macro Coverage `1` and control Strength `1`; the report records effective Strength `0.55`.
+- The Macro contract checks zero-by-Strength parity, zero-by-Coverage parity, current and normalized-maximum determinism, normalized-maximum distribution, and retention without protection/fallback exceptions.
+- The fixed EW-V1A.2c/d/e five-strength sweep is removed.
+- Current preview and Macro contract elapsed milliseconds are reported; existing per-case and aggregate matrix timings remain.
+- A failed current preview or Macro contract writes a fail-fast report before matrices. A failed topology matrix writes a fail-fast report before the artistic matrix.
+
+### Unchanged owners
+
+`MassSurfaceFeatureGenerator.cs`, `MassGenerator.cs`, plane-cut kernel, junction solver, mesh output, EW-S1 shader/include files, materials, scenes, prefabs, recipes, metadata, vertex layouts, budgets, production `EdgeWearEvaluationMode.None`, and active-gameplay work remain unchanged.
+
+
+## EW-V1A.3b active code inventory
+
+### `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+
+- `ResolveEdgeWearMacroAnglePermission` normalizes dihedral with `Mathf.InverseLerp(15, 90, angle)`, applies `Mathf.SmoothStep(0, 1, t)`, and maps reduction permission from `1` to `0.35`.
+- `ResolveEdgeWearMacroRequestedWidth` preserves the existing participation/width hashes, Coverage, sampled multiplier, and normalized effective Strength, then multiplies only downward reduction by angle permission.
+- The early call uses the shallow endpoint to preserve legacy diagnostic initialization. After successful convex classification, the measured-dihedral result overwrites all `Macro*` fields plus `RequestedWidth`, `RequiredFootprintLength`, and `LengthToWidthRatio` through `ApplyResolvedEdgeWearMacroWidth`.
+
+### `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+- `EvaluateEdgeWearMacroAngleMappingContract` invokes the actual runtime resolver over 10,001 angle samples, fixed edge identities, and Strength samples. It checks bounds, permission and width monotonicity, deterministic repeatability, zero-Strength parity, zero-Coverage parity, and generated-transition parity.
+- Macro summaries report mapping constants and angle-permission minimum/median/maximum. Per-edge reports emit measured dihedral, sampled multiplier, angle permission, effective multiplier, and final requested width without adding a persistent field to `MassGenerator.EdgeWear.Types.cs`.
+
+### `GeneratedMass.cs` and `Editor/GeneratedMassEditor.cs`
+
+- `GeneratedMass.cs` retains Macro authoring and the uniform response controls. It removes all four EW-S1 serialized fields, recipe fields/defaults/comparisons, public properties, shader IDs, and property-block writes.
+- `GeneratedMassEditor.cs` removes the four EW-S1 property lookups and Inspector controls, advances suite labels to `EW-V1A.3b`, and folds the runtime angle-mapping contract into the one-click Macro result.
+- Serialized scenes are intentionally unchanged. Obsolete YAML keys are ignored by Unity and may disappear on a later normal resave.
+
+### PixelSurface shader ownership
+
+- `SH_PixelSurfaceLit.shader` removes the four hidden EW-S1 properties and their member from each existing `UnityPerMaterial` block while preserving every block's unrelated ordered field set.
+- `PixelSurfaceGeneratedMassFeatures.hlsl` no longer declares the variation record, object-space wave evaluator, normal perturbation, or smoothness offset. `ApplyGeneratedMassGeometryEdgeWearResponse` is the exact former zero-variation uniform response using UV2.z directly.
+- `PixelSurfaceForwardPass.hlsl` no longer resolves breakup, changes the bevel normal, or offsets smoothness. Its mask debug, flat-normal path, colour shaping, overall rock tint, PBR construction, lighting, and fog remain unchanged.
+
+### Unchanged owners
+
+`MassSurfaceFeatureGenerator.cs`, `MassGenerator.cs`, `MassGenerator.EdgeWear.Types.cs`, orchestration, plane-cut kernel, junction solver, mesh output, scenes, materials, prefabs, recipes, metadata, vertex layouts, budgets, production `EdgeWearEvaluationMode.None`, and active-gameplay work remain unchanged.
+
+
+## EW-V1A.3a rejected code inventory
+
+EW-V1A.3a temporarily added:
+
+- five non-overlapping Macro retention tiers in `MassGenerator.EdgeWear.SelectionAndCorners.cs`;
+- convexity-priority reduction/protection lists and retry telemetry in `MassGenerator.EdgeWear.PlaneCutKernel.cs`;
+- public priority counters in `MassGenerator.cs` and `MassGenerator.EdgeWear.Diagnostics.Logging.cs`;
+- cross-identity Macro hierarchy and global endpoint materialized-scale inversion checks in `Editor/GeneratedMassEditor.cs`.
+
+The Unity suite failed at topology `28/33`. EW-V1A.3b removes all of those symbols and restores the five code files to the EW-V1A.3 implementation. The only intentional code delta from EW-V1A.3 is the user-visible contract label `EW-V1A.3b`.
+
+No shader, scene, prefab, material, recipe, serialized asset, metadata, mesh channel, production evaluation mode, or active-gameplay path changes in EW-V1A.3b.
+
+
+
+## EW-V1A.3b freeze inventory and EW-C1A pre-bevel audit ownership
+
+No code file changed in the EW-V1A.3b acceptance freeze. The active V1A.3b code inventory above remains authoritative and frozen.
+
+The EW-C1A ordering audit is complete. `A. PRE-BEVEL CUT APPROVED`. The exact insertion point is inside `ApplyGeneratedEdgeWearBevels`, after `NormalizeEdgeWearMicroTopology` returns normalized faces and before `BuildEdgeWearBevelCandidates`.
+
+### Existing source and topology owners
+
+- `MassGenerator.PlaneCut.cs::BuildPlaneCutMass` owns the convex source `PolygonFace` list and immutable source-placement triangle soup.
+- `MassGenerator.EdgeWear.Graph.cs::NormalizeEdgeWearMicroTopology` owns the accepted normalized working polyhedron.
+- `MassGenerator.EdgeWear.Graph.cs::TryBuildEdgeWearTopologyGraph` owns normalized vertex/edge/face adjacency. `EdgeWearGraphVertex.EdgeIndices` and `.FaceIndices` are the candidate corner incidence sets.
+- `MassGenerator.EdgeWear.Types.cs::EdgeWearMicroTopologyNormalizationResult` owns surviving original-edge exact-key mapping, generated-transition keys, and suppressed original-edge evidence.
+
+### Existing clipping and cap owners
+
+- `MassGenerator.Polyhedron.cs::ClipPolyhedron` performs whole-polyhedron half-space clipping, cap-point collection, oriented cap creation, welding, and sanitization.
+- `ClipPolygonExact`, `TryResolveExactClipIntersection`, `TryValidateExactIntersection`, `TryConstrainPointToOwnerAndCutPlanes`, and `ProjectPointOntoCutPlane` own exact intersection construction and residual evidence.
+- `CreateOrientedFace`, `CalculatePolygonNormal`, `WeldSharedVerticesByDistance`, and `SanitizeAllFaces` own cap ordering, winding, shared vertices, and cleanup.
+- C1A must not call `ClipPolyhedron` as an unobserved mutation. `EW-C1A.1` adds a transactional wrapper that clips a clone and returns structured success, blocker, cap, volume, and identity evidence before commit.
+
+### Existing bevel and render owners
+
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs::BuildEdgeWearBevelCandidates` is the first bevel consumer of the damaged source polyhedron. It must consume C1A descendant/cap-ring identity before Macro sampling.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryTriangulateBoundedPreviewFaces` triangulates the final polygon shell. `TryTriangulateBoundedBevelRegionFace` emits authored normals and stable surface groups for bevel faces. C1A.2 extends the same contract to `CornerDamageCap` without adding a mesh channel.
+- `MassGenerator.MeshOutput.cs::BuildMeshData` assigns final geometric normals to ordinary triangles and consumes authored normals where present.
+- `Game/Procedural/Core/MeshBuilder.cs::ApplyToMesh` assigns the final normal channel and calls `Mesh.RecalculateTangents()` after vertices, triangles, and UVs are final. This file is a reviewed consumer and is not expected to change.
+
+### EW-C1A.1 implemented identity and transaction ownership
+
+`PolygonFaceProvenanceKind.CornerDamageCap` is implemented. `MassGenerator.EdgeWear.Types.cs` owns `CornerDamageCandidateRecord`, `CornerDamageTrialRecord`, `CornerDamageEdgeIdentityRecord`, and `CornerDamageTransactionAuditResult`, which carry:
+
+- selected normalized graph vertex index and position;
+- accepted depth, normal, plane, trial index, and cap polygon;
+- original normalized and damaged volumes;
+- untouched original edge map;
+- shortened original-edge descendant map;
+- generated cap-ring key/identity map;
+- complete rejection and certification evidence.
+
+Untouched original keys retain current `OriginalSourceEdgeIndex`. Each shortened incident edge inherits its parent ID. Cap-ring identity derives from selected normalized vertex index plus the ordered intersected original-edge pair, never output order or floating-point coordinates.
+
+### EW-C1A.1 actual code scope
+
+Modify only:
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.cs`
+6. `Game/Procedural/Masses/MassGenerator.Types.cs`
+7. `Game/Procedural/Masses/MassGenerator.Polyhedron.cs`
+8. `Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+9. `Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs`
+10. `Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+11. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+12. `Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+`EW-C1A.1` is diagnostic-only. It adds no serialized control, visual mesh replacement, shader/material change, asset edit, mesh channel, new source file, production-mode change, or per-frame work. Active symbols are:
+
+- `MassGenerator.Polyhedron.cs::TryClipCornerDamageTransaction`;
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs::EvaluateCornerDamageTransaction`, `BuildCornerDamageCandidate`, `EvaluateCornerDamageTrial`, `AuditCornerDamageFaceQuality`, and `AuditCornerDamageIdentityMapping`;
+- `MassGenerator.EdgeWear.Orchestration.cs::EdgeWearEvaluationMode.CornerDamageTransactionAudit` branch after normalization and before bevel candidates;
+- `MassGenerator.GenerateCornerDamageTransactionAudit`;
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs::BuildCornerDamageTransactionAuditReport`;
+- `GeneratedMassEditor::RunCornerDamageTransactionAudit`, report file `Library/GeneratedMassCornerDamageTransactionAudit.txt`, clipboard copy, and reveal controls.
+
+### EW-C1A.2 expected additional owners
+
+- `MassSurfaceFeatureGenerator.cs` transports approved corner authoring values.
+- `GeneratedMass.cs` owns serialized controls, recipe/default comparison, preview state, and rebuild invalidation.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs` owns cap authored normal/surface-group triangulation and cap-ring one-surface render certification.
+
+Exact control defaults are not approved by the audit. They must be recorded in the C1A.2 plan and approved before those files are edited.
+
+### Reviewed but unchanged owners
+
+- `MassGenerator.MeshOutput.cs`
+- `Game/Procedural/Core/MeshBuilder.cs`
+- PixelSurface shader/include files
+- scenes, prefabs, materials, recipes as serialized assets, metadata, feature atlases, vertex layouts, budgets, and `EdgeWearEvaluationMode.None`
+
+The audit found no requirement for a new source file, dependency, shader property, texture, buffer, mesh channel, or active-gameplay path.

@@ -22,25 +22,91 @@ Actions → Foam Cache & Validation
   Historical / Deep Diagnostics (collapsed by default)
 ```
 
-The first P12 Medium fixed candidate passed runtime/cache/transport evidence. P12a restored ordinary previous/current interpolation and proved that the presentation alpha traversed the complete material-step interval, but dead Layer C edges still flickered in both Material Presence and Remaining Life. The subsequent code audit confirmed that automatic events re-authored cumulative source coverage after transport/lifecycle and could resurrect packed-zero material; it also found that the previous-state alias was not parity-safe for even transport substep counts.
+The first P12 Medium fixed candidate passed runtime/cache/transport evidence. P12a restored ordinary previous/current interpolation. P12b corrected the broad dead-edge Layer C back-and-forth flicker, added one parity-safe previous-committed packed-state texture, and added effective lateral face/flux evidence. Unity then exposed that P12b had incorrectly applied deposit-once ownership to Object Contact Arc/Semi-Arc and therefore silenced their authored Hold and Release phases.
 
-P12b replaces that ownership with deposit-once automatic sources. Build uses the positive difference between current and previous source coverage only as the newly advancing deposition gate and preserves the current authored source contribution as the absolute birth target. Hold and Release preserve event scheduling but deposit nothing and never erase material. Once born, Layer C material belongs only to transport and lifecycle. One same-format previous-committed packed-state texture is copied before each material update so renderer/debug interpolation remains exact for any substep parity. The existing transport metric buffer additionally reports material-weighted lateral face speed and signed Presence-area movement, while generated-lane diagnostics distinguish cell-centre intent from face cancellation. All report groups retain disk output and adjacent clipboard-copy actions. P13 still owns overall foam-amount tuning, final tier selection, cache freeze, and Stage 1 closure. No new Debug View is introduced.
+P12c restores the accepted hybrid automatic-source contract. Nonpersistent Shore, Wash, Fleck, and Free-Water sources retain P12b current-minus-previous advancing-frontier deposition. Object Contact Arc/Semi-Arc again resolve Build/Hold/Release phases and rasterize their current phase-shaped emitter every active material tick: Build grows the open-C path, Hold continuously emits from the complete path, Release progressively retracts it, and Rest submits no event. P12b committed-state ownership, even-substep correctness, source-event ABI, lateral metrics, and clipboard actions remain unchanged. The extracted warning-producing source-contribution helper is removed; source evaluator selection is inline as in the warning-free pre-P12b shader structure. P12c is Unity-accepted. P12d then passed the complete 12-case runtime sweep, and visual review selected `0.15 m` after rejecting `0.20 m`. P13 still owns overall Foam amount, final tier/cache freeze, and Stage 1 closure. No new Debug View is introduced.
 
 
-### Current automatic-source deposition ownership — P12b
+### Complete fixed-spacing/lateral-response sweep — P12d
 
-Automatic source events remain scheduled through Build, Hold, Release, and Rest, but those phases no longer imply continuing Layer C maintenance:
+One Play Mode action now runs the real Foam runtime through this matrix:
 
 ```text
-Build    deposit newly revealed positive coverage only;
-Hold     deposit zero;
-Release  deposit zero and delete zero;
-Rest     no active event;
+spacing: 0.25 / 0.20 / 0.15 / 0.10 m
+lateral ratio per spacing: 0 / authored / 1
 ```
 
-The GPU evaluates the unchanged source-family shape at current and previous deposition progress. `max(0, current - previous)` determines whether the current texel is on an advancing deposition frontier; when permitted, the current authored source contribution is merged as the absolute Presence target expected by `FoamMergeBornPresence`. A shrinking or moving source cannot erase material, and an already-dead cell cannot be reborn merely because its old event remains active. Manual injections remain explicit one-shot commands and do not use this difference contract.
+The suite uses nonserialized runtime overrides. Each case receives a real descriptor allocation and diagnostic-only transient topology generation, then a deterministic source/material reset, two-second warmup, and at least five seconds/30 frames of ordinary runtime accounting. The assigned cache asset is neither read for mismatched test descriptors nor written/replaced. Initialization Motion Time is frozen across the matrix. After completion, failure, or cancellation, overrides are removed and normal authored cache-only ownership is restored.
 
-The `Automatic Birth Sources` view now represents deposition for the current material step rather than the complete scheduled source footprint: an advancing Build frontier may be visible; Hold, Release, and Rest should be black. Historical sections below that describe a fully replenished Hold footprint remain records of the superseded pre-P12b source behavior rather than current runtime authority.
+The combined report owns machine evidence only: descriptor, topology, CFL/curvature, memory/work, lane face cancellation, lateral movement, zero-ratio isolation, cache immutability, and restoration. Visual candidate selection remains direct Unity review. Existing P7, P9, and single-candidate P12 reports remain final focused regressions.
+
+
+### Presence and transport A/B ownership — P12e
+
+P12e exposes two independent runtime comparisons while preserving the former result as both defaults:
+
+```text
+Foam > Runtime & Quality
+  Material Transport Scheme
+    Donor Cell (Current)
+    TVD Superbee
+
+Foam > Layer E — Rendering > General Composition
+  Presence Footprint
+    Current
+    Presence-Amplitude
+```
+
+`Donor Cell` retains the exact first-order packed-state face donor. `TVD Superbee` uses bounded monotonic interior-face reconstruction and the existing CFL/substep contract; it carries Presence, Presence×Remaining Life, and Presence×Pattern through the same conservative face flux and does not alter closed faces or endpoint outflow.
+
+`Current` retains the accepted Layer E footprint mapping. `Presence-Amplitude` caps the resolved base footprint by committed Presence before the existing opaque patterned-body evaluation. It does not change Layer C material, Remaining Life, Film, Shape, sources, colour, lighting, or final composition controls.
+
+Both controls are serialized, independent, and rebound live. They add no textures, buffers, kernels, dispatches, cache contract, topology work, or Debug View. P12 snapshot/sweep reports include the selected values. Unity import succeeded; Presence-Amplitude is retained for further visual testing, while TVD selection remains open.
+
+
+### Mode-specific Chip-edge ownership — P12g/P12j
+
+P12f is rejected: its hardened-mask derivative produced exterior and false interior contours, and its per-pixel edge multiplication fragmented connected candidates. P12g replaced only the Presence-Amplitude path; Unity accepted its single exterior eligibility contour and direct carve, but rejected its doubled-diameter production permission as over-broad. P12h is also rejected because one projected reach still created a second production area outside the displayed mask. P12i removes every derived admission region.
+
+Current and Presence-Amplitude intentionally use separate Chip paths:
+
+```text
+Current
+  edge source       = preChipSoftVisibility
+  edge start        = 0.06
+  edge selection    = candidate × narrow edge band
+  Chip application  = accepted soft-mask reconstruction
+
+Presence-Amplitude
+  edge source       = clean committed-Presence/life silhouette
+  support gate      = binary at meaningful Presence 0.02
+  edge gradient     = length(ddx, ddy)
+  edge selection    = candidate field × exact displayed eligibility mask
+  Chip application  = direct hardened-mask carve
+```
+
+P12j clean-silhouette ownership is rejected because the signal is produced before patterned erosion and structural Strand shaping and therefore cannot define the rendered edge. P12k resolves `strandKeep` before Presence-Amplitude Chip selection and uses `preChipRenderedMask = saturate(foam.mask × strandKeep)` as the sole support, eligibility, removal, and debug geometry. Production permission remains Candidate × Eligibility with no projected reach, inferred depth, or Presence-Amplitude Interior Access.
+
+Current is a protected compatibility path and must remain arithmetic-identical. Presence-Amplitude remains `baseMask = min(baseMask, presence)` with no compression or threshold retuning. Both modes retain the existing candidate field, identity, lifecycle, source system, transport, Film, Shape, resources, kernels, and controls; Current retains Interior Access while Presence-Amplitude disables it. Mechanical validation must confirm Current equivalence, exact pre-Chip rendered-mask ownership, the per-fragment invariant `production <= eligibility`, exact visible-removal reporting, retirement of clean-silhouette plumbing, protected resources/properties, and warning-free changed-function parsing; Unity visual validation remains pending.
+
+
+### Current automatic-source ownership — P12c
+
+```text
+Nonpersistent sources
+  Build/progression    deposit newly revealed positive coverage only;
+  repeated old coverage    no new deposit;
+
+Object Arc/Semi-Arc persistent emitters
+  Build    progressively growing active emitter;
+  Hold     complete active emitter replenished each material tick;
+  Release  progressively retracting active emitter;
+  Rest     no active event.
+```
+
+The GPU uses `max(0, current - previous)` only for nonpersistent source families. When that gate admits a texel, the current authored source contribution remains the absolute Presence target expected by `FoamMergeBornPresence`. Object Arc/Semi-Arc bypass the difference gate and use their existing phase-shaped contribution directly. Manual injections remain explicit one-shot commands.
+
+The `Automatic Birth Sources` view therefore has two valid semantics: nonpersistent sources show only newly deposited coverage, while Object Arc/Semi-Arc show the complete currently active emitter through Build, Hold, and Release. Rest is black.
 
 
 Static Chipping work is complete for the current milestone and is Unity-validated as a whole.
@@ -4015,3 +4081,79 @@ The source-event dispatch path now supports an optional Y range. Existing shore/
 Free Water Foam now has a third source grammar: **Cross-Lace Connector**. The original Lace Connector is flow-aligned because its sampled path runs along global distance. Cross-Lace swaps that path basis so the source head travels across the river laterally while the ribbon only bends slightly along flow. This is intended to supply the horizontal/cross-current pale ribbons visible in the visual target without increasing global spawn density or inserting final foam art.
 
 Cross-Lace remains Layer C material birth only. It writes persistent FoamState through the existing automatic source-event rasterizer, is clipped by river boundary and obstacle exclusion, and uses the existing local X/Y dispatch bounds.
+
+
+### Clean binary Presence-Amplitude eligibility — P12j
+
+P12i retained exact Candidate × Eligibility ownership but Unity showed that the eligibility field itself remained procedurally stippled and that fractional visible-support intensity weakened removal across faint fringe. P12j separates eligibility geometry from patterned Foam rendering.
+
+`Current` remains unchanged. `Presence-Amplitude` receives a transient clean silhouette from committed Presence plus the existing near-death life gate before pattern erosion. The silhouette follows the existing stored/warped/lead/trail and surface-coupling path, then drives edge width through Euclidean screen-gradient magnitude. Meaningful support is binary permission; candidate antialiasing remains the only fractional removal contour. Production remains exactly Candidate × Eligibility and no secondary permission region exists.
+
+### Exact pre-Chip rendered-mask Chip ownership — P12k
+
+The Presence-Amplitude Chip edge is defined by the exact no-Chip mask that Final would compose:
+
+```text
+strandKeep = existing structural Strand evaluation
+preChipRenderedMask = saturate(foam.mask × strandKeep)
+visible support = RiverWaterFoamResolveBaseCoverage(preChipRenderedMask)
+production = candidate × eligibility(preChipRenderedMask)
+final = preChipRenderedMask × (1 - production)
+removed = preChipRenderedMask - final
+```
+
+This ordering includes Presence amplitude, Remaining Life, patterned erosion, warp/stretch coupling, hardening, and structural Strands before eligibility. Current retains the prior selection/application ordering unchanged.
+
+
+
+### Binary Presence-Amplitude Chip selection — P12l
+
+P12k defines the exact no-Chip rendered Foam geometry as `preChipRenderedMask = foam.mask × strandKeep`. P12l changes only Presence-Amplitude Chip selection and application:
+
+```text
+candidateSelected   = chipCandidateField >= 0.5 ? 1 : 0
+eligibilitySelected = chipEligibility.edgeBand >= 0.5 ? 1 : 0
+productionSelected  = candidateSelected × eligibilitySelected
+finalFoamMask       = productionSelected == 1 ? 0 : preChipRenderedMask
+```
+
+The `0.5` values are contour-selection thresholds, not removal strengths. Production is binary and removes 100% of selected Foam. Presence-Amplitude Candidate, Eligibility, and Production debug views expose these exact three masks. Current retains its accepted continuous candidate/eligibility fields, Interior Access, soft-mask reconstruction, and Strand ordering.
+
+
+### Any-support binary Presence-Amplitude Chip selection — P12m
+
+P12k remains the geometry owner and P12l remains the full-removal foundation. P12m changes only the binary interpretation of the existing antialiased Candidate and Eligibility fields:
+
+```text
+candidateSelected   = chipCandidateField > 0.0 ? 1 : 0
+eligibilitySelected = chipEligibility.edgeBand > 0.0 ? 1 : 0
+productionSelected  = candidateSelected × eligibilitySelected
+finalFoamMask       = productionSelected == 1 ? 0 : preChipRenderedMask
+```
+
+This implements exact per-pixel any-support ownership. It does not expand or regenerate Candidate or Eligibility geometry, add Interior Access, derive another permission region, or modify Layer C, Layer D, Strands, source behavior, transport, lifetime, controls, resources, or serialized state.
+
+Presence-Amplitude Candidate, Eligibility, and Production diagnostics are binary. Current retains its continuous Candidate/Eligibility values, optional Interior Access, continuous production coverage, soft reconstruction, and existing final behavior. `Foam Chip And Strand Probe` is the authoritative exact final Foam mask in both modes.
+
+Because Candidate visibility includes existing antialias, readability, and subpixel fades before binary selection, every positive tail receives full Presence-Amplitude authority. Hard edges or candidate pop-in are an accepted risk of the absolute any-support rule and require Unity evidence before any separate tuning patch.
+
+
+## Layer E optional Candidate-Straddle admission — `RG-METRIC-P12n`
+
+P12n adds transient candidate permission inside Layer E. It does not mutate Presence, Remaining Life, Material Pattern, transport, sources, Film, Shape, or topology caches.
+
+```text
+Existing analytical candidate identity and motion
+        +
+low-frequency centre/perimeter support classification
+        -> binary candidate admission texture
+        -> existing render-frame analytical candidate
+        × exact pre-Chip rendered Foam
+        -> full binary removal at selected Foam pixels
+```
+
+The experimental support test is candidate-level rather than a per-pixel edge-distance field. A new candidate enters only when its centre is outside the camera-independent shaped support and at least two irregular-perimeter samples are inside. A previously admitted candidate retains while one perimeter contact remains and its centre is not convincingly interior. This produces complete candidate-shaped overlaps without using the derivative Edge Width band.
+
+The support evaluator is a fixed-world-footprint approximation of the no-Chip Layer E state. It mirrors stable pattern, lifecycle erosion, hardening, and structural Strand policy from the render include, but deliberately omits screen derivatives and surface-wake deformation. This limitation can create missed/no-op attachment or timing mismatch; exact final removal prevents it from removing pixels where rendered Foam does not exist.
+
+The established P12m Rendered Edge Band path remains default and selectable. Current Presence Footprint remains unchanged. Candidate Straddle evaluates admitted candidates on every positive exact pre-Chip rendered-mask pixel rather than inheriting the Rendered Edge Band route’s `0.08` BaseCoverage gate, so faint exact Foam fringe is part of the same binary removal. Candidate Straddle uses one on-demand point RFloat texture, one due-time compute dispatch at default `4 Hz`, and point loads only for overlapping active candidates in the existing fragment candidate loop. No new pass, draw, persistent simulation field, or high-resolution topology texture is introduced. Unity visual and performance acceptance are pending.

@@ -1,4 +1,2513 @@
+## 2026-07-21 — GSU-M2.7C.5C: Frozen Rock Library and Material-Response Refinement
+
+Status: **Implemented in the exact approved five-file scope and statically audited. Unity 6000.5 compilation, menu execution, generated evidence, and visual material/burial acceptance remain pending.**
+
+### Objective
+
+Freeze the user-approved 18-source Generated Mass river-rock library, stop seed exploration, and refine only the offline projected material response so the accepted silhouettes retain broad geological planes without raw low-poly triangle noise, full-perimeter root outlines, or line-art edge wear.
+
+### Approved files
+
+Modify only:
+
+1. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs`
+2. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionValidation.cs`
+3. `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+4. `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+5. `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+No files may be created or deleted. No Generated Mass, Ground runtime, River, shader, scene, prefab, material, profile, texture-array, layer, tag, or Inspector implementation may change.
+
+### Reviewed evidence
+
+- `GeneratedMassRiverRockFamilySweepReport(1).txt` records a deterministic M2.7C.5B.2 pass with matching catalog fingerprints, 32 Uneven Broad Terrain/Squat sources, seven preserved anchors, and all raw/processed evidence outputs.
+- User visual review accepted the existing seven anchors and approved the proposed expanded frozen library.
+- Current baker evidence:
+  - `GeneratedMassRiverRockProjectionBaker.BuildProcessedBuffers` uses one three-pass height field for processed normals.
+  - `BuildProcessedBuffers` still blends raw mesh-derived variation, exposure, and crevice back into filtered channels.
+  - `BuildProcessedEdgeWear` may preserve native wear near the silhouette and uses one-pixel interior eligibility only.
+  - `BuildCatalogImages` derives root darkening from low height × processed crevice × side-facing normal, but the processed crevice source remains perimeter-heavy.
+- Current producer contracts were verified without modification:
+  - `Assets/Game/Procedural/Masses/GeneratedMass.cs` — `MassRecipe` serialized recipe fields and public seed setters.
+  - `Assets/Game/Procedural/Masses/MassSurfaceFeatureGenerator.cs` — `MassSurfaceFeatureSettings` constructor and clamps.
+  - `Assets/Game/Procedural/Masses/MassGenerator.cs` — ordinary and unified edge-wear preview mesh generation APIs.
+
+### Frozen library contract
+
+The active source library is exactly these 18 IDs with the generation/projection values already recorded by M2.7C.5B.2:
+
+- Terrain: `T-05`, `T-08`, `T-09`, `T-10`, `T-11`, `T-12`, `T-13`, `T-14`, `T-15`.
+- Squat: `S-00`, `S-03`, `S-04`, `S-08`, `S-09`, `S-10`, `S-12`, `S-13`, `S-14`.
+
+Every frozen entry retains its existing archetype, shape seed, surface seed, burial fraction, rotation, Uneven Broad recipe fields, and edge-wear settings. M2.7C.5C may not regenerate, substitute, reindex, or retune source geometry.
+
+### Implementation plan and acceptance criteria
+
+1. **Plan — complete:** record scope, evidence, frozen IDs, invariants, risks, sequence, and validation requirements here before implementation.
+2. **Frozen catalog — complete:** replace the 32-source exploration tables with explicit 18-entry frozen definitions; retain stable IDs and exact settings; use a compact 5 × 4 evidence layout with two unused cells.
+3. **Two-scale normals — complete:** derive a strongly filtered volume normal and a mildly filtered broad-plane normal, then blend them with a restrained plane contribution. Raw mesh normals remain diagnostic only.
+4. **Non-triangular material variation — complete:** replace processed vertex-colour variation with deterministic per-rock low-frequency patches and restrained grain keyed by the frozen surface seed; raw variation remains diagnostic only.
+5. **Normal-derived exposure — complete:** derive processed exposure from the blended processed normal, with at most a small diagnostic contribution from the raw Generated Mass exposure channel.
+6. **Selective root darkening — complete:** replace perimeter-heavy processed crevice use with a directional, disconnected burial-root field derived from low processed height, side-facing processed normal, deterministic contact-sector modulation, and a restrained raw-crevice contribution.
+7. **Interior edge wear — complete:** suppress the outer 2–3 projected pixels, retain native wear only on eligible interior structure, and generate fallback wear only from genuine convex/normal transitions; no complete silhouette outline is permitted.
+8. **Material comparison — complete:** output the frozen catalog in neutral, moderate, and strong stylized response variants plus compact processed data audits and the accepted-anchor burial comparison.
+9. **Validator/report — complete:** require exactly 18 frozen IDs and exact settings, deterministic repeat fingerprints, complete expected outputs, no non-frozen source, and no runtime integration.
+10. **Architecture docs — complete:** record that source generation is frozen and that M2.7C.5C is material/burial refinement only; preserve M2.7C.5D seamless assembly and M2.7C.5E runtime integration as later gates.
+11. **Post-change audit — complete with pending Unity gate:** reread all five modified files and related Mass contracts; compare final diff with this scope; run available syntax/structure/static checks; mark Unity compile and visual acceptance pending unless supplied by Unity.
+
+### Post-implementation consistency and compliance audit
+
+- Final project-file comparison against the reconstructed M2.7C.5B.2 baseline reports exactly five modified files: the two projection scripts and three approved canonical documents. No file was created or deleted.
+- The baker and validator both parse as valid C# compilation units with the available tree-sitter C# grammar; brace balance is zero; no method/field is emitted at namespace scope; no duplicate private/static method declaration remains.
+- Static contract comparison confirms 18 baker frozen definitions and 18 validator contracts match exactly, with 9 Terrain and 9 Squat sources and the approved stable-ID set.
+- Validator member-reference checks found no projection-result or rock-evidence field used without a corresponding current contract member.
+- The final baker retains only the existing `MassRecipe`, `MassSurfaceFeatureSettings`, `MassGenerator.Generate`, and `MassGenerator.GenerateUnifiedEdgeWearPreview` producer contracts. Those related producer files remain byte-identical to the M2.7C.5B.2 baseline.
+- Deterministic formula sampling confirms the new material-variation field stays restrained for representative frozen seeds and the directional contact-sector function covers only approximately 40–44% of the perimeter before height/normal gating, rather than a complete ring. This is an offline mathematical sanity check, not Unity visual proof.
+- Unity/C# compilation is unavailable in this container. Authoritative next action: compile in Unity 6000.5.0f1 and run `Tools > PS3D > Run Generated Mass River-Rock Material Refinement` once; inspect the report and all generated PNGs.
+
+### Invariants and non-goals
+
+- Source silhouettes and generation settings are immutable in this patch.
+- Unified edge-wear fallback remains acceptable and must not reject a visually accepted rock.
+- Raw geometry/material channels remain available as audit evidence but do not directly control final processed appearance.
+- All work remains explicit Editor-only generation under `Library`; runtime cost remains zero.
+- This patch does not assemble a seamless riverbed tile and does not authorize runtime integration.
+
+### Risks and required checks
+
+- Over-filtering can make rocks read as wax or soap; verify the mild-plane normal restores broad structure without source-triangle starbursts.
+- Procedural material variation can become noisy or visibly repetitive; verify it remains low-frequency and per-rock deterministic.
+- Root darkening and wear can regress into perimeter outlines; inspect their standalone evidence maps for broken, selective support.
+- The 18 frozen definitions must match the accepted M2.7C.5B.2 report exactly.
+
+Previous plan history follows below.
+
+## 2026-07-21 — GSU-M2.7C.5B.2: Uneven-Broad Expansion and Projection Cleanup
+
+**Status:** Implemented in the exact approved five-file scope and statically audited. Unity 6000.5 compilation, authoritative menu execution, generated evidence, and final source-rock selection remain pending. Runtime integration remains prohibited.
+
+### Objective
+
+Preserve the seven user-accepted Uneven Broad Terrain/Squat projections as immutable anchors, replace the six-profile 48-rock catalog with a focused 32-rock Uneven Broad sweep, add raw-versus-processed evidence that suppresses source-triangle visibility without changing silhouettes, and replace the unhelpful fixed-source burial sheet with a labelled accepted-anchor comparison.
+
+### User decisions and observed evidence
+
+- The authoritative M2.7C.5B Unity run passed determinism with matching catalog fingerprint `2c0268cc641336c2dc0404d15e78bfcbeca58337d9f68e8e803ae800f6a7d1eb`, generated 48 entries, and produced the complete evidence archive under `Library/SurfaceMaterialDiagnostics/GeneratedMassRiverRockProjection`.
+- The user visually accepted exactly seven sources: `T-12`, `T-13`, `T-14`, `T-15`, `S-12`, `S-13`, and `S-14`.
+- All seven accepted sources use the same `UB / Uneven Broad` recipe profile: `Complex`, `High`, `Chipped`, `Wild`, width/height/depth `1.15 / 0.83 / 1.14`, surface variation `0.68`, edge-wear amount/width `1.12 / 0.72`, and burial around 22–24%.
+- The masks and macro height forms are acceptable; visible triangle tessellation is strongest in raw normals, variation, and exposure. The next evidence must preserve mask and macro height while filtering presentation channels independently.
+- The current burial comparison repeats one poor Squat source and one poor Terrain source. It is not useful for judging burial on accepted rocks and must be replaced.
+
+### Read-only review evidence
+
+Reviewed before this plan write:
+
+- `Assets/AGENTS.md`: mandatory review, plan-first write, exact scope, post-change audit, and no unsupported completion claims.
+- Live layered baseline reconstructed from `Assets-Code-Archive(7).zip`, M2.7C.5A, M2.7C.5A.1, M2.7C.5B, and M2.7C.5B.1 packages.
+- Complete current `GeneratedMassRiverRockProjectionBaker.cs`: six profile definitions, 48-entry Terrain/Squat catalog construction, typed `MassRecipe` assignment, unified-edge-wear fallback, top-down triangle rasterization, raw channel storage, neutral/stylized conversion, labels, burial comparison, and fingerprints.
+- Complete current `GeneratedMassRiverRockProjectionValidation.cs`: two-run determinism, family/anchor/identity/output gates, report/clipboard writing, evidence PNG writing, and stale evidence cleanup.
+- Authoritative passing `GeneratedMassRiverRockProjection(1).zip` report and all ten generated evidence images.
+- User screenshots selecting the seven accepted IDs and rejecting the existing burial comparison.
+- Current top-level M2.7C.5B/M2.7C.5B.1 sections in the three canonical Ground documents.
+- Repository search confirms no project consumer of the projection result beyond its validation action. The supplied baseline contains no `.git` directory, so branch, `HEAD`, history, and working-tree comparison are unavailable; the layered supplied baseline is authoritative.
+
+### Approved project-file scope
+
+**Modify only:**
+
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionValidation.cs`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+**Create/delete:** none.
+
+No `MassGenerator`, `GeneratedMass`, Ground runtime/editor implementation, River, shader/HLSL, scene, prefab, material, profile, layer, texture-array, or Inspector implementation file is authorized.
+
+### Focused catalog contract
+
+1. Generate exactly 32 entries: 16 `TerrainBoulder` and 16 `SquatBoulder`.
+2. Every entry uses the existing `UB / Uneven Broad` recipe profile.
+3. Preserve these seven accepted anchors with their exact M2.7C.5B settings, IDs, seeds, rotation, burial, family, and recipe values:
+   - `T-12`: shape/surface `1579 / 2222`, burial `21.8%`, rotation `201°`;
+   - `T-13`: `3821 / 8048`, `22.6%`, `259°`;
+   - `T-14`: `6173 / 4645`, `23.4%`, `353°`;
+   - `T-15`: `9431 / 7584`, `24.2%`, `68°`;
+   - `S-12`: `1693 / 3997`, `21.8%`, `222°`;
+   - `S-13`: `4001 / 286`, `22.6%`, `322°`;
+   - `S-14`: `6311 / 6588`, `23.4%`, `35°`.
+4. Fill the remaining 25 entries with deterministic new shape/surface seeds using the same profile; do not reuse output fingerprints.
+5. Stable IDs remain `T-00`–`T-15` and `S-00`–`S-15`; the seven accepted anchors retain their historical IDs.
+6. Keep ordinary Generated Mass fallback generation valid; unified edge-wear success remains diagnostic, not an automatic visual gate.
+
+### Projection-cleanup contract
+
+- Preserve the raw mask exactly.
+- Preserve raw projected height as the audit source.
+- Build a masked, edge-aware filtered height for presentation only. Filtering must not sample outside the rock mask and must not cross large height discontinuities.
+- Derive processed presentation normals from the filtered height instead of raw mesh normals.
+- Build processed variation with stronger low-pass filtering and only a restrained raw-channel contribution.
+- Build processed exposure and crevice with moderate masked filtering plus restrained raw contribution.
+- Keep raw channel evidence available and add direct `Raw` versus `Processed` color sheets.
+- Build fallback wear from convex height/normal response only where native projected wear is absent; never derive wear from mask distance or create a complete outline.
+- Apply processed stylized lighting, selective root darkening, and wear enhancement only to evidence previews. Neutral data remains runtime-independent evidence.
+
+### Burial comparison contract
+
+Replace the current two-source burial sheet with a labelled 4 × 4 matrix using accepted anchors:
+
+- `S-12`;
+- `S-14`;
+- `T-13`;
+- `T-15`.
+
+Each source is shown at `8%`, `18%`, `28%`, and `38%` burial. Every cell must label the source ID and depth. The comparison is evidence only and must not alter frozen catalog anchors.
+
+### Evidence outputs
+
+The single existing menu action remains under `Tools > PS3D` and writes only under `Library/SurfaceMaterialDiagnostics/GeneratedMassRiverRockProjection`:
+
+- `GeneratedMassRiverRockFamilySweepReport.txt`
+- `RockFamilySweep_Raw.png`
+- `RockFamilySweep_Processed.png`
+- `RockFamilySweep_Height.png`
+- `RockFamilySweep_ProcessedHeight.png`
+- `RockFamilySweep_Normals.png`
+- `RockFamilySweep_ProcessedNormals.png`
+- `RockFamilySweep_Mask.png`
+- `RockFamilySweep_Variation.png`
+- `RockFamilySweep_ProcessedVariation.png`
+- `RockFamilySweep_Exposure.png`
+- `RockFamilySweep_ProcessedExposure.png`
+- `RockFamilySweep_Crevice.png`
+- `RockFamilySweep_ProcessedCrevice.png`
+- `RockFamilySweep_EdgeWear.png`
+- `RockFamilySweep_ProcessedEdgeWear.png`
+- `RockFamilySweep_BurialComparison.png`
+
+M2.7C.5B `Neutral` and `Stylized` filenames become legacy evidence and are deleted by the validation action.
+
+### Hard validation gates
+
+- exactly 32 entries;
+- exactly 16 entries per retained family;
+- every entry uses profile code `UB`;
+- exactly seven frozen accepted anchors are present with exact ID/seed/burial/rotation values;
+- all stable IDs and raw output fingerprints are unique;
+- repeated catalog and per-rock fingerprints match;
+- all raw and processed image arrays exist at the required resolution;
+- every rock has valid geometry, normals, non-empty projected coverage, and required height/normal variation;
+- burial comparison contains all four accepted IDs and four required depths;
+- no excluded archetype, runtime asset, runtime code, or new project dependency is introduced.
+
+### Implementation sequence and status
+
+1. **Complete — review:** reconstructed and inspected the live layered baseline, generated evidence, accepted IDs, callers, contracts, canonical docs, and repository limitations.
+2. **Complete — plan:** this section records objective, evidence, exact scope, invariants, risks, outputs, and validation before code edits.
+3. **Complete — baker:** focuses definitions on 32 Uneven Broad entries, freezes the seven accepted anchors, adds mask-constrained height cleanup, height-derived processed normals, filtered material channels, interior curvature-derived fallback wear, raw/processed evidence, and the accepted-anchor 4 × 4 burial matrix.
+4. **Complete — validation:** enforces count/profile/anchor/output/determinism/uniqueness/burial gates, writes sixteen evidence PNGs plus the report, and deletes the superseded Neutral/Stylized evidence filenames.
+5. **Complete — architecture docs:** records the focused selection result and authoritative M2.7C.5B.2 → M2.7C.5C → M2.7C.5D → M2.7C.5E progression.
+6. **Complete locally / Unity pending — post-change audit:** complete final-file reread, exact five-file diff comparison, Tree-sitter C# parse, brace/scope/duplicate-method checks, recipe-field contract scan, output/seed/anchor count scan, and project-consumer search passed. Unity compilation and authoritative menu execution remain pending.
+
+### Post-implementation consistency and compliance audit
+
+- Exact diff against the reconstructed M2.7C.5B.1 baseline contains only the five approved modified files; no project path was added or deleted.
+- Both changed C# files parse with the installed C# Tree-sitter grammar with zero error or missing nodes.
+- Brace balance is zero with no negative scope depth; AST inspection found no method at namespace scope and no duplicate method declaration.
+- All twelve reflected `MassRecipe` private fields still exist with the expected names in current `GeneratedMass.cs`; the Mass generation and edge-wear API call sites are unchanged.
+- Static catalog scan confirms 32 definitions, 16 Terrain seeds, 16 Squat seeds, seven exact anchor cases/contracts, one `UB` profile, an 8 × 4 catalog, and sixteen PNG outputs plus the report.
+- Repository search found no consumer of `ProjectionResult` outside the validation action; no runtime/editor Ground implementation, River, shader, scene, prefab, material, profile, layer, or texture-array reference was introduced.
+- The final code preserves raw masks and raw height, and processed fallback wear contains no mask-distance computation. The only mask use in fallback wear is a four-neighbour interior threshold that suppresses wear at the silhouette.
+- The source package contains no `.git` metadata. `HEAD`, branch history, and unrelated working-tree state remain unavailable and were not inferred.
+- No Unity or C# compiler is available in this environment. Compilation and the two-run Unity evidence action are pending and are the authoritative remaining technical gate.
+
+### Risks and controls
+
+- **Risk:** filtering destroys silhouette or broad planes. **Control:** mask remains unchanged; filtering is mask-constrained and range-weighted; raw evidence remains available.
+- **Risk:** fallback wear recreates the rejected border. **Control:** derive only from interior convex height/normal changes and explicitly exclude mask-distance logic.
+- **Risk:** accepted anchors drift. **Control:** define exact anchor constants and hard-validate ID, seeds, burial, rotation, family, and profile.
+- **Risk:** processing hides malformed source geometry. **Control:** raw sheets, raw height/normals, and per-rock raw fingerprints remain mandatory.
+- **Risk:** offline generation cost increases. **Control:** Editor-only explicit menu action; runtime cost remains zero.
+
+Previous plan history follows below.
+
+## 2026-07-20 — GSU-M2.7C.5B.1: MassRecipe Construction Correction
+
+**Status:** Correction implemented in the approved two-file scope. Unity compilation and authoritative family-sweep execution remain pending.
+
+### Failure evidence
+
+The first M2.7C.5B Unity run failed before generating the first rock. `GeneratedMassRiverRockFamilySweepReport.txt` records `System.ArgumentException: JSON parse error: Invalid value` at `GeneratedMassRiverRockProjectionBaker.CreateRecipe`, specifically the second `JsonUtility.FromJsonOverwrite` call used to apply profile overrides. Both deterministic builds failed at the same location; the reported fingerprint mismatch was a consequence of both builds returning `FAIL`, not evidence of nondeterministic Generated Mass output.
+
+### Approved correction scope
+
+**Modify only:**
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+
+### Correction design
+
+- Remove the hand-assembled JSON override string and both recipe-construction `JsonUtility.FromJsonOverwrite` calls.
+- Assign the existing private serialized `MassRecipe` fields through a typed Editor-only reflection helper using the exact current field names and types.
+- Set `archetype` before `ApplyArchetypeDefaults`, then apply the approved profile values directly.
+- Keep public seed setters, all sweep definitions, projection behavior, validation gates, evidence outputs, and runtime non-integration unchanged.
+- Throw a precise exception if a required `MassRecipe` field is absent or has an unexpected type, so future contract drift fails explicitly rather than producing malformed JSON.
+
+### Validation
+
+- Static syntax/scope audit of the modified baker.
+- Exact review of every reflected `MassRecipe` field against `GeneratedMass.cs`.
+- Unity compilation and rerun of `Tools > PS3D > Run Generated Mass River-Rock Family Sweep` remain authoritative.
+
+Previous plan history follows below.
+
+## 2026-07-20 — GSU-M2.7C.5B: Curated Terrain/Squat Sweep and Donor-Tool Retirement
+
+**Status:** Implemented in the exact approved project-file scope and statically audited. Unity 6000.5 compilation, authoritative menu execution, generated evidence, and user selection remain pending. Runtime integration remains prohibited.
+
+### Objective
+
+Retire the remaining M2.7B donor-extraction code and replace the broad six-family Generated Mass projection proof with a deterministic, labelled 48-rock selection sweep containing only `TerrainBoulder` and `SquatBoulder`. Preserve real Generated Mass geometry/data as the source of truth and document the authoritative progression through selected-rock refinement, seamless tile assembly, and later runtime integration.
+
+### User decisions and accepted evidence
+
+- The M2.7C.5A projection action passed deterministic mechanical validation in Unity 6000.5.0f1 with 24 entries, 9 evidence images, matching repeated fingerprint `3be4e4e6e250f741c380015f8c8c8341c044997d26fc0ee7312fbb75c239a207`, and 12 unified-edge-wear fallbacks.
+- The user visually accepted the Generated Mass projection architecture as a viable foundation and specifically selected Terrain Boulder and Squat Boulder forms for deeper exploration.
+- The user requested removal of the remaining donor-extraction tools because the donor and handmade 2D approaches are superseded and should not remain as stale active code.
+- Expensive deterministic Editor-only generation is acceptable. Runtime integration remains prohibited.
+
+### Read-only review evidence
+
+Reviewed before this plan write:
+
+- `Assets/AGENTS.md`: mandatory review, plan-first write, exact scope, post-change audit, and no unsupported validation claims.
+- Live baseline reconstructed from `Assets-Code-Archive(7).zip`, `GSU_M2_7C_5A_Retire_2D_And_Project_Generated_Masses.zip`, and `GSU_M2_7C_5A_1_Compile_Correction.zip`.
+- Complete current `GeneratedMassRiverRockProjectionBaker.cs`: six-family / four-seed catalog generation, unified-edge-wear fallback, top-down rasterization, projected material channels, evidence conversion, burial comparison, and combined fingerprint.
+- Complete current `GeneratedMassRiverRockProjectionValidation.cs`: two-run determinism, hard geometry/evidence checks, report/clipboard output, and PNG writing.
+- `GeneratedMass.cs`: `MassArchetype`, `MassRecipe`, serialized profile fields, archetype defaults, and seed accessors.
+- `MassSurfaceFeatureGenerator.cs`: immutable `MassSurfaceFeatureSettings` contract.
+- `MassGenerator.cs`: public ordinary generation and Editor-only unified edge-wear preview APIs.
+- `MeshData.cs`: vertices, triangles, normals, colours, and UV2 validation contract.
+- `SparseRiverbedDonorExtractor.cs` and `SparseRiverbedDonorExtractionValidation.cs`: mutually dependent historical donor extraction/evidence tools with no active code consumer. Repository search found only historical documentation references outside those two scripts.
+- Authoritative M2.7C.5A Unity report and complete projection evidence archive, including the user-selected Terrain/Squat screenshots.
+- The three canonical Ground documents and their historical M2.7B–M2.7C.5A records.
+
+The supplied source has no `.git` directory. Branch, `HEAD`, status, commit history, and unrelated working-tree comparison are unavailable. The layered supplied baseline is authoritative.
+
+### Approved project-file scope
+
+**Delete**
+
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractor.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractor.cs.meta` if present
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractionValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractionValidation.cs.meta` if present
+
+**Modify**
+
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionValidation.cs`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+**Create:** none.
+
+No Mass generator, Generated Mass runtime/editor component, Ground, River, shader, HLSL, scene, prefab, material, profile, layer, texture array, or Inspector implementation file is authorized.
+
+### Curated sweep contract
+
+1. Generate exactly 48 entries: 24 `TerrainBoulder` and 24 `SquatBoulder`.
+2. Use six deterministic profile groups across four deterministic seeds per family:
+   - Broad Low;
+   - Compact High;
+   - Long Low;
+   - Uneven Broad;
+   - Worn;
+   - Restrained.
+3. Preserve explicit anchor entries for Terrain shape seeds `5727`, `8889`, and `7319`, and Squat shape seeds `5727` and `2223`.
+4. Vary actual Mass recipe geometry controls: form complexity, facet density, edge character, shape diversity, grounding, lean, width/height/depth bias, and surface variation.
+5. Vary real edge-wear amount and width through `MassSurfaceFeatureSettings`.
+6. Use one controlled review burial per entry in the approximate 18–28% range. Burial comparison remains separate and does not count as source-rock variety.
+7. Label every catalog cell with a compact stable ID and settings summary. Full settings remain in the copied report.
+8. Preserve ordinary fallback generation when unified edge-wear preview fails; label and report every fallback.
+
+### Evidence outputs
+
+The single action remains under `Tools > PS3D` and writes only under `Library/SurfaceMaterialDiagnostics/GeneratedMassRiverRockProjection`:
+
+- `GeneratedMassRiverRockFamilySweepReport.txt`
+- `RockFamilySweep_Neutral.png`
+- `RockFamilySweep_Stylized.png`
+- `RockFamilySweep_Height.png`
+- `RockFamilySweep_Normals.png`
+- `RockFamilySweep_Mask.png`
+- `RockFamilySweep_Variation.png`
+- `RockFamilySweep_Exposure.png`
+- `RockFamilySweep_Crevice.png`
+- `RockFamilySweep_EdgeWear.png`
+- `RockFamilySweep_BurialComparison.png`
+
+### Stylized evidence contract
+
+- Neutral preview remains restrained and geometry-readable.
+- Stylized preview remaps real `N·L` for stronger plane contrast, applies restrained variation, enhances projected real edge wear, and applies selective root darkening from low projected height, crevice, and side-facing response.
+- No mask-distance outline, complete perimeter darkening, fake cracks, painted interior lines, or baked runtime albedo is introduced.
+- Neutral projected data remains lighting-independent.
+
+### Hard validation gates
+
+- exactly 48 entries;
+- exactly 24 entries per retained family;
+- zero excluded archetypes;
+- all five approved anchors present;
+- every mesh has valid triangles and normals;
+- every projection has non-empty coverage and required image arrays;
+- repeated catalog fingerprints match;
+- repeated per-rock fingerprints match;
+- all per-rock fingerprints are unique;
+- all evidence remains under `Library`;
+- donor extraction menu/code is absent;
+- no runtime asset or runtime code changes.
+
+Fallback count, geometry cost, projected metrics, and edge-wear coverage remain report-only diagnostics rather than automatic visual rejection.
+
+### Implementation sequence and status
+
+1. **Complete — plan:** recorded evidence, scope, contracts, risks, and progression before implementation edits.
+2. **Complete — retirement:** removed both donor scripts; matching metas are included in the delivery deletion manifest because they were absent from the supplied archive.
+3. **Complete — baker:** replaced the broad archetype catalog with explicit Terrain/Squat profile entries, five anchors, stable labels, neutral/stylized previews, burial comparison, and exact per-rock output fingerprints.
+4. **Complete — validation:** enforces family/anchor/output/determinism/uniqueness gates and updates the one-button report/output contract.
+5. **Complete — architecture docs:** marks donor extraction retired and records the authoritative M2.7C.5B–M2.7C.5E progression.
+6. **Complete locally / Unity pending — audit:** final diff and static checks pass; Unity compilation and execution remain authoritative pending evidence.
+
+### Risks and controls
+
+- **Generation time:** 48 meshes and two complete runs are more expensive. This is explicit Editor-only work and adds no runtime cost.
+- **Label readability:** reserve a dedicated label strip per cell and use an internal deterministic bitmap font; do not depend on project fonts or assets.
+- **Profile duplication:** include profile ID, complete parameters, and per-rock output fingerprint; require all fingerprints to be unique.
+- **Unified preview instability:** preserve fallback, label fallback status, and do not reject otherwise useful rocks solely for missing edge-wear geometry.
+- **Stylized preview misleading geometry:** retain neutral and raw data outputs beside the stylized preview.
+
+### Authoritative recommended progression
+
+- **M2.7C.5B — Curated family sweep:** current patch; select approximately 12–20 accepted source rocks.
+- **M2.7C.5C — Selected-rock material and burial refinement:** freeze selected IDs/settings; refine projected wear visibility, stylized lighting, surface variation, selective root darkening, and accepted burial ranges.
+- **M2.7C.5D — Seamless sparse riverbed assembly:** rasterize only selected meshes into a periodic tile with approved scale/rotation/burial variation, broad quiet regions, wrapped placements, 3×3 repetition evidence, and mip validation.
+- **M2.7C.5E — Runtime material integration:** only after complete tile acceptance; create reusable Ground material/profile/library payload and validate production-camera appearance, memory, and shader cost.
+
+Runtime integration remains blocked until the preceding visual gates are accepted.
+
+### Post-change consistency and compliance audit
+
+**Actual project-file diff against the reconstructed M2.7C.5A.1 baseline:**
+
+- deleted `SparseRiverbedDonorExtractor.cs`;
+- deleted `SparseRiverbedDonorExtractionValidation.cs`;
+- modified the two Generated Mass projection scripts;
+- modified exactly the three approved canonical documents;
+- added no project file;
+- changed no Mass, Ground, River, shader, scene, prefab, material, profile, layer, texture-array, vegetation, or Inspector implementation file.
+
+The supplied archive did not contain donor-script `.meta` files. The delivery manifest still names both meta paths for deletion if they exist in the live Unity project.
+
+**Implemented behavior:**
+
+- 48 entries at 1536 x 1536: 24 Terrain and 24 Squat;
+- six deterministic profile groups across four seeds per family;
+- exact anchors: `T-00` 5727, `T-01` 8889, `T-02` 7319, `S-00` 5727, and `S-01` 2223;
+- cell labels include stable ID, profile, unified/fallback path, anchor marker, shape/surface seeds, burial, and edge-wear width;
+- neutral, stylized, height, normal, mask, variation, exposure, crevice, edge-wear, and burial outputs;
+- repeated catalog and per-rock fingerprints;
+- exact rendered-cell output fingerprints exclude stable IDs so duplicate rendered outputs are rejected rather than hidden by identity metadata;
+- legacy M2.7C.5A evidence filenames are removed by the new menu action before writing the current sweep.
+
+**Static validation completed:**
+
+- both changed C# files parse with the tree-sitter C# grammar with zero error or missing nodes;
+- AST namespace-scope inspection finds only the intended class declaration in each file;
+- duplicate-method scan finds no duplicate method declarations;
+- deterministic definition-model audit confirms 48 entries, 24 per family, five exact anchors, unique stable IDs, and unique family/shape-seed pairs;
+- label-width audit confirms all three compact label lines fit the 192-pixel catalog cell width at 2x bitmap-font scale;
+- referenced enums, recipe properties, mesh channels, `MassSurfaceFeatureSettings` constructor, and `MassGenerator.GenerateUnifiedEdgeWearPreview` signature match the current supplied source;
+- repository search confirms the donor extraction menu and implementation classes are absent from active Editor code;
+- exact scope comparison reports only the approved two deletions and five modifications.
+
+**Unavailable validation:**
+
+No Unity or C# compiler is available in this environment. Unity 6000.5 compilation, two-run menu execution, PNG inspection, and user source-rock selection remain pending and are not represented as passed.
+
+---
+
+## 2026-07-20 — GSU-M2.7C.5A.1: Generated Mass Projection Compile Correction
+
+**Status:** Implemented as a narrow compile correction; Unity recompilation remains pending.
+
+### Evidence
+
+Unity reported:
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs(230,17): error CS0246: The type or namespace name 'UnifiedEdgeWearPreviewStatus' could not be found
+```
+
+The current Mass API declares this status as the nested public type `MassGenerator.UnifiedEdgeWearPreviewStatus` in `Assets/Game/Procedural/Masses/MassGenerator.cs`. The projection baker referenced it without the owning `MassGenerator.` qualifier.
+
+### Approved correction scope
+
+- Modify `GeneratedMassRiverRockProjectionBaker.cs` only to qualify the nested status type.
+- Update this canonical plan before the code change.
+- Do not change projection behavior, generated recipes, rasterization, evidence outputs, retirement scope, runtime code, Mass code, shaders, scenes, prefabs, or assets.
+
+### Validation
+
+- Confirm the changed declaration matches the exact current API signature.
+- Re-scan both new projection scripts for other unqualified `MassGenerator` nested status types.
+- Run structural C# parsing where available.
+- Unity compilation remains authoritative.
+
 # Ground Generation and Surface Upgrade Plan
+
+## 2026-07-20 — GSU-M2.7C.5A: Retire Handmade 2D Stones and Prove Generated Mass Projection
+
+**Status:** Implemented in the exact approved scope and statically audited. Unity 6000.5 compilation, menu execution, generated evidence, and visual acceptance remain pending. Runtime integration remains prohibited.
+
+### Outcome required
+
+Retire the complete M2.7C.x handmade 2D sparse-riverbed stone generator and replace it with an Editor-only evidence tool that generates actual `Generated Mass` meshes, projects their visible top surfaces into material-data catalogs, and proves whether existing 3D rock geometry can become the source of truth for future sparse riverbed material assembly.
+
+The current 2D generator is not retained as fallback code. Its deterministic placement, quiet-region, and reporting ideas may be reimplemented later only after the Generated Mass source catalog is visually accepted.
+
+### User decision and current evidence
+
+- M2.7C.4 compiled after M2.7C.4.1 but remained visually unacceptable.
+- The user explicitly rejected the generated results as non-rock geometry and required retirement before further work.
+- The user approved a combined retirement plus `Generated Mass River-Rock Projection Evidence` patch.
+- Expensive Editor-only generation is acceptable. Active-gameplay cost remains the controlling performance priority.
+
+### Read-only review evidence
+
+Reviewed before this plan write:
+
+- `Assets/AGENTS.md`: plan-first workflow, exact scope, post-change audit, Unity 6000.5 constraints, and no false validation claims.
+- Current source baseline reconstructed from `Assets-Code-Archive(7).zip` plus accepted M2.7C.3, M2.7C.4, and M2.7C.4.1 patches.
+- `SparseRiverbedCandidateSynthesizer.cs` and `SparseRiverbedCandidateSynthesisValidation.cs`: complete failed handmade 2D motif source, placement, validation, and evidence pipeline.
+- `MassGenerator.cs`: public `Generate`, Editor-only `GenerateUnifiedEdgeWearPreview`, and deterministic mesh production APIs.
+- `GeneratedMass.cs`: `MassRecipe`, supported rock archetypes, recipe defaults, and seed controls.
+- `MassSurfaceFeatureGenerator.cs`: public `MassSurfaceFeatureSettings` constructor and edge-wear settings.
+- `MeshData.cs`: vertices, triangles, normals, vertex colours, and UV2 material data.
+- `MassGenerator.MeshOutput.cs`: vertex colour R/G/B/A and UV2.Z contracts for variation, exposure, crevice, and real generated convex edge-wear faces.
+- The three canonical Ground documents and the latest rejected M2.7C.4 evidence archive.
+
+No `.git` metadata is present in the supplied archive. Branch, `HEAD`, status, and history remain unavailable; the layered supplied source is authoritative.
+
+### Approved project-file scope
+
+**Delete / retire**
+
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesisValidation.cs`
+- matching `.meta` files if they exist in the live project
+
+**Create**
+
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs.meta`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionValidation.cs.meta`
+
+**Modify**
+
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+No Mass generator, runtime Ground, River, shader, HLSL, scene, prefab, material, profile, layer, texture-array, vegetation, or Inspector implementation file is authorized.
+
+### Implementation contract
+
+1. Generate a deterministic catalog of 24 real 3D rocks: four seeds across `TerrainBoulder`, `SquatBoulder`, `FlatSlab`, `PolishedStone`, `LayeredStone`, and restrained `BrokenChunk`.
+2. Request real generated edge-wear preview geometry where available; fall back to the ordinary generated mesh only if the preview path throws or yields invalid data. Report every fallback.
+3. Apply deterministic Y rotation, controlled height bias, and one of four burial fractions before projection.
+4. CPU-rasterize the topmost visible triangle sample into a supersampled 1024 x 1024 catalog. Below-burial samples are discarded.
+5. Interpolate real mesh channels into evidence maps:
+   - mask from visible geometry;
+   - height from topmost Y above burial plane;
+   - normal from generated mesh normals;
+   - variation from vertex colour R;
+   - exposure from vertex colour G;
+   - crevice from vertex colour B;
+   - convex edge wear from max(vertex colour A, UV2.Z).
+6. Generate a separate four-depth burial comparison using one representative mesh per archetype.
+7. Run the complete build twice and require identical fingerprints.
+8. Write all evidence only under `Library/SurfaceMaterialDiagnostics/GeneratedMassRiverRockProjection` and copy the report to the clipboard.
+
+### Evidence outputs
+
+- `GeneratedMassRiverRockProjectionReport.txt`
+- `RockCatalog_Color.png`
+- `RockCatalog_Height.png`
+- `RockCatalog_Normals.png`
+- `RockCatalog_Mask.png`
+- `RockCatalog_Variation.png`
+- `RockCatalog_Exposure.png`
+- `RockCatalog_Crevice.png`
+- `RockCatalog_EdgeWear.png`
+- `RockCatalog_BurialComparison.png`
+
+### Acceptance criteria
+
+- The handmade 2D candidate action and both implementation scripts are absent from the active project.
+- The new action compiles and runs once from `Tools > PS3D > Run Generated Mass River-Rock Projection Evidence`.
+- Both runs produce identical fingerprints.
+- All 24 meshes and projections succeed, or any fallback is explicitly reported.
+- At least 12 projected entries visibly and unambiguously read as rocks before any sparse-tile assembly begins.
+- Silhouettes, planes, normals, exposure, crevice, and edge wear must originate from Generated Mass geometry/data.
+- No artificial perimeter halo, superellipse motif, fake 2D facet slash, or procedural 2D stone interior feature is permitted.
+- Runtime integration remains blocked until the individual projected-rock catalog is visually accepted.
+
+### Performance
+
+This work is explicit Editor-only generation. It may generate high-detail meshes, rasterize millions of triangle samples, and allocate temporary 1024 x 1024 buffers. It adds zero active-gameplay CPU/GPU work, zero draw calls, zero runtime texture samples, and zero runtime memory because all outputs remain local under `Library`.
+
+### Risks and controls
+
+- **Risk:** edge-wear preview generation may fail for particular seeds. **Control:** catch the failure, fall back to the ordinary generated mesh, and report it.
+- **Risk:** burial clipping may expose side triangles incorrectly. **Control:** discard each rasterized sample below the burial plane and keep only the topmost Y sample.
+- **Risk:** projected results may still fail visually. **Control:** stop at individual-rock evidence; do not implement sparse tile assembly in this patch.
+- **Risk:** zip extraction cannot physically delete existing files. **Control:** delivery includes an explicit deletion manifest and deletion-capable unified patch in addition to replacement files.
+
+### Post-change audit and validation state
+
+**Actual project-file changes match the approved scope:**
+
+- deleted the two active handmade 2D candidate `.cs` files from the reconstructed baseline;
+- created the two Generated Mass projection `.cs` files and their metas;
+- modified exactly the three canonical Ground documents;
+- no Mass, runtime, shader, Ground, River, scene, prefab, material, profile, layer, or vegetation file changed.
+
+**Static evidence completed:**
+
+- both new C# files parse with the tree-sitter C# grammar with zero error or missing nodes;
+- AST scope inspection confirms no methods, fields, or properties occur directly at namespace scope;
+- duplicate-method scan reports no duplicate declarations;
+- new references were checked against the current public signatures of `MassGenerator`, `MassRecipe`, `MassSurfaceFeatureSettings`, `UnifiedEdgeWearPreviewStatus`, and `MeshData`;
+- both generated script metas use unique GUIDs within the supplied source set;
+- exact baseline comparison reports only the approved creations, deletions, and three documentation modifications.
+
+**Unavailable evidence:**
+
+A Unity/C# compiler is not available in this environment. Unity 6000.5 compilation and authoritative menu execution are pending and must not be treated as passed.
+
+---
+
+## 2026-07-20 — GSU-M2.7C.4.1: Premature Class-Closure Compile Correction
+
+**Status:** Implemented as a narrow compile correction. Unity recompilation remains required.
+
+### Evidence
+
+Unity reported a cascade beginning with namespace-scope member errors in `SparseRiverbedCandidateSynthesizer.cs`, including `CS0116`, `CS1527`, inaccessible nested types, and unresolved nested symbols. Direct inspection found one extra closing brace immediately after `ResolveDirectionalContactWeight`, closing `SparseRiverbedCandidateSynthesizer` before `DirectionalCoordinate` and every following method.
+
+### Approved correction scope
+
+**Modify:**
+
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+
+### Correction
+
+Remove only the premature closing brace after `ResolveDirectionalContactWeight`. Preserve all M2.7C.4 rock-grammar behavior, candidate definitions, validation logic, evidence outputs, and runtime isolation.
+
+### Validation
+
+- Verify balanced namespace/class/method braces.
+- Verify every private method after `ResolveDirectionalContactWeight` remains inside `SparseRiverbedCandidateSynthesizer`.
+- Recompile in Unity 6000.5.0f1.
+- Do not rerun visual synthesis until compilation is clean.
+
+Previous plan history follows below.
+
+## 2026-07-20 — GSU-M2.7C.4: Natural-Rock Motif Grammar, Broken Contact, and Candidate Renaming
+
+Status: approved implementation scope completed in this patch package; Unity-side visual validation still pending.
+
+Reason for patch:
+- M2.7C.3 passed deterministic synthesis and evidence generation, but the user rejected the visuals.
+- Rejection reasons were explicit and severe: stones still read as non-rock shapes, with too-uniform perimeter treatment, obvious center-crossing internal lines, overly flat interiors, and insufficient rock-like contour/relief language.
+- The next patch therefore keeps the approved sparse-placement and quiet-composition architecture, but rewrites the stone grammar itself.
+
+Approved M2.7C.4 scope:
+1. Keep file scope limited to the synthesis evidence generator and the three canonical docs.
+2. Preserve all donor-exclusion, determinism, quiet-space, seam, and local-output constraints.
+3. Replace the M2.7C.3 "facet-owned pill" read with a more natural rock read by changing:
+   - contour generation,
+   - crown / facet composition,
+   - local feature placement,
+   - burial/contact breakup, and
+   - preview shading.
+4. Rename the two denser candidates to `Natural Sparse Riverbed` and `Dense Sparse Riverbed` to better reflect the intended review set.
+
+Concrete implementation notes:
+- Boundary evaluation now injects stronger, still-bounded asymmetry and feature-aware contour perturbation instead of near-oval hulls.
+- Facet contribution is localized into rocky patches instead of reading like long clean diagonal cuts across the entire stone.
+- Local features are now short / local / edge-biased where appropriate, rather than long center-spanning slashes.
+- Contact depression and cavity are directionally broken up, narrower, and more burial-owned so they stop reading like an outline wrapped around every stone.
+- Color-preview rendering now uses subtler cavity darkening and more internal tonal variation so the stones read less like flat banded icons.
+
+Validation expectation:
+- Re-run `Tools > PS3D > Run Sparse Riverbed Candidate Synthesis`.
+- Inspect every generated `ColorPreview`, `ColorPreview_3x3`, `MotifCatalog`, `MotifNormalCatalog`, `PlacementDebug`, and `FinalStructureDebug`.
+- Runtime integration remains blocked until at least one candidate is visually accepted.
+
+Previous plan history follows below.
+
+# Ground Generation and Surface Upgrade Plan
+
+
+## 2026-07-20 — GSU-M2.7C.3: Facet-Owned Stone Geometry, Directional Embedding, and Enforced Quiet Composition
+
+**Status:** Implemented in the exact approved five-file scope and post-change statically audited. C# parser checks, compatibility-stub Roslyn compilation, deterministic offline synthesis, the quiet-budget rejection-path test, and the offline validation/report control path pass. Unity 6000.5 compilation, authoritative menu execution, Unity-encoded evidence, and user visual acceptance remain pending; this item is not complete or accepted.
+
+### Objective
+
+Correct the rejected M2.7C.2 evidence generator rather than weakening its validator. Replace dome-owned final stone height with facet-owned planar stone geometry bounded by rounded silhouettes; replace complete perimeter contact halos with directional burial/contact; enforce candidate quiet-region budgets before committing placements; measure structural readability from the final placed candidate height field rather than copying source-motif metrics; and lower the three candidate coverage contracts to remain substrate-dominant. Continue to generate evidence only under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`.
+
+### Authoritative M2.7C.2 Unity evidence and user decision
+
+The authoritative Unity 6000.5.0f1 M2.7C.2 run completed deterministically and generated all 34 expected outputs. It failed exactly two quiet-block checks:
+
+- Mixed Feature Riverbed: 65.63% quiet 32x32 blocks against 66.00%, one block over budget;
+- Structured Embedded Stones: 55.86% quiet 32x32 blocks against 58.00%, six blocks over budget.
+
+Quiet Buried Pebbles passed at 75.78% against 72.00%. Coverage, seams, catalog participation, fingerprints, donor exclusion, and output creation passed. Visual review rejected the candidate set because final height/normal/color evidence still reads primarily as smooth pills, capsules, and rounded mounds; cavity remains substantially perimeter-complete; and the 3x3 evidence exposes recognizable repeated compositions. The user explicitly approved proceeding with M2.7C.3.
+
+### Read-only review evidence
+
+Reviewed before the first edit:
+
+- `Assets/AGENTS.md`: mandatory review, plan-first write, exact scope, implementation traceability, post-change audit, Unity constraints, and delivery requirements.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs`, SHA-256 `6919a0d993cd9496a8eefad419001649705e478b4c2cbc3f859e95b346610ae4`: complete M2.7C.2 definitions, deterministic 48-motif catalog, dome-first height, facet blending, feature application, full-perimeter contact, probabilistic density field, post-hoc quiet metric, source-motif candidate metrics, final normals/previews, seams, mips, fingerprints, and deterministic RNG.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesisValidation.cs`, SHA-256 `e605ed4fce0a1a92521fd93c105fda15b98fe9035e63a9a42291e4ed43e9e229`: complete two-run validation, source-motif candidate checks, quiet/seam/coverage checks, report, clipboard copy, and Library-only evidence writing.
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md` and `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`: current evidence-only architecture and no-Inspector/runtime ownership.
+- `SparseRiverbedCandidates(3).zip`, SHA-256 `bbd738bbb838eceb856fc6560014cf21021eb504c5d48bf343672a768078ae10`: complete M2.7C.2 report and every candidate color, 3x3, mask, height, cavity, normal, roughness, placement, motif-catalog, and mip output.
+- `GSU_M2_7C_2_Failure_Exhaustive_Continuation_Handoff_2026-07-20(1).md`: provenance, history, constraints, and exact current failure state.
+
+The supplied archive contains no `.git` directory. Branch, `HEAD`, status, history, commits, and unrelated working-tree comparisons are unavailable. `Assets-Code-Archive(7).zip` is the authoritative source snapshot for this implementation.
+
+### Approved files
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesisValidation.cs
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+```
+
+No `.meta`, runtime, shader, HLSL, Ground, River, hydrology, vegetation, scene, prefab, material, profile, layer, library, mesh, renderer, package, layer, tag, component, or dependency change is authorized.
+
+### Acceptance criteria
+
+1. Final stone height is primarily defined by multiple broad planar facets/shoulders inside rounded analytic silhouettes; a smooth dome may contribute only restrained broad bias.
+2. Flat crowns, wedges, offset shoulders, broad ridges, shallow split tops, local cuts, and partly buried slabs remain visibly distinct in final candidate height, normal, and color evidence.
+3. Candidate structural metrics are calculated from final placed stone height after scale, relief, embedding, substrate combination, and final field construction. Source-motif metrics remain catalog evidence only.
+4. Contact/cavity is directionally concentrated on buried/downhill sectors; exposed/high sectors do not receive a complete dark perimeter halo.
+5. A placement is rejected before commit when it would exceed the candidate's deterministic 32x32 occupied-block budget.
+6. Density uses irregular toroidal macro regions without the prior dominant three-sine diagonal composition.
+7. Coverage contracts are approximately 7%, 9%, and 11%, with accepted ranges 6–8%, 8–10.5%, and 10–12.5%.
+8. Repeated synthesis fingerprints match; coverage, quiet blocks, final placed-structure metrics, seams, participation, and output checks pass.
+9. No donor pixels or stamps contribute; no output is written under `Assets`; runtime cost remains zero.
+10. Runtime integration remains blocked until one candidate is visually accepted.
+
+### File-by-file implementation sequence
+
+1. `Ground_Generation_Surface_Upgrade_Plan.md`: record evidence, objective, acceptance criteria, exact scope, invariants, risks, implementation sequence, and validation before code changes.
+2. `SparseRiverbedCandidateSynthesizer.cs`:
+   - increment the algorithm version;
+   - lower candidate coverage contracts and add explicit occupied-macro-block budgets;
+   - generate deterministic irregular toroidal macro regions;
+   - reject placements that would exceed the occupied-block budget before commit;
+   - make planar facet envelopes own primary stone height and use a narrow rounded boundary shoulder instead of multiplying the full stone by the broad inside field;
+   - strengthen bounded structural families while preserving rounded silhouettes;
+   - apply directional burial/contact weighting;
+   - compute final placed-stone residual/curvature metrics and a structure-debug image from the combined final field;
+   - include new metrics and counters in deterministic fingerprints.
+3. `SparseRiverbedCandidateSynthesisValidation.cs`:
+   - update M2.7C.3 labels;
+   - validate occupied-block budgets and final placed-structure metrics;
+   - stop treating selected source-motif averages as candidate proof;
+   - report macro-budget rejections and final structure evidence;
+   - write the new Library-only structure-debug image.
+4. `Ground_Visual_Design_and_Architecture.md`: supersede M2.7C.2 with facet-owned height, directional embedding, enforced quiet composition, final-field validation, and revised coverage architecture.
+5. `GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`: preserve the single project-level evidence action and explicitly record that the new metrics/output add no GeneratedGround controls.
+6. Reread all five final files and the two unchanged historical donor modules; compare final scope against this plan; parse changed C# with every available static tool; scan all introduced symbols/imports; record static results and pending Unity validation here.
+
+### Invariants and non-goals
+
+- Editor-only manual synthesis remains the only execution path.
+- All evidence remains under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates` and the report remains copied to the clipboard.
+- The 48-motif deterministic catalog, rounded silhouette bounds, arbitrary-angle analytic rasterization, toroidal wrapping, final global normal derivation, semantic roughness, seam metrics, wrapped mips, and donor exclusion remain unless explicitly changed above.
+- M2.7B extractor files remain byte-identical and inactive.
+- No runtime material is created or promoted.
+- No validation threshold is lowered solely to convert the rejected M2.7C.2 result into a pass.
+
+### Risks and controls
+
+- **Facet hardness may become synthetic:** retain rounded analytic masks, broad planes, bounded slopes, narrow antialiased shoulders, and complete motif height/normal catalogs.
+- **Macro enforcement may prevent target coverage:** count new occupied blocks before commit, concentrate proposals in deterministic irregular macro regions, retain larger stone buckets, and fail clearly if coverage cannot be reached within budget.
+- **Clustering may create obvious blobs or repeats:** use several seed-derived toroidal elliptical regions with varied radii/orientations and inspect 3x3 evidence.
+- **Final-field metrics may be dominated by boundaries:** sample only interior stone pixels with occupied neighbours and compare against a local wrapped smooth baseline.
+- **Directional contact may become too weak:** preserve a restrained minimum buried-sector contribution and inspect cavity/color evidence.
+- **Unity compilation/execution is unavailable in the current environment:** static validation cannot replace the authoritative Unity run; status remains pending until the user executes the one menu action.
+
+### Performance
+
+The change remains manual Editor-only work. Macro-region evaluation, occupied-block accounting, final-field structure measurement, and one additional 512x512 evidence image add bounded authoring-time CPU/memory. Active-gameplay CPU, dirty-triggered runtime compute, runtime memory, draw calls, texture samples, renderers, and per-frame behavior remain unchanged. No `PERFORMANCE EXCEPTION` applies.
+
+### Implemented result
+
+- Algorithm version is 4.
+- Facet planes share a crown-profile apex, use bounded outward-facing slopes, and form a continuous lower envelope. Flattened and slab profiles add explicit planar caps. Final normals use stronger diagnostic response, and the color preview uses an oblique light plus a nonzero stone-value floor so planar sectors remain readable without manufacturing a complete dark edge through preview colour.
+- Candidate macro regions use deterministic toroidal best-candidate centre separation, bounded elliptical radii/aspects, and 5 / 7 / 8 regions. The former three-sine density layout is absent.
+- Candidate coverage contracts are 6–8%, 8–10.5%, and 10–12.5%. Occupied 32x32 macro-block budgets are 71, 87, and 107.
+- Proposed stamps are measured against the occupied-block budget before commit. Directional burial weights control broad depression, narrow cavity, and inside contact.
+- Final placed-structure thresholds are residual RMS >= 0.018 and high-curvature participation >= 12%. These are measured from the combined final height field; selected source-motif averages remain report-only diagnostics.
+- The validator writes 12 images per candidate, including `FinalStructureDebug`, plus one report: 37 local Library outputs in total.
+
+### Post-change consistency and compliance audit
+
+**Expected affected files:** the five approved paths in this section.
+
+**Actual affected files:** exactly the same five paths. Archive-wide SHA-256 comparison against `Assets-Code-Archive(7).zip` found zero added files, zero deleted files, and no other modified path. Script `.meta` files and both M2.7B donor modules remain byte-identical. No scope discrepancy exists.
+
+Static checks performed against the final source:
+
+- tree-sitter C# parse: both changed C# files have no error or missing nodes;
+- Roslyn C# compilation: both changed files compile together with a minimal Unity compatibility stub and explicit .NET reference set; this checks C# syntax, declarations, overload use, and introduced references but is not a Unity assembly compile;
+- deterministic synthesis harness: the actual `SynthesizeAll()` path ran twice with identical catalog fingerprint `9b8419f356c5c9aed6fde8ebfbc536abbd9a21332a9a89e52ab661e23c4c39a4` and combined fingerprint `981d426e3fcd1b9e3b6504ac5f142d1684c8ec95d1c5261e5a45c2a6b0f4c360`;
+- quiet-budget rejection-path harness: temporarily constraining the first candidate to 53 occupied blocks caused three pre-commit quiet-budget rejections, completed synthesis at 52 occupied blocks and 7.47% coverage, and never exceeded the temporary budget; the project definitions were not modified by this test;
+- offline validation/report path: the complete menu-action logic produced a report with `VERDICT: PASS` and the expected 37 output paths under a non-Unity stub environment. Stub PNG encoding is not Unity image evidence and is not treated as authoritative;
+- generated arrays were exported separately for read-only offline inspection. Planar sectors, flat slabs, wedges, asymmetric crowns, directional substrate depression, and more spatially separated compositions are visible. This is supportive evidence only; user acceptance remains pending;
+- source scan confirms zero donor read/sampling dependency, zero output beneath `Assets`, and no runtime, shader, HLSL, Ground, River, vegetation, scene, prefab, material, profile, layer, renderer, package, tag, or component reference was introduced.
+
+Offline deterministic candidate measurements:
+
+| Candidate | Coverage | Quiet blocks | Occupied / budget | Placements | Final residual RMS | Final high curvature |
+|---|---:|---:|---:|---:|---:|---:|
+| Quiet Embedded Stones | 7.47% | 78.91% | 54 / 71 | 12 | 0.0387 | 32.95% |
+| Mixed Sparse Riverbed | 9.17% | 72.27% | 71 / 87 | 11 | 0.0340 | 27.30% |
+| Structured Sparse Stones | 11.42% | 66.02% | 87 / 107 | 15 | 0.0346 | 27.48% |
+
+All offline coverage, quiet, occupied-block, final-structure, profile-participation, seam, and mip checks pass. The deterministic seeds naturally remain under their budgets, so their normal run records zero quiet-budget rejections; the separate forced-budget test proves the rejection branch is active.
+
+### Pending authoritative validation
+
+Unity 6000.5.0f1 must compile the final files and execute `Tools > PS3D > Run Sparse Riverbed Candidate Synthesis` once. The resulting report, all 37 Unity-generated outputs, and user visual review remain the acceptance gate. Runtime integration remains prohibited.
+
+## 2026-07-20 — GSU-M2.7C.2: Feature-Rich Procedural Stone Motifs and Lower-Coverage Riverbed Candidates
+
+**Status:** Implemented in the exact approved five-file scope and post-change statically audited. Unity 6000.5 compilation, authoritative menu execution, generated evidence, and user visual acceptance remain pending; this item is not complete or accepted.
+
+### Objective
+
+Replace the visually rejected M2.7C.1 smooth-mound stone model with an Editor-only procedural stone-recipe system in which every rock has a rounded silhouette, a selected crown profile, a selected edge profile, one to three local structural modifiers, and an independently selected burial/contact profile. Lower final visible stone coverage and preserve substantially larger quiet substrate regions. Continue to generate evidence only under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`; do not create runtime profiles, layers, array entries, shaders, scenes, prefabs, meshes, decals, or Inspector controls.
+
+### Accepted user direction
+
+- M2.7C.1 deterministic procedural generation is mechanically valid but visually rejected.
+- The current 11.51%, 15.81%, and 19.32% candidates are not sparse enough.
+- Current rock height reads as one consistent gradual smoothening rather than rock geometry.
+- Rocks require a per-individual feature family. Rounded overall silhouettes remain mandatory; sharp star-like points remain prohibited.
+- The approved active direction is feature-rich procedural generation. Donor extraction and donor-stamp synthesis remain superseded evidence only.
+
+### M2.7C.1 Unity evidence and visual rejection
+
+Unity 6000.5.0f1 report `SparseRiverbedCandidateSynthesis.txt`, generated 2026-07-20T13:21:40.9473508Z, records:
+
+- algorithm version 2;
+- 36 procedural motifs;
+- deterministic identical catalog and combined fingerprints;
+- zero extracted donor placements and zero purchased donor pixels;
+- candidate coverage 11.51%, 15.81%, and 19.32%;
+- seam metrics within the implemented absolute/local limits;
+- `VERDICT: PASS` for deterministic evidence generation.
+
+The user rejected all three candidates because coverage remained visually excessive and the height model produced consistently smoothed mounds without uneven planes, hard shoulders, ridges, chips, or other individual geometric features. Visual evidence in the supplied complete archive confirms that density and rock-form quality, not determinism or seam handling, are the active failures.
+
+### Read-only review evidence
+
+Reviewed completely before the first edit:
+
+- `Assets/AGENTS.md`: mandatory read-only review, plan-first write, exact scope, evidence requirements, post-change consistency/compliance audit, Unity constraints, and delivery structure.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs`: complete M2.7C.1 motif catalog, definitions, placement, analytic stamp rasterization, smooth crown/facet/tilt model, contact, substrate, normals, previews, seam metrics, mip helpers, fingerprints, and deterministic RNG.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesisValidation.cs`: complete two-run validation, catalog bounds, coverage/family/seam checks, clipboard report, and Library-only evidence writer.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractor.cs` and `SparseRiverbedDonorExtractionValidation.cs`: historical producer/evidence modules; they remain unchanged and are not active synthesis dependencies.
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`, `Ground_Visual_Design_and_Architecture.md`, and `GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`.
+- Superseded M2.7C donor-stamp source and current M2.7C.1 source were compared. M2.7C.1 intentionally removed donor sampling, nearest-neighbour stamping, quarter-turn-only rotation, fixed contact radius, and sparse global seam ratios.
+- Complete M2.7C.1 Unity report and all supplied candidate color, repeat, mask, height, cavity, normal, roughness, placement, motif-catalog, and mip evidence.
+
+The reconstructed source contains no `.git` directory. Branch, `HEAD`, status, history, commits, and unrelated working-tree comparisons are unavailable. The captured pre-edit SHA-256 values are stored outside the project for all reviewed files. The working baseline is the reconstructed accepted state through M2.7C.1 plus its authoritative Unity report and visual rejection.
+
+### Approved files
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesisValidation.cs
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+```
+
+The existing script `.meta` files remain unchanged. No new file, folder, asset, layer, tag, component, dependency, or serialized object is authorized.
+
+### Procedural stone recipe contract
+
+Each deterministic motif is assembled from independent bounded choices.
+
+#### Silhouette family
+
+1. rounded pebble;
+2. broad oval;
+3. low slab;
+4. softly angular rounded stone;
+5. rounded chipped accent.
+
+Silhouettes continue to use ellipse/superellipse distance fields with broad low-amplitude radial deformation, bounded aspect, bounded concavity, and antialiased closed masks. No raw polygon rasterization, acute tips, or star-like shapes are permitted.
+
+#### Crown profile
+
+1. rounded dome;
+2. flattened dome;
+3. offset shoulder;
+4. twin shoulder;
+5. one-sided rise;
+6. low slab top.
+
+The crown profile owns broad height distribution before local modifiers.
+
+#### Edge profile
+
+1. soft even edge;
+2. mixed edge hardness;
+3. one-side buried edge;
+4. shoulder-and-drop;
+5. broad locally chipped edge;
+6. flattened side.
+
+The edge profile changes local falloff and burial without producing a constant dark outline.
+
+#### Local structural modifiers
+
+Each motif receives one to three deterministic modifiers selected from:
+
+1. planar facet;
+2. diagonal ridge;
+3. shallow crease;
+4. local depression;
+5. secondary rounded lobe;
+6. broad rounded notch;
+7. buried-side cut.
+
+Modifiers use broad antialiased fields. Their total amplitude is bounded so the stone remains rounded overall. The final height must differ measurably from the corresponding unmodified smooth crown.
+
+#### Burial/contact profile
+
+Each motif independently selects light embedding, half burial, one-side burial, slab setting, or shallow sinking. Contact remains a broad shallow substrate deformation plus a restrained narrow cavity whose strength varies per placement.
+
+### Candidate contract
+
+| Candidate | Stable evidence id | Target coverage | Accepted range | Primary distinction |
+|---|---|---:|---:|---|
+| Quiet Buried Pebbles | `quiet-buried-pebbles` | 7.5% | 6–9% | broad quiet substrate, rounded/oval stones, stronger burial, restrained features |
+| Mixed Feature Riverbed | `mixed-feature-riverbed` | 10.5% | 9–12.5% | balanced families, crown/edge diversity, one to three structural modifiers |
+| Structured Embedded Stones | `structured-embedded-stones` | 13.5% | 12–15.5% | more slabs and softly angular stones, stronger facets/shoulders/ridges, still substrate-dominant |
+
+Candidates differ in coverage, family mix, size mix, feature weights, relief, embedding, and substrate treatment. They must not be three density variants of one identical motif language.
+
+### Implementation sequence
+
+1. Increase the synthesis algorithm version and replace the M2.7C.1 candidate definitions with the lower-coverage candidate contract.
+2. Extend procedural motifs with explicit crown, edge, burial, and local-feature records. Generate a deterministic catalog with complete family/profile participation.
+3. Evaluate a smooth reference crown and a final feature-rich height field separately. Use profile-specific crown and edge functions, then apply one to three bounded structural modifiers.
+4. Measure per-motif feature residual RMS and high-curvature participation against the reference crown. Reject catalogs that contain featureless smooth mounds or exceed rounded-silhouette bounds.
+5. Lower final placement coverage, strengthen broad quiet-region gating, and retain toroidal spacing/overlap/coverage rejection.
+6. Keep analytic arbitrary-angle rasterization, final global normal derivation, periodic substrate generation, semantic roughness, absolute/local seam metrics, and deterministic fingerprints.
+7. Expand the report with crown, edge, burial, modifier, residual-complexity, placement-feature, and lower-coverage evidence.
+8. Expand motif evidence so the final height and normal structure of every generated recipe can be visually inspected before runtime integration.
+9. Run the complete catalog and candidate generation twice and require identical fingerprints and metrics.
+
+### Evidence outputs
+
+The existing action `Tools > PS3D > Run Sparse Riverbed Candidate Synthesis` remains the single entry point. It writes one clipboard report and, per candidate:
+
+```text
+ColorPreview.png
+ColorPreview_3x3.png
+StoneMask.png
+Height.png
+Cavity.png
+Normals.png
+Roughness.png
+MipContactSheet.png
+PlacementDebug.png
+MotifCatalog.png
+MotifNormalCatalog.png
+```
+
+All outputs remain under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`.
+
+### Invariants and non-goals
+
+- No donor image, extracted stamp, or purchased pixel contributes to synthesis.
+- M2.7B extractor and validation files remain byte-identical.
+- No output is written under `Assets`.
+- No runtime code, shader, HLSL, Ground, River, hydrology, vegetation, Painted Accent, scene, prefab, material profile, layer, library entry, mesh, renderer, texture sample, draw call, allocation, or per-frame behavior changes.
+- No automatic generation on reload or `OnValidate`.
+- This patch does not promote a candidate. Runtime integration remains blocked until visual acceptance.
+
+### Risks and controls
+
+- **Risk:** local modifiers create pointed or star-like silhouettes. **Control:** silhouette and height modifiers are separated; silhouette deformation remains bounded and broad, while most structural modifiers affect height only.
+- **Risk:** features become noisy rather than geometric. **Control:** one to three broad modifiers, minimum feature width, bounded amplitude, and residual/curvature metrics.
+- **Risk:** all stones still share one mound. **Control:** six crown profiles, six edge profiles, five burial profiles, seven modifier types, and complete participation checks.
+- **Risk:** hard transitions alias. **Control:** all masks and feature fields use smooth bounded widths; final normals are derived from the combined 512×512 height field.
+- **Risk:** candidates remain visually dense. **Control:** lower coverage ranges, stronger quiet-region gating, quiet-block threshold, and measured coverage.
+- **Risk:** candidate distinctions collapse. **Control:** explicit per-candidate profile/feature weights and report counts.
+- **Risk:** runtime scope drifts. **Control:** exact five-file scope and Library-only outputs.
+
+### Acceptance and validation
+
+- [x] User approved the feature-rich procedural direction and lower-density requirement.
+- [x] M2.7C.1 Unity deterministic PASS and visual rejection are recorded.
+- [x] Complete read-only review performed before the first edit.
+- [x] Canonical plan updated as the first source modification.
+- [x] Algorithm version, candidate definitions, and stone-recipe model implemented.
+- [x] Every generated motif is assigned one to three structural modifiers; rounded-silhouette limits are implemented and statically verified.
+- [x] Crown, edge, burial, and modifier families are represented by explicit deterministic catalog records and validation counters.
+- [x] Feature-residual RMS and high-curvature participation are measured and validated against minimum thresholds.
+- [ ] Unity-generated candidate coverage reaches 6–9%, 9–12.5%, and 12–15.5% respectively. A non-authoritative offline reconstruction reached approximately 7.78%, 10.55%, and 14.40%.
+- [ ] Unity repeated catalog/candidate fingerprints pass. Two-run fingerprint validation is implemented but not executed authoritatively here.
+- [x] Motif height and normal catalog writers target `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`; Unity output remains pending.
+- [x] Post-change exact-scope, parse, caller/consumer, namespace/import, output-path, and repository-rule audit passes.
+- [ ] Unity 6000.5 compilation and menu execution pass.
+- [ ] User visually accepts one candidate before runtime integration.
+
+### Implementation result
+
+- `SparseRiverbedCandidateSynthesizer.AlgorithmVersion` is `3`; the catalog contains 48 deterministic rounded motifs.
+- Every motif selects one crown, one edge, one burial profile, two to five broad facet planes, and one to three local structural modifiers.
+- Implemented local feature types are planar facet, diagonal ridge, shallow crease, local depression, secondary rounded lobe, broad rounded notch, and buried-side cut.
+- The final motif height preserves facet and feature structure through multiplicative burial reduction rather than subtractive clipping.
+- Candidate definitions are Quiet Buried Pebbles (7.5%), Mixed Feature Riverbed (10.5%), and Structured Embedded Stones (13.5%).
+- The existing menu action remains the only entry point and writes report and image evidence under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`.
+- No runtime or serialized material integration was added.
+
+### Post-change consistency and compliance audit
+
+- Final tree comparison against the captured M2.7C.1 baseline found exactly the five approved file changes and no additions or deletions.
+- `SparseRiverbedDonorExtractor.cs`, `SparseRiverbedDonorExtractionValidation.cs`, and both candidate-script `.meta` files are byte-identical to the captured baseline.
+- Tree-sitter C# parsing found zero error or missing nodes in both changed scripts and both unchanged direct M2.7B producer/validation files after the final facet and burial changes.
+- Source-contract checks confirm algorithm version 3, 48 motifs, lower coverage definitions, all explicit recipe/profile enums, one-to-three modifier assignment, MotifNormalCatalog output, zero donor-extractor dependency, no `AssetDatabase`, no automatic reload execution, and no `OnValidate`.
+- All file writes are owned by `SparseRiverbedCandidateSynthesisValidation` and target `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`; no output path targets `Assets`.
+- A non-authoritative independent reconstruction measured approximately 7.78%, 10.55%, and 14.40% stone coverage; quiet-block fractions were approximately 77.34%, 67.58%, and 58.98%. It also measured motif feature-residual RMS approximately 0.186–0.442 and high-curvature participation approximately 0.131–0.338. These checks support feasibility only and do not replace Unity execution.
+- No `.git` metadata or Unity/Roslyn compiler is available in the execution environment. `HEAD`, history, Unity compilation, authoritative deterministic output, exact coverage, seam metrics, and visual quality remain pending.
+
+### Performance contract
+
+M2.7C.2 remains an explicit Editor-only 512×512 evidence generator. Expensive deterministic generation is permitted. Runtime cost remains zero because no runtime file or serialized candidate changes.
+
+### File-by-file status
+
+- `Ground_Generation_Surface_Upgrade_Plan.md`: **plan, implementation evidence, and post-change audit recorded; Unity validation pending.**
+- `SparseRiverbedCandidateSynthesizer.cs`: **implemented and statically parsed; Unity compilation/execution pending.**
+- `SparseRiverbedCandidateSynthesisValidation.cs`: **implemented and statically parsed; Unity compilation/execution pending.**
+- `Ground_Visual_Design_and_Architecture.md`: **updated with the active feature-rich recipe architecture.**
+- `GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`: **updated; project-level menu ownership and absence of Inspector/runtime controls retained.**
+
+
+## 2026-07-20 — GSU-M2.7C.1: Procedural Rounded-Stone Motif and Riverbed Candidate Generation
+
+**Status:** Implemented in the exact approved five-file scope and post-change statically audited. Unity 6000.5 compilation, exact C# generation, report/evidence output, and visual acceptance remain pending; this item is not complete or accepted.
+
+### Objective
+
+Replace the visually rejected donor-stamp synthesis with an Editor-only procedural material-data generator that creates rounded or softly angular embedded river stones over stylized sediment. The generator must avoid sharp star-like silhouettes, raw polygon corners, uniform dark outlines, nearest-neighbour stamp resampling, and dependence on purchased donor motifs. It produces evidence only under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`; it does not create runtime profiles, layers, array entries, shaders, scenes, prefabs, meshes, decals, or Inspector controls.
+
+### Accepted user direction
+
+- Procedural generation is the active stone-source direction.
+- Stones should be circular, oval, rounded, or softly angular in the visual family shown by the user reference image. Polygon structure may contribute to variation, but corners must be rounded and acute star-like tips are prohibited.
+- The approved construction is a hybrid rounded primitive: ellipse or superellipse foundation, low-amplitude broad radial perturbation, optional broad flattened/chipped region, smooth distance-field rasterization, asymmetric rounded crown, and restrained embedding/contact response.
+- M2.7C donor extraction remains historical evidence only. Stone Ground and Black Gravel contribute zero placements and zero source pixels to M2.7C.1.
+
+### Failed M2.7C evidence
+
+Unity report `SparseRiverbedCandidateSynthesis.txt`, generated 2026-07-20T11:44:44.8126026Z under Unity 6000.5.0f1, records deterministic repeated synthesis and valid coverage of 11.01%, 16.10%, and 20.12%. It reports one automated failure: Sparse River Sediment vertical height seam ratio 2.3351. Visual review rejected all three candidates because:
+
+- donor shapes were nearest-neighbour resampled and limited to quarter-turn rotations;
+- normalized donor forms were reconstructed through one fixed mound formula;
+- fixed-radius contact generation produced repeated dark outlines;
+- the substrate was only a constant plus four low-amplitude sine waves;
+- lower mips reduced stones to blocky motifs.
+
+These findings are traceable to the superseded implementation in `SparseRiverbedCandidateSynthesizer.cs`: `BuildStampPixels`, `CommitStamp`, `BuildContactAndFinish`, `BuildPeriodicSubstrate`, and `MeasureSeams`.
+
+### Read-only review evidence
+
+Reviewed completely before the first edit:
+
+- `Assets/AGENTS.md`: mandatory review, plan-first implementation, strict scope, evidence, post-change compliance audit, Unity constraints, and delivery structure.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs`: full M2.7C generation, donor dependency, placement, nearest-neighbour stamping, height/contact/substrate generation, seam metric, fingerprint, and mip helpers.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesisValidation.cs`: complete two-run validation, coverage/seam checks, clipboard report, and evidence writer.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractor.cs` and `SparseRiverbedDonorExtractionValidation.cs`: historical producer contract and evidence ownership; neither remains a synthesis dependency.
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`, `Ground_Visual_Design_and_Architecture.md`, and `GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`.
+- Unity M2.7C report and all supplied candidate color, repeat, mask, height, cavity, normal, roughness, placement, and mip evidence.
+- User-supplied rounded-stone visual reference and explicit prohibition on pointed/star-like procedural stones.
+
+The reconstructed source has no `.git` directory. Branch, `HEAD`, status, history, and commit comparisons are unavailable. The working baseline is the accepted reconstructed state through M2.7C plus its Unity failure report and visual rejection.
+
+### Approved files
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesisValidation.cs
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+```
+
+The existing script `.meta` files remain unchanged. No new file, folder, asset, layer, tag, component, dependency, or serialized object is authorized.
+
+### Procedural motif contract
+
+Generate a deterministic catalog of 36 rounded motifs across five bounded families:
+
+1. rounded pebble;
+2. broad oval river stone;
+3. low embedded slab;
+4. softly angular rounded stone;
+5. small rounded chipped accent.
+
+Each motif starts from an ellipse or superellipse with exponent at or above the ellipse range, receives only low-amplitude broad harmonic boundary variation, and may receive one wide shallow flattening/chip. A smooth distance field produces antialiased closed masks. Minimum solidity, bounded aspect, bounded concavity, and minimum corner-radius proxies prevent acute tips and star-like silhouettes.
+
+Height is generated from a separate asymmetrically shifted rounded crown with mild broad faceting, per-motif relief, tilt, and embedding depth. Contact uses two distance bands: a broad shallow substrate depression and a narrow restrained cavity. No constant-width black outline is permitted.
+
+### Candidate contract
+
+| Candidate | Stable evidence id | Target coverage | Accepted range | Primary distinction |
+|---|---|---:|---:|---|
+| Rounded Pebble Sediment | `rounded-pebble-sediment` | 10.5% | 9–12% | broad rounded/oval stones, calm pale sediment |
+| Mixed Rounded Riverbed | `mixed-rounded-riverbed` | 15.5% | 13.5–17.5% | balanced rounded, oval, slab, and softly angular families |
+| Embedded Stone Sediment | `embedded-stone-sediment` | 19% | 17–21% | larger lower-relief embedded stones and slightly stronger sediment structure |
+
+Candidates differ in family mix, size mix, relief/embedding, and substrate treatment rather than only density. Every candidate remains substrate-dominant and retains broad stone-free regions.
+
+### Implementation sequence
+
+1. Remove all runtime synthesis dependency on M2.7B donor extraction and source hashes while leaving M2.7B files unchanged.
+2. Build a deterministic procedural motif catalog from bounded family definitions and fixed seeds.
+3. Rasterize each proposed motif analytically at arbitrary Editor-time rotation using filtered distance fields; do not resample a source bitmap.
+4. Use toroidal placement, broad periodic density gating, spacing/overlap rejection, and measured final coverage.
+5. Generate periodic sediment from multiple integer-period broad fields, shallow pits/ripples, and restrained fine variation. Candidate-specific parameters remain deterministic and documented.
+6. Compose stone masks, asymmetric crowns, broad embedding depressions, restrained contacts, semantic roughness, and final normals from the combined height field.
+7. Replace the sparse-field seam ratio with absolute boundary mean/p95 deltas and local edge-neighbour excess metrics; retain 3×3 and mip evidence as mandatory visual evidence.
+8. Run the complete generator twice and compare combined, catalog, candidate, placement, and field fingerprints.
+
+### Evidence outputs
+
+The existing action `Tools > PS3D > Run Sparse Riverbed Candidate Synthesis` remains the single entry point. It writes one clipboard report and, per candidate:
+
+```text
+ColorPreview.png
+ColorPreview_3x3.png
+StoneMask.png
+Height.png
+Cavity.png
+Normals.png
+Roughness.png
+MipContactSheet.png
+PlacementDebug.png
+MotifCatalog.png
+```
+
+All outputs remain under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`.
+
+### Invariants and non-goals
+
+- No purchased donor image or extracted stamp contributes to procedural motif generation.
+- M2.7B extractor and validation files remain byte-identical.
+- No output is written under `Assets`.
+- No runtime code, shader, HLSL, Ground, River, hydrology, vegetation, Painted Accent, scene, prefab, material profile, layer, library entry, mesh, renderer, texture sample, draw call, allocation, or per-frame behavior changes.
+- No automatic generation on reload or `OnValidate`.
+- This patch does not promote a candidate. Runtime integration remains blocked until visual acceptance.
+
+### Risks and controls
+
+- **Risk:** motifs become pointed or star-like. **Control:** superellipse exponent floor, low harmonic amplitudes, broad angular lobes only, wide chip window, analytic smooth mask, and report metrics for minimum radial scale and maximum boundary perturbation.
+- **Risk:** motifs look like perfect eggs. **Control:** asymmetric crown shift, broad boundary harmonics, restrained flattening, varied aspect, rotation, relief, and family mix.
+- **Risk:** stones still look pasted on. **Control:** per-placement embedding, broad substrate depression, narrow low-strength contact, globally derived normals, and cavity/contact evidence.
+- **Risk:** substrate remains flat. **Control:** integer-period macro patches, shallow pits/ripples, fine low-amplitude variation, and candidate-specific substrate evidence.
+- **Risk:** distant mips become blocks. **Control:** antialiased distance masks, larger minimum rendered motif size, filtered mip evidence, and mip occupancy reporting.
+- **Risk:** sparse seam validator false positives. **Control:** absolute and local edge metrics, deterministic toroidal generation, and visual repeat evidence; no global sparse-field denominator.
+
+### Acceptance and validation
+
+- [x] User approved procedural generation and rounded-stone constraint.
+- [x] M2.7C Unity evidence and visual failure are recorded.
+- [x] Read-only review completed before the first edit.
+- [x] Canonical plan updated before implementation.
+- [x] Donor extraction has zero code dependency and zero source contribution.
+- [x] Source contract generates exactly 36 deterministic motifs across all five families; Unity execution remains pending.
+- [x] Static and offline approximation metrics remain within rounded-shape bounds; exact Unity report remains pending.
+- [x] Validation invokes two complete runs and compares catalog, candidate, placement-count, and combined fingerprints; exact Unity result remains pending.
+- [x] Non-authoritative offline approximation reached 11.08%, 16.38%, and 19.43%; exact Unity coverage and quiet-block results remain pending.
+- [x] Replacement absolute/local seam metric is implemented; non-authoritative approximation passed all limits, exact Unity result pending.
+- [x] Evidence writer covers color, repeat, mask, height, cavity, normal, roughness, placement, motif catalog, and mip sheets; Unity file generation pending.
+- [x] Tree-sitter C# parsing reports zero syntax-error or missing nodes for both changed files and both preserved M2.7B direct related files.
+- [x] Post-change scope and compliance audit passes for the reconstructed source.
+- [ ] Unity 6000.5 compilation and menu execution pass.
+- [ ] User visually accepts one candidate before runtime integration.
+
+### Implementation result
+
+- Replaced donor extraction/stamp consumption with a deterministic 36-motif procedural catalog. `SparseRiverbedCandidateSynthesizer.cs` contains no reference to `SparseRiverbedDonorExtractor`, donor stable IDs, source hashes, source labels, or bitmap resampling.
+- Added five rounded motif families using ellipse/superellipse distance fields, broad low-amplitude harmonics, wide optional flattening, analytic antialiasing, arbitrary rotation, asymmetric crowns, broad faceting, tilt, relief, and embedding.
+- Replaced the fixed contact radius with broad shallow depression and narrow restrained contact bands derived from analytic distance.
+- Replaced the four-wave substrate with candidate-specific periodic sediment fields, fine variation, shallow pits, and limited ripple response.
+- Replaced the sparse global seam ratio with boundary mean, p95, and local edge-excess metrics.
+- Updated validation/reporting for procedural catalog metrics, family usage, mip occupancy, motif-catalog evidence, and zero donor contribution.
+- Preserved the existing script `.meta` files and both M2.7B extractor/validation files byte-identically.
+
+### Post-change consistency and compliance audit
+
+- Exact reconstructed scope comparison: **PASS — only the five approved files changed.**
+- Tree-sitter C# parse: **PASS — zero syntax-error or missing nodes in both changed files and both directly related preserved M2.7B files.**
+- Donor independence: **PASS — no `SparseRiverbedDonorExtractor`, donor ID, source hash, donor label, or source-coordinate dependency remains in M2.7C.1 synthesis/validation.**
+- Rounded-shape source contracts: **PASS — algorithm version 2, 36 motifs, five families, exponent floor 2.0, arbitrary rotation, analytic distance antialiasing, and no quarter-turn/nearest-neighbour stamp path.**
+- Editor-only scope: **PASS — no `AssetDatabase` mutation, automatic reload hook, `OnValidate`, runtime file, output under `Assets`, or `GeneratedGround`/shader/material-property integration.**
+- Evidence contract: **PASS — one menu action, two synthesis runs, clipboard report, 3×3 repeat, mask, height, cavity, normal, roughness, placement, motif catalog, and mip outputs under `Library`.**
+- Preserved files: **PASS — both existing script `.meta` files and both M2.7B code files remain byte-identical.**
+- Non-authoritative Python approximation of the recorded formulas: **PASS for feasibility only — 36 motifs; minimum exponent 2.1041; maximum aspect 1.6918; minimum radial scale 0.8480; maximum perturbation 0.1520; candidate coverage 11.08%, 16.38%, and 19.43%; all approximate seam metrics below the implemented limits. This does not replace Unity C# execution or visual acceptance.**
+- Unity/Roslyn compilation and exact C# execution: **PENDING — unavailable in this environment.**
+- Production visual acceptance: **PENDING.**
+
+### Performance contract
+
+M2.7C.1 is an explicit Editor-only 512×512 evidence generator. Expensive deterministic dirty-time work is acceptable. Runtime cost remains exactly zero because no runtime file or serialized candidate changes.
+
+### File-by-file implementation status
+
+- `Ground_Generation_Surface_Upgrade_Plan.md`: **implemented and audited.**
+- `SparseRiverbedCandidateSynthesizer.cs`: **implemented and statically audited.**
+- `SparseRiverbedCandidateSynthesisValidation.cs`: **implemented and statically audited.**
+- `Ground_Visual_Design_and_Architecture.md`: **updated.**
+- `GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`: **updated.**
+
+## 2026-07-20 — GSU-M2.7C: Stone-Ground-Only Sparse Riverbed Candidate Synthesis
+
+**Status:** Superseded and visually rejected after Unity 6000.5 execution. Determinism and target coverage passed, but the donor-stamp candidates appeared as simplified isolated stickers with uniform contact outlines, weak substrate identity, limited orientation, and blocky lower-mip silhouettes. The only automated failure was the sparse-field seam ratio, which is not retained as the authoritative seam metric. GSU-M2.7C.1 is the authoritative replacement.
+
+### Objective
+
+Add one explicit Editor-only synthesis workflow that consumes only the accepted Stone Ground 01 donor catalog and creates three new sparse riverbed material-data candidates over one deterministic calm substrate. This patch produces diagnostic images and reports under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`; it does not create a runtime surface profile, Ground layer, detail-library entry, shader path, serialized generated texture, scene object, prefab, or Inspector control.
+
+The dense donor layout is never copied. Each candidate places a bounded subset of isolated donor stamps over broad quiet substrate areas and measures its own final visible stone coverage.
+
+### Accepted prerequisite evidence and decisions
+
+Unity report `SparseRiverbedDonorExtraction.txt`, generated 2026-07-20T11:08:58.7956876Z under Unity 6000.5.0f1, records deterministic repeated extraction with combined fingerprint `5359742dfd11d06aa25962d99aa0c15675ef69838f441aa762709f96ea92953b`. Stone Ground 01 produced 54 selected candidates across 19 small, 17 medium, and 18 large records. Source hashes were reported and the extraction verdict was PASS.
+
+The user visually accepted Stone Ground 01 as the primary donor. The Black Gravel 01 accepted sheets contained excessive crescent, shell, disconnected, and fragmentary forms and are excluded from M2.7C. Black Gravel source files remain unchanged and available for possible later research; they contribute zero placements and zero visible area in this patch.
+
+### Read-only review evidence
+
+Reviewed completely before the first edit:
+
+- `Assets/AGENTS.md`: mandatory review, plan-first, strict scope, post-change audit, evidence, Unity constraints, and response structure.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractor.cs`: donor definitions, 512×512 arrays, component labels, candidate bounds and metrics, selected-catalog ordering, source hashing, and deterministic fingerprint ownership.
+- `Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractionValidation.cs`: one-action report/clipboard and PNG output conventions under `Library`.
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`: M2.7A/A.1 retirement, M2.7B extraction contract, and M2.7C–E sequencing.
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`: donor-only source ownership and substrate-plus-feature direction.
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`: project-level diagnostics remain outside `GeneratedGround`; synthesized candidates may not enter selectors before later promotion.
+- User-supplied M2.7B Unity report and the full Stone Ground / Black Gravel detection, accepted, normal, cavity, and rejection sheets.
+
+The reconstructed source contains no `.git` directory. Branch, `HEAD`, working-tree status, history, and commit comparison are unavailable. The working baseline is the accepted reconstructed state through V1A.6.1, GSU-M2.4.1, GSU-M2.7A.1, and GSU-M2.7B plus the supplied Unity reports and visual decision.
+
+### Approved files
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesizer.cs.meta
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesisValidation.cs
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedCandidateSynthesisValidation.cs.meta
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+```
+
+### Candidate contract
+
+All candidates use one shared deterministic substrate and Stone Ground 01 stamps only:
+
+| Candidate | Stable evidence id | Target stone coverage | Accepted range |
+|---|---|---:|---:|
+| Very Sparse River Sediment | `very-sparse-river-sediment` | 11% | 9.5–12.5% |
+| Sparse River Sediment | `sparse-river-sediment` | 16% | 14–18% |
+| Moderate River Sediment | `moderate-river-sediment` | 20% | 18–22% |
+
+The substrate must remain visually dominant, low-frequency, periodic, and identical across the three comparisons. Placement uses deterministic toroidal coordinates, broad periodic density gating, bounded overlap rejection, fixed discrete rotation/scale choices, and no inherited donor-source layout. Eligible synthesis stamps exclude microscopic records, extreme aspect, weak separation, and low compactness even when they were retained for extraction evidence.
+
+Each placed stamp contributes a coherent silhouette, donor-derived local height, and generated embedding/contact response. Final normals are derived from the combined periodic height field so substrate, contact depression, and stones remain coherent. Roughness is generated semantically from substrate, stone mask, and stable placement variation rather than copying donor photographic roughness.
+
+### Invariants and non-goals
+
+- Stone Ground 01 is the only donor used in M2.7C. Black Gravel contributes zero candidate placements.
+- Donor source images and `.meta` files remain byte-identical and importer settings remain unchanged.
+- All candidate textures, reports, fingerprints, contact sheets, repeats, and mip evidence are written only under `Library`.
+- No generated candidate is serialized under `Assets`, added to `StylizedSurfaceDetailLibrary`, exposed through a material profile, or selectable by `GeneratedGround` in this patch.
+- No runtime C#, shader, HLSL, Ground, River, hydrology, vegetation, Painted Accent, scene, prefab, material, layer, tag, component, mesh, renderer, draw call, texture sample, memory allocation, or per-frame behavior changes.
+- No automatic synthesis runs on domain reload. One explicit project-level menu action performs two runs, validates determinism, writes evidence, and copies the complete report to the clipboard.
+- Candidate synthesis does not claim production readiness. M2.7D semantic/runtime integration remains blocked until one candidate is visually accepted.
+
+### Synthesis sequence
+
+1. Run `SparseRiverbedDonorExtractor.ExtractAll` and select the successful `stone-ground-01` donor only.
+2. Apply stricter synthesis eligibility to remove tiny/basic, highly elongated, low-compactness, and weakly separated stamps.
+3. Generate one 512×512 periodic calm substrate from fixed low-frequency integer-period waves.
+4. For each candidate definition, use a fixed deterministic PRNG and broad periodic density field to propose stamp centers, discrete rotations, and restrained scales on a torus.
+5. Reject proposals with excessive toroidal center proximity, excessive pixel overlap, or coverage overshoot. Stop within the candidate's accepted coverage range or fail explicitly.
+6. Build a combined height field from substrate, partially embedded donor forms, and a narrow contact depression. Derive periodic normals and semantic cavity/roughness fields.
+7. Generate fixed palette evidence, grayscale form, stone mask, cavity, normal, roughness, 3×3 repeats, and wrapped mip 0–4 evidence.
+8. Repeat the complete synthesis and fail if fingerprints, placement counts, or final coverage differ.
+
+### Evidence outputs
+
+One menu action `Tools > PS3D > Run Sparse Riverbed Candidate Synthesis` writes and copies:
+
+```text
+Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates/SparseRiverbedCandidateSynthesis.txt
+```
+
+Per candidate it writes:
+
+```text
+<ColorPreview>.png
+<ColorPreview_3x3>.png
+<StoneMask>.png
+<Height>.png
+<Cavity>.png
+<Normals>.png
+<Roughness>.png
+<MipContactSheet>.png
+<PlacementDebug>.png
+```
+
+The report includes donor fingerprint, stricter eligible count, seed, target and actual coverage, placement count, size-bucket usage, proposal/rejection counters, largest connected stone-mask region, seam ratios, mip dimensions, output fingerprint, repeated-run equality, source hashes, and confirmation that Black Gravel placements equal zero.
+
+### Risks and controls
+
+- **Risk:** extracted stamps still appear pasted over the substrate. **Control:** partial embedding, a bounded contact depression, globally derived normals, and visual height/cavity evidence.
+- **Risk:** target coverage is reached through many small noisy stamps. **Control:** synthesis-specific minimum area, balanced bucket selection, lower small-stamp share, and explicit placement/coverage reports.
+- **Risk:** sparse placement accidentally forms a uniform carpet. **Control:** broad periodic density gating, toroidal minimum spacing, placement-debug image, and measured quiet-area evidence.
+- **Risk:** toroidal wrapping produces seams or edge crowding. **Control:** all placement, height, normals, mip generation, and seam measurement use wrapped coordinates.
+- **Risk:** a donor-based result still looks unsuitable. **Control:** stop after visual evidence. The approved fallback is a later procedurally generated stone-motif patch using the same substrate/synthesis validation contract.
+
+### Acceptance and validation
+
+- [x] M2.7A.1 retirement Unity report passed.
+- [x] M2.7B repeated extraction and source-integrity report passed.
+- [x] Stone Ground 01 visually accepted as the only M2.7C donor.
+- [x] Black Gravel 01 excluded from all M2.7C placements.
+- [ ] Unity compilation passes.
+- [ ] Two complete synthesis runs produce identical fingerprints and metrics.
+- [ ] All three candidates land inside their accepted coverage ranges.
+- [ ] Reports confirm Black Gravel placement count and visible coverage are zero.
+- [ ] 3×3 and mip 0–4 evidence show no conspicuous repeat seam.
+- [ ] Candidate images show broad quiet substrate areas and coherent embedded stones.
+- [ ] Donor source hashes remain unchanged.
+- [x] Final diff and post-change audit remain inside the approved seven-file scope.
+- [x] New and direct-consumer C# files parse with zero syntax-error nodes under the available tree-sitter C# parser.
+- [x] Static source-contract checks confirm Stone Ground as the sole donor, Black Gravel placement count fixed at zero, two-run determinism invocation, coverage targets, Library-only output, clipboard report, repeat evidence, and wrapped mip evidence.
+- [ ] User visually accepts one candidate before M2.7D begins.
+
+### Performance contract
+
+M2.7C adds no runtime code or data. Synthesis is an explicit Editor-only operation over 512×512 arrays and bounded placement attempts. Temporary textures and arrays are released after evidence generation. The patch adds zero runtime draw calls, texture samples, meshes, renderers, gameplay allocations, per-frame CPU work, or per-chunk work.
+
+### Implementation result
+
+- Added `SparseRiverbedCandidateSynthesizer`, which consumes the existing in-memory extraction result, selects only `stone-ground-01`, applies stricter synthesis eligibility, generates one shared periodic substrate, and produces the three fixed coverage candidates through deterministic toroidal placement.
+- Added `SparseRiverbedCandidateSynthesisValidation`, exposing one explicit menu action, two complete synthesis runs, fingerprint/coverage/source-hash checks, clipboard reporting, and all candidate evidence under `Library/SurfaceMaterialDiagnostics/SparseRiverbedCandidates`.
+- The synthesizer derives final normals from combined height, generates a bounded contact cavity and semantic roughness, and writes no asset or importer state.
+- Black Gravel is not referenced by stable donor ID in the synthesizer. Its reported placement count is initialized to and validated as zero.
+
+### Post-change consistency and compliance audit
+
+- Exact whole-tree comparison against the reconstructed pre-edit baseline: **PASS — three approved Markdown files modified and four approved new code/meta files added; no other difference.**
+- C# syntax parsing: **PASS — both new files and both direct M2.7B producer/caller files parse with zero syntax-error or missing nodes using the available tree-sitter C# grammar.**
+- Direct producer preservation: **PASS — `SparseRiverbedDonorExtractor.cs` and `SparseRiverbedDonorExtractionValidation.cs` remain byte-identical to their captured pre-edit hashes.**
+- Scope and architecture assertions: **PASS — no `AssetDatabase` mutation, runtime asset creation, `GeneratedGround`, shader, material-property-block, automatic reload callback, `OnValidate`, or output path under `Assets` occurs in the new implementation.**
+- GUID audit: **PASS — both new script GUIDs are unique across the reconstructed `Assets` tree.**
+- Approximate algorithm sanity check: **PASS, non-authoritative — a Python reconstruction using the user-supplied Stone Ground accepted contact sheets reached 11.20%, 16.11%, and 20.07% coverage with 49, 67, and 97 placements. This does not replace the exact Unity/source-map run.**
+- Unity/Roslyn compilation: **PENDING — unavailable in this environment.**
+- Exact source-driven output, seam/mip measurements, and production visual acceptance: **PENDING — run the one Unity menu action and review its complete report and evidence.**
+
+## 2026-07-20 — GSU-M2.7B: Donor Stone Extraction and Evidence
+
+**Status:** Accepted as an extraction/evidence phase after Unity 6000.5 execution and visual review. Repeated fingerprints and source hashes passed. Stone Ground 01 is accepted for M2.7C; Black Gravel 01 is retained as source evidence but rejected from first-pass synthesis.
+
+### Objective
+
+Add an Editor-only deterministic donor extractor for the retained Stone Ground 01 and Black Gravel 01 height, ambient-occlusion, and normal maps. Produce a reusable in-memory catalog of isolated stone stamps plus one comprehensive report and diagnostic image set under `Library/SurfaceMaterialDiagnostics/SparseRiverbedDonors`. Do not create any runtime surface material, detail-library entry, Ground layer, shader path, scene object, prefab, or serialized extracted-stamp asset in this patch.
+
+Dense donor coverage is not the synthesis target. M2.7B only identifies useful individual source forms. M2.7C will place a controlled subset over a quiet substrate and will own final stone coverage targets. No donor-source coverage percentage is inherited automatically.
+
+### Accepted prerequisite evidence
+
+Unity report `ImportedSurfaceRetirement.txt`, generated 2026-07-20T10:28:28.9678804Z under Unity 6000.5.0f1, records:
+
+```text
+VERDICT: PASS — direct imported runtime surfaces retired; empty logical libraries have valid neutral backing; donor maps preserved.
+No retired runtime layer/material assets remain.
+No retained material uses a retired detail ID.
+Retired detail entries remaining: 0.
+Donor source folders retained: 2/2.
+Donor source textures retained: 13.
+```
+
+M2.7A.1 is therefore accepted and no longer blocks extraction.
+
+### Read-only review evidence
+
+Reviewed before the first edit:
+
+- `Assets/AGENTS.md` in full: mandatory review, plan-first, strict scope, post-change audit, evidence, and response requirements.
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`: M2.7A/A.1 retirement contract and M2.7B–E sequencing.
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`: donor-only source ownership, empty-library backing, and sparse substrate-plus-feature direction.
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`: no new GeneratedGround foldout, debug view, scene component, or per-River donor control.
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs`: current authored source conventions, normal decoding, height/AO use, generated evidence conventions, and Editor-only processing ownership.
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs`: report/clipboard and `Library/SurfaceMaterialDiagnostics` output conventions.
+- `Assets/Game/Rendering/PixelSurface/Editor/RetireImportedSurfaceMaterialsMigration.cs`: canonical donor folder paths and preservation contract.
+- `Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceDetailLibrary.cs`: direct imported entries are absent; no library mutation is needed for extraction.
+- Retained donor path contract:
+  - `Assets/Game/ArtSources/Editor/SurfaceMaterials/StylizedStoneGround01`
+  - `Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01`
+- The reconstructed source contains no `.git` directory. Branch, `HEAD`, status, history, and comparison to commits are unavailable. The working baseline is the accepted reconstructed state through V1A.6.1, GSU-M2.4.1, and GSU-M2.7A.1 plus the supplied Unity retirement report.
+
+### Approved files
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractor.cs
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractor.cs.meta
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractionValidation.cs
+Assets/Game/Rendering/PixelSurface/Editor/SparseRiverbedDonorExtractionValidation.cs.meta
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+```
+
+### Invariants and non-goals
+
+- Donor source images and their `.meta` files remain byte-identical.
+- All extraction output is local under `Library`; no extracted texture or catalog is serialized under `Assets`.
+- The extractor reads source bytes directly and does not change TextureImporter settings.
+- Extraction is deterministic for identical donor bytes and algorithm version.
+- Edge-truncated, microscopic, oversized, weakly separated, extreme-aspect, and incoherent-normal candidates are rejected with explicit reasons.
+- The accepted catalog is quality-limited and size-stratified; it is not a copy of every dense donor component.
+- M2.7B does not decide final sparse coverage. M2.7C will own target coverage and placement over a quiet substrate.
+- No runtime C#, shader, HLSL, Ground, River, hydrology, vegetation, Painted Accent, scene, prefab, material profile, Ground layer, detail-library asset, layer, tag, component, mesh, renderer, draw call, texture sample, or per-frame work change is authorized.
+- No automatic extraction runs on domain reload. One explicit menu action performs the full extraction, writes the report and images, and copies the complete report to the clipboard.
+
+### Extraction algorithm
+
+1. Load required donor height, AO, and normal JPEG bytes into temporary readable textures without importer mutation.
+2. Area-reduce each donor to a fixed 512×512 analysis grid. Normalize height and AO by robust 5th/95th percentiles.
+3. Build a lightly smoothed stone-support field from `0.75 × normalized height + 0.25 × normalized AO`.
+4. Use the support-field 70th percentile as the high-confidence component threshold and label 8-connected components.
+5. Measure area, bounds, aspect, compactness, support contrast against an exterior ring, AO contact contrast, height range, and decoded-normal coherence.
+6. Reject candidates that touch a source edge, are too small or large, exceed bounded aspect, are too sparse inside their bounds, lack support contrast, or lack coherent normal data.
+7. Rank eligible candidates deterministically and retain a bounded size-stratified catalog per donor so small, medium, and large forms are all represented.
+8. Run the extraction twice from the same loaded data and fail validation if catalog fingerprints differ.
+
+### Evidence outputs
+
+The one menu action `Tools > PS3D > Run Sparse Riverbed Donor Extraction` writes and copies:
+
+```text
+Library/SurfaceMaterialDiagnostics/SparseRiverbedDonors/SparseRiverbedDonorExtraction.txt
+```
+
+It also writes per donor:
+
+```text
+<Donor>_DetectionOverlay.png
+<Donor>_AcceptedHeight.png
+<Donor>_AcceptedSilhouettes.png
+<Donor>_AcceptedNormals.png
+<Donor>_AcceptedCavity.png
+<Donor>_RejectedExamples.png
+```
+
+The report includes source hashes, dimensions, thresholds, raw component count, rejection counts by reason, accepted catalog count, size/aspect/contrast distributions, deterministic fingerprints, and an explicit statement that donor coverage is not final synthesis coverage.
+
+### File-by-file implementation sequence
+
+1. `SparseRiverbedDonorExtractor.cs`: source definitions, byte loading, area reduction, robust normalization, support construction, component measurement, deterministic rejection/ranking, size-stratified catalog selection, and reusable in-memory stamp records for M2.7C.
+2. `SparseRiverbedDonorExtractionValidation.cs`: one menu action, two-run determinism check, report/clipboard output, source-hash verification, and all diagnostic PNG generation under `Library`.
+3. Update the three canonical Ground documents with extraction ownership, no-Inspector/no-runtime impact, and the M2.7C gate.
+
+### Risks and controls
+
+- **Risk:** dense sources yield too many near-duplicate fragments. **Control:** strict quality rejection, deterministic ranking, size-stratified caps, and visual contact sheets.
+- **Risk:** one threshold splits one stone into multiple top-face fragments. **Control:** M2.7B reports component size/shape evidence; M2.7C may use stamps as source motifs rather than claim exact original stone identity. No runtime feature depends on segmentation yet.
+- **Risk:** source normal convention differs. **Control:** extraction uses normal Z/coherence only; green-channel orientation is irrelevant to candidate acceptance.
+- **Risk:** donor edge seams contaminate candidates. **Control:** all edge-touching components are rejected in this phase.
+- **Risk:** extraction appears sparse by selecting only examples while hiding poor raw results. **Control:** report records all raw components and every rejection reason; overlays show accepted and rejected bounds over the full donor.
+
+### Acceptance and validation
+
+- [x] Both retained donor folders and all required height/AO/normal maps resolve in Unity.
+- [x] Source SHA-256 hashes before and after extraction match.
+- [x] Two repeated extractions produce identical catalog fingerprints.
+- [x] Report contains complete raw/accepted/rejected counts and rejection reasons for both donors.
+- [x] Visual review completed: Stone Ground 01 shows a coherent varied catalog and is accepted; Black Gravel 01 shows excessive fragmentary/crescent forms and is explicitly excluded from M2.7C.
+- [x] Detection overlays expose the complete full-source segmentation rather than only selected examples.
+- [x] Static scope proof: no output is written under `Assets` except the approved code, `.meta`, and Markdown files.
+- [x] Exact final diff remains inside the approved seven-file scope.
+- [x] Unity compilation and extraction execution passed before M2.7B acceptance.
+- [x] M2.7C unblocked with Stone-Ground-only synthesis scope after user acceptance.
+
+### Performance contract
+
+M2.7B adds no runtime code or data. Extraction is an explicit Editor-only operation over two 512×512 analysis fields. Temporary arrays and textures are released after the action. The patch adds zero draw calls, runtime samples, gameplay allocations, per-frame CPU work, meshes, or renderers.
+
+### Implementation result
+
+- Added `SparseRiverbedDonorExtractor`, an Editor-only reusable extraction API with fixed donor definitions, direct byte decoding, 512×512 area reduction, robust normalization, smoothed height/AO support, deterministic 8-connected component labeling, explicit quality rejection, bounded size-stratified selection, and SHA-256 catalog fingerprints.
+- Added `SparseRiverbedDonorExtractionValidation`, exposing one explicit menu action. It runs extraction twice, verifies deterministic fingerprints and unchanged donor hashes, writes one clipboard report, and produces complete detection overlays plus accepted height/silhouette/normal/cavity and rejected-example contact sheets under `Library`.
+- No importer mutation, automatic domain-reload execution, `AssetDatabase` write, runtime asset, detail-library mutation, Ground control, scene object, or serialized extraction result was added.
+- Dense donor layout is not copied or treated as target coverage. The report states this explicitly, and M2.7C remains responsible for sparse placement and measured final coverage.
+
+### Post-change consistency and compliance audit
+
+- Scope: **PASS — exactly the seven approved files changed: two new Editor C# files, their two `.meta` files, and three canonical Markdown documents.**
+- C# lexical/static structure: **PASS — both new files have balanced delimiters, terminated strings/comments, balanced preprocessor state, required namespaces, one explicit menu action, deterministic two-run validation, source-hash checks, clipboard/report output, and no automatic execution attribute.** A C# compiler, Unity assemblies, and Unity Editor are unavailable in this environment; compilation is pending and not claimed passed.
+- GUID/meta review: **PASS — both new script GUIDs are unique in the reconstructed project.**
+- Scope/prohibition review: **PASS — no donor image, donor `.meta`, runtime C#, shader, HLSL, Ground, River, vegetation, Painted Accent, scene, prefab, profile, layer, detail-library asset, or generated runtime asset changed.**
+- File-write review: **PASS — implementation writes only the report and PNG evidence under `Library/SurfaceMaterialDiagnostics/SparseRiverbedDonors`.**
+- Black Gravel offline algorithm check: **PASS with limitation — 512×512 analysis produced 583 raw components, 435 quality-eligible components, and a 96-stamp catalog with 32 small, 32 medium, and 32 large selections. Selected area min/p25/median/p75/max was 31/60/119.5/165/1167 analysis texels. Stone Ground 01 source bytes were unavailable in this environment, so both-donor execution remains a Unity gate.**
+- Existing builder, material validation, detail-library contracts, retirement code, runtime consumers, shaders, and Ground code were reread after implementation and remain byte-identical to the pre-edit state.
+- M2.7C remains blocked until Unity produces the complete report and the user accepts both donors' contact sheets.
+
+## 2026-07-20 — GSU-M2.7A.1: Empty Logical Detail Library Support and Retirement Retry
+
+**Status:** Accepted in Unity 6000.5.0f1 on 2026-07-20. `ImportedSurfaceRetirement.txt` reported `VERDICT: PASS`, zero retired runtime assets or detail IDs, two retained donor folders, 13 retained donor textures, and valid empty-library neutral backing.
+
+### Outcome required
+
+Allow `StylizedSurfaceDetailLibrary` to contain zero logical entries while retaining one internal neutral packed-detail backing slice. Retry the existing GSU-M2.7A retirement without preserving any rejected imported runtime entry. The internal slice is structural storage only: it is not serialized as a logical `Entry`, cannot resolve through a stable ID, does not appear in selectors, and is not referenced by any retained material profile.
+
+### Observed blocker and reviewed evidence
+
+Unity produced the following no-change preflight failure:
+
+```text
+[GSU-M2.7A] Imported-surface retirement made no changes because preflight failed.
+Retiring imported entries would leave detail library 'Assets/Game/Demo/Profiles/SurfaceMaterials/SSDL_DefaultSurfaceDetails.asset' empty.
+```
+
+The current implementation proves the blocker:
+
+- `Assets/Game/Rendering/PixelSurface/Editor/RetireImportedSurfaceMaterialsMigration.cs`, `PreflightLibraries`, rejects `remainingCount <= 0` before any mutation.
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs`, `Validate`, reports `The detail library has no entries.` and returns failure.
+- The same builder creates the packed `Texture2DArray` with `depth = library.Entries.Count`; zero entries therefore cannot build a valid backing array.
+- `NeedsRebuild` also requires packed-array depth to equal logical entry count, which is incompatible with a one-slice internal backing array.
+- `Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceDetailLibrary.cs`, `FindEntryIndex`, `TryResolve`, and `TryResolveAuthoredColor`, already return no resolution for a missing stable ID. A hidden neutral backing slice therefore cannot become a selectable or resolvable material entry.
+- `Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs` resolves detail only through a stable entry ID. `Assets/Game/Procedural/Ground/GeneratedGround.cs`, `ApplySurfaceLayerDetailProperties`, disables detail when that resolution fails. No Ground runtime consumer indexes backing slice zero directly.
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl`, `PS3D_DecodeStylizedSurfaceDetail`, establishes the neutral packed encoding: `R=0.5`, `G=0.5` yields zero slope; `B=0` yields zero cavity; `A=0.5` yields centred value/finish variation and neutral roughness.
+- `StylizedSurfaceDetailLibraryEditor` and `StylizedSurfaceMaterialProfileEditor` tolerate an empty logical entry list; the material profile editor exposes no selectable entry and runtime resolution remains false.
+- The reconstructed source has no `.git` directory. Branch, `HEAD`, history, staged state, unrelated working-tree changes, and commit comparison are unavailable. The comparison baseline is the reconstructed accepted state from `Assets-Code-Archive(1).zip`, V1A.6/V1A.6.1, GSU-M2.4.1, and GSU-M2.7A.
+
+### Approved files
+
+```text
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceDetailLibrary.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs
+Assets/Game/Rendering/PixelSurface/Editor/RetireImportedSurfaceMaterialsMigration.cs
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+```
+
+No `.meta` change is expected because no file is added, moved, renamed, or deleted by the persistent patch.
+
+### Invariants and non-goals
+
+- Logical entry count may be zero; packed backing depth is `max(1, logical entry count)`.
+- Empty logical libraries generate exactly one neutral packed-detail slice with a complete mip chain.
+- Empty logical libraries generate no texture-form array and serialize an empty texture-form slice mapping.
+- No stable ID resolves when the logical entry list is empty.
+- No fake, placeholder, fallback, or user-visible library entry is created.
+- GSU-M2.7A reverse-reference checks, donor-source preservation, idempotence, and no-scene-rewrite behavior remain unchanged.
+- No shader, HLSL, Ground runtime/editor, River, vegetation, Painted Accent, scene, prefab, layer, tag, component, source image, or generated geometry change is authorized.
+- Runtime texture sample count, draw calls, per-frame CPU work, and material behavior remain unchanged because no retained profile can resolve the internal slice.
+- M2.7B donor extraction remains blocked until the retirement migration reports PASS.
+
+### File-by-file implementation sequence
+
+1. `StylizedSurfaceDetailLibrary.cs`: expose logical-entry count, required packed backing depth, and internal-neutral-backing state without changing stable-ID resolution.
+2. `StylizedSurfaceDetailLibraryBuilder.cs`: accept zero logical entries, create one neutral packed backing slice, update stale-array depth checks, retain null texture-form array state, and report logical versus backing counts.
+3. `StylizedSurfaceMaterialValidation.cs`: add a reusable backing-contract report that validates logical count, packed backing depth, texture-form state, mapping length, and non-resolution of forbidden retired IDs.
+4. `RetireImportedSurfaceMaterialsMigration.cs`: remove only the empty-library preflight rejection, rebuild the empty logical library, invoke the backing-contract validation, and retain every existing reference/deletion/donor verification gate.
+5. Update the three canonical Ground documents to mark direct imported surfaces retired, define empty-library backing ownership, and record that no user-facing placeholder appears in the Inspector.
+
+### Risks and controls
+
+- **Risk:** the backing slice could become accidentally resolvable. **Control:** resolution remains stable-ID based; validation explicitly checks every retired ID returns false.
+- **Risk:** an empty library could rebuild continuously. **Control:** `NeedsRebuild` compares packed depth against `max(1, logical count)` and the generated signature records the empty-backing algorithm version.
+- **Risk:** neutral values could alter a consumer. **Control:** no logical entry maps to the backing slice; neutral encoding is additionally derived from the active HLSL decoder.
+- **Risk:** destructive retirement could begin before all other blockers are cleared. **Control:** all existing reverse-reference and retained-profile preflights run before entry or asset mutation.
+
+### Acceptance and validation
+
+- [x] Source/static contract: empty logical library is accepted by builder validation.
+- [x] Unity execution: retirement report confirmed valid empty-library neutral backing and final PASS.
+- [x] Unity execution: retirement report confirmed zero retired detail entries and no retained material using a retired detail ID.
+- [x] Source/static proof: non-empty library behavior is unchanged because `max(1, n) = n` for every prior positive entry count, the neutral branch is false, and the signature branch is empty-only.
+- [x] Source/static proof: GSU-M2.7A no longer rejects `remainingCount == 0`; it records the internal backing action instead.
+- [x] Source/static proof: existing external-reference and retained-profile preflights still execute before the first mutation.
+- [x] Unity report recorded final `VERDICT: PASS`, zero retired runtime identities, and valid empty-library neutral backing.
+- [x] Persistent patch contains no donor image or serialized runtime asset. Live donor retention remains a migration verification gate.
+- [x] Exact final diff remains inside the approved seven-file scope.
+- [x] Unity compiled and executed the retirement migration under Unity 6000.5.0f1; M2.7A.1 is accepted.
+
+### Implementation result
+
+- `StylizedSurfaceDetailLibrary` now exposes logical entry count, required packed backing depth, and whether the library uses the internal neutral backing slice. Stable-ID resolution is unchanged.
+- The builder accepts zero entries, creates one uniform neutral packed-detail slice with complete generated mips, keeps the texture-form array null, stores an empty texture-form mapping, and versions the empty-library signature independently.
+- The backing-contract validator reports logical/backing counts, signature freshness, rebuild state, texture-form state, mapping count, logical resolution, and forbidden retired-ID resolution.
+- The retirement migration retains all prior reverse-reference and donor-preservation gates, allows an empty logical result, rebuilds affected libraries, and validates only the affected library paths after refresh.
+- No user-visible placeholder entry, profile, layer, selector item, Inspector section, runtime branch, shader edit, or Ground runtime edit is introduced.
+
+### Post-change consistency and compliance audit
+
+- Scope: **PASS — exactly the seven approved files changed; no `.meta`, serialized asset, image, shader, HLSL, Ground runtime/editor, River, vegetation, scene, or prefab file changed.**
+- C# lexical/parser-oriented checks: **PASS — all four changed C# files and five direct consumers have balanced delimiters/preprocessor blocks with strings/comments excluded.** A C# compiler, Roslyn, Unity assemblies, and Unity Editor are unavailable in this environment; compilation is pending and not claimed passed.
+- Namespace/import review: **PASS — all introduced types are covered by existing `System`, `System.Collections.Generic`, `UnityEditor`, and `UnityEngine` imports.**
+- Empty-library static simulation: **PASS — logical depth `0` maps to backing depth `1`; neutral RGBA `(0.5, 0.5, 0, 0.5)` decodes to zero slope, zero value/finish variation, and neutral roughness under the current material decoder.**
+- Non-empty regression proof: **PASS by equation and diff — for every previous logical depth `n > 0`, required depth remains `n`; entry loops, slice indices, mapping, texture-form generation, and non-empty signatures retain their prior paths.**
+- Direct-consumer preservation: **PASS — `StylizedSurfaceMaterialProfile.cs`, `GroundSurfaceLayerProfile.cs`, `GeneratedGround.cs`, both existing material/library editors, and `PixelSurfaceMaterialDetail.hlsl` are byte-identical to the pre-patch state.**
+- Migration ordering: **PASS by source inspection — external references, retained material IDs, and library schema are checked before the no-change failure branch and before `RemoveRetiredLibraryEntries`.**
+- Runtime/performance: **PASS by scope for code paths — no gameplay code or shader changes.** The one 256² RGBA32 full-mip neutral packed slice is approximately `349,524` bytes (`0.333 MiB`) if the library asset is loaded; player-build inclusion remains unverified pending a build report.
+- Unity compilation, actual asset rebuild, migration report, selector cleanup, and donor-source verification: **PENDING.**
+
+## 2026-07-20 — GSU-M2.7A: Retire Direct Imported Surfaces and Freeze Sparse Riverbed Synthesis
+
+**Status:** Superseded by GSU-M2.7A.1. Unity executed the original migration and made no changes because its preflight rejected the valid zero-logical-entry end state. The original implementation and static audit remain historical evidence; the empty-library blocker is corrected only by GSU-M2.7A.1 above.
+
+### Objective
+
+Remove the rejected direct full-cover imported-surface approach from live project data before implementing the replacement. Delete the selectable Stone Ground 01 and Black Gravel 01 Ground layers, their reusable runtime material profiles, and their detail-library entries. Preserve the purchased source maps only as editor-only donor inputs for a new deterministic sparse-riverbed material synthesizer. Record the accepted architecture and the following implementation phases without changing shaders, Ground runtime behavior, River behavior, hydrology, vegetation, scenes, prefabs, or generated geometry in this patch.
+
+### Proven decision
+
+The direct imported materials are visually rejected. Production-camera evidence showed full, uniform high-frequency stone coverage that does not match the subdued stylized Ground language. Pale Sand remains a stronger continuous substrate because it presents broad quiet response rather than a photographic gravel carpet. The accepted replacement is an editor-only synthesizer that extracts useful stone forms from donor height/AO/normal data, procedurally recomposes them sparsely over a calm substrate, and bakes ordinary shared Ground material arrays. No runtime meshes, decals, extra renderers, or per-chunk material generation are permitted.
+
+### Retained versus removed ownership
+
+Remove from live runtime authoring:
+
+- `GSLP_StoneGround01` and legacy `GSLP_FineGravel_ImportedStoneGround01`;
+- `SSMP_StoneGround01` and legacy `SSMP_FineGravel_ImportedStoneGround01`;
+- `GSLP_BlackGravel01`;
+- `SSMP_BlackGravel01`;
+- detail-library entries `stone-ground-01`, `fine-gravel-imported-stone-ground-01`, and `black-gravel-01`;
+- temporary M2.5/M2.6 one-time migration scripts if they remain.
+
+Retain because the replacement subsystem needs them:
+
+- all Stone Ground 01 and Black Gravel 01 source maps under `Assets/Game/ArtSources/Editor/SurfaceMaterials`;
+- the existing shared 256² packed-detail and texture-form array transport;
+- editor importer normalization, source-map sampling, area resampling, periodic mip construction, seam metrics, normal/height/AO/roughness conversion helpers, and validation/report infrastructure;
+- Pale Sand and all unrelated reusable Ground materials.
+
+The retained helpers are infrastructure, not authorization to create another direct imported full-cover material. New runtime candidates must be produced only by the synthesizer phases below.
+
+### Approved persistent patch scope
+
+```text
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+Assets/Game/Rendering/PixelSurface/Editor/RetireImportedSurfaceMaterialsMigration.cs
+Assets/Game/Rendering/PixelSurface/Editor/RetireImportedSurfaceMaterialsMigration.cs.meta
+```
+
+Unity-side migration effects:
+
+```text
+DELETE direct Stone Ground 01 / Black Gravel 01 Ground-layer assets when present
+DELETE direct Stone Ground 01 / Black Gravel 01 material-profile assets when present
+REMOVE their three detail-library IDs
+REBUILD every affected generated detail library
+WRITE/COPY Library/SurfaceMaterialDiagnostics/ImportedSurfaceRetirement.txt
+DELETE the temporary migration script only after verified success
+```
+
+### Safety contract
+
+- Perform a repository-wide reverse-reference preflight before the first deletion. If a scene, prefab, style, profile, or other asset still references a retired layer/material, abort without modifying anything and list every referencer in the report. The author must switch those uses to Pale Sand or another retained layer and rerun the migration.
+- Do not automatically rewrite scenes, prefabs, shared styles, or local Ground selections.
+- Do not delete or move donor source maps.
+- Do not delete generic array/runtime infrastructure or source-processing helpers needed by the synthesizer.
+- Do not alter River masks, binary substrate transitions, hydrology, Ground geometry, vegetation, Painted Accents, shaders, HLSL, layers, tags, or components.
+- The migration must be idempotent. Missing retired assets/entries count as already clean, not failure.
+
+### Following implementation phases
+
+#### GSU-M2.7B — Donor Extraction and Evidence
+
+Editor-only analysis of Stone Ground 01 and Black Gravel 01 height/AO/normal sources. Extract, classify, and validate reusable stone stamps; emit accepted/rejected contact sheets and metrics. No runtime material or shader change.
+
+#### GSU-M2.7C — Sparse Riverbed Candidate Synthesis
+
+Generate one calm sand/soil substrate and three seamless sparse-stone candidates: Sparse Rounded Riverbed, Mixed River Sediment, and Angular Gravel Patches. Bake form, explicit stone mask, cavity, normal, and roughness data. Emit 3×3 repeats and mips 0–4. No River placement change.
+
+#### GSU-M2.7D — Semantic Ground Material Integration
+
+Integrate the selected generated candidate through the existing shared arrays. Use the explicit stone mask to differentiate substrate and stone palette/normal/roughness response with the same mesh, renderer, draw calls, and texture-sample budget wherever technically possible. Add only controls proven necessary by candidate evidence.
+
+#### GSU-M2.7E — Production Validation and Promotion
+
+Validate from the production isometric camera, wet/dry/submerged states, tiling, distant stability, shader cost, memory, and source exclusion. Promote one candidate only after explicit visual acceptance; delete rejected generated candidates afterward.
+
+### Acceptance criteria
+
+- Direct Stone Ground 01 and Black Gravel 01 no longer appear in Ground selectors.
+- Their runtime profiles and library entries are absent.
+- Donor source maps remain unchanged and editor-only.
+- No active reference is broken; preflight blocks deletion when references remain.
+- Affected libraries rebuild without retired slices.
+- Canonical documents identify the sparse synthesized substrate-plus-feature architecture as the only active riverbed gravel direction.
+- No runtime performance, shader, mesh, River, vegetation, scene, or prefab change is introduced by this patch.
+
+### Validation gates
+
+1. Exact source/meta inventory and C# syntax/API review for the migration.
+2. Preflight simulation verifies every retired path and entry ID, while excluding donor maps and retained infrastructure.
+3. Verify no patch file modifies source maps, shaders, HLSL, Ground runtime/editor, River, vegetation, scenes, prefabs, layers, or tags.
+4. Unity report must show either a no-change preflight failure with complete external referencers, or successful deletion/pruning/rebuild with zero retired identities remaining.
+5. Verify Stone Ground 01 and Black Gravel 01 source-map hashes remain unchanged.
+6. Reread all final changed files and reconcile the exact patch scope.
+
+### Implementation result
+
+- Added one idempotent temporary Editor migration. It identifies canonical and legacy Stone Ground 01 paths plus Black Gravel 01, performs a full reverse-reference preflight, removes the three retired detail IDs, deletes retired layer/material assets and superseded import migrations, rebuilds only affected detail libraries, verifies final absence, writes/copies one report, and self-deletes only after success.
+- The migration deliberately does not rewrite any scene, prefab, style, profile, or local Ground selection. A remaining reference produces a no-change failure report with the exact referencer paths.
+- Donor source directories are queried only for final retention evidence. No source map is moved, changed, or included in the patch.
+- Canonical architecture and Inspector documents now identify sparse synthesized substrate-plus-stone-feature materials as the sole active riverbed-gravel direction.
+- No runtime C#, Ground runtime/editor, shader, HLSL, River, vegetation, Painted Accent, scene, prefab, layer, tag, component, geometry, or generated runtime asset is modified by the persistent patch.
+
+### Post-change consistency and compliance audit
+
+- Persistent scope: **PASS — exactly three Markdown documents, one temporary Editor migration, and its `.meta`.**
+- Migration lexical/syntax-structure audit: **PASS — balanced delimiters, terminated strings/comments, required Unity callbacks, report/clipboard path, reverse-reference preflight, library pruning, rebuild, verification, and self-deletion are present.** A Unity/Roslyn compiler is unavailable in this environment, so Unity compilation remains pending.
+- Current API contract review: **PASS by source inspection — `StylizedSurfaceDetailLibrary.Entries`, `StylizedSurfaceDetailLibrary.Entry.StableId`, and `StylizedSurfaceDetailLibraryBuilder.Rebuild(library, logResult)` exist in the reviewed current code.**
+- Safety review: **PASS — mutation occurs only after all reference/library preflight failures are resolved; donor paths are never deletion targets; scene/style rewriting is absent.**
+- Runtime/performance impact: **PASS by scope — Editor-only one-time asset migration and documentation; no runtime path changes.**
+- Black Gravel donor source hashes were recorded before packaging; the patch contains none of those files. Stone Ground donor sources are likewise not part of the patch.
+- Unity migration execution, generated-array rebuild, live selector cleanup, and report verification remain pending.
+
+## 2026-07-20 — GSU-M2.6: Black Gravel 01 Authored Material-Set Import
+
+**Status:** Implemented in the exact approved eighteen-file persistent patch scope and post-change statically/offline audited. Read-only review used the current reconstructed GSU-M2.5 source state, `StylizedSurfaceDetailLibrary`, `StylizedSurfaceMaterialProfile`, `GroundSurfaceLayerProfile`, `StylizedSurfaceDetailLibraryBuilder`, the accepted Stone Ground 01 migration contract, the three canonical Ground documents, and all six supplied 2048² Black Gravel source maps. Unity compilation, one-time migration, generated-array rebuild, normal-orientation confirmation, production-camera visual acceptance, and build-report source exclusion remain pending. The supplied source has no `.git` metadata, so branch, `HEAD`, history, and unrelated working-tree state remain unavailable.
+
+### Objective
+
+Import the supplied `stone_blackGravel_01` material set as one new reusable **Black Gravel 01** surface material using the existing single-palette authored-material-set pipeline. Preserve the supplied stone form, normal, cavity, and roughness information while keeping Base, Dark, Light, and Cavity Color as the sole runtime color authority. Do not alter the shader, Ground transport, River behavior, binary substrate transition, vegetation, Painted Accents, scenes, or prefabs.
+
+### Reviewed evidence
+
+- `StylizedSurfaceDetailLibrary.Entry` already owns editor-only authored base-color, normal, height, ambient-occlusion, and roughness references plus normal-green inversion and cavity-composition controls. No schema extension is required.
+- `StylizedSurfaceDetailLibraryBuilder.ValidateAuthoredMaterialEntry` requires those five maps to share dimensions and normalizes the base color as sRGB while importing the other maps linearly. All five required supplied maps are 2048×2048.
+- `StylizedSurfaceDetailLibraryBuilder.BuildPackedMaterialPixels` already packs normal slopes into RG, height/AO-derived cavity into B, and roughness into A. `BuildAuthoredColorMipChain` already converts base color into periodic normalized grayscale texture form for the single-palette runtime path.
+- `StylizedSurfaceMaterialProfile.UsesTextureForm` resolves automatically from the selected authored-material-set library entry; no Payload Mode, authored tint, or additional color path is required.
+- `GroundSurfaceLayerProfile` already adapts any reusable material profile into the existing Ground layer selector and retains only cover-compatibility values locally.
+- The supplied metallic map is 2048×2048 and every RGB sample is zero. The current material contract has no metallic channel, and the correct runtime interpretation is non-metallic; the file is retained only as editor-source provenance and is not assigned to the library entry.
+- The supplied maps show stronger opposite-edge discontinuities in normal, height, and AO than ordinary adjacent variation. Unity visual validation must inspect generated 3×3 repeats and mips before acceptance; the purchased source files remain unchanged.
+
+### Approved persistent patch scope
+
+```text
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+Assets/Game/Rendering/PixelSurface/Editor/BlackGravel01ImportMigration.cs
+Assets/Game/Rendering/PixelSurface/Editor/BlackGravel01ImportMigration.cs.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_basecolor.jpg
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_basecolor.jpg.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_normal.jpg
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_normal.jpg.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_height.jpg
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_height.jpg.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_ambientocclusion.jpg
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_ambientocclusion.jpg.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_roughness.jpg
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_roughness.jpg.meta
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_metallic.jpg
+Assets/Game/ArtSources/Editor/SurfaceMaterials/BlackGravel01/stone_blackGravel_01_metallic.jpg.meta
+```
+
+Unity-side migration outputs:
+
+```text
+CREATE Assets/Game/Demo/Profiles/SurfaceMaterials/SSMP_BlackGravel01.asset
+CREATE Assets/Game/Demo/Profiles/Ground/Layers/GSLP_BlackGravel01.asset
+ADD    detail-library entry `black-gravel-01`
+REBUILD the affected StylizedSurfaceDetailLibrary generated arrays
+WRITE  Library/SurfaceMaterialDiagnostics/BlackGravel01Import.txt
+```
+
+The migration script deletes itself only after the new layer, material, entry, source references, and rebuilt arrays verify successfully.
+
+### Invariants and non-goals
+
+- Use stable identity `black-gravel-01`, display name `Black Gravel 01`, material asset `SSMP_BlackGravel01`, and Ground layer asset `GSLP_BlackGravel01`.
+- Keep all 2048² source maps under an `Editor` folder; no source Texture2D becomes a direct runtime profile or Ground dependency.
+- Preserve the existing 256² generated array tier, single-palette color contract, M2.1 periodic texture-form generation, and M2.4.1 binary substrate transition.
+- Ignore metallic at runtime because the supplied metallic map is uniformly black and the current surface contract is dielectric.
+- Initial normal-green inversion is disabled. Unity validation must toggle the existing library-entry option only if raised fragments visibly shade as recesses.
+- Do not modify or replace Stone Ground 01, any existing material/profile/layer, the shader, HLSL, `GeneratedGround`, River code, vegetation, Painted Accents, scenes, prefabs, layers, tags, or components.
+- Do not promote Black Gravel 01 over Stone Ground 01; it is an additional selectable material.
+- Do not increase generated resolution before production-camera evidence shows that the 256² tier is insufficient.
+
+### Initial authored values
+
+The migration creates the reusable material with restrained defaults intended for first visual evaluation, not final acceptance:
+
+```text
+Palette: charcoal neutral-brown with near-black cavities
+Texture Form Strength: 0.90
+Scene Lighting Response: 0.70
+Roughness Variation: 0.65
+Macro Contrast: 0.35
+Detail World Scale: 1.50 m per repeat
+Detail Normal Strength: 0.90
+Detail Cavity Strength: 1.10
+Detail Cavity Bias: 0.10
+Dry Smoothness: 0.18
+Dry Specular Strength: 0.05
+```
+
+The larger repeat than the current Stone Ground 01 starting value is intentional because the source contains substantially smaller fragments; `PixelSurfaceGroundForwardPass.hlsl` multiplies world XZ by `1 / DetailWorldScale`, so a larger value produces physically larger rendered chips.
+
+### Implementation sequence
+
+1. Add the six source maps and explicit visible `.meta` files under the editor-only Black Gravel source folder.
+2. Add an idempotent Editor migration that resolves the active detail library, validates all source assets and dimensions, and aborts before mutation if the stable ID or output paths conflict with unrelated assets.
+3. Add or verify one authored-material-set entry with the five required source references, `flipAuthoredNormalGreen = false`, cavity weights `1 / 1`, and cavity floor `0.05`.
+4. Create `SSMP_BlackGravel01` and `GSLP_BlackGravel01` only when absent. Set initial values only during creation; reruns must not overwrite user tuning.
+5. Rebuild the affected library, verify generated detail and texture-form resolution for `black-gravel-01`, save, refresh, write/copy one complete report, and self-delete only after success.
+6. Update canonical architecture/Inspector documentation and run the complete scope, reference, source-map, parser, and offline conversion audit.
+
+### Validation gates
+
+1. C# syntax/API review for the migration and exact source/meta inventory.
+2. Verify the five assigned source maps are 2048×2048; verify metallic is uniformly zero and unassigned.
+3. Verify no duplicate `black-gravel-01` entry or conflicting output asset exists; verify reruns do not reset existing material tuning.
+4. Offline reproduce the current builder’s 256² texture-form and packed-detail conversion; emit source/generated 3×3 previews and edge/mip metrics.
+5. Unity migration report must confirm source importer normalization, one library entry, created/verified material and layer, successful array rebuild, and runtime resolution.
+6. Production-camera validation must check normal orientation, seam/repeat behavior, distant noise, and palette/scale controls before visual acceptance.
+
+### Implementation result
+
+- Added the six supplied 2048² JPEG maps under the editor-only `BlackGravel01` source folder with explicit visible `.meta` files. Base color imports as sRGB; normal, height, AO, roughness, and metallic import linearly, readable, uncompressed, repeat-wrapped, and without source mipmaps for editor-time conversion.
+- Added an idempotent one-time Editor migration. It resolves the active detail library from Stone Ground 01 or the project’s sole library, validates map dimensions and metallic-black provenance, rejects duplicate stable IDs or conflicting output paths before mutation, creates one authored-material-set entry, creates `SSMP_BlackGravel01` and `GSLP_BlackGravel01`, rebuilds the library, verifies both generated slices, writes/copies one complete report, and self-deletes only after success.
+- Existing material/layer assets are never replaced. A rerun preserves existing Black Gravel material tuning and only verifies its library/entry ownership.
+- No runtime C#, shader, HLSL, Ground transport, River, transition, vegetation, Painted Accent, scene, prefab, tag, layer, or component changed.
+
+### Post-change consistency and compliance audit
+
+- Persistent patch scope: **PASS — exactly three Markdown documents, the temporary migration plus `.meta`, the Black Gravel source-folder `.meta`, and six source images plus six `.meta` files.**
+- C# syntax parse: **PASS — Tree-sitter C# reports no error or missing nodes in `BlackGravel01ImportMigration.cs`.**
+- Serialized-contract review: **PASS — every property written by the migration exists in the current `StylizedSurfaceDetailLibrary.Entry`, `StylizedSurfaceMaterialProfile`, and `GroundSurfaceLayerProfile` schemas.**
+- Source inventory: **PASS — all six files are 2048×2048 RGB JPEGs; metallic maximum RGB byte is `0` and is intentionally unassigned.**
+- Offline current-builder reproduction: **PASS — 256² grayscale texture form and packed normal/cavity/roughness outputs were generated; texture-form periodic repair activates on the failing axes/mips and leaves reported post-repair metrics within the current absolute-or-ratio acceptance contract.**
+- Source seam risk: **RECORDED, not hidden — source normal, height, and AO opposite-edge differences are substantially larger than ordinary adjacent differences. The current builder repairs texture-form seams only; packed-detail seam visibility must be judged in Unity.**
+- Runtime impact: **PASS by architecture — one additional generated library slice and one additional selectable profile/layer; no per-pixel sample, branch, draw call, geometry, runtime allocation, or runtime CPU path was added.**
+- Source exclusion: **Architecturally satisfied by the `Editor` folder but player-build report proof remains pending.**
+- Unity compilation, migration execution, generated-array verification, selector appearance, normal-green orientation, production-camera quality, repeat visibility, and distant stability: **unavailable here and pending, not passed.**
+
+### Current status
+
+- Read-only review: **Complete.**
+- Canonical plan record: **Complete.**
+- Source import and migration implementation: **Complete.**
+- Static/offline audit: **Complete.**
+- Unity compile, migration, generated-array rebuild, visual acceptance, and build-report validation: **Pending.**
+
+
+## 2026-07-20 — GSU-M2.5: Stone Ground 01 Canonicalization and Fine Gravel Cleanup
+
+**Status:** Implemented in the exact approved three-file persistent patch scope and post-change statically audited. The Unity-side asset move/delete/library-rebuild migration remains pending until the patch is imported into the live project. Read-only review used the current reconstructed GSU-M2.4.1 source, the current layer selector implementation, all four Fine Gravel layer/material assets, the detail-library schema and builder, and repository-wide references. The supplied source has no `.git` metadata, so branch, `HEAD`, history, and unrelated working-tree state remain unavailable.
+
+### Objective
+
+Promote the accepted imported stone material to the canonical human-facing identity **Stone Ground 01** and remove the obsolete Fine Gravel experiments from authoring. Preserve existing scene/style references to the accepted material by renaming assets through Unity `AssetDatabase.MoveAsset`, which moves their existing `.meta` files and GUIDs. Remove obsolete assets only after a reverse-dependency preflight proves that no external asset still references them.
+
+### Reviewed evidence
+
+- `GeneratedGroundEditor.DrawSurfaceLayerSelector` builds the dropdown from every `GroundSurfaceLayerProfile` returned by `AssetDatabase.FindAssets("t:GroundSurfaceLayerProfile")`; therefore obsolete layer assets remain visible until the assets themselves are deleted.
+- The accepted assets are currently `GSLP_FineGravel_ImportedStoneGround01.asset` and `SSMP_FineGravel_ImportedStoneGround01.asset`, both with the display name `Fine Gravel — Imported Stone Ground 01`.
+- The obsolete dropdown entries are backed by `GSLP_FineGravel.asset`, `GSLP_FineGravel_AB_A_Direct.asset`, and `GSLP_FineGravel_AB_B_Strong.asset`; each references its matching obsolete `SSMP_FineGravel*` profile.
+- `StylizedSurfaceDetailLibrary` stores the obsolete stable IDs `fine-gravel`, `fine-gravel-ab-a-direct`, and `fine-gravel-ab-b-strong`, while the accepted material uses `fine-gravel-imported-stone-ground-01`. The library builder already supports an explicit rebuild after entry edits.
+- The archive omits `.meta` files, so raw file renaming in the distributed patch would risk new GUIDs. Unity-side `AssetDatabase.MoveAsset` is required to preserve the live project GUIDs.
+
+### Approved implementation scope
+
+Persistent source/document changes:
+
+```text
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Game/Rendering/PixelSurface/Editor/StoneGround01CleanupMigration.cs
+```
+
+Unity migration outputs:
+
+```text
+MOVE   Assets/Game/Demo/Profiles/Ground/Layers/GSLP_FineGravel_ImportedStoneGround01.asset
+    -> Assets/Game/Demo/Profiles/Ground/Layers/GSLP_StoneGround01.asset
+MOVE   Assets/Game/Demo/Profiles/SurfaceMaterials/SSMP_FineGravel_ImportedStoneGround01.asset
+    -> Assets/Game/Demo/Profiles/SurfaceMaterials/SSMP_StoneGround01.asset
+DELETE Assets/Game/Demo/Profiles/Ground/Layers/GSLP_FineGravel.asset
+DELETE Assets/Game/Demo/Profiles/Ground/Layers/GSLP_FineGravel_AB_A_Direct.asset
+DELETE Assets/Game/Demo/Profiles/Ground/Layers/GSLP_FineGravel_AB_B_Strong.asset
+DELETE Assets/Game/Demo/Profiles/SurfaceMaterials/SSMP_FineGravel.asset
+DELETE Assets/Game/Demo/Profiles/SurfaceMaterials/SSMP_FineGravel_AB_A_Direct.asset
+DELETE Assets/Game/Demo/Profiles/SurfaceMaterials/SSMP_FineGravel_AB_B_Strong.asset
+```
+
+The migration also renames the accepted detail entry to stable ID `stone-ground-01`, removes the three obsolete Fine Gravel detail entries, and rebuilds each affected `StylizedSurfaceDetailLibrary`. The temporary migration script deletes itself only after every operation and rebuild succeeds.
+
+### Invariants and non-goals
+
+- Preserve accepted layer and material GUIDs; existing scene, style, prefab, and object references must remain valid.
+- Preserve all Stone Ground 01 tuning and source-map references.
+- Do not edit scenes, prefabs, River files, shaders, Ground runtime code, vegetation, or Painted Accents.
+- Do not delete purchased Stone Ground 01 source maps.
+- Do not delete obsolete prepacked source textures in this pass; after their library entries and profiles are removed they are inert storage and can be audited separately if repository-size cleanup is desired.
+- Historical document sections may retain old Fine Gravel names for traceability; current authoritative sections must identify Stone Ground 01 as canonical and the old assets as removed.
+
+### Implementation sequence
+
+1. Add an Editor-only one-time migration with automatic delayed execution and a manual rerun menu item.
+2. Preflight old/new path state and reverse references for every deletion candidate. Abort before mutation if an obsolete asset has any referencer outside the deletion set.
+3. Move the accepted layer/material assets, preserving their `.meta` files; set both Unity object names and display names to `GSLP_StoneGround01` / `SSMP_StoneGround01` and `Stone Ground 01`.
+4. Update the accepted material `detailEntryId` to `stone-ground-01`; rename the matching library entry and remove the three obsolete entries.
+5. Delete the six obsolete layer/material assets, rebuild affected libraries, save, refresh, write a local report, and self-delete the migration script.
+6. Update canonical visual architecture and run the complete post-change scope/reference/static audit.
+
+### Validation gates
+
+1. C# parse and namespace/API review for the migration.
+2. Verify every move/delete path and stable ID is declared exactly once.
+3. Verify preflight occurs before the first mutating `AssetDatabase` call.
+4. Verify the accepted asset move uses `AssetDatabase.MoveAsset` and no new GUID/meta is authored by the patch.
+5. Unity migration report: accepted moves succeed, six obsolete assets delete, three obsolete library entries remove, `stone-ground-01` resolves, and every affected library rebuilds.
+6. Inspector dropdown contains `Stone Ground 01 — GSLP_StoneGround01` and no Fine Gravel entries; existing Bank/Riverbed assignments remain intact.
+
+### Implementation result
+
+- Added a one-time Editor migration that runs after compilation, preserves the accepted layer/material GUIDs through `AssetDatabase.MoveAsset`, updates object/display names and the stable detail ID, removes the rejected layer/material assets and detail entries, rebuilds affected libraries, writes `Library/SurfaceMaterialDiagnostics/StoneGround01Cleanup.txt`, copies that report to the clipboard, and deletes itself only after verified success.
+- Added a strict reverse-dependency preflight. Any obsolete layer/material reference outside the declared deletion set aborts the migration before the first move or deletion.
+- Updated the canonical visual architecture so `Stone Ground 01`, `GSLP_StoneGround01`, `SSMP_StoneGround01`, and `stone-ground-01` are authoritative; old Fine Gravel names remain only in historical sections.
+
+### Post-change consistency and compliance audit
+
+- Persistent patch scope: **PASS — exactly the two declared Markdown documents plus the new temporary Editor migration; no existing C#, HLSL, shader, asset, scene, prefab, River, vegetation, or Painted Accent file changed.**
+- C# syntax parse: **PASS — Tree-sitter C# reports no error or missing nodes.**
+- Contract/API review: **PASS — current source exposes `GroundSurfaceLayerProfile.DisplayName`, `StylizedSurfaceMaterialProfile.DisplayName`, `StylizedSurfaceMaterialProfile.DetailEntryId`, serialized detail-library `entries/stableId/displayName`, and public `StylizedSurfaceDetailLibraryBuilder.Rebuild`.**
+- Mutation ordering: **PASS — old/new path validation and reverse-dependency discovery execute before the first `AssetDatabase.MoveAsset` or `AssetDatabase.DeleteAsset` call.**
+- GUID preservation: **PASS by implementation contract — the patch does not author replacement asset files or `.meta` files; live accepted assets are moved through Unity's AssetDatabase. Unity execution remains pending.**
+- Cleanup completeness: **PASS by static declaration — six obsolete layer/material paths and three obsolete stable IDs are declared; final verification rejects any remainder and requires exactly one `stone-ground-01` entry. Unity execution remains pending.**
+- Self-cleanup/reporting: **PASS — success schedules deletion of the temporary migration script; failure leaves it available through `Tools > PS3D > Run Stone Ground 01 Cleanup`; every run writes and copies one complete report.**
+- Unity compilation, live reverse-reference result, asset moves/deletions, generated-array rebuild, Inspector dropdown result, and reference preservation: **unavailable here and pending, not passed**.
+
+## 2026-07-19 — GSU-M2.4.1: Simple Binary Substrate Cut
+
+**Status:** Implemented in the exact approved twelve-file scope and post-change statically audited. Read-only review used the current M2.4 reconstructed source and the exact pre-M2.4 state reconstructed from `Assets-Code-Archive(1).zip` plus the accepted M2.3, V1A.6, and V1A.6.1 patches. Unity compilation, source-library regeneration, production-camera visual acceptance, and GPU profiling remain pending. The supplied source has no `.git` metadata, so branch, `HEAD`, history, and unrelated working-tree state remain unavailable.
+
+### Objective
+
+Replace the failed M2.4 whole-stone scatter with the smallest high-confidence non-interpolating transition. Bank and Riverbed material support are combined first, then authored texture-form substrates use one binary material-ownership cut at the combined substrate boundary. The final contour receives only derivative-width antialiasing. There is no segmentation, scatter, per-stone retention, centroid reconstruction, cavity metadata, or runtime hashing.
+
+### Proven evidence
+
+- The M2.4 screenshot shows ordinary Ground leaking through the Bank/Riverbed boundary and pixel-scale fragmentation inside nominal stones.
+- `PixelSurfaceGroundForwardPass.hlsl` currently runs `PS3D_ResolveStylizedSurfaceTransitionCoverage` independently for Bank and Riverbed before substrate composition. Independent rejection can expose ordinary Ground even when the two surfaces use the same material.
+- `PixelSurfaceMaterialDetail.hlsl` currently reconstructs filtered centroid metadata and hashes it per fragment. Bilinear filtering and mip generation cannot preserve discrete element identity, so the implementation is not a high-confidence basis for a production transition.
+- The accepted pre-M2.4 composition already combines Bank and Riverbed through `ResolveGroundSubstrateCompositionWeights`; restoring that order removes the false internal substrate holes.
+- `PS3D_StylizedSurfaceDetail.textureFormPayload` already identifies imported authored texture-form materials in the shader. No new profile field, transport property, texture sample, or serialized asset is required.
+
+### Approved files
+
+The correction may modify only:
+
+```text
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialProfileEditor.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+Assets/Game/Procedural/Ground/GroundSurfaceLayerProfile.cs
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+```
+
+The eight C#/editor files outside the forward pass are in scope only to remove M2.4 transition controls, metadata generation, validation output, and transport while restoring their exact accepted pre-M2.4 behavior. No River file, scene, prefab, material asset, source texture, vegetation file, Painted Accent implementation, shader property declaration, or generated asset is approved.
+
+### Runtime contract
+
+1. Resolve the original continuous Bank and Riverbed material blends.
+2. Sample Bank and Riverbed detail through the accepted M2.3 path.
+3. Compute the ordinary/secondary substrate ownership from the **combined** Bank + Riverbed support.
+4. When either active secondary layer has an authored texture-form payload, replace the combined secondary coverage with a fixed `0.5` binary cut. Use `fwidth` only to provide approximately one screen-pixel antialiasing at the contour.
+5. Preserve the original Bank:Riverbed ratio inside the retained secondary coverage. Different wetness, smoothness, and lighting therefore remain possible, while ordinary Ground cannot appear between Bank and Riverbed merely because their individual weights cross.
+6. Continuous/prepacked materials retain the accepted smooth substrate interpolation.
+
+### Removed M2.4 behavior
+
+- Remove `StylizedSurfaceTransitionStyle` and all four transition controls.
+- Restore authored texture-form generation to normalized grayscale form only; generation algorithm version returns to the accepted M2.3 value and will force a signature mismatch/rebuild from the current M2.4 asset.
+- Remove component segmentation, centroid/prominence payloads, metadata-aware mips, transition diagnostic images, runtime centroid reconstruction, hashing, scatter, and cavity-cut logic.
+- Restore the hidden authored-tint transport vector to its neutral compatibility value.
+
+### Invariants and performance
+
+- No additional texture sample, property, texture, draw call, geometry, runtime allocation, CPU callback, or generated asset type.
+- Texture-form and packed-detail visual evaluation remain M2.3.
+- Bank/Riverbed hydrology and response remain independently weighted after material ownership is resolved.
+- V1A.6 vegetation coverage, V1A.6.1 object search, Painted Accent, River masks, UV3, and geometry remain unchanged.
+- The binary transition changes only authored texture-form substrate ownership at its boundary; continuous materials remain unchanged.
+
+### Validation gates
+
+1. Exact twelve-file scope and exact removal of all M2.4 transition symbols.
+2. Parse every changed C# file and affected unchanged consumer; scan namespaces and method arity.
+3. Verify HLSL delimiters, no remaining centroid/hash/scatter functions, and unchanged texture-sample counts.
+4. Verify `GeneratedGround.cs` and `GeneratedGroundEditor.cs` retain the complete V1A.6 vegetation contract and no obsolete `FindObjectsSortMode` use.
+5. Unity compilation and source-library rebuild.
+6. Production-camera validation: no pixel scatter, no ordinary Ground between Bank and Riverbed, a single hard outer contour with only screen-width antialiasing, and unchanged continuous-material behavior.
+
+### Implementation result
+
+- Removed all M2.4 transition enums, four material controls, profile/layer accessors, Ground transport, editor UI, segmentation and metadata generation, whole-stone diagnostics, centroid reconstruction, runtime hashing, scatter, and cavity-cut logic.
+- Restored the M2.3 grayscale texture-form payload and generation algorithm version `4`. A live M2.4-generated library signature therefore becomes stale and Unity must rebuild it through the existing repair path.
+- Added `ResolveGroundSimpleBinarySubstrateWeights` in the Ground forward pass. It combines Bank and Riverbed support before one fixed `0.5` ownership cut for authored texture-form substrates, preserves their relative internal weights, and uses `fwidth` only for the exact contour.
+- Preserved the current `CS0414` suppression around the hidden serialized `payloadMode` compatibility field.
+- Preserved the complete V1A.6 vegetation coverage runtime/editor implementation and V1A.6.1 nonobsolete object-search overload.
+
+### Post-change consistency and compliance audit
+
+- Exact diff scope: **PASS — twelve declared files and no others** relative to the current M2.4 reconstructed source. Vegetation benchmarks and the serialized recovery scene are byte-identical.
+- C# syntax parse: **PASS — seven changed C# files plus four direct unchanged consumers/contracts parsed with Tree-sitter C# without error or missing nodes**.
+- HLSL structure: **PASS — delimiters and preprocessor balance are valid; the new helper has one definition and one call**.
+- M2.4 removal: **PASS — no transition-style, thinning, cavity-attraction, retention, segmentation, centroid, prominence, or runtime scatter symbol remains under `Assets/Game`**.
+- Accepted-code restoration: **PASS — builder, material editor, validation, material-detail HLSL, layer adapter, Ground runtime, and Ground editor are byte-identical to the reconstructed accepted pre-M2.4 state**. The material profile differs only by the retained `CS0414` warning suppression.
+- Runtime sampling parity: **PASS — four texture-array samples and one ordinary texture sample, unchanged from M2.4/M2.3**. No new property, texture, draw call, geometry, allocation, CPU callback, or per-frame process was added.
+- Numeric invariant test: **PASS — 100,000 random Bank/Riverbed pairs reproduce the original continuous weights exactly when texture-form hard cutting is disabled; hard-cut weights remain normalized and ordinary Ground is zero whenever combined support is at or above the fixed threshold**.
+- Unity/Roslyn compilation, generated-subasset rebuild, production-camera edge appearance, and GPU timing: **unavailable here and pending, not passed**.
+
+### Supersession
+
+GSU-M2.4 whole-stone thinning is superseded by this patch because the runtime metadata representation produced false internal substrate holes and mip/filter-driven fragmentation. Its historical section remains below for traceability but is no longer authoritative.
+
+
+## 2026-07-19 — GSU-M2.4: Discrete Whole-Stone Transition with Cavity-Locked Edges
+
+**Status:** Implemented in the exact approved twelve-file source/document scope and statically/offline audited. Read-only review and implementation used `Assets-Code-Archive(1).zip` overlaid with the accepted V1A.6 and V1A.6.1 Ground vegetation-recovery patches. Unity compilation, source-driven array regeneration, copied live validation output, production-camera acceptance, and profiling remain pending. The supplied source has no `.git` metadata, so branch, `HEAD`, history, and unrelated working-tree state are unavailable.
+
+### Objective
+
+Replace broad opacity-like interpolation for discrete stone materials with a material-capability transition that preserves fully opaque complete stones. Inside the existing Bank/Riverbed transition field, whole stones progressively disappear according to deterministic per-stone retention; the final visible silhouette terminates at generated stone boundaries and the existing cavity field. Continuous materials retain the current smooth substrate interpolation.
+
+### Read-only evidence
+
+Reviewed before this plan edit:
+
+- `StylizedSurfaceMaterialProfile.cs` and `GroundSurfaceLayerProfile.cs`: reusable material identity currently owns palette, grayscale texture form, packed detail, and finish, but has no transition capability contract.
+- `StylizedSurfaceDetailLibraryBuilder.cs`: authored-material-set output is a 256² sRGB RGBA32 array. M2.3 writes normalized grayscale form redundantly to RGB and alpha `1`; therefore G/B/A can carry transition metadata without adding an array or sample. The packed-detail array already supplies cavity in B.
+- `PixelSurfaceMaterialDetail.hlsl`: the texture-form sample currently consumes only R. G/B/A are unused. The packed sample already decodes broad cavity and cavity core.
+- `PixelSurfaceGroundResponse.hlsl`: `ResolveGroundBankMaterialBlend` and `ResolveGroundRiverbedMaterialBlend` produce continuous scalar material weights. `ResolveGroundSubstrateCompositionWeights` then crossfades ordinary Ground, Bank, and Riverbed albedo/normal/finish.
+- `PixelSurfaceGroundForwardPass.hlsl`: Bank and Riverbed each sample packed detail and optional texture form before substrate composition. The current order can be changed so those already-sampled details reshape the scalar material blend before composition; no extra sample is required.
+- `GeneratedGround.ApplySurfaceLayerDetailProperties`: the legacy hidden authored-tint vector is still transported but intentionally unused after M2.3. It can carry four transition parameters without adding shader property IDs or changing serialized materials.
+- `StylizedSurfaceMaterialProfileEditor.cs`, inline `GeneratedGroundEditor.cs`, and `StylizedSurfaceMaterialValidation.cs`: the reusable material editor and existing one-button report are the correct ownership and evidence surfaces. No new top-level Ground group or debug view is required.
+- User screenshot: the continuous contour visibly crosses recognizable stones and produces a broad green/stone mix. The requested accepted direction is whole-stone thinning with cavity-locked termination.
+
+### Approved files
+
+The implementation may modify only:
+
+```text
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialProfileEditor.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+Assets/Game/Procedural/Ground/GroundSurfaceLayerProfile.cs
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+```
+
+Expected Unity-generated output after the generation-version increment:
+
+```text
+Assets/Game/Demo/Profiles/SurfaceMaterials/SSDL_DefaultSurfaceDetails.asset
+```
+
+The generated asset must not be hand-edited. No River producer, corridor mask, UV3, hydrology, geometry, scene, prefab, material asset, source JPEG, vegetation benchmark, vegetation coverage, Painted Accent, layer, tag, renderer, draw call, or new texture is approved.
+
+### Transition contract
+
+Add a reusable material transition style with serialized compatibility:
+
+- `Automatic`: authored material-set entries resolve to `Discrete Elements + Cavity Cut`; prepacked/legacy entries resolve to `Continuous`.
+- `Continuous`: preserves the current scalar substrate interpolation.
+- `Discrete Elements + Cavity Cut`: evaluates the existing spatial blend at a generated stone centroid, selects the complete stone through a deterministic retention threshold, and applies only derivative-width antialiasing at the final silhouette.
+
+Material-owned controls:
+
+- `Transition Style`.
+- `Thinning Width`: fraction of the existing material-blend range used to remove stones.
+- `Cavity Edge Attraction`: strength with which the final silhouette follows the packed cavity field.
+- `Stone Retention Bias`: interpolation from deterministic random retention toward generated stone prominence, allowing larger/prominent stones to survive farther into ordinary Ground.
+
+No River-application duplicate controls are added.
+
+### Generated payload
+
+For authored material-set entries, increment the generation algorithm version and repack the existing texture-form RGBA32 slice:
+
+```text
+R — normalized grayscale texture form
+G — shortest toroidal U offset from the texel to its detected stone centroid
+B — shortest toroidal V offset from the texel to its detected stone centroid
+A — stone prominence and membership; zero denotes cavity/background
+```
+
+G/B are encoded from signed `[-0.5, +0.5]` offsets into `[0, 1]` using the existing sRGB-compatible raw upload. A remains linear. The builder must:
+
+1. derive a deterministic stone/cavity domain from the already-generated packed cavity channel;
+2. adapt the threshold when a merged component dominates the tile;
+3. label components with toroidal eight-neighbour connectivity so stones crossing a repeat edge remain one element;
+4. calculate circular/toroidal centroids and area-derived prominence;
+5. produce explicit mips that preserve form in linear space and reconstruct centroid offsets relative to each destination texel;
+6. retain M2.1 form-seam repair without modifying centroid/prominence channels;
+7. keep the array 256² RGBA32, Repeat, Bilinear, complete-mip, and non-readable after upload.
+
+### Runtime evaluation
+
+1. Sample the same packed-detail and texture-form arrays already used by M2.3.
+2. Decode centroid offset and prominence from the texture-form sample.
+3. Convert centroid UV offset to world metres using the existing detail scale.
+4. Estimate the existing Bank/Riverbed scalar blend at that centroid from screen derivatives of world XZ and the blend field. Pixels belonging to one stone therefore use one approximately common transition value rather than allowing the contour to cross the stone.
+5. Generate deterministic retention from centroid world position and blend it toward prominence through `Stone Retention Bias`.
+6. In the thinning band, retain or remove the stone as a unit. Multiply its final silhouette by generated membership and packed cavity according to `Cavity Edge Attraction`.
+7. Preserve full substrate coverage in the interior core. Use `fwidth` only for screen-width edge antialiasing; do not restore a broad opacity blend.
+8. Feed the adjusted Bank/Riverbed coverage into the existing substrate composition, normal weighting, cover retention, smoothness, wetness, and lighting paths.
+
+### Inspector and validation
+
+- Show the four transition controls only for detail-enabled authored material-set entries in the dedicated material editor and the existing inline `Shared Material Definition` foldout.
+- Extend the existing one-button Surface Material Validation report with segmentation threshold, element count, coverage, area/prominence distribution, centroid reconstruction error, channel contract, runtime style resolution, and sample-count statement.
+- Emit local-only PNG evidence under `Library/SurfaceMaterialDiagnostics`: component labels, prominence, and deterministic thinning previews at several transition positions. No new Inspector button or debug view.
+
+### Invariants and performance
+
+- Continuous materials are byte-for-byte behaviorally unchanged at runtime.
+- Automatic mode changes authored material-set transitions only; palette, normal, cavity, roughness, wetness, and material identity remain M2.3.
+- No extra texture-array sample, texture, draw call, geometry, runtime allocation, CPU callback, or per-frame field build.
+- Added runtime cost is bounded fragment ALU and derivatives only where an authored material-set substrate is active.
+- Stone segmentation and mip construction are editor rebuild work only.
+- M2.1 periodic seam repair and M2.3 single-palette authority remain mandatory.
+- The V1A.6 vegetation coverage contract and V1A.6.1 object-search repair must remain unchanged.
+
+### Validation gates
+
+1. Exact twelve-file source/document scope; `SSDL_DefaultSurfaceDetails.asset` may change only through Unity regeneration.
+2. Parse every changed C# file and affected unchanged callers; scan new symbol references and required namespaces.
+3. Verify shader delimiters, function arity, property parity, and unchanged texture-sample statement/count.
+4. Synthetic builder tests: toroidal edge-crossing components, disconnected stones, merged-domain threshold fallback, centroid reconstruction, mip reconstruction, and no stone membership in cavity pixels.
+5. Unity: compile, rebuild the library, run the existing one-button report, and inspect component/prominence/thinning PNGs.
+6. Production camera: confirm no broad green/stone crossfade, no stones cut through by the transition, no repeat seam, no temporal crawl, and unchanged continuous-material behavior.
+
+### Implementation result
+
+- Added reusable `Automatic`, `Continuous`, and `Discrete Elements + Cavity Cut` transition styles. `Automatic` resolves to the discrete path only when the selected detail-library entry has an authored texture-form payload.
+- Repacked the existing authored texture-form RGBA32 slice without changing its format or sample count: R remains normalized form, G/B carry shortest toroidal centroid offsets, and A carries element membership/prominence.
+- Added editor-time adaptive cavity segmentation with toroidal eight-neighbour connectivity, circular centroids, area-derived prominence, explicit metadata-preserving mips, and R-only periodic form repair. The generation algorithm version is now `5`, forcing Unity to regenerate stale arrays.
+- Added whole-element runtime retention at the estimated element-centroid blend, prominence-biased deterministic thinning, generated membership, and a derivative-width cavity silhouette. The full material remains intact in the interior core.
+- Reused the hidden legacy authored-tint vector as the transition transport slot. Enable is encoded with sentinel value `2`, so the shader property's legacy white default (`x=1`) remains neutral. No shader property or material asset was added.
+- Added the four material-owned transition controls to the dedicated material editor and existing inline Shared Material Definition only for enabled authored material sets.
+- Extended the existing one-button validation report and local diagnostic output with element coverage, threshold, area, centroid-error, component-label, prominence, and 25/50/75-percent thinning evidence.
+- Preserved the V1A.6 Ground vegetation-coverage runtime/editor contract and V1A.6.1 nonobsolete object-search overload.
+
+### Static and offline audit result
+
+- Exact modified scope: **PASS — the twelve declared files and no others** when compared with the latest archive plus V1A.6/V1A.6.1 overlays. No scene, prefab, material asset, source texture, River file, vegetation benchmark, or Painted Accent file changed.
+- C# syntax parse: **PASS — seven changed C# files, zero error or missing nodes**. New references and required `System`, collection, UnityEngine, and UnityEditor imports are present.
+- HLSL structural audit: **PASS** for delimiters, the four-argument texture-form assignment and transition-coverage callers, transition property declarations, and enable-sentinel transport.
+- Runtime sampling parity: **PASS — the Ground forward pass remains four `SAMPLE_TEXTURE2D_ARRAY` calls and one `SAMPLE_TEXTURE2D` call**. No draw call, texture, geometry, allocation, CPU callback, or per-frame segmentation was added.
+- Supplied serialized Fine Gravel evidence: adaptive p60 threshold `0.345098`; `210` detected elements; `59.9304%` element coverage; largest component `7.5517%` of element pixels; mean component area `187.0286` pixels; quantized centroid reconstruction max/p95 `0.00870086 / 0.00710501` UV; zero cavity pixels labelled as stones.
+- Synthetic connectivity evidence: toroidal edge-crossing domain resolved as one component and two disconnected domains resolved as two. Deterministic thinning retained `129 / 45 / 15` complete elements at 25/50/75-percent progress.
+- V1A.6 preservation audit: **PASS** for `VegetationCoverageInitialized`, `VegetationCoverageRevision`, `CalculateVegetationCoverageFraction`, `TrySampleVegetationCoverage`, Scene-view callback registration, and absence of `FindObjectsSortMode`.
+- Full Unity/Roslyn compilation, generated-subasset inspection, live seam/transition report, camera stability, and GPU timing: **unavailable here and pending, not passed**.
+
+
+
+## 2026-07-19 — GSU-M2.3: Single-Palette Surface Material Control Pass
+
+**Status:** Implemented in the reconstructed supplied-source workspace and statically/offline audited. Exact fourteen-file scope, C# syntax parsing, HLSL delimiter/caller checks, serialized compatibility, runtime sample-count parity, real-array form normalization, palette-band coverage, and simulated periodic mips pass. Unity compilation, source-JPEG-driven form-array rebuild, production-camera colour/seam validation, copied control-integrity report, profiling, and user visual acceptance remain pending.
+
+### Objective
+
+Make `Base Color`, `Dark Color`, `Light Color`, and `Cavity Color` the single visible colour-authoring system for every reusable stylized surface material. Preserve the imported material-set texture only as a grayscale structural form input, not as a second colour source. Remove or hide controls whose resolved coefficient is zero, preserve serialized assets and the M2.1 periodic repair, and keep the existing runtime texture-sample count, array dimensions, draw calls, and River contracts.
+
+### Read-only review and evidence
+
+Current source was reconstructed from the supplied `Assets-Code-Archive.zip` plus the accepted GSU-M2.1 and GSU-M2.2 patches. The supplied source has no `.git` metadata; branch, `HEAD`, history, and unrelated working-tree changes are unavailable. The following current implementations and direct callers/consumers were reviewed before this plan edit:
+
+- `StylizedSurfaceMaterialProfile.cs`: `payloadMode` manually selects `UsesAuthoredColor`; authored tint has a separate strength; `DetailValueStrength`, `DetailFormHighlightStrength`, and `FinishVariationStrength` are forced to zero in Authored Color mode.
+- `StylizedSurfaceDetailLibrary.cs`: entry `sourceMode` already proves whether a material has a full authored material set, and generated slice mapping already resolves that source independently of the profile payload field.
+- `StylizedSurfaceDetailLibraryBuilder.cs`: the generated sRGB array currently retains source RGB; M2.1 periodic repair and explicit mips are editor-only and must remain.
+- `PixelSurfaceMaterialDetail.hlsl`: `PS3D_ResolveStylizedSurfaceAuthoredColor` uses `sqrt(sourceLuminance)`, retains 35% source chroma, weakens cavity shoulder/core response, and blends through a separate colour path. `PS3D_ResolveStylizedSurfaceDrySmoothness` can replace the profile baseline with `1 - roughness` at strength one.
+- `PixelSurfaceGroundForwardPass.hlsl`: Bank and Riverbed are the only callers of the separate authored-colour evaluator. The extra array sample is already present and must not increase.
+- `GroundSurfaceLayerProfile.cs`, `GroundMaterialControls.cs`, and `GeneratedGround.ApplySurfaceLayerDetailProperties`: transport exposes authored colour/tint/lighting/roughness semantics and applies multipliers to values that resolve to zero for the imported material.
+- `StylizedSurfaceMaterialProfileEditor.cs` and `GeneratedGroundEditor.cs`: both expose Payload and Authored Color as a second colour system. Bank/Riverbed application panels always show Value/Form, Finish Variation, and Legacy Cell multipliers even when the selected material resolves those coefficients to zero.
+- `StylizedSurfaceMaterialValidation.cs`: validates arrays and seams but has no control-integrity or palette-band-coverage report.
+
+**Proven faults:**
+
+1. `Authored Color Tint` is mathematically inert at tint strength zero, while the two controls are presented as one colour operation.
+2. The imported RGB sample remains a colour/luminance authority after GSU-M2.2; palette colours grade it rather than owning final material colour.
+3. `sqrt(sourceLuminance)` places nearly all measured source texels in the Base-to-Light branch, leaving Dark Color with negligible ordinary-surface coverage.
+4. Imported-material cavity response uses lower coefficients than Palette Detail, so the same visible Cavity Color has materially different authority.
+5. At authored roughness strength one, the profile Dry Smoothness baseline is replaced rather than modulated.
+6. Bank/Riverbed application UI exposes multipliers whose profile-side coefficient is exactly zero.
+
+Controls with valid current runtime paths and no proven fault remain unchanged unless their labels must reflect the unified contract: Detail World Scale, Detail Normal Strength, Detail Cavity Strength/Bias, Dry Specular Strength, material coverage/reach/transition, hydrology/wetness, and cover compatibility.
+
+### Approved files
+
+First plan update and implementation may modify only:
+
+```text
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs
+Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceDetailLibrary.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialProfileEditor.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+Assets/Game/Procedural/Ground/GroundSurfaceLayerProfile.cs
+Assets/Game/Procedural/Ground/GroundMaterialControls.cs
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+```
+
+Expected Unity-generated output after the generation-version change:
+
+```text
+Assets/Game/Demo/Profiles/SurfaceMaterials/SSDL_DefaultSurfaceDetails.asset
+```
+
+The generated asset is not to be hand-edited. No River source, geometry, hydrology, UV3, scene, prefab, material, purchased source texture, layer, tag, renderer, shader property name, or debug view may change.
+
+### Implementation sequence
+
+1. Preserve the serialized `payloadMode`, authored tint, and existing authored-value fields for backward compatibility, but hide the obsolete payload/tint controls and remove them from runtime colour authority. Determine texture-form capability automatically from the selected detail-library entry's `AuthoredMaterialSet` source mode.
+2. Increment the editor generation algorithm version. Area-reduce source base colour as before, convert it to linear luminance, map the source 5th percentile / median / 95th percentile to form values `0 / 0.5 / 1`, encode the normalized grayscale form into the existing sRGB array, then retain M2.1 conditional periodic repair and explicit mips. Source hue must not enter the runtime array.
+3. Replace the separate authored-colour evaluator with one shared palette resolver. Texture form contributes signed Dark/Base/Light variation through the same path as prepacked form; the common cavity shoulder and full cavity core apply identically to both source types.
+4. Reinterpret the existing serialized authored controls as `Texture Form Strength`, `Scene Lighting Response`, and `Roughness Variation`. Dry Smoothness remains the baseline; roughness contributes bounded centred variation and cannot replace that baseline.
+5. Update Ground transport without adding material properties or samples. Keep existing hidden shader property names for serialized/material compatibility while changing their documented semantics.
+6. Make Bank and Riverbed application controls capability-aware. Show scale/form/lighting/normal/cavity/value-finish/legacy multipliers only when the selected resolved material has a nonzero coefficient for that control.
+7. Update the dedicated and inline material editors so Palette is the only colour section. Update the preview to consume normalized texture form and the common palette/cavity/smoothness direction.
+8. Extend the existing one-button validation report with control-integrity and form-distribution evidence, including missing form data, negligible Dark/Base/Light coverage, and active/inactive application-control capability.
+9. Update canonical architecture and Inspector documents, then run exact-scope, parser/compiler, namespace/import, shader delimiter/caller, serialized-compatibility, generated-signature, algorithm, and performance audits.
+
+### Invariants and non-goals
+
+- Base, Dark, Light, and Cavity are the only visible colour pickers.
+- The imported source contributes structural value/form only; source hue is discarded.
+- Existing serialized assets retain their values; obsolete payload/tint fields remain hidden compatibility data.
+- Palette Detail materials retain their existing packed-alpha value/form and finish behavior.
+- M2.1 seam repair, complete mips, 256² RGBA32/sRGB arrays, Repeat/Bilinear sampling, and non-readable runtime arrays remain.
+- Runtime remains one packed-detail sample plus one texture-form sample only for entries that contain an authored material set. No new sample, branch class, draw call, allocation, texture, geometry, or CPU callback is approved.
+- No default profile asset or source JPEG is edited by the patch.
+- No unrelated control formula is retuned without new concrete evidence.
+
+### Implementation result
+
+- `payloadMode`, authored tint, and their existing serialized names remain hidden compatibility data, but runtime capability now resolves automatically from the selected library entry's source mode.
+- Imported base colour is converted editor-side to normalized grayscale texture form using linear-luminance p05 / median / p95 anchors. Source hue is absent from generated form data.
+- The M2.1 repeat-edge repair remains conditional and narrow-band, but now averages and interpolates decoded linear form values before re-encoding, avoiding gamma-space form distortion.
+- Prepacked and imported entries now use one `PS3D_ResolveStylizedSurfacePalette` path with common Dark/Base/Light mapping, common cavity shoulder, and full common Cavity Color core.
+- `Texture Form Strength`, `Scene Lighting Response`, and `Roughness Variation` reuse existing serialized values as structural/finish controls. Dry Smoothness remains the additive baseline at every roughness-variation value.
+- Both custom material editors expose one Palette section only. Detail-dependent variation controls are not shown when Structural Detail is disabled.
+- Bank and Riverbed application panels resolve the selected material and display only multipliers whose material-side coefficient is nonzero; scene-lighting response is independently omitted when its base coefficient is zero.
+- The existing one-button validation action now reports automatic source capability, grayscale channel integrity, p05/median/p95, Dark/Base/Light coverage, periodic mip evidence, and active control capability while preserving report-file and clipboard output.
+- No generated array asset, imported material/profile asset, source art, shader declaration, scene, prefab, River source, hydrology, geometry, UV3, layer, tag, renderer, or debug view is included in the patch.
+
+### Static and offline validation result
+
+- Exact modified-file scope: **PASS — 14 declared files and no others**.
+- Tree-sitter C# parse: **PASS — 9 changed C# files, zero error/missing nodes**.
+- C#/HLSL lexical delimiter scan and changed caller arities: **PASS**.
+- Runtime sampling parity: **PASS — `SAMPLE_TEXTURE2D_ARRAY` remains 4 and `SAMPLE_TEXTURE2D` remains 1 in the Ground forward pass**.
+- Existing serialized M2.2 array simulation: p05 `0.079202`, median `0.159695`, p95 `0.353858`; normalized form coverage Dark `45.36%`, Base `15.84%`, Light `38.80%`; RGB channel delta `0`.
+- Simulated texture-form mip 0 repeat repair: left/right mean and p95 ratios reduce to `0`; unaffected top/bottom ratios remain within M2.1 thresholds. Simulated mips 1–4 also pass.
+- Full Unity/Roslyn and shader compilation: unavailable in this environment and therefore pending, not passed.
+
+### Acceptance criteria
+
+- Payload Mode and Authored Color colour controls are absent from both material authoring interfaces.
+- Base, Dark, Light, and Cavity independently produce visible, appropriately localized changes on the imported material.
+- Generated texture form contains grayscale only and reports meaningful Dark/Base/Light coverage.
+- Cavity Color reaches the same deep-core authority for imported and prepacked materials.
+- Dry Smoothness changes the baseline at every Roughness Variation value.
+- No displayed Bank/Riverbed application multiplier resolves to zero for the selected material.
+- The prior periodic seam remains within M2.1 limits.
+- Runtime sample count, shader property count, array dimensions, draw calls, and memory layout do not increase.
+- The existing comprehensive validation action copies one report containing seam and control-integrity evidence.
+
+### Validation status
+
+- Read-only review: **PASS** for the current reconstructed source and approved scope.
+- Canonical plan persistence: **PASS** after this section is written.
+- Implementation: **PASS — source work complete in exact approved scope**.
+- Static/compile-oriented audit: **PASS for available parser, delimiter, caller, scope, compatibility, sample-count, and offline-array checks**.
+- Unity compile, source rebuild, copied live report, visual acceptance, and profiling: **PENDING**.
+
+## 2026-07-19 — GSU-M2.2: Authored-Color Palette Control and Encoded-Color Preservation
+
+**Status:** Implemented in the supplied code workspace and statically audited. Exact eight-file scope passed. Unity compilation, source-driven array rebuild, production-camera colour/seam validation, and user visual acceptance remain pending.
+
+### Objective
+
+Restore the imported authored-colour material to an authorable brightness/hue range after GSU-M2.1 and make the existing reusable `Base Color`, `Dark Color`, `Light Color`, and `Cavity Color` controls materially affect Authored Color payloads. Preserve the seam correction, source artwork, runtime array size, sample count, River contracts, and reusable material ownership.
+
+### Read-only evidence
+
+- User screenshot after the M2.1 rebuild shows the Bank/Riverbed authored material rendered near-black while the visible palette controls cannot restore colour.
+- `StylizedSurfaceDetailLibraryBuilder.CopyGeneratedMipChain` writes M2.1 authored colour through `Texture2DArray.SetPixels(Color[])`; `AreaResamplePixels` reads through `Texture2D.GetPixels`. The destination is an sRGB `Texture2DArray`. The current code does not explicitly preserve encoded source bytes across the CPU resample/upload path.
+- `PS3D_ResolveStylizedSurfaceAuthoredColor` returns `lerp(paletteColor, authored, authoredColorStrength)`. At the candidate default strength `1`, `paletteColor` is removed entirely. `Base Color` and `Light Color` therefore have zero direct influence over ordinary authored texels; `Dark Color` only multiplies cavity shoulders and can only reduce values; `Cavity Color` affects deep gaps.
+- `StylizedSurfaceMaterialProfileEditor` preview repeats the same bypass by blending directly from `BaseColor` to the authored sample, so preview and runtime both lack the requested four-colour authored grading contract.
+- Repository search finds only two runtime calls to `PS3D_ResolveStylizedSurfaceAuthoredColor`, both in `PixelSurfaceGroundForwardPass.hlsl` for Bank and Riverbed. No River geometry, hydrology, UV3, scene, prefab, or material asset owns this behaviour.
+
+### Approved implementation files
+
+Modify only:
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialProfileEditor.cs
+Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl
+Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+```
+
+Expected Unity-generated output after the generation-version change:
+
+```text
+Assets/Game/Demo/Profiles/SurfaceMaterials/SSDL_DefaultSurfaceDetails.asset
+```
+
+No profile schema, source texture, River source, hydrology, geometry, UV3, material-property name, scene, prefab, material, layer, tag, renderer, or debug-view edit is approved.
+
+### Implementation sequence
+
+1. Increment the authored-colour generation algorithm version so existing arrays rebuild.
+2. Read base-colour source pixels as `Color32`, perform the existing area reduction/seam repair in encoded colour values, and upload each RGBA32 mip with raw `SetPixelData(Color32[])`. This removes implicit `Color` format conversion from the sRGB array write while retaining M2.1 periodic generation and diagnostics.
+3. Change the authored-colour evaluator so source luminance selects between the existing Dark/Base/Light palette colours. Preserve a restrained portion of source chroma, then apply existing cavity shoulder/core response. `Authored Color Strength` continues to blend between the ordinary palette result and the palette-graded authored result.
+4. Mirror the runtime grading in the material Inspector preview.
+5. Label and explain the existing palette controls in both the dedicated material Inspector and GeneratedGround inline editor so authors know they apply to Authored Color payloads.
+6. Update canonical architecture/Inspector documents and run parser, delimiter, property/signature, caller, scope, and generated-signature audits.
+
+### Implementation result
+
+- `AuthoredColorGenerationAlgorithmVersion` is now `3`, invalidating the M2.1 generated array so Unity rebuilds it.
+- Authored source pixels are read with `GetPixels32`; the existing area reduction, conditional periodic repair, and explicit mip construction continue in normalized encoded values. Each RGBA32 mip is quantized to `Color32` and uploaded with raw `Texture2DArray.SetPixelData`, avoiding implicit colour conversion during the sRGB array write.
+- The authored evaluator converts sampled linear luminance to a perceptual value with `sqrt`, maps that value through Dark/Base/Light, retains 35% of the source chroma offset, and applies cavity shoulder/core through Dark and Cavity Color. All four visible palette fields therefore participate at Authored Color Strength `1`.
+- The dedicated material preview mirrors the same value mapping and restrained chroma retention.
+- Both material authoring surfaces label the fields `Palette (Applied to Authored Color)` and explain their ownership. No new serialized field was added.
+- Static audit found exactly the eight declared modified files. `SAMPLE_TEXTURE` counts are unchanged; the shared evaluator has exactly two runtime callers and both pass the new Light Color argument.
+
+### Static validation result
+
+- Custom lexical syntax/delimiter scan: PASS for all changed C# and HLSL files.
+- Function definition/caller arity audit: PASS (`5` arguments at both Bank and Riverbed calls).
+- Namespace/import scan: PASS; new C# types are supplied by the existing `UnityEngine` import.
+- Exact scope and line-ending audit: PASS; `GeneratedGroundEditor.cs` retains CRLF and no serialized asset/source file changed.
+- Mathematical control-responsiveness cases: PASS for independent Base, Dark, Light, and Cavity changes.
+- Runtime sample-count comparison against M2.1: unchanged.
+- Full Unity/Roslyn compilation: unavailable in this environment and therefore pending, not passed.
+
+### Invariants and performance
+
+- Runtime remains one authored-colour sample per active authored layer; no added sample, texture, draw call, CPU callback, allocation, geometry, or material property.
+- The new grading is fixed arithmetic on the already-sampled colour. It adds no branch beyond the existing authored path and no memory.
+- Generated arrays remain 256² RGBA32/sRGB, complete-mip, Repeat/Bilinear, and non-readable.
+- Palette Detail behaviour remains unchanged.
+- M2.1 seam measurement, conditional edge repair, explicit mip generation, and diagnostics remain unchanged.
+- Original purchased source bytes and GUIDs remain unchanged.
+
+### Acceptance criteria
+
+- Changing Base, Dark, Light, and Cavity Color visibly changes the imported surface at Authored Color Strength `1`.
+- White/light palette values can restore a clearly visible mid/high value range; dark values can intentionally darken it.
+- Source stone value structure and restrained per-stone chroma remain readable.
+- The prior long repeat line does not return.
+- Dedicated material preview and production shader respond in the same direction.
+- No unrelated file changes and no runtime resource/sample-count change.
+
+## 2026-07-19 — GSU-M2.1: Periodic Authored-Color Import and Seam Diagnostics
+
+**Status:** Implemented in the supplied code workspace and statically audited. The current serialized authored-colour array is proven non-periodic at its horizontal repeat boundary. The editor-only generation/validation correction is complete; Unity compilation, source-driven array rebuild, production-camera visual acceptance, build exclusion, memory evidence, and GPU timing remain pending. No River, hydrology, geometry, normal, lighting, profile-schema, or runtime implementation change was made.
+
+### Objective
+
+Preserve the accepted visual quality of `Fine Gravel — Imported Stone Ground 01` while removing the repeating authored-colour line. Replace point-sampled authored-colour reduction and implicit temporary-texture mip generation with deterministic editor-only area reduction, bounded periodic edge repair when required, explicit mip construction, and one-button seam evidence. Runtime texture dimensions, formats, samples, profiles, shaders, Ground transport, River semantics, and source artwork remain unchanged.
+
+### Read-only evidence
+
+The current code archive contains the live generated `SSDL_DefaultSurfaceDetails_AuthoredColorArray` subasset in `Assets/Game/Demo/Profiles/SurfaceMaterials/SSDL_DefaultSurfaceDetails.asset`:
+
+- 256×256, depth 1, RGBA32/sRGB, nine mips, non-readable;
+- generated stable entry `fine-gravel-imported-stone-ground-01` resolves to colour slice 0;
+- `StylizedSurfaceDetailLibraryBuilder.Rebuild` calls `ResamplePixels`, which takes one `GetPixelBilinear` sample per output texel, then `CopyGeneratedMipChain`, which delegates all mips to `Texture2D.Apply(true, false)`;
+- the current validation report checks dimensions, references, and importer contracts but does not measure repeat boundaries or emit tiled previews.
+
+The serialized array byte payload was decoded read-only and measured in normalized RGB. Boundary difference is compared with ordinary adjacent-pixel difference on the same axis:
+
+| Mip | Size | Left/right mean ratio | Left/right p95 ratio | Top/bottom mean ratio | Top/bottom p95 ratio |
+|---:|---:|---:|---:|---:|---:|
+| 0 | 256 | 1.212 | 1.238 | 0.963 | 0.947 |
+| 1 | 128 | 1.130 | 1.069 | 0.894 | 0.913 |
+| 2 | 64 | 1.101 | 1.097 | 0.940 | 0.879 |
+| 3 | 32 | 1.131 | 1.116 | 0.965 | 1.048 |
+| 4 | 16 | 0.854 | 0.974 | 1.188 | 1.099 |
+
+**Conclusion — proven:** the generated authored-colour payload already contains an excessive left/right repeat discontinuity at mip 0 and retains elevated horizontal boundary differences through mips 1–3. The shader samples this array with repeated world-XZ UVs, so the array can produce the observed recurring line without any River-domain defect.
+
+**Unverified:** the code-only archive omits the purchased source JPEGs, so this review cannot separate source-edge mismatch from point-resampling loss. The implementation must therefore guarantee periodic generated output while leaving the original source unchanged.
+
+### Approved implementation files
+
+Modify only:
+
+```text
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs
+Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md
+```
+
+Expected Unity-generated output after the revised signature forces a rebuild:
+
+```text
+Assets/Game/Demo/Profiles/SurfaceMaterials/SSDL_DefaultSurfaceDetails.asset
+```
+
+Expected local-only diagnostics:
+
+```text
+Library/SurfaceMaterialDiagnostics/<Library>_<StableId>_SourceBaseColor_3x3.png
+Library/SurfaceMaterialDiagnostics/<Library>_<StableId>_GeneratedColor_Mip0_3x3.png
+Library/SurfaceMaterialDiagnostics/<Library>_<StableId>_GeneratedColor_Mip1_3x3.png
+Library/SurfaceMaterialDiagnostics/<Library>_<StableId>_GeneratedColor_Mip2_3x3.png
+Library/SurfaceMaterialDiagnostics/<Library>_<StableId>_GeneratedColor_Mip3_3x3.png
+Library/SurfaceMaterialDiagnostics/<Ground>_SurfaceMaterialValidation.txt
+```
+
+No profile schema, serialized authoring field, shader, Ground runtime, River, scene, prefab, material, source texture, layer, tag, renderer, mesh, or debug-view edit is approved.
+
+### Invariants and non-goals
+
+- Preserve source JPEG bytes and GUIDs.
+- Preserve `fine-gravel-imported-stone-ground-01`, array resolution 256, RGBA32 formats, complete mip chain, Repeat/Bilinear sampling, and non-readable generated arrays.
+- Preserve the M2.0 runtime path and its already-approved optional authored-colour sample count.
+- Preserve all `PaletteDetail` generation and copies byte-for-byte in behavior.
+- Do not add stochastic tiling, texture bombing, triplanar sampling, UV offsets, runtime seam branches, runtime allocations, or extra texture samples.
+- Do not alter normal, height, AO, roughness conversion in this correction.
+- Do not hide the line by weakening authored colour, changing world scale, moving River boundaries, or tuning material response.
+
+### File-by-file implementation sequence
+
+1. In `StylizedSurfaceDetailLibraryBuilder.cs`, add an authored-colour generation algorithm version to the library signature so existing generated arrays rebuild automatically after the patch.
+2. Replace authored-colour point reduction with exact weighted box-area reduction for downscales. The current 2048→256 source therefore contributes its complete 8×8 footprint to each output texel rather than one centre sample. Preserve bilinear fallback only for source dimensions smaller than the destination.
+3. Measure horizontal and vertical boundary mean and p95 differences against ordinary same-axis neighbor differences. Apply no repair when both axes are within the accepted threshold.
+4. When an axis exceeds the threshold, repair only a narrow eight-texel band at 256², scaled down with each mip. Blend symmetric samples across that repeat boundary with a smooth cubic falloff: exact averaging at the outermost pair, decreasing to zero at the inner edge of the band. This changes only the generated copy and avoids a full-tile colour ramp or central cross.
+5. Construct every authored-colour mip explicitly from the preceding corrected mip by deterministic 2×2 box averaging, then evaluate and repair that mip independently. Write each mip directly to the destination array.
+6. Extend `StylizedSurfaceMaterialValidation.cs` to use the same managed generation path, record pre/post seam metrics for each mip, fail generated mean ratio above 1.15 or p95 ratio above 1.25, and write the source/generated three-by-three diagnostic PNGs. Keep the existing report file and clipboard behavior.
+7. Update the three canonical documents with the final implementation, runtime invariants, validation state, and remaining Unity/profile gates.
+
+### Implementation result
+
+- `AuthoredColorGenerationAlgorithmVersion = 2` participates in the generated-library signature, so the existing M2.0 array becomes stale and rebuilds in Unity.
+- Authored base colour now uses exact weighted box-area reduction for downscales; the 2048→256 case consumes every source texel in its corresponding 8×8 footprint.
+- Generated seam repair is conditional. It touches only an eight-texel band at 256², scales that band with each mip, averages the outermost repeat pair exactly, and feathers inward with a cubic falloff.
+- Every authored-colour mip is built explicitly from the corrected preceding mip and is measured/repaired independently before direct `Texture2DArray.SetPixels` upload.
+- The existing comprehensive validation action now caches one managed authored-colour build per shared library entry, reports pre/post mean and p95 ratios for every mip, emits one source-derived and mip 0–3 tiled diagnostic set, preserves report-file output, and copies the complete report to the clipboard.
+- Static scope audit found exactly the five declared modified files and no River, shader, runtime transport, schema, serialized source, scene, prefab, layer, tag, or material edit.
+- Synthetic periodic/horizontal/vertical/two-axis tests pass. A read-only simulation against the serialized M2.0 mip 0 changes the failing left/right mean ratio from `1.212` to `0.000` while the unaffected top/bottom mean ratio remains within threshold (`0.960`). This is algorithm evidence, not a substitute for the required Unity rebuild and production-camera result.
+
+### Acceptance criteria
+
+- Generated authored-colour mip 0–3 mean boundary ratios are at most 1.15 on both axes; p95 ratios are at most 1.25.
+- Three-by-three previews show no long repeat line and no new broad cross, strip, or full-tile gradient.
+- The purchased source hash remains unchanged.
+- Existing `PaletteDetail` entries retain their existing source mip-copy path.
+- Unity rebuilds the library because the generation algorithm version participates in `GeneratedSignature`.
+- Generated arrays remain 256² RGBA32 with nine mips and `isReadable == false` after rebuild.
+- The runtime shader sample count, draw calls, CPU work, GC, geometry, and memory dimensions are unchanged from M2.0.
+- The same River scene remains line-free with authored colour strength 1 across the previously tested world-scale range.
+
+### Performance
+
+- **Active gameplay:** no change from M2.0. No new sample, branch, allocation, callback, draw call, texture, geometry, or memory dimension.
+- **Dirty/editor CPU:** the current 2048→256 authored base colour performs approximately 4,194,304 weighted source-pixel contributions instead of 65,536 point samples, followed by 87,381 mip texels and narrow edge repair. This is rebuild-only work and is accepted under the project priority order.
+- **Storage:** local PNG evidence is written under `Library`; no new runtime or repository asset is created.
+- **Memory:** temporary managed colour arrays exist only during editor rebuild/validation. Final array memory remains approximately 0.333 MiB for one full-mip RGBA32 colour slice.
+
+### Validation plan
+
+- Parse every changed C# source and scan introduced symbols/usings.
+- Audit exact modified-file scope and line endings.
+- Verify the algorithm version participates in `CalculateSignature`.
+- Run deterministic synthetic tests for already-periodic, horizontal-seam, vertical-seam, and two-axis-seam images; confirm repair is conditional and post-repair thresholds pass.
+- Decode the existing serialized array as the pre-edit baseline and compare generated diagnostics after Unity rebuild.
+- Unity compilation, actual source-driven rebuild, production-camera visual acceptance, Memory Profiler evidence, player-build source exclusion, and Ground-pass GPU timing remain explicit user-side gates.
 
 
 ## 2026-07-19 — GSU-M2.0: Optional Authored-Color Surface Materials

@@ -46,6 +46,8 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("AdvanceFoamVisualOccupancy");
             evaluateShapeKernel = computeShader.FindKernel("EvaluateFoamShape");
             applyBoundaryKernel = computeShader.FindKernel("ApplyBoundary");
+            buildFoamChipStraddleAdmissionKernel =
+                computeShader.FindKernel("BuildFoamChipStraddleAdmission");
         }
 
         private void ConfigureGridDescriptorComputeParameters()
@@ -137,7 +139,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ResolveBaseFoamDownstreamSpeedMetresPerSecond());
             computeShader.SetFloat(
                 "_FoamMaximumLateralSpeedRatio",
-                river.FoamMaximumLateralSpeedRatio);
+                ResolveEffectiveFoamMaximumLateralSpeedRatio());
             computeShader.SetFloat(
                 "_FoamObstacleSlowdownStrength",
                 river.FoamObstacleSlowdownStrength);
@@ -150,6 +152,14 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamTransportMetricFixedPointScale",
                 TransportMetricFixedPointScale);
+            computeShader.SetInt(
+                "_FoamTransportScheme",
+                (int)river.FoamTransportScheme);
+            computeShader.SetFloat(
+                "_FoamTransportReconstructionCourant",
+                Mathf.Clamp01(
+                    lastMaximumTransportCfl /
+                    Mathf.Max(1, lastUsedTransportSubsteps)));
             computeShader.SetFloat(
                 "_FoamVisualOccupancyBuildTime",
                 river.FoamVisualOccupancyBuildTime);
@@ -308,10 +318,11 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInt("_FoamRangeStart", startX);
             computeShader.SetInt("_FoamRangeCount", countX);
 
-            // Patch 4.11C.5.16B combines conservative donor-cell advection and
-            // lifecycle aging in one pass. The caller may repeat this kernel for
-            // CFL-safe substeps; every pass reads one committed packed state and
-            // writes the next ping-pong state.
+            // Conservative packed-state advection and lifecycle aging share one
+            // pass. Donor Cell preserves the accepted baseline; the optional TVD
+            // branch changes only interior face reconstruction. The caller may
+            // repeat this kernel for CFL-safe substeps; every pass reads one
+            // committed packed state and writes the next ping-pong state.
             Dispatch(simulateKernel, countX, fieldHeight);
         }
 
@@ -353,7 +364,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ResolveBaseFoamDownstreamSpeedMetresPerSecond());
             computeShader.SetFloat(
                 "_FoamMaximumLateralSpeedRatio",
-                river.FoamMaximumLateralSpeedRatio);
+                ResolveEffectiveFoamMaximumLateralSpeedRatio());
             computeShader.SetFloat(
                 "_FoamObstacleSlowdownStrength",
                 river.FoamObstacleSlowdownStrength);

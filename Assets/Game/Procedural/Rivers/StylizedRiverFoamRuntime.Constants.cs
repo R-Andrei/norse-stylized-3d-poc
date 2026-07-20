@@ -651,6 +651,8 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamSharpness");
         private static readonly int FoamFinalVisibilityModeId =
             Shader.PropertyToID("_FoamFinalVisibilityMode");
+        private static readonly int FoamPresenceFootprintModeId =
+            Shader.PropertyToID("_FoamPresenceFootprintMode");
         private static readonly int FoamDebugViewId =
             Shader.PropertyToID("_FoamDebugView");
     }

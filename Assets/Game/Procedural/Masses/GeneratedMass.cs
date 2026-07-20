@@ -473,8 +473,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassEdgeWearTintStrength");
         private static readonly int GeneratedMassEdgeWearMacroVariationId =
             Shader.PropertyToID("_GeneratedMassEdgeWearMacroVariation");
-        private static readonly int GeneratedMassEdgeWearMicroVariationId =
-            Shader.PropertyToID("_GeneratedMassEdgeWearMicroVariation");
         private static readonly int GeneratedMassCreaseLengthId =
             Shader.PropertyToID("_GeneratedMassCreaseLength");
         private static readonly int GeneratedMassCreaseBranchingId =
@@ -518,7 +516,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float EdgeWearTintStrength;
             public float EdgeWearMacroVariationCoverage;
             public float EdgeWearMacroVariation;
-            public float EdgeWearMicroVariation;
             public float CreaseAmount;
             public float CreaseWidth;
             public float CreaseLength;
@@ -823,16 +820,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float edgeWearMacroVariationCoverage = 1f;
 
-        [Tooltip("Strength of deterministic average-width variation on participating edges. Zero preserves uniform widths; one allows the full current downward-only range.")]
+        [Tooltip("Strength of deterministic average-width variation on participating edges. Zero preserves uniform widths; one applies the certified downward-only amplitude while sharper convex edges retain more width than shallow convex edges.")]
         [Range(0f, 1f)]
         [SerializeField]
         [FormerlySerializedAs("edgeWearBreakup")]
         private float edgeWearMacroVariation;
-
-        [Tooltip("Reserved for future along-edge chipping/segmentation on generated bevel/chamfer wear. The first EW-4 pass does not segment bevel faces.")]
-        [Range(0f, 1f)]
-        [SerializeField]
-        private float edgeWearMicroVariation;
 
         [Tooltip("Reserved ConcaveCrease amount for the future atlas-based crack/seam feature. Current Patch 14C does not render secondary crease meshes.")]
         [Range(0f, 2f)]
@@ -1051,7 +1043,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public float EdgeWearMacroVariationCoverage =>
             edgeWearMacroVariationCoverage;
         public float EdgeWearMacroVariation => edgeWearMacroVariation;
-        public float EdgeWearMicroVariation => edgeWearMicroVariation;
         public float CreaseAmount => creaseAmount;
         public float CreaseWidth => creaseWidth;
         public float CreaseLength => creaseLength;
@@ -2370,7 +2361,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             edgeWearMacroVariationCoverage =
                 values.EdgeWearMacroVariationCoverage;
             edgeWearMacroVariation = values.EdgeWearMacroVariation;
-            edgeWearMicroVariation = values.EdgeWearMicroVariation;
             creaseAmount = values.CreaseAmount;
             creaseWidth = values.CreaseWidth;
             creaseLength = values.CreaseLength;
@@ -2452,9 +2442,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                    FloatApproximately(
                        edgeWearMacroVariation,
                        values.EdgeWearMacroVariation) &&
-                   FloatApproximately(
-                       edgeWearMicroVariation,
-                       values.EdgeWearMicroVariation) &&
                    FloatApproximately(creaseAmount, values.CreaseAmount) &&
                    FloatApproximately(creaseWidth, values.CreaseWidth) &&
                    FloatApproximately(creaseLength, values.CreaseLength) &&
@@ -2483,7 +2470,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.EdgeWearTintStrength = 0.12f;
                     values.EdgeWearMacroVariationCoverage = 1f;
                     values.EdgeWearMacroVariation = 0.28f;
-                    values.EdgeWearMicroVariation = 0f;
                     return values;
 
                 case GeneratedMassFeatureRecipe.WetRiverStone:
@@ -2505,7 +2491,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.EdgeWearTintStrength = 0f;
                     values.EdgeWearMacroVariationCoverage = 1f;
                     values.EdgeWearMacroVariation = 0f;
-                    values.EdgeWearMicroVariation = 0f;
                     return values;
 
                 case GeneratedMassFeatureRecipe.PaleFrostStone:
@@ -2524,7 +2509,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.EdgeWearTintStrength = 0f;
                     values.EdgeWearMacroVariationCoverage = 1f;
                     values.EdgeWearMacroVariation = 0f;
-                    values.EdgeWearMicroVariation = 0f;
                     return values;
 
                 case GeneratedMassFeatureRecipe.BlackSacredStone:
@@ -2543,7 +2527,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.EdgeWearTintStrength = 0f;
                     values.EdgeWearMacroVariationCoverage = 1f;
                     values.EdgeWearMacroVariation = 0f;
-                    values.EdgeWearMicroVariation = 0f;
                     values.LightingTintInfluence = 0.2f;
                     return values;
 
@@ -2591,7 +2574,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearTintStrength = 0.18f,
                 EdgeWearMacroVariationCoverage = 1f,
                 EdgeWearMacroVariation = 0.32f,
-                EdgeWearMicroVariation = 0f,
                 CreaseAmount = 1f,
                 CreaseWidth = 1f,
                 CreaseLength = 1f,
@@ -2710,9 +2692,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearMacroVariationId,
                 Mathf.Clamp01(edgeWearMacroVariation));
-            materialProperties.SetFloat(
-                GeneratedMassEdgeWearMicroVariationId,
-                Mathf.Clamp01(edgeWearMicroVariation));
             materialProperties.SetFloat(
                 GeneratedMassCreaseLengthId,
                 Mathf.Clamp(creaseLength, 0.25f, 2f));

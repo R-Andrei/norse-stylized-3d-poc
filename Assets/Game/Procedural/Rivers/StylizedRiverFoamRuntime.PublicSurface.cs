@@ -39,9 +39,7 @@ namespace ProgrammaticStylized3D.Rivers
         public float FoamGridRepresentedLateralMaximumMetres =>
             gridDescriptor.RepresentedLateralMaximumMetres;
         public float FoamGridProvisionalRequestedCellSizeMetres =>
-            river != null
-                ? river.FoamFixedMetricRequestedCellSizeMetres
-                : 0f;
+            ResolveEffectiveFoamRequestedCellSizeMetres();
         public string FoamAuthoredGridMode => river != null
             ? river.FoamGridMode.ToString()
             : "Unavailable";
@@ -66,7 +64,7 @@ namespace ProgrammaticStylized3D.Rivers
 
                 return !fixedSelected || Mathf.Approximately(
                     gridDescriptor.RequestedDxMetres,
-                    river.FoamFixedMetricRequestedCellSizeMetres);
+                    ResolveEffectiveFoamRequestedCellSizeMetres());
             }
         }
         public bool FoamFixedMetricCandidateAvailable =>
@@ -151,7 +149,7 @@ namespace ProgrammaticStylized3D.Rivers
             ResolveBaseFoamDownstreamSpeedMetresPerSecond();
         public float FoamMaximumLateralSpeedMetresPerSecond =>
             ResolveBaseFoamDownstreamSpeedMetresPerSecond() *
-            (river != null ? river.FoamMaximumLateralSpeedRatio : 0f);
+            ResolveEffectiveFoamMaximumLateralSpeedRatio();
         public int FoamMotionLaneSignature => lastMotionLaneSignature;
         public int FoamObstacleRoutingSignature => lastObstacleRoutingSignature;
         public int MajorOpportunityCount => majorTopology != null
@@ -1272,7 +1270,8 @@ namespace ProgrammaticStylized3D.Rivers
         private static bool IsAutomaticDevelopmentCacheEnabled => false;
 
         private bool DevelopmentTopologyGenerationInProgress =>
-            explicitTopologyGenerationInProgress;
+            explicitTopologyGenerationInProgress ||
+            P12CandidateSweepTransientTopologyGenerationActive;
 
         private bool IsTopologyDebugActive
         {

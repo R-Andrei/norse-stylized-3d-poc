@@ -6,29 +6,62 @@ P2–P10 are Unity-validated and closed; P11 found no mechanical or consistency 
 
 Selection changes intentionally invalidate runtime resources and require an explicit matching cache rebuild. No automatic cache write, duplicate runtime path, scene/prefab/material migration, or compute/render retuning is included. The P12 snapshot records active descriptor, cache, initialization, topology, CFL/curvature, memory, dispatch/cell/substep, visibility, and CPU-submit evidence; visual acceptance remains direct Unity review.
 
-The first P12 Medium fixed candidate passed runtime evidence. P12a restored ordinary previous/current committed-state interpolation and proved a full interpolation range, but Unity still showed dead source-covered Layer C edges repeatedly reappearing. P12b follows the confirmed code path rather than adding more render smoothing: automatic sources now deposit only newly revealed Build coverage; Hold and Release deposit nothing; one dedicated previous-committed packed-state texture makes presentation ownership independent of transport substep parity; and P12 records face-level lane cancellation plus material-weighted signed lateral movement. Clipboard-copy actions remain adjacent to all saved reports. Overall foam coverage is deliberately deferred to the later layer-by-layer P13 tuning pass.
+The first P12 Medium fixed candidate passed runtime evidence. P12a restored ordinary previous/current committed-state interpolation. P12b corrected the broad dead-edge back-and-forth flicker, made committed presentation independent of transport-substep parity, and added face-level lateral evidence. Unity then rejected P12b's global deposit-once source policy because Object Contact Arc/Semi-Arc emitted only during Build and were silent through Hold and Release. P12c restored and Unity-validated persistent Object emitters while retaining deposit-once ownership for the other six automatic source families. P12d completed the runtime matrix with all 12 cases passing; visual review selected `0.15 m` and rejected `0.20 m` as too coarse. P12e provides independent Presence-amplitude rendering and TVD Superbee transport A/B options. Unity retained Presence-Amplitude, rejected P12f's dual-contour/fragmented Chip path, and partially accepted P12g: its single exterior eligibility contour is correct, but its doubled-diameter production admission is over-broad. P12h is also rejected because one projected reach still creates a second permission region outside the displayed eligibility mask. P12i removes every derived Presence-Amplitude admission region and uses Candidate × displayed Eligibility exactly, but Unity rejects the eligibility field itself because procedural soft-visibility noise creates stipple and fractional support weakens faint-fringe removal. P12j is rejected because its clean binary silhouette omits patterned erosion and structural Strand shaping. P12k replaces the surrogate with exact pre-Chip rendered-mask ownership. Unity then showed that fractional candidate and eligibility values still attenuated Foam rather than creating complete holes. P12l converts Presence-Amplitude Candidate and Eligibility to binary selected regions, defines Production as their exact logical intersection, and removes 100% of selected Foam. Overall Foam coverage remains deferred to the layer-by-layer P13 tuning pass.
 
 
-## Deposit-once automatic-source ownership and effective lateral evidence — `RG-METRIC-P12b` — mechanically implemented, Unity validation pending
+## Hybrid automatic-source ownership and shader import repair — `RG-METRIC-P12c` — Unity-accepted
 
-P12b corrects a committed Layer C ownership defect found after the fixed candidate was activated. Before this patch, every active source event re-rasterized its cumulative footprint after transport and lifecycle. A weak edge cell could reach packed zero and then receive fresh Presence, Remaining Life, and pattern state from the same event on the next material tick. Repeated source-space maintenance also visually opposed lateral transport.
-
-Current source ownership is:
+P12c preserves the P12b fixes that Unity accepted and corrects the Object emitter regression:
 
 ```text
-Build    positive-difference gate; current authored source target at the advancing frontier;
-Hold     no new birth;
-Release  no new birth and no deletion;
-already-born material    transport/lifecycle-owned.
+Shore / Wash / Fleck / Free-Water
+  newly revealed positive coverage only;
+  repeated old coverage deposits zero.
+
+Object Contact Arc / Semi-Arc
+  Build    progressively growing active emitter;
+  Hold     complete active emitter replenished each material tick;
+  Release  progressively retracting active emitter;
+  Rest     no source event.
 ```
 
-All eight family evaluators and source geometry remain unchanged. The source-event ABI adds previous deposition state and becomes eight `float4` lanes / 128 bytes. Manual injection remains unchanged. Event Hold/Release durations remain authored scheduling phases even though they no longer maintain material.
+The source-event ABI remains eight `float4` lanes / 128 bytes. Object phase/progress resolution returns to the accepted pre-P12b phase `0/1/2` contract, and Arc/Semi-Arc dispatch every active material tick. Their existing geometry and phase-mask evaluators are unchanged. Nonpersistent sources retain P12b current-minus-previous deposition permission and current absolute-target merging. Manual injection remains unchanged.
 
-A dedicated previous-committed packed-state texture is copied before each material update. Transport continues to ping-pong its original two writable states, so previous/current renderer ownership remains distinct for one through 64 substeps. This adds one state-sized texture and one GPU texture copy per material tick, but no kernel or dispatch.
+The dedicated previous-committed texture, even-substep correction, 27-value transport metric buffer, generated-lane face-cancellation evidence, cache contract, and all clipboard-copy actions are unchanged.
 
-The existing transport metric buffer grows by four counters rather than adding a buffer. It reports material-weighted absolute lateral face speed and positive/negative Presence-area movement. Generated Motion Lane reporting additionally measures face intent, opposing-sign neighbours, and cancellation ratio. These metrics diagnose effective transport without changing velocity, face averaging, source amount, or final render tuning.
+The extracted source-contribution helper that produced sixteen D3D11 definite-assignment warnings is removed. Current and nonpersistent previous evaluator selection are inline, matching the warning-free pre-P12b definite-assignment structure without changing any evaluator formula.
 
-P12b Unity acceptance requires zero compile/import errors or warnings, stable dead edges in Material Presence and Remaining Life, Build-frontier-only Automatic Birth Sources, a passing P12 snapshot copied from the Inspector, and a final P9 consumer regression. P13 remains the owner of total Foam-amount reduction and final tier/cache freeze.
+Unity accepted the restored Object Build/Hold/Release/Rest visual behavior and warning repair. Existing P7/P9 reports remain available for final selected-candidate closure.
+
+## Complete fixed-spacing and lateral-response sweep — `RG-METRIC-P12d` — Unity-complete
+
+P12d replaces four manual candidate sessions with one Play Mode action. It runs `0.25`, `0.20`, `0.15`, and `0.10 m`; for each spacing it executes lateral ratios `0`, authored, and `1`. Each of the 12 cases uses the real descriptor/allocation/topology/transport/source/Film/Shape/render path, clears source/material state, warms for two seconds, and records at least five seconds/30 frames.
+
+Mismatched candidates use explicit suite-owned transient topology generation. The assigned cache asset is not read, written, replaced, or serialized. The initialization Motion Time is frozen across all cases. The suite then removes its nonserialized overrides and restores normal authored cache-only startup ownership.
+
+The combined report records descriptor/topology, initialization, CFL/substeps/Jacobian/curvature, memory, dispatch/cell/CPU work, lane face cancellation, material-weighted lateral movement, zero-ratio isolation, cache immutability, and restoration. It is saved under `Library/RiverFoamDiagnostics` and has an adjacent Inspector clipboard-copy action. Unity completed all 12 cases with `Overall: PASS`; visual review selected `0.15 m` and rejected `0.20 m` as too coarse. P13 amount tuning remains separate.
+
+
+## Presence-amplitude rendering and TVD transport A/B — `RG-METRIC-P12e` — Unity-imported, selection in progress
+
+P12e separates the two identified fat-blob contributors into independent runtime options:
+
+- `Material Transport Scheme`: `Donor Cell (Current)` or `TVD Superbee`;
+- `Presence Footprint`: `Current` or `Presence-Amplitude`.
+
+Donor Cell and Current preserve the accepted baseline exactly. TVD Superbee changes only interior Layer C face reconstruction, retaining conservative packed Presence/life/pattern flux, closed boundaries, endpoint behavior, resources, kernels, and dispatch count. Presence-Amplitude changes only Layer E evaluation by preventing the base visual footprint from exceeding raw committed Presence before the existing opaque pattern/lifecycle logic.
+
+The four combinations can be switched in Play Mode at the selected `0.15 m` candidate without cache rebuild or resource reallocation. P12 reports label both selections. Unity import succeeded. Presence-Amplitude is visually close to the target but exposed incomplete Chip edge eligibility; TVD retention and comparative cost remain open. No claim is made that TVD mathematically guarantees zero support growth in every flow.
+
+## Exact rendered-mask Chip ownership — `RG-METRIC-P12g/P12k` — P12k mechanically implemented
+
+P12f is rejected. Its Presence-Amplitude derivative coordinate used the hardened pre-Chip mask, whose fringe and hard-body ramps generated an exterior and false interior contour. Its production selection also clipped connected candidates to the narrow edge band at each pixel, producing fragmented stripes.
+
+P12g protects the old mode explicitly. Current retains `preChipSoftVisibility` / `0.06`, candidate × edge-band selection, and accepted soft-mask reconstruction exactly. P12g established a single exterior Presence-Amplitude contour; P12h and P12i then removed all derived production regions so production became exactly candidate field multiplied by displayed eligibility. Unity rejected P12i because the displayed eligibility itself remained procedurally stippled and fractional.
+
+P12j is rejected because its clean committed-Presence/life silhouette remains geometrically broader than actual rendered Foam after patterned erosion and structural Strands. P12k leaves Current unchanged, resolves the existing Strand keep before Presence-Amplitude selection, and defines `preChipRenderedMask = foam.mask × strandKeep`. Eligibility, production removal, and both Chip debug views use that exact mask.
+
+Presence-Amplitude itself remains unchanged. No amplitude compression, new control, diagnostic, resource, kernel, dispatch, cache, scene, prefab, or material change is included. Mechanical validation must pass scope, Current compatibility, exact pre-Chip mask ownership, production-within-eligibility bounds, exact visible-removal reporting, disabled Presence-Amplitude Interior Access, retired clean-silhouette plumbing, HLSL parse, and archive-byte gates. Unity must confirm the grey body, yellow eligibility, magenta removal, and Final share one rendered edge and Current remains unchanged.
 
 ## Thin Mesh Profile and Front-Persistent Semi-Arc Lifecycle — `4.11C.5.18H.6.2` — implemented, Unity validation pending
 
@@ -1262,3 +1295,27 @@ Immediate order:
 5.16E.3 attributes capacity loss to unit overflow and fractional shoreline capacity with zero residual;
 5.16E.3C retains the `0.10%` engineering target, temporarily tolerates measured sub-1% PoC loss, and defers expensive transport correction;
 ```
+
+
+P12j is superseded. P12k preserves Current and exact Candidate × Eligibility ownership while deriving Presence-Amplitude eligibility from the exact no-Chip rendered mask after structural Strands. Chip Eligibility Composite and Production Chip Mask report that same geometry without adding resources or controls.
+
+
+## Binary Presence-Amplitude Chip intersection — `RG-METRIC-P12l` — mechanically implemented
+
+Current remains unchanged. Presence-Amplitude uses the P12k exact pre-Chip rendered mask, but thresholds the analytical candidate and eligibility fields at their `0.5` contours. Production is the exact binary product of those selected regions. Selected pixels remove all rendered Foam; unselected pixels preserve it. Candidate, Eligibility, and Production debug views report the exact binary masks used by production. No new control, resource, kernel, dispatch, cache, scene, prefab, material, or serialized field is introduced. Unity import and visual comparison remain pending.
+
+
+## Any-support Presence-Amplitude Chip intersection — `RG-METRIC-P12m` — source implemented
+
+P12l is visually rejected because its `0.5` contour thresholds discard positive Candidate and Eligibility support. P12m preserves P12k exact pre-Chip rendered-mask ownership and the existing complete-removal application, but selects Presence-Amplitude Candidate and Eligibility wherever their existing fields are greater than zero. Production is their exact binary product. Current remains unchanged. Inspector diagnostics now distinguish Presence-Amplitude binary masks from Current continuous fields, and `Foam Chip And Strand Probe` is identified as the authoritative final Foam mask. No control, property, resource, kernel, dispatch, cache, scene, prefab, material, serialized field, or Debug View identity is added or changed. Unity import and visual comparison remain pending.
+
+
+## Optional Candidate-Straddle Chipping A/B — `RG-METRIC-P12n` — source implemented
+
+P12m fixed the `0.5` antialias-support threshold but did not make the derivative Eligibility band produce coherent candidate-shaped bites in Unity. P12n retains P12m as `Rendered Edge Band (Current)` and adds `Candidate Straddle (Experimental)` for Presence-Amplitude.
+
+The experimental route classifies deterministic candidates at low frequency using centre plus up to eight irregular-perimeter samples of a camera-independent shaped Layer E support approximation. Entry requires two perimeter contacts with an outside centre; binary hysteresis retains with one contact until the centre becomes interior. The existing analytical candidate still moves and renders every frame, and exact pre-Chip rendered Foam remains the only removal target.
+
+Resource scope is one guarded point RFloat admission texture and one due-time kernel dispatch, default `4 Hz`. For the current approximate domain including guards, the analytical payload is approximately `136.1 KiB`; the conservative no-early-exit support ceiling is approximately `704,000` evaluations/second, while implemented centre rejection and early perimeter completion reduce actual work. GPU cost is unmeasured. No high-resolution field, distance transform, new render pass, draw call, scene, prefab, material, or shader-target increase is included.
+
+Status: offline source/contract validation passes. Unity 6000.5 import, same-frame debug comparison, Final visual verdict, and GPU timing are pending. If rejected, P12n can be removed without changing the preserved P12m route.

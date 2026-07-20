@@ -30,6 +30,320 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static PendingEdgeWearStableFingerprint
             pendingEdgeWearStableFingerprint;
 
+        private static CornerDamageTransactionAuditResult
+            capturedCornerDamageTransactionAudit;
+
+        private static void ResetCornerDamageTransactionAuditCapture()
+        {
+            capturedCornerDamageTransactionAudit = null;
+        }
+
+        private static void CaptureCornerDamageTransactionAudit(
+            CornerDamageTransactionAuditResult audit)
+        {
+            capturedCornerDamageTransactionAudit = audit;
+        }
+
+        private static string CompleteCornerDamageTransactionAuditCapture(
+            MassRecipe recipe)
+        {
+            CornerDamageTransactionAuditResult audit =
+                capturedCornerDamageTransactionAudit;
+            capturedCornerDamageTransactionAudit = null;
+            return BuildCornerDamageTransactionAuditReport(recipe, audit);
+        }
+
+        private static string BuildCornerDamageTransactionAuditReport(
+            MassRecipe recipe,
+            CornerDamageTransactionAuditResult audit)
+        {
+            StringBuilder builder = new StringBuilder(16384);
+            builder.AppendLine("GeneratedMass EW-C1A.1 corner transaction audit");
+            builder.AppendLine("contract=EW-C1A.1-transaction");
+            builder.Append("shapeSeed=");
+            builder.AppendLine((recipe == null ? 0 : recipe.ShapeSeed)
+                .ToString(CultureInfo.InvariantCulture));
+            if (audit == null)
+            {
+                builder.AppendLine("status=failed");
+                builder.AppendLine("diagnostic=audit capture was unavailable");
+                return builder.ToString();
+            }
+
+            builder.Append("status=");
+            builder.AppendLine(audit.Succeeded ? "passed" : "failed");
+            builder.Append("attempted=");
+            builder.AppendLine(audit.Attempted ? "1" : "0");
+            builder.Append("graphAvailable=");
+            builder.AppendLine(audit.GraphAvailable ? "1" : "0");
+            builder.Append("candidateFound=");
+            builder.AppendLine(audit.CandidateFound ? "1" : "0");
+            builder.Append("transactionCertified=");
+            builder.AppendLine(audit.Succeeded ? "1" : "0");
+            builder.Append("diagnostic=");
+            builder.AppendLine(audit.Diagnostic ?? string.Empty);
+            builder.Append("normalizedTopology=");
+            builder.Append(audit.NormalizedVertexCount);
+            builder.Append('/');
+            builder.Append(audit.NormalizedEdgeCount);
+            builder.Append('/');
+            builder.AppendLine(audit.NormalizedFaceCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("eligibleCandidates=");
+            builder.AppendLine(audit.EligibleCandidateCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("selectedGraphVertex=");
+            builder.AppendLine(audit.SelectedGraphVertexIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("selectedPosition=");
+            builder.AppendLine(FormatCornerDamageVector(
+                audit.SelectedPosition));
+            builder.Append("outwardNormal=");
+            builder.AppendLine(FormatCornerDamageVector(
+                audit.OutwardNormal));
+            builder.Append("baseDepth=");
+            builder.AppendLine(audit.BaseDepth.ToString(
+                "G12",
+                CultureInfo.InvariantCulture));
+            builder.Append("acceptedTrial=");
+            builder.AppendLine(audit.AcceptedTrialIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("thresholds=minimumStableEdge:");
+            builder.Append(audit.MinimumStableEdgeLength.ToString(
+                "G12",
+                CultureInfo.InvariantCulture));
+            builder.Append(",minimumStableFaceArea:");
+            builder.Append(audit.MinimumStableFaceArea.ToString(
+                "G12",
+                CultureInfo.InvariantCulture));
+            builder.Append(",maximumDimension:");
+            builder.AppendLine(audit.MaximumDimension.ToString(
+                "G12",
+                CultureInfo.InvariantCulture));
+            builder.Append("sourceVolume=");
+            builder.AppendLine(audit.SourceVolume.ToString(
+                "G12",
+                CultureInfo.InvariantCulture));
+
+            builder.AppendLine();
+            builder.AppendLine("[Candidates]");
+            builder.Append("count=");
+            builder.AppendLine(audit.Candidates.Count.ToString(
+                CultureInfo.InvariantCulture));
+            for (int candidateIndex = 0;
+                 candidateIndex < audit.Candidates.Count;
+                 candidateIndex++)
+            {
+                CornerDamageCandidateRecord candidate =
+                    audit.Candidates[candidateIndex];
+                builder.Append("vertex=");
+                builder.Append(candidate.GraphVertexIndex);
+                builder.Append(",eligible=");
+                builder.Append(candidate.Eligible ? 1 : 0);
+                builder.Append(",position=");
+                builder.Append(FormatCornerDamageVector(
+                    candidate.Position));
+                builder.Append(",faces=");
+                AppendCornerDamageIntList(
+                    builder,
+                    candidate.IncidentFaceIndices);
+                builder.Append(",graphEdges=");
+                AppendCornerDamageIntList(
+                    builder,
+                    candidate.IncidentGraphEdgeIndices);
+                builder.Append(",originalEdges=");
+                AppendCornerDamageIntList(
+                    builder,
+                    candidate.IncidentOriginalEdgeIndices);
+                builder.Append(",convex=");
+                builder.Append(candidate.ConvexIncidentEdgeCount);
+                builder.Append(",maxDihedral=");
+                builder.Append(candidate.MaximumIncidentDihedral.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",minEdgeLength=");
+                builder.Append(candidate.MinimumIncidentEdgeLength.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",score=");
+                builder.Append(candidate.Score.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append("{sharp:");
+                builder.Append(candidate.SharpnessScore.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",size:");
+                builder.Append(candidate.SizeScore.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",up:");
+                builder.Append(candidate.UpwardExposureScore.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",random:");
+                builder.Append(candidate.RandomScore.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append('}');
+                builder.Append(",blocker=");
+                builder.AppendLine(candidate.Blocker ?? string.Empty);
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("[Depth Trials]");
+            builder.Append("count=");
+            builder.AppendLine(audit.Trials.Count.ToString(
+                CultureInfo.InvariantCulture));
+            for (int trialIndex = 0;
+                 trialIndex < audit.Trials.Count;
+                 trialIndex++)
+            {
+                CornerDamageTrialRecord trial = audit.Trials[trialIndex];
+                builder.Append("trial=");
+                builder.Append(trial.TrialIndex);
+                builder.Append(",factor=");
+                builder.Append(trial.DepthFactor.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",depth=");
+                builder.Append(trial.Depth.ToString(
+                    "G12",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",planePoint=");
+                builder.Append(FormatCornerDamageVector(
+                    trial.PlanePoint));
+                builder.Append(",planeDistance=");
+                builder.Append(trial.PlaneDistance.ToString(
+                    "G12",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",succeeded=");
+                builder.Append(trial.Succeeded ? 1 : 0);
+                builder.Append(",faces=");
+                builder.Append(trial.FaceCount);
+                builder.Append(",cap=");
+                builder.Append(trial.CapFaceCount);
+                builder.Append('/');
+                builder.Append(trial.CapVertexCount);
+                builder.Append('/');
+                builder.Append(trial.CapArea.ToString(
+                    "G12",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",capResidual=");
+                builder.Append(trial.MaximumCapPlaneResidual.ToString(
+                    "G12",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",topology=");
+                builder.Append(trial.OpenEdgeCount);
+                builder.Append('/');
+                builder.Append(trial.NonManifoldEdgeCount);
+                builder.Append('/');
+                builder.Append(trial.TJunctionCount);
+                builder.Append(",faceQuality=");
+                builder.Append(trial.InvalidFaceCount);
+                builder.Append('/');
+                builder.Append(trial.NonPlanarFaceCount);
+                builder.Append('/');
+                builder.Append(trial.NonConvexFaceCount);
+                builder.Append('/');
+                builder.Append(trial.WindingFailureCount);
+                builder.Append(",boundsValid=");
+                builder.Append(trial.BoundsValid);
+                builder.Append(",budget=");
+                builder.Append(trial.OutputVertexCount);
+                builder.Append('/');
+                builder.Append(trial.OutputTriangleCount);
+                builder.Append('/');
+                builder.Append(trial.BudgetValid);
+                builder.Append(",volume=");
+                builder.Append(trial.SourceVolume.ToString(
+                    "G12",
+                    CultureInfo.InvariantCulture));
+                builder.Append('/');
+                builder.Append(trial.ResultVolume.ToString(
+                    "G12",
+                    CultureInfo.InvariantCulture));
+                builder.Append('/');
+                builder.Append(trial.VolumeLoss.ToString(
+                    "G12",
+                    CultureInfo.InvariantCulture));
+                builder.Append('/');
+                builder.Append(trial.VolumeLossFraction.ToString(
+                    "G12",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",identity=");
+                builder.Append(trial.UntouchedOriginalEdgeCount);
+                builder.Append('/');
+                builder.Append(trial.ShortenedDescendantEdgeCount);
+                builder.Append('/');
+                builder.Append(trial.CapRingEdgeCount);
+                builder.Append('/');
+                builder.Append(trial.MissingOriginalEdgeCount);
+                builder.Append('/');
+                builder.Append(trial.AmbiguousIdentityCount);
+                builder.Append(",exactFailures=");
+                builder.Append(trial.ExactConstructionFailureCount);
+                builder.Append(",exactReason=");
+                builder.Append(trial.ExactConstructionFailure ??
+                    string.Empty);
+                builder.Append(",blocker=");
+                builder.AppendLine(trial.Blocker ?? string.Empty);
+
+                for (int identityIndex = 0;
+                     identityIndex < trial.IdentityRecords.Count;
+                     identityIndex++)
+                {
+                    CornerDamageEdgeIdentityRecord identity =
+                        trial.IdentityRecords[identityIndex];
+                    builder.Append("  identity=");
+                    builder.Append(identity.Kind);
+                    builder.Append(",outputGraphEdge=");
+                    builder.Append(identity.OutputGraphEdgeIndex);
+                    builder.Append(",parents=");
+                    builder.Append(identity.ParentOriginalEdgeA);
+                    builder.Append('/');
+                    builder.Append(identity.ParentOriginalEdgeB);
+                    builder.Append(",generated=");
+                    builder.Append(identity.GeneratedIdentity);
+                    builder.Append(",segment=");
+                    builder.Append(FormatCornerDamageVector(identity.Start));
+                    builder.Append("->");
+                    builder.AppendLine(FormatCornerDamageVector(identity.End));
+                }
+            }
+            return builder.ToString();
+        }
+
+        private static string FormatCornerDamageVector(Vector3 value)
+        {
+            return "(" +
+                value.x.ToString("G9", CultureInfo.InvariantCulture) +
+                "/" +
+                value.y.ToString("G9", CultureInfo.InvariantCulture) +
+                "/" +
+                value.z.ToString("G9", CultureInfo.InvariantCulture) +
+                ")";
+        }
+
+        private static void AppendCornerDamageIntList(
+            StringBuilder builder,
+            List<int> values)
+        {
+            builder.Append('{');
+            if (values != null)
+            {
+                for (int index = 0; index < values.Count; index++)
+                {
+                    if (index > 0)
+                    {
+                        builder.Append('/');
+                    }
+                    builder.Append(values[index]);
+                }
+            }
+            builder.Append('}');
+        }
+
 #if UNITY_EDITOR
         private sealed class EdgeWearBatchAuditCapture
         {
@@ -508,6 +822,416 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             placement.AddVector3(placementFrame.RecenterOffset);
             return placement.Finish();
         }
+        private readonly struct EdgeWearMacroMappingProbe
+        {
+            public readonly float ParticipationIdentity01;
+            public readonly bool Participates;
+            public readonly float Identity01;
+            public readonly float SampledMultiplier;
+            public readonly float EffectiveMultiplier;
+            public readonly float RequestedWidth;
+            public readonly bool MinimumStyleClamped;
+
+            public EdgeWearMacroMappingProbe(
+                float participationIdentity01,
+                bool participates,
+                float identity01,
+                float sampledMultiplier,
+                float effectiveMultiplier,
+                float requestedWidth,
+                bool minimumStyleClamped)
+            {
+                ParticipationIdentity01 = participationIdentity01;
+                Participates = participates;
+                Identity01 = identity01;
+                SampledMultiplier = sampledMultiplier;
+                EffectiveMultiplier = effectiveMultiplier;
+                RequestedWidth = requestedWidth;
+                MinimumStyleClamped = minimumStyleClamped;
+            }
+        }
+
+        private static EdgeWearMacroMappingProbe
+            EvaluateEdgeWearMacroMappingProbe(
+                int shapeSeed,
+                int canonicalSourceEdgeIndex,
+                float coverage,
+                float controlStrength,
+                float dihedralDegrees,
+                bool generatedTransition)
+        {
+            ResolveEdgeWearMacroRequestedWidth(
+                shapeSeed,
+                canonicalSourceEdgeIndex,
+                coverage,
+                controlStrength,
+                1f,
+                EdgeWearMinimumStyleWidthSetting,
+                dihedralDegrees,
+                generatedTransition,
+                out float participationIdentity01,
+                out bool participates,
+                out float identity01,
+                out float sampledMultiplier,
+                out float effectiveMultiplier,
+                out float requestedWidth,
+                out bool minimumStyleClamped);
+            return new EdgeWearMacroMappingProbe(
+                participationIdentity01,
+                participates,
+                identity01,
+                sampledMultiplier,
+                effectiveMultiplier,
+                requestedWidth,
+                minimumStyleClamped);
+        }
+
+        private static bool EdgeWearMacroMappingProbeEquals(
+            EdgeWearMacroMappingProbe left,
+            EdgeWearMacroMappingProbe right)
+        {
+            return left.ParticipationIdentity01 ==
+                    right.ParticipationIdentity01 &&
+                left.Participates == right.Participates &&
+                left.Identity01 == right.Identity01 &&
+                left.SampledMultiplier == right.SampledMultiplier &&
+                left.EffectiveMultiplier == right.EffectiveMultiplier &&
+                left.RequestedWidth == right.RequestedWidth &&
+                left.MinimumStyleClamped == right.MinimumStyleClamped;
+        }
+
+        public static bool EvaluateEdgeWearMacroAngleMappingContract(
+            out string report)
+        {
+            const int AngleSampleCount = 10001;
+            int[] sourceEdgeIndices = { 0, 1, 7, 38, 97 };
+            float[] controlStrengths = { 0f, 0.25f, 1f };
+            bool bounded = true;
+            bool endpointParity = true;
+            bool permissionMonotonic = true;
+            bool formulaParity = true;
+            bool widthMonotonic = true;
+            bool dependentFieldParity = true;
+            bool deterministic = true;
+            bool zeroParity = true;
+            bool coverageParity = true;
+            bool generatedTransitionParity = true;
+            string firstFailure = "none";
+            int evaluatedProbeCount = 0;
+            float previousPermission = float.PositiveInfinity;
+            endpointParity =
+                Mathf.Abs(
+                    ResolveEdgeWearMacroAnglePermission(
+                        EdgeWearMacroShallowAngleDegrees) - 1f) <=
+                    0.000001f &&
+                Mathf.Abs(
+                    ResolveEdgeWearMacroAnglePermission(
+                        EdgeWearMacroSharpAngleDegrees) -
+                    EdgeWearMacroSharpReductionPermission) <= 0.000001f &&
+                Mathf.Abs(
+                    ResolveEdgeWearMacroAnglePermission(0f) - 1f) <=
+                    0.000001f &&
+                Mathf.Abs(
+                    ResolveEdgeWearMacroAnglePermission(180f) -
+                    EdgeWearMacroSharpReductionPermission) <= 0.000001f;
+            if (!endpointParity)
+            {
+                firstFailure = "angle-endpoint-parity";
+            }
+
+            for (int angleIndex = 0;
+                 angleIndex < AngleSampleCount;
+                 angleIndex++)
+            {
+                float angle = 180f * angleIndex /
+                    (AngleSampleCount - 1f);
+                float permission =
+                    ResolveEdgeWearMacroAnglePermission(angle);
+                if (permission <
+                        EdgeWearMacroSharpReductionPermission - 0.000001f ||
+                    permission > 1.000001f)
+                {
+                    bounded = false;
+                    if (firstFailure == "none")
+                    {
+                        firstFailure = "angle-permission-out-of-bounds@" +
+                            angle.ToString("R", CultureInfo.InvariantCulture);
+                    }
+                }
+                if (permission > previousPermission + 0.000001f)
+                {
+                    permissionMonotonic = false;
+                    if (firstFailure == "none")
+                    {
+                        firstFailure = "angle-permission-increased@" +
+                            angle.ToString("R", CultureInfo.InvariantCulture);
+                    }
+                }
+                previousPermission = permission;
+
+                for (int edgeIndex = 0;
+                     edgeIndex < sourceEdgeIndices.Length;
+                     edgeIndex++)
+                {
+                    for (int strengthIndex = 0;
+                         strengthIndex < controlStrengths.Length;
+                         strengthIndex++)
+                    {
+                        int sourceEdgeIndex = sourceEdgeIndices[edgeIndex];
+                        float controlStrength =
+                            controlStrengths[strengthIndex];
+                        EdgeWearMacroMappingProbe current =
+                            EvaluateEdgeWearMacroMappingProbe(
+                                7319,
+                                sourceEdgeIndex,
+                                1f,
+                                controlStrength,
+                                angle,
+                                false);
+                        EdgeWearMacroMappingProbe repeated =
+                            EvaluateEdgeWearMacroMappingProbe(
+                                7319,
+                                sourceEdgeIndex,
+                                1f,
+                                controlStrength,
+                                angle,
+                                false);
+                        evaluatedProbeCount += 2;
+                        if (!EdgeWearMacroMappingProbeEquals(
+                                current,
+                                repeated))
+                        {
+                            deterministic = false;
+                            if (firstFailure == "none")
+                            {
+                                firstFailure = "nondeterministic@edge:" +
+                                    sourceEdgeIndex + ",angle:" +
+                                    angle.ToString(
+                                        "R",
+                                        CultureInfo.InvariantCulture);
+                            }
+                        }
+                        float expectedStrength =
+                            Mathf.Clamp01(controlStrength) *
+                            EdgeWearMacroMaximumCertifiedStrength;
+                        float expectedMultiplier = current.Participates
+                            ? 1f -
+                                (1f - current.SampledMultiplier) *
+                                expectedStrength *
+                                permission
+                            : 1f;
+                        if (Mathf.Abs(
+                                current.EffectiveMultiplier -
+                                expectedMultiplier) > 0.000001f ||
+                            Mathf.Abs(
+                                current.RequestedWidth -
+                                Mathf.Max(
+                                    EdgeWearMinimumStyleWidthSetting,
+                                    expectedMultiplier)) > 0.000001f)
+                        {
+                            formulaParity = false;
+                            if (firstFailure == "none")
+                            {
+                                firstFailure = "resolver-formula-parity@edge:" +
+                                    sourceEdgeIndex + ",angle:" +
+                                    angle.ToString(
+                                        "R",
+                                        CultureInfo.InvariantCulture);
+                            }
+                        }
+                        if (current.EffectiveMultiplier <
+                                EdgeWearMacroMinimumSampledMultiplier -
+                                    0.000001f ||
+                            current.EffectiveMultiplier > 1.000001f ||
+                            current.RequestedWidth <
+                                EdgeWearMinimumStyleWidthSetting - 0.000001f ||
+                            current.RequestedWidth > 1.000001f)
+                        {
+                            bounded = false;
+                            if (firstFailure == "none")
+                            {
+                                firstFailure = "resolved-output-out-of-bounds";
+                            }
+                        }
+                        if (controlStrength <= 0f &&
+                            (current.Participates ||
+                             current.EffectiveMultiplier != 1f ||
+                             current.RequestedWidth != 1f ||
+                             current.MinimumStyleClamped))
+                        {
+                            zeroParity = false;
+                            if (firstFailure == "none")
+                            {
+                                firstFailure = "zero-strength-parity";
+                            }
+                        }
+
+                        if (angleIndex > 0)
+                        {
+                            float previousAngle = 180f *
+                                (angleIndex - 1) /
+                                (AngleSampleCount - 1f);
+                            EdgeWearMacroMappingProbe previous =
+                                EvaluateEdgeWearMacroMappingProbe(
+                                    7319,
+                                    sourceEdgeIndex,
+                                    1f,
+                                    controlStrength,
+                                    previousAngle,
+                                    false);
+                            evaluatedProbeCount++;
+                            if (current.SampledMultiplier !=
+                                    previous.SampledMultiplier ||
+                                current.EffectiveMultiplier + 0.000001f <
+                                    previous.EffectiveMultiplier ||
+                                current.RequestedWidth + 0.000001f <
+                                    previous.RequestedWidth)
+                            {
+                                widthMonotonic = false;
+                                if (firstFailure == "none")
+                                {
+                                    firstFailure = "width-decreased@edge:" +
+                                        sourceEdgeIndex + ",angle:" +
+                                        angle.ToString(
+                                            "R",
+                                            CultureInfo.InvariantCulture);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            EdgeWearMacroMappingProbe coverageZero =
+                EvaluateEdgeWearMacroMappingProbe(
+                    7319,
+                    38,
+                    0f,
+                    1f,
+                    90f,
+                    false);
+            evaluatedProbeCount++;
+            coverageParity = !coverageZero.Participates &&
+                coverageZero.EffectiveMultiplier == 1f &&
+                coverageZero.RequestedWidth == 1f &&
+                !coverageZero.MinimumStyleClamped;
+            if (!coverageParity && firstFailure == "none")
+            {
+                firstFailure = "zero-coverage-parity";
+            }
+
+            EdgeWearMacroMappingProbe generatedTransition =
+                EvaluateEdgeWearMacroMappingProbe(
+                    7319,
+                    38,
+                    1f,
+                    1f,
+                    180f,
+                    true);
+            evaluatedProbeCount++;
+            generatedTransitionParity =
+                !generatedTransition.Participates &&
+                generatedTransition.SampledMultiplier == 1f &&
+                generatedTransition.EffectiveMultiplier == 1f &&
+                generatedTransition.RequestedWidth == 1f &&
+                !generatedTransition.MinimumStyleClamped;
+            if (!generatedTransitionParity && firstFailure == "none")
+            {
+                firstFailure = "generated-transition-parity";
+            }
+
+            EdgeWearEdgeViabilityRecord dependentFields =
+                new EdgeWearEdgeViabilityRecord();
+            ApplyResolvedEdgeWearMacroWidth(
+                dependentFields,
+                3f,
+                0.01f,
+                generatedTransition.ParticipationIdentity01,
+                generatedTransition.Participates,
+                generatedTransition.Identity01,
+                generatedTransition.SampledMultiplier,
+                generatedTransition.EffectiveMultiplier,
+                generatedTransition.RequestedWidth,
+                generatedTransition.MinimumStyleClamped);
+            dependentFieldParity =
+                dependentFields.RequestedWidth == 1f &&
+                Mathf.Abs(
+                    dependentFields.RequiredFootprintLength - 2.01f) <=
+                    0.000001f &&
+                Mathf.Abs(dependentFields.LengthToWidthRatio - 3f) <=
+                    0.000001f;
+            if (!dependentFieldParity && firstFailure == "none")
+            {
+                firstFailure = "dependent-width-field-parity";
+            }
+
+            bool passed = bounded &&
+                endpointParity &&
+                permissionMonotonic &&
+                formulaParity &&
+                widthMonotonic &&
+                dependentFieldParity &&
+                deterministic &&
+                zeroParity &&
+                coverageParity &&
+                generatedTransitionParity;
+            float sharpMinimumMultiplier = 1f -
+                (1f - EdgeWearMacroMinimumSampledMultiplier) *
+                EdgeWearMacroMaximumCertifiedStrength *
+                EdgeWearMacroSharpReductionPermission;
+            StringBuilder builder = new StringBuilder(768);
+            builder.Append("status=");
+            builder.AppendLine(passed ? "passed" : "failed");
+            builder.Append("policy=actual-runtime-resolver/dense-angle-monotonicity");
+            builder.Append(",angleSamples=");
+            builder.Append(AngleSampleCount);
+            builder.Append(",probeEvaluations=");
+            builder.AppendLine(evaluatedProbeCount.ToString());
+            builder.Append("mapping=shallow:");
+            builder.Append(
+                EdgeWearMacroShallowAngleDegrees.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append(",sharp:");
+            builder.Append(
+                EdgeWearMacroSharpAngleDegrees.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append(",sharpPermission:");
+            builder.AppendLine(
+                EdgeWearMacroSharpReductionPermission.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append("sharpMinimumMultiplier=");
+            builder.AppendLine(sharpMinimumMultiplier.ToString(
+                "G9",
+                CultureInfo.InvariantCulture));
+            builder.Append("checks=bounded:");
+            builder.Append(bounded ? '1' : '0');
+            builder.Append(",endpointParity:");
+            builder.Append(endpointParity ? '1' : '0');
+            builder.Append(",permissionMonotonic:");
+            builder.Append(permissionMonotonic ? '1' : '0');
+            builder.Append(",formulaParity:");
+            builder.Append(formulaParity ? '1' : '0');
+            builder.Append(",widthMonotonic:");
+            builder.Append(widthMonotonic ? '1' : '0');
+            builder.Append(",dependentFieldParity:");
+            builder.Append(dependentFieldParity ? '1' : '0');
+            builder.Append(",deterministic:");
+            builder.Append(deterministic ? '1' : '0');
+            builder.Append(",zeroParity:");
+            builder.Append(zeroParity ? '1' : '0');
+            builder.Append(",coverageParity:");
+            builder.Append(coverageParity ? '1' : '0');
+            builder.Append(",generatedTransitionParity:");
+            builder.AppendLine(generatedTransitionParity ? "1" : "0");
+            builder.Append("firstFailure=");
+            builder.Append(firstFailure);
+            report = builder.ToString();
+            return passed;
+        }
+
 #endif
 
         private static void CapturePendingEdgeWearStableFingerprint(
@@ -3157,6 +3881,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         CultureInfo.InvariantCulture));
                 signature.Append(':');
                 signature.Append(
+                    ResolveEdgeWearMacroAnglePermission(
+                        lifecycle.DihedralDegrees).ToString(
+                            "R",
+                            CultureInfo.InvariantCulture));
+                signature.Append(':');
+                signature.Append(
                     viability.MacroEffectiveMultiplier.ToString(
                         "R",
                         CultureInfo.InvariantCulture));
@@ -3764,6 +4494,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             List<float> multipliers = new List<float>();
             List<float> widths = new List<float>();
+            List<float> anglePermissions = new List<float>();
             int participants = 0;
             int varied = 0;
             int minimumStyleClamped = 0;
@@ -3786,6 +4517,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 multipliers.Add(viability.MacroEffectiveMultiplier);
                 widths.Add(viability.RequestedWidth);
+                anglePermissions.Add(
+                    ResolveEdgeWearMacroAnglePermission(
+                        lifecycle.DihedralDegrees));
                 if (viability.MacroVariationParticipates)
                 {
                     participants++;
@@ -3809,6 +4543,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             multipliers.Sort();
             widths.Sort();
+            anglePermissions.Sort();
             float multiplierMinimum = multipliers.Count > 0
                 ? multipliers[0]
                 : 1f;
@@ -3825,10 +4560,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float widthMaximum = widths.Count > 0
                 ? widths[widths.Count - 1]
                 : 0f;
-            return "policy=canonical-shape-seed-source-edge/downward-only" +
+            float anglePermissionMinimum = anglePermissions.Count > 0
+                ? anglePermissions[0]
+                : 1f;
+            float anglePermissionMedian = anglePermissions.Count > 0
+                ? ResolveEdgeWearSortedMedian(anglePermissions)
+                : 1f;
+            float anglePermissionMaximum = anglePermissions.Count > 0
+                ? anglePermissions[anglePermissions.Count - 1]
+                : 1f;
+            return "policy=canonical-shape-seed-source-edge/dihedral-biased-downward-only" +
+                ",shallowAngle=" +
+                    EdgeWearMacroShallowAngleDegrees.ToString("G9") +
+                ",sharpAngle=" +
+                    EdgeWearMacroSharpAngleDegrees.ToString("G9") +
+                ",sharpPermission=" +
+                    EdgeWearMacroSharpReductionPermission.ToString("G9") +
                 ",coverage=" +
                     audit.MacroVariationCoverage.ToString("G9") +
-                ",strength=" + audit.MacroVariation.ToString("G9") +
+                ",controlStrength=" +
+                    audit.MacroVariation.ToString("G9") +
+                ",effectiveStrength=" +
+                    (Mathf.Clamp01(audit.MacroVariation) *
+                     EdgeWearMacroMaximumCertifiedStrength).ToString("G9") +
                 ",baseRequestedWidth=" +
                     audit.MacroBaseRequestedWidth.ToString("G9") +
                 ",evaluated=" + multipliers.Count +
@@ -3840,6 +4594,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     multiplierMinimum.ToString("G9") + "/" +
                     multiplierMedian.ToString("G9") + "/" +
                     multiplierMaximum.ToString("G9") +
+                ",anglePermission=" +
+                    anglePermissionMinimum.ToString("G9") + "/" +
+                    anglePermissionMedian.ToString("G9") + "/" +
+                    anglePermissionMaximum.ToString("G9") +
                 ",requestedWidth=" +
                     widthMinimum.ToString("G9") + "/" +
                     widthMedian.ToString("G9") + "/" +
@@ -4657,6 +5415,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(",sampled:");
                 builder.Append(
                     record.MacroSampledMultiplier.ToString("G9"));
+                builder.Append(",anglePermission:");
+                builder.Append(
+                    ResolveEdgeWearMacroAnglePermission(
+                        lifecycle.DihedralDegrees).ToString("G9"));
                 builder.Append(",effective:");
                 builder.Append(
                     record.MacroEffectiveMultiplier.ToString("G9"));
@@ -4988,6 +5750,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     builder.Append(
                         record.Viability.MacroSampledMultiplier.ToString(
                             "G9"));
+                    builder.Append(",anglePermission:");
+                    builder.Append(
+                        ResolveEdgeWearMacroAnglePermission(
+                            record.DihedralDegrees).ToString("G9"));
                     builder.Append(",effective:");
                     builder.Append(
                         record.Viability.MacroEffectiveMultiplier.ToString(

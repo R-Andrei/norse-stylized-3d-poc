@@ -18,8 +18,72 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private const float EdgeWearMinimumStyleWidthSetting = 0.05f;
         private const float EdgeWearMinimumCentralSpanWidthMultiplier = 0.5f;
         private const float EdgeWearMacroMinimumSampledMultiplier = 0.55f;
+        private const float EdgeWearMacroMaximumCertifiedStrength = 0.55f;
+        private const float EdgeWearMacroShallowAngleDegrees =
+            EdgeWearMinimumViableDihedralDegrees;
+        private const float EdgeWearMacroSharpAngleDegrees = 90f;
+        private const float EdgeWearMacroSharpReductionPermission = 0.35f;
         private const int EdgeWearMacroVariationSalt = 0x6D31;
         private const int EdgeWearMacroParticipationSalt = 0x4B17;
+        private const int CornerDamageSelectionSalt = 0x2C51;
+        private const int CornerDamageDepthSalt = 0x57A3;
+        private const int CornerDamageIdentitySalt = 0x6E19;
+        private static readonly float[] CornerDamageDepthTrialFactors =
+        {
+            1f,
+            0.75f,
+            0.5625f,
+            0.421875f
+        };
+
+        private static float ResolveEdgeWearMacroAnglePermission(
+            float dihedralDegrees)
+        {
+            if (float.IsNaN(dihedralDegrees) ||
+                float.IsInfinity(dihedralDegrees))
+            {
+                return 1f;
+            }
+
+            float angle01 = Mathf.InverseLerp(
+                EdgeWearMacroShallowAngleDegrees,
+                EdgeWearMacroSharpAngleDegrees,
+                dihedralDegrees);
+            float sharpness = Mathf.SmoothStep(0f, 1f, angle01);
+            return Mathf.Lerp(
+                1f,
+                EdgeWearMacroSharpReductionPermission,
+                sharpness);
+        }
+
+        private static void ApplyResolvedEdgeWearMacroWidth(
+            EdgeWearEdgeViabilityRecord viability,
+            float edgeLength,
+            float footprintGuard,
+            float participationIdentity01,
+            bool participates,
+            float identity01,
+            float sampledMultiplier,
+            float effectiveMultiplier,
+            float variedRequestedWidth,
+            bool minimumStyleClamped)
+        {
+            viability.MacroParticipationIdentity01 =
+                participationIdentity01;
+            viability.MacroVariationParticipates = participates;
+            viability.MacroIdentity01 = identity01;
+            viability.MacroSampledMultiplier = sampledMultiplier;
+            viability.MacroEffectiveMultiplier = effectiveMultiplier;
+            viability.MacroMinimumStyleClamped = minimumStyleClamped;
+            viability.RequestedWidth = variedRequestedWidth;
+            viability.RequiredFootprintLength =
+                variedRequestedWidth *
+                    EdgeWearMinimumFootprintLengthMultiplier +
+                footprintGuard;
+            viability.LengthToWidthRatio = variedRequestedWidth > 0f
+                ? edgeLength / variedRequestedWidth
+                : 0f;
+        }
 
         private static void ResolveEdgeWearMacroRequestedWidth(
             int shapeSeed,
@@ -28,6 +92,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float macroVariationStrength,
             float baseRequestedWidth,
             float minimumStyleWidth,
+            float dihedralDegrees,
             bool generatedTransition,
             out float participationIdentity01,
             out bool participates,
@@ -62,7 +127,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 : Mathf.Clamp01(macroVariationCoverage);
             float strength = generatedTransition
                 ? 0f
-                : Mathf.Clamp01(macroVariationStrength);
+                : Mathf.Clamp01(macroVariationStrength) *
+                    EdgeWearMacroMaximumCertifiedStrength;
             participates = coverage > 0f &&
                 strength > 0f &&
                 (coverage >= 1f ||
@@ -75,8 +141,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return;
             }
 
-            float requestedMultiplier =
-                Mathf.Lerp(1f, sampledMultiplier, strength);
+            float anglePermission =
+                ResolveEdgeWearMacroAnglePermission(dihedralDegrees);
+            float requestedMultiplier = 1f -
+                (1f - sampledMultiplier) *
+                strength *
+                anglePermission;
             float unboundedWidth =
                 baseRequestedWidth * requestedMultiplier;
             variedRequestedWidth =
@@ -215,6 +285,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     settings.EdgeWearMacroVariation,
                     requestedWidth,
                     minimumStyleWidth,
+                    EdgeWearMacroShallowAngleDegrees,
                     microGeneratedTransition,
                     out float macroParticipationIdentity01,
                     out bool macroVariationParticipates,
@@ -252,27 +323,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         BaseRequestedWidth = requestedWidth,
                         MacroVariationCoverage =
                             settings.EdgeWearMacroVariationCoverage,
-                        MacroVariation = settings.EdgeWearMacroVariation,
-                        MacroParticipationIdentity01 =
-                            macroParticipationIdentity01,
-                        MacroVariationParticipates =
-                            macroVariationParticipates,
-                        MacroIdentity01 = macroIdentity01,
-                        MacroSampledMultiplier =
-                            macroSampledMultiplier,
-                        MacroEffectiveMultiplier =
-                            macroEffectiveMultiplier,
-                        MacroMinimumStyleClamped =
-                            macroMinimumStyleClamped,
-                        RequestedWidth = variedRequestedWidth,
-                        RequiredFootprintLength =
-                            variedRequestedWidth *
-                                EdgeWearMinimumFootprintLengthMultiplier +
-                            footprintGuard,
-                        LengthToWidthRatio = variedRequestedWidth > 0f
-                            ? length / variedRequestedWidth
-                            : 0f
+                        MacroVariation = settings.EdgeWearMacroVariation
                     };
+                ApplyResolvedEdgeWearMacroWidth(
+                    viability,
+                    length,
+                    footprintGuard,
+                    macroParticipationIdentity01,
+                    macroVariationParticipates,
+                    macroIdentity01,
+                    macroSampledMultiplier,
+                    macroEffectiveMultiplier,
+                    variedRequestedWidth,
+                    macroMinimumStyleClamped);
                 lifecycle.Viability = viability;
                 coverageAudit.Records.Add(lifecycle);
                 coverageAudit.RecordByKey[edgeKey] = lifecycle;
@@ -377,6 +440,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     viability.FailureReason = lifecycle.CandidateReason;
                     continue;
                 }
+
+                ResolveEdgeWearMacroRequestedWidth(
+                    recipe.ShapeSeed,
+                    originalSourceEdgeIndex,
+                    settings.EdgeWearMacroVariationCoverage,
+                    settings.EdgeWearMacroVariation,
+                    requestedWidth,
+                    minimumStyleWidth,
+                    evidence.DihedralDegrees,
+                    microGeneratedTransition,
+                    out macroParticipationIdentity01,
+                    out macroVariationParticipates,
+                    out macroIdentity01,
+                    out macroSampledMultiplier,
+                    out macroEffectiveMultiplier,
+                    out variedRequestedWidth,
+                    out macroMinimumStyleClamped);
+                ApplyResolvedEdgeWearMacroWidth(
+                    viability,
+                    length,
+                    footprintGuard,
+                    macroParticipationIdentity01,
+                    macroVariationParticipates,
+                    macroIdentity01,
+                    macroSampledMultiplier,
+                    macroEffectiveMultiplier,
+                    variedRequestedWidth,
+                    macroMinimumStyleClamped);
 
                 lifecycle.StructuralEligible = true;
                 Vector3 bevelNormal = normalSum.normalized;
@@ -4226,6 +4317,887 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
                 }
             }
+        }
+
+        private static CornerDamageTransactionAuditResult
+            EvaluateCornerDamageTransaction(
+                List<PolygonFace> normalizedFaces,
+                EdgeWearMicroTopologyNormalizationResult normalization,
+                Bounds normalizedBounds,
+                float maximumDimension,
+                MassRecipe recipe)
+        {
+            CornerDamageTransactionAuditResult result =
+                new CornerDamageTransactionAuditResult
+                {
+                    Attempted = true,
+                    ShapeSeed = recipe == null ? 0 : recipe.ShapeSeed,
+                    MaximumDimension = maximumDimension,
+                    MinimumStableEdgeLength = maximumDimension * 0.0012f,
+                    MinimumStableFaceArea =
+                        maximumDimension * maximumDimension * 0.000001f
+                };
+            result.SourceVolume =
+                CalculatePlaneCutPolyhedronVolume(normalizedFaces);
+
+            if (normalizedFaces == null || normalizedFaces.Count < 4 ||
+                recipe == null ||
+                !TryBuildEdgeWearTopologyGraph(
+                    normalizedFaces,
+                    out EdgeWearTopologyGraph graph,
+                    out EdgeWearGraphBuildStats graphStats) ||
+                graphStats.GraphBoundaryEdgeCount != 0 ||
+                graphStats.GraphNonManifoldEdgeCount != 0)
+            {
+                result.Diagnostic =
+                    "normalized corner-damage topology graph is unavailable";
+                return result;
+            }
+
+            result.GraphAvailable = true;
+            result.NormalizedVertexCount = graph.Vertices.Count;
+            result.NormalizedEdgeCount = graph.Edges.Count;
+            result.NormalizedFaceCount = graph.Faces.Count;
+            Vector3 solidCentre =
+                CalculatePlaneCutFaceVertexCentre(normalizedFaces);
+            float massBoundsDiagonal = Mathf.Max(
+                PointMergeDistance,
+                normalizedBounds.size.magnitude);
+            float structuralTolerance = Mathf.Max(
+                PointMergeDistance * 8f,
+                maximumDimension * 0.00001f);
+
+            CornerDamageCandidateRecord selected = null;
+            for (int vertexIndex = 0;
+                 vertexIndex < graph.Vertices.Count;
+                 vertexIndex++)
+            {
+                EdgeWearGraphVertex vertex = graph.Vertices[vertexIndex];
+                CornerDamageCandidateRecord candidate =
+                    BuildCornerDamageCandidate(
+                        normalizedFaces,
+                        graph,
+                        normalization,
+                        solidCentre,
+                        massBoundsDiagonal,
+                        result.MinimumStableEdgeLength,
+                        structuralTolerance,
+                        recipe.ShapeSeed,
+                        vertexIndex,
+                        vertex);
+                result.Candidates.Add(candidate);
+                if (!candidate.Eligible)
+                {
+                    continue;
+                }
+
+                result.EligibleCandidateCount++;
+                if (selected == null ||
+                    candidate.Score > selected.Score + 0.0000001f ||
+                    (Mathf.Abs(candidate.Score - selected.Score) <=
+                         0.0000001f &&
+                     candidate.GraphVertexIndex <
+                         selected.GraphVertexIndex))
+                {
+                    selected = candidate;
+                }
+            }
+
+            if (selected == null)
+            {
+                result.Diagnostic =
+                    "no normalized source corner satisfies the C1A.1 eligibility contract";
+                return result;
+            }
+
+            result.CandidateFound = true;
+            result.SelectedGraphVertexIndex =
+                selected.GraphVertexIndex;
+            result.SelectedPosition = selected.Position;
+            Vector3 outwardNormal = Vector3.zero;
+            for (int faceListIndex = 0;
+                 faceListIndex < selected.IncidentFaceIndices.Count;
+                 faceListIndex++)
+            {
+                int faceIndex = selected.IncidentFaceIndices[faceListIndex];
+                if (faceIndex < 0 || faceIndex >= normalizedFaces.Count)
+                {
+                    continue;
+                }
+                PolygonFace face = normalizedFaces[faceIndex];
+                float area = CalculatePolygonArea(face.Vertices);
+                outwardNormal += face.Normal * area;
+            }
+            if (!IsFinite(outwardNormal) ||
+                outwardNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                result.Diagnostic =
+                    "selected corner has no finite area-weighted outward normal";
+                return result;
+            }
+            outwardNormal.Normalize();
+            result.OutwardNormal = outwardNormal;
+
+            float depthIdentity = Hash01(
+                unchecked(recipe.ShapeSeed + CornerDamageDepthSalt),
+                selected.GraphVertexIndex);
+            result.BaseDepth =
+                selected.MinimumIncidentEdgeLength *
+                Mathf.Lerp(0.08f, 0.16f, depthIdentity);
+
+            for (int trialIndex = 0;
+                 trialIndex < CornerDamageDepthTrialFactors.Length;
+                 trialIndex++)
+            {
+                float factor = CornerDamageDepthTrialFactors[trialIndex];
+                float depth = Mathf.Clamp(
+                    result.BaseDepth * factor,
+                    2f * result.MinimumStableEdgeLength,
+                    selected.MinimumIncidentEdgeLength * 0.18f);
+                Vector3 planePoint =
+                    selected.Position - outwardNormal * depth;
+                CutPlane plane = new CutPlane(
+                    outwardNormal,
+                    Vector3.Dot(outwardNormal, planePoint));
+                CornerDamageTrialRecord trial =
+                    EvaluateCornerDamageTrial(
+                        normalizedFaces,
+                        graph,
+                        normalization,
+                        selected,
+                        normalizedBounds,
+                        result.MinimumStableEdgeLength,
+                        result.MinimumStableFaceArea,
+                        structuralTolerance,
+                        plane,
+                        planePoint,
+                        trialIndex,
+                        factor,
+                        depth);
+                result.Trials.Add(trial);
+                if (!trial.Succeeded)
+                {
+                    continue;
+                }
+
+                result.Succeeded = true;
+                result.AcceptedTrialIndex = trialIndex;
+                result.Diagnostic =
+                    "corner-damage transaction certified on trial " +
+                    trialIndex;
+                break;
+            }
+
+            if (!result.Succeeded)
+            {
+                result.Diagnostic =
+                    "all four bounded corner-damage depth trials were rejected";
+            }
+            return result;
+        }
+
+        private static CornerDamageCandidateRecord
+            BuildCornerDamageCandidate(
+                List<PolygonFace> normalizedFaces,
+                EdgeWearTopologyGraph graph,
+                EdgeWearMicroTopologyNormalizationResult normalization,
+                Vector3 solidCentre,
+                float massBoundsDiagonal,
+                float minimumStableEdgeLength,
+                float tolerance,
+                int shapeSeed,
+                int vertexIndex,
+                EdgeWearGraphVertex vertex)
+        {
+            CornerDamageCandidateRecord candidate =
+                new CornerDamageCandidateRecord
+                {
+                    GraphVertexIndex = vertexIndex,
+                    Position = vertex.Position,
+                    IncidentFaceCount = vertex.FaceIndices.Count,
+                    IncidentEdgeCount = vertex.EdgeIndices.Count,
+                    MinimumIncidentEdgeLength = float.PositiveInfinity
+                };
+            candidate.IncidentFaceIndices.AddRange(vertex.FaceIndices);
+            candidate.IncidentGraphEdgeIndices.AddRange(vertex.EdgeIndices);
+            candidate.IncidentFaceIndices.Sort();
+            candidate.IncidentGraphEdgeIndices.Sort();
+
+            if (candidate.IncidentFaceCount != 3)
+            {
+                candidate.Blocker = "incident-face-count-is-not-three";
+                return candidate;
+            }
+            if (candidate.IncidentEdgeCount != 3)
+            {
+                candidate.Blocker = "incident-edge-count-is-not-three";
+                return candidate;
+            }
+
+            for (int incidentIndex = 0;
+                 incidentIndex < candidate.IncidentGraphEdgeIndices.Count;
+                 incidentIndex++)
+            {
+                int graphEdgeIndex =
+                    candidate.IncidentGraphEdgeIndices[incidentIndex];
+                if (graphEdgeIndex < 0 ||
+                    graphEdgeIndex >= graph.Edges.Count)
+                {
+                    candidate.Blocker = "incident-edge-index-is-invalid";
+                    return candidate;
+                }
+                EdgeWearGraphEdge edge = graph.Edges[graphEdgeIndex];
+                if (edge.FaceA < 0 || edge.FaceB < 0 ||
+                    edge.ExtraFaceCount != 0)
+                {
+                    candidate.Blocker = "incident-edge-is-not-manifold";
+                    return candidate;
+                }
+                Vector3 edgeA = graph.Vertices[edge.VertexA].Position;
+                Vector3 edgeB = graph.Vertices[edge.VertexB].Position;
+                EdgeKey edgeKey = new EdgeKey(edgeA, edgeB);
+                if (normalization != null &&
+                    normalization.GeneratedTransitionKeys.Contains(edgeKey))
+                {
+                    candidate.Blocker =
+                        "corner-touches-a-micro-topology-generated-transition";
+                    return candidate;
+                }
+
+                float edgeLength = (edgeB - edgeA).magnitude;
+                candidate.MinimumIncidentEdgeLength = Mathf.Min(
+                    candidate.MinimumIncidentEdgeLength,
+                    edgeLength);
+                int originalEdgeIndex = normalization == null
+                    ? graphEdgeIndex
+                    : normalization.ResolveOriginalSourceEdgeIndex(
+                        edgeKey,
+                        graphEdgeIndex);
+                candidate.IncidentOriginalEdgeIndices.Add(
+                    originalEdgeIndex);
+
+                if (!TryClassifyEdgeWearStructuralEdge(
+                        normalizedFaces,
+                        edge.FaceA,
+                        edge.FaceB,
+                        edgeA,
+                        edgeB,
+                        solidCentre,
+                        tolerance,
+                        out BoundedEdgeClassificationEvidence evidence))
+                {
+                    candidate.Blocker =
+                        "incident-edge-classification-failed";
+                    return candidate;
+                }
+                candidate.MaximumIncidentDihedral = Mathf.Max(
+                    candidate.MaximumIncidentDihedral,
+                    evidence.DihedralDegrees);
+                if (evidence.Classification ==
+                    BoundedEdgeClassification.Convex)
+                {
+                    candidate.ConvexIncidentEdgeCount++;
+                }
+            }
+
+            candidate.IncidentOriginalEdgeIndices.Sort();
+            if (candidate.ConvexIncidentEdgeCount < 2)
+            {
+                candidate.Blocker =
+                    "fewer-than-two-convex-incident-edges";
+                return candidate;
+            }
+            if (candidate.MaximumIncidentDihedral < 55f)
+            {
+                candidate.Blocker =
+                    "maximum-incident-dihedral-below-55-degrees";
+                return candidate;
+            }
+            if (float.IsNaN(candidate.MinimumIncidentEdgeLength) ||
+                float.IsInfinity(candidate.MinimumIncidentEdgeLength) ||
+                candidate.MinimumIncidentEdgeLength <
+                    minimumStableEdgeLength * 8f)
+            {
+                candidate.Blocker =
+                    "minimum-incident-edge-length-below-eight-stable-lengths";
+                return candidate;
+            }
+
+            candidate.SharpnessScore = Mathf.Clamp01(
+                (candidate.MaximumIncidentDihedral - 35f) / 65f);
+            candidate.SizeScore = Mathf.Clamp01(
+                candidate.MinimumIncidentEdgeLength /
+                massBoundsDiagonal);
+            Vector3 radial = candidate.Position - solidCentre;
+            candidate.UpwardExposureScore = radial.sqrMagnitude >
+                MinimumEdgeLengthSqr
+                ? Mathf.Clamp01(
+                    Vector3.Dot(radial.normalized, Vector3.up) *
+                        0.5f + 0.5f)
+                : 0.5f;
+            candidate.RandomScore = Hash01(
+                unchecked(shapeSeed + CornerDamageSelectionSalt),
+                vertexIndex);
+            candidate.Score =
+                candidate.SharpnessScore * 0.55f +
+                candidate.SizeScore * 0.25f +
+                candidate.UpwardExposureScore * 0.15f +
+                candidate.RandomScore * 0.05f;
+            candidate.Eligible = true;
+            return candidate;
+        }
+
+        private static CornerDamageTrialRecord EvaluateCornerDamageTrial(
+            List<PolygonFace> normalizedFaces,
+            EdgeWearTopologyGraph sourceGraph,
+            EdgeWearMicroTopologyNormalizationResult normalization,
+            CornerDamageCandidateRecord selected,
+            Bounds sourceBounds,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            float tolerance,
+            CutPlane plane,
+            Vector3 planePoint,
+            int trialIndex,
+            float depthFactor,
+            float depth)
+        {
+            CornerDamageTrialRecord trial =
+                new CornerDamageTrialRecord
+                {
+                    TrialIndex = trialIndex,
+                    DepthFactor = depthFactor,
+                    Depth = depth,
+                    PlanePoint = planePoint,
+                    PlaneDistance = plane.Distance,
+                    SourceVolume =
+                        CalculatePlaneCutPolyhedronVolume(normalizedFaces)
+                };
+
+            if (!TryClipCornerDamageTransaction(
+                    normalizedFaces,
+                    plane,
+                    selected.GraphVertexIndex,
+                    out List<PolygonFace> clippedFaces,
+                    out PolygonFace capFace,
+                    out PlaneCutNumericalRepairTelemetry numericalRepairs,
+                    out string clipBlocker))
+            {
+                trial.ExactConstructionFailureCount =
+                    numericalRepairs == null
+                        ? 0
+                        : numericalRepairs.ExactConstructionFailureCount;
+                trial.ExactConstructionFailure =
+                    numericalRepairs == null
+                        ? string.Empty
+                        : numericalRepairs.FirstExactFailureReason ??
+                            string.Empty;
+                trial.Blocker = clipBlocker;
+                return trial;
+            }
+
+            trial.ExactConstructionFailureCount =
+                numericalRepairs.ExactConstructionFailureCount;
+            trial.ExactConstructionFailure =
+                numericalRepairs.FirstExactFailureReason ?? string.Empty;
+            if (!TryPrepareBoundedFaces(
+                    clippedFaces,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    out List<PolygonFace> preparedFaces,
+                    out _,
+                    out string preparationBlocker))
+            {
+                trial.Blocker =
+                    "corner-damage face preparation failed: " +
+                    preparationBlocker;
+                return trial;
+            }
+
+            trial.FaceCount = preparedFaces.Count;
+            capFace = null;
+            for (int faceIndex = 0;
+                 faceIndex < preparedFaces.Count;
+                 faceIndex++)
+            {
+                PolygonFace face = preparedFaces[faceIndex];
+                if (face.ProvenanceKind ==
+                    PolygonFaceProvenanceKind.CornerDamageCap)
+                {
+                    trial.CapFaceCount++;
+                    capFace = face;
+                }
+                AuditCornerDamageFaceQuality(
+                    face,
+                    minimumStableFaceArea,
+                    tolerance,
+                    ref trial);
+            }
+            if (trial.CapFaceCount != 1 || capFace == null)
+            {
+                trial.Blocker =
+                    "prepared corner transaction does not contain exactly one cap";
+                return trial;
+            }
+
+            trial.CapVertexCount = capFace.Vertices.Count;
+            trial.CapArea = CalculatePolygonArea(capFace.Vertices);
+            for (int capVertexIndex = 0;
+                 capVertexIndex < capFace.Vertices.Count;
+                 capVertexIndex++)
+            {
+                trial.MaximumCapPlaneResidual = Mathf.Max(
+                    trial.MaximumCapPlaneResidual,
+                    Mathf.Abs(plane.SignedDistance(
+                        capFace.Vertices[capVertexIndex])));
+            }
+
+            EdgeWearTopologyStats topology = AuditEdgeWearTopology(
+                preparedFaces,
+                minimumStableEdgeLength);
+            trial.OpenEdgeCount = topology.OpenEdgeCount;
+            trial.NonManifoldEdgeCount = topology.NonManifoldEdgeCount;
+            trial.TJunctionCount = topology.TJunctionCount;
+            Bounds resultBounds = CalculateFaceBounds(preparedFaces);
+            trial.BoundsValid = ArePlaneCutBoundsContained(
+                sourceBounds,
+                resultBounds,
+                tolerance)
+                ? 1
+                : 0;
+            trial.ResultVolume =
+                CalculatePlaneCutPolyhedronVolume(preparedFaces);
+            trial.VolumeLoss = trial.SourceVolume - trial.ResultVolume;
+            trial.VolumeLossFraction = trial.SourceVolume > 0.000000001
+                ? trial.VolumeLoss / trial.SourceVolume
+                : 0.0;
+
+            if (!TryBuildEdgeWearTopologyGraph(
+                    preparedFaces,
+                    out EdgeWearTopologyGraph outputGraph,
+                    out EdgeWearGraphBuildStats outputStats) ||
+                outputStats.GraphBoundaryEdgeCount != 0 ||
+                outputStats.GraphNonManifoldEdgeCount != 0)
+            {
+                trial.Blocker =
+                    "corner-damage output graph is not closed manifold";
+                return trial;
+            }
+
+            trial.OutputVertexCount = outputGraph.Vertices.Count;
+            trial.OutputTriangleCount =
+                CalculateCornerDamagePolygonTriangleCount(preparedFaces);
+            int sourceTriangleCount =
+                CalculateCornerDamagePolygonTriangleCount(normalizedFaces);
+            trial.BudgetValid =
+                trial.OutputVertexCount <=
+                    sourceGraph.Vertices.Count + 2 &&
+                trial.OutputTriangleCount <= sourceTriangleCount + 4
+                    ? 1
+                    : 0;
+
+            AuditCornerDamageIdentityMapping(
+                sourceGraph,
+                outputGraph,
+                normalization,
+                selected,
+                capFace,
+                tolerance,
+                trial);
+
+            if (trial.CapVertexCount < 3 ||
+                trial.CapArea <= minimumStableFaceArea ||
+                trial.MaximumCapPlaneResidual > tolerance ||
+                trial.OpenEdgeCount != 0 ||
+                trial.NonManifoldEdgeCount != 0 ||
+                trial.TJunctionCount != 0 ||
+                trial.InvalidFaceCount != 0 ||
+                trial.NonPlanarFaceCount != 0 ||
+                trial.NonConvexFaceCount != 0 ||
+                trial.WindingFailureCount != 0 ||
+                trial.BoundsValid != 1 ||
+                trial.BudgetValid != 1 ||
+                trial.SourceVolume <= 0.000000001 ||
+                trial.ResultVolume <= 0.000000001 ||
+                trial.VolumeLoss <= 0.000000001 ||
+                trial.VolumeLossFraction > 0.12 ||
+                trial.MissingOriginalEdgeCount != 0 ||
+                trial.AmbiguousIdentityCount != 0 ||
+                trial.ShortenedDescendantEdgeCount !=
+                    selected.IncidentGraphEdgeIndices.Count ||
+                trial.CapRingEdgeCount != capFace.Vertices.Count)
+            {
+                trial.Blocker = BuildCornerDamageTrialBlocker(
+                    trial,
+                    tolerance,
+                    selected.IncidentGraphEdgeIndices.Count,
+                    capFace.Vertices.Count);
+                return trial;
+            }
+
+            trial.Succeeded = true;
+            return trial;
+        }
+
+        private static void AuditCornerDamageFaceQuality(
+            PolygonFace face,
+            float minimumStableFaceArea,
+            float tolerance,
+            ref CornerDamageTrialRecord trial)
+        {
+            if (face == null || face.Vertices == null ||
+                face.Vertices.Count < 3 || !IsFinite(face.Normal))
+            {
+                trial.InvalidFaceCount++;
+                return;
+            }
+            float area = CalculatePolygonArea(face.Vertices);
+            if (float.IsNaN(area) || float.IsInfinity(area) ||
+                area <= minimumStableFaceArea)
+            {
+                trial.InvalidFaceCount++;
+            }
+            Vector3 measured = CalculatePolygonNormal(face.Vertices);
+            if (!IsFinite(measured) ||
+                measured.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                trial.InvalidFaceCount++;
+                return;
+            }
+            measured.Normalize();
+            if (Vector3.Dot(measured, face.Normal) <= 0f)
+            {
+                trial.WindingFailureCount++;
+            }
+            float planeDistance = CalculateAuthoredFacePlaneDistance(face);
+            float maximumResidual = 0f;
+            for (int vertexIndex = 0;
+                 vertexIndex < face.Vertices.Count;
+                 vertexIndex++)
+            {
+                Vector3 vertex = face.Vertices[vertexIndex];
+                if (!IsFinite(vertex))
+                {
+                    trial.InvalidFaceCount++;
+                    continue;
+                }
+                maximumResidual = Mathf.Max(
+                    maximumResidual,
+                    Mathf.Abs(
+                        Vector3.Dot(face.Normal, vertex) -
+                        planeDistance));
+            }
+            if (maximumResidual > tolerance)
+            {
+                trial.NonPlanarFaceCount++;
+            }
+            if (!IsBoundedPolygonConvex(
+                    BuildBoundedConvexityCheckLoop(face.Vertices),
+                    face.Normal))
+            {
+                trial.NonConvexFaceCount++;
+            }
+        }
+
+        private static void AuditCornerDamageIdentityMapping(
+            EdgeWearTopologyGraph sourceGraph,
+            EdgeWearTopologyGraph outputGraph,
+            EdgeWearMicroTopologyNormalizationResult normalization,
+            CornerDamageCandidateRecord selected,
+            PolygonFace capFace,
+            float tolerance,
+            CornerDamageTrialRecord trial)
+        {
+            HashSet<int> selectedEdges = new HashSet<int>(
+                selected.IncidentGraphEdgeIndices);
+            Dictionary<int, int> capParentByVertex =
+                new Dictionary<int, int>();
+
+            for (int sourceEdgeIndex = 0;
+                 sourceEdgeIndex < sourceGraph.Edges.Count;
+                 sourceEdgeIndex++)
+            {
+                EdgeWearGraphEdge sourceEdge =
+                    sourceGraph.Edges[sourceEdgeIndex];
+                Vector3 sourceA = sourceGraph.Vertices[
+                    sourceEdge.VertexA].Position;
+                Vector3 sourceB = sourceGraph.Vertices[
+                    sourceEdge.VertexB].Position;
+                EdgeKey sourceKey = new EdgeKey(sourceA, sourceB);
+                bool generatedTransition = normalization != null &&
+                    normalization.GeneratedTransitionKeys.Contains(
+                        sourceKey);
+                int originalIdentity = normalization == null
+                    ? sourceEdgeIndex
+                    : normalization.ResolveOriginalSourceEdgeIndex(
+                        sourceKey,
+                        sourceEdgeIndex);
+
+                if (!selectedEdges.Contains(sourceEdgeIndex))
+                {
+                    if (!outputGraph.EdgeByKey.TryGetValue(
+                            sourceKey,
+                            out int outputEdgeIndex))
+                    {
+                        trial.MissingOriginalEdgeCount++;
+                        continue;
+                    }
+                    trial.UntouchedOriginalEdgeCount++;
+                    trial.IdentityRecords.Add(
+                        new CornerDamageEdgeIdentityRecord
+                        {
+                            Kind = generatedTransition
+                                ? "untouched-generated-transition"
+                                : "untouched-original",
+                            OutputGraphEdgeIndex = outputEdgeIndex,
+                            ParentOriginalEdgeA = originalIdentity,
+                            Start = sourceA,
+                            End = sourceB
+                        });
+                    continue;
+                }
+
+                Vector3 retainedEndpoint =
+                    sourceEdge.VertexA == selected.GraphVertexIndex
+                        ? sourceB
+                        : sourceA;
+                int matchingCapVertex = -1;
+                int matchingCapVertexCount = 0;
+                for (int capVertexIndex = 0;
+                     capVertexIndex < capFace.Vertices.Count;
+                     capVertexIndex++)
+                {
+                    float distanceSqr =
+                        DistanceCornerDamagePointToSegmentSquared(
+                            capFace.Vertices[capVertexIndex],
+                            sourceA,
+                            sourceB,
+                            out float segmentT);
+                    if (distanceSqr <= tolerance * tolerance &&
+                        segmentT > 0f && segmentT < 1f)
+                    {
+                        matchingCapVertex = capVertexIndex;
+                        matchingCapVertexCount++;
+                    }
+                }
+                if (matchingCapVertexCount != 1)
+                {
+                    trial.AmbiguousIdentityCount++;
+                    continue;
+                }
+
+                Vector3 intersection =
+                    capFace.Vertices[matchingCapVertex];
+                EdgeKey descendantKey = new EdgeKey(
+                    retainedEndpoint,
+                    intersection);
+                if (!outputGraph.EdgeByKey.TryGetValue(
+                        descendantKey,
+                        out int descendantEdgeIndex))
+                {
+                    trial.MissingOriginalEdgeCount++;
+                    continue;
+                }
+                trial.ShortenedDescendantEdgeCount++;
+                capParentByVertex[matchingCapVertex] = originalIdentity;
+                trial.IdentityRecords.Add(
+                    new CornerDamageEdgeIdentityRecord
+                    {
+                        Kind = "shortened-descendant",
+                        OutputGraphEdgeIndex = descendantEdgeIndex,
+                        ParentOriginalEdgeA = originalIdentity,
+                        Start = retainedEndpoint,
+                        End = intersection
+                    });
+            }
+
+            HashSet<int> generatedIdentities = new HashSet<int>();
+            for (int capVertexIndex = 0;
+                 capVertexIndex < capFace.Vertices.Count;
+                 capVertexIndex++)
+            {
+                int nextIndex =
+                    (capVertexIndex + 1) % capFace.Vertices.Count;
+                if (!capParentByVertex.TryGetValue(
+                        capVertexIndex,
+                        out int parentA) ||
+                    !capParentByVertex.TryGetValue(
+                        nextIndex,
+                        out int parentB))
+                {
+                    trial.AmbiguousIdentityCount++;
+                    continue;
+                }
+                Vector3 start = capFace.Vertices[capVertexIndex];
+                Vector3 end = capFace.Vertices[nextIndex];
+                EdgeKey capKey = new EdgeKey(start, end);
+                if (!outputGraph.EdgeByKey.TryGetValue(
+                        capKey,
+                        out int capGraphEdgeIndex))
+                {
+                    trial.MissingOriginalEdgeCount++;
+                    continue;
+                }
+                int generatedIdentity =
+                    ResolveCornerDamageCapRingIdentity(
+                        selected.GraphVertexIndex,
+                        parentA,
+                        parentB);
+                if (!generatedIdentities.Add(generatedIdentity))
+                {
+                    trial.AmbiguousIdentityCount++;
+                    continue;
+                }
+                trial.CapRingEdgeCount++;
+                trial.IdentityRecords.Add(
+                    new CornerDamageEdgeIdentityRecord
+                    {
+                        Kind = "cap-ring",
+                        OutputGraphEdgeIndex = capGraphEdgeIndex,
+                        ParentOriginalEdgeA = parentA,
+                        ParentOriginalEdgeB = parentB,
+                        GeneratedIdentity = generatedIdentity,
+                        Start = start,
+                        End = end
+                    });
+            }
+        }
+
+        private static int CalculateCornerDamagePolygonTriangleCount(
+            List<PolygonFace> faces)
+        {
+            int triangleCount = 0;
+            if (faces == null)
+            {
+                return triangleCount;
+            }
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                if (face != null && face.Vertices != null &&
+                    face.Vertices.Count >= 3)
+                {
+                    triangleCount += face.Vertices.Count - 2;
+                }
+            }
+            return triangleCount;
+        }
+
+        private static int ResolveCornerDamageCapRingIdentity(
+            int selectedGraphVertexIndex,
+            int parentEdgeA,
+            int parentEdgeB)
+        {
+            int minimumParent = Mathf.Min(parentEdgeA, parentEdgeB);
+            int maximumParent = Mathf.Max(parentEdgeA, parentEdgeB);
+            int identity;
+            unchecked
+            {
+                identity = CornerDamageIdentitySalt;
+                identity = identity * 486187739 +
+                    selectedGraphVertexIndex;
+                identity = identity * 16777619 + minimumParent;
+                identity = identity * 16777619 + maximumParent;
+            }
+            return identity & 0x7fffffff;
+        }
+
+        private static float DistanceCornerDamagePointToSegmentSquared(
+            Vector3 point,
+            Vector3 start,
+            Vector3 end,
+            out float segmentT)
+        {
+            Vector3 axis = end - start;
+            float lengthSqr = axis.sqrMagnitude;
+            if (lengthSqr <= MinimumEdgeLengthSqr)
+            {
+                segmentT = 0f;
+                return (point - start).sqrMagnitude;
+            }
+            segmentT = Mathf.Clamp01(
+                Vector3.Dot(point - start, axis) / lengthSqr);
+            Vector3 closest = start + axis * segmentT;
+            return (point - closest).sqrMagnitude;
+        }
+
+        private static string BuildCornerDamageTrialBlocker(
+            CornerDamageTrialRecord trial,
+            float tolerance,
+            int expectedShortenedDescendantCount,
+            int expectedCapRingEdgeCount)
+        {
+            if (trial.CapFaceCount != 1)
+            {
+                return "cap-face-count-invalid";
+            }
+            if (trial.CapVertexCount < 3 || trial.CapArea <= 0f)
+            {
+                return "cap-geometry-invalid";
+            }
+            if (trial.MaximumCapPlaneResidual > tolerance)
+            {
+                return "cap-plane-residual-exceeded";
+            }
+            if (trial.OpenEdgeCount != 0)
+            {
+                return "topology-open-edge";
+            }
+            if (trial.NonManifoldEdgeCount != 0)
+            {
+                return "topology-non-manifold-edge";
+            }
+            if (trial.TJunctionCount != 0)
+            {
+                return "topology-t-junction";
+            }
+            if (trial.InvalidFaceCount != 0)
+            {
+                return "face-invalid-or-below-stable-area";
+            }
+            if (trial.NonPlanarFaceCount != 0)
+            {
+                return "face-non-planar";
+            }
+            if (trial.NonConvexFaceCount != 0)
+            {
+                return "face-non-convex";
+            }
+            if (trial.WindingFailureCount != 0)
+            {
+                return "face-winding-invalid";
+            }
+            if (trial.BoundsValid != 1)
+            {
+                return "bounds-expanded";
+            }
+            if (trial.BudgetValid != 1)
+            {
+                return "corner-cut-budget-delta-exceeded";
+            }
+            if (trial.VolumeLoss <= 0.000000001 ||
+                trial.VolumeLossFraction > 0.12)
+            {
+                return "volume-loss-outside-bounds";
+            }
+            if (trial.MissingOriginalEdgeCount != 0)
+            {
+                return "original-edge-identity-missing";
+            }
+            if (trial.AmbiguousIdentityCount != 0)
+            {
+                return "edge-identity-ambiguous";
+            }
+            if (trial.ShortenedDescendantEdgeCount !=
+                expectedShortenedDescendantCount)
+            {
+                return "shortened-descendant-count-mismatch";
+            }
+            if (trial.CapRingEdgeCount != expectedCapRingEdgeCount)
+            {
+                return "cap-ring-identity-count-mismatch";
+            }
+            return "corner-damage-certification-failed";
         }
 
         private static void AddBoundaryAdjacency(

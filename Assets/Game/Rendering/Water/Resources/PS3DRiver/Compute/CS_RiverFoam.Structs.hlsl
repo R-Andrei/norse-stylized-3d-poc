@@ -29,7 +29,8 @@ struct FoamSourceEventData
     // x = previous deposition side/phase, y = previous deposition progress,
     // z = previous deposition state valid (0 on the first source tick), w reserved.
     // Current deposition side/phase and progress remain header.y/z. Positive
-    // coverage difference gates the current absolute source target.
+    // newly revealed coverage gates nonpersistent families; Object Arc/Semi-Arc
+    // use their current phase-shaped persistent emitter directly.
     float4 deposit;
 };
 

@@ -104,8 +104,12 @@ namespace ProgrammaticStylized3D.Rivers
             report.AppendLine(
                 $"Authored fixed size: {river.FoamFixedMetricCellSize}");
             report.AppendLine(
+                $"Material options: transport={river.FoamTransportScheme} / " +
+                $"presence footprint={river.FoamPresenceFootprintMode} / " +
+                $"final visibility={river.FoamFinalVisibilityMode}");
+            report.AppendLine(
                 $"Requested fixed spacing: " +
-                $"{river.FoamFixedMetricRequestedCellSizeMetres:0.000} m");
+                $"{ResolveEffectiveFoamRequestedCellSizeMetres():0.000} m");
             report.AppendLine(
                 $"Active mapping: {FoamGridMapping}");
             report.AppendLine(
@@ -167,7 +171,8 @@ namespace ProgrammaticStylized3D.Rivers
                     : "FAIL"));
             report.AppendLine();
 
-            bool depositOnceExact = ValidateP7DepositOnceContracts(report);
+            bool sourceOwnershipExact =
+                ValidateP7AutomaticSourceOwnershipContracts(report);
 
             report.AppendLine("TRANSPORT / CURVILINEAR METRICS");
             report.AppendLine(
@@ -212,7 +217,7 @@ namespace ProgrammaticStylized3D.Rivers
             report.AppendLine(
                 $"Authored speed ratios: downstream " +
                 $"{river.FoamDownstreamSpeedRatio:0.000000} / " +
-                $"maximum lateral {river.FoamMaximumLateralSpeedRatio:0.000000} / " +
+                $"maximum lateral {ResolveEffectiveFoamMaximumLateralSpeedRatio():0.000000} / " +
                 $"lane advection {river.FoamLaneAdvectionRatio:0.000000}");
             report.AppendLine(
                 $"Resolved speed ceiling: downstream " +
@@ -320,7 +325,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool overallRuntime = selectionExact && descriptorFinite &&
                 committedStateOwnershipExact && runtimeReady && cacheReady &&
                 topologyReady &&
-                depositOnceExact && transportSafe && presentationEvidence &&
+                sourceOwnershipExact && transportSafe && presentationEvidence &&
                 laneEvidence && accountingReady;
             report.AppendLine("FINAL LEDGER");
             report.AppendLine(
@@ -338,8 +343,8 @@ namespace ProgrammaticStylized3D.Rivers
                     ? "PASS"
                     : "FAIL"));
             report.AppendLine(
-                "Deposit-once automatic-source ownership: " +
-                (depositOnceExact ? "PASS" : "FAIL"));
+                "Hybrid automatic-source ownership: " +
+                (sourceOwnershipExact ? "PASS" : "FAIL"));
             report.AppendLine(
                 "Transport/CFL/curvature safety: " +
                 (transportSafe ? "PASS" : "FAIL"));

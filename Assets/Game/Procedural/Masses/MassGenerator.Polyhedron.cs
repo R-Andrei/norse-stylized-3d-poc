@@ -278,6 +278,85 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        private static bool TryClipCornerDamageTransaction(
+            List<PolygonFace> sourceFaces,
+            CutPlane plane,
+            int selectedGraphVertexIndex,
+            out List<PolygonFace> clippedFaces,
+            out PolygonFace capFace,
+            out PlaneCutNumericalRepairTelemetry numericalRepairs,
+            out string blocker)
+        {
+            clippedFaces = null;
+            capFace = null;
+            numericalRepairs = new PlaneCutNumericalRepairTelemetry();
+            blocker = string.Empty;
+            if (sourceFaces == null || sourceFaces.Count < 4)
+            {
+                blocker = "corner-damage source contains fewer than four faces";
+                return false;
+            }
+
+            clippedFaces = ClonePolygonFacesForPlaneCutAudit(
+                sourceFaces,
+                assignSourceFaceProvenance: true);
+            ClipPolyhedron(
+                clippedFaces,
+                plane,
+                PolygonFaceFeature.Base,
+                0f,
+                clampIntersectionsToSegment: true,
+                insideEpsilon: PlaneEpsilon,
+                canonicalizeSharedIntersections: true,
+                capProvenanceKind:
+                    PolygonFaceProvenanceKind.CornerDamageCap,
+                capProvenanceIndex: selectedGraphVertexIndex,
+                enforceExactPlaneIntersections: true,
+                useDistanceWelding: true,
+                numericalRepairs: numericalRepairs);
+
+            if (numericalRepairs.ExactConstructionFailureCount > 0)
+            {
+                blocker =
+                    "exact corner clip failed: " +
+                    (string.IsNullOrEmpty(
+                        numericalRepairs.FirstExactFailureReason)
+                        ? "unspecified exact-intersection failure"
+                        : numericalRepairs.FirstExactFailureReason);
+                return false;
+            }
+
+            int capCount = 0;
+            for (int faceIndex = 0;
+                 faceIndex < clippedFaces.Count;
+                 faceIndex++)
+            {
+                PolygonFace face = clippedFaces[faceIndex];
+                if (face.ProvenanceKind !=
+                    PolygonFaceProvenanceKind.CornerDamageCap)
+                {
+                    continue;
+                }
+
+                capCount++;
+                capFace = face;
+            }
+
+            if (capCount != 1 || capFace == null)
+            {
+                blocker =
+                    "corner clip emitted " + capCount +
+                    " cap faces instead of exactly one";
+                return false;
+            }
+            if (clippedFaces.Count < 4)
+            {
+                blocker = "corner clip emitted fewer than four faces";
+                return false;
+            }
+            return true;
+        }
+
         private enum PlaneClipPointClassification
         {
             Inside,

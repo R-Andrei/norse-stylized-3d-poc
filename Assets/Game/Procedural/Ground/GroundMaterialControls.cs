@@ -150,14 +150,14 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float bankDetailScaleMultiplier = 1f;
 
-    [InspectorName("Authored Color Strength Multiplier")]
-    [Tooltip("Multiplies reusable authored-colour strength for this Bank application. One preserves the shared material definition.")]
+    [InspectorName("Texture Form Strength Multiplier")]
+    [Tooltip("Multiplies imported texture-form strength for this Bank application. One preserves the shared material definition.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float bankAuthoredColorStrengthMultiplier = 1f;
 
-    [InspectorName("Scene Lighting Strength Multiplier")]
-    [Tooltip("Multiplies the reusable authored-colour scene-lighting strength for this Bank application. One preserves the shared material definition.")]
+    [InspectorName("Scene Lighting Response Multiplier")]
+    [Tooltip("Multiplies imported texture-form scene-lighting response for this Bank application. One preserves the shared material definition.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float bankAuthoredColorLightingMultiplier = 1f;
@@ -174,14 +174,14 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float bankDetailCavityStrengthMultiplier = 1f;
 
-    [InspectorName("Value / Form Multiplier")]
-    [Tooltip("Multiplies authored per-stone value and form-highlight response for this Bank application. One preserves the shared material definition.")]
+    [InspectorName("Packed Value / Form Multiplier")]
+    [Tooltip("Multiplies packed-alpha value and form-highlight response for this Bank application. Imported texture-form materials do not use this control.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float bankDetailValueFormMultiplier = 1f;
 
-    [InspectorName("Finish Variation Multiplier")]
-    [Tooltip("Multiplies reusable dry finish variation for this Bank application. One preserves the shared material definition.")]
+    [InspectorName("Roughness / Finish Variation Multiplier")]
+    [Tooltip("Multiplies imported roughness variation or prepacked finish variation for this Bank application. One preserves the shared material definition.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float bankDetailFinishVariationMultiplier = 1f;
@@ -206,14 +206,14 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float riverbedDetailScaleMultiplier = 1f;
 
-    [InspectorName("Authored Color Strength Multiplier")]
-    [Tooltip("Multiplies reusable authored-colour strength for this Riverbed application. One preserves the shared material definition.")]
+    [InspectorName("Texture Form Strength Multiplier")]
+    [Tooltip("Multiplies imported texture-form strength for this Riverbed application. One preserves the shared material definition.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float riverbedAuthoredColorStrengthMultiplier = 1f;
 
-    [InspectorName("Scene Lighting Strength Multiplier")]
-    [Tooltip("Multiplies the reusable authored-colour scene-lighting strength for this Riverbed application. One preserves the shared material definition.")]
+    [InspectorName("Scene Lighting Response Multiplier")]
+    [Tooltip("Multiplies imported texture-form scene-lighting response for this Riverbed application. One preserves the shared material definition.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float riverbedAuthoredColorLightingMultiplier = 1f;
@@ -230,14 +230,14 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float riverbedDetailCavityStrengthMultiplier = 1f;
 
-    [InspectorName("Value / Form Multiplier")]
-    [Tooltip("Multiplies authored per-stone value and form-highlight response for this Riverbed application. One preserves the shared material definition.")]
+    [InspectorName("Packed Value / Form Multiplier")]
+    [Tooltip("Multiplies packed-alpha value and form-highlight response for this Riverbed application. Imported texture-form materials do not use this control.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float riverbedDetailValueFormMultiplier = 1f;
 
-    [InspectorName("Finish Variation Multiplier")]
-    [Tooltip("Multiplies reusable dry finish variation for this Riverbed application. One preserves the shared material definition.")]
+    [InspectorName("Roughness / Finish Variation Multiplier")]
+    [Tooltip("Multiplies imported roughness variation or prepacked finish variation for this Riverbed application. One preserves the shared material definition.")]
     [Range(0f, 2f)]
     [SerializeField]
     private float riverbedDetailFinishVariationMultiplier = 1f;
@@ -625,36 +625,48 @@ public sealed class GroundMaterialControls
     public float OuterBankFade => Mathf.Clamp(outerBankFade, 0.05f, 10f);
     public float BankDetailScaleMultiplier =>
         Mathf.Clamp(bankDetailScaleMultiplier, 0.25f, 4f);
-    public float BankAuthoredColorStrengthMultiplier =>
+    public float BankTextureFormStrengthMultiplier =>
         Mathf.Clamp(bankAuthoredColorStrengthMultiplier, 0f, 2f);
-    public float BankAuthoredColorLightingMultiplier =>
+    public float BankSceneLightingResponseMultiplier =>
         Mathf.Clamp(bankAuthoredColorLightingMultiplier, 0f, 2f);
+    public float BankAuthoredColorStrengthMultiplier =>
+        BankTextureFormStrengthMultiplier;
+    public float BankAuthoredColorLightingMultiplier =>
+        BankSceneLightingResponseMultiplier;
     public float BankDetailNormalStrengthMultiplier =>
         Mathf.Clamp(bankDetailNormalStrengthMultiplier, 0f, 2f);
     public float BankDetailCavityStrengthMultiplier =>
         Mathf.Clamp(bankDetailCavityStrengthMultiplier, 0f, 2f);
     public float BankDetailValueFormMultiplier =>
         Mathf.Clamp(bankDetailValueFormMultiplier, 0f, 2f);
-    public float BankDetailFinishVariationMultiplier =>
+    public float BankRoughnessVariationMultiplier =>
         Mathf.Clamp(bankDetailFinishVariationMultiplier, 0f, 2f);
+    public float BankDetailFinishVariationMultiplier =>
+        BankRoughnessVariationMultiplier;
     public float BankLegacyPixelCellInfluenceMultiplier =>
         Mathf.Clamp(bankLegacyPixelCellInfluenceMultiplier, 0f, 2f);
     public float RiverbedMaterialStrength =>
         Mathf.Clamp01(riverbedMaterialStrength);
     public float RiverbedDetailScaleMultiplier =>
         Mathf.Clamp(riverbedDetailScaleMultiplier, 0.25f, 4f);
-    public float RiverbedAuthoredColorStrengthMultiplier =>
+    public float RiverbedTextureFormStrengthMultiplier =>
         Mathf.Clamp(riverbedAuthoredColorStrengthMultiplier, 0f, 2f);
-    public float RiverbedAuthoredColorLightingMultiplier =>
+    public float RiverbedSceneLightingResponseMultiplier =>
         Mathf.Clamp(riverbedAuthoredColorLightingMultiplier, 0f, 2f);
+    public float RiverbedAuthoredColorStrengthMultiplier =>
+        RiverbedTextureFormStrengthMultiplier;
+    public float RiverbedAuthoredColorLightingMultiplier =>
+        RiverbedSceneLightingResponseMultiplier;
     public float RiverbedDetailNormalStrengthMultiplier =>
         Mathf.Clamp(riverbedDetailNormalStrengthMultiplier, 0f, 2f);
     public float RiverbedDetailCavityStrengthMultiplier =>
         Mathf.Clamp(riverbedDetailCavityStrengthMultiplier, 0f, 2f);
     public float RiverbedDetailValueFormMultiplier =>
         Mathf.Clamp(riverbedDetailValueFormMultiplier, 0f, 2f);
-    public float RiverbedDetailFinishVariationMultiplier =>
+    public float RiverbedRoughnessVariationMultiplier =>
         Mathf.Clamp(riverbedDetailFinishVariationMultiplier, 0f, 2f);
+    public float RiverbedDetailFinishVariationMultiplier =>
+        RiverbedRoughnessVariationMultiplier;
     public float RiverbedLegacyPixelCellInfluenceMultiplier =>
         Mathf.Clamp(riverbedLegacyPixelCellInfluenceMultiplier, 0f, 2f);
     public float RiverbedWetnessStrength =>

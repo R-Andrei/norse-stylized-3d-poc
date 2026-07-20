@@ -127,32 +127,32 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ? surfaceMaterial.CavityColor
                 : darkColor;
         public Color WetColor => wetColor;
+        public bool UsesTextureForm =>
+            surfaceMaterial != null && surfaceMaterial.UsesTextureForm;
+        public float TextureFormStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.TextureFormStrength
+                : 0f;
+        public float SceneLightingResponse =>
+            surfaceMaterial != null
+                ? surfaceMaterial.SceneLightingResponse
+                : 1f;
+        public float RoughnessVariationStrength =>
+            surfaceMaterial != null
+                ? surfaceMaterial.RoughnessVariationStrength
+                : 0f;
+
+        // Compatibility aliases for existing callers and serialized terminology.
         public StylizedSurfaceMaterialPayloadMode PayloadMode =>
             surfaceMaterial != null
                 ? surfaceMaterial.PayloadMode
                 : StylizedSurfaceMaterialPayloadMode.PaletteDetail;
-        public bool UsesAuthoredColor =>
-            surfaceMaterial != null && surfaceMaterial.UsesAuthoredColor;
-        public float AuthoredColorStrength =>
-            surfaceMaterial != null
-                ? surfaceMaterial.AuthoredColorStrength
-                : 0f;
-        public Color AuthoredColorTint =>
-            surfaceMaterial != null
-                ? surfaceMaterial.AuthoredColorTint
-                : Color.white;
-        public float AuthoredColorTintStrength =>
-            surfaceMaterial != null
-                ? surfaceMaterial.AuthoredColorTintStrength
-                : 0f;
-        public float AuthoredColorLightingStrength =>
-            surfaceMaterial != null
-                ? surfaceMaterial.AuthoredColorLightingStrength
-                : 1f;
-        public float AuthoredRoughnessStrength =>
-            surfaceMaterial != null
-                ? surfaceMaterial.AuthoredRoughnessStrength
-                : 0f;
+        public bool UsesAuthoredColor => UsesTextureForm;
+        public float AuthoredColorStrength => TextureFormStrength;
+        public Color AuthoredColorTint => Color.white;
+        public float AuthoredColorTintStrength => 0f;
+        public float AuthoredColorLightingStrength => SceneLightingResponse;
+        public float AuthoredRoughnessStrength => RoughnessVariationStrength;
         public float MacroContrast =>
             surfaceMaterial != null
                 ? surfaceMaterial.MacroContrast
@@ -219,7 +219,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                        out sliceIndex);
         }
 
-        public bool TryResolveAuthoredColor(
+        public bool TryResolveTextureForm(
             out Texture2DArray textureArray,
             out int sliceIndex)
         {
@@ -227,9 +227,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             sliceIndex = -1;
 
             return surfaceMaterial != null &&
-                   surfaceMaterial.TryResolveAuthoredColor(
+                   surfaceMaterial.TryResolveTextureForm(
                        out textureArray,
                        out sliceIndex);
+        }
+
+        public bool TryResolveAuthoredColor(
+            out Texture2DArray textureArray,
+            out int sliceIndex)
+        {
+            return TryResolveTextureForm(out textureArray, out sliceIndex);
         }
 
         public void SetDisplayName(string value)

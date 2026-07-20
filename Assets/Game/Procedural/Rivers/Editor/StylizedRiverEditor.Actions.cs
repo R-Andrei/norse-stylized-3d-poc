@@ -763,11 +763,95 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         : runtime.TopologyCacheDiagnosticReportPath);
             }
 
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Complete Candidate Sweep",
+                EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "One Play Mode action runs 12 cases: 0.25/0.20/0.15/0.10 m " +
+                "at lateral ratios 0, authored, and 1. Each case clears and " +
+                "warms the real runtime, captures at least five seconds, then " +
+                "restores the authored selection. The assigned cache is never " +
+                "written or replaced. Expected duration is roughly 90–120 " +
+                "seconds on the current scene.",
+                EditorStyles.wordWrappedMiniLabel);
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Sweep State",
+                    "Current state of the one-button P12 candidate matrix."),
+                runtime != null
+                    ? runtime.P12CandidateSweepStatus
+                    : "Runtime unavailable");
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Sweep Progress",
+                    "Completed and in-progress fraction of the 12-case matrix."),
+                runtime != null
+                    ? $"{runtime.P12CandidateSweepProgress * 100f:0.0}% — " +
+                      runtime.P12CandidateSweepSummary
+                    : "Runtime unavailable");
+
             EditorGUILayout.BeginHorizontal();
             using (new EditorGUI.DisabledScope(
                        !Application.isPlaying ||
                        runtime == null ||
-                       river == null))
+                       river == null ||
+                       river.FoamGridMode !=
+                           StylizedRiverFoamGridMode.FixedMetric ||
+                       river.FoamStateHeld ||
+                       river.FreezeAmount >= 0.999f ||
+                       runtime.P12CandidateSweepActive))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run Complete P12 Candidate Sweep",
+                            "Runs the complete 4-spacing × 3-lateral-ratio " +
+                            "matrix through the real runtime and writes one " +
+                            "combined report.")))
+                {
+                    runtime.StartP12CandidateSweep();
+                    Repaint();
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       !runtime.P12CandidateSweepActive))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Cancel P12 Sweep",
+                            "Stops after the current frame, restores authored " +
+                            "runtime ownership, and writes the partial report.")))
+                {
+                    runtime.CancelP12CandidateSweep();
+                    Repaint();
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       string.IsNullOrEmpty(
+                           runtime.P12CandidateSweepReport)))
+            {
+                if (GUILayout.Button("Copy P12 Sweep Report to Clipboard"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        runtime.P12CandidateSweepReport;
+                }
+            }
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Single Candidate Evidence",
+                EditorStyles.boldLabel);
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying ||
+                       runtime == null ||
+                       river == null ||
+                       (runtime != null && runtime.P12CandidateSweepActive)))
             {
                 if (GUILayout.Button(
                         new GUIContent(
@@ -783,6 +867,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                        !Application.isPlaying ||
                        runtime == null ||
                        river == null ||
+                       (runtime != null && runtime.P12CandidateSweepActive) ||
                        !runtime.SteadyStateWorkAccountingActive))
             {
                 if (GUILayout.Button(

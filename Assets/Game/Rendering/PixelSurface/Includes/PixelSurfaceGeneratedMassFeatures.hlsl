@@ -11,14 +11,15 @@
                 // dedicated GeneratedMass enable flag instead of SurfaceContract
                 // so the final response follows the same UV2.z mask validated
                 // by Surface Mask Debug = ConvexEdgeWear.
+                float faceMask =
+                    saturate(input.materialMasks.z) *
+                    saturate(_GeneratedMassGeometryEdgeWearEnabled);
                 float softness = saturate(_GeneratedMassEdgeWearSoftness);
                 float responseSoftening = lerp(1.0, 0.72, softness);
                 float edgeWearMask =
-                    saturate(input.materialMasks.z) *
-                    saturate(_GeneratedMassGeometryEdgeWearEnabled) *
+                    faceMask *
                     saturate(_GeneratedMassEdgeWearResponseStrength) *
                     responseSoftening;
-
                 if (edgeWearMask <= 0.0001)
                 {
                     return albedo;
@@ -26,12 +27,6 @@
 
                 half lift =
                     (half)(_GeneratedMassEdgeWearBrightnessLift * edgeWearMask * lerp(1.0, 0.82, softness));
-
-                // Additive lift is intentionally used here because multiplying
-                // already-dark stone albedo can be visually invisible even when
-                // the UV2.z bevel mask is correct. Keep it bounded and then tint
-                // the lifted value so Response/Brightness/Tint can be validated
-                // independently of bevel topology.
                 half3 lifted = saturate(albedo + lift * 0.58h);
                 half3 tinted = PS3D_ApplyValuePreservingTint(
                     lifted,

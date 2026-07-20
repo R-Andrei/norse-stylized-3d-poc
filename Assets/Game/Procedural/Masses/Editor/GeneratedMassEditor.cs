@@ -77,6 +77,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         };
 
         private const float EdgeWearBatchMinimumWidthScale = 0.25f;
+        private const float EdgeWearMacroMaximumCertifiedStrength = 0.55f;
 
         private enum RenderMeshProofMode
         {
@@ -108,6 +109,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             string.Empty;
         private const string EdgeWearValidationSuiteReportFileName =
             "GeneratedMassEdgeWearValidationSuite.txt";
+        private const string CornerDamageTransactionAuditReportFileName =
+            "GeneratedMassCornerDamageTransactionAudit.txt";
+        private static string lastCornerDamageTransactionAuditSummary =
+            string.Empty;
         private const string EdgeWearArtisticComprehensiveReportFileName =
             "GeneratedMassEdgeWearArtisticComprehensiveAudit.txt";
         private const string EdgeWearArtisticComprehensiveEdgesCsvFileName =
@@ -693,7 +698,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearTintStrength",
                 "edgeWearMacroVariationCoverage",
                 "edgeWearMacroVariation",
-                "edgeWearMicroVariation",
                 "creaseAmount",
                 "creaseWidth",
                 "creaseLength",
@@ -942,6 +946,50 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 suiteRunning))
             {
                 if (GUILayout.Button(
+                        "Run EW-C1A.1 Corner Transaction Audit"))
+                {
+                    GeneratedMass mass = target as GeneratedMass;
+                    if (mass != null)
+                    {
+                        RunCornerDamageTransactionAudit(mass);
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(
+                    lastCornerDamageTransactionAuditSummary))
+            {
+                EditorGUILayout.HelpBox(
+                    lastCornerDamageTransactionAuditSummary,
+                    MessageType.None);
+                string cornerReportPath = GetEdgeWearLibraryPath(
+                    CornerDamageTransactionAuditReportFileName);
+                using (new EditorGUI.DisabledScope(
+                    !File.Exists(cornerReportPath)))
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(
+                            "Copy EW-C1A.1 Audit Report"))
+                    {
+                        EditorGUIUtility.systemCopyBuffer =
+                            File.ReadAllText(cornerReportPath);
+                    }
+                    if (GUILayout.Button(
+                            "Reveal EW-C1A.1 Audit Report"))
+                    {
+                        EditorUtility.RevealInFinder(cornerReportPath);
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                Application.isPlaying ||
+                serializedObject.isEditingMultipleObjects ||
+                matrixRunning ||
+                suiteRunning))
+            {
+                if (GUILayout.Button(
                         "Run Full Edge-Wear Validation Suite (1 Click)"))
                 {
                     GeneratedMass mass = target as GeneratedMass;
@@ -1066,6 +1114,68 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
         }
 
+        private static void RunCornerDamageTransactionAudit(
+            GeneratedMass mass)
+        {
+            if (mass == null || mass.Recipe == null)
+            {
+                lastCornerDamageTransactionAuditSummary =
+                    "EW-C1A.1 audit failed: selected mass has no recipe.";
+                return;
+            }
+
+            string report;
+            try
+            {
+                MassRecipe recipe = JsonUtility.FromJson<MassRecipe>(
+                    JsonUtility.ToJson(mass.Recipe));
+                MassSurfaceFeatureSettings settings =
+                    new MassSurfaceFeatureSettings(
+                        recipe.Archetype,
+                        recipe.SurfaceSeed,
+                        mass.EdgeWearAmount,
+                        mass.EdgeWearWidth,
+                        mass.EdgeWearCoverage,
+                        mass.EdgeWearMacroVariationCoverage,
+                        mass.EdgeWearMacroVariation,
+                        mass.EdgeWearSoftness,
+                        mass.CreaseAmount,
+                        mass.CreaseWidth,
+                        mass.CreaseLength,
+                        mass.CreaseBranching);
+                report =
+                    MassGenerator.GenerateCornerDamageTransactionAudit(
+                        recipe,
+                        settings);
+            }
+            catch (Exception exception)
+            {
+                report =
+                    "GeneratedMass EW-C1A.1 corner transaction audit" +
+                    Environment.NewLine +
+                    "contract=EW-C1A.1-transaction" +
+                    Environment.NewLine +
+                    "status=failed" + Environment.NewLine +
+                    "diagnostic=exception: " + exception;
+            }
+
+            string reportPath = GetEdgeWearLibraryPath(
+                CornerDamageTransactionAuditReportFileName);
+            File.WriteAllText(reportPath, report);
+            bool passed = report.IndexOf(
+                "status=passed",
+                StringComparison.Ordinal) >= 0;
+            lastCornerDamageTransactionAuditSummary =
+                "EW-C1A.1 corner transaction audit " +
+                (passed ? "passed" : "failed") +
+                ". Report: " + reportPath;
+            EditorGUIUtility.systemCopyBuffer = report;
+            Debug.Log(
+                lastCornerDamageTransactionAuditSummary +
+                " The complete report was copied to the clipboard.",
+                mass);
+        }
+
         private static void StartEdgeWearValidationSuite(
             GeneratedMass mass)
         {
@@ -1086,9 +1196,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             {
                 suite.Stage = EdgeWearValidationSuiteStage.CurrentPreview;
                 suite.PrepareCurrentPreviewCapture();
+                System.Diagnostics.Stopwatch previewStopwatch =
+                    System.Diagnostics.Stopwatch.StartNew();
                 mass.EvaluateUnifiedEdgeWearPreview();
+                previewStopwatch.Stop();
+                suite.CurrentPreviewMilliseconds =
+                    previewStopwatch.Elapsed.TotalMilliseconds;
                 suite.CaptureCurrentPreview();
+
+                System.Diagnostics.Stopwatch macroStopwatch =
+                    System.Diagnostics.Stopwatch.StartNew();
                 suite.EvaluateMacroVariationContract();
+                macroStopwatch.Stop();
+                suite.MacroVariationContractMilliseconds =
+                    macroStopwatch.Elapsed.TotalMilliseconds;
+
+                if (!suite.CurrentPreviewPassed ||
+                    !suite.CurrentPreviewTelemetryAvailable ||
+                    !suite.MacroVariationContractPassed)
+                {
+                    suite.FailFastTriggered = true;
+                    FinishEdgeWearValidationSuite(
+                        suite,
+                        false,
+                        "fail-fast: current preview or Macro contract failed");
+                    return;
+                }
+
                 suite.Stage =
                     EdgeWearValidationSuiteStage.TopologyViability;
                 StartEdgeWearViabilityMatrix(
@@ -1344,6 +1478,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
                 if (job.Kind == EdgeWearMatrixKind.TopologyViability)
                 {
+                    if (aggregate.Status != "passed")
+                    {
+                        suite.FailFastTriggered = true;
+                        FinishEdgeWearValidationSuite(
+                            suite,
+                            false,
+                            "fail-fast: topology viability matrix failed");
+                        return;
+                    }
+
                     suite.Stage = EdgeWearValidationSuiteStage
                         .ArtisticPreviewParity;
                     StartEdgeWearViabilityMatrix(
@@ -1440,34 +1584,44 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             suite.Cancelled = cancelled;
             suite.TerminalReason = terminalReason ?? string.Empty;
 
-            BuildEdgeWearArtisticComprehensiveEvidence(
-                suite,
-                out string comprehensiveReport,
-                out string comprehensiveEdgesCsv,
-                out string comprehensiveScenariosCsv,
-                out string comprehensiveDiagnostic);
-            suite.ComprehensiveArtisticReport =
-                comprehensiveReport ?? string.Empty;
-            suite.ComprehensiveArtisticDiagnostic =
-                comprehensiveDiagnostic ?? string.Empty;
-            suite.ComprehensiveArtisticAvailable =
-                string.IsNullOrEmpty(comprehensiveDiagnostic) &&
-                !string.IsNullOrEmpty(comprehensiveReport);
-            bool comprehensiveWritten =
-                WriteEdgeWearArtisticComprehensiveReports(
-                    comprehensiveReport,
-                    comprehensiveEdgesCsv,
-                    comprehensiveScenariosCsv,
-                    out string comprehensiveWriteDiagnostic);
-            if (!comprehensiveWritten)
+            if (suite.FailFastTriggered)
             {
                 suite.ComprehensiveArtisticAvailable = false;
+                suite.ComprehensiveArtisticReport = string.Empty;
                 suite.ComprehensiveArtisticDiagnostic =
-                    string.IsNullOrEmpty(
-                        suite.ComprehensiveArtisticDiagnostic)
-                        ? comprehensiveWriteDiagnostic
-                        : suite.ComprehensiveArtisticDiagnostic + "; " +
-                            comprehensiveWriteDiagnostic;
+                    "not run because a prerequisite contract failed";
+            }
+            else
+            {
+                BuildEdgeWearArtisticComprehensiveEvidence(
+                    suite,
+                    out string comprehensiveReport,
+                    out string comprehensiveEdgesCsv,
+                    out string comprehensiveScenariosCsv,
+                    out string comprehensiveDiagnostic);
+                suite.ComprehensiveArtisticReport =
+                    comprehensiveReport ?? string.Empty;
+                suite.ComprehensiveArtisticDiagnostic =
+                    comprehensiveDiagnostic ?? string.Empty;
+                suite.ComprehensiveArtisticAvailable =
+                    string.IsNullOrEmpty(comprehensiveDiagnostic) &&
+                    !string.IsNullOrEmpty(comprehensiveReport);
+                bool comprehensiveWritten =
+                    WriteEdgeWearArtisticComprehensiveReports(
+                        comprehensiveReport,
+                        comprehensiveEdgesCsv,
+                        comprehensiveScenariosCsv,
+                        out string comprehensiveWriteDiagnostic);
+                if (!comprehensiveWritten)
+                {
+                    suite.ComprehensiveArtisticAvailable = false;
+                    suite.ComprehensiveArtisticDiagnostic =
+                        string.IsNullOrEmpty(
+                            suite.ComprehensiveArtisticDiagnostic)
+                            ? comprehensiveWriteDiagnostic
+                            : suite.ComprehensiveArtisticDiagnostic + "; " +
+                                comprehensiveWriteDiagnostic;
+                }
             }
 
             string status = suite.Status;
@@ -1537,7 +1691,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-V1A.2b-suite");
+            builder.AppendLine("contract=EW-V1A.3b-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -1558,12 +1712,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append("currentPreviewTelemetryAvailable=");
             builder.AppendLine(
                 suite.CurrentPreviewTelemetryAvailable ? "1" : "0");
+            builder.Append("currentPreviewElapsedMs=");
+            builder.AppendLine(
+                suite.CurrentPreviewMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append("macroContractElapsedMs=");
+            builder.AppendLine(
+                suite.MacroVariationContractMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append("failFastTriggered=");
+            builder.AppendLine(suite.FailFastTriggered ? "1" : "0");
+            builder.Append("matrixMacroCoverage=");
+            builder.AppendLine("1");
+            builder.Append("matrixMacroControlStrength=");
+            builder.AppendLine("1");
+            builder.Append("matrixMacroEffectiveStrength=");
+            builder.AppendLine(
+                EdgeWearMacroMaximumCertifiedStrength.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
             builder.Append("macroVariationContractStatus=");
             builder.AppendLine(
                 suite.MacroVariationContractPassed ? "passed" : "failed");
             builder.Append("macroZeroParity=");
             builder.AppendLine(
                 suite.MacroZeroParityPassed ? "1" : "0");
+            builder.Append("macroAngleMapping=");
+            builder.AppendLine(
+                suite.MacroAngleMappingPassed ? "1" : "0");
             builder.Append("macroDeterminism=");
             builder.AppendLine(
                 suite.MacroDeterminismPassed ? "1" : "0");
@@ -1921,7 +2099,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             reportBuilder.AppendLine(
                 "GeneratedMass comprehensive artistic selection evidence");
             reportBuilder.AppendLine(
-                "contract=EW-V1A.2b-comprehensive");
+                "contract=EW-V1A.3b-comprehensive");
             reportBuilder.Append("cases=");
             reportBuilder.AppendLine(expectedCaseCount.ToString());
             reportBuilder.Append("scenariosPerCase=");
@@ -5667,11 +5845,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public EdgeWearValidationSuiteStage Stage;
             public bool CancelRequested;
             public bool Cancelled;
+            public bool FailFastTriggered;
             public string TerminalReason = string.Empty;
+            public double CurrentPreviewMilliseconds;
+            public double MacroVariationContractMilliseconds;
             public bool CurrentPreviewPassed;
             public bool CurrentPreviewTelemetryAvailable;
             public bool MacroVariationContractPassed;
             public bool MacroZeroParityPassed;
+            public bool MacroAngleMappingPassed;
             public bool MacroDeterminismPassed;
             public bool MacroDistributionPassed;
             public bool MacroRetentionPassed;
@@ -5908,6 +6090,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             {
                 MacroVariationContractPassed = false;
                 MacroZeroParityPassed = false;
+                MacroAngleMappingPassed = false;
                 MacroDeterminismPassed = false;
                 MacroDistributionPassed = false;
                 MacroRetentionPassed = false;
@@ -5920,13 +6103,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
                 try
                 {
+                    MacroAngleMappingPassed =
+                        MassGenerator.EvaluateEdgeWearMacroAngleMappingContract(
+                            out string angleMappingReport);
                     float currentCoverage = Mathf.Clamp01(
                         Target.EdgeWearMacroVariationCoverage);
-                    float currentStrength = Mathf.Clamp01(
+                    float currentControlStrength = Mathf.Clamp01(
                         Target.EdgeWearMacroVariation);
-                    float coverageProbeStrength = currentStrength > 0.000001f
-                        ? currentStrength
-                        : 1f;
+                    const float maximumControlStrength = 1f;
+                    float coverageProbeStrength =
+                        currentControlStrength > 0.000001f
+                            ? currentControlStrength
+                            : maximumControlStrength;
 
                     MassGenerator.EdgeWearBatchAuditCaseResult strengthZeroA =
                         EvaluateMacroVariationCase(1f, 0f);
@@ -5943,13 +6131,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     MassGenerator.EdgeWearBatchAuditCaseResult currentA =
                         EvaluateMacroVariationCase(
                             currentCoverage,
-                            currentStrength);
+                            currentControlStrength);
                     MassGenerator.EdgeWearBatchAuditCaseResult currentB =
                         EvaluateMacroVariationCase(
                             currentCoverage,
-                            currentStrength);
-                    MassGenerator.EdgeWearBatchAuditCaseResult fullCoverage =
-                        EvaluateMacroVariationCase(1f, currentStrength);
+                            currentControlStrength);
+                    MassGenerator.EdgeWearBatchAuditCaseResult maximumA =
+                        currentCoverage >= 1f - 0.000001f &&
+                        currentControlStrength >= 1f - 0.000001f
+                            ? currentA
+                            : EvaluateMacroVariationCase(
+                                1f,
+                                maximumControlStrength);
+                    MassGenerator.EdgeWearBatchAuditCaseResult maximumB =
+                        currentCoverage >= 1f - 0.000001f &&
+                        currentControlStrength >= 1f - 0.000001f
+                            ? currentB
+                            : EvaluateMacroVariationCase(
+                                1f,
+                                maximumControlStrength);
 
                     bool strengthZeroParity =
                         IsUniformMacroVariationResult(strengthZeroA) &&
@@ -5969,68 +6169,104 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     MacroDeterminismPassed =
                         AreMacroVariationResultsDeterministic(
                             currentA,
-                            currentB);
+                            currentB) &&
+                        AreMacroVariationResultsDeterministic(
+                            maximumA,
+                            maximumB);
 
-                    bool participantBoundsValid =
+                    bool currentParticipantBoundsValid =
                         currentA.MacroParticipantEdgeCount >= 0 &&
                         currentA.MacroParticipantEdgeCount <=
-                            currentA.MacroEvaluatedEdgeCount &&
-                        fullCoverage.MacroParticipantEdgeCount >= 0 &&
-                        fullCoverage.MacroParticipantEdgeCount <=
-                            fullCoverage.MacroEvaluatedEdgeCount;
-                    bool fullCoverageValid = currentStrength <= 0.000001f
-                        ? fullCoverage.MacroParticipantEdgeCount == 0
-                        : fullCoverage.MacroParticipantEdgeCount ==
-                            fullCoverage.MacroEvaluatedEdgeCount;
-                    bool distributionNotRequired =
+                            currentA.MacroEvaluatedEdgeCount;
+                    bool maximumParticipantBoundsValid =
+                        maximumA.MacroParticipantEdgeCount >= 0 &&
+                        maximumA.MacroParticipantEdgeCount <=
+                            maximumA.MacroEvaluatedEdgeCount;
+                    bool maximumCoverageValid =
+                        maximumA.MacroParticipantEdgeCount ==
+                            maximumA.MacroEvaluatedEdgeCount;
+                    bool currentDistributionNotRequired =
                         currentCoverage <= 0.000001f ||
-                        currentStrength <= 0.000001f ||
+                        currentControlStrength <= 0.000001f ||
                         currentA.MacroParticipantEdgeCount < 2;
-                    bool allParticipantsMinimumStyleClamped =
+                    bool currentAllClamped =
                         currentA.MacroParticipantEdgeCount > 0 &&
                         currentA.MacroMinimumStyleClampedEdgeCount >=
                             currentA.MacroParticipantEdgeCount;
-                    bool distinctDistribution =
+                    bool currentDistinct =
                         currentA.MacroMultiplierMaximum -
                             currentA.MacroMultiplierMinimum > 0.000001f &&
                         currentA.MacroVariedEdgeCount > 0;
-                    MacroDistributionPassed = currentA.Passed &&
-                        fullCoverage.Passed &&
-                        participantBoundsValid &&
-                        fullCoverageValid &&
-                        (distributionNotRequired ||
-                         allParticipantsMinimumStyleClamped ||
-                         distinctDistribution);
+                    bool maximumAllClamped =
+                        maximumA.MacroParticipantEdgeCount > 0 &&
+                        maximumA.MacroMinimumStyleClampedEdgeCount >=
+                            maximumA.MacroParticipantEdgeCount;
+                    bool maximumDistinct =
+                        maximumA.MacroMultiplierMaximum -
+                            maximumA.MacroMultiplierMinimum > 0.000001f &&
+                        maximumA.MacroVariedEdgeCount > 0;
+                    bool currentDistributionValid = currentA.Passed &&
+                        currentParticipantBoundsValid &&
+                        (currentDistributionNotRequired ||
+                         currentAllClamped ||
+                         currentDistinct);
+                    bool maximumDistributionValid = maximumA.Passed &&
+                        maximumParticipantBoundsValid &&
+                        maximumCoverageValid &&
+                        (maximumAllClamped || maximumDistinct);
+                    MacroDistributionPassed =
+                        currentDistributionValid &&
+                        maximumDistributionValid;
+
                     MacroRetentionPassed = EvaluateMacroRetentionContract(
                         strengthZeroA,
-                        currentA,
+                        maximumA,
                         out int retentionBaselineCount,
                         out int retentionCertifiedCount,
                         out int retentionProvenInfeasibleCount,
                         out string retentionUnprovenLosses);
                     MacroVariationContractPassed =
                         MacroZeroParityPassed &&
+                        MacroAngleMappingPassed &&
                         MacroDeterminismPassed &&
                         MacroDistributionPassed &&
                         MacroRetentionPassed;
 
-                    StringBuilder builder = new StringBuilder(2304);
+                    StringBuilder builder = new StringBuilder(2560);
                     builder.AppendLine(
-                        "policy=zero-strength/zero-coverage/repeated-determinism/full-coverage/current-distribution/active-retention");
+                        "policy=runtime-angle-mapping/zero-strength/zero-coverage/repeated-determinism/normalized-maximum-distribution/maximum-retention");
                     builder.Append("currentCoverage=");
                     builder.Append(currentCoverage.ToString(
                         "G9",
                         CultureInfo.InvariantCulture));
-                    builder.Append(",currentStrength=");
-                    builder.AppendLine(currentStrength.ToString(
+                    builder.Append(",currentControlStrength=");
+                    builder.Append(currentControlStrength.ToString(
                         "G9",
                         CultureInfo.InvariantCulture));
+                    builder.Append(",currentEffectiveStrength=");
+                    builder.AppendLine((
+                        currentControlStrength *
+                        EdgeWearMacroMaximumCertifiedStrength).ToString(
+                            "G9",
+                            CultureInfo.InvariantCulture));
+                    builder.Append("maximumControlStrength=");
+                    builder.Append(maximumControlStrength.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture));
+                    builder.Append(",maximumEffectiveStrength=");
+                    builder.AppendLine(
+                        EdgeWearMacroMaximumCertifiedStrength.ToString(
+                            "G9",
+                            CultureInfo.InvariantCulture));
                     builder.Append("zeroParity=");
                     builder.Append(MacroZeroParityPassed ? '1' : '0');
                     builder.Append(",strengthZero=");
                     builder.Append(strengthZeroParity ? '1' : '0');
                     builder.Append(",coverageZero=");
                     builder.AppendLine(coverageZeroParity ? "1" : "0");
+                    builder.Append("angleMapping=");
+                    builder.AppendLine(
+                        MacroAngleMappingPassed ? "1" : "0");
                     builder.Append("determinism=");
                     builder.AppendLine(
                         MacroDeterminismPassed ? "1" : "0");
@@ -6038,28 +6274,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     builder.Append(MacroDistributionPassed ? '1' : '0');
                     builder.Append(",retention=");
                     builder.Append(MacroRetentionPassed ? '1' : '0');
-                    builder.Append(",evaluated=");
+                    builder.Append(",currentEvaluated=");
                     builder.Append(currentA.MacroEvaluatedEdgeCount);
-                    builder.Append(",participants=");
+                    builder.Append(",currentParticipants=");
                     builder.Append(currentA.MacroParticipantEdgeCount);
-                    builder.Append(",varied=");
-                    builder.Append(currentA.MacroVariedEdgeCount);
-                    builder.Append(",fullCoverageParticipants=");
-                    builder.Append(fullCoverage.MacroParticipantEdgeCount);
-                    builder.Append('/');
+                    builder.Append(",currentVaried=");
                     builder.AppendLine(
-                        fullCoverage.MacroEvaluatedEdgeCount.ToString());
-                    builder.Append("multiplier=");
-                    builder.Append(currentA.MacroMultiplierMinimum.ToString(
+                        currentA.MacroVariedEdgeCount.ToString());
+                    builder.Append("maximumEvaluated=");
+                    builder.Append(maximumA.MacroEvaluatedEdgeCount);
+                    builder.Append(",maximumParticipants=");
+                    builder.Append(maximumA.MacroParticipantEdgeCount);
+                    builder.Append(",maximumVaried=");
+                    builder.AppendLine(
+                        maximumA.MacroVariedEdgeCount.ToString());
+                    builder.Append("maximumMultiplier=");
+                    builder.Append(maximumA.MacroMultiplierMinimum.ToString(
                         "G9",
                         CultureInfo.InvariantCulture));
                     builder.Append('/');
-                    builder.Append(currentA.MacroMultiplierMedian.ToString(
+                    builder.Append(maximumA.MacroMultiplierMedian.ToString(
                         "G9",
                         CultureInfo.InvariantCulture));
                     builder.Append('/');
                     builder.AppendLine(
-                        currentA.MacroMultiplierMaximum.ToString(
+                        maximumA.MacroMultiplierMaximum.ToString(
                             "G9",
                             CultureInfo.InvariantCulture));
                     builder.Append("retention=baseline:");
@@ -6073,11 +6312,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         ? "none"
                         : retentionUnprovenLosses);
                     builder.AppendLine("}");
+                    builder.AppendLine("angleMappingReport={");
+                    builder.AppendLine(angleMappingReport);
+                    builder.AppendLine("}");
                     builder.Append("currentFailure=");
                     builder.AppendLine(string.IsNullOrEmpty(
                             currentA.PrimaryFailure)
                         ? "none"
                         : currentA.PrimaryFailure);
+                    builder.Append("maximumFailure=");
+                    builder.AppendLine(string.IsNullOrEmpty(
+                            maximumA.PrimaryFailure)
+                        ? "none"
+                        : maximumA.PrimaryFailure);
                     MacroVariationContractReport = builder.ToString().TrimEnd();
                 }
                 catch (Exception exception)
@@ -6703,9 +6950,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 TargetEntityId = target.GetEntityId().ToString();
                 RecipeJson = JsonUtility.ToJson(target.Recipe);
                 EdgeWearAmount = target.EdgeWearAmount;
-                EdgeWearMacroVariationCoverage =
-                    target.EdgeWearMacroVariationCoverage;
-                EdgeWearMacroVariation = target.EdgeWearMacroVariation;
+                EdgeWearMacroVariationCoverage = suiteOwned
+                    ? 1f
+                    : target.EdgeWearMacroVariationCoverage;
+                EdgeWearMacroVariation = suiteOwned
+                    ? 1f
+                    : target.EdgeWearMacroVariation;
                 EdgeWearSoftness = target.EdgeWearSoftness;
                 CreaseAmount = target.CreaseAmount;
                 CreaseWidth = target.CreaseWidth;
@@ -6753,8 +7003,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
-                ? "EW-V1A.2b-topology"
-                : "EW-V1A.2b-preview";
+                ? "EW-V1A.3b-topology"
+                : "EW-V1A.3b-preview";
 
             public int TotalCaseCount =>
                 EdgeWearBatchShapeSeeds.Length *
@@ -7740,10 +7990,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "EW-4 geometry edge wear is active for plane-cut mass archetypes. " +
-                    "These controls drive generated bevel/chamfer faces and their " +
-                    "worn-edge material response. FeatureAtlas0/1 remain temporary " +
-                    "boundary diagnostics only and are not sampled by normal edge wear.",
+                    "Geometry edge wear uses one certified scalar bevel per selected " +
+                    "source edge plus deterministic Macro edge-to-edge width variation. " +
+                    "Macro reduction is dihedral-biased: sharper convex edges retain more " +
+                    "width on average while the visible bevel response remains uniform.",
                     MessageType.Info);
 
                 EditorGUILayout.LabelField(
@@ -7773,7 +8023,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     edgeWearMacroVariation,
                     new GUIContent(
                         "Macro Variation Strength",
-                        "How strongly participating edges narrow from the uniform bevel width. Zero is uniform; one allows the full current downward-only 0.55x-1.0x range."));
+                        "How strongly participating edges narrow from the uniform bevel width. Zero is uniform; one applies the certified downward-only amplitude, with sharper convex edges retaining more width than shallow convex edges."));
                 EditorGUILayout.PropertyField(
                     edgeWearSoftness,
                     new GUIContent(
@@ -7785,8 +8035,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "Visual Response",
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.HelpBox(
-                    "Visual response is applied to mesh bevel faces marked in UV2.z. " +
-                    "Response Strength must be above zero for bevel faces to visibly brighten/tint.",
+                    "Visual response is applied only to generated bevel faces marked in UV2.z. " +
+                    "Response Strength controls the uniform worn-edge lift/tint; Softness " +
+                    "controls its visible material softening without changing bevel geometry.",
                     MessageType.None);
                 EditorGUILayout.PropertyField(
                     edgeWearResponseStrength,

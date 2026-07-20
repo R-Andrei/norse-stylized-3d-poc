@@ -79,11 +79,11 @@ namespace ProgrammaticStylized3D.Rivers
             bool livePreparationReady = false;
             bool transactionStarted = false;
             bool resourcesCompleteWhileMeasured = false;
-            bool activeLegacy = false;
+            bool activeSelectionExact = false;
             bool fixedCandidateReady = false;
             bool unitPolicyExact = false;
             bool automaticExact = false;
-            bool depositOnceExact = false;
+            bool sourceOwnershipExact = false;
             bool manualExact = false;
             bool coordinateProbeExact = false;
             bool evaluatorExact = false;
@@ -102,13 +102,13 @@ namespace ProgrammaticStylized3D.Rivers
                 resourcesCompleteWhileMeasured = livePreparationReady &&
                     initializationPhase == InitializationPhase.Ready &&
                     AreResourcesCompleteAndCurrent();
-                activeLegacy = resourcesCompleteWhileMeasured &&
+                activeSelectionExact = resourcesCompleteWhileMeasured &&
                     gridDescriptor.IsCreated &&
-                    !gridDescriptor.UsesFixedMetricLattice;
+                    FoamGridSelectionMatchesActive;
                 fixedCandidateReady = resourcesCompleteWhileMeasured &&
                     fixedMetricCandidateDescriptor.IsCreated &&
                     fixedMetricCandidateDescriptor.UsesFixedMetricLattice;
-                depositOnceExact = ValidateP7DepositOnceContracts(report);
+                sourceOwnershipExact = ValidateP7AutomaticSourceOwnershipContracts(report);
 
                 report.AppendLine("ACTIVE SOURCE OWNERSHIP");
                 report.AppendLine(
@@ -130,16 +130,16 @@ namespace ProgrammaticStylized3D.Rivers
                         "Preparation failure: " + preparationFailure);
                 }
                 report.AppendLine(
-                    "P7 does not activate fixed-metric allocation, transport, " +
-                    "film, shape, topology, or production rendering.");
+                    "P7 preserves the authored active mapping and does not change " +
+                    "allocation, transport, film, shape, topology, or rendering.");
                 report.AppendLine(
-                    "ACTIVE LEGACY OWNERSHIP VERDICT: " +
-                    (activeLegacy && fixedCandidateReady
+                    "ACTIVE SELECTION OWNERSHIP VERDICT: " +
+                    (activeSelectionExact && fixedCandidateReady
                         ? "PASS"
                         : "FAIL"));
                 report.AppendLine();
 
-                if (resourcesCompleteWhileMeasured && activeLegacy &&
+                if (resourcesCompleteWhileMeasured && activeSelectionExact &&
                     fixedCandidateReady)
                 {
                     unitPolicyExact = ValidateP7SourceUnitPolicy(report);
@@ -293,9 +293,9 @@ namespace ProgrammaticStylized3D.Rivers
                 bindingsDisabled && string.IsNullOrEmpty(cleanupFailure);
             bool cacheExact = metadataUnchanged && payloadUnchanged;
             bool overall = livePreparationReady &&
-                resourcesCompleteWhileMeasured && activeLegacy &&
+                resourcesCompleteWhileMeasured && activeSelectionExact &&
                 fixedCandidateReady && unitPolicyExact && automaticExact &&
-                depositOnceExact && manualExact && coordinateProbeExact &&
+                sourceOwnershipExact && manualExact && coordinateProbeExact &&
                 evaluatorExact &&
                 lifecycleExact && cleanupExact && cacheExact;
 
@@ -304,8 +304,10 @@ namespace ProgrammaticStylized3D.Rivers
                 "Live diagnostic preparation transaction: " +
                 (livePreparationReady ? "PASS" : "FAIL"));
             report.AppendLine(
-                "Active legacy ownership preserved: " +
-                (activeLegacy && fixedCandidateReady ? "PASS" : "FAIL"));
+                "Active descriptor matches authored selection: " +
+                (activeSelectionExact && fixedCandidateReady
+                    ? "PASS"
+                    : "FAIL"));
             report.AppendLine(
                 "Source unit classification: " +
                 (unitPolicyExact ? "PASS" : "FAIL"));
@@ -313,8 +315,8 @@ namespace ProgrammaticStylized3D.Rivers
                 "All eight automatic source families: " +
                 (automaticExact ? "PASS" : "FAIL"));
             report.AppendLine(
-                "Deposit-once automatic-source ownership: " +
-                (depositOnceExact ? "PASS" : "FAIL"));
+                "Hybrid automatic-source ownership: " +
+                (sourceOwnershipExact ? "PASS" : "FAIL"));
             report.AppendLine(
                 "Manual ellipse/compound/segment commands: " +
                 (manualExact ? "PASS" : "FAIL"));
@@ -381,9 +383,10 @@ namespace ProgrammaticStylized3D.Rivers
             return exact;
         }
 
-        private bool ValidateP7DepositOnceContracts(StringBuilder report)
+        private bool ValidateP7AutomaticSourceOwnershipContracts(
+            StringBuilder report)
         {
-            report.AppendLine("DEPOSIT-ONCE AUTOMATIC-SOURCE OWNERSHIP");
+            report.AppendLine("HYBRID AUTOMATIC-SOURCE OWNERSHIP");
             StylizedRiverFoamGridDescriptor descriptor =
                 gridDescriptor.IsCreated
                     ? gridDescriptor
@@ -423,21 +426,29 @@ namespace ProgrammaticStylized3D.Rivers
 
             bool shoreBuildAdvances =
                 shoreBuild.Header.z > shoreBuild.Deposit.y;
-            bool repeatedInteriorZero = P7FloatBitsEqual(
+            bool repeatedNonpersistentInteriorZero = P7FloatBitsEqual(
                 shoreRepeated.Header.z,
                 shoreRepeated.Deposit.y);
             bool arcBuildAdvances =
                 arcBuild.Header.y == 0f && arcBuild.Deposit.x == 0f &&
                 arcBuild.Header.z > arcBuild.Deposit.y;
-            bool arcBuildToHoldCompletes =
-                Mathf.Approximately(arcBuildToHold.Header.z, 1f) &&
-                arcBuildToHold.Header.z > arcBuildToHold.Deposit.y;
-            bool arcHoldZero =
-                Mathf.Approximately(arcHold.Header.z, 1f) &&
-                P7FloatBitsEqual(arcHold.Header.z, arcHold.Deposit.y);
-            bool arcReleaseZero =
-                Mathf.Approximately(arcRelease.Header.z, 1f) &&
-                P7FloatBitsEqual(arcRelease.Header.z, arcRelease.Deposit.y);
+            bool arcBuildToHoldTransition =
+                arcBuildToHold.Header.y == 1f &&
+                arcBuildToHold.Deposit.x == 0f &&
+                arcBuildToHold.Header.z >= 0f &&
+                arcBuildToHold.Header.z <= 1f;
+            bool arcHoldActive =
+                arcHold.Header.y == 1f && arcHold.Deposit.x == 1f &&
+                arcHold.Header.z > arcHold.Deposit.y;
+            bool arcReleaseActive =
+                arcRelease.Header.y == 2f && arcRelease.Deposit.x == 2f &&
+                arcRelease.Header.z > arcRelease.Deposit.y;
+            bool arcEventHasRestBoundary =
+                Mathf.Approximately(
+                    arc.Duration,
+                    arc.ObjectBuildDuration + arc.ObjectHoldDuration +
+                    arc.ObjectReleaseDuration) &&
+                arc.ObjectRestDuration > 0f;
 
             string projectRoot = Path.GetFullPath(
                 Path.Combine(Application.dataPath, ".."));
@@ -448,7 +459,17 @@ namespace ProgrammaticStylized3D.Rivers
             string computeSource = File.Exists(computePath)
                 ? File.ReadAllText(computePath)
                 : string.Empty;
-            bool gpuPositiveDifferenceGate =
+            string injectionPath = Path.Combine(
+                projectRoot,
+                "Assets/Game/Procedural/Rivers/" +
+                "StylizedRiverFoamRuntime.Injection.cs");
+            string injectionSource = File.Exists(injectionPath)
+                ? File.ReadAllText(injectionPath)
+                : string.Empty;
+            bool nonpersistentDifferenceGate =
+                computeSource.IndexOf(
+                    "if (!persistentObjectEmitter)",
+                    StringComparison.Ordinal) >= 0 &&
                 computeSource.IndexOf(
                     "max(0.0, currentContribution - previousContribution)",
                     StringComparison.Ordinal) >= 0 &&
@@ -458,6 +479,23 @@ namespace ProgrammaticStylized3D.Rivers
                 computeSource.IndexOf(
                     "previousSourceEvent.header.z = sourceEvent.deposit.y;",
                     StringComparison.Ordinal) >= 0;
+            bool persistentObjectBypass =
+                computeSource.IndexOf(
+                    "bool persistentObjectEmitter =",
+                    StringComparison.Ordinal) >= 0 &&
+                computeSource.IndexOf(
+                    "else if (currentContribution <= FoamMaterialStateEpsilon)",
+                    StringComparison.Ordinal) >= 0 &&
+                injectionSource.IndexOf(
+                    "hasNewDeposition = persistentObjectEmitter ||",
+                    StringComparison.Ordinal) >= 0;
+            bool phaseResolverRestored =
+                injectionSource.IndexOf(
+                    "phaseOrSide = 1f;",
+                    StringComparison.Ordinal) >= 0 &&
+                injectionSource.IndexOf(
+                    "phaseOrSide = 2f;",
+                    StringComparison.Ordinal) >= 0;
             bool absoluteTargetPreserved =
                 computeSource.IndexOf(
                     "float birthContribution = currentContribution;",
@@ -465,32 +503,46 @@ namespace ProgrammaticStylized3D.Rivers
                 computeSource.IndexOf(
                     "FoamMergeBornPresence(",
                     StringComparison.Ordinal) >= 0;
-            bool deadCellRemainsDead = repeatedInteriorZero &&
+            bool warningHelperRemoved =
+                computeSource.IndexOf(
+                    "FoamEvaluateAutomaticSourceContribution",
+                    StringComparison.Ordinal) < 0;
+            bool nonpersistentDeadCellRemainsDead =
+                repeatedNonpersistentInteriorZero &&
                 computeSource.IndexOf(
                     "newlyRevealedContribution <= FoamMaterialStateEpsilon",
                     StringComparison.Ordinal) >= 0;
 
             bool exact = descriptor.IsCreated && shoreBuildAdvances &&
-                repeatedInteriorZero && arcBuildAdvances &&
-                arcBuildToHoldCompletes && arcHoldZero && arcReleaseZero &&
-                gpuPositiveDifferenceGate && absoluteTargetPreserved &&
-                deadCellRemainsDead;
+                repeatedNonpersistentInteriorZero && arcBuildAdvances &&
+                arcBuildToHoldTransition && arcHoldActive &&
+                arcReleaseActive && arcEventHasRestBoundary &&
+                nonpersistentDifferenceGate && persistentObjectBypass &&
+                phaseResolverRestored && absoluteTargetPreserved &&
+                warningHelperRemoved && nonpersistentDeadCellRemainsDead;
             report.AppendLine(
-                $"Shore Build frontier advances: {shoreBuildAdvances}; " +
-                $"repeated Build interior zero: {repeatedInteriorZero}");
+                $"Nonpersistent Build frontier advances: {shoreBuildAdvances}; " +
+                $"repeated Build interior zero: " +
+                $"{repeatedNonpersistentInteriorZero}");
             report.AppendLine(
                 $"Object Build advances: {arcBuildAdvances}; " +
-                $"Build-to-Hold completes final frontier: " +
-                $"{arcBuildToHoldCompletes}");
+                $"Build-to-Hold transition: {arcBuildToHoldTransition}");
             report.AppendLine(
-                $"Object Hold zero: {arcHoldZero}; Release zero: " +
-                $"{arcReleaseZero}");
+                $"Object Hold active: {arcHoldActive}; progressive Release " +
+                $"active: {arcReleaseActive}; Rest boundary retained: " +
+                $"{arcEventHasRestBoundary}");
             report.AppendLine(
-                $"GPU positive-difference gate: {gpuPositiveDifferenceGate}; " +
-                $"absolute birth target preserved: {absoluteTargetPreserved}; " +
-                $"dead covered cell remains dead: {deadCellRemainsDead}");
+                $"Nonpersistent GPU difference gate: " +
+                $"{nonpersistentDifferenceGate}; persistent Object bypass: " +
+                $"{persistentObjectBypass}; phase resolver restored: " +
+                $"{phaseResolverRestored}");
             report.AppendLine(
-                "DEPOSIT-ONCE SOURCE VERDICT: " +
+                $"Absolute birth target preserved: {absoluteTargetPreserved}; " +
+                $"warning helper removed: {warningHelperRemoved}; " +
+                $"nonpersistent dead cell remains dead: " +
+                $"{nonpersistentDeadCellRemainsDead}");
+            report.AppendLine(
+                "HYBRID SOURCE OWNERSHIP VERDICT: " +
                 (exact ? "PASS" : "FAIL"));
             report.AppendLine();
             return exact;

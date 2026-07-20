@@ -538,7 +538,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             UnifiedBoundedPreview,
             UnifiedBatchAudit,
             UnifiedPreviewBatchAudit,
-            SourceEdgeIndexDebug
+            SourceEdgeIndexDebug,
+            CornerDamageTransactionAudit
         }
 
         private const float PlaneEpsilon = 0.0001f;
@@ -640,6 +641,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 edges.Length > 0,
                 diagnostic,
                 edges);
+        }
+
+        public static string GenerateCornerDamageTransactionAudit(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures)
+        {
+            if (recipe == null)
+            {
+                throw new ArgumentNullException(nameof(recipe));
+            }
+
+            ResetCornerDamageTransactionAuditCapture();
+            GenerateInternal(
+                recipe,
+                surfaceFeatures,
+                EdgeWearEvaluationMode.CornerDamageTransactionAudit,
+                -1,
+                out _,
+                out _,
+                out _);
+            return CompleteCornerDamageTransactionAuditCapture(recipe);
         }
 
         public static MeshData GeneratePlaneCutBevelPreview(

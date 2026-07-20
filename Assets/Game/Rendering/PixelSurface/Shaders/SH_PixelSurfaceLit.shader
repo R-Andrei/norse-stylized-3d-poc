@@ -87,7 +87,6 @@ Shader "PS3D/Pixel Surface Lit"
         [HideInInspector] _GeneratedMassEdgeWearTint("Generated Mass Edge Wear Tint", Color) = (0.70, 0.69, 0.62, 1)
         [HideInInspector] _GeneratedMassEdgeWearTintStrength("Generated Mass Edge Wear Tint Strength", Float) = 0
         [HideInInspector] _GeneratedMassEdgeWearMacroVariation("Generated Mass Edge Wear Macro Variation", Float) = 0
-        [HideInInspector] _GeneratedMassEdgeWearMicroVariation("Generated Mass Edge Wear Micro Variation", Float) = 0
         [HideInInspector] _GeneratedMassCreaseLength("Generated Mass Crease Length", Float) = 1
         [HideInInspector] _GeneratedMassCreaseBranching("Generated Mass Crease Branching", Float) = 1
         [HideInInspector] _GeneratedMassCreaseSoftness("Generated Mass Crease Softness", Float) = 0.35
@@ -232,7 +231,6 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
                 float _GeneratedMassEdgeWearMacroVariation;
-                float _GeneratedMassEdgeWearMicroVariation;
                 float _GeneratedMassCreaseLength;
                 float _GeneratedMassCreaseBranching;
                 float _GeneratedMassCreaseSoftness;
@@ -355,7 +353,6 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
                 float _GeneratedMassEdgeWearMacroVariation;
-                float _GeneratedMassEdgeWearMicroVariation;
                 float _GeneratedMassCreaseLength;
                 float _GeneratedMassCreaseBranching;
                 float _GeneratedMassCreaseSoftness;
@@ -526,7 +523,6 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
                 float _GeneratedMassEdgeWearMacroVariation;
-                float _GeneratedMassEdgeWearMicroVariation;
                 float _GeneratedMassCreaseLength;
                 float _GeneratedMassCreaseBranching;
                 float _GeneratedMassCreaseSoftness;
@@ -691,7 +687,6 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
                 float _GeneratedMassEdgeWearMacroVariation;
-                float _GeneratedMassEdgeWearMicroVariation;
                 float _GeneratedMassCreaseLength;
                 float _GeneratedMassCreaseBranching;
                 float _GeneratedMassCreaseSoftness;

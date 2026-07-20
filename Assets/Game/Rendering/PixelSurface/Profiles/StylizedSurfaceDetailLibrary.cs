@@ -126,6 +126,9 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
 
         public int SliceResolution => Mathf.Max(16, sliceResolution);
         public IReadOnlyList<Entry> Entries => entries;
+        public int LogicalEntryCount => entries != null ? entries.Count : 0;
+        public int RequiredPackedBackingDepth => Mathf.Max(1, LogicalEntryCount);
+        public bool UsesInternalNeutralBackingSlice => LogicalEntryCount == 0;
         public Texture2DArray GeneratedTextureArray => generatedTextureArray;
         public Texture2DArray GeneratedAuthoredColorArray =>
             generatedAuthoredColorArray;
@@ -139,6 +142,15 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
             }
         }
         public string GeneratedSignature => generatedSignature ?? string.Empty;
+
+        public bool EntryUsesAuthoredMaterialSet(string stableId)
+        {
+            int entryIndex = FindEntryIndex(stableId);
+            return entryIndex >= 0 &&
+                   entryIndex < entries.Count &&
+                   entries[entryIndex] != null &&
+                   entries[entryIndex].UsesAuthoredMaterialSet;
+        }
 
         public bool TryResolve(
             string stableId,

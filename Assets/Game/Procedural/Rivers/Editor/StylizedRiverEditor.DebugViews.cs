@@ -498,7 +498,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawReadOnlyRow(
                 new GUIContent(
                     "Object Contact Cycles",
-                    "Per-object Arc/Semi-Arc deposition. Build shows only the newly revealed contiguous open-C birth frontier. Hold, Release, and Rest deposit no additional material. The downstream rear remains unsourced."),
+                    "Per-object Arc/Semi-Arc emission phases. Build grows one contiguous open-C source path, Hold replenishes that complete path, Release clears it contiguously, and Rest submits no source. The downstream rear remains unsourced in every phase."),
                 $"{runtime.AutomaticObjectContactBuildCount} build | " +
                 $"{runtime.AutomaticObjectContactHoldCount} hold | " +
                 $"{runtime.AutomaticObjectContactReleaseCount} release | " +
@@ -1465,7 +1465,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamChipAndStrandProbe:
                     return
-                        "Layer E production Chip-and-Strand mask after the committed Final Foam silhouette receives the current Chip and Strand controls. It is render-only: it does not write FoamState or _FoamShapeMask, but it is the same local morphology consumed by normal Final Foam.";
+                        "Exact final Foam mask after production Chipping and structural Strands. This is the authoritative proof of whether Foam survives: black means the Foam mask is zero even if underlying water, refraction, lighting, or fog remains pale. It is render-only and does not write FoamState or _FoamShapeMask.";
 
                 case StylizedRiverFoamDebugView.FoamChipAndStrandDifference:
                     return
@@ -1474,15 +1474,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.ChipCandidateField:
                     return
-                        "Chip construction diagnostic. Orange shows the exact activated analytical candidate field after lifecycle, rigid motion, view stabilization, rotation, pulse, and shape change, but before material permission.";
+                        "Complete activated analytical Candidate field after lifecycle, rigid motion, view stabilization, rotation, pulse, and shape change. Presence-Amplitude displays binary any-positive support. Candidate Straddle does not alter this geometry; it only admits or rejects deterministic candidate identities through its low-frequency cache.";
 
                 case StylizedRiverFoamDebugView.ChipEligibilityComposite:
                     return
-                        "Canonical Chip permission diagnostic, independent of current candidates and Activation. Dark gray is exact pre-Chip rendered Foam, yellow is the derivative-normalized Chip Edge Width band, magenta is optional established-body permission from Chip Interior Access, and cyan is permission outside visible support and should be absent.";
+                        "Dark gray is exact pre-Chip rendered Foam. Presence-Amplitude + Rendered Edge Band shows the current binary derivative-based Edge Eligibility in yellow. Presence-Amplitude + Candidate Straddle shows complete admitted candidate territory in yellow, including cyan where that territory lies outside current Foam. Current Presence Footprint retains continuous Edge Width in yellow and optional Interior Access in magenta.";
 
                 case StylizedRiverFoamDebugView.ProductionChipMask:
                     return
-                        "Production Chip diagnostic. Magenta shows the exact hardened Final Foam coverage removed after activated candidates meet the canonical Edge Width or optional Interior Access permission. It matches the production cut before Strands.";
+                        "Magenta is exact Foam coverage actually removed. Candidate Straddle therefore shows only the admitted analytical candidate overlap with exact pre-Chip rendered Foam; Rendered Edge Band shows its current Candidate × Eligibility removal. Current Presence Footprint retains its established continuous removed coverage. Compare with Foam Chip And Strand Probe for the authoritative final Foam mask.";
 
                 case StylizedRiverFoamDebugView.FoamFilmSource:
                     return

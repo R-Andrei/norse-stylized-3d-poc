@@ -217,7 +217,8 @@ namespace ProgrammaticStylized3D.Rivers
                 IsAutomaticSourcePopulationActive;
             bool hasWork = materialWork || topologyDebugActive ||
                 automaticBirthDebugActive || motionFieldDebugActive ||
-                shapeProductDebugActive;
+                shapeProductDebugActive ||
+                P12CandidateSweepForcesRuntimeWork;
 
             if (!hasWork && currentState == null &&
                 !HasTopologyTransitionVisibleHold)
@@ -231,6 +232,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (!EnsureResources())
             {
+                AdvanceP12CandidateSweepFrame(false);
                 if (!BindTopologyTransitionHold())
                 {
                     BindDisabled();
@@ -250,8 +252,10 @@ namespace ProgrammaticStylized3D.Rivers
                 lastRenderInterpolationAlpha = simulationInterpolation;
                 idleSince = 0.0;
                 RecordSteadyStateWorkFrame(materialWork, true);
+                UpdateFoamChipStraddleAdmission(false);
                 BindField();
                 UpdateRecentPeaks();
+                AdvanceP12CandidateSweepFrame(true);
                 return;
             }
 
@@ -500,8 +504,10 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             RecordSteadyStateWorkFrame(materialWork, false);
+            UpdateFoamChipStraddleAdmission(false);
             BindField();
             UpdateRecentPeaks();
+            AdvanceP12CandidateSweepFrame(true);
         }
 
         private void ResolveTransportSubsteps(
@@ -525,7 +531,7 @@ namespace ProgrammaticStylized3D.Rivers
                 : 1f;
             float lateralSpeedRatio = Mathf.Max(
                 0f,
-                river != null ? river.FoamMaximumLateralSpeedRatio : 0f);
+                ResolveEffectiveFoamMaximumLateralSpeedRatio());
 
             ResolveTransportCflContract(
                 materialStepDuration,

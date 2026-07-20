@@ -1,0 +1,246 @@
+#pragma kernel InitializeField
+#pragma kernel RecenterField
+#pragma kernel SimulateField
+
+#define PS3D_TWO_PI 6.28318530718
+
+RWTexture2D<float2> _TargetWindWrite;
+RWTexture2D<float4> _StateAWrite;
+RWTexture2D<float4> _StateBWrite;
+Texture2D<float4> _StateRead;
+RWTexture2D<float4> _StateWrite;
+
+int2 _FieldResolution;
+int2 _FieldOffset;
+float4 _FieldOriginCellSize;
+float _DeltaTime;
+float _WindTime;
+int _WindSeed;
+float4 _PrevailingParameters;
+float4 _BroadNoiseParameters;
+float4 _GustParameters;
+float4 _ResponseParameters;
+int2 _RecenterDelta;
+int _ResetAll;
+
+uint HashUint(uint state)
+{
+    state ^= state >> 16;
+    state *= 0x7feb352du;
+    state ^= state >> 15;
+    state *= 0x846ca68bu;
+    state ^= state >> 16;
+    return state;
+}
+
+float Hash01(int2 cell, uint salt)
+{
+    uint state = (uint)cell.x * 0x8da6b343u;
+    state ^= (uint)cell.y * 0xd8163841u;
+    state ^= salt * 0xcb1ab31fu;
+    state = HashUint(state);
+    return (state & 0x00ffffffu) / 16777215.0;
+}
+
+float ValueNoise(float2 coordinate, uint salt)
+{
+    int2 cell = (int2)floor(coordinate);
+    float2 t = frac(coordinate);
+    t = t * t * (3.0 - 2.0 * t);
+
+    float h00 = Hash01(cell, salt);
+    float h10 = Hash01(cell + int2(1, 0), salt);
+    float h01 = Hash01(cell + int2(0, 1), salt);
+    float h11 = Hash01(cell + int2(1, 1), salt);
+    return lerp(lerp(h00, h10, t.x), lerp(h01, h11, t.x), t.y);
+}
+
+float2 SafeNormalize(float2 value, float2 fallback)
+{
+    float magnitudeSquared = dot(value, value);
+    if (magnitudeSquared <= 0.0000001)
+    {
+        return fallback;
+    }
+
+    return value * rsqrt(magnitudeSquared);
+}
+
+float2 ClampVectorMagnitude(float2 value, float maximum)
+{
+    float magnitudeSquared = dot(value, value);
+    float maximumSquared = maximum * maximum;
+    if (magnitudeSquared <= maximumSquared || magnitudeSquared <= 0.0000001)
+    {
+        return value;
+    }
+
+    return value * (maximum * rsqrt(magnitudeSquared));
+}
+
+int2 PhysicalCell(int2 logicalCell)
+{
+    return (logicalCell + _FieldOffset) % _FieldResolution;
+}
+
+float2 WorldPositionForLogicalCell(int2 logicalCell)
+{
+    return _FieldOriginCellSize.xy +
+        ((float2)logicalCell + 0.5) * _FieldOriginCellSize.z;
+}
+
+float2 EvaluateTargetWind(float2 worldXZ)
+{
+    float2 direction = SafeNormalize(_PrevailingParameters.xy, float2(1.0, 0.0));
+    float2 perpendicular = float2(-direction.y, direction.x);
+    float baseStrength = max(0.0, _PrevailingParameters.z);
+    float turbulenceStrength = max(0.0, _PrevailingParameters.w);
+    float broadScale = max(1.0, _BroadNoiseParameters.x);
+    float broadSpeed = max(0.0, _BroadNoiseParameters.y);
+    float gustScale = max(2.0, _BroadNoiseParameters.z);
+    float gustSpeed = max(0.0, _BroadNoiseParameters.w);
+
+    float2 broadCoordinate =
+        (worldXZ - direction * (_WindTime * broadSpeed)) / broadScale;
+    uint baseSeed = (uint)_WindSeed;
+    float noiseX = ValueNoise(broadCoordinate, baseSeed + 11u) * 2.0 - 1.0;
+    float noiseY = ValueNoise(
+        broadCoordinate * 0.83 + float2(19.17, -7.31),
+        baseSeed + 37u) * 2.0 - 1.0;
+    float2 turbulentWind = float2(noiseX, noiseY) * turbulenceStrength;
+
+    float2 gustCoordinate =
+        (worldXZ - direction * (_WindTime * gustSpeed)) / gustScale;
+    float gustA = ValueNoise(gustCoordinate, baseSeed + 101u);
+    float gustB = ValueNoise(
+        gustCoordinate * 2.03 + float2(-13.7, 8.9),
+        baseSeed + 211u);
+    float gustNoise = gustA * 0.68 + gustB * 0.32;
+    float gustThreshold = saturate(_GustParameters.y);
+    float gustSoftness = max(0.01, _GustParameters.z);
+    float gustMask = smoothstep(
+        gustThreshold - gustSoftness,
+        gustThreshold + gustSoftness,
+        gustNoise);
+    gustMask *= gustMask;
+
+    float2 gustDirection = SafeNormalize(
+        direction + perpendicular * (noiseX * 0.22),
+        direction);
+    float2 target =
+        direction * baseStrength +
+        turbulentWind +
+        gustDirection * (max(0.0, _GustParameters.x) * gustMask);
+    return ClampVectorMagnitude(target, max(0.05, _GustParameters.w));
+}
+
+float2 TargetWindToVisualBend(float2 targetWind)
+{
+    float maximumWindStrength = max(0.05, _GustParameters.w);
+    float maximumVisualBend = max(0.05, _ResponseParameters.w);
+    return targetWind * (maximumVisualBend / maximumWindStrength);
+}
+
+float4 InitialState(float2 targetWind)
+{
+    return float4(TargetWindToVisualBend(targetWind), 0.0, 0.0);
+}
+
+[numthreads(8, 8, 1)]
+void InitializeField(uint3 dispatchId : SV_DispatchThreadID)
+{
+    int2 logicalCell = (int2)dispatchId.xy;
+    if (any(logicalCell >= _FieldResolution))
+    {
+        return;
+    }
+
+    int2 physicalCell = PhysicalCell(logicalCell);
+    float2 target = EvaluateTargetWind(WorldPositionForLogicalCell(logicalCell));
+    float4 state = InitialState(target);
+    _TargetWindWrite[physicalCell] = target;
+    _StateAWrite[physicalCell] = state;
+    _StateBWrite[physicalCell] = state;
+}
+
+[numthreads(8, 8, 1)]
+void RecenterField(uint3 dispatchId : SV_DispatchThreadID)
+{
+    int2 logicalCell = (int2)dispatchId.xy;
+    if (any(logicalCell >= _FieldResolution))
+    {
+        return;
+    }
+
+    int2 oldLogicalCell = logicalCell + _RecenterDelta;
+    bool preserved = _ResetAll == 0 &&
+        all(oldLogicalCell >= 0) &&
+        all(oldLogicalCell < _FieldResolution);
+    if (preserved)
+    {
+        return;
+    }
+
+    int2 physicalCell = PhysicalCell(logicalCell);
+    float2 target = EvaluateTargetWind(WorldPositionForLogicalCell(logicalCell));
+    float4 state = InitialState(target);
+    _TargetWindWrite[physicalCell] = target;
+    _StateAWrite[physicalCell] = state;
+    _StateBWrite[physicalCell] = state;
+}
+
+[numthreads(8, 8, 1)]
+void SimulateField(uint3 dispatchId : SV_DispatchThreadID)
+{
+    int2 logicalCell = (int2)dispatchId.xy;
+    if (any(logicalCell >= _FieldResolution))
+    {
+        return;
+    }
+
+    int2 physicalCell = PhysicalCell(logicalCell);
+    float2 worldXZ = WorldPositionForLogicalCell(logicalCell);
+    float2 target = EvaluateTargetWind(worldXZ);
+    float2 targetBend = TargetWindToVisualBend(target);
+    float4 state = _StateRead.Load(int3(physicalCell, 0));
+    float2 bend = state.xy;
+    float2 velocity = state.zw;
+
+    float variationNoise = ValueNoise(
+        worldXZ / max(1.0, _BroadNoiseParameters.x * 0.55),
+        (uint)_WindSeed + 401u) * 2.0 - 1.0;
+    float dampingNoise = ValueNoise(
+        worldXZ / max(1.0, _BroadNoiseParameters.x * 0.71) + float2(5.7, -11.3),
+        (uint)_WindSeed + 503u) * 2.0 - 1.0;
+    float variation = saturate(_ResponseParameters.z);
+    float localFrequency = max(0.1, _ResponseParameters.x) *
+        max(0.25, 1.0 + variationNoise * variation * 0.45);
+    float localDampingRatio = max(0.1, _ResponseParameters.y) *
+        max(0.25, 1.0 + dampingNoise * variation * 0.35);
+    float omega = PS3D_TWO_PI * localFrequency;
+    float totalDeltaTime = max(0.0, _DeltaTime);
+    int integrationStepCount = clamp(
+        (int)ceil(totalDeltaTime * omega / 0.75),
+        1,
+        4);
+    float integrationDeltaTime = totalDeltaTime / integrationStepCount;
+    float maximumBend = max(0.05, _ResponseParameters.w);
+    float maximumVelocity = maximumBend * max(1.0, omega) * 2.0;
+
+    [loop]
+    for (int integrationStep = 0;
+         integrationStep < integrationStepCount;
+         integrationStep++)
+    {
+        float2 acceleration =
+            omega * omega * (targetBend - bend) -
+            2.0 * localDampingRatio * omega * velocity;
+        velocity += acceleration * integrationDeltaTime;
+        velocity = ClampVectorMagnitude(velocity, maximumVelocity);
+        bend += velocity * integrationDeltaTime;
+        bend = ClampVectorMagnitude(bend, maximumBend);
+    }
+
+    _TargetWindWrite[physicalCell] = target;
+    _StateWrite[physicalCell] = float4(bend, velocity);
+}

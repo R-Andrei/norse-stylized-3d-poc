@@ -106,6 +106,30 @@ namespace ProgrammaticStylized3D.Rivers
         LifecycleFaithful = 1
     }
 
+    public enum StylizedRiverFoamPresenceFootprintMode
+    {
+        [InspectorName("Current")]
+        Current = 0,
+        [InspectorName("Presence-Amplitude")]
+        PresenceAmplitude = 1
+    }
+
+    public enum StylizedRiverFoamChipApplicationMode
+    {
+        [InspectorName("Rendered Edge Band (Current)")]
+        RenderedEdgeBand = 0,
+        [InspectorName("Candidate Straddle (Experimental)")]
+        CandidateStraddle = 1
+    }
+
+    public enum StylizedRiverFoamTransportScheme
+    {
+        [InspectorName("Donor Cell (Current)")]
+        DonorCell = 0,
+        [InspectorName("TVD Superbee")]
+        TvdSuperbee = 1
+    }
+
     public enum StylizedRiverFoamBirthShapeMode
     {
         Ellipse,
@@ -397,6 +421,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float DefaultFoamChipMaximumViewScale = 1.75f;
         private const float DefaultFoamChipEdgeWidthPixels = 4f;
         private const float DefaultFoamChipInteriorAccess = 0f;
+        private const float MinimumFoamChipStraddleRefreshRate = 1f;
+        private const float MaximumFoamChipStraddleRefreshRate = 8f;
+        private const float DefaultFoamChipStraddleRefreshRate = 4f;
         private const float MinimumFoamChipFieldSpeed = 0f;
         private const float MaximumFoamChipFieldSpeed = 12f;
         private const float DefaultFoamChipFieldSpeed = 0f;
@@ -947,6 +974,11 @@ namespace ProgrammaticStylized3D.Rivers
             foamFixedMetricCellSize =
                 StylizedRiverFoamFixedMetricCellSize.QualityDefault;
 
+        [Tooltip("Selects Layer C material transport. Donor Cell preserves the accepted first-order conservative baseline. TVD Superbee uses bounded monotonic face reconstruction to reduce numerical diffusion while retaining the same packed Presence/life/pattern conservation path. This changes no allocation or topology contract and may be switched during Play Mode.")]
+        [SerializeField]
+        private StylizedRiverFoamTransportScheme foamTransportScheme =
+            StylizedRiverFoamTransportScheme.DonorCell;
+
         [Tooltip("Persistent prepared-topology cache associated with this authored river. Exact caches load directly. Stale-compatible caches may be used for one Play session without replacement; missing or incompatible caches require explicit Edit Mode preparation and are never generated or saved automatically during Play.")]
         [SerializeField]
         private StylizedRiverFoamTopologyCacheAsset foamTopologyCacheAsset;
@@ -1191,11 +1223,11 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamObjectFoamFormationSpeedMetresPerSecond =
             DefaultShoreFoamFormationSpeedMetresPerSecond;
 
-        [Tooltip("Minimum time in seconds that an eligible object event remains in Hold after progressive deposition finishes. Hold schedules the event lifecycle but does not deposit material again.")]
+        [Tooltip("Minimum time in seconds that an eligible object's complete Contact Arc or Contact Semi-Arc remains actively replenished after the progressive build finishes.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactHoldDurationMinSeconds = 5.0f;
 
-        [Tooltip("Maximum time in seconds that an eligible object event remains in Hold after progressive deposition finishes. Hold schedules the event lifecycle but does not deposit material again.")]
+        [Tooltip("Maximum time in seconds that an eligible object's complete Contact Arc or Contact Semi-Arc remains actively replenished after the progressive build finishes.")]
         [Min(0f)]
         [SerializeField] private float foamObjectContactHoldDurationMaxSeconds = 10.0f;
 
@@ -1644,6 +1676,12 @@ namespace ProgrammaticStylized3D.Rivers
         private StylizedRiverFinalFoamVisibilityMode foamFinalVisibilityMode =
             StylizedRiverFinalFoamVisibilityMode.ConcentrationAndLifetime;
 
+        [Tooltip("Selects whether Layer E may amplify weak stored Presence into a full visual footprint. Current preserves the accepted renderer. Presence-Amplitude limits the resolved Foam base mask to the actual committed Presence amplitude, so weak transported tails shrink or disappear instead of receiving near-full coverage. This is render-only and may be switched during Play Mode.")]
+        [SerializeField]
+        private StylizedRiverFoamPresenceFootprintMode
+            foamPresenceFootprintMode =
+                StylizedRiverFoamPresenceFootprintMode.Current;
+
         [Tooltip("Aging-rate multiplier at full Negative Aging Pressure. Values above one consume Remaining Life faster. Negative pressure also suppresses positive support preservation before this multiplier is applied, so hostile overlap kills rather than merely weakens support.")]
         [Range(
             MinimumFoamNegativeAgingRate,
@@ -1792,15 +1830,27 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamChipMaximumViewScale =
             DefaultFoamChipMaximumViewScale;
 
-        [Tooltip("Approximate inward width, in rendered pixels, of the canonical pre-Chip Foam edge territory. Zero disables edge permission exactly. The Inspector slider covers 0–256 px, while direct numeric entry accepts any non-negative value for deliberately extreme tests. This is a derivative-normalized local screen-space estimate, not a global geometric distance field.")]
+        [Tooltip("Selects how Presence-Amplitude production authorizes the existing analytical Chip candidates. Rendered Edge Band preserves the current P12m derivative-based route. Candidate Straddle is an experimental low-frequency candidate-level boundary test. Current Presence Footprint always preserves its established Chipping path.")]
+        [SerializeField] private StylizedRiverFoamChipApplicationMode
+            foamChipApplicationMode =
+                StylizedRiverFoamChipApplicationMode.RenderedEdgeBand;
+
+        [Tooltip("Approximate inward width, in rendered pixels, of the canonical pre-Chip Foam edge territory used by Rendered Edge Band. Zero disables edge permission exactly. The Inspector slider covers 0–256 px, while direct numeric entry accepts any non-negative value for deliberately extreme tests. This is a derivative-normalized local screen-space estimate, not a global geometric distance field.")]
         [Min(0f)]
         [SerializeField] private float foamChipEdgeWidthPixels =
             DefaultFoamChipEdgeWidthPixels;
 
-        [Tooltip("Fraction of activated analytical candidate cells granted permission in the established visible body complementary to Chip Edge Width. Zero keeps every candidate edge-only; one grants every activated candidate full visible-body access. Admission is deterministic per candidate, so connected Chip contours remain intact.")]
+        [Tooltip("Fraction of activated analytical candidate cells granted permission in the established visible body complementary to Chip Edge Width. This belongs only to the preserved Current/Rendered Edge Band route. Zero keeps every candidate edge-only; one grants every activated candidate full visible-body access.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamChipInteriorAccess =
             DefaultFoamChipInteriorAccess;
+
+        [Tooltip("Refresh rate for the experimental Candidate Straddle admission cache. Candidate motion remains render-frame analytical; only the binary boundary-contact decision updates at this lower rate. Rendered Edge Band does not dispatch this cache.")]
+        [Range(
+            MinimumFoamChipStraddleRefreshRate,
+            MaximumFoamChipStraddleRefreshRate)]
+        [SerializeField] private float foamChipStraddleRefreshRate =
+            DefaultFoamChipStraddleRefreshRate;
 
         [Tooltip("Downstream speed in metres per second of the complete analytical Chip candidate field. This is rigid translation in River space and cannot stretch an individual candidate.")]
         [Range(MinimumFoamChipFieldSpeed, MaximumFoamChipFieldSpeed)]
@@ -2388,6 +2438,10 @@ namespace ProgrammaticStylized3D.Rivers
         public StylizedRiverFoamGridMode FoamGridMode => foamGridMode;
         public StylizedRiverFoamFixedMetricCellSize
             FoamFixedMetricCellSize => foamFixedMetricCellSize;
+        public StylizedRiverFoamTransportScheme FoamTransportScheme =>
+            foamTransportScheme == StylizedRiverFoamTransportScheme.TvdSuperbee
+                ? StylizedRiverFoamTransportScheme.TvdSuperbee
+                : StylizedRiverFoamTransportScheme.DonorCell;
         public float FoamFixedMetricRequestedCellSizeMetres =>
             ResolveFoamFixedMetricRequestedCellSizeMetres();
         public bool FoamStateHeld =>
@@ -2953,6 +3007,12 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful
                 ? StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful
                 : StylizedRiverFinalFoamVisibilityMode.ConcentrationAndLifetime;
+        public StylizedRiverFoamPresenceFootprintMode
+            FoamPresenceFootprintMode =>
+                foamPresenceFootprintMode ==
+                    StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude
+                    ? StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude
+                    : StylizedRiverFoamPresenceFootprintMode.Current;
         public float FoamNegativeAgingRate =>
             Mathf.Clamp(
                 foamNegativeAgingRate,
@@ -3034,10 +3094,22 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipMaximumViewScale,
                 MinimumFoamChipMaximumViewScale,
                 MaximumFoamChipMaximumViewScale);
+        public StylizedRiverFoamChipApplicationMode FoamChipApplicationMode =>
+            foamChipApplicationMode ==
+                StylizedRiverFoamChipApplicationMode.CandidateStraddle
+                ? StylizedRiverFoamChipApplicationMode.CandidateStraddle
+                : StylizedRiverFoamChipApplicationMode.RenderedEdgeBand;
         public float FoamChipEdgeWidthPixels =>
             Mathf.Max(0f, foamChipEdgeWidthPixels);
         public float FoamChipInteriorAccess =>
             Mathf.Clamp01(foamChipInteriorAccess);
+        public float FoamChipStraddleRefreshRate =>
+            foamChipStraddleRefreshRate > 0f
+                ? Mathf.Clamp(
+                    foamChipStraddleRefreshRate,
+                    MinimumFoamChipStraddleRefreshRate,
+                    MaximumFoamChipStraddleRefreshRate)
+                : DefaultFoamChipStraddleRefreshRate;
         public float FoamChipFieldSpeed =>
             Mathf.Clamp(
                 foamChipFieldSpeed,
@@ -5080,6 +5152,13 @@ namespace ProgrammaticStylized3D.Rivers
                 foamFixedMetricCellSize =
                     StylizedRiverFoamFixedMetricCellSize.QualityDefault;
             }
+            if (!Enum.IsDefined(
+                    typeof(StylizedRiverFoamTransportScheme),
+                    foamTransportScheme))
+            {
+                foamTransportScheme =
+                    StylizedRiverFoamTransportScheme.DonorCell;
+            }
 
             width = Mathf.Max(0.5f, width);
             bankBlend = Mathf.Max(0.1f, bankBlend);
@@ -5404,6 +5483,7 @@ namespace ProgrammaticStylized3D.Rivers
                 MinimumFoamFullSupportedAgingAt,
                 MaximumFoamFullSupportedAgingAt);
             foamFinalVisibilityMode = FoamFinalVisibilityMode;
+            foamPresenceFootprintMode = FoamPresenceFootprintMode;
             foamNegativeAgingRate = Mathf.Clamp(
                 foamNegativeAgingRate,
                 MinimumFoamNegativeAgingRate,
@@ -5476,6 +5556,13 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipEdgeWidthPixels);
             foamChipInteriorAccess = Mathf.Clamp01(
                 foamChipInteriorAccess);
+            foamChipStraddleRefreshRate =
+                foamChipStraddleRefreshRate > 0f
+                    ? Mathf.Clamp(
+                        foamChipStraddleRefreshRate,
+                        MinimumFoamChipStraddleRefreshRate,
+                        MaximumFoamChipStraddleRefreshRate)
+                    : DefaultFoamChipStraddleRefreshRate;
             foamChipFieldSpeed = Mathf.Clamp(
                 foamChipFieldSpeed,
                 MinimumFoamChipFieldSpeed,

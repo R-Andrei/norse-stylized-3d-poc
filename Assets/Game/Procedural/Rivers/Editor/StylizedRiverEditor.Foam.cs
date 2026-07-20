@@ -68,6 +68,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Quality Default resolves Low to 0.25 m, Medium to 0.15 m, and High to 0.10 m. The explicit 0.20 m option is the intermediate P12 candidate."));
             }
 
+            EditorGUILayout.PropertyField(
+                Find("foamTransportScheme"),
+                new GUIContent(
+                    "Material Transport Scheme",
+                    "Donor Cell preserves the accepted first-order conservative baseline. TVD Superbee uses bounded higher-order face reconstruction to reduce numerical diffusion. Both move the same packed Presence, life moment, and pattern moment and can be switched during Play Mode without rebuilding the cache."));
+
             EditorGUILayout.HelpBox(
                 "Changing Grid Mode or the resolved Fixed Cell Size deliberately " +
                 "invalidates the active Foam resources and topology-cache " +
@@ -342,8 +348,36 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 "Production Chipping",
                 EditorStyles.miniBoldLabel);
+            SerializedProperty chipApplicationMode = Find(
+                "foamChipApplicationMode");
+            EditorGUILayout.PropertyField(
+                chipApplicationMode,
+                new GUIContent(
+                    "Chip Application",
+                    "Rendered Edge Band preserves the current P12m route. Candidate Straddle is an experimental low-frequency candidate-level boundary test used only by Presence-Amplitude. Switching back immediately restores the current route and stops admission-cache dispatches."));
+            bool mixedChipApplication =
+                chipApplicationMode.hasMultipleDifferentValues;
+            bool candidateStraddleSelected =
+                !mixedChipApplication &&
+                chipApplicationMode.enumValueIndex ==
+                    (int)StylizedRiverFoamChipApplicationMode.CandidateStraddle;
+            SerializedProperty presenceFootprintMode = Find(
+                "foamPresenceFootprintMode");
+            bool mixedPresenceFootprint =
+                presenceFootprintMode.hasMultipleDifferentValues;
+            bool presenceAmplitudeSelected =
+                !mixedPresenceFootprint &&
+                presenceFootprintMode.enumValueIndex ==
+                    (int)StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude;
+            bool candidateStraddleActive =
+                candidateStraddleSelected && presenceAmplitudeSelected;
+            string chipApplicationHelp = candidateStraddleActive
+                ? "Candidate Straddle keeps the existing analytical candidates, but admits a complete candidate only when its centre and irregular perimeter samples prove that it crosses subcell Layer E Foam support. Admission refreshes independently at the authored low rate; Final still removes only exact pre-Chip rendered Foam."
+                : candidateStraddleSelected
+                    ? "Candidate Straddle applies only to Presence-Amplitude. Current Presence Footprint continues to use its established Edge Width and Interior Access path, and no admission-cache dispatch runs."
+                    : "Rendered Edge Band is the preserved P12m route. It intersects the analytical Candidate field with the current derivative-based Edge Width territory and optional Current-mode Interior Access. Use the three Chip debug views for direct A/B comparison.";
             EditorGUILayout.HelpBox(
-                "Production Chipping now exposes six primary controls: Amount, Size, Spacing, Irregularity, Edge Width, and optional Interior Access. One canonical material-permission model owns edge and interior territory. Use Chip Candidate Field, Chip Eligibility Composite, and Production Chip Mask to inspect the complete handoff.",
+                chipApplicationHelp,
                 MessageType.Info);
             EditorGUILayout.PropertyField(
                 Find("foamChipActivation"),
@@ -428,18 +462,37 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     $"{meanRadius * maximumMultiplier:0.###} m");
             }
 
-            DrawUnboundedNonNegativeSlider(
-                Find("foamChipEdgeWidthPixels"),
-                new GUIContent(
-                    "Chip Edge Width (px)",
-                    "Approximate inward width of the canonical visible Foam edge band in rendered pixels. Zero disables edge permission exactly. The slider covers 0–256 px; the numeric field accepts any non-negative value for deliberately extreme bands."),
-                0f,
-                256f);
-            EditorGUILayout.PropertyField(
-                Find("foamChipInteriorAccess"),
-                new GUIContent(
-                    "Chip Interior Access",
-                    "Fraction of activated candidate identities granted permission in the established body outside Chip Edge Width. Zero is edge-only; one lets every active candidate cut the full visible body. Intermediate values admit complete deterministic candidates, not pixel noise."));
+            if (mixedChipApplication || mixedPresenceFootprint ||
+                !candidateStraddleActive)
+            {
+                DrawUnboundedNonNegativeSlider(
+                    Find("foamChipEdgeWidthPixels"),
+                    new GUIContent(
+                        "Chip Edge Width (px)",
+                        "Approximate inward width of the visible Foam edge band used by Rendered Edge Band. Zero disables edge permission exactly. The slider covers 0–256 px; the numeric field accepts any non-negative value for deliberately extreme bands."),
+                    0f,
+                    256f);
+                EditorGUILayout.PropertyField(
+                    Find("foamChipInteriorAccess"),
+                    new GUIContent(
+                        "Chip Interior Access",
+                        "Current/Rendered Edge Band permission outside Chip Edge Width. Presence-Amplitude Rendered Edge Band keeps this disabled; Current Presence Footprint retains the established optional candidate-level interior admission."));
+            }
+
+            if (mixedChipApplication || candidateStraddleSelected)
+            {
+                using (new EditorGUI.DisabledScope(
+                    !mixedChipApplication &&
+                    !mixedPresenceFootprint &&
+                    !presenceAmplitudeSelected))
+                {
+                    EditorGUILayout.PropertyField(
+                        Find("foamChipStraddleRefreshRate"),
+                        new GUIContent(
+                            "Straddle Refresh Rate (Hz)",
+                            "How often the experimental candidate-level boundary admission is refreshed while Presence-Amplitude is active. Candidate geometry and motion still evaluate every rendered frame. Four hertz is the default; lower values reduce compute and increase admission lag."));
+                }
+            }
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
                 "View Readability LOD",
@@ -790,6 +843,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Final Foam Visibility Mode",
                     "Render-only choice between concentration-gated Final Foam and lifecycle-faithful coverage. Stored material and lifecycle remain unchanged."));
+            EditorGUILayout.PropertyField(
+                Find("foamPresenceFootprintMode"),
+                new GUIContent(
+                    "Presence Footprint",
+                    "Current preserves the accepted visibility mapping. Presence-Amplitude prevents Layer E from granting more base footprint authority than the actual stored Presence, so weak transported tails shrink or disappear instead of looking like full-strength Foam. Stored material and lifecycle remain unchanged."));
             EditorGUILayout.PropertyField(
                 Find("foamColour"),
                 new GUIContent(
@@ -1176,13 +1234,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Anchor Coverage",
                         "Stable share of registered object anchors that receive the per-object Arc/Semi-Arc cycle. One includes every eligible object."));
                 EditorGUILayout.HelpBox(
-                    "Each eligible object progressively deposits one contiguous thin open-C ribbon through the immediate upstream/shoulder contact ring. Hold and Release retain event timing but deposit no additional material; the born ribbon is then owned only by transport and lifecycle. The downstream rear is never sourced.",
+                    "Each eligible object grows one contiguous thin open-C ribbon through the immediate upstream/shoulder contact ring, replenishes that open C during Hold, then releases it contiguously before Rest. Arcs release in Build order; Semi-Arcs retract the dominant arm first and clear the path in reverse order. The downstream rear is never sourced.",
                     MessageType.None);
                 DrawMinMaxUnitControls(
                     "Hold Duration (s)",
                     Find("foamObjectContactHoldDurationMinSeconds"),
                     Find("foamObjectContactHoldDurationMaxSeconds"),
-                    "How long the object event remains in Hold after Build finishes. Hold deposits no additional material.");
+                    "How long the complete one-cell open-C contact ribbon remains actively replenished after Build finishes.");
                 DrawMinMaxUnitControls(
                     "Release Duration (s)",
                     Find("foamObjectContactReleaseDurationMinSeconds"),

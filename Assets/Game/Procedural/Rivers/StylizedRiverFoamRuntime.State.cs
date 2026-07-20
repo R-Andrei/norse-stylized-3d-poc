@@ -222,8 +222,9 @@ namespace ProgrammaticStylized3D.Rivers
             // x = previous deposition side/phase, y = previous deposition
             // progress, z = previous deposition state valid (0 for the first
             // source tick, 1 afterward), w reserved. Current phase/progress
-            // remain Header.y/z. Positive coverage newly revealed between these
-            // states gates the current authored source target.
+            // remain Header.y/z. Positive newly revealed coverage gates
+            // nonpersistent source families; Object Arc/Semi-Arc use their
+            // current phase-shaped persistent emitter directly.
             public Vector4 Deposit;
         }
 

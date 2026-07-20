@@ -21,6 +21,7 @@
 #pragma kernel AdvanceFoamVisualOccupancy
 #pragma kernel EvaluateFoamShape
 #pragma kernel ApplyBoundary
+#pragma kernel BuildFoamChipStraddleAdmission
 #pragma target 5.0
 
 #include "../Shaders/Includes/RiverWaterCommon.hlsl"
@@ -35,6 +36,7 @@
 #include "CS_RiverFoam.Simulation.hlsl"
 #include "CS_RiverFoam.Evolution.hlsl"
 #include "CS_RiverFoam.TopologyTransition.hlsl"
+#include "CS_RiverFoam.ChipAdmission.hlsl"
 
 float4 ResolveFoamSegmentInjectionSample(
     float2 physicalPosition,
@@ -2350,100 +2352,6 @@ struct FoamAutomaticSourceRasterSample
     float clearState;
 };
 
-float FoamEvaluateAutomaticSourceContribution(
-    FoamSourceEventData sourceEvent,
-    float sourceType,
-    float globalDistance,
-    float lateralMetres,
-    float shoreMetres,
-    float2 physicalCellSpacing,
-    int2 coordinate)
-{
-    float amountMultiplier = 1.0;
-    float shape = 0.0;
-    if (sourceType < 1.5)
-    {
-        shape = FoamEvaluateShoreRibbonSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            shoreMetres,
-            physicalCellSpacing,
-            amountMultiplier);
-    }
-    else if (sourceType < 2.5)
-    {
-        shape = FoamEvaluateInwardWashSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            shoreMetres,
-            physicalCellSpacing,
-            amountMultiplier);
-    }
-    else if (sourceType < 3.5)
-    {
-        shape = FoamEvaluateObjectContactArcSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            amountMultiplier);
-    }
-    else if (sourceType < 4.5)
-    {
-        shape = FoamEvaluateObjectContactFleckSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            coordinate,
-            amountMultiplier);
-    }
-    else if (sourceType < 5.5)
-    {
-        shape = FoamEvaluateObjectContactSemiArcSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            amountMultiplier);
-    }
-    else if (sourceType < 6.5)
-    {
-        shape = FoamEvaluateFreeWaterLaceConnectorSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            amountMultiplier);
-    }
-    else if (sourceType < 7.5)
-    {
-        shape = FoamEvaluateFreeWaterTornFragmentSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            amountMultiplier);
-    }
-    else if (sourceType < 8.5)
-    {
-        shape = FoamEvaluateFreeWaterCrossLaceConnectorSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            amountMultiplier);
-    }
-    else
-    {
-        return 0.0;
-    }
-
-    return saturate(shape) * max(0.0, amountMultiplier);
-}
-
 FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     int2 coordinate)
 {
@@ -2502,42 +2410,178 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
         return result;
     }
 
-    float currentContribution = FoamEvaluateAutomaticSourceContribution(
-        sourceEvent,
-        sourceType,
-        globalDistance,
-        lateralMetres,
-        shoreMetres,
-        physicalCellSpacing,
-        coordinate);
-
-    FoamSourceEventData previousSourceEvent = sourceEvent;
-    previousSourceEvent.header.y = sourceEvent.deposit.x;
-    previousSourceEvent.header.z = sourceEvent.deposit.y;
-    float previousContribution = 0.0;
-    if (sourceEvent.deposit.z > 0.5)
+    float currentAmountMultiplier = 1.0;
+    float currentShape = 0.0;
+    if (sourceType < 1.5)
     {
-        previousContribution = FoamEvaluateAutomaticSourceContribution(
-            previousSourceEvent,
-            sourceType,
+        currentShape = FoamEvaluateShoreRibbonSource(
+            sourceEvent,
             globalDistance,
             lateralMetres,
             shoreMetres,
             physicalCellSpacing,
-            coordinate);
+            currentAmountMultiplier);
     }
-    float newlyRevealedContribution = sourceEvent.deposit.z > 0.5
-        ? max(0.0, currentContribution - previousContribution)
-        : currentContribution;
-    if (newlyRevealedContribution <= FoamMaterialStateEpsilon)
+    else if (sourceType < 2.5)
+    {
+        currentShape = FoamEvaluateInwardWashSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            shoreMetres,
+            physicalCellSpacing,
+            currentAmountMultiplier);
+    }
+    else if (sourceType < 3.5)
+    {
+        currentShape = FoamEvaluateObjectContactArcSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            currentAmountMultiplier);
+    }
+    else if (sourceType < 4.5)
+    {
+        currentShape = FoamEvaluateObjectContactFleckSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            coordinate,
+            currentAmountMultiplier);
+    }
+    else if (sourceType < 5.5)
+    {
+        currentShape = FoamEvaluateObjectContactSemiArcSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            currentAmountMultiplier);
+    }
+    else if (sourceType < 6.5)
+    {
+        currentShape = FoamEvaluateFreeWaterLaceConnectorSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            currentAmountMultiplier);
+    }
+    else if (sourceType < 7.5)
+    {
+        currentShape = FoamEvaluateFreeWaterTornFragmentSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            currentAmountMultiplier);
+    }
+    else
+    {
+        currentShape = FoamEvaluateFreeWaterCrossLaceConnectorSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            currentAmountMultiplier);
+    }
+
+    float currentContribution = saturate(currentShape) *
+        max(0.0, currentAmountMultiplier);
+    bool persistentObjectEmitter =
+        (sourceType > 2.5 && sourceType < 3.5) ||
+        (sourceType > 4.5 && sourceType < 5.5);
+    if (!persistentObjectEmitter)
+    {
+        FoamSourceEventData previousSourceEvent = sourceEvent;
+        previousSourceEvent.header.y = sourceEvent.deposit.x;
+        previousSourceEvent.header.z = sourceEvent.deposit.y;
+        float previousContribution = 0.0;
+        if (sourceEvent.deposit.z > 0.5)
+        {
+            float previousAmountMultiplier = 1.0;
+            float previousShape = 0.0;
+            if (sourceType < 1.5)
+            {
+                previousShape = FoamEvaluateShoreRibbonSource(
+                    previousSourceEvent,
+                    globalDistance,
+                    lateralMetres,
+                    shoreMetres,
+                    physicalCellSpacing,
+                    previousAmountMultiplier);
+            }
+            else if (sourceType < 2.5)
+            {
+                previousShape = FoamEvaluateInwardWashSource(
+                    previousSourceEvent,
+                    globalDistance,
+                    lateralMetres,
+                    shoreMetres,
+                    physicalCellSpacing,
+                    previousAmountMultiplier);
+            }
+            else if (sourceType < 4.5)
+            {
+                previousShape = FoamEvaluateObjectContactFleckSource(
+                    previousSourceEvent,
+                    globalDistance,
+                    lateralMetres,
+                    physicalCellSpacing,
+                    coordinate,
+                    previousAmountMultiplier);
+            }
+            else if (sourceType < 6.5)
+            {
+                previousShape = FoamEvaluateFreeWaterLaceConnectorSource(
+                    previousSourceEvent,
+                    globalDistance,
+                    lateralMetres,
+                    physicalCellSpacing,
+                    previousAmountMultiplier);
+            }
+            else if (sourceType < 7.5)
+            {
+                previousShape = FoamEvaluateFreeWaterTornFragmentSource(
+                    previousSourceEvent,
+                    globalDistance,
+                    lateralMetres,
+                    physicalCellSpacing,
+                    previousAmountMultiplier);
+            }
+            else
+            {
+                previousShape = FoamEvaluateFreeWaterCrossLaceConnectorSource(
+                    previousSourceEvent,
+                    globalDistance,
+                    lateralMetres,
+                    physicalCellSpacing,
+                    previousAmountMultiplier);
+            }
+
+            previousContribution = saturate(previousShape) *
+                max(0.0, previousAmountMultiplier);
+        }
+
+        float newlyRevealedContribution = sourceEvent.deposit.z > 0.5
+            ? max(0.0, currentContribution - previousContribution)
+            : currentContribution;
+        if (newlyRevealedContribution <= FoamMaterialStateEpsilon)
+        {
+            return result;
+        }
+    }
+    else if (currentContribution <= FoamMaterialStateEpsilon)
     {
         return result;
     }
 
-    // FoamMergeBornPresence treats its source as an absolute Presence target,
-    // not an additive delta. The positive difference is therefore deposition
-    // permission, while the current source contribution preserves the authored
-    // full-strength spatial target at the advancing frontier.
+    // Nonpersistent sources use current-minus-previous only as deposition
+    // permission. Persistent Object Arc/Semi-Arc sources rasterize their current
+    // phase-shaped emitter every material tick. Both paths preserve the current
+    // authored contribution as the absolute birth target expected by the merge.
     float birthContribution = currentContribution;
 
     bool objectRibbonSource =
