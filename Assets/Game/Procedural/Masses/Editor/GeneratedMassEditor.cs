@@ -6315,16 +6315,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     builder.AppendLine("angleMappingReport={");
                     builder.AppendLine(angleMappingReport);
                     builder.AppendLine("}");
-                    builder.Append("currentFailure=");
-                    builder.AppendLine(string.IsNullOrEmpty(
-                            currentA.PrimaryFailure)
-                        ? "none"
-                        : currentA.PrimaryFailure);
-                    builder.Append("maximumFailure=");
-                    builder.AppendLine(string.IsNullOrEmpty(
-                            maximumA.PrimaryFailure)
-                        ? "none"
-                        : maximumA.PrimaryFailure);
+                    AppendMacroProbeEvidence(
+                        builder,
+                        "strengthZero",
+                        strengthZeroA);
+                    AppendMacroProbeEvidence(
+                        builder,
+                        "coverageZero",
+                        coverageZeroA);
+                    AppendMacroProbeEvidence(
+                        builder,
+                        "current",
+                        currentA);
+                    AppendMacroProbeEvidence(
+                        builder,
+                        "maximum",
+                        maximumA);
                     MacroVariationContractReport = builder.ToString().TrimEnd();
                 }
                 catch (Exception exception)
@@ -6333,6 +6339,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         "failed: " + exception.GetType().Name + ":" +
                         exception.Message;
                 }
+            }
+
+            private static void AppendMacroProbeEvidence(
+                StringBuilder builder,
+                string label,
+                MassGenerator.EdgeWearBatchAuditCaseResult result)
+            {
+                builder.Append(label);
+                builder.Append("Passed=");
+                builder.AppendLine(
+                    result != null && result.Passed ? "1" : "0");
+                builder.Append(label);
+                builder.Append("Failure=");
+                builder.AppendLine(
+                    result == null
+                        ? "audit-result-null"
+                        : string.IsNullOrEmpty(result.PrimaryFailure)
+                            ? "none"
+                            : result.PrimaryFailure);
             }
 
             private static bool EvaluateMacroRetentionContract(

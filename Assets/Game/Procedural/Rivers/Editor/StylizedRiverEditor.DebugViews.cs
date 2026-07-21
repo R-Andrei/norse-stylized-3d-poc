@@ -1474,15 +1474,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.ChipCandidateField:
                     return
-                        "Complete activated analytical Candidate field after lifecycle, rigid motion, view stabilization, rotation, pulse, and shape change. Presence-Amplitude displays binary any-positive support. Candidate Straddle does not alter this geometry; it only admits or rejects deterministic candidate identities through its low-frequency cache.";
+                        "Chip construction diagnostic before material permission. Presence-Amplitude shows the binary any-positive-support Candidate region consumed by production. Current shows its existing continuous activated analytical field after lifecycle, rigid motion, view stabilization, rotation, pulse, and shape change.";
 
                 case StylizedRiverFoamDebugView.ChipEligibilityComposite:
                     return
-                        "Dark gray is exact pre-Chip rendered Foam. Presence-Amplitude + Rendered Edge Band shows the current binary derivative-based Edge Eligibility in yellow. Presence-Amplitude + Candidate Straddle shows complete admitted candidate territory in yellow, including cyan where that territory lies outside current Foam. Current Presence Footprint retains continuous Edge Width in yellow and optional Interior Access in magenta.";
+                        "Chip permission diagnostic, independent of current candidates and Activation. Dark gray is exact pre-Chip rendered Foam. In Presence-Amplitude, yellow is the binary any-positive-support Edge Eligibility measured from the isolated exterior rendered-fringe coordinate; the inner hardened-body rise is excluded and Interior Access is disabled. In Current, yellow retains the continuous soft-visibility Edge Width band and magenta retains optional Interior Access. Cyan is permission outside visible support and should be absent.";
 
                 case StylizedRiverFoamDebugView.ProductionChipMask:
                     return
-                        "Magenta is exact Foam coverage actually removed. Candidate Straddle therefore shows only the admitted analytical candidate overlap with exact pre-Chip rendered Foam; Rendered Edge Band shows its current Candidate × Eligibility removal. Current Presence Footprint retains its established continuous removed coverage. Compare with Foam Chip And Strand Probe for the authoritative final Foam mask.";
+                        "Production Chip diagnostic. In Presence-Amplitude, magenta is the exact binary Candidate × Eligibility selection consumed by full removal. In Current, magenta retains the existing continuous coverage removed after Candidate, Edge Width, and optional Interior Access permission. Compare with Foam Chip And Strand Probe for the authoritative final Foam mask.";
 
                 case StylizedRiverFoamDebugView.FoamFilmSource:
                     return

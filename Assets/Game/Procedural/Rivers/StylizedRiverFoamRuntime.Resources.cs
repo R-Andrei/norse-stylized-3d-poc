@@ -1296,7 +1296,6 @@ namespace ProgrammaticStylized3D.Rivers
             shapeProductDebugActiveLastUpdate = false;
 
             ReleaseMajorEvolutionResources();
-            ReleaseFoamChipStraddleAdmissionResources();
 
             if (boundaryTexture != null)
             {

@@ -4654,7 +4654,7 @@ The patch adds one scalar interpolator, one vertex `float2` dot product and scal
 
 ### Status
 
-**Source implemented and audited — Unity import, visual validation, rebuild timing, and GPU profiling pending.**
+**Implemented, source-audited, and user visually validated — rebuild timing and GPU profiling pending.**
 
 ### Objective
 
@@ -4906,3 +4906,406 @@ No Unity compiler, URP shader importer, or target GPU is available in this envir
 5. Copy the comprehensive report and verify the VEG-V1F heading, 48-byte stride, patch settings, region counts, and signed statistics.
 6. Measure one 50-clusters/m² rebuild duration and compare active GPU frame time at strengths `0/0` versus defaults.
 
+
+---
+
+## VEG-V1G — Mature Foundation Benchmark Suite
+
+**Status:** IMPLEMENTED AND SOURCE-AUDITED — UNITY RUN PENDING
+
+### Objective
+
+Replace the obsolete V1B silhouette-profile timed matrix with one mature vegetation-foundation suite that the user runs once in Play Mode, waits for, and then copies as one consolidated report. The suite must compare all retained geometry candidates at the two accepted dense stress levels while separately measuring the incremental whole-frame cost of the accepted visual foundation features.
+
+### Approved files
+
+- `Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md`
+- `Assets/Game/Procedural/Vegetation/VegetationBenchmark.cs`
+- `Assets/Game/Procedural/Vegetation/Editor/VegetationBenchmarkEditor.cs`
+
+### Read-only review evidence
+
+- `Assets/AGENTS.md` was read completely. It requires a persistent pre-edit plan, exact scope, one comprehensive Inspector-triggered report where practical, source validation, and honest Unity-only pending checks.
+- `VegetationBenchmark.cs > RunTimedComparisonSuite()` currently runs 18 cases: three geometry candidates × three historical silhouette profiles × densities 35/50. It mutates master width, taper, tip width, and width stabilization, so it no longer measures the user-accepted current visual configuration.
+- `VegetationBenchmark.cs > MeasureSuiteWindow()` already supplies warm-up, repeated whole-frame CPU samples, genuine `FrameTimingManager` GPU samples when available, and an optional adjacent render-disabled baseline.
+- `VegetationBenchmarkEditor.cs > OnInspectorGUI()` already provides one run button, one copy button, progress, and Play Mode gating. This interaction contract should be retained rather than duplicated.
+- `VegetationClusterMeshBuilder.cs > VegetationBenchmarkGeometry` still defines exactly `OpaqueStrips`, `CrossedCards`, and `Hybrid`.
+- The accepted dense stress levels remain 35 and 50 clusters/m².
+- The mature visual foundation controls now include punctual edge accent, wind-normal tilt, explicit bend-side shading, and grass macro patch strengths. Each is material-only and can be disabled without changing placement or mesh structure.
+- The supplied source tree contains no `.git` directory. Branch, HEAD, history, and working-tree comparisons are unavailable; the supplied V1F tree is the authoritative pre-edit baseline.
+
+### Test matrix
+
+The suite runs six timed cases:
+
+```text
+3 geometry candidates
+× 2 densities: 35 / 50 clusters per m²
+= 6 mature full-configuration cases
+```
+
+Every case preserves the user's complete accepted visual configuration. The suite does not attempt feature-cost ablation by setting material controls to zero. Source audit proved those zero values do not compile out the corresponding shader instructions: macro-patch arithmetic, wind-normal arithmetic, bend-shading arithmetic, and most edge-accent work still execute. Reporting their timing differences as feature costs would therefore be invalid.
+
+### Execution contract
+
+- One Inspector button starts the complete suite in Play Mode.
+- One Copy button copies the last completed report.
+- The suite uses forced full coverage for comparable stress.
+- Each of the six geometry/density configurations is rebuilt once and measured with the complete accepted visual foundation.
+- Every measurement retains configurable warm-up, measurement duration, pass count, alternating enabled/disabled ordering, and real GPU timing when `FrameTimingManager` supplies it.
+- Optional screenshots produce one representative capture for each of the six cases.
+- The suite saves the report under `Library/VegetationBenchmarkDiagnostics` and retains it in memory for clipboard copying.
+- A `finally` path restores geometry, density, rendering, and the coverage override, then rebuilds the original resources. Visual controls are never mutated by the suite.
+
+### Report requirements
+
+The consolidated report must include:
+
+- current resolution, render scale, graphics API, GPU, AA, VSync, target frame rate, and Editor/player context;
+- suite settings and an explicit warning when the run is not 2560 × 1440;
+- per-case resource readiness, rebuild duration, instance count, candidate/rejection counts, per-cluster and total geometry, draw count, 48-byte instance memory, deterministic hash, accepted visual-control values, and timing statistics;
+- paired enabled/disabled CPU and GPU median deltas with noise estimates;
+- confidence-aware ranking of the six geometry/density outcomes, with no winner claim inside noise;
+- final restoration state and saved report path.
+
+### Invariants and non-goals
+
+- Do not change geometry generation, placement, instance layout, shader behavior, Weather, Ground, lighting formulas, scenes, prefabs, materials, URP assets, layers, or tags.
+- Do not add a second suite or additional manual case steps.
+- Do not force Game View resolution through unsupported Editor internals; report the actual resolution and warning instead.
+- Do not describe whole-frame deltas as isolated shader timings.
+- Do not select or remove a geometry candidate automatically.
+- Do not add per-frame profiling work outside an active user-triggered suite.
+
+### Performance model
+
+- Normal gameplay cost is unchanged because all timing capture and profile switching execute only while the explicit suite coroutine is active.
+- The suite performs six full rebuilds plus one restoration rebuild.
+- At default settings, each timed case performs three enabled measurement windows and, when baseline interleaving is enabled, three disabled windows.
+- The run duration is approximately:
+
+```text
+6 cases × passes × windows × (warm-up + measurement)
+```
+
+With the current defaults and paired baselines this is approximately `6 × 3 × 2 × 2.75 s = 99 s`, plus rebuilds and screenshots. Users may reduce passes or durations in the existing serialized controls.
+
+### Design correction after shader audit
+
+The initial V1G plan proposed five material-value ablations. That design was rejected before delivery. `SH_StylizedVegetationBenchmark.shader` performs the macro-patch, wind-normal, and bend-shading arithmetic without compile-time feature branches, and `VegetationLighting.hlsl` enters the eligible punctual edge path based on light class rather than `Stylized Edge Accent` strength. Setting those strengths to zero changes output but does not reliably remove the instruction cost. A valid cost-ablation suite would require retained benchmark shader variants or benchmark-only branches, which would add shader complexity and production variant cost. The user requested a practical foundation suite, so V1G measures the complete accepted configuration only and leaves per-feature shader isolation outside scope.
+
+### Implementation sequence
+
+| ID | File | Work | Status |
+|---|---|---|---|
+| V1G.0 | This document | Record objective, evidence, exact scope, matrix, invariants, performance model, and validation before implementation. | Complete |
+| V1G.1 | `VegetationBenchmark.cs` | Replace silhouette profiles with six mature full-configuration geometry/density cases; add compact case evidence, rebuild timing, report saving, complete restoration, confidence-aware ranking, and V1G identifiers. | Complete; Unity run pending |
+| V1G.2 | `VegetationBenchmarkEditor.cs` | Replace obsolete labels/help with one mature suite Run button, one Copy button, progress, saved-path status, and V1G identifiers. | Complete; Unity run pending |
+| V1G.3 | Approved files and direct dependencies | Run scope, restoration, report, lexical, shader-audit, and preservation checks; record Unity compilation and runtime profiling as pending. | Complete; Unity run pending |
+
+### Acceptance criteria
+
+1. The Inspector exposes exactly one mature timed-suite Run action and one last-report Copy action.
+2. A default run executes six mature full-configuration cases without manual intervention and performs six structural rebuilds before restoration.
+3. The suite never mutates the accepted visual controls.
+4. The report includes per-case structural evidence, paired timing, confidence-aware ranking, environment data, 1440p warning, and saved path.
+5. The original benchmark state is restored even after a failed case or exception.
+6. No ordinary rendering, placement, shader, Weather, Ground, geometry, or instance-layout behavior changes.
+
+### Validation requirements
+
+- Source-level validation: exact three-file scope, no added/deleted project files, old silhouette suite symbols absent, six-case matrix present, accepted visual controls never assigned by the suite, complete restoration fields, report save/copy contract, and balanced C# delimiters.
+- Unity-only validation: C# compilation, one Play Mode run, correct progress, six completed cases, six representative screenshots when enabled, report saved under `Library`, clipboard copy, valid GPU samples where supported, and exact restoration of geometry/density/render state.
+
+
+### VEG-V1G post-change consistency and compliance audit
+
+#### Actual affected files
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Game/Procedural/Vegetation/VegetationBenchmark.cs
+Assets/Game/Procedural/Vegetation/Editor/VegetationBenchmarkEditor.cs
+```
+
+The actual three-file delta matches the approved scope exactly. No project file was added or deleted.
+
+#### Implemented differences
+
+- Replaced the obsolete 18-case silhouette-profile timed matrix with six mature full-configuration cases: `OpaqueStrips`, `CrossedCards`, and `Hybrid`, each at 35 and 50 clusters/m².
+- Preserved the user's current accepted visual values for every case. The suite assigns no edge-accent, wind-normal, bend-shading, or grass-patch strength.
+- Retained configurable warm-up, measurement duration, pass count, alternating rendered/disabled ordering, `FrameTimingManager` GPU sampling, and whole-frame CPU sampling.
+- Added one structural rebuild per matrix case, measured rebuild duration, compact structural evidence, one optional screenshot per case, and a confidence-aware six-case ranking.
+- Added a 2560 × 1440 target warning without changing Game View resolution through unsupported Editor APIs.
+- Added automatic report saving to `Library/VegetationBenchmarkDiagnostics/Vegetation_V1G_Foundation_Benchmark_Suite_Report.txt`, retained the report in memory, exposed the saved path, and preserved one Copy action.
+- Updated Inspector labels and help to one `Run Complete Foundation Benchmark Suite` action and one `Copy Last Foundation Suite Report` action.
+- Added last rebuild duration to the ordinary comprehensive report.
+- Restored geometry, density, render-enabled state, and the forced-coverage override in `finally`, followed by one restoration rebuild.
+
+#### Shader-audit correction
+
+The first V1G design draft proposed material-value feature ablations. It was rejected before delivery because source inspection proved those values do not remove the corresponding shader instructions:
+
+- `SH_StylizedVegetationBenchmark.shader` always calculates macro-patch masks and colour composition.
+- The shader always calculates wind-normal slope and bend-side inputs; zero response only multiplies the result down.
+- Bend-side fragment arithmetic remains present at response zero.
+- `VegetationLighting.hlsl` enters the punctual edge path based on light eligibility, not `Stylized Edge Accent` strength.
+
+No benchmark shader variants or benchmark-only production branches were added. The final suite reports only valid complete-configuration comparisons.
+
+#### Preservation evidence
+
+The following direct dependencies are byte-identical to the V1F baseline:
+
+- `VegetationClusterMeshBuilder.cs`
+- `VegetationInstanceData.cs`
+- `SH_StylizedVegetationBenchmark.shader`
+- `VegetationWindResponse.hlsl`
+- `VegetationLighting.hlsl`
+- `WeatherWindDomain.cs`
+- `GeneratedGround.cs`
+
+Normal Play Mode rendering remains in the existing `LateUpdate > SubmitIndirectRender` path. Profiling work executes only inside the explicit user-triggered suite coroutine.
+
+#### Source validation evidence
+
+`VEG-V1G_Source_Validation.txt` records **71/71 passed checks**, including:
+
+- exact approved scope and no added/deleted files;
+- absence of obsolete silhouette-suite and rejected feature-ablation symbols;
+- exact three-geometry × two-density matrix;
+- six rebuilds plus restoration and no visual-control assignment by the suite;
+- report environment, resolution warning, timing, ranking, saving, path, and clipboard contracts;
+- rebuild-duration recording on all early-return and normal paths;
+- Editor Play Mode gating, progress, Run/Copy actions, and saved-path display;
+- byte-identical shader, geometry, instance, Ground, and Weather dependencies;
+- source evidence for rejecting invalid zero-value feature-cost ablations;
+- balanced C# delimiters, clean lexical state, no conflict markers, and no obsolete instance-ID API.
+
+No Unity compiler or runtime is available in this environment. C# compilation, actual coroutine execution, screenshot generation, file saving, `FrameTimingManager` GPU sample availability, clipboard copying, and restoration behavior remain pending in Unity 6000.5.0f1.
+
+#### Performance reconciliation
+
+- Ordinary gameplay cost is unchanged.
+- The suite performs six matrix rebuilds plus one restoration rebuild only after explicit user action.
+- With current defaults and paired baselines, the timed windows total approximately 99 seconds; rebuilds and screenshots add additional time.
+- Whole-frame deltas remain comparative estimates. A standalone development build and Unity Profiler/Frame Debugger remain authoritative for final production selection.
+
+#### Unity validation
+
+1. Enter Play Mode and run `Run Complete Foundation Benchmark Suite`; confirm progress reaches six of six without Console errors.
+2. Confirm the report records the actual resolution and either passes 2560 × 1440 or emits the target-resolution warning.
+3. Confirm six cases and six rebuilds are reported, with screenshots present when enabled and valid GPU samples or an explicit unavailable result.
+4. Confirm geometry, density, and render-enabled state return to their pre-run values and visual controls remain unchanged.
+5. Press `Copy Last Foundation Suite Report` and paste the complete report; also confirm the saved path under `Library/VegetationBenchmarkDiagnostics` exists.
+
+---
+
+## VEG-V1H — Ground-Owned Vegetation Placement Domain
+
+**Status:** IMPLEMENTED AND SOURCE-AUDITED — UNITY VALIDATION PENDING
+
+### Objective
+
+Correct the authored vegetation placement domain so a `VegetationBenchmark` using an assigned `GeneratedGround` can generate visible grass across the complete Ground patch rather than only inside the legacy manually positioned `fieldSize` rectangle. Preserve the fixed `40 × 30 m` benchmark domain for the explicit V1G forced-full-coverage performance suite.
+
+### User-observed defect and acceptance
+
+- The Ground vegetation-coverage overlay spans the complete map chunk and painting outside the visible grass rectangle changes red coverage points to green.
+- Visible grass remains restricted to the current `VegetationBenchmark.fieldSize` rectangle.
+- The accepted fix must make ordinary Ground-integrated placement use the complete assigned Ground domain and derive render bounds from generated instances.
+- Full-patch candidate generation cost is accepted. The user states production chunks will not contain 100% grass coverage and does not consider the additional rejected dirty-time candidates a blocker.
+- Hierarchy, vegetation-child creation, coverage ownership, and multiple grass-family infrastructure are explicitly deferred to the next design discussion. This patch must not pre-emptively implement that architecture.
+
+### Approved file scope
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+Assets/Game/Procedural/Vegetation/VegetationBenchmark.cs
+Assets/Game/Procedural/Vegetation/Editor/VegetationBenchmarkEditor.cs
+```
+
+No Ground runtime/editor source, scene, prefab, shader, material, Weather, layer, tag, or serialized project asset is approved for modification.
+
+### Read-only review evidence
+
+- `Assets/AGENTS.md` was read completely. It requires the canonical plan to be the first write, exact scope, complete post-change reread, evidence, and honest Unity-only pending checks.
+- The supplied/reconstructed tree has no `.git` directory. Branch, HEAD, status, history, and comparison with repository commits are unavailable. The current V1G tree is the authoritative pre-edit baseline.
+- Pre-edit SHA-256:
+  - `VegetationBenchmark.cs`: `6da2bd1e5239cb8a35da51d3058aafd6e8d58a71bf4a536dc0eaf8e1fc15c3cd`
+  - `VegetationBenchmarkEditor.cs`: `1e889e85a2e58175df9802e8fe66ed11546c2f57de43dcbc64885307e3031ccb`
+  - this document: `51310f54d185c9b9461baab1466a72ab8882d50c4325edaafb9f7631bd480e5b`
+  - `Stylized_Vegetation_Architecture.md`: `31f49a64de257c121bfb8884fff84e90e4095074fb9a6023a5573277139e6ec6`
+- `VegetationBenchmark.cs > BuildInstances()` currently calculates candidate count and positions exclusively from `fieldSize`, transforms them through the vegetation object's transform, and only afterward queries Ground coverage and height. This proves painted coverage outside `fieldSize` can never receive candidates.
+- `VegetationBenchmark.cs > RebuildBenchmark()` currently derives `localBounds` from `fieldSize`, so the indirect-draw culling domain is tied to the same obsolete rectangle.
+- `GeneratedGround.cs > PatchSize` exposes the resolved local Ground domain size. `TrySampleVegetationCoverage()` and `TrySampleBaseSurface()` transform world points into Ground-local space and support the project's expected translated, yaw-rotated, and scaled Ground usage. Arbitrary pitched/rolled Ground is outside the current height-sampling contract because `TrySampleBaseSurface()` returns world Y height rather than a complete projected world point.
+- `GeneratedGround.cs > TryResolveVegetationCoverageDomain()` uses the generated base-surface half size when available and otherwise falls back to `PatchSize / 2`.
+- `GeneratedGroundEditor.cs > RebuildVegetationBenchmarksUsingGround()` already rebuilds every benchmark whose `CoverageGround` matches the edited Ground. No Ground-side source change is needed for coverage or regeneration propagation.
+- `VegetationBenchmark.cs > RunTimedComparisonSuite()` sets `suiteForceFullCoverage = true` for every V1G case. This existing private state can preserve the fixed `fieldSize` stress domain while ordinary authored rendering uses Ground ownership.
+- `VegetationInstanceData` stores local instance position in `PositionYaw.xyz`; no layout change is required.
+
+### Placement-domain contract
+
+The authoritative domain is selected as follows:
+
+```text
+if useGroundCoverage && coverageGround != null && !suiteForceFullCoverage:
+    domain owner = GeneratedGround
+    local XZ extent = coverageGround.PatchSize square
+    candidate world position = coverageGround.transform.TransformPoint(groundLocalXZ)
+else:
+    domain owner = VegetationBenchmark
+    local XZ extent = fieldSize
+    candidate world position = transform.TransformPoint(benchmarkLocalXZ)
+```
+
+The Ground-owned candidate count uses the actual transformed world area:
+
+```text
+world area = patchSize² × |cross(groundTransform.rightVector, groundTransform.forwardVector)|
+```
+
+where the transformed unit basis vectors include Ground scale. This preserves `densityPerSquareMetre` under translated, rotated, and scaled Ground transforms. Candidate sampling remains uniform in Ground-local XZ.
+
+After Ground height is sampled, every accepted world position is converted into the vegetation object's local coordinates before packing the instance record. The vegetation object does not need to share the Ground transform in this patch.
+
+### Bounds contract
+
+- Non-empty placement: derive local bounds from every accepted instance base and its maximum local blade top, then expand horizontally for cluster footprint, width stabilization, and maximum Weather bend and vertically by the existing safety margin.
+- Empty placement: use the resolved placement domain transformed into vegetation-local space as a conservative fallback, then apply the same wind/height expansion.
+- Render submission continues to transform the resulting local bounds through `transform.localToWorldMatrix` exactly once.
+
+### Benchmark-suite preservation
+
+- V1G timed suite cases continue setting `suiteForceFullCoverage = true`.
+- Forced suite cases therefore use the legacy `fieldSize`, currently `40 × 30 m`, for candidate extent and count regardless of Ground size or authored coverage. When a Ground remains assigned, the existing suite behavior still samples its base-surface height and may reject candidates outside that Ground; this patch does not redesign V1G height ownership.
+- Suite restoration clears the override and rebuilds the ordinary authored Ground-owned domain.
+- No timing matrix, pass count, visual setting, shader, or report-save workflow changes are permitted beyond accurate placement-domain reporting.
+
+### Invariants and non-goals
+
+- No change to Ground coverage storage or painting.
+- No automatic child-object creation or hierarchy migration.
+- No support for multiple vegetation coverage channels or grass families yet.
+- No scene/prefab edits and no automatic transform reassignment.
+- No change to deterministic placement RNG ordering inside a selected domain.
+- No instance stride, shader, geometry, Weather, lighting, patching, or draw-call change.
+- No per-frame placement/bounds recomputation.
+- `fieldSize` remains serialized because it is still the fallback and V1G benchmark domain; Inspector text must state when it is ignored by ordinary Ground-integrated placement.
+
+### File-by-file implementation sequence
+
+| ID | File | Required work | Status |
+| --- | --- | --- | --- |
+| V1H.0 | This document | Record evidence, exact scope, domain/bounds contracts, invariants, performance, and validation before source edits. | Complete |
+| V1H.1 | `VegetationBenchmark.cs` | Add a resolved placement-domain helper; generate Ground-owned candidates during ordinary Ground integration; preserve forced suite domain; derive candidate count from resolved world area; calculate instance-derived local bounds with empty-domain fallback; expose/report the resolved domain. | Complete; Unity validation pending |
+| V1H.2 | `VegetationBenchmarkEditor.cs` | Clarify the active domain in status/help text and identify `fieldSize` as fallback/benchmark-only while Ground ownership is active. | Complete; Unity validation pending |
+| V1H.3 | `Stylized_Vegetation_Architecture.md` | Record Ground-owned authored placement and explicitly defer multi-family coverage/hierarchy architecture. | Complete |
+| V1H.4 | Approved files and read-only dependencies | Run exact-scope, API/signature, deterministic-domain, suite-preservation, bounds, lexical/static, and post-change reread checks. Record Unity compilation and visual validation as pending. | Source audit complete; Unity validation pending |
+
+### Performance model
+
+- Normal-frame CPU/GPU work is unchanged. Placement and bounds remain rebuild-only.
+- No new buffers, textures, samples, draw calls, passes, per-frame loops, or instance bytes are introduced.
+- Candidate count scales with the resolved world area. For an unscaled `40 × 40 m` Ground at `50 clusters/m²`, the generator tests `80,000` candidates instead of the legacy `60,000` candidates from `40 × 30 m`.
+- Coverage-empty regions are still evaluated and rejected during the monolithic rebuild. The user explicitly accepts this dirty-time overhead for the current foundation; chunking/coverage-aware generation remains later infrastructure work.
+- Bounds calculation adds one linear pass over accepted instances during rebuild. `BuildInstances()` already performs one linear generation pass; this does not affect normal-frame cost.
+
+### Risks and mitigations
+
+- **Ground scale:** use transformed X/Z basis cross-product for world area; do not assume scale one.
+- **Vegetation/Ground transform mismatch:** generate in Ground local space, sample in world space, and pack in vegetation local space.
+- **Empty authored coverage:** calculate conservative fallback bounds from the resolved domain; the indirect draw still submits zero instances.
+- **Suite regression:** select Ground ownership only when `suiteForceFullCoverage` is false and verify six V1G cases remain fixed-domain.
+- **Deterministic hash change:** Ground-owned placement intentionally changes positions and candidate count relative to the defective rectangle. Repeated rebuilds with unchanged Ground/domain/settings must remain deterministic.
+
+### Validation requirements
+
+Source validation:
+
+1. Exact four-file scope and no added/deleted project files.
+2. Ground-owned ordinary domain and fixed forced-suite domain are mutually explicit.
+3. Ground world-area calculation includes transformed X/Z basis vectors.
+4. Accepted positions are packed in vegetation-local coordinates and Ground coverage/height are sampled in world space.
+5. Local bounds are generated from accepted instances, with a resolved-domain fallback for zero instances.
+6. V1G suite restoration, one-draw/48-byte contracts, shaders, Ground, Weather, geometry, and instance layout remain unchanged.
+
+Unity-only validation:
+
+- C# compilation in Unity 6000.5.0f1.
+- Paint coverage outside the former rectangle and confirm visible grass appears across the complete Ground domain.
+- Move the vegetation GameObject independently, rebuild the vegetation benchmark, and confirm Ground-owned placement realigns with the assigned Ground. Automatic hierarchy/transform lifecycle handling is deferred.
+- Run the V1G suite and confirm its cases still report/use `40 × 30 m` forced benchmark placement, then restore to Ground ownership.
+
+
+### VEG-V1H post-change consistency and compliance audit
+
+#### Actual affected files
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+Assets/Game/Procedural/Vegetation/VegetationBenchmark.cs
+Assets/Game/Procedural/Vegetation/Editor/VegetationBenchmarkEditor.cs
+```
+
+The final four-file delta matches the approved scope exactly. No file was added or deleted.
+
+#### Implemented differences
+
+- Added a single resolved placement-domain contract to `VegetationBenchmark`.
+- Ordinary Ground-integrated placement now resolves a square domain from `coverageGround.PatchSize`, generates candidate XZ positions in Ground-local coordinates, transforms them to world space for coverage and height sampling, and converts accepted positions into vegetation-local coordinates for the existing instance record.
+- Ground-owned candidate count now uses transformed world area from the cross product of Ground-local X and Z basis vectors. A unit-scale `40 × 40 m` Ground therefore generates `1,600 × density` candidates.
+- Fallback and V1G forced-suite placement preserve the serialized `fieldSize` path and its existing random-call ordering.
+- Replaced `fieldSize`-derived indirect bounds with bounds calculated from accepted instance bases and maximum blade tops, expanded by the existing maximum horizontal bend/footprint and vertical safety margin. Zero-instance builds use a conservative transformed-domain fallback.
+- Added placement-domain ownership, resolved extent/area, and configured fallback field information to the comprehensive report and per-case V1G evidence.
+- Added Inspector help/status that identifies the active placement owner and states when `fieldSize` is ignored.
+- Recorded Ground-owned authored placement in the stylized architecture while explicitly deferring automatic child creation, vegetation-owned painting, and multi-family coverage representation.
+
+#### Preserved behavior and contracts
+
+The following files are byte-identical to the V1G baseline:
+
+- `GeneratedGround.cs`
+- `GeneratedGroundEditor.cs`
+- `VegetationInstanceData.cs`
+- `VegetationClusterMeshBuilder.cs`
+- `SH_StylizedVegetationBenchmark.shader`
+- `VegetationWindResponse.hlsl`
+- `VegetationLighting.hlsl`
+
+The 48-byte instance stride, one indirect draw, shaders, lighting, wind, macro patches, coverage storage, coverage painting, Ground height API, geometry, V1G timings, screenshots, report saving, and suite restoration remain unchanged. The timed suite still sets `suiteForceFullCoverage` before each case and clears it before the restoration rebuild.
+
+#### Source validation evidence
+
+A local source-validation script recorded **38/38 passed checks**, including:
+
+- exact four-file scope and no added/deleted project files;
+- mutually exclusive Ground-owned ordinary placement and forced-suite/fallback placement;
+- Ground patch-size ownership and transformed-basis world-area calculation;
+- world-space Ground coverage/height sampling and vegetation-local instance packing;
+- fixed suite override assignment and restoration;
+- instance-derived bounds and zero-instance transformed-domain fallback;
+- removal of the obsolete `fieldSize` culling-bounds formula;
+- report and Inspector ownership evidence;
+- byte-identical Ground, instance-layout, geometry, shader, wind, and lighting dependencies;
+- balanced C# delimiters, clean lexical state, and balanced preprocessor directives.
+
+No C# compiler or Unity runtime is available in this environment. Unity 6000.5.0f1 compilation, actual Ground painting across the former boundary, render-culling validation, and V1G suite execution remain pending.
+
+#### Performance reconciliation
+
+- Normal-frame work is unchanged.
+- No shader, buffer, memory-stride, draw-call, texture, sampling, or compute cost was added.
+- Rebuild work now scales with the complete resolved Ground world area, as required to populate the previously unreachable region.
+- Bounds add one rebuild-only linear pass over accepted instances.
+- Coverage-empty candidates remain dirty-time rejection work in the current monolithic foundation. The user explicitly accepted this cost; coverage-aware chunk generation is deferred to the upcoming infrastructure work.
+
+#### Unity validation
+
+1. Confirm Unity imports and compiles without vegetation errors.
+2. Paint coverage outside the former red rectangle and confirm visible grass appears across the complete assigned Ground patch.
+3. Confirm the comprehensive report states `GeneratedGround-owned authored domain`, the Ground's resolved size/area, and instance-derived local bounds.
+4. Move either object, rebuild once, and confirm placement aligns to the assigned Ground rather than the old vegetation rectangle.
+5. Run the V1G suite and confirm each case reports the configured `40 × 30 m` forced benchmark placement domain, then confirm restoration returns to Ground ownership.

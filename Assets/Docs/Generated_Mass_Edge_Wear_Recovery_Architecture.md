@@ -22,7 +22,7 @@ The architecture now establishes:
 - certified topology, convexity, containment, bounds, volume, face quality, triangulation, normals, tangents, and render channels;
 - stable seed-8889 positive/negative fixtures, including edges `13/23/39`, suppressed component `14/24/30`, and excluded edge `40`.
 
-The accepted R13A.9a uniform baseline and V1A.2b macro extension remain closed. V1A.2 completed owner/support construction-width backoff and retained the reported meaningful edge; V1A.2a closed stable-floor classification before corner solving; V1A.2b closed the corresponding editor-only fixture proof. The later EW-V2A multi-plane geometric Micro path is retired after runtime evidence showed high dirty-time cost and a repeated wide-end/narrow-middle result. EW-V1A.2c/d/e protected-Macro recovery experiments are likewise rejected and removed after failing functionally and producing an unresponsive 256-state editor case. EW-V1A.2f restores the complete V1A.2b recovery system and normalizes public Macro Strength to the certified effective amplitude. EW-S1 is rejected and removed. EW-V1A.3b is the accepted and frozen Macro-width/recovery boundary. `EW-C1A-RO2` completed the ownership/construction audit and approved one transactional corner cut after micro-topology normalization but before bevel-candidate construction. `EW-C1A.1` is implemented as a diagnostic-only transaction; Unity compilation and explicit report acceptance remain pending before promotion.
+The accepted R13A.9a uniform baseline and V1A.2b macro extension remain closed. V1A.2 completed owner/support construction-width backoff and retained the reported meaningful edge; V1A.2a closed stable-floor classification before corner solving; V1A.2b closed the corresponding editor-only fixture proof. The later EW-V2A multi-plane geometric Micro path is retired after runtime evidence showed high dirty-time cost and a repeated wide-end/narrow-middle result. EW-V1A.2c/d/e protected-Macro recovery experiments are likewise rejected and removed after failing functionally and producing an unresponsive 256-state editor case. EW-V1A.2f restores the complete V1A.2b recovery system and normalizes public Macro Strength to the certified effective amplitude. EW-S1 is rejected and removed. EW-V1A.3b is the accepted and frozen Macro-width/recovery boundary. `EW-C1A-RO2` completed the ownership/construction audit and approved one transactional corner cut after micro-topology normalization but before bevel-candidate construction. `EW-C1A.1` is implemented as a diagnostic-only transaction and its seed-8889 trial-0 report is accepted. EW-C1A.1a visual/non-regression validation remains pending before promotion to C1A.2.
 
 The legacy construction and repair paths and the earlier bounded/plane experiments remain documented as architecture history and diagnostic comparison evidence. Any pre-R13A section that speaks of a future geometry direction is historical unless repeated by the current contract near the end of this document.
 
@@ -2264,3 +2264,38 @@ Recovery owns polygon geometry and authored face-plane normals only. It does not
 - `EW-C1A.3` must pass disabled/default/maximum policies over the 11 accepted seeds before freeze.
 
 No production `EdgeWearEvaluationMode.None` promotion is included in C1A unless separately planned and approved.
+
+## EW-C1A.1a — Mandatory one-polygon render contract
+
+Before corner-damage geometry can be promoted, the final polygon shell must not expose its internal GPU triangulation as apparent rock cuts. The former ordinary-face centre fan emitted one triangle per boundary segment, then `BuildMeshData` calculated per-triangle normals and per-triangle surface variation because no authored ownership existed.
+
+The active contract is now:
+
+```text
+one certified PolygonFace
+→ stable boundary-anchor triangulation
+→ exactly boundaryVertices - 2 GPU triangles
+→ one normalized PolygonFace.Normal
+→ one stable authored surface group
+→ zero internal fan vertices
+```
+
+The group namespace preserves the accepted bevel identity formula and uses a separate ordinary-polygon prefix. Duplicate group ownership inside one shell is a certification failure. `PolygonSurfaceRenderValid` is required by baseline construction and every topology-scale retry before preview mesh acceptance.
+
+This patch remains before EW-C1A.2 in the implementation order because committed corner clipping creates an additional polygon cap; the cap must inherit this render contract immediately rather than introducing another visible triangulation pattern.
+
+## EW-C1A.1a.2 / EW-C1A.1a.3 — Recovery-safe polygon triangulation fallback
+
+The direct-fan-only rule is superseded. Recovery still certifies one polygon as one render surface, but triangulation may use a projected centre fan when a valid convex polygon has no single boundary anchor whose complete fan satisfies the final `0.5` render-normal agreement guard.
+
+Selection order is fixed:
+
+```text
+1. resolve one authored polygon normal and one authored surface group
+2. try every stable direct boundary anchor
+3. if no polygon anchor certifies, project the boundary mean onto the polygon plane
+4. certify every centre-fan triangle against area and render-normal guards
+5. fail only when both modes fail
+```
+
+EW-C1A.1a.3 makes the fallback universal, including `BoundedEdgeBevel` and `EdgeBevelPlane`. Bevel fallback triangles retain their analytical bevel normal, feature marking, stable bevel surface group, and bevel-region counters. The fallback changes no clipping, source topology, recovery scale, candidate selection, width solve, material identity, mesh channel, or final mesh guard. One fallback face contributes exactly one complete-shell internal fan vertex and, when it is a bevel polygon, exactly one bevel-region internal fan vertex. Certification requires mode-correct triangle counts, authored channel equality, zero surface-group collisions, and both internal-fan counts bounded by their corresponding face counts.

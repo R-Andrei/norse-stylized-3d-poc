@@ -2119,7 +2119,7 @@ The prior audit identified the most dangerous dependencies but did not enumerate
 - Unity import and direct Candidate / Eligibility / Production / final-mask / Final comparison remain authoritative and pending.
 
 
-## P12n dependency disposition — optional Candidate-Straddle admission A/B
+## P12n dependency disposition — optional Candidate-Straddle admission A/B — visually rejected and superseded by P12o
 
 P12n adds an optional Layer E-only permission route. The established P12m Rendered Edge Band route remains serialized value `0`, remains selectable, and is the fallback when the experimental cache is unavailable. Current Presence Footprint ignores Candidate Straddle and retains its prior Chipping arithmetic.
 
@@ -2139,3 +2139,45 @@ The admission texture is visual transient state, not Layer C material, cache top
 For the current approximate `64.2 × 6.75 m`, `0.125 m`-spacing domain including implemented guards, the analytical cache is approximately `520 × 67 = 34,840` RFloat texels (`136.1 KiB` logical), one dispatch of `545` groups per refresh, default `4 Hz`. Inactive/dormant candidates, impossible centre classifications, and already-satisfied perimeter tests exit early. Runtime GPU cost remains unmeasured. No other subsystem consumes the new include or texture; `SH_CleanStylizedRiver.shader` remains the sole render consumer.
 
 Validation state: source/offline contract checks pass; Unity 6000.5 import, GPU timing, and visual A/B acceptance are pending.
+
+
+## P12o dependency disposition — original Candidate Field with boundary-anchored Eligibility
+
+P12o removes P12n candidate-level admission. The existing render-frame analytical Candidate Field remains the sole candidate producer. The experimental dependency now supplies Eligibility descriptors only:
+
+```text
+StylizedRiver Chip Application / boundary refresh rate
+    -> StylizedRiverFoamRuntime.ChipAdmission (repurposed in place)
+    -> BuildFoamChipBoundaryDescriptors compute kernel
+    -> guarded point ARGBFloat boundary-descriptor texture
+    -> River forward-fragment local strip reconstruction
+    -> original Candidate × selected Eligibility
+    -> exact pre-Chip rendered-mask removal
+```
+
+Each descriptor stores a River-space boundary anchor plus exact candidate identity and boundary state in the same ARGBFloat record. `Z` packs lateral identity, state (`0` unacquired, `1` valid, `2` locked), and a 10-bit inward-normal angle into one exact 24-bit integer; `W` stores the exact longitudinal identity. Initial acquisition stops at the first centre/ring occupied-empty disagreement, refines that known bracket by four binary-search steps, and locally refines the normal. Valid tracking searches from the previous boundary anchor and normal with intermediate samples so thin ribbons are not skipped; it cannot follow the moving candidate into Foam or reacquire a different edge during the same living cycle.
+
+The P12m Rendered Edge Band route remains serialized value `0`, source default, fallback, and behaviorally protected. Enum value `1` is reassigned from rejected Candidate Straddle to `Boundary-Anchored Strip (Experimental)` so existing experimental scene values select the replacement without scene editing. `foamChipStraddleRefreshRate` migrates through `FormerlySerializedAs` to `foamChipBoundaryRefreshRate`.
+
+The descriptor texture is transient Layer E state, not Layer C, Film, Shape, topology cache, or save data. It is allocated only while Presence-Amplitude + Boundary-Anchored Strip + nonzero Chipping and Edge Width are requested. For the previously observed guarded `520 × 67` candidate lattice, one ARGBFloat record per identity is `557,440` logical bytes (`544.4 KiB`). Absolute identities use a circular modulo index, so downstream lattice-origin movement preserves history without a second texture; decoded coordinates reject stale slots. The exact representable contract is longitudinal `±16,000,000` and lateral `-2048…2047` candidate cells, with fallback outside it. One low-frequency dispatch updates a bijective set of unique records in place. No high-resolution topology field, distance transform, extra pass, draw call, or new persistent simulation field is introduced.
+
+Shared-shader impact remains confined to `SH_CleanStylizedRiver.shader`, the sole consumer of `RiverWaterFoam.hlsl`. Current Presence Footprint and the P12m fallback perform no descriptor texture load. Unity import, visual A/B, and GPU timing remain pending.
+
+## P12p dependency disposition — retire experimental cache and isolate rendered exterior fringe
+
+P12n Candidate Straddle and P12o Boundary-Anchored Strip are visually rejected and removed. Their serialized route selector, refresh rate, runtime allocation/update/release paths, descriptor texture, compute kernel/include, shader properties, fragment descriptor loads, and experiment-only source files have no surviving dependency.
+
+The retained production chain is:
+
+```text
+original full-rate analytical Candidate Field
+    ×
+rendered Eligibility band
+    -> exact binary Presence-Amplitude Production
+    -> complete removal from exact pre-Chip rendered Foam
+```
+
+Presence-Amplitude Eligibility still reads `preChipRenderedMask`, but distance is derived only from the normalized exterior-fringe branch between the existing visible start `0.08` and rendered fringe ceiling `0.34`. The coordinate is clamped at `0.34`; therefore the inner hardened-body rise cannot restart the derivative estimate or create a second permission contour. Current Presence Footprint retains its established `preChipSoftVisibility` path unchanged.
+
+Dependency impact is one shared River shader include and its sole consumer, `SH_CleanStylizedRiver.shader`. No texture, buffer, kernel, dispatch, cache, serialized control, render pass, scene, prefab, material, layer, or tag remains from the experiment. Memory and compute return to the P12m baseline. Unity import and visual validation remain pending.
+

@@ -18,7 +18,7 @@
 
 `RG-METRIC-P12k — Exact pre-Chip rendered-mask ownership` remains retained. It correctly moved Presence-Amplitude eligibility to the exact no-Chip rendered mask passed to final composition: `preChipRenderedMask = foam.mask × strandKeep`.
 
-`RG-METRIC-P12l — Binary Candidate × Eligibility intersection` is mechanically valid but rejected by Unity visual evidence. Its `>= 0.5` tests select only the midpoint contour interiors of two antialiased fields, so positive Candidate or Eligibility support below `0.5` remains unselected and can preserve Foam. `RG-METRIC-P12m — Any-Support Binary Chip Selection and Full-Removal Proof` corrected that threshold defect, but Unity still shows sparse/fragmented Production because the current derivative Eligibility band clips otherwise valid moving candidates. `RG-METRIC-P12n — Optional Candidate-Straddle Chip Admission A/B` is source-implemented as a secondary route; Unity import, performance measurement, and visual comparison are pending.
+`RG-METRIC-P12l — Binary Candidate × Eligibility intersection` is mechanically valid but rejected by Unity visual evidence. Its `>= 0.5` tests select only the midpoint contour interiors of two antialiased fields, so positive Candidate or Eligibility support below `0.5` remains unselected and can preserve Foam. `RG-METRIC-P12m — Any-Support Binary Chip Selection and Full-Removal Proof` corrected that threshold defect. `RG-METRIC-P12n — Optional Candidate-Straddle Chip Admission A/B` and `RG-METRIC-P12o — Original Analytical Candidates with Boundary-Anchored Eligibility` are visually rejected and removed. `RG-METRIC-P12p — Retire Experimental Cache and Isolate the Rendered Exterior Fringe` is the active implementation: one original analytical Candidate Field multiplied by one rendered Eligibility band whose distance coordinate excludes the inner hard-body rise.
 
 ### P12g reviewed evidence
 
@@ -348,13 +348,15 @@ No compute shader, HLSL include, render shader, topology generator, source recip
 
 ## Active blocker
 
-P12n is implemented in source as an optional A/B route. Unity must import it without C# or shader/compute errors or warnings, then compare `Rendered Edge Band (Current)` against `Candidate Straddle (Experimental)` on the same camera and Foam state. The experimental route must produce coherent edge-attached candidate bites without detached interior removal. Current Presence Footprint and the P12m Rendered Edge Band route must remain unchanged.
+Unity evidence rejects both P12n Candidate Straddle and P12o Boundary-Anchored Strip. The low-frequency cache produces permission geometry unrelated to the required continuous rendered edge band and must be removed completely. The sole retained route is the original full-rate analytical Candidate Field multiplied by one rendered Eligibility band.
 
-No new diagnostic view is authorized. GPU timing is unmeasured.
+The remaining blocker is narrower: the visible pale exterior Foam fringe survives some Chips because Presence-Amplitude Eligibility currently derives distance from the complete hardened `preChipRenderedMask`. `RiverWaterFoamHardenSoftVisibility` constructs that mask from two rises: `hardVisible = smoothstep(0.22, 0.58, soft)` and `fringe = smoothstep(0.06, 0.34, soft) * 0.34`. Derivatives of the complete mask can therefore respond to the inner hard-body rise instead of exclusively tracking the actual exterior fringe. P12p isolates the exterior rendered-fringe coordinate and uses it as the only Presence-Amplitude edge-distance source.
 
-## Next patch after P12n evidence
+No new diagnostic view, texture, buffer, kernel, dispatch, serialized control, render pass, or candidate system is authorized. GPU timing is unmeasured.
 
-If Candidate Straddle is visually accepted and its measured cost is acceptable, freeze it as the selected Presence-Amplitude Chip route or retain both only if the A/B control remains useful. If rejected, delete the P12n route and restore the P12m source footprint. P13 remains deferred until Chipping is accepted.
+## Next patch after P12p evidence
+
+If the isolated rendered-fringe coordinate produces one coherent exterior Eligibility band and every Production pixel is black in `Foam Chip And Strand Probe`, continue from that route. If it still fails, stop derivative tuning and reassess the Layer E mask construction itself. P13 remains deferred until Chipping is accepted.
 
 P13 will choose the accepted quality/cell-size policy from P12 evidence, make any justified final tuning, rebuild/freeze the accepted caches, remove rejected temporary candidate guidance, and close the contiguous fixed-metric Stage 1 baseline.
 
@@ -477,3 +479,198 @@ This amendment changes only the internal cache representation. The route selecti
 - Existing debug identities are retained. Candidate shows raw analytical candidates; Eligibility shows route-specific permission; Production now reports actual Foam coverage removed; `Foam Chip And Strand Probe` remains the final mask authority. Candidate-Straddle Eligibility evaluates outside current support only in that debug view so cyan territory is truthful without production cost.
 - Exact approved scope is `15` modified and `4` created project files. No files were deleted, moved, or renamed. No scene, prefab, material, cache, layer, tag, shader target, render pass, or draw call changed.
 - Offline checks pass for delimiter/preprocessor balance, property/kernel/call-site contracts, `36`-argument selection signature parity, unique new GUIDs, guarded lattice indexing, exhaustive admission/hysteresis Boolean equivalence, default-current ownership, and protected Current application arithmetic. Unity compilation/import and GPU/visual evidence are unavailable here and remain pending.
+
+
+## RG-METRIC-P12o — Original Analytical Candidates with Boundary-Anchored Eligibility
+
+### P12o authorization and reviewed evidence
+
+- The user explicitly rejected P12n Candidate Straddle and authorized its replacement. The required relationship is exact and mode-visible: `original full-rate Candidate Field × selected Eligibility = Production`.
+- Unity screenshot evidence shows a P12n candidate acquiring permission at an exterior edge, moving into the Foam body, cutting a round interior hole, and disappearing when cached admission changes. This behavior follows directly from P12n candidate-level authorization and is not a tuning defect.
+- `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl::RiverWaterFoamEvaluateSelectionDiagnostics` still evaluates the accepted analytical Candidate geometry every rendered frame. The candidate loop, hashes, movement, lifecycle, rotation, pulse, view stabilization, irregular contour, and activation are protected and must remain identical between routes.
+- P12n adds candidate-level authority through `chipStraddleCandidates` and then sets experimental Production from that complete admitted candidate. That block is the rejected behavior and will be removed.
+- The current P12m `Rendered Edge Band` route remains a required fallback and A/B baseline. Its derivative-based Eligibility arithmetic and Presence-Amplitude any-support selection remain protected.
+- `StylizedRiverFoamRuntime.ChipAdmission.cs` and `CS_RiverFoam.ChipAdmission.hlsl` currently own the low-frequency experimental cache. They will be repurposed in place, without file/meta churn, to store and update boundary descriptors only. No low-frequency candidate field or candidate admission value will remain.
+- The experimental descriptor is one record per existing deterministic candidate identity: boundary anchor in River coordinates, inward normal angle, and tracking state. Compute may reproduce candidate identity and current centre only to search for a nearby boundary; it does not produce candidate shape, movement, or Production authority.
+- Boundary detection uses binary occupied/empty support samples and a local bracket plus binary search. It does not use `ddx`, `ddy`, `fwidth`, scalar-gradient normalization, a high-resolution river-wide field, or river-cell edge geometry.
+- The supplied source has no Git metadata. Pre-edit comparison uses the immutable reconstructed P12n workspace and captured hashes. The protected candidate-core snapshot SHA-256 is `d43d12194a12d56f182f97c3c7dff8a1813273ab2cae95fcd1968e439b34eb13`; the protected P12m branch snapshot SHA-256 is `8b6eb2db50ebba3968bb93a3ec3dd165bfc93556a75d60fa2a07e93298a6eb0e`.
+
+### P12o objective and acceptance criteria
+
+1. Remove Candidate Straddle as a behavior and option. Replace enum value `1` with `Boundary-Anchored Strip (Experimental)` while preserving serialized numeric compatibility.
+2. Preserve `Rendered Edge Band (Current)` as value `0`, default, fallback, and behaviorally unchanged route.
+3. Preserve the original render-frame analytical Candidate Field as the sole candidate implementation. Switching routes must not change Candidate geometry, position, movement, lifecycle, pulse, rotation, size, irregularity, activation, or debug output.
+4. Use the low-frequency cache only to acquire and track local Foam-boundary descriptors. A descriptor contains an anchor, inward normal, and state; it contains no candidate mask or candidate admission authority.
+5. Initial acquisition searches around the current analytical candidate centre for mixed binary Foam support, estimates the inward direction from occupied/empty topology, brackets one outside-to-inside transition, and refines the boundary anchor by four binary-search steps.
+6. After acquisition, tracking starts from the previous boundary anchor and normal, not from the moving candidate centre. A lost or discontinuous boundary locks the descriptor for the remainder of the current candidate lifecycle; it cannot reacquire another interior or unrelated edge until dormancy resets the state.
+7. The render shader reconstructs an analytical local strip from the descriptor. Eligibility is limited to the Foam side from approximately one antialias pixel outside through authored `Chip Edge Width` inward, and is tangentially bounded to the local candidate reach. The strip does not follow the candidate between cache refreshes.
+8. Experimental Production is the exact binary product of the original Candidate union and the experimental Eligibility union. No hidden admission, reach, secondary permission region, or candidate-level authorization is permitted.
+9. `Chip Candidate Field` must be route-identical. `Chip Eligibility Composite` must show the current derivative band for the current route and the actual boundary-anchored strip for the experimental route. `Production Chip Mask` must equal Candidate × selected Eligibility. `Foam Chip And Strand Probe` remains the authoritative final surviving Foam.
+10. The exact pre-Chip rendered mask remains the final removal target. Every selected Production pixel removes complete Foam; no partial attenuation or reconstruction after Chipping is introduced.
+11. Preserve Layer C, Film, Shape, sources, transport, fixed spacing `0.15 m`, existing candidate controls, scenes, prefabs, materials, cache assets, layers, tags, render-pass count, draw-call count, and unrelated River composition.
+12. Unity acceptance requires warning-free import; route-identical Candidate debug on the same paused frame; a narrow coherent experimental Eligibility strip; no travelling interior holes; exact Production intersection; black final-mask probe at every Production pixel; and unchanged current route.
+
+### P12o approved file scope
+
+Modify exactly:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+6. `Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+9. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs`
+10. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.ChipAdmission.cs`
+11. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs`
+12. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+13. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+14. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.ChipAdmission.hlsl`
+15. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+16. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+17. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+Create: none.
+
+Delete: none.
+
+Move/rename: none. The two P12n auxiliary source filenames and their existing `.meta` files are retained solely to avoid Unity asset churn; their implementation and symbols are replaced with boundary-eligibility ownership.
+
+### P12o implementation sequence
+
+1. Update this canonical plan before code.
+2. Replace authoring labels and serialized refresh ownership from Candidate Straddle to Boundary-Anchored Strip while preserving enum numeric value and serialized refresh data through `FormerlySerializedAs`.
+3. Repurpose the runtime cache from one scalar admission texture to one point-loaded `ARGBFloat` descriptor texture. Bind route mode, availability, origin, dimensions, and descriptor texture; disable and release it outside Presence-Amplitude experimental use.
+4. Replace the compute kernel with boundary acquisition/tracking. Keep deterministic candidate identity and centre reproduction only as a search origin. Remove candidate-perimeter admission, hysteresis authority, and complete-candidate caching.
+5. Replace the fragment-side admission load with descriptor decoding and analytical strip evaluation inside the existing candidate loop. Preserve the original Candidate accumulation unchanged; separately union experimental Eligibility strips; compute Presence-Amplitude experimental Production as exact binary Candidate × Eligibility.
+6. Update the existing four debug descriptions and canonical documents. Do not add a debug view.
+7. Run scope reconciliation, C#/HLSL contract checks, delimiter/preprocessor checks, protected candidate/current-route hash comparisons, deterministic descriptor state-machine models, package reproduction, and cross-subsystem shader-consumer audit.
+
+### P12o performance and memory budget
+
+- Active-gameplay fragment cost in the experimental route: one point descriptor load only for an active candidate whose analytical search cell is already being evaluated, plus descriptor decode, one dot product for inward depth, one tangent projection, and bounded strip comparisons. The original Candidate loop and Current route receive no added texture load.
+- Dirty-time compute: one candidate-record dispatch at the authored refresh rate, default `4 Hz`. Inactive/dormant and locked records exit before support sampling. Valid descriptors attempt a short previous-anchor track. Unacquired records use a fixed local stencil and at most four binary-search refinements.
+- Memory: one `ARGBFloat` descriptor texel per guarded candidate identity. For the P12n-reported `520 × 67` allocation, logical payload is `520 × 67 × 16 = 557,440 bytes`, approximately `544.4 KiB`. No second history texture is planned; prior descriptor state is read and overwritten in place by the same record thread.
+- No high-resolution topology texture, distance transform, extra render target, render pass, draw call, persistent Layer C field, or per-frame full-field rebuild.
+- GPU milliseconds remain unverified until Unity profiling. The experimental route is removable and the current route remains available if visual or measured cost is unacceptable.
+
+### P12o risks
+
+- The compute support evaluator is a camera-independent approximation of the no-Chip Layer E footprint; descriptor anchors may miss or lag screen-derived micro-boundaries. Unity debug comparison must decide whether the local topology is sufficiently aligned.
+- One local line cannot exactly represent a sharp corner or boundary curvature larger than the candidate-local tangent extent. The strip is intentionally bounded so approximation error cannot authorize a river-wide line.
+- A `4 Hz` descriptor update can visibly step if the Foam boundary itself moves quickly. This patch does not add descriptor interpolation; first establish geometric correctness and profile cost.
+- `ARGBFloat` random-write support is required. Unsupported allocation falls back to Rendered Edge Band with one warning.
+- In-place record read/write assumes one compute thread owns each unique texel. The dispatch/index proof is mandatory.
+
+### P12o performance amendment — acquisition early exit
+
+- Post-implementation cost review found that accumulating all eight perimeter samples into a topology gradient would force nine support evaluations for every living unacquired record and additional refinement work for mixed records. That is unnecessary for a local boundary bracket and is not retained.
+- The approved acquisition implementation instead samples the centre, then tests the existing eight ring directions in deterministic order and stops at the first occupied/empty disagreement. That first mixed direction supplies the initial outside-to-inside bracket; the four-step boundary refinement and local four-axis normal refinement remain unchanged.
+- Fully uniform inside/outside records still require at most centre plus eight ring checks, while boundary-near records can exit the ring search early. This preserves the same binary-topology requirement and removes the full eight-sample gradient accumulation.
+- This amendment changes only dirty-time acquisition work inside the already approved compute include. It does not change scope, serialized defaults, candidate generation, tracking-from-anchor behavior, render eligibility, debug contracts, or the current fallback route.
+
+### P12o descriptor-identity amendment — moving lattice origin
+
+- Post-implementation consistency review found that the candidate lattice origin advances as the analytical Candidate field translates downstream. Treating an origin change as global history invalidation would let all living candidates reacquire unrelated boundaries roughly whenever the moving lattice crossed one Candidate Spacing, violating the lock-until-dormancy contract.
+- The approved correction keeps one descriptor texture and indexes it as a circular cache by absolute candidate-cell identity modulo the current dimensions. The descriptor stores the absolute longitudinal cell coordinate as an exact float integer and packs the lateral cell coordinate, three-state ownership, and a 10-bit inward-normal angle into one exact 24-bit float integer. Compute and render both validate the decoded coordinates before using history or Eligibility.
+- The descriptor layout is therefore `XY = boundary anchor`, `Z = packed lateral identity/state/normal`, `W = exact longitudinal identity`. The representable contract is longitudinal `±16,000,000` candidate cells and lateral `-2048…2047`; the runtime falls back with one warning outside that range. The contiguous current candidate range maps bijectively into the texture for unchanged dimensions, so one thread still owns each write and origin movement does not remap a candidate identity to a different cache slot. Dimension changes still invalidate/recreate history.
+- This correction adds no texture, memory, dispatch, file, control, or render pass. It preserves the one-`ARGBFloat` budget while preventing origin-driven mid-lifecycle reacquisition.
+
+### P12o current status
+
+- Authorization: approved.
+- Read-only source review: complete.
+- Canonical plan: recorded before implementation.
+- Implementation: source-complete inside the approved `17` modified paths; no file or `.meta` was created, deleted, moved, or renamed.
+- Protected behavior: the original analytical Candidate core, `RiverWaterFoamApplyChipAndStrands`, and the Current Presence compatibility branch are byte-identical to P12m. The P12m Rendered Edge Band any-support product remains present and is still value `0`, source default, and fallback.
+- Offline audit: `41/41` source/model gates pass before packaging, including 36-argument caller parity, compute/property contracts, exact descriptor packing, circular-cache continuity, boundary acquisition, thin-ribbon tracking, strict strip depth, unique writes, and sole shared-include consumer review.
+- Analytical experimental cost at the previously observed `520 × 67` guarded lattice: `544.4 KiB` logical descriptor payload; approximately `704,135` support evaluations/second for the uniform-living model and a conservative all-living mixed ceiling of `1,486,507`/second at `4 Hz` before activation, locked-state, and other early exits. GPU milliseconds remain unmeasured.
+- Final changed-file archive reproduction: `17/17` entries extracted and reproduced byte-for-byte. The delivery archive is rebuilt from this finalized plan state and rechecked before delivery.
+- Unity 6000.5 import, visual A/B, and GPU timing: pending and must not be represented as passed.
+
+## RG-METRIC-P12p — Retire Experimental Cache and Isolate the Rendered Exterior Fringe
+
+### P12p authorization and reviewed evidence
+
+- The user explicitly approved removing the P12n/P12o low-frequency route and returning to one rendered-edge-band implementation.
+- Unity screenshots show P12o rectangular/local permission artifacts and no improvement to the primary surviving-fringe failure. The experimental cache is visually rejected.
+- `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl::RiverWaterFoamHardenSoftVisibility` constructs final hardened Foam as `max(hardVisible, fringe)`, where `hardVisible = smoothstep(0.22, 0.58, soft)` and `fringe = smoothstep(0.06, 0.34, soft) * 0.34`.
+- `RiverWaterFoamResolveChipEligibility` currently derives Presence-Amplitude inward distance from derivatives of the complete hardened `preChipRenderedMask`. That source contains both the exterior fringe rise and the inner hard-body rise.
+- `RiverWaterFoamApplyChipAndStrands` already removes selected Presence-Amplitude pixels completely from the exact pre-Chip rendered mask. `SH_CleanStylizedRiver.shader` passes `finalFoamMask` as the sole Foam-mask input to `RiverWaterResolveFoamComposition`; no later Foam-edge overlay exists in the supplied source.
+- The immutable P12m source is the accepted pre-experiment comparison baseline. P12p restores every P12n/P12o non-document path to that baseline before applying the isolated-fringe eligibility change. The supplied source contains no Git metadata.
+
+### P12p objective and acceptance criteria
+
+1. Delete the P12n/P12o low-frequency candidate/boundary cache, compute include, kernel, serialized mode, refresh control, runtime allocation/binding/update/release paths, shader properties, and experimental debug wording.
+2. Preserve the original full-rate analytical Candidate Field exactly. No candidate position, lifecycle, motion, pulse, rotation, irregularity, spacing, amount, search loop, or antialiasing change is permitted.
+3. Preserve Current Presence Footprint arithmetic exactly.
+4. Keep one Presence-Amplitude route: binary any-positive-support `Candidate × Rendered Eligibility`, followed by complete removal from the exact `preChipRenderedMask`.
+5. Derive Presence-Amplitude Eligibility from an isolated rendered exterior-fringe coordinate:
+   - `exactRenderedMask = saturate(preChipRenderedMask)`;
+   - `outerFringeMask = min(exactRenderedMask, 0.34)`;
+   - `outerEdgeCoordinate = saturate((outerFringeMask - 0.08) / (0.34 - 0.08))`;
+   - estimate inward pixels from the Euclidean screen derivative of `outerEdgeCoordinate`;
+   - retain the existing authored `Chip Edge Width` smooth band.
+6. Use exact rendered support only where `preChipRenderedMask` exceeds the existing visible start. Once the mask reaches the `0.34` fringe ceiling, the coordinate must remain flat so the inner hard-body rise cannot create another edge.
+7. Keep `Chip Candidate Field`, `Chip Eligibility Composite`, `Production Chip Mask`, and `Foam Chip And Strand Probe`; add no view.
+8. Unity acceptance requires zero C# and shader/compute errors or warnings, one coherent yellow exterior band without P12o rectangles, magenta Production equal to Candidate × Eligibility, and a black final-mask probe at every Production pixel including the pale exterior fringe.
+
+### P12p approved file scope
+
+Modify exactly:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+6. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+7. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Game/Procedural/Rivers/StylizedRiver.cs`
+9. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs`
+10. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs`
+11. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+12. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+13. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+14. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+15. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+Delete exactly:
+
+1. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.ChipAdmission.cs`
+2. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.ChipAdmission.cs.meta`
+3. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.ChipAdmission.hlsl`
+4. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.ChipAdmission.hlsl.meta`
+
+Create: none. Move/rename: none. Scene, prefab, material, cache, layer, and tag edits are prohibited.
+
+### P12p implementation sequence
+
+1. Record this plan before implementation.
+2. Restore all P12n/P12o implementation paths to the immutable P12m source and delete the four experiment-only files.
+3. Change only the Presence-Amplitude branch of `RiverWaterFoamResolveChipEligibility` to use the isolated rendered-fringe coordinate.
+4. Update the existing Inspector/debug wording and all five canonical documents to mark P12n/P12o rejected and P12p active.
+5. Audit exact scope, deleted references, kernel/property/resource counts, Current and Candidate byte identity, sole shared-include consumer, delimiters/preprocessor, formula boundary cases, and archive reproduction.
+
+### P12p performance and risk
+
+- Runtime compute improves relative to P12o because one kernel, one low-frequency full-cache dispatch, one descriptor texture, its allocation/release/binding work, and experimental fragment descriptor loads are removed.
+- Relative to P12m, the fragment route remains arithmetic-only with no new sample, loop, pass, buffer, texture, or dispatch. The Presence-Amplitude eligibility source adds a clamp and normalization around the existing derivative estimate.
+- Memory returns to the P12m baseline; the approximately `544.4 KiB` logical P12o descriptor payload and its driver allocation are removed.
+- Risk: clamping at `0.34` intentionally prevents eligibility from extending through the hard-body rise. The result may be shallower than desired, but it directly matches the requested narrow visible exterior band and remains controlled by `Chip Edge Width`.
+- Unity shader compilation, visual acceptance, and GPU timing remain pending.
+
+### P12p current status
+
+- Authorization: approved.
+- Read-only source review: complete.
+- Canonical plan: recorded before implementation.
+- Implementation: source-complete inside the approved `15` modified and `4` deleted paths; no file was created, moved, or renamed.
+- Experimental retirement: all P12n/P12o runtime, compute, shader-property, serialized-control, Inspector, and fragment-descriptor references are absent. The four experiment-only source/metadata files are deleted.
+- Protected behavior: `StylizedRiver.cs`, runtime binding/compute/lifecycle/resources, `CS_RiverFoam.compute`, and `SH_CleanStylizedRiver.shader` are byte-identical to P12m. The analytical Candidate evaluator, Current eligibility branch, pre-Chip mask resolver, and final full-removal function are byte-identical to P12m.
+- Offline validation: `97/97` scope, retirement-reference, protected-path, delimiter, preprocessor, Markdown, sole-consumer, formula, and hard-body-flatness checks pass.
+- Packaging: the changed-file archive contains the `15` replacement project files plus a deletion manifest and Windows deletion helper for the `4` retired paths. Applying the archive and manifest to the captured P12o source reproduces the final Assets tree byte-for-byte with zero mismatches; ZIP path safety passes.
+- Compiler availability: no C# compiler is installed. The available Clang HLSL frontend cannot run because its required `hlsl.h` resource header is missing. Unity 6000.5 import and shader compilation remain pending and must not be represented as passed.
+- Unity visual acceptance and GPU timing: pending.

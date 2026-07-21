@@ -46,8 +46,6 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("AdvanceFoamVisualOccupancy");
             evaluateShapeKernel = computeShader.FindKernel("EvaluateFoamShape");
             applyBoundaryKernel = computeShader.FindKernel("ApplyBoundary");
-            buildFoamChipStraddleAdmissionKernel =
-                computeShader.FindKernel("BuildFoamChipStraddleAdmission");
         }
 
         private void ConfigureGridDescriptorComputeParameters()

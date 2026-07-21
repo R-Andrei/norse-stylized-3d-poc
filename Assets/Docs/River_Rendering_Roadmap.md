@@ -1310,7 +1310,7 @@ Current remains unchanged. Presence-Amplitude uses the P12k exact pre-Chip rende
 P12l is visually rejected because its `0.5` contour thresholds discard positive Candidate and Eligibility support. P12m preserves P12k exact pre-Chip rendered-mask ownership and the existing complete-removal application, but selects Presence-Amplitude Candidate and Eligibility wherever their existing fields are greater than zero. Production is their exact binary product. Current remains unchanged. Inspector diagnostics now distinguish Presence-Amplitude binary masks from Current continuous fields, and `Foam Chip And Strand Probe` is identified as the authoritative final Foam mask. No control, property, resource, kernel, dispatch, cache, scene, prefab, material, serialized field, or Debug View identity is added or changed. Unity import and visual comparison remain pending.
 
 
-## Optional Candidate-Straddle Chipping A/B — `RG-METRIC-P12n` — source implemented
+## Optional Candidate-Straddle Chipping A/B — `RG-METRIC-P12n` — visually rejected
 
 P12m fixed the `0.5` antialias-support threshold but did not make the derivative Eligibility band produce coherent candidate-shaped bites in Unity. P12n retains P12m as `Rendered Edge Band (Current)` and adds `Candidate Straddle (Experimental)` for Presence-Amplitude.
 
@@ -1319,3 +1319,23 @@ The experimental route classifies deterministic candidates at low frequency usin
 Resource scope is one guarded point RFloat admission texture and one due-time kernel dispatch, default `4 Hz`. For the current approximate domain including guards, the analytical payload is approximately `136.1 KiB`; the conservative no-early-exit support ceiling is approximately `704,000` evaluations/second, while implemented centre rejection and early perimeter completion reduce actual work. GPU cost is unmeasured. No high-resolution field, distance transform, new render pass, draw call, scene, prefab, material, or shader-target increase is included.
 
 Status: offline source/contract validation passes. Unity 6000.5 import, same-frame debug comparison, Final visual verdict, and GPU timing are pending. If rejected, P12n can be removed without changing the preserved P12m route.
+
+
+## Original Candidate Field with Boundary-Anchored Eligibility — `RG-METRIC-P12o` — source implemented
+
+P12n is rejected because its low-frequency candidate-level admission can travel into Foam and carve detached interior holes. P12o keeps the original render-frame analytical Candidate Field as the only candidate route and repurposes the experimental cache strictly for local boundary Eligibility.
+
+The current P12m Rendered Edge Band remains value `0`, default, fallback, and unchanged. Experimental value `1` stores a River-space boundary anchor plus exact candidate identity, tracking state, and a quantized inward normal in one ARGBFloat record. Initial acquisition stops at the first centre/ring occupied-empty disagreement and refines that bracket. Continuing updates track from the prior anchor rather than from the moving candidate and sample intermediate positions so thin ribbons are not skipped. Lost or discontinuous tracking locks until dormancy.
+
+The River fragment shader reconstructs a tangentially bounded inward strip and computes exact binary original Candidate × selected Eligibility. Debug Candidate is route-identical, Eligibility shows the actual selected route, Production shows their product, and the final-mask probe remains authoritative.
+
+Logical experimental memory at the prior `520 × 67` guarded lattice is approximately `544.4 KiB` for one ARGBFloat descriptor texture. Absolute candidate identities use a circular modulo cache, preserving valid/locked history as the analytical lattice origin moves downstream. Default update cadence remains `4 Hz`; Current and fallback perform no descriptor load. No high-resolution edge texture, distance transform, render pass, draw call, scene, prefab, material, or fixed-grid change is included. Source implementation and `41/41` pre-package offline gates pass; Unity import, visual verdict, and GPU timing remain pending.
+
+## Rendered exterior-fringe Chipping — `RG-METRIC-P12p` — source implemented
+
+P12n Candidate Straddle and P12o Boundary-Anchored Eligibility are visually rejected and removed. Their low-frequency cache, compute kernel/include, descriptor texture, serialized route controls, runtime update path, and shader integration no longer exist.
+
+The original full-rate analytical Candidate Field is again the only candidate system. Presence-Amplitude retains exact binary any-support Candidate × Eligibility and complete removal from the exact pre-Chip rendered mask. The sole change is that Eligibility now estimates distance from the isolated rendered exterior-fringe coordinate (`0.08…0.34`) rather than the complete hardened mask. The coordinate saturates at the fringe ceiling so the inner hard-body rise cannot create a second contour.
+
+Current Presence Footprint is unchanged. No new texture, buffer, kernel, dispatch, cache, render pass, scene, prefab, material, or serialized control is introduced. Offline validation and Unity visual acceptance remain pending.
+

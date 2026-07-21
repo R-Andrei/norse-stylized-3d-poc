@@ -17,7 +17,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
     /// </summary>
     internal static class GeneratedMassRiverRockProjectionBaker
     {
-        internal const int AlgorithmVersion = 4;
+        internal const int AlgorithmVersion = 8;
         internal const int Resolution = 1536;
         internal const int CatalogColumns = 5;
         internal const int CatalogRows = 4;
@@ -37,8 +37,17 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private const float StrongNormalStrength = 6.2f;
         private const float MildNormalStrength = 7.2f;
         private const float MildNormalBlend = 0.22f;
-        private const float RawExposureContribution = 0.12f;
         private const int WearSilhouetteExclusionRadius = 3;
+        private const int RawGeometryFingerprintVersion = 4;
+        private const float RootAffectedThreshold = 0.08f;
+        private const int WearNormalizationBinCount = 64;
+        private const float WearNormalizationPercentile = 0.90f;
+        private const float MinimumWearNormalizationSignal = 0.055f;
+        private const float UnifiedWearTargetPercentile = 0.52f;
+        private const float FallbackWearTargetPercentile = 0.56f;
+
+        private static readonly Vector3 DiagnosticLightDirection =
+            new Vector3(-0.72f, 0.26f, 0.64f).normalized;
 
         private static readonly float[] BurialComparisonFractions =
         {
@@ -51,6 +60,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private static readonly string[] BurialComparisonSourceIds =
         {
             "S-12", "S-14", "T-13", "T-15"
+        };
+
+        private static readonly string[] ResponseCloseupSourceIds =
+        {
+            "S-12", "S-13", "S-14", "T-05", "T-13", "T-15"
         };
 
         private static readonly Dictionary<char, string[]> BitmapFont =
@@ -90,9 +104,31 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal float MeanCrevice;
             internal float MeanEdgeWear;
             internal float SilhouetteAspect;
+            internal int RootContactPixels;
+            internal float RootPerimeterAffectedFraction;
             internal bool UsedFallbackMesh;
             internal string FallbackReason;
             internal string Fingerprint;
+        }
+
+        internal sealed class FrozenSourceDefinition
+        {
+            internal int Index;
+            internal string StableId;
+            internal MassArchetype Archetype;
+            internal int ShapeSeed;
+            internal int SurfaceSeed;
+            internal float DefaultBurialFraction;
+            internal float CatalogRotationDegrees;
+            internal string AcceptedRawFingerprint;
+        }
+
+        internal sealed class GeneratedFrozenSource
+        {
+            internal FrozenSourceDefinition Definition;
+            internal MeshData Mesh;
+            internal bool UsedFallbackMesh;
+            internal string FallbackReason;
         }
 
         internal sealed class ProjectionResult
@@ -100,6 +136,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal readonly List<RockEvidence> Rocks =
                 new List<RockEvidence>();
             internal readonly List<string> BurialSourceIds =
+                new List<string>();
+            internal readonly List<string> ResponseCloseupSourceIds =
                 new List<string>();
             internal Color32[] Raw;
             internal Color32[] Neutral;
@@ -113,13 +151,18 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal Color32[] Variation;
             internal Color32[] ProcessedVariation;
             internal Color32[] Exposure;
-            internal Color32[] ProcessedExposure;
+            internal Color32[] UpwardExposure;
+            internal Color32[] DirectionalLightResponse;
             internal Color32[] Crevice;
             internal Color32[] ProcessedCrevice;
             internal Color32[] EdgeWear;
             internal Color32[] ProcessedEdgeWear;
+            internal Color32[] ResponseCloseups;
             internal Color32[] BurialComparison;
+            internal int ResponseCloseupCellCount;
             internal int BurialComparisonCellCount;
+            internal readonly List<BurialFrameEvidence> BurialFrames =
+                new List<BurialFrameEvidence>();
             internal int TotalVertices;
             internal int TotalTriangles;
             internal int FallbackCount;
@@ -187,6 +230,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal readonly float[] Mask;
             internal readonly float[] Variation;
             internal readonly float[] Exposure;
+            internal readonly float[] DirectionalLightResponse;
             internal readonly float[] Crevice;
             internal readonly float[] EdgeWear;
             internal readonly Vector3[] Normals;
@@ -201,6 +245,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 Mask = new float[pixelCount];
                 Variation = new float[pixelCount];
                 Exposure = new float[pixelCount];
+                DirectionalLightResponse = new float[pixelCount];
                 Crevice = new float[pixelCount];
                 EdgeWear = new float[pixelCount];
                 Normals = new Vector3[pixelCount];
@@ -212,6 +257,28 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     RockIndex[index] = -1;
                 }
             }
+        }
+
+        internal sealed class BurialFrameEvidence
+        {
+            internal string StableId;
+            internal float WorldCenterX;
+            internal float WorldCenterZ;
+            internal float MinimumY;
+            internal float MaximumY;
+            internal float Scale;
+            internal int DepthCount;
+            internal string Fingerprint;
+        }
+
+        private sealed class FixedProjectionFrame
+        {
+            internal float WorldCenterX;
+            internal float WorldCenterZ;
+            internal float MinimumY;
+            internal float MaximumY;
+            internal float FullHeight;
+            internal float Scale;
         }
 
         private sealed class GeneratedRock
@@ -266,6 +333,182 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             new FrozenRockContract { StableId = "S-14", Archetype = MassArchetype.SquatBoulder, ShapeSeed = 6311, SurfaceSeed = 6588, BurialFraction = 0.234f, RotationDegrees = 35f }
         };
 
+        private static readonly string[] AcceptedAssemblyRawFingerprints =
+        {
+            "4e48dac913b980279ad9de1f600101f913a21c029b152b7bbe57b193b2cd1a60",
+            "78fcf374d475208ea4c32e65ccfbf6a1fb317df9d088c4106d9d705f1ac6a402",
+            "635996ff3a4c8b4b7f2703ad41707d83be761e203d377403d246ebdc517cf072",
+            "65b5a839947217e0184b9354b4015880f5e300a067ccc6107d8d3ecfb5b461c4",
+            "6a3eb4a4cc1c0965bfe8c7916de93bfab2d05476fd580a2282cae4395bc5df9a",
+            "ee826776a0d9b728c4ebc021743d93d5769bdd25cc5ab345b7c2e5ed5b64975e",
+            "cf6493580bdc3452fe642392a3d5981866ad6020adb6b97293b087b72fc1c08e",
+            "bd9b4c4ec13b90db6fb40b5c4d1c34adb07156053b2797e64212dc229b91450e",
+            "66062ce43d3d8873dd63b843e291df104d67e58ba3f6c45df8cf997d78385d51",
+            "79957201bb069bb0505b16d6a28b4731b4c53778189837b69b48c029293fcd25",
+            "b5a3742996a9bfe2e1ad9d862df2e292931556cea48ae300cfae054d18c6e7ed",
+            "03d9c266f760d442a1a48a6704aba1236bbedf6ddc11fef324e6f4c0a37dd3d9",
+            "973ac749ec7055a97e77c4393caff69cd8395a704b74874a6219ccca062ef1f5",
+            "8c75d7c749c0ec2e77c13c07e0963452fc051732badcf833acfd994c7437d9ba",
+            "026ee59f376e35bebed969c9752369ba8ad7a86503a5ac379642790abdbe8329",
+            "b2dd65fa09df4f79bb0d1cf58151cb2eb5563362b3e1af75cc32e9bf328d2b50",
+            "e2e076156b9b932fdd4d18d00278ab944b66f5a4004c7bada5f7155f86f5e63b",
+            "bc5876c956883478f69762728b690c43dbcc72b141d5845905a30b29e8a85f6d"
+        };
+
+        internal static IReadOnlyList<FrozenSourceDefinition>
+            GetFrozenSourceDefinitions()
+        {
+            if (FrozenLibrary.Length != AcceptedAssemblyRawFingerprints.Length)
+            {
+                throw new InvalidOperationException(
+                    "Frozen source and accepted fingerprint counts differ.");
+            }
+
+            List<FrozenSourceDefinition> definitions =
+                new List<FrozenSourceDefinition>(FrozenLibrary.Length);
+            for (int index = 0; index < FrozenLibrary.Length; index++)
+            {
+                FrozenRockContract source = FrozenLibrary[index];
+                definitions.Add(new FrozenSourceDefinition
+                {
+                    Index = index,
+                    StableId = source.StableId,
+                    Archetype = source.Archetype,
+                    ShapeSeed = source.ShapeSeed,
+                    SurfaceSeed = source.SurfaceSeed,
+                    DefaultBurialFraction = source.BurialFraction,
+                    CatalogRotationDegrees = source.RotationDegrees,
+                    AcceptedRawFingerprint =
+                        AcceptedAssemblyRawFingerprints[index]
+                });
+            }
+
+            return definitions;
+        }
+
+        internal static IReadOnlyDictionary<string, string>
+            BuildCurrentRawFingerprintSnapshot()
+        {
+            ProjectionResult result = Build();
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    "Frozen source snapshot build failed: " +
+                    result.Failure);
+            }
+
+            Dictionary<string, string> snapshot =
+                new Dictionary<string, string>(StringComparer.Ordinal);
+            for (int index = 0; index < result.Rocks.Count; index++)
+            {
+                RockEvidence rock = result.Rocks[index];
+                snapshot.Add(
+                    rock.StableId,
+                    rock.Fingerprint ?? string.Empty);
+            }
+
+            return snapshot;
+        }
+
+        internal static GeneratedFrozenSource GenerateFrozenSource(
+            string stableId)
+        {
+            List<RockDefinition> definitions = BuildRockDefinitions();
+            RockDefinition definition = FindDefinition(definitions, stableId);
+            GeneratedRock generated = GenerateRock(definition);
+            FrozenSourceDefinition exposed = null;
+            IReadOnlyList<FrozenSourceDefinition> sources =
+                GetFrozenSourceDefinitions();
+            for (int index = 0; index < sources.Count; index++)
+            {
+                if (string.Equals(
+                        sources[index].StableId,
+                        stableId,
+                        StringComparison.Ordinal))
+                {
+                    exposed = sources[index];
+                    break;
+                }
+            }
+
+            if (exposed == null)
+            {
+                throw new InvalidOperationException(
+                    "Frozen source is absent: " + stableId + ".");
+            }
+
+            return new GeneratedFrozenSource
+            {
+                Definition = exposed,
+                Mesh = generated.Mesh,
+                UsedFallbackMesh = generated.UsedFallback,
+                FallbackReason = generated.FallbackReason
+            };
+        }
+
+        internal static Vector3 FrozenDiagnosticLightDirection =>
+            DiagnosticLightDirection;
+
+        internal static float FrozenUnifiedWearTargetPercentile =>
+            UnifiedWearTargetPercentile;
+
+        internal static float FrozenFallbackWearTargetPercentile =>
+            FallbackWearTargetPercentile;
+
+        internal static Color EvaluateFrozenModerateMaterial(
+            float height,
+            float variation,
+            float upwardExposure,
+            float directionalLightResponse,
+            float rootDarkening,
+            float edgeWear)
+        {
+            const float minimumLighting = 0.44f;
+            const float maximumLighting = 1.24f;
+            const float contrastLow = 0.27f;
+            const float contrastHigh = 0.73f;
+            const float variationStrength = 0.19f;
+            const float upwardStrength = 0.07f;
+            const float wearSupportStrength = 0.13f;
+            const float wearCoreStrength = 0.075f;
+            const float rootStrength = 0.78f;
+            Color rockDark = new Color(0.14f, 0.15f, 0.14f, 1f);
+            Color rockLight = new Color(0.64f, 0.62f, 0.56f, 1f);
+            Color wearColor = new Color(0.68f, 0.66f, 0.60f, 1f);
+            Color rootColor = new Color(0.055f, 0.050f, 0.041f, 1f);
+
+            float contrastLight = SmoothStep(
+                contrastLow,
+                contrastHigh,
+                directionalLightResponse);
+            float lighting = Mathf.Lerp(
+                minimumLighting,
+                maximumLighting,
+                contrastLight);
+            float materialValue = Mathf.Clamp(
+                0.34f +
+                height * 0.14f +
+                (variation - 0.5f) * variationStrength +
+                (upwardExposure - 0.5f) * upwardStrength,
+                0.16f,
+                0.72f);
+            Color color = Color.Lerp(
+                rockDark,
+                rockLight,
+                materialValue) * lighting;
+            float wearSupport = SmoothStep(0.06f, 0.52f, edgeWear);
+            float wearCore = SmoothStep(0.48f, 0.84f, edgeWear);
+            float wear = Mathf.Clamp01(
+                wearSupport * wearSupportStrength +
+                wearCore * wearCoreStrength);
+            color = Color.Lerp(color, wearColor, wear);
+            color = Color.Lerp(
+                color,
+                rootColor,
+                Mathf.Clamp01(rootDarkening * rootStrength));
+            return color;
+        }
+
         internal static ProjectionResult Build()
         {
             ProjectionResult result = new ProjectionResult();
@@ -310,8 +553,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     CatalogRows);
                 BuildCatalogImages(catalog, processed, result);
                 ApplyCatalogLabels(result);
+                result.ResponseCloseups = BuildResponseCloseups(
+                    result.ResponseCloseupSourceIds,
+                    out int responseCloseupCellCount);
+                result.ResponseCloseupCellCount = responseCloseupCellCount;
                 result.BurialComparison = BuildBurialComparison(
                     result.BurialSourceIds,
+                    result.BurialFrames,
                     out int burialCellCount);
                 result.BurialComparisonCellCount = burialCellCount;
                 result.Fingerprint = CalculateFingerprint(result);
@@ -537,8 +785,30 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 cell.width,
                 Mathf.Max(4, cell.height - labelStripHeight));
 
+            RockEvidence evidence = CreateRockEvidence(generated);
+
+            RasterizeMesh(
+                generated.Mesh,
+                buffers,
+                resolution,
+                projectionCell,
+                definition.BurialFraction,
+                definition.RotationDegrees,
+                evidence);
+            evidence.Fingerprint = CalculateRockFingerprint(
+                evidence,
+                buffers,
+                resolution,
+                projectionCell);
+            return evidence;
+        }
+
+        private static RockEvidence CreateRockEvidence(
+            GeneratedRock generated)
+        {
+            RockDefinition definition = generated.Definition;
             ProfileDefinition profile = definition.Profile;
-            RockEvidence evidence = new RockEvidence
+            return new RockEvidence
             {
                 Index = definition.Index,
                 StableId = definition.StableId,
@@ -567,21 +837,6 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 UsedFallbackMesh = generated.UsedFallback,
                 FallbackReason = generated.FallbackReason
             };
-
-            RasterizeMesh(
-                generated.Mesh,
-                buffers,
-                resolution,
-                projectionCell,
-                definition.BurialFraction,
-                definition.RotationDegrees,
-                evidence);
-            evidence.Fingerprint = CalculateRockFingerprint(
-                evidence,
-                buffers,
-                resolution,
-                projectionCell);
-            return evidence;
         }
 
         private static void RasterizeMesh(
@@ -955,6 +1210,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 mildHeight,
                 raw.Mask,
                 MildNormalStrength);
+            float[] rootSeeds = new float[raw.Mask.Length];
 
             for (int y = 0; y < Resolution; y++)
             {
@@ -964,6 +1220,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     if (raw.Mask[index] <= 0.5f)
                     {
                         processed.Normals[index] = Vector3.up;
+                        processed.Exposure[index] = 0f;
+                        processed.DirectionalLightResponse[index] = 0.5f;
                         continue;
                     }
 
@@ -980,15 +1238,18 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         rockIndex,
                         columns,
                         rows);
-                    float normalExposure = SmoothStep(
-                        0.20f,
-                        0.96f,
+
+                    float upward = SmoothStep(
+                        0.18f,
+                        0.98f,
                         processed.Normals[index].y);
-                    processed.Exposure[index] = Mathf.Lerp(
-                        normalExposure,
-                        raw.Exposure[index],
-                        RawExposureContribution);
-                    processed.Crevice[index] = BuildSelectiveRootDarkening(
+                    processed.Exposure[index] = Mathf.Clamp01(
+                        0.12f + upward * 0.72f);
+                    processed.DirectionalLightResponse[index] = Mathf.Clamp01(
+                        Vector3.Dot(
+                            processed.Normals[index],
+                            DiagnosticLightDirection) * 0.5f + 0.5f);
+                    rootSeeds[index] = BuildRootContactSeed(
                         raw,
                         processed,
                         rock,
@@ -1001,12 +1262,21 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 }
             }
 
+            float[] expandedRoot = ExpandRootContactSectors(
+                rootSeeds,
+                raw,
+                rocks);
+            Array.Copy(
+                expandedRoot,
+                processed.Crevice,
+                expandedRoot.Length);
             BuildProcessedEdgeWear(
                 raw,
                 processed,
                 rocks,
                 columns,
                 rows);
+            MeasureProcessedEvidence(raw, processed, rocks);
             return processed;
         }
 
@@ -1065,7 +1335,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 grain * 0.018f);
         }
 
-        private static float BuildSelectiveRootDarkening(
+        private static float BuildRootContactSeed(
             CatalogBuffers raw,
             CatalogBuffers processed,
             RockEvidence rock,
@@ -1093,37 +1363,218 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             float angle = Mathf.Atan2(localY, localX);
             int seed = rock.SurfaceSeed;
             float contactAngle = Hash01(seed * 43 + 503) * Mathf.PI * 2f;
-            Vector2 contactDirection = new Vector2(
+            Vector2 radial = new Vector2(localX, localY).normalized;
+            Vector2 primaryDirection = new Vector2(
                 Mathf.Cos(contactAngle),
                 Mathf.Sin(contactAngle));
-            Vector2 radial = new Vector2(localX, localY).normalized;
-            float sector = SmoothStep(
-                -0.05f,
-                0.68f,
-                Vector2.Dot(radial, contactDirection));
-            float wave = 0.5f + 0.5f * Mathf.Sin(
-                angle * 3f +
-                Hash01(seed * 59 + 601) * Mathf.PI * 2f +
-                Mathf.Sin(angle * 2f + contactAngle) * 0.55f);
-            float brokenContact = SmoothStep(0.48f, 0.72f, wave);
-            float lowHeight = SmoothStep(
-                0.30f,
-                0.035f,
-                processed.Height[index]);
-            float sideFacing = SmoothStep(
-                0.04f,
-                0.58f,
-                1f - processed.Normals[index].y);
-            float rawSupport = Mathf.Lerp(
+            float primarySector = SmoothStep(
+                0.16f,
                 0.78f,
+                Vector2.Dot(radial, primaryDirection));
+
+            float secondaryAngle = contactAngle + Mathf.Lerp(
+                1.65f,
+                2.45f,
+                Hash01(seed * 47 + 557));
+            Vector2 secondaryDirection = new Vector2(
+                Mathf.Cos(secondaryAngle),
+                Mathf.Sin(secondaryAngle));
+            float secondarySector = SmoothStep(
+                0.38f,
+                0.86f,
+                Vector2.Dot(radial, secondaryDirection)) *
+                Mathf.Lerp(
+                    0.18f,
+                    0.52f,
+                    Hash01(seed * 61 + 617));
+            float sector = Mathf.Max(primarySector, secondarySector);
+
+            float breakupPhase = Hash01(seed * 59 + 601) * Mathf.PI * 2f;
+            float broadBreakup = 0.5f + 0.5f * Mathf.Sin(
+                angle * 2f + breakupPhase +
+                Mathf.Sin(angle * 3f + contactAngle) * 0.42f);
+            float brokenContact = SmoothStep(0.42f, 0.70f, broadBreakup);
+            float lowHeight = SmoothStep(
+                0.48f,
+                0.025f,
+                processed.Height[index]);
+            float sideResponse = SmoothStep(
+                0.03f,
+                0.45f,
+                1f - processed.Normals[index].y);
+            float sideFacing = Mathf.Lerp(0.50f, 1f, sideResponse);
+            float sourceSupport = Mathf.Lerp(
+                0.82f,
                 1f,
                 Mathf.Clamp01(raw.Crevice[index]));
+            float burialStrength = Mathf.Lerp(
+                0.88f,
+                1.08f,
+                Mathf.InverseLerp(0.18f, 0.28f, rock.BurialFraction));
             return Mathf.Clamp01(
                 lowHeight *
                 sideFacing *
                 sector *
-                Mathf.Lerp(0.30f, 1f, brokenContact) *
-                rawSupport);
+                Mathf.Lerp(0.52f, 1f, brokenContact) *
+                sourceSupport *
+                burialStrength);
+        }
+
+        private static float[] ExpandRootContactSectors(
+            float[] seeds,
+            CatalogBuffers raw,
+            IReadOnlyList<RockEvidence> rocks)
+        {
+            float[] current = (float[])seeds.Clone();
+            float[] next = new float[current.Length];
+            const int maximumRadius = 7;
+            for (int pass = 1; pass <= maximumRadius; pass++)
+            {
+                Array.Copy(current, next, current.Length);
+                for (int y = 1; y < Resolution - 1; y++)
+                {
+                    for (int x = 1; x < Resolution - 1; x++)
+                    {
+                        int index = y * Resolution + x;
+                        int rockIndex = raw.RockIndex[index];
+                        if (raw.Mask[index] <= 0.5f || rockIndex < 0)
+                        {
+                            continue;
+                        }
+
+                        RockEvidence rock = ResolveRockEvidence(
+                            rocks,
+                            rockIndex);
+                        if (pass > ResolveRootExpansionRadius(rock))
+                        {
+                            continue;
+                        }
+
+                        float neighbour = 0f;
+                        for (int offsetY = -1; offsetY <= 1; offsetY++)
+                        {
+                            for (int offsetX = -1; offsetX <= 1; offsetX++)
+                            {
+                                if (offsetX == 0 && offsetY == 0)
+                                {
+                                    continue;
+                                }
+
+                                int sample = (y + offsetY) * Resolution +
+                                    x + offsetX;
+                                if (raw.RockIndex[sample] != rockIndex ||
+                                    raw.Mask[sample] <= 0.5f)
+                                {
+                                    continue;
+                                }
+
+                                float diagonal = offsetX != 0 && offsetY != 0
+                                    ? 0.90f
+                                    : 1f;
+                                neighbour = Mathf.Max(
+                                    neighbour,
+                                    current[sample] * diagonal);
+                            }
+                        }
+
+                        float propagated = neighbour * 0.86f;
+                        if (propagated > next[index])
+                        {
+                            next[index] = propagated;
+                        }
+                    }
+                }
+
+                float[] swap = current;
+                current = next;
+                next = swap;
+            }
+
+            for (int index = 0; index < current.Length; index++)
+            {
+                if (raw.Mask[index] <= 0.5f)
+                {
+                    current[index] = 0f;
+                    continue;
+                }
+
+                current[index] = SmoothStep(0.025f, 0.72f, current[index]);
+            }
+
+            return current;
+        }
+
+        private static int ResolveRootExpansionRadius(RockEvidence rock)
+        {
+            return 3 + Mathf.FloorToInt(
+                Hash01(rock.SurfaceSeed * 67 + 661) * 4.999f);
+        }
+
+        private static void MeasureProcessedEvidence(
+            CatalogBuffers raw,
+            CatalogBuffers processed,
+            IReadOnlyList<RockEvidence> rocks)
+        {
+            int[] contactPixels = new int[rocks.Count];
+            int[] perimeterPixels = new int[rocks.Count];
+            int[] affectedPerimeter = new int[rocks.Count];
+            for (int y = 1; y < Resolution - 1; y++)
+            {
+                for (int x = 1; x < Resolution - 1; x++)
+                {
+                    int index = y * Resolution + x;
+                    int rockIndex = raw.RockIndex[index];
+                    if (raw.Mask[index] <= 0.5f ||
+                        rockIndex < 0 ||
+                        rockIndex >= rocks.Count)
+                    {
+                        continue;
+                    }
+
+                    if (processed.Crevice[index] > RootAffectedThreshold)
+                    {
+                        contactPixels[rockIndex]++;
+                    }
+
+                    if (!IsMaskPerimeterPixel(raw.Mask, x, y))
+                    {
+                        continue;
+                    }
+
+                    perimeterPixels[rockIndex]++;
+                    if (processed.Crevice[index] > RootAffectedThreshold)
+                    {
+                        affectedPerimeter[rockIndex]++;
+                    }
+                }
+            }
+
+            for (int index = 0; index < rocks.Count; index++)
+            {
+                RockEvidence rock = rocks[index];
+                rock.RootContactPixels = contactPixels[index];
+                rock.RootPerimeterAffectedFraction = perimeterPixels[index] > 0
+                    ? affectedPerimeter[index] /
+                        (float)perimeterPixels[index]
+                    : 0f;
+            }
+        }
+
+        private static bool IsMaskPerimeterPixel(
+            float[] mask,
+            int x,
+            int y)
+        {
+            int index = y * Resolution + x;
+            if (mask[index] <= 0.5f)
+            {
+                return false;
+            }
+
+            return mask[index - 1] <= 0.5f ||
+                mask[index + 1] <= 0.5f ||
+                mask[index - Resolution] <= 0.5f ||
+                mask[index + Resolution] <= 0.5f;
         }
 
         private static void ResolveLocalRockCoordinates(
@@ -1355,29 +1806,204 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         rows,
                         out float localX,
                         out float localY);
-                    float breakup = 0.5f + 0.5f * Mathf.Sin(
+                    float phase = Hash01(
+                        rock.SurfaceSeed * 83 + 709) * Mathf.PI * 2f;
+                    float breakupA = 0.5f + 0.5f * Mathf.Sin(
                         (localX * 4.7f + localY * 3.9f) * Mathf.PI +
-                        Hash01(rock.SurfaceSeed * 83 + 709) *
-                        Mathf.PI * 2f);
+                        phase);
+                    float breakupB = 0.5f + 0.5f * Mathf.Sin(
+                        (localX * 8.3f - localY * 5.1f) * Mathf.PI +
+                        phase * 0.73f + 1.17f);
+                    float breakup = Mathf.Lerp(
+                        breakupA,
+                        breakupB,
+                        0.38f);
                     float intermittent = Mathf.Lerp(
-                        0.35f,
+                        0.12f,
                         1f,
-                        SmoothStep(0.32f, 0.72f, breakup));
+                        SmoothStep(0.40f, 0.76f, breakup));
                     float heightSupport = SmoothStep(
                         0.12f,
                         0.30f,
                         processed.Height[index]);
                     float nativeWear = Mathf.Pow(
                         Mathf.Clamp01(raw.EdgeWear[index]),
-                        0.78f) * 0.88f;
+                        0.84f) * 0.60f;
                     float fallbackWear = Mathf.Max(
                         convex,
-                        normalBreak) * 0.46f;
+                        normalBreak) * 0.62f;
                     processed.EdgeWear[index] = Mathf.Clamp01(
                         Mathf.Max(nativeWear, fallbackWear) *
                         intermittent *
                         heightSupport);
                 }
+            }
+
+            DilateInteriorWear(raw, processed, rocks);
+            NormalizeProcessedEdgeWear(raw, processed, rocks);
+        }
+
+        private static void DilateInteriorWear(
+            CatalogBuffers raw,
+            CatalogBuffers processed,
+            IReadOnlyList<RockEvidence> rocks)
+        {
+            float[] current = (float[])processed.EdgeWear.Clone();
+            float[] next = new float[current.Length];
+            const int maximumRadius = 2;
+            for (int pass = 1; pass <= maximumRadius; pass++)
+            {
+                Array.Copy(current, next, current.Length);
+                for (int y = WearSilhouetteExclusionRadius;
+                     y < Resolution - WearSilhouetteExclusionRadius;
+                     y++)
+                {
+                    for (int x = WearSilhouetteExclusionRadius;
+                         x < Resolution - WearSilhouetteExclusionRadius;
+                         x++)
+                    {
+                        int index = y * Resolution + x;
+                        int rockIndex = raw.RockIndex[index];
+                        if (raw.Mask[index] <= 0.5f ||
+                            rockIndex < 0 ||
+                            !IsInteriorAtRadius(
+                                raw.Mask,
+                                x,
+                                y,
+                                WearSilhouetteExclusionRadius))
+                        {
+                            continue;
+                        }
+
+                        RockEvidence rock = ResolveRockEvidence(
+                            rocks,
+                            rockIndex);
+                        int radius = 1 + Mathf.FloorToInt(
+                            Hash01(rock.SurfaceSeed * 89 + 733) * 1.999f);
+                        if (pass > radius)
+                        {
+                            continue;
+                        }
+
+                        float strongest = 0f;
+                        for (int offsetY = -1; offsetY <= 1; offsetY++)
+                        {
+                            for (int offsetX = -1; offsetX <= 1; offsetX++)
+                            {
+                                if (offsetX == 0 && offsetY == 0)
+                                {
+                                    continue;
+                                }
+
+                                int sample = (y + offsetY) * Resolution +
+                                    x + offsetX;
+                                if (raw.RockIndex[sample] != rockIndex)
+                                {
+                                    continue;
+                                }
+
+                                strongest = Mathf.Max(
+                                    strongest,
+                                    current[sample]);
+                            }
+                        }
+
+                        if (strongest > 0.16f)
+                        {
+                            next[index] = Mathf.Max(
+                                next[index],
+                                strongest * 0.82f);
+                        }
+                    }
+                }
+
+                float[] swap = current;
+                current = next;
+                next = swap;
+            }
+
+            Array.Copy(current, processed.EdgeWear, current.Length);
+        }
+
+        private static void NormalizeProcessedEdgeWear(
+            CatalogBuffers raw,
+            CatalogBuffers processed,
+            IReadOnlyList<RockEvidence> rocks)
+        {
+            int rockCount = rocks.Count;
+            int[,] histograms = new int[rockCount, WearNormalizationBinCount];
+            int[] sampleCounts = new int[rockCount];
+            for (int index = 0; index < processed.EdgeWear.Length; index++)
+            {
+                int rockIndex = raw.RockIndex[index];
+                float value = processed.EdgeWear[index];
+                if (rockIndex < 0 ||
+                    rockIndex >= rockCount ||
+                    raw.Mask[index] <= 0.5f ||
+                    value <= 0.0001f)
+                {
+                    continue;
+                }
+
+                int bin = Mathf.Clamp(
+                    Mathf.FloorToInt(value * WearNormalizationBinCount),
+                    0,
+                    WearNormalizationBinCount - 1);
+                histograms[rockIndex, bin]++;
+                sampleCounts[rockIndex]++;
+            }
+
+            float[] gains = new float[rockCount];
+            for (int rockIndex = 0; rockIndex < rockCount; rockIndex++)
+            {
+                gains[rockIndex] = 1f;
+                int sampleCount = sampleCounts[rockIndex];
+                if (sampleCount <= 0)
+                {
+                    continue;
+                }
+
+                int targetSample = Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(sampleCount * WearNormalizationPercentile));
+                int accumulated = 0;
+                int percentileBin = 0;
+                for (int bin = 0; bin < WearNormalizationBinCount; bin++)
+                {
+                    accumulated += histograms[rockIndex, bin];
+                    if (accumulated >= targetSample)
+                    {
+                        percentileBin = bin;
+                        break;
+                    }
+                }
+
+                float percentileValue = (percentileBin + 0.5f) /
+                    WearNormalizationBinCount;
+                if (percentileValue < MinimumWearNormalizationSignal)
+                {
+                    continue;
+                }
+
+                float target = rocks[rockIndex].UsedFallbackMesh
+                    ? FallbackWearTargetPercentile
+                    : UnifiedWearTargetPercentile;
+                gains[rockIndex] = Mathf.Clamp(
+                    target / percentileValue,
+                    0.55f,
+                    2.60f);
+            }
+
+            for (int index = 0; index < processed.EdgeWear.Length; index++)
+            {
+                int rockIndex = raw.RockIndex[index];
+                if (rockIndex < 0 || rockIndex >= rockCount)
+                {
+                    continue;
+                }
+
+                processed.EdgeWear[index] = Mathf.Clamp01(
+                    processed.EdgeWear[index] * gains[rockIndex]);
             }
         }
 
@@ -1430,20 +2056,18 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             result.Variation = new Color32[pixelCount];
             result.ProcessedVariation = new Color32[pixelCount];
             result.Exposure = new Color32[pixelCount];
-            result.ProcessedExposure = new Color32[pixelCount];
+            result.UpwardExposure = new Color32[pixelCount];
+            result.DirectionalLightResponse = new Color32[pixelCount];
             result.Crevice = new Color32[pixelCount];
             result.ProcessedCrevice = new Color32[pixelCount];
             result.EdgeWear = new Color32[pixelCount];
             result.ProcessedEdgeWear = new Color32[pixelCount];
 
-            Vector3 lightDirection = new Vector3(
-                -0.55f,
-                0.72f,
-                0.42f).normalized;
             Color backgroundA = new Color(0.16f, 0.14f, 0.11f, 1f);
             Color backgroundB = new Color(0.20f, 0.18f, 0.14f, 1f);
-            Color rockDark = new Color(0.24f, 0.25f, 0.23f, 1f);
-            Color rockLight = new Color(0.62f, 0.61f, 0.55f, 1f);
+            Color rawRockDark = new Color(0.24f, 0.25f, 0.23f, 1f);
+            Color rockDark = new Color(0.14f, 0.15f, 0.14f, 1f);
+            Color rockLight = new Color(0.64f, 0.62f, 0.56f, 1f);
 
             for (int y = 0; y < Resolution; y++)
             {
@@ -1469,8 +2093,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         ToByte(processed.Variation[index]));
                     result.Exposure[index] = Grayscale(
                         ToByte(raw.Exposure[index]));
-                    result.ProcessedExposure[index] = Grayscale(
+                    result.UpwardExposure[index] = Grayscale(
                         ToByte(processed.Exposure[index]));
+                    result.DirectionalLightResponse[index] = Grayscale(
+                        ToByte(processed.DirectionalLightResponse[index]));
                     result.Crevice[index] = Grayscale(
                         ToByte(raw.Crevice[index]));
                     result.ProcessedCrevice[index] = Grayscale(
@@ -1482,11 +2108,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
                     if (mask <= 0.5f)
                     {
-                        Color32 encodedUp = new Color32(
-                            128,
-                            255,
-                            128,
-                            255);
+                        Color32 encodedUp = new Color32(128, 255, 128, 255);
                         result.Normals[index] = encodedUp;
                         result.ProcessedNormals[index] = encodedUp;
                         Color32 backgroundPixel = (Color32)background;
@@ -1505,7 +2127,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         EncodeWorldNormal(processedNormal);
 
                     float rawLight = Mathf.Clamp01(
-                        Vector3.Dot(rawNormal, lightDirection) * 0.5f + 0.5f);
+                        Vector3.Dot(rawNormal, DiagnosticLightDirection) *
+                        0.5f + 0.5f);
                     float rawValue = Mathf.Clamp01(
                         0.24f +
                         raw.Height[index] * 0.28f +
@@ -1513,7 +2136,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         raw.Exposure[index] * 0.14f +
                         rawLight * 0.16f);
                     Color rawColor = Color.Lerp(
-                        rockDark,
+                        rawRockDark,
                         rockLight,
                         rawValue);
                     rawColor = Color.Lerp(
@@ -1522,27 +2145,24 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         raw.EdgeWear[index] * 0.22f);
                     rawColor = Color.Lerp(
                         rawColor,
-                        rockDark * 0.72f,
+                        rawRockDark * 0.72f,
                         raw.Crevice[index] * 0.28f);
                     result.Raw[index] = (Color32)rawColor;
                     result.Neutral[index] = (Color32)BuildProcessedMaterialColor(
                         processed,
                         index,
-                        lightDirection,
                         rockDark,
                         rockLight,
                         MaterialResponseMode.Neutral);
                     result.Processed[index] = (Color32)BuildProcessedMaterialColor(
                         processed,
                         index,
-                        lightDirection,
                         rockDark,
                         rockLight,
                         MaterialResponseMode.Moderate);
                     result.Strong[index] = (Color32)BuildProcessedMaterialColor(
                         processed,
                         index,
-                        lightDirection,
                         rockDark,
                         rockLight,
                         MaterialResponseMode.Strong);
@@ -1553,7 +2173,6 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private static Color BuildProcessedMaterialColor(
             CatalogBuffers processed,
             int index,
-            Vector3 lightDirection,
             Color rockDark,
             Color rockLight,
             MaterialResponseMode mode)
@@ -1562,64 +2181,82 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             float maximumLighting;
             float contrastLow;
             float contrastHigh;
-            float wearStrength;
+            float variationStrength;
+            float upwardStrength;
+            float wearSupportStrength;
+            float wearCoreStrength;
             float rootStrength;
             switch (mode)
             {
                 case MaterialResponseMode.Neutral:
-                    minimumLighting = 0.80f;
-                    maximumLighting = 1.10f;
-                    contrastLow = 0.16f;
-                    contrastHigh = 0.84f;
-                    wearStrength = 0.12f;
-                    rootStrength = 0.24f;
+                    minimumLighting = 0.76f;
+                    maximumLighting = 1.08f;
+                    contrastLow = 0.14f;
+                    contrastHigh = 0.86f;
+                    variationStrength = 0.12f;
+                    upwardStrength = 0.05f;
+                    wearSupportStrength = 0.075f;
+                    wearCoreStrength = 0.025f;
+                    rootStrength = 0.42f;
                     break;
                 case MaterialResponseMode.Strong:
-                    minimumLighting = 0.36f;
-                    maximumLighting = 1.44f;
-                    contrastLow = 0.33f;
-                    contrastHigh = 0.67f;
-                    wearStrength = 0.52f;
-                    rootStrength = 0.72f;
+                    minimumLighting = 0.25f;
+                    maximumLighting = 1.38f;
+                    contrastLow = 0.38f;
+                    contrastHigh = 0.62f;
+                    variationStrength = 0.27f;
+                    upwardStrength = 0.10f;
+                    wearSupportStrength = 0.19f;
+                    wearCoreStrength = 0.11f;
+                    rootStrength = 0.96f;
                     break;
                 default:
-                    minimumLighting = 0.56f;
-                    maximumLighting = 1.28f;
-                    contrastLow = 0.25f;
-                    contrastHigh = 0.75f;
-                    wearStrength = 0.34f;
-                    rootStrength = 0.54f;
+                    minimumLighting = 0.44f;
+                    maximumLighting = 1.24f;
+                    contrastLow = 0.27f;
+                    contrastHigh = 0.73f;
+                    variationStrength = 0.19f;
+                    upwardStrength = 0.07f;
+                    wearSupportStrength = 0.13f;
+                    wearCoreStrength = 0.075f;
+                    rootStrength = 0.78f;
                     break;
             }
 
-            Vector3 normal = processed.Normals[index].normalized;
-            float light = Mathf.Clamp01(
-                Vector3.Dot(normal, lightDirection) * 0.5f + 0.5f);
+            float directional = processed.DirectionalLightResponse[index];
             float contrastLight = SmoothStep(
                 contrastLow,
                 contrastHigh,
-                light);
+                directional);
             float lighting = Mathf.Lerp(
                 minimumLighting,
                 maximumLighting,
                 contrastLight);
-            float materialValue = Mathf.Clamp01(
+            float materialValue = Mathf.Clamp(
                 0.34f +
-                processed.Height[index] * 0.22f +
-                (processed.Variation[index] - 0.5f) * 0.42f +
-                processed.Exposure[index] * 0.12f);
+                processed.Height[index] * 0.14f +
+                (processed.Variation[index] - 0.5f) * variationStrength +
+                (processed.Exposure[index] - 0.5f) * upwardStrength,
+                0.16f,
+                0.72f);
             Color color = Color.Lerp(
                 rockDark,
                 rockLight,
                 materialValue) * lighting;
-            color = Color.Lerp(
-                color,
-                rockLight * 1.08f,
-                processed.EdgeWear[index] * wearStrength);
-            color = Color.Lerp(
-                color,
-                rockDark * 0.48f,
+
+            Color wearColor = new Color(0.68f, 0.66f, 0.60f, 1f);
+            float wearSignal = processed.EdgeWear[index];
+            float wearSupport = SmoothStep(0.06f, 0.52f, wearSignal);
+            float wearCore = SmoothStep(0.48f, 0.84f, wearSignal);
+            float wear = Mathf.Clamp01(
+                wearSupport * wearSupportStrength +
+                wearCore * wearCoreStrength);
+            color = Color.Lerp(color, wearColor, wear);
+
+            Color rootColor = new Color(0.055f, 0.050f, 0.041f, 1f);
+            float root = Mathf.Clamp01(
                 processed.Crevice[index] * rootStrength);
+            color = Color.Lerp(color, rootColor, root);
             return color;
         }
 
@@ -1628,14 +2265,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             CatalogBuffers processed)
         {
             Color32[] output = new Color32[Resolution * Resolution];
-            Vector3 lightDirection = new Vector3(
-                -0.55f,
-                0.72f,
-                0.42f).normalized;
             Color backgroundA = new Color(0.16f, 0.14f, 0.11f, 1f);
             Color backgroundB = new Color(0.20f, 0.18f, 0.14f, 1f);
-            Color rockDark = new Color(0.24f, 0.25f, 0.23f, 1f);
-            Color rockLight = new Color(0.62f, 0.61f, 0.55f, 1f);
+            Color rockDark = new Color(0.14f, 0.15f, 0.14f, 1f);
+            Color rockLight = new Color(0.64f, 0.62f, 0.56f, 1f);
             for (int y = 0; y < Resolution; y++)
             {
                 for (int x = 0; x < Resolution; x++)
@@ -1652,7 +2285,6 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         ? (Color32)BuildProcessedMaterialColor(
                             processed,
                             index,
-                            lightDirection,
                             rockDark,
                             rockLight,
                             MaterialResponseMode.Moderate)
@@ -1677,7 +2309,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             ApplyLabels(result.Variation, result.Rocks);
             ApplyLabels(result.ProcessedVariation, result.Rocks);
             ApplyLabels(result.Exposure, result.Rocks);
-            ApplyLabels(result.ProcessedExposure, result.Rocks);
+            ApplyLabels(result.UpwardExposure, result.Rocks);
+            ApplyLabels(result.DirectionalLightResponse, result.Rocks);
             ApplyLabels(result.Crevice, result.Rocks);
             ApplyLabels(result.ProcessedCrevice, result.Rocks);
             ApplyLabels(result.EdgeWear, result.Rocks);
@@ -1756,12 +2389,167 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             }
         }
 
+        private static Color32[] BuildResponseCloseups(
+            ICollection<string> sourceIds,
+            out int cellCount)
+        {
+            const int columns = 6;
+            const int rows = 3;
+            CatalogBuffers raw = new CatalogBuffers(Resolution);
+            List<RockEvidence> labels = new List<RockEvidence>(18);
+            List<RockDefinition> definitions = BuildRockDefinitions();
+            GeneratedRock[] generatedSources =
+                new GeneratedRock[ResponseCloseupSourceIds.Length];
+            for (int sourceIndex = 0;
+                 sourceIndex < ResponseCloseupSourceIds.Length;
+                 sourceIndex++)
+            {
+                sourceIds.Add(ResponseCloseupSourceIds[sourceIndex]);
+                generatedSources[sourceIndex] = GenerateRock(
+                    FindDefinition(
+                        definitions,
+                        ResponseCloseupSourceIds[sourceIndex]));
+            }
+
+            int index = 0;
+            for (int responseIndex = 0; responseIndex < rows; responseIndex++)
+            {
+                for (int sourceIndex = 0; sourceIndex < columns; sourceIndex++)
+                {
+                    RockDefinition source = FindDefinition(
+                        definitions,
+                        ResponseCloseupSourceIds[sourceIndex]);
+                    RockDefinition definition = new RockDefinition
+                    {
+                        Index = index,
+                        StableId = source.StableId,
+                        Archetype = source.Archetype,
+                        Profile = source.Profile,
+                        ShapeSeed = source.ShapeSeed,
+                        SurfaceSeed = source.SurfaceSeed,
+                        BurialFraction = source.BurialFraction,
+                        RotationDegrees = source.RotationDegrees,
+                        IsFrozen = true
+                    };
+                    GeneratedRock generated = generatedSources[sourceIndex];
+                    generated.Definition = definition;
+                    labels.Add(RasterizeRockIntoCell(
+                        generated,
+                        raw,
+                        Resolution,
+                        columns,
+                        rows,
+                        LabelStripHeight));
+                    index++;
+                }
+            }
+
+            CatalogBuffers processed = BuildProcessedBuffers(
+                raw,
+                labels,
+                columns,
+                rows);
+            Color32[] output = BuildResponseCloseupImage(
+                raw,
+                processed,
+                columns,
+                rows);
+            ApplyResponseCloseupLabels(output, labels, columns, rows);
+            cellCount = labels.Count;
+            return output;
+        }
+
+        private static Color32[] BuildResponseCloseupImage(
+            CatalogBuffers raw,
+            CatalogBuffers processed,
+            int columns,
+            int rows)
+        {
+            Color32[] output = new Color32[Resolution * Resolution];
+            int cellHeight = Resolution / rows;
+            Color backgroundA = new Color(0.16f, 0.14f, 0.11f, 1f);
+            Color backgroundB = new Color(0.20f, 0.18f, 0.14f, 1f);
+            Color rockDark = new Color(0.14f, 0.15f, 0.14f, 1f);
+            Color rockLight = new Color(0.64f, 0.62f, 0.56f, 1f);
+            for (int y = 0; y < Resolution; y++)
+            {
+                int responseIndex = Mathf.Clamp(y / cellHeight, 0, rows - 1);
+                MaterialResponseMode mode = responseIndex == 0
+                    ? MaterialResponseMode.Neutral
+                    : responseIndex == 1
+                        ? MaterialResponseMode.Moderate
+                        : MaterialResponseMode.Strong;
+                for (int x = 0; x < Resolution; x++)
+                {
+                    int index = y * Resolution + x;
+                    float checker = ((x / 32 + y / 32) & 1) == 0
+                        ? 0f
+                        : 1f;
+                    Color background = Color.Lerp(
+                        backgroundA,
+                        backgroundB,
+                        checker * 0.32f);
+                    output[index] = raw.Mask[index] > 0.5f
+                        ? (Color32)BuildProcessedMaterialColor(
+                            processed,
+                            index,
+                            rockDark,
+                            rockLight,
+                            mode)
+                        : (Color32)background;
+                }
+            }
+
+            return output;
+        }
+
+        private static void ApplyResponseCloseupLabels(
+            Color32[] pixels,
+            IReadOnlyList<RockEvidence> rocks,
+            int columns,
+            int rows)
+        {
+            int cellWidth = Resolution / columns;
+            int cellHeight = Resolution / rows;
+            Color32 background = new Color32(18, 18, 18, 255);
+            Color32 text = new Color32(246, 236, 202, 255);
+            for (int index = 0; index < rocks.Count; index++)
+            {
+                int column = index % columns;
+                int row = index / columns;
+                RectInt labelRect = new RectInt(
+                    column * cellWidth,
+                    row * cellHeight,
+                    cellWidth,
+                    LabelStripHeight);
+                FillRect(pixels, Resolution, labelRect, background);
+                string mode = row == 0 ? "NEU" : row == 1 ? "MOD" : "STR";
+                string line = rocks[index].StableId + " " + mode;
+                DrawText(
+                    pixels,
+                    Resolution,
+                    labelRect.xMin + 8,
+                    labelRect.yMin + 16,
+                    line,
+                    text,
+                    2);
+            }
+        }
+
         private static Color32[] BuildBurialComparison(
             ICollection<string> sourceIds,
+            ICollection<BurialFrameEvidence> frameEvidence,
             out int cellCount)
         {
             const int columns = 4;
             const int rows = 4;
+            int cellWidth = Resolution / columns;
+            int cellHeight = Resolution / rows;
+            RectInt referenceProjectionCell = new RectInt(
+                0,
+                LabelStripHeight,
+                cellWidth,
+                Mathf.Max(4, cellHeight - LabelStripHeight));
             CatalogBuffers raw = new CatalogBuffers(Resolution);
             List<RockEvidence> labels = new List<RockEvidence>(16);
             List<RockDefinition> definitions = BuildRockDefinitions();
@@ -1771,11 +2559,27 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                  sourceIndex++)
             {
                 string sourceId = BurialComparisonSourceIds[sourceIndex];
-                RockDefinition source = FindDefinition(
-                    definitions,
-                    sourceId);
+                RockDefinition source = FindDefinition(definitions, sourceId);
                 sourceIds.Add(sourceId);
                 GeneratedRock generated = GenerateRock(source);
+                FixedProjectionFrame frame = CreateFixedProjectionFrame(
+                    generated.Mesh,
+                    source.RotationDegrees,
+                    referenceProjectionCell);
+                BurialFrameEvidence frameRecord = new BurialFrameEvidence
+                {
+                    StableId = sourceId,
+                    WorldCenterX = frame.WorldCenterX,
+                    WorldCenterZ = frame.WorldCenterZ,
+                    MinimumY = frame.MinimumY,
+                    MaximumY = frame.MaximumY,
+                    Scale = frame.Scale,
+                    DepthCount = BurialComparisonFractions.Length
+                };
+                frameRecord.Fingerprint = CalculateBurialFrameFingerprint(
+                    frameRecord);
+                frameEvidence.Add(frameRecord);
+
                 for (int burialIndex = 0;
                      burialIndex < BurialComparisonFractions.Length;
                      burialIndex++)
@@ -1788,20 +2592,19 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         Profile = source.Profile,
                         ShapeSeed = source.ShapeSeed,
                         SurfaceSeed = source.SurfaceSeed,
-                        BurialFraction =
-                            BurialComparisonFractions[burialIndex],
+                        BurialFraction = BurialComparisonFractions[burialIndex],
                         RotationDegrees = source.RotationDegrees,
                         IsFrozen = true
                     };
                     generated.Definition = definition;
-                    RockEvidence evidence = RasterizeRockIntoCell(
+                    labels.Add(RasterizeRockIntoFixedFrameCell(
                         generated,
                         raw,
                         Resolution,
                         columns,
                         rows,
-                        LabelStripHeight);
-                    labels.Add(evidence);
+                        LabelStripHeight,
+                        frame));
                     index++;
                 }
             }
@@ -1813,8 +2616,180 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 rows);
             Color32[] output = BuildProcessedColorImage(raw, processed);
             ApplyBurialLabels(output, labels, columns, rows);
+            DrawBurialGauges(output, labels, columns, rows);
             cellCount = labels.Count;
             return output;
+        }
+
+        private static FixedProjectionFrame CreateFixedProjectionFrame(
+            MeshData mesh,
+            float rotationDegrees,
+            RectInt cell)
+        {
+            float radians = rotationDegrees * Mathf.Deg2Rad;
+            float cosine = Mathf.Cos(radians);
+            float sine = Mathf.Sin(radians);
+            float minimumX = float.PositiveInfinity;
+            float maximumX = float.NegativeInfinity;
+            float minimumY = float.PositiveInfinity;
+            float maximumY = float.NegativeInfinity;
+            float minimumZ = float.PositiveInfinity;
+            float maximumZ = float.NegativeInfinity;
+            for (int index = 0; index < mesh.Vertices.Count; index++)
+            {
+                Vector3 source = mesh.Vertices[index];
+                Vector3 transformed = new Vector3(
+                    source.x * cosine + source.z * sine,
+                    source.y,
+                    -source.x * sine + source.z * cosine);
+                minimumX = Mathf.Min(minimumX, transformed.x);
+                maximumX = Mathf.Max(maximumX, transformed.x);
+                minimumY = Mathf.Min(minimumY, transformed.y);
+                maximumY = Mathf.Max(maximumY, transformed.y);
+                minimumZ = Mathf.Min(minimumZ, transformed.z);
+                maximumZ = Mathf.Max(maximumZ, transformed.z);
+            }
+
+            float width = Mathf.Max(0.0001f, maximumX - minimumX);
+            float depth = Mathf.Max(0.0001f, maximumZ - minimumZ);
+            float availableWidth = Mathf.Max(4f, cell.width - CellPadding * 2f);
+            float availableHeight = Mathf.Max(4f, cell.height - CellPadding * 2f);
+            return new FixedProjectionFrame
+            {
+                WorldCenterX = (minimumX + maximumX) * 0.5f,
+                WorldCenterZ = (minimumZ + maximumZ) * 0.5f,
+                MinimumY = minimumY,
+                MaximumY = maximumY,
+                FullHeight = Mathf.Max(0.0001f, maximumY - minimumY),
+                Scale = Mathf.Min(
+                    availableWidth / width,
+                    availableHeight / depth)
+            };
+        }
+
+        private static RockEvidence RasterizeRockIntoFixedFrameCell(
+            GeneratedRock generated,
+            CatalogBuffers buffers,
+            int resolution,
+            int columns,
+            int rows,
+            int labelStripHeight,
+            FixedProjectionFrame frame)
+        {
+            RockDefinition definition = generated.Definition;
+            int column = definition.Index % columns;
+            int row = definition.Index / columns;
+            int cellWidth = resolution / columns;
+            int cellHeight = resolution / rows;
+            RectInt cell = new RectInt(
+                column * cellWidth,
+                row * cellHeight,
+                cellWidth,
+                cellHeight);
+            RectInt projectionCell = new RectInt(
+                cell.xMin,
+                cell.yMin + labelStripHeight,
+                cell.width,
+                Mathf.Max(4, cell.height - labelStripHeight));
+            RockEvidence evidence = CreateRockEvidence(generated);
+            RasterizeMeshFixedFrame(
+                generated.Mesh,
+                buffers,
+                resolution,
+                projectionCell,
+                definition.BurialFraction,
+                definition.RotationDegrees,
+                evidence,
+                frame);
+            evidence.Fingerprint = CalculateRockFingerprint(
+                evidence,
+                buffers,
+                resolution,
+                projectionCell);
+            return evidence;
+        }
+
+        private static void RasterizeMeshFixedFrame(
+            MeshData mesh,
+            CatalogBuffers buffers,
+            int resolution,
+            RectInt cell,
+            float burialFraction,
+            float rotationDegrees,
+            RockEvidence evidence,
+            FixedProjectionFrame frame)
+        {
+            int vertexCount = mesh.Vertices.Count;
+            Vector3[] positions = new Vector3[vertexCount];
+            Vector3[] normals = new Vector3[vertexCount];
+            Vector2[] projected = new Vector2[vertexCount];
+            float radians = rotationDegrees * Mathf.Deg2Rad;
+            float cosine = Mathf.Cos(radians);
+            float sine = Mathf.Sin(radians);
+            float screenCenterX = cell.xMin + cell.width * 0.5f;
+            float screenCenterY = cell.yMin + cell.height * 0.5f;
+            for (int index = 0; index < vertexCount; index++)
+            {
+                Vector3 source = mesh.Vertices[index];
+                Vector3 transformed = new Vector3(
+                    source.x * cosine + source.z * sine,
+                    source.y,
+                    -source.x * sine + source.z * cosine);
+                positions[index] = transformed;
+                Vector3 sourceNormal = mesh.Normals[index];
+                normals[index] = new Vector3(
+                    sourceNormal.x * cosine + sourceNormal.z * sine,
+                    sourceNormal.y,
+                    -sourceNormal.x * sine + sourceNormal.z * cosine)
+                    .normalized;
+                projected[index] = new Vector2(
+                    screenCenterX +
+                        (transformed.x - frame.WorldCenterX) * frame.Scale,
+                    screenCenterY +
+                        (transformed.z - frame.WorldCenterZ) * frame.Scale);
+            }
+
+            float burialY = frame.MinimumY +
+                frame.FullHeight * Mathf.Clamp(burialFraction, 0f, 0.75f);
+            for (int triangleOffset = 0;
+                 triangleOffset < mesh.Triangles.Count;
+                 triangleOffset += 3)
+            {
+                RasterizeTriangle(
+                    mesh,
+                    positions,
+                    normals,
+                    projected,
+                    mesh.Triangles[triangleOffset],
+                    mesh.Triangles[triangleOffset + 1],
+                    mesh.Triangles[triangleOffset + 2],
+                    burialY,
+                    frame.FullHeight,
+                    buffers,
+                    resolution,
+                    cell,
+                    evidence.Index);
+            }
+
+            MeasureCellEvidence(buffers, resolution, cell, evidence);
+        }
+
+        private static string CalculateBurialFrameFingerprint(
+            BurialFrameEvidence frame)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream))
+            {
+                writer.Write(frame.StableId ?? string.Empty);
+                writer.Write(frame.WorldCenterX);
+                writer.Write(frame.WorldCenterZ);
+                writer.Write(frame.MinimumY);
+                writer.Write(frame.MaximumY);
+                writer.Write(frame.Scale);
+                writer.Write(frame.DepthCount);
+                writer.Flush();
+                return CalculateSha256(stream.ToArray());
+            }
         }
 
         private static RockDefinition FindDefinition(
@@ -1874,6 +2849,52 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             }
         }
 
+        private static void DrawBurialGauges(
+            Color32[] pixels,
+            IReadOnlyList<RockEvidence> rocks,
+            int columns,
+            int rows)
+        {
+            int cellWidth = Resolution / columns;
+            int cellHeight = Resolution / rows;
+            Color32 below = new Color32(72, 58, 42, 255);
+            Color32 above = new Color32(86, 86, 80, 255);
+            Color32 line = new Color32(246, 210, 116, 255);
+            for (int index = 0; index < rocks.Count; index++)
+            {
+                RockEvidence rock = rocks[index];
+                int column = index % columns;
+                int row = index / columns;
+                int xMin = column * cellWidth + cellWidth - 18;
+                int xMax = xMin + 7;
+                int yMin = row * cellHeight + LabelStripHeight + 12;
+                int yMax = (row + 1) * cellHeight - 12;
+                int burialY = Mathf.RoundToInt(Mathf.Lerp(
+                    yMin,
+                    yMax,
+                    rock.BurialFraction));
+                FillRect(
+                    pixels,
+                    Resolution,
+                    new RectInt(xMin, yMin, xMax - xMin, yMax - yMin),
+                    above);
+                FillRect(
+                    pixels,
+                    Resolution,
+                    new RectInt(
+                        xMin,
+                        yMin,
+                        xMax - xMin,
+                        Mathf.Max(1, burialY - yMin)),
+                    below);
+                FillRect(
+                    pixels,
+                    Resolution,
+                    new RectInt(xMin - 2, burialY - 1, 11, 3),
+                    line);
+            }
+        }
+
         private static string CalculateRockFingerprint(
             RockEvidence rock,
             CatalogBuffers buffers,
@@ -1883,7 +2904,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             using (MemoryStream stream = new MemoryStream())
             using (BinaryWriter writer = new BinaryWriter(stream))
             {
-                writer.Write(AlgorithmVersion);
+                writer.Write(RawGeometryFingerprintVersion);
                 writer.Write(cell.width);
                 writer.Write(cell.height);
                 for (int y = cell.yMin; y < cell.yMax; y++)
@@ -1937,12 +2958,28 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 WritePixels(writer, result.Variation);
                 WritePixels(writer, result.ProcessedVariation);
                 WritePixels(writer, result.Exposure);
-                WritePixels(writer, result.ProcessedExposure);
+                WritePixels(writer, result.UpwardExposure);
+                WritePixels(writer, result.DirectionalLightResponse);
                 WritePixels(writer, result.Crevice);
                 WritePixels(writer, result.ProcessedCrevice);
                 WritePixels(writer, result.EdgeWear);
                 WritePixels(writer, result.ProcessedEdgeWear);
+                WritePixels(writer, result.ResponseCloseups);
+                writer.Write(result.ResponseCloseupSourceIds.Count);
+                for (int index = 0;
+                     index < result.ResponseCloseupSourceIds.Count;
+                     index++)
+                {
+                    writer.Write(result.ResponseCloseupSourceIds[index]);
+                }
                 WritePixels(writer, result.BurialComparison);
+                writer.Write(result.BurialFrames.Count);
+                for (int index = 0; index < result.BurialFrames.Count; index++)
+                {
+                    BurialFrameEvidence frame = result.BurialFrames[index];
+                    writer.Write(frame.StableId ?? string.Empty);
+                    writer.Write(frame.Fingerprint ?? string.Empty);
+                }
                 writer.Flush();
                 return CalculateSha256(stream.ToArray());
             }
@@ -2115,10 +3152,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             font['A'] = Glyph("01110", "10001", "10001", "11111", "10001", "10001", "10001");
             font['B'] = Glyph("11110", "10001", "10001", "11110", "10001", "10001", "11110");
             font['C'] = Glyph("01111", "10000", "10000", "10000", "10000", "10000", "01111");
+            font['D'] = Glyph("11110", "10001", "10001", "10001", "10001", "10001", "11110");
             font['E'] = Glyph("11111", "10000", "10000", "11110", "10000", "10000", "11111");
             font['F'] = Glyph("11111", "10000", "10000", "11110", "10000", "10000", "10000");
             font['H'] = Glyph("10001", "10001", "10001", "11111", "10001", "10001", "10001");
             font['L'] = Glyph("10000", "10000", "10000", "10000", "10000", "10000", "11111");
+            font['M'] = Glyph("10001", "11011", "10101", "10101", "10001", "10001", "10001");
+            font['N'] = Glyph("10001", "11001", "11001", "10101", "10011", "10011", "10001");
+            font['O'] = Glyph("01110", "10001", "10001", "10001", "10001", "10001", "01110");
             font['R'] = Glyph("11110", "10001", "10001", "11110", "10100", "10010", "10001");
             font['S'] = Glyph("01111", "10000", "10000", "01110", "00001", "00001", "11110");
             font['T'] = Glyph("11111", "00100", "00100", "00100", "00100", "00100", "00100");

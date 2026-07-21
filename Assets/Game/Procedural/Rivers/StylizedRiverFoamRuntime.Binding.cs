@@ -193,7 +193,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(
                 FoamDebugViewId,
                 river != null ? (float)river.FoamDebugView : 0f);
-            BindFoamChipStraddleAdmission(propertyBlock, false);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
             return true;
         }
@@ -357,7 +356,6 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamPresenceFootprintModeId,
                 (float)river.FoamPresenceFootprintMode);
             propertyBlock.SetFloat(FoamDebugViewId, (float)river.FoamDebugView);
-            BindFoamChipStraddleAdmission(propertyBlock, true);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }
 
@@ -438,7 +436,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamFinalVisibilityModeId, 0f);
             propertyBlock.SetFloat(FoamPresenceFootprintModeId, 0f);
             propertyBlock.SetFloat(FoamDebugViewId, 0f);
-            BindFoamChipStraddleAdmission(propertyBlock, false);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }
 

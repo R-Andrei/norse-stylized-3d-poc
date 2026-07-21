@@ -781,6 +781,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int LocalJunctionMinimumLoopVertexCount;
             public int LocalJunctionMaximumLoopVertexCount;
             public float LocalJunctionMaximumExtentRatio;
+            public int PolygonSurfaceFaceCount;
+            public int PolygonSurfaceBoundaryVertexCount;
+            public int PolygonSurfaceExpectedTriangleCount;
+            public int PolygonSurfaceTriangleCount;
+            public int PolygonSurfaceAuthoredNormalTriangleCount;
+            public int PolygonSurfaceAuthoredSurfaceGroupTriangleCount;
+            public int PolygonSurfaceInternalFanVertexCount;
+            public int PolygonSurfaceGroupCollisionCount;
+            public int PolygonSurfaceGroupCollisionSurfaceGroup;
+            public int PolygonSurfaceGroupCollisionFirstFace;
+            public int PolygonSurfaceGroupCollisionSecondFace;
+            public float PolygonSurfaceMaximumPlaneResidual;
+            public float PolygonSurfaceMaximumNormalDeviationDegrees;
+            public int PolygonSurfaceRenderValid;
+            public int PolygonSurfaceFailureFace;
+            public int PolygonSurfaceFailureProvenanceIndex;
+            public string PolygonSurfaceFailureReason;
             public int BevelRegionFaceCount;
             public int BevelRegionBoundaryVertexCount;
             public int BevelRegionTriangleCount;
@@ -1303,6 +1320,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         ref surfaceAudit,
                         out auditedSoup,
                         out string surfaceBlocker);
+                result.PolygonSurfaceFaceCount =
+                    surfaceAudit.PolygonSurfaceFaceCount;
+                result.PolygonSurfaceBoundaryVertexCount =
+                    surfaceAudit.PolygonSurfaceBoundaryVertexCount;
+                result.PolygonSurfaceExpectedTriangleCount =
+                    surfaceAudit.PolygonSurfaceExpectedTriangleCount;
+                result.PolygonSurfaceTriangleCount =
+                    surfaceAudit.PolygonSurfaceTriangleCount;
+                result.PolygonSurfaceAuthoredNormalTriangleCount =
+                    surfaceAudit.PolygonSurfaceAuthoredNormalTriangleCount;
+                result.PolygonSurfaceAuthoredSurfaceGroupTriangleCount =
+                    surfaceAudit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount;
+                result.PolygonSurfaceInternalFanVertexCount =
+                    surfaceAudit.PolygonSurfaceInternalFanVertexCount;
+                result.PolygonSurfaceGroupCollisionCount =
+                    surfaceAudit.PolygonSurfaceGroupCollisionCount;
+                result.PolygonSurfaceGroupCollisionSurfaceGroup =
+                    surfaceAudit.PolygonSurfaceGroupCollisionSurfaceGroup;
+                result.PolygonSurfaceGroupCollisionFirstFace =
+                    surfaceAudit.PolygonSurfaceGroupCollisionFirstFace;
+                result.PolygonSurfaceGroupCollisionSecondFace =
+                    surfaceAudit.PolygonSurfaceGroupCollisionSecondFace;
+                result.PolygonSurfaceMaximumPlaneResidual =
+                    surfaceAudit.PolygonSurfaceMaximumPlaneResidual;
+                result.PolygonSurfaceMaximumNormalDeviationDegrees =
+                    surfaceAudit.PolygonSurfaceMaximumNormalDeviationDegrees;
+                result.PolygonSurfaceRenderValid =
+                    surfaceAudit.PolygonSurfaceRenderValid;
+                result.PolygonSurfaceFailureFace =
+                    surfaceAudit.PolygonSurfaceFailureFace;
+                result.PolygonSurfaceFailureProvenanceIndex =
+                    surfaceAudit.PolygonSurfaceFailureProvenanceIndex;
+                result.PolygonSurfaceFailureReason =
+                    surfaceAudit.PolygonSurfaceFailureReason;
                 result.BevelRegionFaceCount =
                     surfaceAudit.BevelRegionFaceCount;
                 result.BevelRegionBoundaryVertexCount =
@@ -1341,6 +1392,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             bool geometryValid = polygonGeometryValid &&
                 surfaceTriangulationValid &&
+                result.PolygonSurfaceRenderValid == 1 &&
                 result.BevelRegionFaceCount == result.PlanesBuilt &&
                 result.BevelRegionRenderValid == 1 &&
                 result.PreviewGeometryValid == 1;
@@ -6127,6 +6179,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         ref surfaceAudit,
                         out auditedSoup,
                         out string surfaceBlocker);
+                trialAudit.PolygonSurfaceFaceCount =
+                    surfaceAudit.PolygonSurfaceFaceCount;
+                trialAudit.PolygonSurfaceBoundaryVertexCount =
+                    surfaceAudit.PolygonSurfaceBoundaryVertexCount;
+                trialAudit.PolygonSurfaceExpectedTriangleCount =
+                    surfaceAudit.PolygonSurfaceExpectedTriangleCount;
+                trialAudit.PolygonSurfaceTriangleCount =
+                    surfaceAudit.PolygonSurfaceTriangleCount;
+                trialAudit.PolygonSurfaceAuthoredNormalTriangleCount =
+                    surfaceAudit.PolygonSurfaceAuthoredNormalTriangleCount;
+                trialAudit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount =
+                    surfaceAudit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount;
+                trialAudit.PolygonSurfaceInternalFanVertexCount =
+                    surfaceAudit.PolygonSurfaceInternalFanVertexCount;
+                trialAudit.PolygonSurfaceGroupCollisionCount =
+                    surfaceAudit.PolygonSurfaceGroupCollisionCount;
+                trialAudit.PolygonSurfaceGroupCollisionSurfaceGroup =
+                    surfaceAudit.PolygonSurfaceGroupCollisionSurfaceGroup;
+                trialAudit.PolygonSurfaceGroupCollisionFirstFace =
+                    surfaceAudit.PolygonSurfaceGroupCollisionFirstFace;
+                trialAudit.PolygonSurfaceGroupCollisionSecondFace =
+                    surfaceAudit.PolygonSurfaceGroupCollisionSecondFace;
+                trialAudit.PolygonSurfaceMaximumPlaneResidual =
+                    surfaceAudit.PolygonSurfaceMaximumPlaneResidual;
+                trialAudit.PolygonSurfaceMaximumNormalDeviationDegrees =
+                    surfaceAudit.PolygonSurfaceMaximumNormalDeviationDegrees;
+                trialAudit.PolygonSurfaceRenderValid =
+                    surfaceAudit.PolygonSurfaceRenderValid;
+                trialAudit.PolygonSurfaceFailureFace =
+                    surfaceAudit.PolygonSurfaceFailureFace;
+                trialAudit.PolygonSurfaceFailureProvenanceIndex =
+                    surfaceAudit.PolygonSurfaceFailureProvenanceIndex;
+                trialAudit.PolygonSurfaceFailureReason =
+                    surfaceAudit.PolygonSurfaceFailureReason;
                 trialAudit.BevelRegionFaceCount =
                     surfaceAudit.BevelRegionFaceCount;
                 trialAudit.BevelRegionBoundaryVertexCount =
@@ -6162,6 +6248,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             trial.SurfaceValid =
                 surfaceTriangulationValid &&
+                trialAudit.PolygonSurfaceRenderValid == 1 &&
                 trialAudit.BevelRegionFaceCount ==
                     trialCandidates.Count &&
                 trialAudit.BevelRegionRenderValid == 1
@@ -6393,6 +6480,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             result.FaceQualitySeamTouchedFaceCount =
                 trial.FaceQualitySeamTouchedFaceCount;
             CopyPlaneCutBandAudit(trial, ref result);
+            result.PolygonSurfaceFaceCount =
+                trial.PolygonSurfaceFaceCount;
+            result.PolygonSurfaceBoundaryVertexCount =
+                trial.PolygonSurfaceBoundaryVertexCount;
+            result.PolygonSurfaceExpectedTriangleCount =
+                trial.PolygonSurfaceExpectedTriangleCount;
+            result.PolygonSurfaceTriangleCount =
+                trial.PolygonSurfaceTriangleCount;
+            result.PolygonSurfaceAuthoredNormalTriangleCount =
+                trial.PolygonSurfaceAuthoredNormalTriangleCount;
+            result.PolygonSurfaceAuthoredSurfaceGroupTriangleCount =
+                trial.PolygonSurfaceAuthoredSurfaceGroupTriangleCount;
+            result.PolygonSurfaceInternalFanVertexCount =
+                trial.PolygonSurfaceInternalFanVertexCount;
+            result.PolygonSurfaceGroupCollisionCount =
+                trial.PolygonSurfaceGroupCollisionCount;
+            result.PolygonSurfaceGroupCollisionSurfaceGroup =
+                trial.PolygonSurfaceGroupCollisionSurfaceGroup;
+            result.PolygonSurfaceGroupCollisionFirstFace =
+                trial.PolygonSurfaceGroupCollisionFirstFace;
+            result.PolygonSurfaceGroupCollisionSecondFace =
+                trial.PolygonSurfaceGroupCollisionSecondFace;
+            result.PolygonSurfaceMaximumPlaneResidual =
+                trial.PolygonSurfaceMaximumPlaneResidual;
+            result.PolygonSurfaceMaximumNormalDeviationDegrees =
+                trial.PolygonSurfaceMaximumNormalDeviationDegrees;
+            result.PolygonSurfaceRenderValid =
+                trial.PolygonSurfaceRenderValid;
+            result.PolygonSurfaceFailureFace =
+                trial.PolygonSurfaceFailureFace;
+            result.PolygonSurfaceFailureProvenanceIndex =
+                trial.PolygonSurfaceFailureProvenanceIndex;
+            result.PolygonSurfaceFailureReason =
+                trial.PolygonSurfaceFailureReason;
             result.BevelRegionFaceCount = trial.BevelRegionFaceCount;
             result.BevelRegionBoundaryVertexCount =
                 trial.BevelRegionBoundaryVertexCount;

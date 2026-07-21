@@ -76,6 +76,7 @@ namespace ProgrammaticStylized3D.Vegetation
 
         [Header("Benchmark Domain")]
         [SerializeField]
+        [Tooltip("Fallback and V1G benchmark domain in local metres. Ordinary placement ignores this rectangle when Ground Coverage Integration is enabled with an assigned GeneratedGround.")]
         private Vector2 fieldSize = new Vector2(40f, 30f);
 
         [SerializeField]
@@ -223,7 +224,7 @@ namespace ProgrammaticStylized3D.Vegetation
         [Tooltip("Minimum attenuated punctual-light energy required before a stylized edge accent can appear. Sun and directional lights never create this accent.")]
         private float localEdgeActivationThreshold = 0.35f;
 
-        [Header("Automated Comparison Suite")]
+        [Header("Mature Foundation Benchmark Suite")]
         [SerializeField, Min(0.1f)]
         private float suiteWarmupSeconds = 0.75f;
 
@@ -283,6 +284,31 @@ namespace ProgrammaticStylized3D.Vegetation
         private int suiteTotalCases;
         private string suiteStatus = "Not run";
         private string lastTimedSuiteReport = string.Empty;
+        private string lastTimedSuiteReportPath = string.Empty;
+        private double lastBuildDurationMilliseconds;
+
+        private readonly struct PlacementDomain
+        {
+            public PlacementDomain(
+                bool usesGround,
+                Vector2 localSize,
+                float worldArea,
+                Matrix4x4 localToWorld,
+                string ownerLabel)
+            {
+                UsesGround = usesGround;
+                LocalSize = localSize;
+                WorldArea = worldArea;
+                LocalToWorld = localToWorld;
+                OwnerLabel = ownerLabel;
+            }
+
+            public bool UsesGround { get; }
+            public Vector2 LocalSize { get; }
+            public float WorldArea { get; }
+            public Matrix4x4 LocalToWorld { get; }
+            public string OwnerLabel { get; }
+        }
 
         public Vector2 FieldSize => fieldSize;
         public int DensityPerSquareMetre => densityPerSquareMetre;
@@ -304,9 +330,15 @@ namespace ProgrammaticStylized3D.Vegetation
         public string SuiteStatus => suiteStatus;
         public bool HasTimedSuiteReport => !string.IsNullOrEmpty(lastTimedSuiteReport);
         public string LastTimedSuiteReport => lastTimedSuiteReport;
+        public string LastTimedSuiteReportPath => lastTimedSuiteReportPath;
+        public double LastBuildDurationMilliseconds => lastBuildDurationMilliseconds;
         public bool RenderBenchmarkEnabled => renderBenchmark;
         public bool SceneViewPreviewEnabled => sceneViewPreview;
         public bool UsesAllCameras => targetCamera == null;
+        public bool UsesGroundOwnedPlacementDomain =>
+            ShouldUseGroundOwnedPlacementDomain();
+        public string PlacementDomainSummary =>
+            BuildPlacementDomainSummary(ResolvePlacementDomain());
         public static IReadOnlyList<VegetationBenchmark> ActiveBenchmarks =>
             ActiveBenchmarksInternal;
 
@@ -591,12 +623,158 @@ namespace ProgrammaticStylized3D.Vegetation
             editModeGroundSyncPending = false;
         }
 
+        private bool ShouldUseGroundOwnedPlacementDomain()
+        {
+            return useGroundCoverage &&
+                   coverageGround != null &&
+                   !suiteForceFullCoverage;
+        }
+
+        private PlacementDomain ResolvePlacementDomain()
+        {
+            if (ShouldUseGroundOwnedPlacementDomain())
+            {
+                float patchSize = Mathf.Max(0.5f, coverageGround.PatchSize);
+                Matrix4x4 groundLocalToWorld =
+                    coverageGround.transform.localToWorldMatrix;
+                Vector3 worldLocalX = groundLocalToWorld.MultiplyVector(
+                    Vector3.right);
+                Vector3 worldLocalZ = groundLocalToWorld.MultiplyVector(
+                    Vector3.forward);
+                float worldAreaScale = Vector3.Cross(
+                    worldLocalX,
+                    worldLocalZ).magnitude;
+                float worldArea = Mathf.Max(
+                    0.0001f,
+                    patchSize * patchSize * worldAreaScale);
+                return new PlacementDomain(
+                    true,
+                    new Vector2(patchSize, patchSize),
+                    worldArea,
+                    groundLocalToWorld,
+                    coverageGround.name);
+            }
+
+            return new PlacementDomain(
+                false,
+                fieldSize,
+                Mathf.Max(0.0001f, fieldSize.x * fieldSize.y),
+                transform.localToWorldMatrix,
+                suiteForceFullCoverage
+                    ? "V1G forced benchmark field"
+                    : "VegetationBenchmark fallback field");
+        }
+
+        private static string BuildPlacementDomainSummary(
+            PlacementDomain domain)
+        {
+            return $"{domain.OwnerLabel}: " +
+                   $"{domain.LocalSize.x:0.###} × {domain.LocalSize.y:0.###} local m, " +
+                   $"{domain.WorldArea:0.###} world m²";
+        }
+
+        private Bounds BuildLocalBounds(
+            VegetationInstanceData[] instances,
+            PlacementDomain domain,
+            float maximumHeight,
+            float maximumHorizontalBend)
+        {
+            Bounds bounds;
+            if (instances.Length > 0)
+            {
+                Vector3 firstBase = ReadInstanceLocalPosition(instances[0]);
+                bounds = new Bounds(firstBase, Vector3.zero);
+                for (int index = 0; index < instances.Length; index++)
+                {
+                    Vector3 basePosition =
+                        ReadInstanceLocalPosition(instances[index]);
+                    bounds.Encapsulate(basePosition);
+                    bounds.Encapsulate(
+                        basePosition + Vector3.up * maximumHeight);
+                }
+            }
+            else
+            {
+                bounds = BuildPlacementDomainFallbackBounds(domain);
+                Vector3 baseMinimum = bounds.min;
+                Vector3 baseMaximum = bounds.max;
+                bounds.Encapsulate(
+                    baseMinimum + Vector3.up * maximumHeight);
+                bounds.Encapsulate(
+                    baseMaximum + Vector3.up * maximumHeight);
+            }
+
+            bounds.Expand(new Vector3(
+                maximumHorizontalBend * 2f,
+                maximumHeight * 0.5f,
+                maximumHorizontalBend * 2f));
+            return bounds;
+        }
+
+        private Bounds BuildPlacementDomainFallbackBounds(
+            PlacementDomain domain)
+        {
+            float halfX = domain.LocalSize.x * 0.5f;
+            float halfZ = domain.LocalSize.y * 0.5f;
+            Vector3 firstWorld = domain.LocalToWorld.MultiplyPoint3x4(
+                new Vector3(-halfX, 0f, -halfZ));
+            Bounds bounds = new Bounds(
+                transform.InverseTransformPoint(firstWorld),
+                Vector3.zero);
+            EncapsulateDomainCorner(ref bounds, domain, halfX, -halfZ);
+            EncapsulateDomainCorner(ref bounds, domain, -halfX, halfZ);
+            EncapsulateDomainCorner(ref bounds, domain, halfX, halfZ);
+            return bounds;
+        }
+
+        private void EncapsulateDomainCorner(
+            ref Bounds bounds,
+            PlacementDomain domain,
+            float x,
+            float z)
+        {
+            Vector3 world = domain.LocalToWorld.MultiplyPoint3x4(
+                new Vector3(x, 0f, z));
+            bounds.Encapsulate(transform.InverseTransformPoint(world));
+        }
+
+        private static Vector3 ReadInstanceLocalPosition(
+            VegetationInstanceData instance)
+        {
+            return new Vector3(
+                instance.PositionYaw.x,
+                instance.PositionYaw.y,
+                instance.PositionYaw.z);
+        }
+
         public int ComputeRebuildConfigurationHash()
         {
             unchecked
             {
                 int hash = 17;
-                hash = CombineHash(hash, fieldSize.GetHashCode());
+                bool groundOwnedDomain =
+                    ShouldUseGroundOwnedPlacementDomain();
+                hash = CombineHash(hash, groundOwnedDomain ? 1 : 0);
+                if (groundOwnedDomain)
+                {
+                    hash = CombineHash(
+                        hash,
+                        coverageGround.PatchSize.GetHashCode());
+                    Transform groundTransform = coverageGround.transform;
+                    hash = CombineHash(
+                        hash,
+                        groundTransform.position.GetHashCode());
+                    hash = CombineHash(
+                        hash,
+                        groundTransform.rotation.GetHashCode());
+                    hash = CombineHash(
+                        hash,
+                        groundTransform.lossyScale.GetHashCode());
+                }
+                else
+                {
+                    hash = CombineHash(hash, fieldSize.GetHashCode());
+                }
                 hash = CombineHash(hash, densityPerSquareMetre);
                 hash = CombineHash(hash, seed);
                 hash = CombineHash(
@@ -755,6 +933,8 @@ namespace ProgrammaticStylized3D.Vegetation
 
         private struct SuiteOutcome
         {
+            public VegetationBenchmarkGeometry Geometry;
+            public int Density;
             public string Label;
             public double CpuDelta;
             public double CpuNoise;
@@ -762,29 +942,19 @@ namespace ProgrammaticStylized3D.Vegetation
             public double GpuNoise;
         }
 
-        private enum SilhouetteSuiteProfile
-        {
-            CurrentCompatible = 0,
-            StableSilhouette = 1,
-            BroadStress = 2
-        }
-
         private struct SuiteCase
         {
             public VegetationBenchmarkGeometry Geometry;
             public int Density;
-            public SilhouetteSuiteProfile Profile;
             public bool ForceFullCoverage;
 
             public SuiteCase(
                 VegetationBenchmarkGeometry geometry,
                 int density,
-                SilhouetteSuiteProfile profile,
                 bool forceFullCoverage)
             {
                 Geometry = geometry;
                 Density = density;
-                Profile = profile;
                 ForceFullCoverage = forceFullCoverage;
             }
 
@@ -797,28 +967,30 @@ namespace ProgrammaticStylized3D.Vegetation
             VegetationBenchmarkGeometry originalGeometry = geometry;
             int originalDensity = densityPerSquareMetre;
             bool originalRenderState = renderBenchmark;
-            float originalMasterBladeWidth = masterBladeWidth;
-            float originalTipWidthRatio = tipWidthRatio;
-            float originalTaperStart = taperStart;
-            bool originalWidthStabilization = enableWidthStabilization;
-            float originalStabilizationStart = widthStabilizationStartDistance;
-            float originalStabilizationMaximum = widthStabilizationMaximumMultiplier;
-            var builder = new StringBuilder(65536);
+            var builder = new StringBuilder(131072);
             var cases = BuildSuiteCases();
             int successfulCases = 0;
             int failedCases = 0;
+            int structuralRebuilds = 0;
             var outcomes = new List<SuiteOutcome>(cases.Count);
 
             suiteRunning = true;
             suiteCurrentCase = 0;
             suiteTotalCases = cases.Count;
-            suiteStatus = "Preparing complete benchmark suite";
+            suiteStatus = "Preparing mature foundation benchmark suite";
             lastTimedSuiteReport = string.Empty;
+            lastTimedSuiteReportPath = string.Empty;
 
-            builder.AppendLine("[Vegetation V1B Silhouette Stability Automated Benchmark Suite]");
+            builder.AppendLine("[Vegetation V1G Mature Foundation Automated Benchmark Suite]");
             builder.Append("Cases: ").AppendLine(cases.Count.ToString());
-            builder.AppendLine("Scope: 3 geometry candidates × 3 silhouette profiles × 2 densities");
+            builder.AppendLine("Scope: 3 geometry candidates × 2 densities");
+            builder.AppendLine("Densities: 35 / 50 clusters per m²");
+            builder.AppendLine("Visual configuration: current accepted Inspector values, unchanged by the suite");
             builder.AppendLine("Coverage scenario: forced full coverage stress");
+            builder.Append("Forced benchmark placement domain: ")
+                .Append(fieldSize.x.ToString("0.###")).Append(" × ")
+                .Append(fieldSize.y.ToString("0.###"))
+                .AppendLine(" m in VegetationBenchmark local space");
             builder.Append("Passes per case: ").AppendLine(suitePassesPerCase.ToString());
             builder.Append("Warm-up per measurement: ")
                 .Append(suiteWarmupSeconds.ToString("0.###"))
@@ -829,11 +1001,26 @@ namespace ProgrammaticStylized3D.Vegetation
             builder.Append("Disabled-render baseline: ")
                 .AppendLine(suiteInterleaveDisabledBaseline ? "Interleaved" : "Disabled");
             builder.Append("Automatic screenshots: ")
-                .AppendLine(suiteCaptureScreenshots ? "Enabled" : "Disabled");
+                .AppendLine(suiteCaptureScreenshots
+                    ? "Enabled — one per geometry/density case"
+                    : "Disabled");
             AppendEnvironmentSummary(builder);
+            if (Screen.width != 2560 || Screen.height != 1440)
+            {
+                builder.Append("TARGET RESOLUTION WARNING: expected 2560 × 1440, measured ")
+                    .Append(Screen.width).Append(" × ").Append(Screen.height)
+                    .AppendLine(". Timing remains valid for the measured resolution only.");
+            }
+            else
+            {
+                builder.AppendLine("Target resolution check: PASS — 2560 × 1440");
+            }
             builder.AppendLine(
                 "CPU and GPU values are whole-frame measurements. Vegetation deltas " +
                 "subtract an adjacent render-disabled baseline and remain estimates.");
+            builder.AppendLine(
+                "The suite does not claim per-feature shader cost: setting visual strengths " +
+                "to zero does not compile out their shader instructions.");
             builder.AppendLine();
 
             try
@@ -845,24 +1032,35 @@ namespace ProgrammaticStylized3D.Vegetation
                     geometry = suiteCase.Geometry;
                     densityPerSquareMetre = suiteCase.Density;
                     suiteForceFullCoverage = suiteCase.ForceFullCoverage;
-                    ApplySilhouetteSuiteProfile(suiteCase.Profile);
                     renderBenchmark = true;
-                    suiteStatus = BuildSuiteStatus(caseIndex, cases.Count, suiteCase, "rebuilding");
+                    suiteStatus = BuildSuiteStatus(
+                        caseIndex,
+                        cases.Count,
+                        suiteCase,
+                        "rebuilding");
                     RebuildBenchmark();
+                    structuralRebuilds++;
 
                     builder.AppendLine("============================================================");
                     builder.Append("Case ").Append(caseIndex + 1).Append(" / ")
                         .Append(cases.Count).Append(": ").Append(suiteCase.Geometry)
                         .Append(" @ ").Append(suiteCase.Density).Append(" clusters/m² — ")
-                        .Append(suiteCase.Profile).Append(" — ")
                         .AppendLine(suiteCase.CoverageLabel);
                     builder.AppendLine("============================================================");
+                    AppendFoundationCaseSummary(
+                        builder,
+                        suiteCase,
+                        lastBuildDurationMilliseconds);
 
                     if (!resourcesReady)
                     {
                         failedCases++;
-                        builder.AppendLine(BuildComprehensiveReport());
                         builder.AppendLine("Timed measurement: SKIPPED — build failed");
+                        if (!string.IsNullOrEmpty(lastBuildError))
+                        {
+                            builder.AppendLine("Build error:");
+                            builder.AppendLine(lastBuildError);
+                        }
                         builder.AppendLine();
                         yield return null;
                         continue;
@@ -878,13 +1076,23 @@ namespace ProgrammaticStylized3D.Vegetation
                         if (suiteInterleaveDisabledBaseline && baselineFirst)
                         {
                             yield return MeasureSuiteWindow(
-                                false, caseIndex, cases.Count, suiteCase, pass,
-                                "baseline", baselineAggregate);
+                                false,
+                                caseIndex,
+                                cases.Count,
+                                suiteCase,
+                                pass,
+                                "baseline",
+                                baselineAggregate);
                         }
 
                         yield return MeasureSuiteWindow(
-                            true, caseIndex, cases.Count, suiteCase, pass,
-                            "vegetation", enabledAggregate);
+                            true,
+                            caseIndex,
+                            cases.Count,
+                            suiteCase,
+                            pass,
+                            "vegetation",
+                            enabledAggregate);
 
                         if (suiteCaptureScreenshots && pass == 0)
                         {
@@ -901,18 +1109,24 @@ namespace ProgrammaticStylized3D.Vegetation
                         if (suiteInterleaveDisabledBaseline && !baselineFirst)
                         {
                             yield return MeasureSuiteWindow(
-                                false, caseIndex, cases.Count, suiteCase, pass,
-                                "baseline", baselineAggregate);
+                                false,
+                                caseIndex,
+                                cases.Count,
+                                suiteCase,
+                                pass,
+                                "baseline",
+                                baselineAggregate);
                         }
                     }
 
                     renderBenchmark = true;
                     successfulCases++;
-                    builder.AppendLine(BuildComprehensiveReport());
                     AppendComparisonTimingSummary(
                         builder,
                         enabledAggregate,
-                        suiteInterleaveDisabledBaseline ? baselineAggregate : null);
+                        suiteInterleaveDisabledBaseline
+                            ? baselineAggregate
+                            : null);
                     if (suiteInterleaveDisabledBaseline)
                     {
                         outcomes.Add(BuildSuiteOutcome(
@@ -933,12 +1147,6 @@ namespace ProgrammaticStylized3D.Vegetation
                 geometry = originalGeometry;
                 densityPerSquareMetre = originalDensity;
                 renderBenchmark = originalRenderState;
-                masterBladeWidth = originalMasterBladeWidth;
-                tipWidthRatio = originalTipWidthRatio;
-                taperStart = originalTaperStart;
-                enableWidthStabilization = originalWidthStabilization;
-                widthStabilizationStartDistance = originalStabilizationStart;
-                widthStabilizationMaximumMultiplier = originalStabilizationMaximum;
                 suiteForceFullCoverage = false;
                 RebuildBenchmark();
 
@@ -949,26 +1157,46 @@ namespace ProgrammaticStylized3D.Vegetation
                     .Append(" / ").AppendLine(suiteTotalCases.ToString());
                 builder.Append("Failed cases: ").Append(failedCases)
                     .Append(" / ").AppendLine(suiteTotalCases.ToString());
+                builder.Append("Structural rebuilds during matrix: ")
+                    .Append(structuralRebuilds).AppendLine(" / expected 6");
+                builder.Append("Restoration rebuild duration: ")
+                    .Append(lastBuildDurationMilliseconds.ToString("0.###"))
+                    .AppendLine(" ms");
                 builder.Append("Restored geometry: ").AppendLine(originalGeometry.ToString());
                 builder.Append("Restored density: ").Append(originalDensity)
                     .AppendLine(" clusters/m²");
                 builder.Append("Restored render enabled: ")
                     .AppendLine(originalRenderState ? "Yes" : "No");
-                builder.Append("Restored master blade width: ")
-                    .Append(originalMasterBladeWidth.ToString("0.####")).AppendLine(" m");
-                builder.Append("Restored tip width ratio: ")
-                    .AppendLine(originalTipWidthRatio.ToString("0.###"));
-                builder.Append("Restored taper start: ")
-                    .AppendLine(originalTaperStart.ToString("0.###"));
-                builder.Append("Restored width stabilization: ")
-                    .AppendLine(originalWidthStabilization ? "Enabled" : "Disabled");
+                builder.AppendLine("Visual controls mutated by suite: No");
 
-                lastTimedSuiteReport = builder.ToString();
+                string reportPath = GetTimedSuiteReportPath();
+                builder.Append("Report file: ").AppendLine(reportPath);
+                string finalReport = builder.ToString();
+                string saveError = TrySaveTimedSuiteReport(
+                    reportPath,
+                    finalReport);
+                if (!string.IsNullOrEmpty(saveError))
+                {
+                    builder.Append("REPORT SAVE FAILED: ").AppendLine(saveError);
+                    finalReport = builder.ToString();
+                    lastTimedSuiteReportPath = string.Empty;
+                }
+                else
+                {
+                    lastTimedSuiteReportPath = reportPath;
+                }
+
+                lastTimedSuiteReport = finalReport;
                 suiteStatus = failedCases == 0
-                    ? "Complete — report ready to copy"
-                    : "Complete with failures — report ready to copy";
+                    ? "Complete — report saved and ready to copy"
+                    : "Complete with failures — report saved and ready to copy";
                 suiteRunning = false;
                 suiteCoroutine = null;
+                Debug.Log(
+                    string.IsNullOrEmpty(lastTimedSuiteReportPath)
+                        ? "[Vegetation V1G] Foundation benchmark suite completed; report remains available in memory but file saving failed."
+                        : $"[Vegetation V1G] Foundation benchmark suite completed. Report: {lastTimedSuiteReportPath}",
+                    this);
             }
         }
 
@@ -1023,63 +1251,71 @@ namespace ProgrammaticStylized3D.Vegetation
             string phase)
         {
             return $"Case {caseIndex + 1}/{caseCount}: {suiteCase.Geometry} @ " +
-                   $"{suiteCase.Density}/m² {suiteCase.Profile} — {phase}";
+                   $"{suiteCase.Density}/m² — {phase}";
         }
 
         private List<SuiteCase> BuildSuiteCases()
         {
             int[] densities = { 35, 50 };
             Array geometries = Enum.GetValues(typeof(VegetationBenchmarkGeometry));
-            Array profiles = Enum.GetValues(typeof(SilhouetteSuiteProfile));
             var cases = new List<SuiteCase>(
-                geometries.Length * profiles.Length * densities.Length);
+                geometries.Length * densities.Length);
             foreach (object geometryValue in geometries)
             {
                 var candidate = (VegetationBenchmarkGeometry)geometryValue;
-                foreach (object profileValue in profiles)
+                for (int densityIndex = 0; densityIndex < densities.Length; densityIndex++)
                 {
-                    var profile = (SilhouetteSuiteProfile)profileValue;
-                    for (int index = 0; index < densities.Length; index++)
-                    {
-                        cases.Add(new SuiteCase(
-                            candidate, densities[index], profile, true));
-                    }
+                    cases.Add(new SuiteCase(
+                        candidate,
+                        densities[densityIndex],
+                        true));
                 }
             }
             return cases;
         }
 
-        private void ApplySilhouetteSuiteProfile(SilhouetteSuiteProfile profile)
+        private void AppendFoundationCaseSummary(
+            StringBuilder builder,
+            SuiteCase suiteCase,
+            double structuralBuildMilliseconds)
         {
-            switch (profile)
-            {
-                case SilhouetteSuiteProfile.CurrentCompatible:
-                    masterBladeWidth = 0.0168f;
-                    tipWidthRatio = 0.10f;
-                    taperStart = 0f;
-                    enableWidthStabilization = false;
-                    widthStabilizationMaximumMultiplier = 1f;
-                    break;
-
-                case SilhouetteSuiteProfile.StableSilhouette:
-                    masterBladeWidth = 0.021f;
-                    tipWidthRatio = 0.12f;
-                    taperStart = 0.68f;
-                    enableWidthStabilization = true;
-                    widthStabilizationMaximumMultiplier = 1.20f;
-                    break;
-
-                case SilhouetteSuiteProfile.BroadStress:
-                    masterBladeWidth = 0.028f;
-                    tipWidthRatio = 0.22f;
-                    taperStart = 0.78f;
-                    enableWidthStabilization = true;
-                    widthStabilizationMaximumMultiplier = 1.35f;
-                    break;
-
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(profile), profile, null);
-            }
+            PlacementDomain placementDomain = ResolvePlacementDomain();
+            long totalTriangles = (long)meshStats.TriangleCount * instanceCount;
+            builder.Append("Placement domain: ")
+                .AppendLine(BuildPlacementDomainSummary(placementDomain));
+            builder.Append("Structural build duration: ")
+                .Append(structuralBuildMilliseconds.ToString("0.###"))
+                .AppendLine(" ms");
+            builder.Append("Resources ready: ")
+                .AppendLine(resourcesReady ? "Yes" : "No");
+            builder.Append("Placement candidates / instances: ")
+                .Append(placementCandidateCount.ToString("N0")).Append(" / ")
+                .AppendLine(instanceCount.ToString("N0"));
+            builder.Append("Coverage / Ground sample rejected: ")
+                .Append(coverageRejectedCount.ToString("N0")).Append(" / ")
+                .AppendLine(groundSampleRejectedCount.ToString("N0"));
+            builder.Append("Cluster vertices / triangles: ")
+                .Append(meshStats.VertexCount.ToString("N0")).Append(" / ")
+                .AppendLine(meshStats.TriangleCount.ToString("N0"));
+            builder.Append("Total submitted triangles: ")
+                .AppendLine(totalTriangles.ToString("N0"));
+            builder.Append("Draw calls / instance stride / buffer bytes: ")
+                .Append(resourcesReady ? "1" : "0").Append(" / ")
+                .Append(VegetationInstanceData.Stride).Append(" / ")
+                .AppendLine(InstanceBufferBytes.ToString("N0"));
+            builder.Append("Deterministic hash: 0x")
+                .AppendLine(deterministicHash.ToString("X16"));
+            builder.Append("Accepted edge / wind normal / bend shading: ")
+                .Append(stylizedEdgeAccent.ToString("0.###")).Append(" / ")
+                .Append(windNormalResponse.ToString("0.###")).Append(" / ")
+                .AppendLine(windBendShadingResponse.ToString("0.###"));
+            builder.Append("Accepted dark / light patch strengths: ")
+                .Append(darkPatchStrength.ToString("0.###")).Append(" / ")
+                .AppendLine(lightPatchStrength.ToString("0.###"));
+            builder.Append("Patch dark / neutral / light instances: ")
+                .Append(darkPatchInstanceCount.ToString("N0")).Append(" / ")
+                .Append(neutralPatchInstanceCount.ToString("N0")).Append(" / ")
+                .AppendLine(lightPatchInstanceCount.ToString("N0"));
         }
 
         private static void AddFinitePositive(List<double> samples, double value)
@@ -1098,7 +1334,7 @@ namespace ProgrammaticStylized3D.Vegetation
                     Application.dataPath,
                     "../Library/VegetationBenchmarkCaptures"));
                 Directory.CreateDirectory(directory);
-                string fileName = $"VegetationV1B_{suiteCase.Geometry}_{suiteCase.Density}pm2_{suiteCase.Profile}_{BuildAaFileLabel()}.png";
+                string fileName = $"VegetationV1G_{suiteCase.Geometry}_{suiteCase.Density}pm2_{BuildAaFileLabel()}.png";
                 string path = Path.Combine(directory, fileName);
                 ScreenCapture.CaptureScreenshot(path, 1);
                 return path;
@@ -1142,7 +1378,9 @@ namespace ProgrammaticStylized3D.Vegetation
                 out double gpuDelta, out double gpuNoise);
             return new SuiteOutcome
             {
-                Label = $"{suiteCase.Geometry} @ {suiteCase.Density}/m² {suiteCase.Profile}",
+                Geometry = suiteCase.Geometry,
+                Density = suiteCase.Density,
+                Label = $"{suiteCase.Geometry} @ {suiteCase.Density}/m²",
                 CpuDelta = cpuDelta,
                 CpuNoise = cpuNoise,
                 GpuDelta = gpuDelta,
@@ -1154,24 +1392,38 @@ namespace ProgrammaticStylized3D.Vegetation
             StringBuilder builder,
             List<SuiteOutcome> outcomes)
         {
-            builder.AppendLine("Confidence-aware ranking");
+            builder.AppendLine("Confidence-aware geometry/density ranking");
             if (outcomes.Count == 0)
             {
                 builder.AppendLine("Ranking unavailable: no paired baseline outcomes.");
+                builder.AppendLine();
                 return;
             }
 
-            outcomes.Sort((left, right) => left.GpuDelta.CompareTo(right.GpuDelta));
+            bool rankByGpu = false;
+            for (int index = 0; index < outcomes.Count; index++)
+            {
+                if (!double.IsNaN(outcomes[index].GpuDelta))
+                {
+                    rankByGpu = true;
+                    break;
+                }
+            }
+
+            outcomes.Sort((left, right) => CompareSuiteOutcomes(
+                left,
+                right,
+                rankByGpu));
+            builder.Append("Ranking metric: ")
+                .AppendLine(rankByGpu
+                    ? "estimated GPU median delta"
+                    : "estimated CPU median delta — GPU samples unavailable");
             bool anySeparated = false;
             for (int index = 0; index < outcomes.Count; index++)
             {
                 SuiteOutcome outcome = outcomes[index];
-                bool gpuSeparated = !double.IsNaN(outcome.GpuDelta) &&
-                                    outcome.GpuNoise > 0.0 &&
-                                    Math.Abs(outcome.GpuDelta) >= outcome.GpuNoise;
-                bool cpuSeparated = !double.IsNaN(outcome.CpuDelta) &&
-                                    outcome.CpuNoise > 0.0 &&
-                                    Math.Abs(outcome.CpuDelta) >= outcome.CpuNoise;
+                bool gpuSeparated = IsSeparated(outcome.GpuDelta, outcome.GpuNoise);
+                bool cpuSeparated = IsSeparated(outcome.CpuDelta, outcome.CpuNoise);
                 anySeparated |= gpuSeparated || cpuSeparated;
                 builder.Append(index + 1).Append(". ").Append(outcome.Label)
                     .Append(" | GPU Δ ").Append(FormatDelta(outcome.GpuDelta))
@@ -1184,19 +1436,41 @@ namespace ProgrammaticStylized3D.Vegetation
                         : "WITHIN OBSERVED NOISE");
             }
 
-            if (!anySeparated)
-            {
-                builder.AppendLine(
-                    "Verdict: no configuration is separated from observed timing " +
-                    "noise; do not select a winner from this run.");
-            }
-            else
-            {
-                builder.AppendLine(
-                    "Verdict: ranking is ordered by estimated GPU median delta, but " +
-                    "only rows marked separated should influence a performance decision.");
-            }
+            builder.AppendLine(anySeparated
+                ? "Verdict: only rows separated from observed noise may influence a performance decision."
+                : "Verdict: no configuration is separated from observed timing noise; do not select a winner from this run.");
             builder.AppendLine();
+        }
+
+        private static int CompareSuiteOutcomes(
+            SuiteOutcome left,
+            SuiteOutcome right,
+            bool useGpu)
+        {
+            double leftValue = useGpu ? left.GpuDelta : left.CpuDelta;
+            double rightValue = useGpu ? right.GpuDelta : right.CpuDelta;
+            bool leftUnavailable = double.IsNaN(leftValue);
+            bool rightUnavailable = double.IsNaN(rightValue);
+            if (leftUnavailable != rightUnavailable)
+            {
+                return leftUnavailable ? 1 : -1;
+            }
+            if (leftUnavailable)
+            {
+                return string.CompareOrdinal(left.Label, right.Label);
+            }
+            int valueComparison = leftValue.CompareTo(rightValue);
+            return valueComparison != 0
+                ? valueComparison
+                : string.CompareOrdinal(left.Label, right.Label);
+        }
+
+        private static bool IsSeparated(double delta, double noise)
+        {
+            return !double.IsNaN(delta) &&
+                   !double.IsNaN(noise) &&
+                   noise > 0.0 &&
+                   Math.Abs(delta) >= noise;
         }
 
         private static void CalculateDelta(
@@ -1361,6 +1635,33 @@ namespace ProgrammaticStylized3D.Vegetation
                    (sortedSamples[upper] - sortedSamples[lower]) * fraction;
         }
 
+        private static string GetTimedSuiteReportPath()
+        {
+            return Path.GetFullPath(Path.Combine(
+                Application.dataPath,
+                "../Library/VegetationBenchmarkDiagnostics/Vegetation_V1G_Foundation_Benchmark_Suite_Report.txt"));
+        }
+
+        private static string TrySaveTimedSuiteReport(
+            string reportPath,
+            string report)
+        {
+            try
+            {
+                string directory = Path.GetDirectoryName(reportPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                File.WriteAllText(reportPath, report);
+                return string.Empty;
+            }
+            catch (Exception exception)
+            {
+                return exception.ToString();
+            }
+        }
+
         public string BuildAllConfigurationComparisonsReport()
         {
             VegetationBenchmarkGeometry originalGeometry = geometry;
@@ -1369,7 +1670,7 @@ namespace ProgrammaticStylized3D.Vegetation
             int completedCases = 0;
             int failedCases = 0;
 
-            builder.AppendLine("[Vegetation V1A Complete Configuration Comparison]");
+            builder.AppendLine("[Vegetation V1H Complete Configuration Comparison]");
             builder.AppendLine("Scope: 3 geometry candidates × 3 density presets");
             builder.AppendLine("Cases: 9");
             builder.AppendLine(
@@ -1444,6 +1745,7 @@ namespace ProgrammaticStylized3D.Vegetation
 
         public void RebuildBenchmark()
         {
+            double buildStartTime = Time.realtimeSinceStartupAsDouble;
             ReleaseResources();
             lastBuildError = string.Empty;
             editModeGroundSyncPending = false;
@@ -1452,6 +1754,7 @@ namespace ProgrammaticStylized3D.Vegetation
             {
                 lastBuildError =
                     "Graphics.RenderMeshIndirect requires compute-shader support on the current platform.";
+                RecordBuildDuration(buildStartTime);
                 return;
             }
 
@@ -1460,6 +1763,7 @@ namespace ProgrammaticStylized3D.Vegetation
             {
                 lastBuildError =
                     $"Required shader was not found: {BenchmarkShaderName}";
+                RecordBuildDuration(buildStartTime);
                 return;
             }
 
@@ -1472,6 +1776,7 @@ namespace ProgrammaticStylized3D.Vegetation
                         $"Vegetation instance stride mismatch. Declared " +
                         $"{VegetationInstanceData.Stride}, runtime " +
                         $"{VegetationInstanceData.RuntimeStride}.";
+                    RecordBuildDuration(buildStartTime);
                     return;
                 }
 
@@ -1484,7 +1789,9 @@ namespace ProgrammaticStylized3D.Vegetation
                     taperStart,
                     out meshStats);
 
+                PlacementDomain placementDomain = ResolvePlacementDomain();
                 VegetationInstanceData[] instances = BuildInstances(
+                    placementDomain,
                     out deterministicHash);
                 instanceCount = instances.Length;
                 VegetationInstanceData[] uploadInstances = instances;
@@ -1544,12 +1851,11 @@ namespace ProgrammaticStylized3D.Vegetation
                 float maximumHorizontalBend = maximumHeight * 1.1f +
                     clusterDiameter * widthScaleRange.y *
                     widthStabilizationMaximumMultiplier;
-                localBounds = new Bounds(
-                    new Vector3(0f, maximumHeight * 0.5f, 0f),
-                    new Vector3(
-                        fieldSize.x + maximumHorizontalBend * 2f,
-                        maximumHeight * 1.5f,
-                        fieldSize.y + maximumHorizontalBend * 2f));
+                localBounds = BuildLocalBounds(
+                    instances,
+                    placementDomain,
+                    maximumHeight,
+                    maximumHorizontalBend);
 
                 resourcesReady = true;
                 editModeGroundSyncPending =
@@ -1564,20 +1870,33 @@ namespace ProgrammaticStylized3D.Vegetation
                 lastBuildError = exception.ToString();
                 ReleaseResources();
             }
+
+            RecordBuildDuration(buildStartTime);
+        }
+
+        private void RecordBuildDuration(double buildStartTime)
+        {
+            lastBuildDurationMilliseconds = Math.Max(
+                0.0,
+                (Time.realtimeSinceStartupAsDouble - buildStartTime) * 1000.0);
         }
 
         public string BuildComprehensiveReport()
         {
-            float area = fieldSize.x * fieldSize.y;
+            PlacementDomain placementDomain = ResolvePlacementDomain();
+            float area = placementDomain.WorldArea;
             long totalTriangles =
                 (long)meshStats.TriangleCount * instanceCount;
             int windDomainCount = WeatherWindDomain.ActiveDomainCount;
             WeatherWindDomain publishedWindDomain = WeatherWindDomain.PublishedDomain;
 
             var builder = new StringBuilder(4096);
-            builder.AppendLine("[Vegetation V1F Benchmark Report]");
+            builder.AppendLine("[Vegetation V1H Benchmark Report]");
             builder.Append("Status: ")
                 .AppendLine(resourcesReady ? "READY" : "NOT READY");
+            builder.Append("Last rebuild duration: ")
+                .Append(lastBuildDurationMilliseconds.ToString("0.###"))
+                .AppendLine(" ms");
             builder.Append("Render enabled: ")
                 .AppendLine(renderBenchmark ? "Yes" : "No");
             builder.Append("Target camera: ")
@@ -1588,10 +1907,23 @@ namespace ProgrammaticStylized3D.Vegetation
                 .AppendLine(sceneViewPreview ? "Enabled" : "Disabled");
             builder.Append("Scene view preview suppressed by suite: ")
                 .AppendLine(suiteRunning ? "Yes" : "No");
+            builder.Append("Placement domain: ")
+                .AppendLine(BuildPlacementDomainSummary(placementDomain));
+            builder.Append("Placement ownership: ")
+                .AppendLine(placementDomain.UsesGround
+                    ? "GeneratedGround-owned authored domain"
+                    : (suiteForceFullCoverage
+                        ? "V1G forced benchmark domain"
+                        : "VegetationBenchmark fallback domain"));
+            builder.Append("Configured fallback / benchmark field size: ")
+                .Append(fieldSize.x.ToString("0.###"))
+                .Append(" × ")
+                .Append(fieldSize.y.ToString("0.###"))
+                .AppendLine(" m");
             builder.Append("Coverage source: ")
                 .AppendLine(useGroundCoverage && coverageGround != null
                     ? coverageGround.name
-                    : "Full benchmark field");
+                    : "None — full fallback field");
             builder.Append("Coverage scenario: ")
                 .AppendLine(suiteForceFullCoverage ? "Forced full coverage" : "Authored / configured");
             if (coverageGround != null)
@@ -1687,12 +2019,12 @@ namespace ProgrammaticStylized3D.Vegetation
                     .AppendLine((-reportSun.transform.forward).ToString("F3"));
             }
             AppendEnvironmentSummary(builder);
-            builder.Append("Field size: ")
-                .Append(fieldSize.x.ToString("0.###"))
+            builder.Append("Resolved placement local size: ")
+                .Append(placementDomain.LocalSize.x.ToString("0.###"))
                 .Append(" × ")
-                .Append(fieldSize.y.ToString("0.###"))
+                .Append(placementDomain.LocalSize.y.ToString("0.###"))
                 .AppendLine(" m");
-            builder.Append("Field area: ")
+            builder.Append("Resolved placement world area: ")
                 .Append(area.ToString("0.###"))
                 .AppendLine(" m²");
             builder.Append("Density: ")
@@ -1749,10 +2081,12 @@ namespace ProgrammaticStylized3D.Vegetation
             builder.AppendLine(
                 "Lighting path: URP ambient SH + directional body lighting + additional point/spot body lighting + punctual-local-light-only blade-edge accent");
             builder.Append("Ground integration: ")
-                .AppendLine(useGroundCoverage && coverageGround != null
-                    ? "Ground height + authored coverage active; grass macro patches remain independently owned"
-                    : "Disabled / unassigned; grass macro patches remain independently owned");
-            builder.Append("Actor interaction/trails: Not present in V1F")
+                .AppendLine(placementDomain.UsesGround
+                    ? "Ground owns placement domain, height, and authored coverage; grass macro patches remain independently owned"
+                    : (useGroundCoverage && coverageGround != null
+                        ? "Ground height active inside forced benchmark domain; authored coverage bypassed by suite"
+                        : "Disabled / unassigned; grass macro patches remain independently owned"));
+            builder.Append("Actor interaction/trails: Not present in V1H")
                 .AppendLine();
 
             if (!string.IsNullOrEmpty(lastBuildError))
@@ -1764,9 +2098,11 @@ namespace ProgrammaticStylized3D.Vegetation
             return builder.ToString();
         }
 
-        private VegetationInstanceData[] BuildInstances(out ulong hash)
+        private VegetationInstanceData[] BuildInstances(
+            PlacementDomain placementDomain,
+            out ulong hash)
         {
-            float area = fieldSize.x * fieldSize.y;
+            float area = placementDomain.WorldArea;
             placementCandidateCount = Mathf.Max(
                 1,
                 Mathf.RoundToInt(area * densityPerSquareMetre));
@@ -1783,15 +2119,29 @@ namespace ProgrammaticStylized3D.Vegetation
             averageGrassPatchValue = 0f;
             double grassPatchValueSum = 0.0;
 
-            float halfX = fieldSize.x * 0.5f;
-            float halfZ = fieldSize.y * 0.5f;
+            float halfX = placementDomain.LocalSize.x * 0.5f;
+            float halfZ = placementDomain.LocalSize.y * 0.5f;
             for (int index = 0; index < placementCandidateCount; index++)
             {
                 float x = Mathf.Lerp(-halfX, halfX, NextFloat(random));
                 float z = Mathf.Lerp(-halfZ, halfZ, NextFloat(random));
                 float acceptanceRoll = NextFloat(random);
-                Vector3 localPosition = new Vector3(x, 0f, z);
-                Vector3 worldPosition = transform.TransformPoint(localPosition);
+                Vector3 domainLocalPosition = new Vector3(x, 0f, z);
+                Vector3 localPosition;
+                Vector3 worldPosition;
+                if (placementDomain.UsesGround)
+                {
+                    worldPosition =
+                        placementDomain.LocalToWorld.MultiplyPoint3x4(
+                            domainLocalPosition);
+                    localPosition =
+                        transform.InverseTransformPoint(worldPosition);
+                }
+                else
+                {
+                    localPosition = domainLocalPosition;
+                    worldPosition = transform.TransformPoint(localPosition);
+                }
 
                 if (useGroundCoverage && coverageGround != null)
                 {

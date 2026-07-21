@@ -61,6 +61,7 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
             EditorGUILayout.LabelField("Benchmark Actions", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
                 "Geometry, placement, coverage, silhouette, and Grass Macro Patch Scale/Seed/Transition/Separation changes rebuild the benchmark. " +
+                "With Ground Coverage Integration enabled and assigned, ordinary authored placement uses the complete GeneratedGround domain; Benchmark Domain > Field Size is reserved for fallback placement and the forced V1G suite. " +
                 "Grass Dark/Light Patch Strength and Stylized Lighting controls update only the runtime material and do not rebuild instances.",
                 MessageType.Info);
 
@@ -78,7 +79,7 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
                 EditorGUIUtility.systemCopyBuffer =
                     benchmark.BuildComprehensiveReport();
                 Debug.Log(
-                    "[Vegetation V1F] Comprehensive benchmark report copied to clipboard.",
+                    "[Vegetation V1H] Comprehensive benchmark report copied to clipboard.",
                     benchmark);
             }
 
@@ -87,7 +88,7 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
                 EditorGUIUtility.systemCopyBuffer =
                     benchmark.BuildAllConfigurationComparisonsReport();
                 Debug.Log(
-                    "[Vegetation V1F] Structural geometry × density matrix copied " +
+                    "[Vegetation V1H] Structural geometry × density matrix copied " +
                     "to the clipboard.",
                     benchmark);
                 SceneView.RepaintAll();
@@ -96,13 +97,13 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
             using (new EditorGUI.DisabledScope(
                        benchmark.SuiteRunning || !Application.isPlaying))
             {
-                if (GUILayout.Button("Run Complete Timed Comparison Suite"))
+                if (GUILayout.Button("Run Complete Foundation Benchmark Suite"))
                 {
                     if (benchmark.BeginTimedComparisonSuite())
                     {
                         Debug.Log(
-                            "[Vegetation V1F] Automated timed suite started. " +
-                            "All geometry × silhouette profile × density cases will run without manual input.",
+                            "[Vegetation V1G] Mature foundation suite started. " +
+                            "All three geometries at densities 35 and 50 will run with the current accepted visual configuration and no manual input.",
                             benchmark);
                     }
                 }
@@ -111,12 +112,12 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
             using (new EditorGUI.DisabledScope(
                        benchmark.SuiteRunning || !benchmark.HasTimedSuiteReport))
             {
-                if (GUILayout.Button("Copy Last Timed Suite Report"))
+                if (GUILayout.Button("Copy Last Foundation Suite Report"))
                 {
                     EditorGUIUtility.systemCopyBuffer =
                         benchmark.LastTimedSuiteReport;
                     Debug.Log(
-                        "[Vegetation V1F] Last automated timed suite report copied " +
+                        "[Vegetation V1G] Last automated timed suite report copied " +
                         "to the clipboard.",
                         benchmark);
                 }
@@ -125,11 +126,9 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
             if (!Application.isPlaying)
             {
                 EditorGUILayout.HelpBox(
-                    "Enter Play Mode, then press Run Complete Timed Comparison Suite once. " +
-                    "It automatically runs every geometry, three canonical silhouette profiles, and 35/50 density stress cases under forced-full coverage, interleaves " +
-                    "render-disabled baselines when enabled, performs every configured " +
-                    "pass, requests screenshots when enabled, restores the original " +
-                    "configuration, and retains one consolidated report.",
+                    "Enter Play Mode, then press Run Complete Foundation Benchmark Suite once. " +
+                    "It runs all three geometries at densities 35 and 50 using the current accepted visual configuration. " +
+                    "The suite interleaves render-disabled baselines when enabled, captures one screenshot per case, saves one report under Library, restores geometry/density/render state, and retains the report for copying.",
                     MessageType.Info);
             }
 
@@ -149,8 +148,15 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
             else
             {
                 EditorGUILayout.LabelField(
-                    "Timed suite status",
+                    "Foundation suite status",
                     benchmark.SuiteStatus);
+                if (!string.IsNullOrEmpty(benchmark.LastTimedSuiteReportPath))
+                {
+                    EditorGUILayout.SelectableLabel(
+                        benchmark.LastTimedSuiteReportPath,
+                        EditorStyles.textField,
+                        GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                }
             }
 
             EditorGUILayout.Space();
@@ -174,6 +180,20 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
                 EditorGUILayout.HelpBox(
                     benchmark.LastBuildError,
                     MessageType.Error);
+            }
+
+            if (benchmark.UsesGroundOwnedPlacementDomain)
+            {
+                EditorGUILayout.HelpBox(
+                    "Authored placement domain: " + benchmark.PlacementDomainSummary + ". " +
+                    "Benchmark Domain > Field Size is ignored for ordinary Ground-integrated placement and remains available only for fallback placement and the forced V1G suite.",
+                    MessageType.Info);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "Active placement domain: " + benchmark.PlacementDomainSummary + ".",
+                    MessageType.Info);
             }
 
             if (benchmark.UseGroundCoverage)

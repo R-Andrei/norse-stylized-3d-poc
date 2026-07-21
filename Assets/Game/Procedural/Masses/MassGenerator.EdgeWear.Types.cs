@@ -20,6 +20,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             LastChamferCompactSummaryOriginByGeometry =
                 new Dictionary<int, string>();
 
+        private enum PolygonSurfaceTriangulationMode
+        {
+            None,
+            BoundaryFan,
+            ProjectedCentreFan
+        }
+
         private sealed class EdgeWearEdgeAggregate
         {
             public readonly Vector3 Start;

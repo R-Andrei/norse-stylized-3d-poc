@@ -348,36 +348,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 "Production Chipping",
                 EditorStyles.miniBoldLabel);
-            SerializedProperty chipApplicationMode = Find(
-                "foamChipApplicationMode");
-            EditorGUILayout.PropertyField(
-                chipApplicationMode,
-                new GUIContent(
-                    "Chip Application",
-                    "Rendered Edge Band preserves the current P12m route. Candidate Straddle is an experimental low-frequency candidate-level boundary test used only by Presence-Amplitude. Switching back immediately restores the current route and stops admission-cache dispatches."));
-            bool mixedChipApplication =
-                chipApplicationMode.hasMultipleDifferentValues;
-            bool candidateStraddleSelected =
-                !mixedChipApplication &&
-                chipApplicationMode.enumValueIndex ==
-                    (int)StylizedRiverFoamChipApplicationMode.CandidateStraddle;
-            SerializedProperty presenceFootprintMode = Find(
-                "foamPresenceFootprintMode");
-            bool mixedPresenceFootprint =
-                presenceFootprintMode.hasMultipleDifferentValues;
-            bool presenceAmplitudeSelected =
-                !mixedPresenceFootprint &&
-                presenceFootprintMode.enumValueIndex ==
-                    (int)StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude;
-            bool candidateStraddleActive =
-                candidateStraddleSelected && presenceAmplitudeSelected;
-            string chipApplicationHelp = candidateStraddleActive
-                ? "Candidate Straddle keeps the existing analytical candidates, but admits a complete candidate only when its centre and irregular perimeter samples prove that it crosses subcell Layer E Foam support. Admission refreshes independently at the authored low rate; Final still removes only exact pre-Chip rendered Foam."
-                : candidateStraddleSelected
-                    ? "Candidate Straddle applies only to Presence-Amplitude. Current Presence Footprint continues to use its established Edge Width and Interior Access path, and no admission-cache dispatch runs."
-                    : "Rendered Edge Band is the preserved P12m route. It intersects the analytical Candidate field with the current derivative-based Edge Width territory and optional Current-mode Interior Access. Use the three Chip debug views for direct A/B comparison.";
             EditorGUILayout.HelpBox(
-                chipApplicationHelp,
+                "Production Chipping uses the original full-rate analytical Candidate Field and one rendered Eligibility band. Presence-Amplitude isolates the visible exterior fringe before estimating Edge Width so the inner hardened body transition cannot create another permission contour. Use Chip Candidate Field, Chip Eligibility Composite, and Production Chip Mask to inspect Candidate × Eligibility.",
                 MessageType.Info);
             EditorGUILayout.PropertyField(
                 Find("foamChipActivation"),
@@ -462,37 +434,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     $"{meanRadius * maximumMultiplier:0.###} m");
             }
 
-            if (mixedChipApplication || mixedPresenceFootprint ||
-                !candidateStraddleActive)
-            {
-                DrawUnboundedNonNegativeSlider(
-                    Find("foamChipEdgeWidthPixels"),
-                    new GUIContent(
-                        "Chip Edge Width (px)",
-                        "Approximate inward width of the visible Foam edge band used by Rendered Edge Band. Zero disables edge permission exactly. The slider covers 0–256 px; the numeric field accepts any non-negative value for deliberately extreme bands."),
-                    0f,
-                    256f);
-                EditorGUILayout.PropertyField(
-                    Find("foamChipInteriorAccess"),
-                    new GUIContent(
-                        "Chip Interior Access",
-                        "Current/Rendered Edge Band permission outside Chip Edge Width. Presence-Amplitude Rendered Edge Band keeps this disabled; Current Presence Footprint retains the established optional candidate-level interior admission."));
-            }
-
-            if (mixedChipApplication || candidateStraddleSelected)
-            {
-                using (new EditorGUI.DisabledScope(
-                    !mixedChipApplication &&
-                    !mixedPresenceFootprint &&
-                    !presenceAmplitudeSelected))
-                {
-                    EditorGUILayout.PropertyField(
-                        Find("foamChipStraddleRefreshRate"),
-                        new GUIContent(
-                            "Straddle Refresh Rate (Hz)",
-                            "How often the experimental candidate-level boundary admission is refreshed while Presence-Amplitude is active. Candidate geometry and motion still evaluate every rendered frame. Four hertz is the default; lower values reduce compute and increase admission lag."));
-                }
-            }
+            DrawUnboundedNonNegativeSlider(
+                Find("foamChipEdgeWidthPixels"),
+                new GUIContent(
+                    "Chip Edge Width (px)",
+                    "Approximate inward width of the visible Foam edge band in rendered pixels. Presence-Amplitude measures this only through the isolated exterior rendered fringe; Current retains its established soft-visibility estimate. Zero disables edge permission exactly. The slider covers 0–256 px; numeric entry accepts any non-negative value for deliberately extreme bands."),
+                0f,
+                256f);
+            EditorGUILayout.PropertyField(
+                Find("foamChipInteriorAccess"),
+                new GUIContent(
+                    "Chip Interior Access",
+                    "Fraction of activated candidate identities granted permission in the established body outside Chip Edge Width. Zero is edge-only; one lets every active candidate cut the full visible body. Intermediate values admit complete deterministic candidates, not pixel noise."));
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
                 "View Readability LOD",

@@ -1,3 +1,87 @@
+## 2026-07-21 — GSU-M2.7C.5D.1: Generated Mass sparse riverbed assembly architecture
+
+M2.7C.5D.1 converts the accepted isolated-rock library into complete periodic material candidates. The source contract remains frozen to the 18 Terrain/Squat Uneven Broad definitions, current algorithm-8 source snapshot, unified wear normalization `0.52`, fallback normalization `0.56`, processed height/normals, deterministic variation, broken root sectors and Moderate response.
+
+Assembly ownership:
+
+- Editor-only direct triangle rasterization from generated 3D meshes;
+- 2048² working raster and deterministic 2× reduction to 1024² evidence;
+- toroidal placement and processing across all tile boundaries;
+- pre-commit spacing, overlap, coverage and quiet-block checks;
+- deterministic broad macro regions rather than a grid or directional sine carpet;
+- stable-ID diversity and maximum-share limits;
+- final mask, height, normals, variation, root darkening, wear and Moderate preview evidence;
+- explicit 3×3 repetition, placement, stable-ID and mip evidence.
+
+Candidate contracts:
+
+- Quiet Sparse Riverbed: target 7%, accepted 6–8%, at least 72% quiet 32×32 blocks;
+- Natural Sparse Riverbed: target 9%, accepted 8–10.5%, at least 66% quiet blocks;
+- Dense Sparse Riverbed: target 11%, accepted 10–12.5%, at least 58% quiet blocks.
+
+M2.7C.5D.1 does not retune individual rocks or create/import runtime textures. One complete candidate must be visually accepted before M2.7C.5E may integrate it through the ordinary Ground material architecture.
+
+## 2026-07-21 — M2.7C.5C.2.2 addendum: material-response freeze and drift policy
+
+- The isolated-rock response is frozen with the unified wear normalization target at `0.52` and fallback at `0.56`.
+- `S-08` is the accepted reference for unified fragmented internal accents; slight understatement is preferred over louder linework at game scale.
+- Historical raw-geometry drift from upstream Generated Mass unified-preview changes is reportable but non-blocking when same-run determinism and frozen recipes/settings pass.
+- Next phase: `M2.7C.5D — Seamless Sparse Riverbed Assembly`.
+
+## 2026-07-21 — M2.7C.5C.2.1 addendum: edge-accent midpoint and isolated-rock response freeze
+
+The accepted visual midpoint is defined by two frozen references:
+
+- `S-08` supplies the preferred fragmented accent pattern, but its M2.7C.5C.2 accent dominance is slightly too high.
+- `T-15` supplies the preferred integrated accent blend, but its M2.7C.5C.2 accent visibility is slightly too low.
+
+The correction is intentionally path-level rather than ID-specific. Unified edge-wear projections receive a small normalized-strength reduction; fallback curvature-derived wear receives a small normalized-strength increase. Fragmentation frequencies, segment breakup, silhouette exclusion, dilation, support/core colour mapping, processed geometry, lighting, variation, root sectors, and burial remain unchanged.
+
+Moderate remains the production-style target and must stay subtle enough that distant rocks do not collapse into visible line art. Strong remains diagnostic. After this midpoint is visually accepted, the isolated-rock material response is frozen and the next phase is M2.7C.5D seamless sparse riverbed assembly.
+
+Earlier architecture history continues below.
+
+## 2026-07-21 — Addendum: M2.7C.5C.2 Subtle Edge-Accent Response
+
+The isolated-rock material architecture remains frozen to the accepted 18-rock Terrain/Squat Uneven Broad library and the M2.7C.5C.1 processed height, normals, variation, lighting, root sectors, and burial framing. M2.7C.5C.2 changes only the presentation of internal convex edge accents.
+
+The accepted visual direction is deliberately restrained because the final riverbed rocks will often occupy only a small number of screen pixels. Accent lines must therefore improve plane readability when viewed close-up but collapse into ordinary form contrast rather than visible line art at distance.
+
+Authoritative response rules:
+- Native projected wear and curvature-derived fallback wear are balanced into a comparable per-rock range.
+- Long accent segments receive deterministic multi-frequency breakup.
+- The colour response uses a broad low-contrast support component and a smaller bounded core component.
+- Moderate is the intended production-style response and must remain subtle. Strong is diagnostic only and may not become a continuous bright-line treatment.
+- The existing outer silhouette exclusion remains mandatory; edge accents are not outlines and may not derive from generic mask distance.
+
+M2.7C.5D seamless sparse riverbed assembly remains blocked until this calibrated Moderate response is visually accepted.
+
+Earlier architecture content follows below.
+
+## 2026-07-21 — GSU-M2.7C.5C.1: Corrected frozen river-rock response architecture
+
+M2.7C.5C.1 preserves the complete 18-rock frozen Generated Mass source library, every source recipe/projection setting, raw geometry fingerprint, three-pass broad height, one-pass mild height, and 78/22 processed-normal blend. It changes only Editor evidence conversion and burial diagnostics.
+
+Response ownership is now explicit:
+
+- **Upward exposure** is derived from processed-normal vertical orientation and is a restrained secondary weathering/material term. It does not provide the main light/shadow separation.
+- **Directional light response** is derived independently from the signed processed-normal dot product with the diagnostic light direction. It owns the visible dark-facing / light-facing plane separation in Neutral, Moderate, and Strong evidence.
+- **Material variation** remains deterministic per rock and independent of source triangulation.
+- **Root darkening** is generated as one or two broad deterministic burial-owned sectors, expanded inward by a bounded three to seven source pixels. Large perimeter regions remain unaffected; mask-distance rings remain prohibited.
+- **Edge wear** remains excluded from the outer silhouette band, prefers real internal convex structure, and may widen by at most two pixels for evidence visibility.
+
+Neutral, Moderate, and Strong have separate response ranges. Moderate remains the intended production-style target; Strong remains diagnostic exaggeration. The six-rock close-up sheet uses `S-12`, `S-13`, `S-14`, `T-05`, `T-13`, and `T-15` under all three response modes and is the primary material-response acceptance evidence.
+
+Burial evidence uses `S-12`, `S-14`, `T-13`, and `T-15` at 8%, 18%, 28%, and 38%. Every depth for one source reuses the same transformed mesh centre, projection scale, full-height normalization, rotation, and cell framing; only the burial plane moves. A burial gauge provides an explicit substrate-depth reference.
+
+The progression remains:
+
+1. **M2.7C.5C.1:** accept the corrected Moderate response and fixed-frame burial evidence.
+2. **M2.7C.5D:** assemble only the frozen accepted sources into a seamless sparse riverbed tile.
+3. **M2.7C.5E:** integrate an accepted tile through the existing reusable Ground material/profile architecture.
+
+No runtime material, shader branch, Ground selector, Inspector control, scene object, profile, texture-array entry, or source-rock generation change is introduced.
+
 ## 2026-07-21 — GSU-M2.7C.5C: Frozen river-rock material-response architecture
 
 M2.7C.5C ends source-rock exploration. The authoritative projected river-rock library is frozen to 18 Uneven Broad Generated Mass sources:

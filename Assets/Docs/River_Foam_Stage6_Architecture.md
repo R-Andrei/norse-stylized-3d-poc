@@ -4138,7 +4138,7 @@ Presence-Amplitude Candidate, Eligibility, and Production diagnostics are binary
 Because Candidate visibility includes existing antialias, readability, and subpixel fades before binary selection, every positive tail receives full Presence-Amplitude authority. Hard edges or candidate pop-in are an accepted risk of the absolute any-support rule and require Unity evidence before any separate tuning patch.
 
 
-## Layer E optional Candidate-Straddle admission — `RG-METRIC-P12n`
+## Layer E optional Candidate-Straddle admission — `RG-METRIC-P12n` — rejected
 
 P12n adds transient candidate permission inside Layer E. It does not mutate Presence, Remaining Life, Material Pattern, transport, sources, Film, Shape, or topology caches.
 
@@ -4157,3 +4157,45 @@ The experimental support test is candidate-level rather than a per-pixel edge-di
 The support evaluator is a fixed-world-footprint approximation of the no-Chip Layer E state. It mirrors stable pattern, lifecycle erosion, hardening, and structural Strand policy from the render include, but deliberately omits screen derivatives and surface-wake deformation. This limitation can create missed/no-op attachment or timing mismatch; exact final removal prevents it from removing pixels where rendered Foam does not exist.
 
 The established P12m Rendered Edge Band path remains default and selectable. Current Presence Footprint remains unchanged. Candidate Straddle evaluates admitted candidates on every positive exact pre-Chip rendered-mask pixel rather than inheriting the Rendered Edge Band route’s `0.08` BaseCoverage gate, so faint exact Foam fringe is part of the same binary removal. Candidate Straddle uses one on-demand point RFloat texture, one due-time compute dispatch at default `4 Hz`, and point loads only for overlapping active candidates in the existing fragment candidate loop. No new pass, draw, persistent simulation field, or high-resolution topology texture is introduced. Unity visual and performance acceptance are pending.
+
+
+## Layer E boundary-anchored Eligibility — `RG-METRIC-P12o`
+
+P12o restores the required ownership split:
+
+```text
+original full-rate analytical Candidate Field
+        ×
+selected Eligibility route
+        -> Production
+        -> exact pre-Chip rendered Foam removal
+```
+
+The experimental cache does not contain candidate shape or candidate authority. It stores one local boundary descriptor per deterministic candidate identity. Initial acquisition samples the current candidate centre, then checks the existing deterministic ring directions until the first occupied/empty disagreement supplies a known boundary bracket. Four binary refinements locate the transition and a local four-axis probe refines the inward normal. Once valid, tracking starts from the previous boundary anchor and inward normal, using intermediate support samples across the tracking interval so thin Foam ribbons are not skipped. Failed or discontinuous tracking locks the descriptor until the candidate reaches dormancy, preventing interior reacquisition or boundary teleportation.
+
+At render time the original Candidate Field is unchanged. A valid descriptor reconstructs a local strip with inward depth limited by `Chip Edge Width` and tangent extent limited by the current analytical candidate reach. Experimental Production is binary Candidate × strip Eligibility. The strip is displayed directly in `Chip Eligibility Composite`; no hidden admission or secondary reach field exists.
+
+The descriptor solver is camera-independent and topology-based at candidate-local samples. It uses occupied/empty support and a bracketed boundary transition rather than derivatives of a soft scalar. This is not a global exact edge field; sharp curvature and screen-derived micro-boundaries remain risks to validate in Unity.
+
+Current/P12m remains the default and fallback. The experimental texture is one on-demand ARGBFloat record per guarded candidate identity, updated at default `4 Hz`. `XY` stores the River-space boundary anchor; `Z` exactly packs lateral identity, three-state ownership, and a 10-bit normal angle; `W` stores the exact longitudinal identity. Absolute identities map through a circular modulo cache so ordinary downstream lattice-origin movement preserves valid and locked history without a second texture. For the previously observed `520 × 67` allocation, logical payload is `544.4 KiB`. No additional render pass, draw, high-resolution topology field, or persistent material state is added.
+
+Status: source implementation and `41/41` pre-package offline gates pass. Unity 6000.5 import, same-frame visual A/B, and measured GPU cost remain pending.
+
+## P12p Layer E addendum — one Candidate Field and isolated rendered-fringe Eligibility
+
+P12n/P12o low-frequency candidate/boundary caches are rejected and removed. Layer E returns to one candidate producer: the original analytical render-frame Candidate Field. Candidate lifecycle, motion, pulse, rotation, irregularity, view stabilization, and antialiasing are unchanged.
+
+Presence-Amplitude production remains:
+
+```text
+binary any-positive-support Candidate
+×
+binary any-positive-support rendered Eligibility
+=
+binary Production
+```
+
+Selected Production pixels remove the complete exact `preChipRenderedMask`. Eligibility is derived from the exterior rendered-fringe coordinate only. `preChipRenderedMask` is clamped to `0.34`, normalized from the existing visible start `0.08`, and differentiated in screen space. The clamp makes the coordinate flat through the inner hardened body, preventing the hard-body rise from acting as another edge. Current Presence Footprint retains the accepted soft-visibility edge path.
+
+This remains render-only Layer E work. It adds no persistent state, material mutation, topology field, texture, buffer, kernel, dispatch, pass, or cache.
+

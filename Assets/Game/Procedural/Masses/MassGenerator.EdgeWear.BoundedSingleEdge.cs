@@ -13,6 +13,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private const int BoundedIsolatedMaximumWidthAttempts = 12;
         private const float BoundedIsolatedWidthBackoff = 0.75f;
+        private const float OneSurfaceMinimumRenderNormalDot = 0.5f;
 
         private struct BoundedSingleEdgeAuditResult
         {
@@ -210,6 +211,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public double VolumeLowerMargin;
             public double VolumeUpperMargin;
             public int TriangulatedFaceCount;
+            public int PolygonSurfaceFaceCount;
+            public int PolygonSurfaceBoundaryVertexCount;
+            public int PolygonSurfaceExpectedTriangleCount;
+            public int PolygonSurfaceTriangleCount;
+            public int PolygonSurfaceAuthoredNormalTriangleCount;
+            public int PolygonSurfaceAuthoredSurfaceGroupTriangleCount;
+            public int PolygonSurfaceInternalFanVertexCount;
+            public int PolygonSurfaceGroupCollisionCount;
+            public int PolygonSurfaceGroupCollisionSurfaceGroup;
+            public int PolygonSurfaceGroupCollisionFirstFace;
+            public int PolygonSurfaceGroupCollisionSecondFace;
+            public float PolygonSurfaceMaximumPlaneResidual;
+            public float PolygonSurfaceMaximumNormalDeviationDegrees;
+            public int PolygonSurfaceRenderValid;
+            public int PolygonSurfaceFailureFace;
+            public int PolygonSurfaceFailureProvenanceIndex;
+            public string PolygonSurfaceFailureReason;
             public int BevelRegionFaceCount;
             public int BevelRegionBoundaryVertexCount;
             public int BevelRegionTriangleCount;
@@ -7873,6 +7891,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumTriangleArea = Mathf.Max(
                 TinyFaceAreaEpsilon,
                 minimumStableFaceArea * 0.001f);
+            Dictionary<int, int> surfaceGroupOwnerById =
+                new Dictionary<int, int>();
+
+            audit.PolygonSurfaceFaceCount = 0;
+            audit.PolygonSurfaceBoundaryVertexCount = 0;
+            audit.PolygonSurfaceExpectedTriangleCount = 0;
+            audit.PolygonSurfaceTriangleCount = 0;
+            audit.PolygonSurfaceAuthoredNormalTriangleCount = 0;
+            audit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount = 0;
+            audit.PolygonSurfaceInternalFanVertexCount = 0;
+            audit.PolygonSurfaceGroupCollisionCount = 0;
+            audit.PolygonSurfaceGroupCollisionSurfaceGroup = -1;
+            audit.PolygonSurfaceGroupCollisionFirstFace = -1;
+            audit.PolygonSurfaceGroupCollisionSecondFace = -1;
+            audit.PolygonSurfaceMaximumPlaneResidual = 0f;
+            audit.PolygonSurfaceMaximumNormalDeviationDegrees = 0f;
+            audit.PolygonSurfaceRenderValid = 0;
+            audit.PolygonSurfaceFailureFace = -1;
+            audit.PolygonSurfaceFailureProvenanceIndex = -1;
+            audit.PolygonSurfaceFailureReason = string.Empty;
 
             audit.BevelRegionFaceCount = 0;
             audit.BevelRegionBoundaryVertexCount = 0;
@@ -7920,104 +7958,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     return false;
                 }
 
-                if (IsOneSurfaceBevelFace(face))
-                {
-                    if (!TryTriangulateBoundedBevelRegionFace(
-                            face,
-                            faceIndex,
-                            minimumTriangleArea,
-                            ref audit,
-                            soup,
-                            out blocker))
-                    {
-                        soup = null;
-                        return false;
-                    }
-                    audit.TriangulatedFaceCount++;
-                    continue;
-                }
-
-                Vector3 centre = CalculateAverage(convexityLoop);
-                if (!IsFinite(centre))
-                {
-                    blocker = RecordBoundedTriangulationFailure(
-                        ref audit,
-                        faceIndex,
+                if (!TryTriangulateBoundedOneSurfaceFace(
                         face,
-                        BoundedPolygonFailure.NonFinite,
-                        "the convex region has no finite fan centre");
+                        faceIndex,
+                        minimumTriangleArea,
+                        surfaceGroupOwnerById,
+                        ref audit,
+                        soup,
+                        out blocker))
+                {
                     soup = null;
                     return false;
                 }
-
-                for (int vertexIndex = 0;
-                     vertexIndex < face.Vertices.Count;
-                     vertexIndex++)
-                {
-                    Vector3 start = face.Vertices[vertexIndex];
-                    Vector3 end = face.Vertices[
-                        (vertexIndex + 1) % face.Vertices.Count];
-                    List<Vector3> triangle = new List<Vector3>
-                    {
-                        centre,
-                        start,
-                        end
-                    };
-                    if (CalculatePolygonArea(triangle) <=
-                        minimumTriangleArea)
-                    {
-                        blocker = RecordBoundedTriangulationFailure(
-                            ref audit,
-                            faceIndex,
-                            face,
-                            BoundedPolygonFailure.Degenerate,
-                            "a boundary segment collapses against the fan centre");
-                        soup = null;
-                        return false;
-                    }
-
-                    int previousPositionCount = soup.Positions.Count;
-                    AddOrientedTriangle(
-                        soup,
-                        centre,
-                        start,
-                        end,
-                        face.Normal,
-                        face.Feature,
-                        face.FeatureStrength);
-                    if (soup.Positions.Count !=
-                        previousPositionCount + 3)
-                    {
-                        blocker = RecordBoundedTriangulationFailure(
-                            ref audit,
-                            faceIndex,
-                            face,
-                            BoundedPolygonFailure.Degenerate,
-                            "triangle emission rejected a real boundary segment");
-                        soup = null;
-                        return false;
-                    }
-
-                    Vector3 emittedNormal = Vector3.Cross(
-                        soup.Positions[previousPositionCount + 1] -
-                            soup.Positions[previousPositionCount],
-                        soup.Positions[previousPositionCount + 2] -
-                            soup.Positions[previousPositionCount]);
-                    if (!IsFinite(emittedNormal) ||
-                        Vector3.Dot(emittedNormal, face.Normal) <= 0f)
-                    {
-                        blocker = RecordBoundedTriangulationFailure(
-                            ref audit,
-                            faceIndex,
-                            face,
-                            BoundedPolygonFailure.Winding,
-                            "an emitted boundary triangle changes parent-face winding");
-                        soup = null;
-                        return false;
-                    }
-                }
-
                 audit.TriangulatedFaceCount++;
+            }
+
+            audit.PolygonSurfaceRenderValid =
+                audit.PolygonSurfaceFaceCount > 0 &&
+                audit.PolygonSurfaceTriangleCount > 0 &&
+                audit.PolygonSurfaceTriangleCount ==
+                    audit.PolygonSurfaceExpectedTriangleCount &&
+                audit.PolygonSurfaceTriangleCount ==
+                    audit.PolygonSurfaceAuthoredNormalTriangleCount &&
+                audit.PolygonSurfaceTriangleCount ==
+                    audit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount &&
+                audit.PolygonSurfaceInternalFanVertexCount >= 0 &&
+                audit.PolygonSurfaceInternalFanVertexCount <=
+                    audit.PolygonSurfaceFaceCount &&
+                audit.PolygonSurfaceGroupCollisionCount == 0 &&
+                audit.PolygonSurfaceFailureFace < 0
+                    ? 1
+                    : 0;
+            if (audit.PolygonSurfaceRenderValid != 1)
+            {
+                blocker =
+                    "the bounded shell did not render each polygon as one authored surface";
+                soup = null;
+                return false;
             }
 
             audit.BevelRegionRenderValid =
@@ -8027,14 +8004,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     audit.BevelRegionAuthoredNormalTriangleCount &&
                 audit.BevelRegionTriangleCount ==
                     audit.BevelRegionAuthoredSurfaceGroupTriangleCount &&
-                audit.BevelRegionInternalFanVertexCount == 0 &&
+                audit.BevelRegionInternalFanVertexCount >= 0 &&
+                audit.BevelRegionInternalFanVertexCount <=
+                    audit.BevelRegionFaceCount &&
                 audit.BevelRegionFailureFace < 0
                     ? 1
                     : 0;
             if (audit.BevelRegionFaceCount > 0 &&
                 audit.BevelRegionRenderValid != 1)
             {
-                blocker = "the bounded bevel region did not render as one planar authored-normal surface";
+                blocker =
+                    "the bounded bevel region did not render as one planar authored-normal surface";
                 soup = null;
                 return false;
             }
@@ -8054,36 +8034,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return false;
         }
 
-        private static bool TryTriangulateBoundedBevelRegionFace(
+        private static bool TryTriangulateBoundedOneSurfaceFace(
             PolygonFace face,
             int faceIndex,
             float minimumTriangleArea,
+            Dictionary<int, int> surfaceGroupOwnerById,
             ref BoundedSingleEdgeAuditResult audit,
             TriangleSoup soup,
             out string blocker)
         {
             blocker = string.Empty;
-            audit.BevelRegionFaceCount++;
-            audit.BevelRegionBoundaryVertexCount += face.Vertices.Count;
-
-            Vector3 authoredNormal = face.Normal;
-            if (!IsFinite(authoredNormal) ||
-                authoredNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            bool isBevelFace = IsOneSurfaceBevelFace(face);
+            audit.PolygonSurfaceFaceCount++;
+            audit.PolygonSurfaceBoundaryVertexCount +=
+                face.Vertices.Count;
+            if (isBevelFace)
             {
-                audit.BevelRegionFailureFace = faceIndex;
-                audit.BevelRegionFailureProvenanceIndex =
-                    face.ProvenanceIndex;
-                audit.BevelRegionFailureReason =
-                    "the bevel region has no finite authoritative plane normal";
+                audit.BevelRegionFaceCount++;
+                audit.BevelRegionBoundaryVertexCount +=
+                    face.Vertices.Count;
+            }
+
+            if (!TryResolveOneSurfaceAuthoredNormal(
+                    face,
+                    isBevelFace,
+                    out Vector3 authoredNormal))
+            {
                 blocker = RecordBoundedTriangulationFailure(
                     ref audit,
                     faceIndex,
                     face,
                     BoundedPolygonFailure.NonFinite,
-                    audit.BevelRegionFailureReason);
+                    "the polygon has no finite ordered-boundary render normal");
                 return false;
             }
-            authoredNormal.Normalize();
 
             float planeDistance = 0f;
             for (int vertexIndex = 0;
@@ -8109,136 +8093,418 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             face.Vertices[vertexIndex]) -
                         planeDistance));
             }
-            audit.BevelRegionMaximumPlaneResidual = Mathf.Max(
-                audit.BevelRegionMaximumPlaneResidual,
+            audit.PolygonSurfaceMaximumPlaneResidual = Mathf.Max(
+                audit.PolygonSurfaceMaximumPlaneResidual,
                 maximumPlaneResidual);
+            if (isBevelFace)
+            {
+                audit.BevelRegionMaximumPlaneResidual = Mathf.Max(
+                    audit.BevelRegionMaximumPlaneResidual,
+                    maximumPlaneResidual);
+            }
             float planeTolerance = PointMergeDistance * 8f;
             if (maximumPlaneResidual > planeTolerance)
             {
-                audit.BevelRegionFailureFace = faceIndex;
-                audit.BevelRegionFailureProvenanceIndex =
-                    face.ProvenanceIndex;
-                audit.BevelRegionFailureReason =
-                    "the complete bevel boundary is not on one authoritative plane";
                 blocker = RecordBoundedTriangulationFailure(
                     ref audit,
                     faceIndex,
                     face,
                     BoundedPolygonFailure.NonPlanar,
-                    audit.BevelRegionFailureReason);
+                    "the complete polygon boundary is not on one authoritative plane");
                 return false;
             }
 
-            if (!TryFindStableOneSurfaceFanAnchor(
-                    face.Vertices,
-                    minimumTriangleArea,
-                    out int anchorIndex))
+            int authoredSurfaceGroup = ResolvePolygonSurfaceGroup(
+                face,
+                faceIndex);
+            if (authoredSurfaceGroup < 0)
             {
-                audit.BevelRegionFailureFace = faceIndex;
-                audit.BevelRegionFailureProvenanceIndex =
-                    face.ProvenanceIndex;
-                audit.BevelRegionFailureReason =
-                    "the one-surface bevel boundary has no stable direct triangulation anchor";
+                blocker = RecordBoundedTriangulationFailure(
+                    ref audit,
+                    faceIndex,
+                    face,
+                    BoundedPolygonFailure.NonFinite,
+                    "the polygon has no valid authored surface-group identity");
+                return false;
+            }
+            if (surfaceGroupOwnerById.TryGetValue(
+                    authoredSurfaceGroup,
+                    out int previousOwnerFace) &&
+                previousOwnerFace != faceIndex)
+            {
+                audit.PolygonSurfaceGroupCollisionCount++;
+                audit.PolygonSurfaceGroupCollisionSurfaceGroup =
+                    authoredSurfaceGroup;
+                audit.PolygonSurfaceGroupCollisionFirstFace =
+                    previousOwnerFace;
+                audit.PolygonSurfaceGroupCollisionSecondFace =
+                    faceIndex;
                 blocker = RecordBoundedTriangulationFailure(
                     ref audit,
                     faceIndex,
                     face,
                     BoundedPolygonFailure.Degenerate,
-                    audit.BevelRegionFailureReason);
+                    "the polygon authored surface-group collides with face " +
+                        previousOwnerFace);
+                return false;
+            }
+            surfaceGroupOwnerById[authoredSurfaceGroup] = faceIndex;
+
+            PolygonSurfaceTriangulationMode triangulationMode =
+                PolygonSurfaceTriangulationMode.None;
+            int anchorIndex = -1;
+            Vector3 projectedCentre = Vector3.zero;
+            if (TryFindStableOneSurfaceFanAnchor(
+                    face.Vertices,
+                    authoredNormal,
+                    minimumTriangleArea,
+                    out anchorIndex))
+            {
+                triangulationMode =
+                    PolygonSurfaceTriangulationMode.BoundaryFan;
+            }
+            else if (TryResolveProjectedOneSurfaceCentre(
+                    face.Vertices,
+                    authoredNormal,
+                    planeDistance,
+                    planeTolerance,
+                    out projectedCentre) &&
+                IsProjectedOneSurfaceCentreFanStable(
+                    face.Vertices,
+                    projectedCentre,
+                    authoredNormal,
+                    minimumTriangleArea))
+            {
+                triangulationMode =
+                    PolygonSurfaceTriangulationMode.ProjectedCentreFan;
+            }
+
+            if (triangulationMode ==
+                PolygonSurfaceTriangulationMode.None)
+            {
+                blocker = RecordBoundedTriangulationFailure(
+                    ref audit,
+                    faceIndex,
+                    face,
+                    BoundedPolygonFailure.Degenerate,
+                    "the one-surface polygon has neither a stable direct fan nor a stable projected-centre fallback");
                 return false;
             }
 
-            Vector3 anchor = face.Vertices[anchorIndex];
-            int expectedTriangleCount = face.Vertices.Count - 2;
-            int emittedTriangleCount = 0;
-            for (int offset = 1;
-                 offset < face.Vertices.Count - 1;
-                 offset++)
+            int expectedTriangleCount = triangulationMode ==
+                    PolygonSurfaceTriangulationMode.BoundaryFan
+                ? face.Vertices.Count - 2
+                : face.Vertices.Count;
+            audit.PolygonSurfaceExpectedTriangleCount +=
+                expectedTriangleCount;
+            if (triangulationMode ==
+                PolygonSurfaceTriangulationMode.ProjectedCentreFan)
             {
-                Vector3 b = face.Vertices[
-                    (anchorIndex + offset) % face.Vertices.Count];
-                Vector3 c = face.Vertices[
-                    (anchorIndex + offset + 1) % face.Vertices.Count];
-                Vector3 geometricNormal = Vector3.Cross(
-                    b - anchor,
-                    c - anchor);
-                List<Vector3> triangle = new List<Vector3>
+                audit.PolygonSurfaceInternalFanVertexCount++;
+                if (isBevelFace)
                 {
-                    anchor,
-                    b,
-                    c
-                };
-                if (!IsFinite(geometricNormal) ||
-                    geometricNormal.sqrMagnitude <= MinimumEdgeLengthSqr ||
-                    CalculatePolygonArea(triangle) <= minimumTriangleArea)
-                {
-                    audit.BevelRegionFailureFace = faceIndex;
-                    audit.BevelRegionFailureProvenanceIndex =
-                        face.ProvenanceIndex;
-                    audit.BevelRegionFailureReason =
-                        "the one-surface bevel boundary produces a degenerate direct triangle";
-                    blocker = RecordBoundedTriangulationFailure(
-                        ref audit,
-                        faceIndex,
-                        face,
-                        BoundedPolygonFailure.Degenerate,
-                        audit.BevelRegionFailureReason);
-                    return false;
+                    audit.BevelRegionInternalFanVertexCount++;
                 }
+            }
 
-                if (Vector3.Dot(geometricNormal, authoredNormal) < 0f)
+            int emittedTriangleCount = 0;
+            if (triangulationMode ==
+                PolygonSurfaceTriangulationMode.BoundaryFan)
+            {
+                Vector3 anchor = face.Vertices[anchorIndex];
+                for (int offset = 1;
+                     offset < face.Vertices.Count - 1;
+                     offset++)
                 {
-                    Vector3 temporary = b;
-                    b = c;
-                    c = temporary;
-                    geometricNormal = -geometricNormal;
+                    Vector3 b = face.Vertices[
+                        (anchorIndex + offset) % face.Vertices.Count];
+                    Vector3 c = face.Vertices[
+                        (anchorIndex + offset + 1) %
+                            face.Vertices.Count];
+                    if (!TryEmitOneSurfaceTriangle(
+                            anchor,
+                            b,
+                            c,
+                            face,
+                            faceIndex,
+                            authoredNormal,
+                            authoredSurfaceGroup,
+                            minimumTriangleArea,
+                            isBevelFace,
+                            ref audit,
+                            soup,
+                            out blocker))
+                    {
+                        return false;
+                    }
+                    emittedTriangleCount++;
                 }
-
-                float normalDeviation = Vector3.Angle(
-                    geometricNormal.normalized,
-                    authoredNormal);
-                audit.BevelRegionMaximumNormalDeviationDegrees =
-                    Mathf.Max(
-                        audit.BevelRegionMaximumNormalDeviationDegrees,
-                        normalDeviation);
-
-                int authoredSurfaceGroup = unchecked(
-                    0x4B1D0000 ^
-                    ((int)face.ProvenanceKind << 20) ^
-                    face.ProvenanceIndex);
-                soup.AddTriangle(
-                    anchor,
-                    b,
-                    c,
-                    face.Feature,
-                    face.FeatureStrength,
-                    authoredNormal,
-                    authoredSurfaceGroup);
-                emittedTriangleCount++;
-                audit.BevelRegionTriangleCount++;
-                audit.BevelRegionAuthoredNormalTriangleCount++;
-                audit.BevelRegionAuthoredSurfaceGroupTriangleCount++;
+            }
+            else
+            {
+                for (int vertexIndex = 0;
+                     vertexIndex < face.Vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 b = face.Vertices[vertexIndex];
+                    Vector3 c = face.Vertices[
+                        (vertexIndex + 1) % face.Vertices.Count];
+                    if (!TryEmitOneSurfaceTriangle(
+                            projectedCentre,
+                            b,
+                            c,
+                            face,
+                            faceIndex,
+                            authoredNormal,
+                            authoredSurfaceGroup,
+                            minimumTriangleArea,
+                            isBevelFace,
+                            ref audit,
+                            soup,
+                            out blocker))
+                    {
+                        return false;
+                    }
+                    emittedTriangleCount++;
+                }
             }
 
             if (emittedTriangleCount != expectedTriangleCount)
             {
-                audit.BevelRegionFailureFace = faceIndex;
-                audit.BevelRegionFailureProvenanceIndex =
-                    face.ProvenanceIndex;
-                audit.BevelRegionFailureReason =
-                    "the one-surface bevel did not emit exactly boundaryVertices-minus-two triangles";
                 blocker = RecordBoundedTriangulationFailure(
                     ref audit,
                     faceIndex,
                     face,
                     BoundedPolygonFailure.Degenerate,
-                    audit.BevelRegionFailureReason);
+                    "the one-surface polygon emitted an unexpected triangle count for its selected triangulation mode");
                 return false;
             }
 
             return true;
         }
 
+        private static bool TryResolveProjectedOneSurfaceCentre(
+            List<Vector3> vertices,
+            Vector3 authoredNormal,
+            float planeDistance,
+            float planeTolerance,
+            out Vector3 projectedCentre)
+        {
+            projectedCentre = Vector3.zero;
+            if (vertices == null || vertices.Count < 3 ||
+                !IsFinite(authoredNormal) ||
+                authoredNormal.sqrMagnitude <= MinimumEdgeLengthSqr ||
+                !IsFiniteFloat(planeDistance) ||
+                !IsFiniteFloat(planeTolerance) ||
+                planeTolerance < 0f)
+            {
+                return false;
+            }
+
+            for (int vertexIndex = 0;
+                 vertexIndex < vertices.Count;
+                 vertexIndex++)
+            {
+                if (!IsFinite(vertices[vertexIndex]))
+                {
+                    return false;
+                }
+                projectedCentre += vertices[vertexIndex];
+            }
+            projectedCentre /= vertices.Count;
+
+            float residual = Vector3.Dot(
+                authoredNormal,
+                projectedCentre) - planeDistance;
+            if (!IsFiniteFloat(residual))
+            {
+                return false;
+            }
+            projectedCentre -= authoredNormal * residual;
+            if (!IsFinite(projectedCentre))
+            {
+                return false;
+            }
+
+            float projectedResidual = Mathf.Abs(
+                Vector3.Dot(authoredNormal, projectedCentre) -
+                planeDistance);
+            return IsFiniteFloat(projectedResidual) &&
+                projectedResidual <= planeTolerance;
+        }
+
+        private static bool IsProjectedOneSurfaceCentreFanStable(
+            List<Vector3> vertices,
+            Vector3 projectedCentre,
+            Vector3 authoredNormal,
+            float minimumTriangleArea)
+        {
+            if (vertices == null || vertices.Count < 3 ||
+                !IsFinite(projectedCentre) ||
+                !IsFinite(authoredNormal) ||
+                authoredNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            for (int vertexIndex = 0;
+                 vertexIndex < vertices.Count;
+                 vertexIndex++)
+            {
+                if (!TryResolveOneSurfaceTriangle(
+                        projectedCentre,
+                        vertices[vertexIndex],
+                        vertices[(vertexIndex + 1) % vertices.Count],
+                        authoredNormal,
+                        minimumTriangleArea,
+                        out _,
+                        out _,
+                        out _,
+                        out _))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool TryEmitOneSurfaceTriangle(
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            PolygonFace face,
+            int faceIndex,
+            Vector3 authoredNormal,
+            int authoredSurfaceGroup,
+            float minimumTriangleArea,
+            bool isBevelFace,
+            ref BoundedSingleEdgeAuditResult audit,
+            TriangleSoup soup,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            if (!TryResolveOneSurfaceTriangle(
+                    a,
+                    b,
+                    c,
+                    authoredNormal,
+                    minimumTriangleArea,
+                    out Vector3 orientedB,
+                    out Vector3 orientedC,
+                    out _,
+                    out float normalDeviation))
+            {
+                blocker = RecordBoundedTriangulationFailure(
+                    ref audit,
+                    faceIndex,
+                    face,
+                    BoundedPolygonFailure.Winding,
+                    "a polygon triangle failed area or final render-normal agreement certification");
+                return false;
+            }
+
+            audit.PolygonSurfaceMaximumNormalDeviationDegrees =
+                Mathf.Max(
+                    audit.PolygonSurfaceMaximumNormalDeviationDegrees,
+                    normalDeviation);
+            if (isBevelFace)
+            {
+                audit.BevelRegionMaximumNormalDeviationDegrees =
+                    Mathf.Max(
+                        audit.BevelRegionMaximumNormalDeviationDegrees,
+                        normalDeviation);
+            }
+
+            soup.AddTriangle(
+                a,
+                orientedB,
+                orientedC,
+                face.Feature,
+                face.FeatureStrength,
+                authoredNormal,
+                authoredSurfaceGroup);
+            audit.PolygonSurfaceTriangleCount++;
+            audit.PolygonSurfaceAuthoredNormalTriangleCount++;
+            audit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount++;
+            if (isBevelFace)
+            {
+                audit.BevelRegionTriangleCount++;
+                audit.BevelRegionAuthoredNormalTriangleCount++;
+                audit.BevelRegionAuthoredSurfaceGroupTriangleCount++;
+            }
+            return true;
+        }
+
+        private static bool TryResolveOneSurfaceTriangle(
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            Vector3 authoredNormal,
+            float minimumTriangleArea,
+            out Vector3 orientedB,
+            out Vector3 orientedC,
+            out Vector3 normalizedGeometricNormal,
+            out float normalDeviation)
+        {
+            orientedB = b;
+            orientedC = c;
+            normalizedGeometricNormal = Vector3.zero;
+            normalDeviation = 0f;
+            Vector3 geometricNormal = Vector3.Cross(b - a, c - a);
+            float doubleArea = geometricNormal.magnitude;
+            float area = doubleArea * 0.5f;
+            if (!IsFinite(geometricNormal) ||
+                geometricNormal.sqrMagnitude <= MinimumEdgeLengthSqr ||
+                !IsFiniteFloat(area) ||
+                area <= minimumTriangleArea)
+            {
+                return false;
+            }
+
+            if (Vector3.Dot(geometricNormal, authoredNormal) < 0f)
+            {
+                orientedB = c;
+                orientedC = b;
+                geometricNormal = -geometricNormal;
+            }
+
+            normalizedGeometricNormal = geometricNormal.normalized;
+            float renderNormalDot = Vector3.Dot(
+                normalizedGeometricNormal,
+                authoredNormal);
+            if (!IsFiniteFloat(renderNormalDot) ||
+                renderNormalDot < OneSurfaceMinimumRenderNormalDot)
+            {
+                return false;
+            }
+
+            normalDeviation = Vector3.Angle(
+                normalizedGeometricNormal,
+                authoredNormal);
+            return IsFiniteFloat(normalDeviation);
+        }
+
+        private static int ResolvePolygonSurfaceGroup(
+            PolygonFace face,
+            int faceIndex)
+        {
+            if (face == null || faceIndex < 0)
+            {
+                return -1;
+            }
+
+            int identity = face.ProvenanceIndex >= 0
+                ? face.ProvenanceIndex
+                : faceIndex;
+            int prefix = IsOneSurfaceBevelFace(face)
+                ? 0x4B1D0000
+                : 0x3A710000;
+            return unchecked(
+                (prefix ^
+                 ((int)face.ProvenanceKind << 20) ^
+                 identity) &
+                0x7FFFFFFF);
+        }
 
         private static bool IsOneSurfaceBevelFace(PolygonFace face)
         {
@@ -8249,23 +8515,93 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     PolygonFaceProvenanceKind.EdgeBevelPlane);
         }
 
-        private static bool TryFindStableOneSurfaceFanAnchor(
-            List<Vector3> vertices,
-            float minimumTriangleArea,
-            out int anchorIndex)
+        private static bool TryResolveOneSurfaceAuthoredNormal(
+            PolygonFace face,
+            bool isBevelFace,
+            out Vector3 authoredNormal)
         {
-            anchorIndex = -1;
-            if (vertices == null || vertices.Count < 3)
+            authoredNormal = Vector3.zero;
+            if (face == null || face.Vertices == null ||
+                face.Vertices.Count < 3 ||
+                !IsFinite(face.Normal) ||
+                face.Normal.sqrMagnitude <= MinimumEdgeLengthSqr)
             {
                 return false;
             }
 
+            Vector3 analyticalNormal = face.Normal.normalized;
+            if (isBevelFace)
+            {
+                authoredNormal = analyticalNormal;
+                return true;
+            }
+
+            Vector3 orderedBoundaryNormal = Vector3.zero;
+            for (int vertexIndex = 0;
+                 vertexIndex < face.Vertices.Count;
+                 vertexIndex++)
+            {
+                Vector3 current = face.Vertices[vertexIndex];
+                Vector3 next = face.Vertices[
+                    (vertexIndex + 1) % face.Vertices.Count];
+                if (!IsFinite(current) || !IsFinite(next))
+                {
+                    return false;
+                }
+
+                orderedBoundaryNormal.x +=
+                    (current.y - next.y) *
+                    (current.z + next.z);
+                orderedBoundaryNormal.y +=
+                    (current.z - next.z) *
+                    (current.x + next.x);
+                orderedBoundaryNormal.z +=
+                    (current.x - next.x) *
+                    (current.y + next.y);
+            }
+
+            if (!IsFinite(orderedBoundaryNormal) ||
+                orderedBoundaryNormal.sqrMagnitude <=
+                    MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            orderedBoundaryNormal.Normalize();
+            if (Vector3.Dot(
+                    orderedBoundaryNormal,
+                    analyticalNormal) < 0f)
+            {
+                orderedBoundaryNormal = -orderedBoundaryNormal;
+            }
+
+            authoredNormal = orderedBoundaryNormal;
+            return true;
+        }
+
+        private static bool TryFindStableOneSurfaceFanAnchor(
+            List<Vector3> vertices,
+            Vector3 authoredNormal,
+            float minimumTriangleArea,
+            out int anchorIndex)
+        {
+            anchorIndex = -1;
+            if (vertices == null || vertices.Count < 3 ||
+                !IsFinite(authoredNormal) ||
+                authoredNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            authoredNormal.Normalize();
+            float bestMinimumNormalDot = -1f;
             float bestMinimumArea = -1f;
             for (int candidate = 0;
                  candidate < vertices.Count;
                  candidate++)
             {
                 Vector3 anchor = vertices[candidate];
+                float minimumNormalDot = 1f;
                 float minimumArea = float.PositiveInfinity;
                 bool stable = true;
                 for (int offset = 1;
@@ -8276,22 +8612,57 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         (candidate + offset) % vertices.Count];
                     Vector3 c = vertices[
                         (candidate + offset + 1) % vertices.Count];
+                    Vector3 geometricNormal = Vector3.Cross(
+                        b - anchor,
+                        c - anchor);
                     float area = CalculatePolygonArea(
                         new List<Vector3> { anchor, b, c });
-                    if (!IsFiniteFloat(area) ||
+                    if (!IsFinite(geometricNormal) ||
+                        geometricNormal.sqrMagnitude <=
+                            MinimumEdgeLengthSqr ||
+                        !IsFiniteFloat(area) ||
                         area <= minimumTriangleArea)
                     {
                         stable = false;
                         break;
                     }
+
+                    float normalDot = Mathf.Abs(Vector3.Dot(
+                        geometricNormal.normalized,
+                        authoredNormal));
+                    if (!IsFiniteFloat(normalDot) ||
+                        normalDot <
+                            OneSurfaceMinimumRenderNormalDot)
+                    {
+                        stable = false;
+                        break;
+                    }
+
+                    minimumNormalDot = Mathf.Min(
+                        minimumNormalDot,
+                        normalDot);
                     minimumArea = Mathf.Min(minimumArea, area);
                 }
 
-                if (!stable || minimumArea <= bestMinimumArea)
+                if (!stable)
                 {
                     continue;
                 }
 
+                bool betterNormalAgreement =
+                    minimumNormalDot >
+                        bestMinimumNormalDot + 0.000001f;
+                bool equalNormalAgreement = Mathf.Abs(
+                    minimumNormalDot - bestMinimumNormalDot) <=
+                        0.000001f;
+                if (!betterNormalAgreement &&
+                    (!equalNormalAgreement ||
+                     minimumArea <= bestMinimumArea))
+                {
+                    continue;
+                }
+
+                bestMinimumNormalDot = minimumNormalDot;
                 bestMinimumArea = minimumArea;
                 anchorIndex = candidate;
             }
@@ -8315,6 +8686,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ? -1
                 : face.ProvenanceIndex;
             audit.TriangulationFailureReason = reason;
+            audit.PolygonSurfaceRenderValid = 0;
+            audit.PolygonSurfaceFailureFace = faceIndex;
+            audit.PolygonSurfaceFailureProvenanceIndex = face == null
+                ? -1
+                : face.ProvenanceIndex;
+            audit.PolygonSurfaceFailureReason = reason;
             if (IsOneSurfaceBevelFace(face))
             {
                 audit.BevelRegionRenderValid = 0;

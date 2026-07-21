@@ -4615,7 +4615,7 @@ Any positive antialias, readability, or subpixel tail becomes full binary author
 Implementation complete in source; static consistency/compliance validation recorded in the P12m patch report. Unity import and visual acceptance pending.
 
 
-## P12n implementation record — Optional Candidate-Straddle Chip Admission A/B
+## P12n implementation record — Optional Candidate-Straddle Chip Admission A/B — visually rejected
 
 P12m corrected any-support binary thresholds but Unity evidence still showed sparse Production because complete analytical candidates were clipped by the derivative Eligibility band. P12n does not replace P12m. It adds a second selectable Presence-Amplitude route for direct comparison.
 
@@ -4633,3 +4633,61 @@ Implemented contract:
 Actual project delta: `15` modified files and `4` created files, exactly matching approved scope. No scene, prefab, material, fixed spacing, Layer C state, Film, Shape, source, transport, cache asset, layer, tag, shader target, render pass, or draw call changed.
 
 Offline validation passes: source-scope reconciliation; delimiter and preprocessor balance; new GUID uniqueness; compute kernel declaration/implementation/resolution; C# property-to-HLSL contract; render function signature/call parity; guarded lattice uniqueness/index coverage; exhaustive entry/retention Boolean equivalence; protected P12m fallback presence; byte-identical accepted Current application block. Unity compilation/import, measured GPU cost, and visual A/B result are pending.
+
+
+## P12o implementation record — Original Analytical Candidates with Boundary-Anchored Eligibility
+
+P12n is rejected because candidate-level admission allows a permitted candidate to move away from the edge and cut interior Foam. P12o removes that authority while retaining its separate A/B infrastructure.
+
+Implemented contract:
+
+1. `Chip Application = Rendered Edge Band (Current)` remains value `0`, default, fallback, and preserves P12m.
+2. Enum value `1` is now `Boundary-Anchored Strip (Experimental)`. The original analytical Candidate loop remains the only candidate implementation in both routes.
+3. The low-frequency cache is repurposed from scalar candidate admission to one ARGBFloat boundary descriptor per original candidate identity. Anchor occupies XY; Z packs lateral identity, state, and a 10-bit inward-normal angle; W stores exact longitudinal identity.
+4. Initial acquisition samples the centre and stops at the first of eight deterministic ring directions with opposite binary support. That known outside/inside pair is refined by four binary-search steps, then a local four-axis probe refines and orients the inward normal.
+5. Valid tracking starts from the previous anchor along the previous normal and samples intermediate points across the tracking interval so a thin ribbon cannot be skipped by two endpoints. Excessive displacement, missing outside-to-inside bracket, or normal discontinuity locks the record until dormancy resets it. The candidate cannot drag or teleport the permission strip.
+6. Fragment Eligibility is an analytical local strip from approximately one antialias pixel outside through `Chip Edge Width` inward, with tangent extent bounded to the current candidate reach. Production is exact binary original Candidate × experimental Eligibility.
+7. Candidate, Eligibility, Production, and final-mask debug identities are retained. Candidate must be route-identical; experimental Eligibility shows actual anchored strips; Production is their exact displayed relationship.
+8. Exact pre-Chip rendered Foam remains the removal target. Current Presence Footprint, Layer C, sources, transport, Film, Shape, Strands, fixed spacing, scenes, prefabs, materials, caches, render passes, and draw calls are unchanged.
+
+The moving analytical lattice uses a circular modulo cache. Absolute candidate identity is validated from the packed lateral coordinate and exact longitudinal coordinate, so ordinary origin movement preserves valid/locked history instead of globally reacquiring living candidates. Dimension changes still recreate history. The representable contract is longitudinal `±16,000,000` and lateral `-2048…2047` cells; unsupported identity ranges fall back to the current route.
+
+Actual source delta remains inside the approved `17` modified paths. No file or `.meta` is created, deleted, moved, or renamed; the P12n auxiliary filenames are repurposed in place to avoid Unity asset churn.
+
+Offline validation includes exact candidate-core and final-application comparison with P12m, exact Current branch comparison, 36-argument render signature/caller parity, compute C#/HLSL property parity, kernel declaration/resolution, circular-cache bijection and identity packing, unique in-place indexing, descriptor-state truth cases, boundary-acquisition and thin-ribbon tracking models, strict strip-depth truth, syntax/preprocessor balance, and shader-consumer audit. The pre-package audit passes `41/41` gates. A changed-files package was extracted and reproduced `17/17` source bytes; the delivery archive is rebuilt from this finalized record and rechecked. Unity compilation/import, visual A/B, and measured GPU cost remain pending.
+
+## RG-METRIC-P12p implementation record — isolated rendered exterior-fringe Eligibility
+
+### Decision
+
+P12n and P12o are rejected by Unity visual evidence. The low-frequency candidate/boundary field is removed completely. The original analytical Candidate Field remains the sole candidate implementation, and one rendered Eligibility band remains the sole Presence-Amplitude permission route.
+
+### Implementation
+
+- Restored every P12n/P12o non-document implementation path to the immutable P12m baseline.
+- Deleted `StylizedRiverFoamRuntime.ChipAdmission.cs` and its `.meta`.
+- Deleted `CS_RiverFoam.ChipAdmission.hlsl` and its `.meta`.
+- Removed the experimental route enum, refresh field, Inspector controls, runtime bindings, allocation/update/release logic, kernel, shader properties, descriptor texture, caller arguments, and fragment descriptor evaluation.
+- Preserved the original analytical Candidate evaluation and Presence-Amplitude any-support binary Candidate × Eligibility/full-removal application.
+- Changed only the Presence-Amplitude edge-coordinate source inside `RiverWaterFoamResolveChipEligibility`:
+
+```hlsl
+edgeSource = saturate(preChipRenderedMask);
+exteriorFringeSource = min(edgeSource, 0.34);
+exteriorEdgeCoordinate = saturate(
+    (exteriorFringeSource - 0.08) / (0.34 - 0.08));
+estimatedInwardPixels = exteriorEdgeCoordinate /
+    max(length(float2(ddx(exteriorEdgeCoordinate),
+                      ddy(exteriorEdgeCoordinate))), 0.001);
+```
+
+The authored `Chip Edge Width` smooth transition remains unchanged. Current Presence Footprint arithmetic remains byte-identical to P12m.
+
+### Performance
+
+P12p removes the P12o `ARGBFloat` descriptor allocation, low-frequency compute dispatch, cache lifecycle work, fragment descriptor loads, and boundary-strip arithmetic. Relative to P12m, the retained route remains arithmetic-only and adds no texture sample, loop, pass, buffer, texture, kernel, or dispatch.
+
+### Validation state
+
+Offline scope, reference, syntax, formula, protected-path, and package checks are required before delivery. Unity 6000.5 import, shader compilation, visual fringe removal, and GPU timing remain authoritative and pending.
+

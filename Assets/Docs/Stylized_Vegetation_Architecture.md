@@ -192,6 +192,10 @@ coverage map / zone rules
     -> instanced placement inside chunks
 ```
 
+`VEG-V1H` establishes the current authored-domain baseline. When Ground Coverage Integration is enabled and a `GeneratedGround` is assigned, the Ground owns the complete placement extent, transform, sampled height, and authored coverage. The vegetation renderer generates candidates in Ground-local XZ, samples in world space, and packs accepted positions into the vegetation object's local space. The old `VegetationBenchmark.fieldSize` remains only as an unassigned fallback and as the fixed forced domain used by the V1G performance suite. Render bounds are derived from accepted instances rather than from that manual rectangle.
+
+This is intentionally not the final hierarchy or multi-family authoring architecture. Automatic vegetation-child creation, painting through vegetation objects, multiple simultaneous vegetation families, and either multiple coverage fields or a richer family-assignment coverage representation require a separate approved infrastructure design. `VEG-V1H` fixes spatial ownership without choosing that later representation prematurely.
+
 Each chunk can own:
 
 - a list or buffer of visible vegetation instances;

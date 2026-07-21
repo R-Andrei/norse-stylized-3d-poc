@@ -1712,8 +1712,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         planeCutAudit) + "}" +
                 ",localJunction=" +
                     FormatPlaneCutLocalJunctionAudit(planeCutAudit) +
+                ",polygonSurface={" +
+                    FormatPolygonSurfaceAudit(planeCutAudit) + "}" +
                 ",planeSurface=" +
                     "faces:" + planeCutAudit.BevelRegionFaceCount +
+                    FormatBevelRegionTriangulationModeCounts(
+                        planeCutAudit.BevelRegionFaceCount,
+                        planeCutAudit.BevelRegionInternalFanVertexCount) +
                     ",boundaryVertices:" +
                         planeCutAudit.BevelRegionBoundaryVertexCount +
                     ",triangles:" +
@@ -6233,7 +6238,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         : audit.LatestCertifiedState.PassIndex) + "}" +
                 ",retryFailures:{" +
                     FormatCappedPlaneCutRetryFailures(audit, 2) + "}" +
+                ",polygonSurface:{" +
+                    FormatPolygonSurfaceAudit(audit) + "}" +
                 ",surfaceFaces:" + audit.BevelRegionFaceCount +
+                FormatBevelRegionTriangulationModeCounts(
+                    audit.BevelRegionFaceCount,
+                    audit.BevelRegionInternalFanVertexCount) +
                 ",surfaceTriangles:" +
                     audit.BevelRegionTriangleCount +
                 ",surfaceRenderValid:" +
@@ -6920,8 +6930,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         audit.PolygonTriangleVolumeDelta.ToString("G12") +
                     ",polygonTriangleSignedDelta:" +
                         audit.PolygonTriangleSignedVolumeDelta.ToString("G12") +
+                ", boundedPolygonSurface={" +
+                    FormatPolygonSurfaceAudit(audit) + "}" +
                 ", boundedBevelRegion=" +
                     "polygonFaces:" + audit.BevelRegionFaceCount +
+                    FormatBevelRegionTriangulationModeCounts(
+                        audit.BevelRegionFaceCount,
+                        audit.BevelRegionInternalFanVertexCount) +
                     ",boundaryVertices:" +
                         audit.BevelRegionBoundaryVertexCount +
                     ",triangles:" + audit.BevelRegionTriangleCount +
@@ -7034,6 +7049,118 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ",nonConvex:" + audit.NonConvexCount +
                 ",windingFailure:" +
                     audit.WindingFailureCount;
+        }
+
+        private static string FormatBevelRegionTriangulationModeCounts(
+            int faceCount,
+            int internalFanVertexCount)
+        {
+            int centreFanFallbackFaces = Mathf.Clamp(
+                internalFanVertexCount,
+                0,
+                faceCount);
+            int boundaryFanFaces = Mathf.Max(
+                0,
+                faceCount - centreFanFallbackFaces);
+            return ",boundaryFanFaces:" + boundaryFanFaces +
+                ",centreFanFallbackFaces:" +
+                    centreFanFallbackFaces;
+        }
+
+        private static string FormatPolygonSurfaceAudit(
+            PlaneCutBevelAuditResult audit)
+        {
+            int centreFanFallbackFaces = Mathf.Clamp(
+                audit.PolygonSurfaceInternalFanVertexCount,
+                0,
+                audit.PolygonSurfaceFaceCount);
+            int boundaryFanFaces = Mathf.Max(
+                0,
+                audit.PolygonSurfaceFaceCount -
+                    centreFanFallbackFaces);
+            return "faces:" + audit.PolygonSurfaceFaceCount +
+                ",boundaryFanFaces:" + boundaryFanFaces +
+                ",centreFanFallbackFaces:" +
+                    centreFanFallbackFaces +
+                ",boundaryVertices:" +
+                    audit.PolygonSurfaceBoundaryVertexCount +
+                ",expectedTriangles:" +
+                    audit.PolygonSurfaceExpectedTriangleCount +
+                ",triangles:" + audit.PolygonSurfaceTriangleCount +
+                ",authoredNormalTriangles:" +
+                    audit.PolygonSurfaceAuthoredNormalTriangleCount +
+                ",authoredSurfaceGroupTriangles:" +
+                    audit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount +
+                ",internalFanVertices:" +
+                    audit.PolygonSurfaceInternalFanVertexCount +
+                ",surfaceGroupCollisions:" +
+                    audit.PolygonSurfaceGroupCollisionCount +
+                ",collision:" +
+                    audit.PolygonSurfaceGroupCollisionSurfaceGroup + ":" +
+                    audit.PolygonSurfaceGroupCollisionFirstFace + ":" +
+                    audit.PolygonSurfaceGroupCollisionSecondFace +
+                ",maxPlaneResidual:" +
+                    audit.PolygonSurfaceMaximumPlaneResidual.ToString("G9") +
+                ",maxNormalDeviationDegrees:" +
+                    audit.PolygonSurfaceMaximumNormalDeviationDegrees
+                        .ToString("G9") +
+                ",renderValid:" + audit.PolygonSurfaceRenderValid +
+                ",failureFace:" + audit.PolygonSurfaceFailureFace +
+                ",failureProvenance:" +
+                    audit.PolygonSurfaceFailureProvenanceIndex +
+                ",failureReason:" +
+                    (string.IsNullOrEmpty(
+                        audit.PolygonSurfaceFailureReason)
+                        ? "none"
+                        : audit.PolygonSurfaceFailureReason);
+        }
+
+        private static string FormatPolygonSurfaceAudit(
+            BoundedSingleEdgeAuditResult audit)
+        {
+            int centreFanFallbackFaces = Mathf.Clamp(
+                audit.PolygonSurfaceInternalFanVertexCount,
+                0,
+                audit.PolygonSurfaceFaceCount);
+            int boundaryFanFaces = Mathf.Max(
+                0,
+                audit.PolygonSurfaceFaceCount -
+                    centreFanFallbackFaces);
+            return "faces:" + audit.PolygonSurfaceFaceCount +
+                ",boundaryFanFaces:" + boundaryFanFaces +
+                ",centreFanFallbackFaces:" +
+                    centreFanFallbackFaces +
+                ",boundaryVertices:" +
+                    audit.PolygonSurfaceBoundaryVertexCount +
+                ",expectedTriangles:" +
+                    audit.PolygonSurfaceExpectedTriangleCount +
+                ",triangles:" + audit.PolygonSurfaceTriangleCount +
+                ",authoredNormalTriangles:" +
+                    audit.PolygonSurfaceAuthoredNormalTriangleCount +
+                ",authoredSurfaceGroupTriangles:" +
+                    audit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount +
+                ",internalFanVertices:" +
+                    audit.PolygonSurfaceInternalFanVertexCount +
+                ",surfaceGroupCollisions:" +
+                    audit.PolygonSurfaceGroupCollisionCount +
+                ",collision:" +
+                    audit.PolygonSurfaceGroupCollisionSurfaceGroup + ":" +
+                    audit.PolygonSurfaceGroupCollisionFirstFace + ":" +
+                    audit.PolygonSurfaceGroupCollisionSecondFace +
+                ",maxPlaneResidual:" +
+                    audit.PolygonSurfaceMaximumPlaneResidual.ToString("G9") +
+                ",maxNormalDeviationDegrees:" +
+                    audit.PolygonSurfaceMaximumNormalDeviationDegrees
+                        .ToString("G9") +
+                ",renderValid:" + audit.PolygonSurfaceRenderValid +
+                ",failureFace:" + audit.PolygonSurfaceFailureFace +
+                ",failureProvenance:" +
+                    audit.PolygonSurfaceFailureProvenanceIndex +
+                ",failureReason:" +
+                    (string.IsNullOrEmpty(
+                        audit.PolygonSurfaceFailureReason)
+                        ? "none"
+                        : audit.PolygonSurfaceFailureReason);
         }
 
         private static string FormatBoundedSourceProvenanceAudit(
@@ -7445,9 +7572,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ",ratio:" + audit.VolumeRatio.ToString("G12") +
                     ",delta:" + audit.VolumeDelta.ToString("G12") +
                     ",valid:" + audit.VolumeValid +
+                ", boundedPolygonSurface={" +
+                    FormatPolygonSurfaceAudit(
+                        audit.CertificationAudit) + "}" +
                 ", boundedBevelRegion=" +
                     "polygonFaces:" +
                         audit.CertificationAudit.BevelRegionFaceCount +
+                    FormatBevelRegionTriangulationModeCounts(
+                        audit.CertificationAudit.BevelRegionFaceCount,
+                        audit.CertificationAudit
+                            .BevelRegionInternalFanVertexCount) +
                     ",boundaryVertices:" +
                         audit.CertificationAudit
                             .BevelRegionBoundaryVertexCount +
@@ -7804,9 +7938,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ",upperMargin:" +
                         audit.VolumeUpperMargin.ToString("G12") +
                     ",valid:" + audit.VolumeValid +
+                Environment.NewLine + "boundedPolygonSurface=" +
+                    FormatPolygonSurfaceAudit(
+                        audit.CertificationAudit) +
                 Environment.NewLine + "boundedBevelRegion=" +
                     "polygonFaces:" +
                         audit.CertificationAudit.BevelRegionFaceCount +
+                    FormatBevelRegionTriangulationModeCounts(
+                        audit.CertificationAudit.BevelRegionFaceCount,
+                        audit.CertificationAudit
+                            .BevelRegionInternalFanVertexCount) +
                     ",boundaryVertices:" +
                         audit.CertificationAudit
                             .BevelRegionBoundaryVertexCount +

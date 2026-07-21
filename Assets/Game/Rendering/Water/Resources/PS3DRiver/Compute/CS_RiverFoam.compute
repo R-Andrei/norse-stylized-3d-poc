@@ -21,7 +21,6 @@
 #pragma kernel AdvanceFoamVisualOccupancy
 #pragma kernel EvaluateFoamShape
 #pragma kernel ApplyBoundary
-#pragma kernel BuildFoamChipStraddleAdmission
 #pragma target 5.0
 
 #include "../Shaders/Includes/RiverWaterCommon.hlsl"
@@ -36,7 +35,6 @@
 #include "CS_RiverFoam.Simulation.hlsl"
 #include "CS_RiverFoam.Evolution.hlsl"
 #include "CS_RiverFoam.TopologyTransition.hlsl"
-#include "CS_RiverFoam.ChipAdmission.hlsl"
 
 float4 ResolveFoamSegmentInjectionSample(
     float2 physicalPosition,

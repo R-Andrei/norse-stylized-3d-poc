@@ -114,14 +114,6 @@ namespace ProgrammaticStylized3D.Rivers
         PresenceAmplitude = 1
     }
 
-    public enum StylizedRiverFoamChipApplicationMode
-    {
-        [InspectorName("Rendered Edge Band (Current)")]
-        RenderedEdgeBand = 0,
-        [InspectorName("Candidate Straddle (Experimental)")]
-        CandidateStraddle = 1
-    }
-
     public enum StylizedRiverFoamTransportScheme
     {
         [InspectorName("Donor Cell (Current)")]
@@ -421,9 +413,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float DefaultFoamChipMaximumViewScale = 1.75f;
         private const float DefaultFoamChipEdgeWidthPixels = 4f;
         private const float DefaultFoamChipInteriorAccess = 0f;
-        private const float MinimumFoamChipStraddleRefreshRate = 1f;
-        private const float MaximumFoamChipStraddleRefreshRate = 8f;
-        private const float DefaultFoamChipStraddleRefreshRate = 4f;
         private const float MinimumFoamChipFieldSpeed = 0f;
         private const float MaximumFoamChipFieldSpeed = 12f;
         private const float DefaultFoamChipFieldSpeed = 0f;
@@ -1830,27 +1819,15 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamChipMaximumViewScale =
             DefaultFoamChipMaximumViewScale;
 
-        [Tooltip("Selects how Presence-Amplitude production authorizes the existing analytical Chip candidates. Rendered Edge Band preserves the current P12m derivative-based route. Candidate Straddle is an experimental low-frequency candidate-level boundary test. Current Presence Footprint always preserves its established Chipping path.")]
-        [SerializeField] private StylizedRiverFoamChipApplicationMode
-            foamChipApplicationMode =
-                StylizedRiverFoamChipApplicationMode.RenderedEdgeBand;
-
-        [Tooltip("Approximate inward width, in rendered pixels, of the canonical pre-Chip Foam edge territory used by Rendered Edge Band. Zero disables edge permission exactly. The Inspector slider covers 0–256 px, while direct numeric entry accepts any non-negative value for deliberately extreme tests. This is a derivative-normalized local screen-space estimate, not a global geometric distance field.")]
+        [Tooltip("Approximate inward width, in rendered pixels, of the canonical pre-Chip Foam edge territory. Zero disables edge permission exactly. The Inspector slider covers 0–256 px, while direct numeric entry accepts any non-negative value for deliberately extreme tests. This is a derivative-normalized local screen-space estimate, not a global geometric distance field.")]
         [Min(0f)]
         [SerializeField] private float foamChipEdgeWidthPixels =
             DefaultFoamChipEdgeWidthPixels;
 
-        [Tooltip("Fraction of activated analytical candidate cells granted permission in the established visible body complementary to Chip Edge Width. This belongs only to the preserved Current/Rendered Edge Band route. Zero keeps every candidate edge-only; one grants every activated candidate full visible-body access.")]
+        [Tooltip("Fraction of activated analytical candidate cells granted permission in the established visible body complementary to Chip Edge Width. Zero keeps every candidate edge-only; one grants every activated candidate full visible-body access. Admission is deterministic per candidate, so connected Chip contours remain intact.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamChipInteriorAccess =
             DefaultFoamChipInteriorAccess;
-
-        [Tooltip("Refresh rate for the experimental Candidate Straddle admission cache. Candidate motion remains render-frame analytical; only the binary boundary-contact decision updates at this lower rate. Rendered Edge Band does not dispatch this cache.")]
-        [Range(
-            MinimumFoamChipStraddleRefreshRate,
-            MaximumFoamChipStraddleRefreshRate)]
-        [SerializeField] private float foamChipStraddleRefreshRate =
-            DefaultFoamChipStraddleRefreshRate;
 
         [Tooltip("Downstream speed in metres per second of the complete analytical Chip candidate field. This is rigid translation in River space and cannot stretch an individual candidate.")]
         [Range(MinimumFoamChipFieldSpeed, MaximumFoamChipFieldSpeed)]
@@ -3094,22 +3071,10 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipMaximumViewScale,
                 MinimumFoamChipMaximumViewScale,
                 MaximumFoamChipMaximumViewScale);
-        public StylizedRiverFoamChipApplicationMode FoamChipApplicationMode =>
-            foamChipApplicationMode ==
-                StylizedRiverFoamChipApplicationMode.CandidateStraddle
-                ? StylizedRiverFoamChipApplicationMode.CandidateStraddle
-                : StylizedRiverFoamChipApplicationMode.RenderedEdgeBand;
         public float FoamChipEdgeWidthPixels =>
             Mathf.Max(0f, foamChipEdgeWidthPixels);
         public float FoamChipInteriorAccess =>
             Mathf.Clamp01(foamChipInteriorAccess);
-        public float FoamChipStraddleRefreshRate =>
-            foamChipStraddleRefreshRate > 0f
-                ? Mathf.Clamp(
-                    foamChipStraddleRefreshRate,
-                    MinimumFoamChipStraddleRefreshRate,
-                    MaximumFoamChipStraddleRefreshRate)
-                : DefaultFoamChipStraddleRefreshRate;
         public float FoamChipFieldSpeed =>
             Mathf.Clamp(
                 foamChipFieldSpeed,
@@ -5556,13 +5521,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamChipEdgeWidthPixels);
             foamChipInteriorAccess = Mathf.Clamp01(
                 foamChipInteriorAccess);
-            foamChipStraddleRefreshRate =
-                foamChipStraddleRefreshRate > 0f
-                    ? Mathf.Clamp(
-                        foamChipStraddleRefreshRate,
-                        MinimumFoamChipStraddleRefreshRate,
-                        MaximumFoamChipStraddleRefreshRate)
-                    : DefaultFoamChipStraddleRefreshRate;
             foamChipFieldSpeed = Mathf.Clamp(
                 foamChipFieldSpeed,
                 MinimumFoamChipFieldSpeed,

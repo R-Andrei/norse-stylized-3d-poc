@@ -129,7 +129,7 @@ The following files retain the previous replacement-face, strip, patch, boundary
 | `AuditBoundedRailFidelity` | Measures solved-corner retention and any final bevel-polygon extent beyond the four rail bounds. |
 | `AuditBoundedResultConvexity` | Tests every result vertex against every outward result-face half-space and records the worst violation provenance. |
 | `AuditBoundedFaceIntersections` | Reuses directed triangle intersection predicates to report improper coplanar overlaps and non-coplanar face intersections. |
-| `TryTriangulateBoundedPreviewFaces` | Classifies convexity through the same temporary duplicate/collinear-reduced loop used by preparation, chooses an interior fan centre from that region, and emits one oriented triangle per segment of the unchanged real boundary. Failures record exact face and provenance. |
+| `TryTriangulateBoundedPreviewFaces` | Classifies convexity through the same temporary duplicate/collinear-reduced loop used by preparation, then routes every accepted real polygon boundary through `TryTriangulateBoundedOneSurfaceFace`. The complete shell requires direct `n - 2` triangulation, authored normals/groups, zero internal fan vertices, and zero group collisions. Failures record exact face and provenance. |
 
 ## Plane-cut kernel
 
@@ -1966,7 +1966,7 @@ The EW-C1A ordering audit is complete. `A. PRE-BEVEL CUT APPROVED`. The exact in
 ### Existing bevel and render owners
 
 - `MassGenerator.EdgeWear.SelectionAndCorners.cs::BuildEdgeWearBevelCandidates` is the first bevel consumer of the damaged source polyhedron. It must consume C1A descendant/cap-ring identity before Macro sampling.
-- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryTriangulateBoundedPreviewFaces` triangulates the final polygon shell. `TryTriangulateBoundedBevelRegionFace` emits authored normals and stable surface groups for bevel faces. C1A.2 extends the same contract to `CornerDamageCap` without adding a mesh channel.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryTriangulateBoundedPreviewFaces` triangulates the final polygon shell. EW-C1A.1a replaces the bevel-only helper with `TryTriangulateBoundedOneSurfaceFace`, which emits authored normals and stable surface groups for every polygon, including future `CornerDamageCap`, without adding a mesh channel.
 - `MassGenerator.MeshOutput.cs::BuildMeshData` assigns final geometric normals to ordinary triangles and consumes authored normals where present.
 - `Game/Procedural/Core/MeshBuilder.cs::ApplyToMesh` assigns the final normal channel and calls `Mesh.RecalculateTangents()` after vertices, triangles, and UVs are final. This file is a reviewed consumer and is not expected to change.
 
@@ -2026,3 +2026,51 @@ Exact control defaults are not approved by the audit. They must be recorded in t
 - scenes, prefabs, materials, recipes as serialized assets, metadata, feature atlases, vertex layouts, budgets, and `EdgeWearEvaluationMode.None`
 
 The audit found no requirement for a new source file, dependency, shader property, texture, buffer, mesh channel, or active-gameplay path.
+
+### EW-C1A.1a actual code ownership
+
+Modified code owners:
+
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+  - extends `BoundedSingleEdgeAuditResult` with complete polygon-surface ownership telemetry;
+  - removes the ordinary centre-fan branch;
+  - adds `TryTriangulateBoundedOneSurfaceFace`;
+  - adds `ResolvePolygonSurfaceGroup`;
+  - makes one-polygon ownership mandatory for the complete shell while preserving bevel-specific counters.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+  - extends `PlaneCutBevelAuditResult`;
+  - copies polygon-surface evidence from baseline and retry triangulation;
+  - requires `PolygonSurfaceRenderValid == 1` in both geometry gates.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+  - adds `FormatPolygonSurfaceAudit` overloads;
+  - emits `polygonSurface`/`boundedPolygonSurface` evidence in current, detailed, bounded-single, and bounded-all outputs.
+
+Reviewed unchanged consumers:
+
+- `MassGenerator.Types.cs::TriangleSoup` already carries authored normals/groups.
+- `MassGenerator.MeshOutput.cs::BuildMeshData` already consumes those channels.
+- `MassGenerator.EdgeWear.BoundedAllEdges.cs` already routes through the shared triangulator and receives the mandatory result without modification.
+- `GeneratedMassEditor.cs` requires no change; the existing one-click suite and clipboard workflow expose the new telemetry.
+
+### EW-C1A.1a.2 / EW-C1A.1a.3 code ownership
+
+Modified code owners:
+
+- `MassGenerator.EdgeWear.Types.cs::PolygonSurfaceTriangulationMode`
+  - names `BoundaryFan` and `ProjectedCentreFan` without adding serialized or runtime state.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryTriangulateBoundedOneSurfaceFace`
+  - preserves direct boundary triangulation as the first choice;
+  - uses `TryResolveProjectedOneSurfaceCentre` and `IsProjectedOneSurfaceCentreFanStable` for every polygon class when direct triangulation cannot certify;
+  - uses `TryResolveOneSurfaceTriangle` and `TryEmitOneSurfaceTriangle` so both modes share the same area, winding, authored-normal, and authored-group contract;
+  - preserves bevel ownership during fallback emission and accumulates one complete-shell internal fan vertex plus one bevel-region internal fan vertex for each fallback bevel face;
+  - certifies both internal-fan counts as bounded by their corresponding face counts.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs::FormatPolygonSurfaceAudit` and `FormatBevelRegionTriangulationModeCounts`
+  - derive complete-shell and bevel-region `centreFanFallbackFaces` from propagated internal fan counts and `boundaryFanFaces` from total face counts without expanding `PlaneCutBevelAuditResult`.
+- `GeneratedMassEditor.cs::AppendMacroProbeEvidence`
+  - prints pass/failure records for strength-zero, coverage-zero, current, and maximum Macro probes.
+
+Reviewed unchanged owners:
+
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs` continues propagating the existing polygon-surface counters and requires `PolygonSurfaceRenderValid == 1`.
+- `MassGenerator.MeshOutput.cs::ValidateGeneratedMassMeshData` retains the `0.5` render-normal agreement guard.
+- `MassGenerator.Types.cs::TriangleSoup`, shaders, materials, serialized controls, corner transaction geometry, topology/recovery solvers, and `EdgeWearEvaluationMode.None` remain unchanged.

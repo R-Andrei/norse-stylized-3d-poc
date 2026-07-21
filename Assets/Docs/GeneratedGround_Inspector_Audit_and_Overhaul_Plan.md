@@ -1,3 +1,39 @@
+## 2026-07-21 — GSU-M2.7C.5D.1 inspector boundary note
+
+M2.7C.5D.1 adds no GeneratedGround Inspector field, foldout, selector, debug view, scene overlay, serialized profile, runtime material entry or component. The new command is a project-level Editor evidence action:
+
+`Tools > PS3D > Run Generated Mass Sparse Riverbed Assembly Proof`
+
+It writes only local `Library/SurfaceMaterialDiagnostics/GeneratedMassSparseRiverbedAssembly` evidence. Candidate selection and all runtime/Inspector integration remain deferred to separately approved M2.7C.5E after one assembled tile is visually accepted.
+
+## 2026-07-21 — M2.7C.5C.2.2 inspector boundary note
+
+M2.7C.5C.2.2 adds no GeneratedGround control, foldout, debug view, scene overlay, component, material/profile asset, or runtime setting. It freezes the Editor-only isolated-rock response at unified `0.52` / fallback `0.56` and relaxes validation so deterministic historical source-geometry drift is reported as a warning rather than a hard failure. The next authorized work remains `M2.7C.5D` seamless tile assembly.
+
+## 2026-07-21 — M2.7C.5C.2.1 inspector boundary note
+
+This patch changes only Editor evidence calibration for the frozen river-rock library. It does not add Generated Ground Inspector controls and does not alter runtime material integration. The accepted midpoint is a baked-data decision: slightly lower unified-wear accent normalization and slightly higher fallback-wear normalization, with all geometry and non-accent channels frozen. Inspector or runtime exposure remains deferred until an assembled M2.7C.5D tile is visually accepted.
+
+Earlier inspector audit history continues below.
+
+## 2026-07-21 — M2.7C.5C.2 Inspector note
+
+M2.7C.5C.2 adds no GeneratedGround control, foldout, debug view, scene overlay, component, material/profile asset, or runtime setting. It only calibrates the Editor-only evidence rendering of the frozen 18-rock library. The production-target Moderate response is intentionally subtle so internal accents do not become line artifacts when riverbed rocks are small on screen.
+
+No Inspector or runtime integration is authorized until the later M2.7C.5D assembled tile is visually accepted and M2.7C.5E is separately approved.
+
+Earlier inspector-audit content follows below.
+
+## 2026-07-21 — GSU-M2.7C.5C.1 Inspector ownership
+
+M2.7C.5C.1 remains a project-level Editor evidence correction. It reuses the existing menu action:
+
+`Tools > PS3D > Run Generated Mass River-Rock Material Refinement`
+
+The action now emits independent upward-exposure and directional-response evidence, broader broken root-contact sectors, visible interior wear, six-rock response close-ups, and fixed-frame burial comparison. It adds no `GeneratedGround` field, foldout, selector, action button, debug view, Scene overlay, serialized asset, profile, layer, material binding, or runtime behavior.
+
+The frozen 18-rock library and source generation remain unchanged. Inspector/runtime ownership is still reserved for M2.7C.5E after M2.7C.5D seamless tile acceptance.
+
 ## 2026-07-21 — GSU-M2.7C.5C Inspector ownership
 
 M2.7C.5C remains a project-level Editor evidence workflow and adds no Generated Ground Inspector controls, foldouts, debug views, serialized fields, scene overlays, or runtime bindings.

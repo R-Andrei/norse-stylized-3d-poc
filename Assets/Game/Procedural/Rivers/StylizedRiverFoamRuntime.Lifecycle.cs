@@ -252,7 +252,6 @@ namespace ProgrammaticStylized3D.Rivers
                 lastRenderInterpolationAlpha = simulationInterpolation;
                 idleSince = 0.0;
                 RecordSteadyStateWorkFrame(materialWork, true);
-                UpdateFoamChipStraddleAdmission(false);
                 BindField();
                 UpdateRecentPeaks();
                 AdvanceP12CandidateSweepFrame(true);
@@ -504,7 +503,6 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             RecordSteadyStateWorkFrame(materialWork, false);
-            UpdateFoamChipStraddleAdmission(false);
             BindField();
             UpdateRecentPeaks();
             AdvanceP12CandidateSweepFrame(true);

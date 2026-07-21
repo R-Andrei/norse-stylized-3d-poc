@@ -66,29 +66,6 @@ struct RiverWaterFoamSelectionDiagnostics
     float chipProductionSelection;
 };
 
-float RiverWaterFoamResolveChipStraddleAdmission(
-    int2 cell,
-    float2 admissionOrigin,
-    float2 admissionDimensions)
-{
-    int2 origin = (int2)round(admissionOrigin);
-    int2 dimensions = max(
-        int2(1, 1),
-        (int2)round(admissionDimensions));
-    int2 localCell = cell - origin;
-    if (localCell.x < 0 || localCell.y < 0 ||
-        localCell.x >= dimensions.x ||
-        localCell.y >= dimensions.y)
-    {
-        return 0.0;
-    }
-
-    return _FoamChipStraddleAdmission.Load(
-        int3(localCell, 0)) > 0.5
-        ? 1.0
-        : 0.0;
-}
-
 RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
     float preChipSoftVisibility,
     float preChipMask,
@@ -132,9 +109,14 @@ RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
         return result;
     }
 
-    // Presence-Amplitude eligibility is derived from the exact no-Chip mask
+    // Presence-Amplitude eligibility starts from the exact no-Chip mask
     // that final composition would render after structural Strand shaping.
-    // The 0.08 boundary is the existing start of normal Foam coverage.
+    // The hardened mask has two rises: the visible exterior fringe reaches
+    // 0.34, then the inner hard-body response rises toward one. Clamp and
+    // normalize the exterior-fringe branch before taking derivatives so the
+    // hard-body rise cannot masquerade as a second Foam boundary.
+    static const float VisibleMaskStart = 0.08;
+    static const float RenderedFringeCeiling = 0.34;
     float edgeSource = saturate(preChipRenderedMask);
     float renderedCoverage = RiverWaterFoamResolveBaseCoverage(edgeSource);
     float supportGate = step(0.0001, renderedCoverage);
@@ -146,16 +128,20 @@ RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
         return result;
     }
 
-    static const float VisibleMaskStart = 0.08;
+    float exteriorFringeSource = min(
+        edgeSource,
+        RenderedFringeCeiling);
+    float exteriorEdgeCoordinate = saturate(
+        (exteriorFringeSource - VisibleMaskStart) /
+        max(RenderedFringeCeiling - VisibleMaskStart, 0.0001));
     float2 edgeGradient = float2(
-        ddx(edgeSource),
-        ddy(edgeSource));
+        ddx(exteriorEdgeCoordinate),
+        ddy(exteriorEdgeCoordinate));
     float edgeGradientPerPixel = max(
         length(edgeGradient),
         0.001);
-    float estimatedInwardPixels = max(
-        0.0,
-        edgeSource - VisibleMaskStart) / edgeGradientPerPixel;
+    float estimatedInwardPixels =
+        exteriorEdgeCoordinate / edgeGradientPerPixel;
     float edgeMembership = 1.0 - smoothstep(
         widthPixels - 0.5,
         widthPixels + 0.5,
@@ -464,10 +450,6 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
     float preChipMask,
     float preChipRenderedMask,
     float presenceFootprintMode,
-    float chipApplicationMode,
-    float chipStraddleAdmissionAvailable,
-    float2 chipStraddleAdmissionOrigin,
-    float2 chipStraddleAdmissionDimensions,
     float evaluateChipSelection,
     float evaluateChipCandidates,
     float evaluateCandidatesOutsideMaterial,
@@ -525,32 +507,16 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
         ? 0.0
         : interiorAccess;
     float chipInteriorCandidates = 0.0;
-    float chipStraddleCandidates = 0.0;
-    float chipStraddleRouteActive =
-        presenceFootprintMode > 0.5 &&
-        chipApplicationMode > 0.5 &&
-        chipStraddleAdmissionAvailable > 0.5
-        ? 1.0
-        : 0.0;
     float productionPermissionEnabled =
-        (chipStraddleRouteActive > 0.5 ||
-            max(0.0, chipEdgeWidthPixels) > 0.0001 ||
+        (max(0.0, chipEdgeWidthPixels) > 0.0001 ||
             effectiveInteriorAccess > 0.0001)
         ? 1.0
         : 0.0;
-    // Candidate Straddle is already authorized at candidate identity level.
-    // Evaluate it on every positive exact pre-Chip Foam pixel so no faint
-    // rendered fringe can survive merely because BaseCoverage is below its
-    // established 0.08 visibility threshold. The P12m/Current routes retain
-    // their exact existing visible-support gate.
-    float candidateMaterialSupport = chipStraddleRouteActive > 0.5
-        ? step(0.000001, saturate(preChipRenderedMask))
-        : chipEligibility.visibleSupport;
     float candidateFieldRequired =
         (evaluateChipCandidates > 0.5 &&
             activation > 0.0001 &&
             ((productionPermissionEnabled > 0.5 &&
-                candidateMaterialSupport > 0.0001) ||
+                chipEligibility.visibleSupport > 0.0001) ||
                 evaluateCandidatesOutsideMaterial > 0.5))
         ? 1.0
         : 0.0;
@@ -875,20 +841,6 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
                     result.chipCandidateField,
                     activeCandidate);
 
-                [branch]
-                if (chipStraddleRouteActive > 0.5 &&
-                    activeCandidate > 0.0)
-                {
-                    float straddleAdmitted =
-                        RiverWaterFoamResolveChipStraddleAdmission(
-                            (int2)cell,
-                            chipStraddleAdmissionOrigin,
-                            chipStraddleAdmissionDimensions);
-                    chipStraddleCandidates = max(
-                        chipStraddleCandidates,
-                        activeCandidate * straddleAdmitted);
-                }
-
                 // Interior Access is commonly zero, so its identity hash and
                 // admission work are skipped entirely unless that optional
                 // permission is authored. Admitted candidates retain their
@@ -916,40 +868,24 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
         [branch]
         if (presenceFootprintMode > 0.5)
         {
+            // Presence-Amplitude uses an exact binary any-support
+            // intersection. Every positive value in the existing antialiased
+            // Candidate and Eligibility fields owns the selected pixel.
             float candidateSelected = result.chipCandidateField > 0.0
                 ? 1.0
                 : 0.0;
+            float eligibilitySelected = chipEligibility.edgeBand > 0.0
+                ? 1.0
+                : 0.0;
+            float productionSelected =
+                candidateSelected * eligibilitySelected;
 
-            [branch]
-            if (chipStraddleRouteActive > 0.5)
-            {
-                // Experimental A/B route: the low-frequency cache admits a
-                // deterministic candidate identity only when its centre and
-                // irregular perimeter straddle subcell Layer E support. The
-                // complete admitted analytical candidate is then applied to
-                // the exact pre-Chip rendered Foam mask.
-                float admittedCandidateSelected =
-                    chipStraddleCandidates > 0.0 ? 1.0 : 0.0;
-                result.chipCandidateField = candidateSelected;
-                result.chipEdgeEligibility = admittedCandidateSelected;
-                result.chipInteriorEligibility = 0.0;
-                result.chipProductionSelection = admittedCandidateSelected;
-            }
-            else
-            {
-                // Protected P12m A/B route: exact binary any-support
-                // intersection of the current analytical Candidate and
-                // derivative-based rendered Edge Band.
-                float eligibilitySelected = chipEligibility.edgeBand > 0.0
-                    ? 1.0
-                    : 0.0;
-                float productionSelected =
-                    candidateSelected * eligibilitySelected;
-                result.chipCandidateField = candidateSelected;
-                result.chipEdgeEligibility = eligibilitySelected;
-                result.chipInteriorEligibility = 0.0;
-                result.chipProductionSelection = productionSelected;
-            }
+            // These three diagnostics are the exact three masks consumed by
+            // Presence-Amplitude production.
+            result.chipCandidateField = candidateSelected;
+            result.chipEdgeEligibility = eligibilitySelected;
+            result.chipInteriorEligibility = 0.0;
+            result.chipProductionSelection = productionSelected;
         }
         else
         {
@@ -1387,8 +1323,7 @@ float RiverWaterFoamApplyChipAndStrands(
         float productionSelected = productionChip >= 0.5
             ? 1.0
             : 0.0;
-        productionChipRemovedMask = productionSelected *
-            step(0.0001, exactPreChipMask);
+        productionChipRemovedMask = productionSelected;
         return productionSelected > 0.5
             ? 0.0
             : exactPreChipMask;

@@ -1,3 +1,440 @@
+## 2026-07-21 — GSU-M2.7C.5D.1: Deterministic Seamless Sparse Riverbed Assembly Proof
+
+### Status
+
+- Read-only review: **complete**.
+- Canonical plan: **complete — this section is the first write**.
+- Baker contract exposure: **complete**.
+- Tile assembler implementation: **complete**.
+- Assembly validator/evidence implementation: **complete**.
+- Architecture-document updates: **complete**.
+- Post-change consistency/compliance audit: **complete for available static checks; Unity execution remains pending**.
+- Unity compilation and one-button evidence run: **pending in Unity 6000.5.0f1**.
+- Visual candidate acceptance: **pending**.
+
+### Objective
+
+Use only the accepted frozen 18-rock Generated Mass library and the frozen Moderate material response to assemble three deterministic, seamless, Editor-only sparse riverbed tile candidates. This patch proves complete-tile composition, repetition, seams, quiet-space control and mip behaviour. It creates no runtime asset and performs no Ground, River, shader, material-profile, scene, prefab or Inspector integration.
+
+### Approved file scope
+
+Create:
+
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssembler.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssembler.cs.meta`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssemblyValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssemblyValidation.cs.meta`
+
+Modify:
+
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+No other project path is authorized.
+
+### Reviewed evidence and current contracts
+
+- `Assets/AGENTS.md`: mandatory four-gate workflow, exact-scope discipline, Unity 6000.5.0f1 constraints and no false completion claims.
+- `GeneratedMassRiverRockProjectionBaker.cs`: complete 2,996-line algorithm-8 implementation reviewed. It owns the frozen 18 definitions, recipe construction, unified/fallback mesh generation, direct triangle rasterization, processed height/normals, material variation, directional response, broken root sectors, processed edge wear, Moderate rendering and fixed-frame burial evidence.
+- `GeneratedMassRiverRockProjectionValidation.cs`: complete current caller/validator reviewed. It runs two builds, hard-fails same-run nondeterminism and frozen-setting changes, and reports historical source-geometry drift as warning.
+- `Assets/Game/Procedural/Core/MeshData.cs`: complete shared geometry contract reviewed; vertices, triangles, normals, colours and UV2 are available and validated.
+- `Assets/Game/Procedural/Masses/GeneratedMass.cs` / `MassRecipe`: reviewed serialized recipe fields and public seed/default contract used by the baker.
+- `Assets/Game/Procedural/Masses/MassSurfaceFeatureGenerator.cs`: reviewed the immutable `MassSurfaceFeatureSettings` constructor and channel settings.
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`: reviewed `Generate` and Editor-only `GenerateUnifiedEdgeWearPreview` producer paths.
+- Canonical Ground documents: reviewed active M2.7C.5C.2.2 freeze, accepted 18-rock library, unified `0.52`, fallback `0.56`, Moderate response and M2.7C.5D progression.
+- Accepted Unity evidence: `GeneratedMassRiverRockProjection(6).zip`; both algorithm-8 runs matched fingerprint `3602f47e080f259dbaca468c4881bc21cf7c4435d6ad42b9f258abb1884cd3e1`. Current source fingerprints from that accepted run become the M2.7C.5D source snapshot.
+- Repository limitation: no `.git` directory exists in the supplied archive. The layered source archive plus accepted patch packages are the authoritative baseline. Existing unrelated or deletion-only project state must be preserved.
+
+### Frozen source snapshot
+
+The assembler must consume exactly these stable IDs and accepted algorithm-8 raw fingerprints:
+
+- `T-05` `4e48dac913b980279ad9de1f600101f913a21c029b152b7bbe57b193b2cd1a60`
+- `T-08` `78fcf374d475208ea4c32e65ccfbf6a1fb317df9d088c4106d9d705f1ac6a402`
+- `T-09` `635996ff3a4c8b4b7f2703ad41707d83be761e203d377403d246ebdc517cf072`
+- `T-10` `65b5a839947217e0184b9354b4015880f5e300a067ccc6107d8d3ecfb5b461c4`
+- `T-11` `6a3eb4a4cc1c0965bfe8c7916de93bfab2d05476fd580a2282cae4395bc5df9a`
+- `T-12` `ee826776a0d9b728c4ebc021743d93d5769bdd25cc5ab345b7c2e5ed5b64975e`
+- `T-13` `cf6493580bdc3452fe642392a3d5981866ad6020adb6b97293b087b72fc1c08e`
+- `T-14` `bd9b4c4ec13b90db6fb40b5c4d1c34adb07156053b2797e64212dc229b91450e`
+- `T-15` `66062ce43d3d8873dd63b843e291df104d67e58ba3f6c45df8cf997d78385d51`
+- `S-00` `79957201bb069bb0505b16d6a28b4731b4c53778189837b69b48c029293fcd25`
+- `S-03` `b5a3742996a9bfe2e1ad9d862df2e292931556cea48ae300cfae054d18c6e7ed`
+- `S-04` `03d9c266f760d442a1a48a6704aba1236bbedf6ddc11fef324e6f4c0a37dd3d9`
+- `S-08` `973ac749ec7055a97e77c4393caff69cd8395a704b74874a6219ccca062ef1f5`
+- `S-09` `8c75d7c749c0ec2e77c13c07e0963452fc051732badcf833acfd994c7437d9ba`
+- `S-10` `026ee59f376e35bebed969c9752369ba8ad7a86503a5ac379642790abdbe8329`
+- `S-12` `b2dd65fa09df4f79bb0d1cf58151cb2eb5563362b3e1af75cc32e9bf328d2b50`
+- `S-13` `e2e076156b9b932fdd4d18d00278ab944b66f5a4004c7bada5f7155f86f5e63b`
+- `S-14` `bc5876c956883478f69762728b690c43dbcc72b141d5845905a30b29e8a85f6d`
+
+Historical drift from this snapshot is warning-only when frozen definitions remain unchanged and the current two builds are identical. Same-run drift remains a hard failure.
+
+### Candidate definitions
+
+| Candidate | Target coverage | Accepted coverage | Minimum quiet 32×32 block fraction |
+|---|---:|---:|---:|
+| Quiet Sparse Riverbed | 7.0% | 6.0–8.0% | 72% |
+| Natural Sparse Riverbed | 9.0% | 8.0–10.5% | 66% |
+| Dense Sparse Riverbed | 11.0% | 10.0–12.5% | 58% |
+
+The proof uses a 1024×1024 final tile and 2048×2048 working raster. The final evidence is produced by deterministic 2× downsampling; wear uses maximum-preserving reduction.
+
+### Placement and composition contract
+
+- Directly rasterize generated 3D meshes; do not rotate pre-baked 2D stamps.
+- Toroidal tile space with wrapped rasterization across all required edge/corner copies.
+- Controlled placement variation only: Y rotation `0–360°`, uniform scale `0.75–1.25`, burial `18–32%`.
+- Use deterministic macro-region weighting plus best-candidate spacing selection. Do not use a grid or directional sine carpet.
+- Enforce quiet macro-block budgets before placement commit.
+- Use at least 12 source IDs per candidate.
+- No stable ID may exceed 12% of committed placements; immediate local repeats are prohibited.
+- Keep broad substrate regions visibly empty; clustered pockets and isolated rocks are allowed.
+
+### Material and channel contract
+
+The assembler may generate only:
+
+- rock mask;
+- processed height;
+- processed normals;
+- deterministic material variation;
+- upward exposure;
+- directional response used only by the Moderate preview;
+- broken root darkening;
+- processed edge wear;
+- stable-ID debug.
+
+The Moderate rendering contract remains frozen to M2.7C.5C.2.2. No material-response retuning is authorized in M2.7C.5D.1.
+
+### Evidence contract
+
+One menu action must run all three candidates twice and write one clipboard report. Per candidate it must write:
+
+- `<Candidate>_Moderate.png`
+- `<Candidate>_3x3.png`
+- `<Candidate>_PlacementDebug.png`
+- `<Candidate>_StableIdDebug.png`
+- `<Candidate>_Mask.png`
+- `<Candidate>_Height.png`
+- `<Candidate>_Normals.png`
+- `<Candidate>_Variation.png`
+- `<Candidate>_RootDarkening.png`
+- `<Candidate>_EdgeWear.png`
+- `<Candidate>_MipContactSheet.png`
+
+Report: `GeneratedMassSparseRiverbedAssemblyReport.txt`, also copied to the clipboard.
+
+### Hard validation gates
+
+- Both full assembly runs must produce identical candidate and suite fingerprints.
+- Frozen source definitions/settings must remain exact.
+- Missing/invalid mesh or output data fails.
+- Coverage and quiet-block limits must pass per candidate.
+- At least 12 source IDs must be used; maximum stable-ID share must remain at or below 12%.
+- All periodic seam deltas for mask, height, normals, variation, root darkening, edge wear and Moderate preview must remain within declared tolerances.
+- All output dimensions and expected files must be complete.
+- No runtime or project asset may be created or modified.
+
+### Non-goals and invariants
+
+- Do not change `MassGenerator`, `GeneratedMass`, Generated Mass edge-wear implementation, current projection validator, Ground runtime, River runtime, shaders/HLSL, profiles, texture arrays, materials, scenes, prefabs, layers, tags or Inspector implementation.
+- Do not create a runtime texture or import generated evidence into `Assets`.
+- Do not promote a candidate automatically from numerical metrics.
+- Do not retune isolated-rock edge accents, normals, variation, root contact or lighting in this patch.
+
+### File-by-file implementation sequence
+
+1. **Complete — plan:** record this exact objective, evidence, scope, contracts, risks and validation gates.
+2. **Complete — projection baker:** exposed immutable frozen-source metadata, accepted algorithm-8 fingerprints, current snapshot generation, direct generated-mesh access and the frozen Moderate evaluator without changing existing evidence output.
+3. **Complete — assembler:** implemented deterministic source caching, direct toroidal triangle rasterization, pre-commit spacing/overlap/coverage/quiet checks, owner-aware periodic processing, three candidates and all evidence buffers.
+4. **Complete — validator:** implemented one menu action, two-run suite/candidate determinism, frozen-source hard gates, accepted-snapshot drift warnings, coverage/quiet/diversity/root/seam/output gates, PNG output and clipboard report.
+5. **Complete — architecture docs:** recorded the assembly ownership, candidate contracts and Inspector/runtime boundary; M2.7C.5E remains separately gated.
+6. **Complete for available checks — audit:** final diff contains exactly the approved eight paths; complete final files and direct contracts were reread; bracket/parenthesis balance, C# lexical error scan, member-reference checks, duplicate-class scan, meta presence and scope comparison passed. Unity compilation and one-button execution remain pending because no Unity/C# compiler is available in this environment.
+
+### Risks and controls
+
+- **High offline cost:** cache one generated mesh per frozen source for each build; runtime cost remains zero.
+- **Coverage overshoot:** evaluate projected footprint and quiet-block impact before committing each placement; stop at candidate target.
+- **Seam artefacts:** rasterize wrapped copies and validate opposite edges for every exported channel.
+- **Visible repetition:** enforce source diversity/share limits and provide StableIdDebug plus 3×3 evidence.
+- **Small-scale accent collapse:** use frozen Moderate response and maximum-preserving wear downsampling; inspect mip contact sheets before acceptance.
+- **Upstream source drift:** compare against the accepted algorithm-8 snapshot and report warning-only when current-run determinism passes.
+
+### Post-change consistency and compliance result
+
+- Exact project diff: one modified Editor C# file, three modified canonical documents, and four newly approved `.cs`/`.meta` paths; no other project path differs from the reconstructed M2.7C.5C.2.2 baseline.
+- `GeneratedMassRiverRockProjectionBaker.cs`: existing Build/material-refinement behaviour is unchanged; additions are read-only source exposure, accepted snapshot metadata and an exact Moderate evaluator.
+- New assembler: Editor-only; outputs remain in `Library`; direct meshes are generated through the existing Mass APIs and cached once per suite build.
+- New validator: current projection validator remains unchanged; the new menu action owns assembly evidence and clipboard reporting.
+- Static validation passed: balanced braces/parentheses/brackets, no C# lexer error tokens, no duplicate class names, all cross-file baker/assembler member references resolved by source inspection, and both new `.meta` files are present with unique GUIDs.
+- Mathematical feasibility check: an independent approximate toroidal circle simulation using the recorded targets reached 7.11%/79.59%, 9.20%/75.49%, and 11.03%/69.34% coverage/quiet fractions respectively; this supports but does not replace the Unity mesh run.
+- Unavailable validation: Unity compilation, actual Generated Mass raster output, exact performance, final seam values and visual repetition/mip acceptance remain pending. Required next action is the one-button Unity report.
+
+### Acceptance and next gate
+
+M2.7C.5D.1 is not visually accepted until the user selects one complete tile candidate after reviewing Moderate, 3×3, placement/stable-ID debug, channels and mip evidence. Runtime integration remains blocked. The next separately approved phase is `GSU-M2.7C.5E — Runtime Ground Material Integration`.
+
+## 2026-07-21 — GSU-M2.7C.5C.2.2: Material freeze at unified 0.52 and geometry-drift warning policy
+
+- Freeze the isolated-rock material response at unified wear target percentile `0.52` and fallback `0.56`.
+- Accept the current S-08 accent behavior as the unified-wear reference; do not pursue further per-rock edge-accent tuning.
+- Treat historical raw-geometry fingerprint changes on deterministic unified-preview rocks as **warnings**, not hard failures, while frozen recipes/settings and same-run fingerprints remain stable.
+- Keep hard failures for changed frozen recipes/settings, missing outputs, and same-run nondeterminism.
+- Authoritative progression now advances to `M2.7C.5D — Seamless Sparse Riverbed Assembly`.
+
+## 2026-07-21 — GSU-M2.7C.5C.2.1: Unified/Fallback Accent Midpoint Calibration
+
+**Status:** implemented in the exact approved five-file scope and statically audited. Unity 6000.5 compilation, evidence generation, and visual response freeze remain pending.
+
+### Objective
+
+Perform one final narrow edge-accent calibration without changing the frozen 18-rock library or any non-accent material channel. Preserve the accepted fragmented pattern seen on unified-wear rock `S-08`, reduce its dominance slightly, and raise the integrated fallback-wear accents on `T-15` slightly. The intended Moderate response remains subtle at small screen sizes.
+
+### Approved files
+
+1. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs`
+2. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionValidation.cs`
+3. `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+4. `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+5. `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+No file may be created, deleted, renamed, or moved.
+
+### Reviewed evidence and findings
+
+- Complete M2.7C.5C.2 baker, validator, and the three canonical documents were reviewed from `GSU_M2_7C_5C_2_Edge_Accent_Calibration.zip`.
+- The complete Unity output archive `GeneratedMassRiverRockProjection(4).zip` was reviewed, including `GeneratedMassRiverRockEdgeAccentCalibrationReport.txt`, catalog evidence, response close-ups, processed wear, burial evidence, and all material channels.
+- The Unity run passed deterministic generation with matching catalog fingerprint `00dba6b0f34e1dcbf64332c9df432f388c645cbd10fbb0a71b7056db63e13889`.
+- User visual selection identifies `T-15` and `S-08` as the best accent references. `S-08` has the preferred fragmented pattern but is slightly too pronounced; `T-15` has the preferred integrated blend but remains slightly too transparent.
+- Report evidence identifies `T-15` as an ordinary Generated Mass fallback rock and `S-08` as unified edge-wear preview geometry.
+- `NormalizeProcessedEdgeWear` currently targets the 90th percentile at `0.56` for unified geometry and `0.52` for fallback geometry. This direction matches the observed imbalance: unified accents are stronger while fallback accents are weaker.
+- The accepted dual-frequency breakup, two-pixel selective dilation, three-pixel silhouette exclusion, support/core material mapping, root sectors, lighting, variation, burial framing, and source geometry do not require redesign.
+- Direct caller/consumer review confirms only `GeneratedMassRiverRockProjectionValidation` consumes the baker. No runtime system consumes these Editor-only outputs.
+- Git metadata is absent from the supplied source archive. The layered M2.7C.5C.2 package is the authoritative baseline for the five approved paths.
+
+### Invariants and non-goals
+
+- Preserve all 18 frozen IDs, seeds, recipes, rotations, burial values, raw geometry fingerprints, rasterization, masks, heights, normals, variation, upward exposure, directional response, root-darkening, and burial framing exactly.
+- Preserve the current fragmentation frequencies, intermittency thresholds, dilation, silhouette exclusion, and support/core thresholds unless static evidence proves a required correction.
+- Do not introduce per-rock ID special cases. Calibration must operate through the existing unified/fallback path distinction.
+- Do not add new channels, controls, assets, runtime code, tile assembly, profiles, materials, shaders, scenes, prefabs, layers, tags, or Inspector behavior.
+- Moderate remains the production-style target. Strong remains diagnostic. Accents must remain subtle enough to avoid line artifacts when rocks are small on screen.
+
+### Implementation sequence
+
+1. **Plan — complete:** record current evidence, exact scope, invariants, midpoint target, risks, and validation contract before code edits.
+2. **Path midpoint — complete:** lowered the unified normalized target from `0.56` to `0.53` and raised the fallback target from `0.52` to `0.56`; source extraction and breakup are unchanged.
+3. **Response preservation — complete:** retained the existing Neutral/Moderate/Strong support/core mapping unchanged; midpoint calibration is isolated to per-rock normalization.
+4. **Validation/report identity — complete:** bumped the algorithm to version `7`, updated report/log identity to M2.7C.5C.2.1, and named `S-08` unified / `T-15` fallback as the visual references.
+5. **Architecture documentation — complete:** recorded the path-level midpoint and retained M2.7C.5D as the next phase only after visual approval.
+6. **Post-change audit — complete:** reread all five files and direct contracts, compared the complete diff with M2.7C.5C.2, ran available static/scope checks, and recorded Unity validation as pending.
+
+### Acceptance criteria
+
+- Frozen source definitions and raw geometry fingerprints remain unchanged.
+- The existing fragmented pattern remains visible on `S-08`, but its Moderate/Strong accents are slightly less dominant than M2.7C.5C.2.
+- `T-15` retains its integrated blend, but its Moderate/Strong accents become slightly more visible than M2.7C.5C.2.
+- No outer silhouette outline, new continuous accent segment, or triangle-following material noise is introduced.
+- Repeated complete Unity builds produce identical fingerprints and output arrays.
+- Exactly the approved five paths differ from M2.7C.5C.2.
+
+### Risks and mitigations
+
+- **Risk — all fallback rocks become too prominent.** Mitigation: use a small target increase and preserve existing bounded per-rock gain.
+- **Risk — unified accents become invisible.** Mitigation: reduce the unified target only slightly and keep existing breakup/support behavior unchanged.
+- **Risk — response differences are too small to judge.** Mitigation: keep `S-08` and `T-15` explicitly named in the report pending gate and compare the same Moderate/Strong evidence.
+- **Risk — accidental scope drift changes accepted processing.** Mitigation: verify the final diff contains only normalization constants, algorithm/report identity, and documentation.
+
+### Validation contract
+
+- Lexical delimiter/string/comment balance and namespace/type-scope sanity checks for both changed C# files.
+- Byte-level comparison of frozen definition and raw fingerprint contract blocks against M2.7C.5C.2.
+- Diff assertion that edge extraction, breakup, dilation, silhouette exclusion, support/core mapping, root, lighting, variation, height, normals, and burial logic remain unchanged.
+- Exact approved-path scope comparison.
+- Unity 6000.5 compilation and one-button evidence run remain authoritative and pending.
+
+
+### Post-change audit evidence
+
+- `GeneratedMassRiverRockProjectionBaker.AlgorithmVersion` changed from `6` to `7`; `RawGeometryFingerprintVersion` remains unchanged.
+- `UnifiedWearTargetPercentile` changed from `0.56` to `0.53` (approximately 5.4% lower).
+- `FallbackWearTargetPercentile` changed from `0.52` to `0.56` (approximately 7.7% higher).
+- The frozen 18-rock library and validator raw-fingerprint contracts are byte-identical to M2.7C.5C.2.
+- `BuildProcessedEdgeWear`, dual-frequency breakup, selective dilation, silhouette exclusion, root-contact processing, and `BuildProcessedMaterialColor` support/core mapping are byte-identical to M2.7C.5C.2.
+- No per-rock ID conditional was added; the adjustment uses the existing `UsedFallbackMesh` path distinction.
+- Both changed C# files pass lexical delimiter/string/comment balance checks. Since the baseline compiled in Unity and the code diff is limited to three numeric constants plus report strings, no new symbol or control-flow dependency was introduced.
+- Conflict-marker, whitespace, approved-path scope, exact baker-diff, frozen-contract, and accepted-processing-block checks passed.
+- Exactly the approved five files differ from M2.7C.5C.2; no project path was created, deleted, renamed, or moved.
+- A Unity/C# compiler is unavailable in this environment. Unity 6000.5 compilation, deterministic one-button execution, and visual midpoint approval remain authoritative and pending.
+
+## 2026-07-21 — GSU-M2.7C.5C.2: Edge Accent Calibration and Material-Response Freeze
+
+**Status:** implemented in the exact approved five-file scope and statically audited. Unity 6000.5 compilation, menu execution, generated evidence, and visual acceptance remain pending.
+
+### Objective
+
+Calibrate the M2.7C.5C.1 interior edge-accent response without changing the frozen 18-rock library, Generated Mass recipes, projection geometry, processed height, processed normals, material variation, directional lighting, root sectors, or fixed-frame burial system. The production-target Moderate response must show subtle but readable internal accents across both native-wear and fallback-wear rocks, while avoiding bright line-art artifacts at small screen sizes.
+
+### Approved files
+
+1. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs`
+2. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionValidation.cs`
+3. `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+4. `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+5. `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+No file may be created, deleted, or renamed.
+
+### Reviewed evidence and findings
+
+- Complete M2.7C.5C.1 baker, validator, and three canonical documents were reviewed from `GSU_M2_7C_5C_1_Directional_Response_Contact_Sectors_Fixed_Burial.zip`.
+- The Unity report `GeneratedMassRiverRockMaterialRefinementCorrectionReport.txt` passed determinism with matching fingerprint `7690c55cb0b47fa889c7352f9c81e08de32a7d20e19392ee4ef022872f65f884`, 18 frozen rocks, fixed burial frames, and 20 PNG evidence outputs.
+- User visual evidence accepted the overall material response and burial presentation but identified a cross-path imbalance: fallback-wear rocks such as `T-15` show accents that are too weak, while native unified-wear rocks such as `T-13` show accents that are too bright and continuous.
+- `BuildProcessedEdgeWear` currently scales native projected wear by `0.88` and fallback curvature wear by `0.46`, then preserves an intermittency floor of `0.35`. This structurally favors native-wear rocks and leaves long connected segments visible.
+- `BuildProcessedMaterialColor` currently applies edge wear directly with maximum strengths `0.20`, `0.48`, and `0.74` for Neutral, Moderate, and Strong, using a bright fixed wear colour. This permits high-valued native wear to read as drawn lines while low-valued fallback wear remains nearly invisible.
+- Direct caller/consumer review found only `GeneratedMassRiverRockProjectionValidation`; no runtime system consumes the baker. Generated Mass producers and all frozen source contracts remain unchanged.
+- Git metadata is absent from the supplied archive. The accepted M2.7C.5C.1 package is the authoritative baseline for the five approved paths.
+
+### Invariants and non-goals
+
+- Preserve all 18 frozen IDs, seeds, recipes, rotations, burial values, source geometry, raw per-rock fingerprints, processed height, processed normals, variation, lighting, root-darkening, and fixed burial framing exactly.
+- Preserve the existing outer silhouette exclusion. Edge accents must remain internal, broken, and tied to projected native wear or processed convex structure.
+- Do not add mask-distance outlines, fake cracks, source-rock generation, new material channels, seamless tile assembly, runtime integration, Inspector controls, assets, components, layers, tags, materials, profiles, scenes, or prefabs.
+- Strong remains diagnostic. Moderate is the intended production-style response and must remain on the subtle side.
+
+### Implementation sequence
+
+1. **Plan — complete:** record evidence, scope, invariants, risks, acceptance criteria, and validation contract before code changes.
+2. **Source balancing — complete:** reduce native-wear dominance and increase fallback convex-wear contribution without changing source geometry or silhouette exclusion.
+3. **Segment breakup — complete:** lower the continuous intermittency floor and add deterministic secondary breakup so long uniform accents become discontinuous.
+4. **Per-rock normalization — complete:** normalize strong processed-wear percentiles into one restrained target range so native and fallback paths produce comparable accent visibility without amplifying near-zero noise.
+5. **Support/core mapping — complete:** replace direct wear multiplication with a broad low-contrast support response plus a thinner bounded core response; use less luminous wear colour and lower Moderate/Strong maxima.
+6. **Validation/report — complete:** update algorithm/report identity, preserve frozen contracts and raw fingerprints, enforce deterministic outputs, and report the calibrated accent contract.
+7. **Architecture docs — complete:** record the accepted subtle-accent direction and keep M2.7C.5D as the next phase only after visual approval.
+8. **Post-change audit — complete:** reread all five final files and direct contracts, compare final diff with M2.7C.5C.1 and this plan, run available syntax/static/scope checks, and mark Unity validation pending.
+
+### Acceptance criteria
+
+- The 18 frozen source definitions and authoritative raw per-rock fingerprints remain unchanged.
+- Repeated complete builds produce identical catalog fingerprints and output arrays.
+- Moderate shows readable internal accents on fallback examples such as `T-15` without making native examples such as `T-13` appear engraved or outlined.
+- Strong remains visibly stronger than Moderate but no longer produces dominant continuous bright slashes.
+- Outer silhouette exclusion remains active and no complete perimeter outline is introduced.
+- Exactly the approved five files differ from M2.7C.5C.1.
+
+### Risks and mitigations
+
+- **Risk — normalization amplifies numerical noise on rocks with no usable wear.** Mitigation: require a minimum per-rock high-percentile signal before applying gain.
+- **Risk — fallback strengthening restores triangle noise.** Mitigation: fallback remains derived only from the already processed mild height and blended normals, with deterministic breakup and silhouette exclusion.
+- **Risk — accent reduction makes all lines invisible at distance.** Mitigation: retain a low-contrast support component while limiting the bright core component.
+- **Risk — Strong remains line-art-like.** Mitigation: cap both support and core strength, lower wear-colour luminance, and increase segment breakup.
+
+### Validation contract
+
+- Static parse and namespace/type-scope checks for both changed C# files.
+- Exact frozen-definition and raw-fingerprint comparison against M2.7C.5C.1.
+- Exact project-path scope comparison against the approved five files.
+- Unity 6000.5 compilation and one-button evidence run remain authoritative and pending until performed by the user.
+
+### Post-change audit evidence
+
+- `GeneratedMassRiverRockProjectionBaker.AlgorithmVersion` is `6`; `RawGeometryFingerprintVersion` remains `4`.
+- The baker and validator frozen-library contract blocks are byte-identical to M2.7C.5C.1.
+- `BuildProcessedEdgeWear` now reduces native-wear source gain from `0.88` to `0.60`, raises processed fallback contribution from `0.46` to `0.62`, and applies dual-frequency deterministic breakup with a `0.12` low floor.
+- `NormalizeProcessedEdgeWear` uses a 64-bin per-rock histogram, 90th-percentile reference, minimum signal `0.055`, target percentiles `0.56` for unified geometry and `0.52` for fallback geometry, and bounded gain `0.55–2.60`.
+- `BuildProcessedMaterialColor` now maps wear through a broad support term plus a bounded core term. Moderate maximum contribution is reduced from direct `0.48` multiplication to `0.13` support plus `0.075` core; Strong uses `0.19` plus `0.11`. Wear colour luminance is also reduced.
+- Static brace, class-span, namespace-scope, conflict-marker, frozen-contract, raw-fingerprint-version, approved-path-scope, and whitespace checks passed.
+- Exactly the approved five files differ from M2.7C.5C.1; no project path was created, deleted, or renamed.
+- A Unity/C# compiler is unavailable in this environment. Unity 6000.5 compilation and the one-button evidence run remain pending and authoritative.
+
+## 2026-07-21 — GSU-M2.7C.5C.1: Directional Response, Contact Sectors, and Fixed Burial Evidence
+
+**Status:** implemented in the exact approved five-file scope and statically audited. Unity 6000.5 compilation, menu execution, generated evidence, and visual acceptance remain pending.
+
+### Objective
+
+Correct the M2.7C.5C evidence mapping without changing the frozen 18-rock source library, Generated Mass recipes, projection geometry, processed height fields, or 78/22 two-scale processed-normal blend. The correction must make Neutral, Moderate, and Strong materially distinct; separate upward exposure from directional lighting; replace root hairlines with broken contact sectors; expose existing interior wear; and make burial depth visually comparable under fixed framing.
+
+### Approved files
+
+1. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionBaker.cs`
+2. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassRiverRockProjectionValidation.cs`
+3. `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+4. `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+5. `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+No file may be created, deleted, or renamed.
+
+### Reviewed evidence and current findings
+
+- Complete M2.7C.5C baker and validator were reviewed from `GSU_M2_7C_5C_Frozen_Rock_Material_Refinement.zip`.
+- Direct producers reviewed: `MassRecipe` in `Assets/Game/Procedural/Masses/GeneratedMass.cs`, `MassSurfaceFeatureSettings` in `Assets/Game/Procedural/Masses/MassSurfaceFeatureGenerator.cs`, and `MassGenerator.Generate` / `MassGenerator.GenerateUnifiedEdgeWearPreview` in `Assets/Game/Procedural/Masses/MassGenerator.cs`.
+- Direct consumer review found only `GeneratedMassRiverRockProjectionValidation`; no runtime or unrelated project consumer references the baker.
+- Git metadata is absent from the supplied archive. The accepted M2.7C.5C package is the authoritative working baseline for the five approved paths.
+- `GeneratedMassRiverRockMaterialRefinementReport.txt` records a deterministic pass with matching catalog fingerprint `a7fbf687cdd929ce129c9f6670c9bd71c5ccec6f7cba410255dcdda4a3e216bd`, 18 frozen entries, and the expected evidence set.
+- `BuildProcessedBuffers` currently stores processed-normal upward exposure in `processed.Exposure`; `BuildProcessedMaterialColor` then adds that mostly saturated value to material brightness while separately compressing directional `N·L` into a narrow positive range. This makes Neutral, Moderate, and Strong too similar and too pale.
+- `BuildSelectiveRootDarkening` produces narrow low-height results without an inward sector expansion stage, so visual grounding is primarily hairline-sized.
+- `BuildProcessedEdgeWear` generates valid interior wear but the final colour mapping is too weak to expose it consistently.
+- `BuildBurialComparison` calls `RasterizeRockIntoCell` independently for each burial fraction; `RasterizeMesh` recalculates visible height, bounds, scale, and centering per cell, which removes direct apparent-size and height comparison across burial depths.
+
+### Invariants and non-goals
+
+- Preserve all 18 frozen stable IDs, archetypes, shape seeds, surface seeds, rotations, default burial values, Uneven Broad recipe fields, surface-feature settings, and ordering exactly.
+- Preserve raw per-rock geometry fingerprints; bumping the combined evidence algorithm version must not change raw geometry generation or rasterization for the main catalog.
+- Preserve the existing three-pass broad height, one-pass mild height, and 78/22 processed-normal blend.
+- Do not modify `MassGenerator`, `GeneratedMass`, `MassRecipe`, edge-wear architecture, Ground runtime, River, shaders, materials, profiles, scenes, prefabs, layers, tags, or Inspector controls.
+- Do not assemble a seamless riverbed tile or add runtime integration.
+- Do not use mask-distance perimeter shading, complete contact rings, fake cracks, or new source-rock generation.
+
+### Implementation sequence
+
+1. **Plan — complete:** record this objective, evidence, invariants, risks, scope, implementation order, and validation contract before code changes.
+2. **Evidence contract — complete:** extend result buffers with independent `UpwardExposure`, `DirectionalLightResponse`, and close-up evidence outputs while retaining all existing raw/processed diagnostic channels.
+3. **Directional material response — complete:** lower the preview base value, derive signed directional response from processed normals, and define clearly separated Neutral / Moderate / Strong response ranges. Upward exposure remains a restrained secondary weathering term only.
+4. **Contact sectors — complete:** build wider deterministic burial-owned contact sectors, expand them inward by a bounded 3–7 source pixels, soften the interior transition, and preserve large unaffected perimeter regions.
+5. **Wear presentation — complete:** retain silhouette exclusion, selectively widen strong interior wear by at most two pixels, and apply visible value/desaturation response without outlining the rock.
+6. **Fixed-frame burial — complete:** compute one source framing contract per rock and reuse identical X/Z centre, scale, height normalization, rotation, and cell framing for 8/18/28/38% burial variants; only burial plane movement may vary. Add a visible substrate reference.
+7. **Close-up evidence — complete:** generate a six-rock `Neutral | Moderate | Strong` sheet for `S-12`, `S-13`, `S-14`, `T-05`, `T-13`, and `T-15`.
+8. **Validation/report — complete:** enforce unchanged frozen contracts, repeated fingerprints, expected outputs, fixed burial framing metadata, non-empty contact sectors, and substantial unaffected perimeter.
+9. **Architecture docs — complete:** update the two remaining canonical documents to record the corrected response ownership and preserve M2.7C.5D / M2.7C.5E as later gates.
+10. **Post-change audit — complete:** reread all five final files and related producer contracts; compare the final diff with the M2.7C.5C baseline and this plan; run all available static checks; record Unity compilation and visual acceptance as pending.
+
+### Risks and mitigations
+
+- **Risk — root darkening becomes another complete outline.** Mitigation: sector ownership, directional breakup, inward-only expansion, explicit unaffected-perimeter validation, and no mask-distance source term.
+- **Risk — Strong clips to white and hides planes.** Mitigation: lower base albedo range, signed directional response around a neutral midpoint, bounded highlight multiplier, and separate upward exposure.
+- **Risk — wear becomes line art.** Mitigation: keep outer silhouette exclusion, threshold strong interior structure, limit dilation to two pixels, and apply restrained colour response.
+- **Risk — fixed burial framing clips deep or shallow variants.** Mitigation: derive framing from the full unburied transformed mesh and reserve fixed projection padding for all four variants.
+- **Risk — close-up evidence changes source data.** Mitigation: close-ups reuse existing processed buffers or rerasterize the exact frozen definitions without recipe/seed changes.
+
+### Post-change audit evidence
+
+- Changed project paths are limited to the approved two Editor scripts and three canonical documents; no file was created, deleted, or renamed.
+- Both changed C# files parse successfully with the available C# grammar; brace/scope inspection found no method at namespace scope and no duplicate method signature.
+- The baker and validator each contain the same 18 frozen IDs/settings in the same order. The validator also freezes the authoritative M2.7C.5C raw per-rock fingerprints.
+- The main source-rock generation, recipe construction, mesh generation, raw rasterization, frozen definitions, processed-height passes, and 78/22 processed-normal blend remain unchanged. Raw per-rock fingerprint serialization retains contract version 4 while the combined evidence algorithm advances to version 5.
+- New evidence arrays are allocated, labelled, fingerprinted, validated, reported, and written: upward exposure, directional response, response close-ups, and fixed-frame burial metadata.
+- The close-up contract is exactly `S-12/S-13/S-14/T-05/T-13/T-15`; the burial contract is exactly `S-12/S-14/T-13/T-15` at 8/18/28/38%.
+- Root-contact validation requires non-empty contact, perimeter participation above 0.1%, and affected perimeter below 65%.
+- Unity and a C# compiler are unavailable in the delivery environment. Unity compilation, deterministic execution, output generation, and visual judgment are therefore not claimed and remain mandatory user-side gates.
+
+### Acceptance and validation contract
+
+- Exactly the approved five files differ from M2.7C.5C; no project path is added or deleted.
+- Frozen library definitions remain byte-for-byte equivalent in values and order.
+- Both complete runs produce matching catalog and per-rock fingerprints.
+- Raw geometry generation/projection data for the main 18-rock catalog remains unchanged from M2.7C.5C apart from the intentional algorithm-version container fingerprint.
+- `UpwardExposure` and `DirectionalLightResponse` are independent outputs.
+- Neutral, Moderate, and Strong outputs are all generated and measurably non-identical.
+- Every root mask has non-zero contact where eligible, never forms a complete perimeter ring, and preserves a substantial unaffected perimeter fraction.
+- Burial comparison contains `S-12/S-14/T-13/T-15`, each at `8/18/28/38%`, with fixed framing metadata for all four depths of one source.
+- Close-up evidence contains exactly the six approved stable IDs under all three response modes.
+- All evidence remains local under `Library/SurfaceMaterialDiagnostics/GeneratedMassRiverRockProjection`.
+- Unity 6000.5.0f1 compilation and visual review remain mandatory final gates.
+
 ## 2026-07-21 — GSU-M2.7C.5C: Frozen Rock Library and Material-Response Refinement
 
 Status: **Implemented in the exact approved five-file scope and statically audited. Unity 6000.5 compilation, menu execution, generated evidence, and visual material/burial acceptance remain pending.**
