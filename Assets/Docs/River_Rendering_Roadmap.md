@@ -1339,3 +1339,32 @@ The original full-rate analytical Candidate Field is again the only candidate sy
 
 Current Presence Footprint is unchanged. No new texture, buffer, kernel, dispatch, cache, render pass, scene, prefab, material, or serialized control is introduced. Offline validation and Unity visual acceptance remain pending.
 
+## RG-METRIC-P12r — Binary-topology rollback
+
+- **Status:** source-restored; `58/58` offline rollback gates pass; Unity validation pending.
+- The rejected P12q binary-topology route and all associated runtime/compute/shader resources are deleted.
+- P12p rendered-edge Eligibility is again the sole active implementation.
+- No replacement architecture is introduced by this patch. Further work, if approved, must tune or correct the restored rendered-edge path rather than retain P12q code.
+
+
+
+## P12s status — Presence-Amplitude soft-mask reconstruction A/B
+
+P12r remains the default exact rendered-removal route. P12s adds an optional Presence-Amplitude `Soft-Mask Reconstruction (Experimental)` route for direct Unity comparison.
+
+The experiment restores the accepted pre-hardened reconstruction sequence rather than fading the final rendered mask: continuous analytical Candidate × continuous soft Eligibility modifies `coherentSoftVisibility`, the result is rehardened, and structural Strands are then applied. Eligibility uses binary exact rendered support and an authored `Soft Edge Start` defaulting to `0.06`.
+
+Candidate identity, geometry, animation, search budget, fixed spacing `0.15 m`, Layer C, Film, Shape, sources, transport, materials, scenes, passes, and GPU resources remain unchanged. Source implementation is complete; Unity import, same-frame visual A/B, and measured GPU timing are pending.
+
+## `RG-METRIC-P12t` — Soft Reconstruction baseline and Inspector cleanup — implemented, Unity validation pending
+
+P12s soft-mask reconstruction is promoted to the sole Presence-Amplitude Chipping application. Exact Rendered Removal, its serialized selector, scalar binding, shader property, binary selection, and direct final-mask deletion branch are removed. The original analytical Candidate Field, Current Presence Footprint behavior, soft Eligibility formula, rehardened reconstruction, and Strand order remain.
+
+Production Chipping authoring and all Chipping diagnostics now belong to Layer E. Layer D is explicitly diagnostic-only. Presence-Amplitude Edge Start and Current-only Interior Access are conditionally shown. No resource, kernel, dispatch, pass, draw-call, memory, scene, prefab, material, cache, layer, tag, component, or fixed-grid change is included.
+
+
+## P12u — unified automatic birth reveal speed
+
+Automatic Layer C source formation is repaired across all eight recipes. Base Reveal Speed and per-pattern Reveal Speed Multiplier now produce honest metres-per-second progression; resolved duration is path distance divided by requested speed with only the Layer C material-step floor. Historical family duration ceilings, the Torn Fragment compressed timing formula, and the Fleck `0–0.18` reveal window are removed. Arc/Semi-Arc Hold, Release, and Rest remain unchanged.
+
+Contact Fleck and all Free-Water recipes now use their complete authored Min/Max distributions. A one-button Play Mode report with adjacent clipboard copy exposes latest per-recipe timing, actual speed, cadence limiting, active count, 32-slot pool occupancy, and rejected starts. No rendering-stage or GPU-resource change is introduced.

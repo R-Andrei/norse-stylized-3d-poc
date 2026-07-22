@@ -7982,9 +7982,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     audit.PolygonSurfaceAuthoredNormalTriangleCount &&
                 audit.PolygonSurfaceTriangleCount ==
                     audit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount &&
-                audit.PolygonSurfaceInternalFanVertexCount >= 0 &&
-                audit.PolygonSurfaceInternalFanVertexCount <=
-                    audit.PolygonSurfaceFaceCount &&
+                audit.PolygonSurfaceInternalFanVertexCount == 0 &&
                 audit.PolygonSurfaceGroupCollisionCount == 0 &&
                 audit.PolygonSurfaceFailureFace < 0
                     ? 1
@@ -8004,9 +8002,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     audit.BevelRegionAuthoredNormalTriangleCount &&
                 audit.BevelRegionTriangleCount ==
                     audit.BevelRegionAuthoredSurfaceGroupTriangleCount &&
-                audit.BevelRegionInternalFanVertexCount >= 0 &&
-                audit.BevelRegionInternalFanVertexCount <=
-                    audit.BevelRegionFaceCount &&
+                audit.BevelRegionInternalFanVertexCount == 0 &&
                 audit.BevelRegionFailureFace < 0
                     ? 1
                     : 0;
@@ -8153,59 +8149,71 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             PolygonSurfaceTriangulationMode triangulationMode =
                 PolygonSurfaceTriangulationMode.None;
             int anchorIndex = -1;
-            Vector3 projectedCentre = Vector3.zero;
+            OneSurfaceBoundaryFanAudit boundaryFanAudit;
+            List<OneSurfaceTriangleIndex> generalTriangles = null;
+            OneSurfaceGeneralTriangulationAudit generalAudit = default;
+            OneSurfaceCollinearReinsertionAudit collinearAudit = default;
             if (TryFindStableOneSurfaceFanAnchor(
                     face.Vertices,
                     authoredNormal,
                     minimumTriangleArea,
-                    out anchorIndex))
+                    out anchorIndex,
+                    out boundaryFanAudit))
             {
                 triangulationMode =
                     PolygonSurfaceTriangulationMode.BoundaryFan;
             }
-            else if (TryResolveProjectedOneSurfaceCentre(
+            else if (TryResolveGeneralOneSurfaceTriangulation(
+                    face.Vertices,
+                    authoredNormal,
+                    minimumTriangleArea,
+                    out generalTriangles,
+                    out generalAudit))
+            {
+                triangulationMode =
+                    PolygonSurfaceTriangulationMode.GeneralTriangulation;
+            }
+            else if (HasOneSurfaceNormalAgreementFailure(
+                         boundaryFanAudit,
+                         generalAudit) &&
+                TryResolveToleranceCollinearOneSurfaceTriangulation(
                     face.Vertices,
                     authoredNormal,
                     planeDistance,
                     planeTolerance,
-                    out projectedCentre) &&
-                IsProjectedOneSurfaceCentreFanStable(
-                    face.Vertices,
-                    projectedCentre,
-                    authoredNormal,
-                    minimumTriangleArea))
+                    minimumTriangleArea,
+                    out generalTriangles,
+                    out collinearAudit))
             {
                 triangulationMode =
-                    PolygonSurfaceTriangulationMode.ProjectedCentreFan;
+                    PolygonSurfaceTriangulationMode.CollinearReinsertion;
             }
 
             if (triangulationMode ==
                 PolygonSurfaceTriangulationMode.None)
             {
+                string failureEvidence =
+                    FormatOneSurfaceTriangulationFailureEvidence(
+                        face,
+                        faceIndex,
+                        authoredNormal,
+                        maximumPlaneResidual,
+                        minimumTriangleArea,
+                        boundaryFanAudit,
+                        generalAudit,
+                        collinearAudit);
                 blocker = RecordBoundedTriangulationFailure(
                     ref audit,
                     faceIndex,
                     face,
                     BoundedPolygonFailure.Degenerate,
-                    "the one-surface polygon has neither a stable direct fan nor a stable projected-centre fallback");
+                    failureEvidence);
                 return false;
             }
 
-            int expectedTriangleCount = triangulationMode ==
-                    PolygonSurfaceTriangulationMode.BoundaryFan
-                ? face.Vertices.Count - 2
-                : face.Vertices.Count;
+            int expectedTriangleCount = face.Vertices.Count - 2;
             audit.PolygonSurfaceExpectedTriangleCount +=
                 expectedTriangleCount;
-            if (triangulationMode ==
-                PolygonSurfaceTriangulationMode.ProjectedCentreFan)
-            {
-                audit.PolygonSurfaceInternalFanVertexCount++;
-                if (isBevelFace)
-                {
-                    audit.BevelRegionInternalFanVertexCount++;
-                }
-            }
 
             int emittedTriangleCount = 0;
             if (triangulationMode ==
@@ -8242,17 +8250,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
             else
             {
-                for (int vertexIndex = 0;
-                     vertexIndex < face.Vertices.Count;
-                     vertexIndex++)
+                for (int triangleIndex = 0;
+                     triangleIndex < generalTriangles.Count;
+                     triangleIndex++)
                 {
-                    Vector3 b = face.Vertices[vertexIndex];
-                    Vector3 c = face.Vertices[
-                        (vertexIndex + 1) % face.Vertices.Count];
+                    OneSurfaceTriangleIndex triangle =
+                        generalTriangles[triangleIndex];
                     if (!TryEmitOneSurfaceTriangle(
-                            projectedCentre,
-                            b,
-                            c,
+                            face.Vertices[triangle.A],
+                            face.Vertices[triangle.B],
+                            face.Vertices[triangle.C],
                             face,
                             faceIndex,
                             authoredNormal,
@@ -8283,89 +8290,1500 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return true;
         }
 
-        private static bool TryResolveProjectedOneSurfaceCentre(
+        private static bool TryResolveGeneralOneSurfaceTriangulation(
+            List<Vector3> vertices,
+            Vector3 authoredNormal,
+            float minimumTriangleArea,
+            out List<OneSurfaceTriangleIndex> triangles,
+            out OneSurfaceGeneralTriangulationAudit audit)
+        {
+            triangles = new List<OneSurfaceTriangleIndex>();
+            audit = new OneSurfaceGeneralTriangulationAudit
+            {
+                SelectedMinimumArea = 0f,
+                SelectedMinimumNormalDot = 0f,
+                SelectedTriangleEvidence = "none",
+                FailureReason = string.Empty
+            };
+            if (vertices == null || vertices.Count < 3 ||
+                !IsFinite(authoredNormal) ||
+                authoredNormal.sqrMagnitude <= MinimumEdgeLengthSqr ||
+                !IsFiniteFloat(minimumTriangleArea) ||
+                minimumTriangleArea < 0f)
+            {
+                audit.FailureReason =
+                    "general triangulation received invalid polygon inputs";
+                return false;
+            }
+
+            if (!TryProjectChamferPatchLoop(
+                    vertices,
+                    authoredNormal,
+                    out List<Vector2> projected,
+                    out float signedArea,
+                    out float projectionEpsilon))
+            {
+                audit.FailureReason =
+                    "the ordered polygon could not be projected to its authoritative plane";
+                return false;
+            }
+            audit.ProjectionSucceeded = 1;
+            float projectedAreaTolerance =
+                projectionEpsilon * projectionEpsilon;
+            if (!IsFiniteFloat(signedArea) ||
+                Mathf.Abs(signedArea) <= projectedAreaTolerance)
+            {
+                audit.FailureReason =
+                    "the projected polygon has no stable signed area";
+                return false;
+            }
+            if (ChamferPatchPolygonSelfIntersects(
+                    projected,
+                    projectionEpsilon,
+                    out _))
+            {
+                audit.ProjectionSelfIntersection = 1;
+                audit.FailureReason =
+                    "the projected polygon self-intersects";
+                return false;
+            }
+
+            int vertexCount = vertices.Count;
+            List<int> fullBoundary = new List<int>(vertexCount);
+            for (int vertexIndex = 0;
+                 vertexIndex < vertexCount;
+                 vertexIndex++)
+            {
+                fullBoundary.Add(vertexIndex);
+            }
+
+            bool[,] diagonalValid = new bool[vertexCount, vertexCount];
+            for (int first = 0; first < vertexCount; first++)
+            {
+                diagonalValid[first, first] = true;
+                for (int second = first + 1;
+                     second < vertexCount;
+                     second++)
+                {
+                    bool boundarySegment = second == first + 1 ||
+                        (first == 0 && second == vertexCount - 1);
+                    bool valid = boundarySegment ||
+                        IsOneSurfaceProjectedDiagonalValid(
+                            first,
+                            second,
+                            fullBoundary,
+                            projected,
+                            projectionEpsilon);
+                    diagonalValid[first, second] = valid;
+                    diagonalValid[second, first] = valid;
+                    if (!valid)
+                    {
+                        audit.RejectedDiagonalCount++;
+                    }
+                }
+            }
+
+            OneSurfaceTriangulationState[,] states =
+                new OneSurfaceTriangulationState[
+                    vertexCount,
+                    vertexCount];
+            for (int index = 0;
+                 index < vertexCount - 1;
+                 index++)
+            {
+                states[index, index + 1] =
+                    new OneSurfaceTriangulationState
+                    {
+                        Evaluated = true,
+                        Succeeded = true,
+                        MinimumArea = float.PositiveInfinity,
+                        MinimumNormalDot = 1f,
+                        SplitIndex = -1
+                    };
+            }
+
+            const float rankingEpsilon = 0.000001f;
+            for (int span = 2;
+                 span < vertexCount;
+                 span++)
+            {
+                for (int first = 0;
+                     first + span < vertexCount;
+                     first++)
+                {
+                    int last = first + span;
+                    audit.StatesEvaluated++;
+                    OneSurfaceTriangulationState best =
+                        new OneSurfaceTriangulationState
+                        {
+                            Evaluated = true,
+                            Succeeded = false,
+                            MinimumArea = -1f,
+                            MinimumNormalDot = -1f,
+                            SplitIndex = -1
+                        };
+                    if (!diagonalValid[first, last])
+                    {
+                        states[first, last] = best;
+                        continue;
+                    }
+
+                    for (int middle = first + 1;
+                         middle < last;
+                         middle++)
+                    {
+                        OneSurfaceTriangulationState left =
+                            states[first, middle];
+                        OneSurfaceTriangulationState right =
+                            states[middle, last];
+                        if (!left.Succeeded || !right.Succeeded ||
+                            !diagonalValid[first, middle] ||
+                            !diagonalValid[middle, last])
+                        {
+                            continue;
+                        }
+
+                        OneSurfaceTriangleCandidate candidate =
+                            EvaluateOneSurfaceTriangleCandidate(
+                                vertices[first],
+                                vertices[middle],
+                                vertices[last],
+                                authoredNormal,
+                                minimumTriangleArea);
+                        if (candidate.Valid)
+                        {
+                            audit.ValidTriangleCandidateCount++;
+                        }
+                        else if (candidate.Failure ==
+                            OneSurfaceTriangleCandidateFailure.NonFinite)
+                        {
+                            audit.RejectedNonFiniteCount++;
+                            continue;
+                        }
+                        else if (candidate.Failure ==
+                            OneSurfaceTriangleCandidateFailure.Area)
+                        {
+                            audit.RejectedAreaCount++;
+                            continue;
+                        }
+                        else
+                        {
+                            audit.RejectedNormalAgreementCount++;
+                            continue;
+                        }
+
+                        float minimumArea = Mathf.Min(
+                            candidate.Area,
+                            Mathf.Min(
+                                left.MinimumArea,
+                                right.MinimumArea));
+                        float minimumNormalDot = Mathf.Min(
+                            candidate.NormalDot,
+                            Mathf.Min(
+                                left.MinimumNormalDot,
+                                right.MinimumNormalDot));
+                        bool betterArea =
+                            minimumArea >
+                                best.MinimumArea + rankingEpsilon;
+                        bool equalArea = Mathf.Abs(
+                            minimumArea - best.MinimumArea) <=
+                                rankingEpsilon;
+                        bool betterNormal =
+                            minimumNormalDot >
+                                best.MinimumNormalDot + rankingEpsilon;
+                        bool equalNormal = Mathf.Abs(
+                            minimumNormalDot -
+                            best.MinimumNormalDot) <= rankingEpsilon;
+                        bool betterSplit = best.SplitIndex < 0 ||
+                            middle < best.SplitIndex;
+                        if (!best.Succeeded || betterArea ||
+                            (equalArea && betterNormal) ||
+                            (equalArea && equalNormal && betterSplit))
+                        {
+                            best.Succeeded = true;
+                            best.MinimumArea = minimumArea;
+                            best.MinimumNormalDot = minimumNormalDot;
+                            best.SplitIndex = middle;
+                        }
+                    }
+                    states[first, last] = best;
+                }
+            }
+
+            OneSurfaceTriangulationState complete =
+                states[0, vertexCount - 1];
+            if (!complete.Succeeded)
+            {
+                audit.FailureReason =
+                    "the projected interval solver found no complete certified triangulation";
+                return false;
+            }
+
+            if (!CollectOneSurfaceTriangulationTriangles(
+                    states,
+                    0,
+                    vertexCount - 1,
+                    triangles) ||
+                triangles.Count != vertexCount - 2)
+            {
+                triangles.Clear();
+                audit.FailureReason =
+                    "the projected interval solver could not reconstruct exactly n-2 triangles";
+                return false;
+            }
+
+            audit.CompleteSolutionFound = 1;
+            audit.SelectedMinimumArea = complete.MinimumArea;
+            audit.SelectedMinimumNormalDot =
+                complete.MinimumNormalDot;
+            StringBuilder selectedEvidence = new StringBuilder();
+            for (int triangleIndex = 0;
+                 triangleIndex < triangles.Count;
+                 triangleIndex++)
+            {
+                if (triangleIndex > 0)
+                {
+                    selectedEvidence.Append('|');
+                }
+                OneSurfaceTriangleIndex triangle =
+                    triangles[triangleIndex];
+                selectedEvidence.Append(triangle.A);
+                selectedEvidence.Append('/');
+                selectedEvidence.Append(triangle.B);
+                selectedEvidence.Append('/');
+                selectedEvidence.Append(triangle.C);
+            }
+            audit.SelectedTriangleEvidence =
+                selectedEvidence.Length > 0
+                    ? selectedEvidence.ToString()
+                    : "none";
+            audit.FailureReason = string.Empty;
+            return true;
+        }
+
+        private static bool HasOneSurfaceNormalAgreementFailure(
+            OneSurfaceBoundaryFanAudit boundaryFanAudit,
+            OneSurfaceGeneralTriangulationAudit generalAudit)
+        {
+            return boundaryFanAudit.Rejection ==
+                    OneSurfaceTriangleCandidateFailure.NormalAgreement ||
+                generalAudit.RejectedNormalAgreementCount > 0;
+        }
+
+        private static bool TryResolveToleranceCollinearOneSurfaceTriangulation(
             List<Vector3> vertices,
             Vector3 authoredNormal,
             float planeDistance,
             float planeTolerance,
-            out Vector3 projectedCentre)
+            float minimumTriangleArea,
+            out List<OneSurfaceTriangleIndex> triangles,
+            out OneSurfaceCollinearReinsertionAudit audit)
         {
-            projectedCentre = Vector3.zero;
-            if (vertices == null || vertices.Count < 3 ||
+            triangles = new List<OneSurfaceTriangleIndex>();
+            audit = new OneSurfaceCollinearReinsertionAudit
+            {
+                Attempted = 1,
+                BoundaryVertexEvidence = "none",
+                CandidateEvidence = "none",
+                RemovedIndexEvidence = "none",
+                RetainedIndexEvidence = "none",
+                SimplifiedTriangleEvidence = "none",
+                ReinsertionEvidence = "none",
+                FailureReason = string.Empty
+            };
+            if (vertices == null || vertices.Count < 4 ||
                 !IsFinite(authoredNormal) ||
                 authoredNormal.sqrMagnitude <= MinimumEdgeLengthSqr ||
                 !IsFiniteFloat(planeDistance) ||
-                !IsFiniteFloat(planeTolerance) ||
-                planeTolerance < 0f)
+                !IsFiniteFloat(planeTolerance) || planeTolerance < 0f ||
+                !IsFiniteFloat(minimumTriangleArea) ||
+                minimumTriangleArea < 0f)
             {
+                audit.FailureReason =
+                    "collinear reinsertion received invalid polygon inputs";
                 return false;
             }
 
+            if (!TryProjectChamferPatchLoop(
+                    vertices,
+                    authoredNormal,
+                    out List<Vector2> projected,
+                    out float signedArea,
+                    out float projectionEpsilon))
+            {
+                audit.FailureReason =
+                    "the retained boundary could not be projected for collinear reinsertion";
+                return false;
+            }
+            audit.ProjectionSucceeded = 1;
+            audit.SignedAreaBefore = signedArea;
+            audit.SignedAreaAfter = signedArea;
+            audit.BoundaryVertexEvidence =
+                FormatOneSurfaceBoundaryVertexEvidence(
+                    vertices,
+                    projected,
+                    authoredNormal,
+                    planeDistance);
+            if (ChamferPatchPolygonSelfIntersects(
+                    projected,
+                    projectionEpsilon,
+                    out _))
+            {
+                audit.ProjectionSelfIntersection = 1;
+                audit.FailureReason =
+                    "the retained projected boundary self-intersects";
+                return false;
+            }
+
+            List<int> workingIndices = new List<int>(vertices.Count);
             for (int vertexIndex = 0;
                  vertexIndex < vertices.Count;
                  vertexIndex++)
             {
-                if (!IsFinite(vertices[vertexIndex]))
+                workingIndices.Add(vertexIndex);
+            }
+            List<OneSurfaceBoundaryRemoval> removals =
+                new List<OneSurfaceBoundaryRemoval>();
+            StringBuilder candidateEvidence = new StringBuilder();
+            StringBuilder removedEvidence = new StringBuilder();
+            int guard = Mathf.Max(8, vertices.Count * 2);
+            while (workingIndices.Count >= 3 && guard-- > 0)
+            {
+                if (removals.Count > 0)
                 {
+                    audit.SimplificationAttempts++;
+                    List<List<OneSurfaceTriangleIndex>> solutions =
+                        ResolveOneSurfaceWorkingBoundarySolutions(
+                            vertices,
+                            workingIndices,
+                            authoredNormal,
+                            minimumTriangleArea);
+                    for (int solutionIndex = 0;
+                         solutionIndex < solutions.Count;
+                         solutionIndex++)
+                    {
+                        audit.RetainedIndexEvidence =
+                            FormatOneSurfaceIndexList(workingIndices);
+                        audit.SimplifiedTriangleEvidence =
+                            FormatOneSurfaceTriangleIndices(
+                                solutions[solutionIndex]);
+                        audit.RemovedIndexEvidence =
+                            removedEvidence.Length > 0
+                                ? removedEvidence.ToString()
+                                : "none";
+                        List<OneSurfaceTriangleIndex> candidateTriangles =
+                            new List<OneSurfaceTriangleIndex>(
+                                solutions[solutionIndex]);
+                        if (!TryReinsertOneSurfaceBoundaryVertices(
+                                vertices,
+                                authoredNormal,
+                                minimumTriangleArea,
+                                removals,
+                                candidateTriangles,
+                                out string reinsertionEvidence,
+                                out string reinsertionBlocker))
+                        {
+                            audit.ReinsertionEvidence =
+                                reinsertionEvidence;
+                            audit.FailureReason = reinsertionBlocker;
+                            continue;
+                        }
+                        if (!TryCertifyOneSurfaceIndexedTriangulation(
+                                vertices,
+                                authoredNormal,
+                                minimumTriangleArea,
+                                candidateTriangles,
+                                out string certificationBlocker))
+                        {
+                            audit.ReinsertionEvidence =
+                                reinsertionEvidence;
+                            audit.FailureReason = certificationBlocker;
+                            continue;
+                        }
+
+                        triangles = candidateTriangles;
+                        audit.Succeeded = 1;
+                        audit.ReinsertionCount = removals.Count;
+                        audit.RemovedVertexCount = removals.Count;
+                        audit.CandidateEvidence =
+                            candidateEvidence.Length > 0
+                                ? candidateEvidence.ToString()
+                                : "none";
+                        audit.RemovedIndexEvidence =
+                            removedEvidence.Length > 0
+                                ? removedEvidence.ToString()
+                                : "none";
+                        audit.RetainedIndexEvidence =
+                            FormatOneSurfaceIndexList(workingIndices);
+                        audit.SimplifiedTriangleEvidence =
+                            FormatOneSurfaceTriangleIndices(
+                                solutions[solutionIndex]);
+                        audit.ReinsertionEvidence = reinsertionEvidence;
+                        audit.FailureReason = string.Empty;
+                        return true;
+                    }
+                }
+
+                if (workingIndices.Count <= 3)
+                {
+                    break;
+                }
+
+                bool foundCandidate = false;
+                int selectedWorkingIndex = -1;
+                OneSurfaceCollinearCandidateAudit selectedCandidate =
+                    default;
+                List<int> selectedReducedIndices = null;
+                float selectedDistance = float.PositiveInfinity;
+                float selectedCross = float.PositiveInfinity;
+                const float rankingEpsilon = 0.0000001f;
+                for (int workingIndex = 0;
+                     workingIndex < workingIndices.Count;
+                     workingIndex++)
+                {
+                    OneSurfaceCollinearCandidateAudit candidate =
+                        EvaluateOneSurfaceCollinearCandidate(
+                            vertices,
+                            projected,
+                            workingIndices,
+                            workingIndex,
+                            authoredNormal,
+                            planeDistance,
+                            planeTolerance,
+                            minimumTriangleArea,
+                            projectionEpsilon,
+                            signedArea,
+                            out List<int> reducedIndices,
+                            out float reducedSignedArea);
+                    AppendOneSurfaceCollinearCandidateEvidence(
+                        candidateEvidence,
+                        audit.SimplificationAttempts,
+                        candidate,
+                        reducedSignedArea);
+                    if (candidate.Eligible != 1)
+                    {
+                        continue;
+                    }
+
+                    float absoluteCross = Mathf.Abs(
+                        candidate.ProjectedCross);
+                    bool betterDistance =
+                        candidate.ProjectedDistance <
+                            selectedDistance - rankingEpsilon;
+                    bool equalDistance = Mathf.Abs(
+                        candidate.ProjectedDistance -
+                        selectedDistance) <= rankingEpsilon;
+                    bool betterCross =
+                        absoluteCross < selectedCross - rankingEpsilon;
+                    bool equalCross = Mathf.Abs(
+                        absoluteCross - selectedCross) <=
+                            rankingEpsilon;
+                    bool lowerIndex = !foundCandidate ||
+                        candidate.CurrentIndex <
+                            selectedCandidate.CurrentIndex;
+                    if (!foundCandidate || betterDistance ||
+                        (equalDistance && betterCross) ||
+                        (equalDistance && equalCross && lowerIndex))
+                    {
+                        foundCandidate = true;
+                        selectedWorkingIndex = workingIndex;
+                        selectedCandidate = candidate;
+                        selectedReducedIndices = reducedIndices;
+                        selectedDistance = candidate.ProjectedDistance;
+                        selectedCross = absoluteCross;
+                        audit.SignedAreaAfter = reducedSignedArea;
+                    }
+                }
+
+                if (!foundCandidate || selectedReducedIndices == null)
+                {
+                    audit.CandidateEvidence =
+                        candidateEvidence.Length > 0
+                            ? candidateEvidence.ToString()
+                            : "none";
+                    audit.RemovedVertexCount = removals.Count;
+                    audit.RemovedIndexEvidence =
+                        removedEvidence.Length > 0
+                            ? removedEvidence.ToString()
+                            : "none";
+                    audit.RetainedIndexEvidence =
+                        FormatOneSurfaceIndexList(workingIndices);
+                    if (string.IsNullOrEmpty(audit.FailureReason))
+                    {
+                        audit.FailureReason =
+                            "no eligible tolerance-collinear retained boundary vertex remains";
+                    }
                     return false;
                 }
-                projectedCentre += vertices[vertexIndex];
-            }
-            projectedCentre /= vertices.Count;
 
-            float residual = Vector3.Dot(
-                authoredNormal,
-                projectedCentre) - planeDistance;
-            if (!IsFiniteFloat(residual))
-            {
-                return false;
-            }
-            projectedCentre -= authoredNormal * residual;
-            if (!IsFinite(projectedCentre))
-            {
-                return false;
+                OneSurfaceBoundaryRemoval removal =
+                    new OneSurfaceBoundaryRemoval(
+                        selectedCandidate.PreviousIndex,
+                        selectedCandidate.CurrentIndex,
+                        selectedCandidate.NextIndex);
+                removals.Add(removal);
+                if (removedEvidence.Length > 0)
+                {
+                    removedEvidence.Append('|');
+                }
+                removedEvidence.Append(removal.PreviousIndex);
+                removedEvidence.Append('/');
+                removedEvidence.Append(removal.RemovedIndex);
+                removedEvidence.Append('/');
+                removedEvidence.Append(removal.NextIndex);
+                workingIndices = selectedReducedIndices;
+                audit.RemovedVertexCount = removals.Count;
+                audit.RetainedIndexEvidence =
+                    FormatOneSurfaceIndexList(workingIndices);
+                audit.CandidateEvidence =
+                    candidateEvidence.Length > 0
+                        ? candidateEvidence.ToString()
+                        : "none";
+                audit.RemovedIndexEvidence =
+                    removedEvidence.ToString();
+
+                if (selectedWorkingIndex < 0)
+                {
+                    audit.FailureReason =
+                        "the selected collinear boundary index is invalid";
+                    return false;
+                }
             }
 
-            float projectedResidual = Mathf.Abs(
-                Vector3.Dot(authoredNormal, projectedCentre) -
-                planeDistance);
-            return IsFiniteFloat(projectedResidual) &&
-                projectedResidual <= planeTolerance;
+            audit.CandidateEvidence = candidateEvidence.Length > 0
+                ? candidateEvidence.ToString()
+                : "none";
+            audit.RemovedVertexCount = removals.Count;
+            audit.RemovedIndexEvidence = removedEvidence.Length > 0
+                ? removedEvidence.ToString()
+                : "none";
+            audit.RetainedIndexEvidence =
+                FormatOneSurfaceIndexList(workingIndices);
+            if (string.IsNullOrEmpty(audit.FailureReason))
+            {
+                audit.FailureReason =
+                    "the tolerance-collinear simplification produced no reinsertable complete triangulation";
+            }
+            return false;
         }
 
-        private static bool IsProjectedOneSurfaceCentreFanStable(
-            List<Vector3> vertices,
-            Vector3 projectedCentre,
-            Vector3 authoredNormal,
-            float minimumTriangleArea)
+        private static OneSurfaceCollinearCandidateAudit
+            EvaluateOneSurfaceCollinearCandidate(
+                List<Vector3> vertices,
+                List<Vector2> projected,
+                List<int> workingIndices,
+                int workingIndex,
+                Vector3 authoredNormal,
+                float planeDistance,
+                float planeTolerance,
+                float minimumTriangleArea,
+                float projectionEpsilon,
+                float originalSignedArea,
+                out List<int> reducedIndices,
+                out float reducedSignedArea)
         {
-            if (vertices == null || vertices.Count < 3 ||
-                !IsFinite(projectedCentre) ||
-                !IsFinite(authoredNormal) ||
-                authoredNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            reducedIndices = null;
+            reducedSignedArea = 0f;
+            OneSurfaceCollinearCandidateAudit audit =
+                new OneSurfaceCollinearCandidateAudit
+                {
+                    PreviousIndex = -1,
+                    CurrentIndex = -1,
+                    NextIndex = -1,
+                    LocalFailure =
+                        OneSurfaceTriangleCandidateFailure.None,
+                    SegmentParameter = 0f,
+                    ProjectedDistance = float.PositiveInfinity,
+                    ProjectedCross = 0f,
+                    Eligible = 0,
+                    Blocker = string.Empty
+                };
+            if (vertices == null || projected == null ||
+                workingIndices == null || workingIndices.Count < 4 ||
+                workingIndex < 0 ||
+                workingIndex >= workingIndices.Count)
             {
+                audit.Blocker = "invalid-candidate-input";
+                return audit;
+            }
+
+            int previousIndex = workingIndices[
+                (workingIndex - 1 + workingIndices.Count) %
+                    workingIndices.Count];
+            int currentIndex = workingIndices[workingIndex];
+            int nextIndex = workingIndices[
+                (workingIndex + 1) % workingIndices.Count];
+            audit.PreviousIndex = previousIndex;
+            audit.CurrentIndex = currentIndex;
+            audit.NextIndex = nextIndex;
+            if (previousIndex < 0 || currentIndex < 0 ||
+                nextIndex < 0 || previousIndex >= vertices.Count ||
+                currentIndex >= vertices.Count ||
+                nextIndex >= vertices.Count ||
+                previousIndex >= projected.Count ||
+                currentIndex >= projected.Count ||
+                nextIndex >= projected.Count ||
+                !IsFinite(vertices[previousIndex]) ||
+                !IsFinite(vertices[currentIndex]) ||
+                !IsFinite(vertices[nextIndex]))
+            {
+                audit.Blocker = "non-finite-or-invalid-boundary-index";
+                return audit;
+            }
+
+            OneSurfaceTriangleCandidate localCandidate =
+                EvaluateOneSurfaceTriangleCandidate(
+                    vertices[previousIndex],
+                    vertices[currentIndex],
+                    vertices[nextIndex],
+                    authoredNormal,
+                    minimumTriangleArea);
+            audit.LocalArea = localCandidate.Area;
+            audit.LocalNormalDot = localCandidate.NormalDot;
+            audit.LocalFailure = localCandidate.Failure;
+            if (localCandidate.Valid)
+            {
+                audit.Blocker = "local-triangle-is-already-stable";
+                return audit;
+            }
+            if (localCandidate.Failure !=
+                    OneSurfaceTriangleCandidateFailure.NormalAgreement &&
+                localCandidate.Failure !=
+                    OneSurfaceTriangleCandidateFailure.Area &&
+                localCandidate.Failure !=
+                    OneSurfaceTriangleCandidateFailure.NonFinite)
+            {
+                audit.Blocker = "local-failure-is-not-collinearity-compatible";
+                return audit;
+            }
+
+            float previousResidual = Mathf.Abs(
+                Vector3.Dot(authoredNormal, vertices[previousIndex]) -
+                planeDistance);
+            float currentResidual = Mathf.Abs(
+                Vector3.Dot(authoredNormal, vertices[currentIndex]) -
+                planeDistance);
+            float nextResidual = Mathf.Abs(
+                Vector3.Dot(authoredNormal, vertices[nextIndex]) -
+                planeDistance);
+            if (!IsFiniteFloat(previousResidual) ||
+                !IsFiniteFloat(currentResidual) ||
+                !IsFiniteFloat(nextResidual) ||
+                previousResidual > planeTolerance ||
+                currentResidual > planeTolerance ||
+                nextResidual > planeTolerance)
+            {
+                audit.Blocker = "local-vertices-leave-authoritative-plane-tolerance";
+                return audit;
+            }
+
+            Vector2 previous = projected[previousIndex];
+            Vector2 current = projected[currentIndex];
+            Vector2 next = projected[nextIndex];
+            Vector2 span = next - previous;
+            float spanLengthSqr = span.sqrMagnitude;
+            if (!IsFiniteFloat(spanLengthSqr) ||
+                spanLengthSqr <= projectionEpsilon * projectionEpsilon)
+            {
+                audit.Blocker = "neighbour-span-is-degenerate";
+                return audit;
+            }
+
+            float parameter = Vector2.Dot(
+                current - previous,
+                span) / spanLengthSqr;
+            Vector2 closest = previous + span * parameter;
+            float projectedDistance = Vector2.Distance(
+                current,
+                closest);
+            float spanLength = Mathf.Sqrt(spanLengthSqr);
+            float collinearTolerance = Mathf.Max(
+                PointMergeDistance * 8f,
+                projectionEpsilon * 8f);
+            float parameterTolerance = Mathf.Min(
+                0.25f,
+                collinearTolerance / Mathf.Max(spanLength, 0.0000001f));
+            audit.SegmentParameter = parameter;
+            audit.ProjectedDistance = projectedDistance;
+            audit.ProjectedCross = ChamferPatchCross2D(
+                previous,
+                current,
+                next);
+            if (!IsFiniteFloat(parameter) ||
+                !IsFiniteFloat(projectedDistance) ||
+                parameter < -parameterTolerance ||
+                parameter > 1f + parameterTolerance)
+            {
+                audit.Blocker = "projection-does-not-land-on-neighbour-segment";
+                return audit;
+            }
+            if (projectedDistance > collinearTolerance)
+            {
+                audit.Blocker = "projected-distance-exceeds-collinear-tolerance";
+                return audit;
+            }
+            if (!IsOneSurfaceProjectedDiagonalValid(
+                    previousIndex,
+                    nextIndex,
+                    workingIndices,
+                    projected,
+                    projectionEpsilon))
+            {
+                audit.Blocker = "replacement-boundary-segment-is-not-contained";
+                return audit;
+            }
+
+            reducedIndices = new List<int>(workingIndices);
+            reducedIndices.RemoveAt(workingIndex);
+            List<Vector2> reducedProjected =
+                BuildOneSurfaceProjectedIndexLoop(
+                    reducedIndices,
+                    projected);
+            if (reducedProjected == null ||
+                reducedProjected.Count < 3)
+            {
+                reducedIndices = null;
+                audit.Blocker = "simplified-loop-is-incomplete";
+                return audit;
+            }
+            reducedSignedArea =
+                CalculateChamferPatchSignedArea(reducedProjected);
+            float areaTolerance =
+                projectionEpsilon * projectionEpsilon;
+            if (!IsFiniteFloat(reducedSignedArea) ||
+                Mathf.Abs(reducedSignedArea) <= areaTolerance ||
+                Mathf.Sign(reducedSignedArea) !=
+                    Mathf.Sign(originalSignedArea))
+            {
+                reducedIndices = null;
+                audit.Blocker = "simplified-loop-changes-winding-or-area";
+                return audit;
+            }
+            if (ChamferPatchPolygonSelfIntersects(
+                    reducedProjected,
+                    projectionEpsilon,
+                    out _))
+            {
+                reducedIndices = null;
+                audit.Blocker = "simplified-loop-self-intersects";
+                return audit;
+            }
+
+            audit.Eligible = 1;
+            audit.Blocker = "none";
+            return audit;
+        }
+
+        private static List<List<OneSurfaceTriangleIndex>>
+            ResolveOneSurfaceWorkingBoundarySolutions(
+                List<Vector3> vertices,
+                List<int> workingIndices,
+                Vector3 authoredNormal,
+                float minimumTriangleArea)
+        {
+            List<List<OneSurfaceTriangleIndex>> solutions =
+                new List<List<OneSurfaceTriangleIndex>>();
+            if (vertices == null || workingIndices == null ||
+                workingIndices.Count < 3)
+            {
+                return solutions;
+            }
+
+            List<Vector3> workingVertices =
+                new List<Vector3>(workingIndices.Count);
+            for (int index = 0;
+                 index < workingIndices.Count;
+                 index++)
+            {
+                int originalIndex = workingIndices[index];
+                if (originalIndex < 0 ||
+                    originalIndex >= vertices.Count)
+                {
+                    return solutions;
+                }
+                workingVertices.Add(vertices[originalIndex]);
+            }
+
+            if (TryFindStableOneSurfaceFanAnchor(
+                    workingVertices,
+                    authoredNormal,
+                    minimumTriangleArea,
+                    out int anchorIndex,
+                    out _))
+            {
+                List<OneSurfaceTriangleIndex> fanTriangles =
+                    new List<OneSurfaceTriangleIndex>();
+                for (int offset = 1;
+                     offset < workingIndices.Count - 1;
+                     offset++)
+                {
+                    fanTriangles.Add(new OneSurfaceTriangleIndex(
+                        workingIndices[anchorIndex],
+                        workingIndices[
+                            (anchorIndex + offset) %
+                                workingIndices.Count],
+                        workingIndices[
+                            (anchorIndex + offset + 1) %
+                                workingIndices.Count]));
+                }
+                solutions.Add(fanTriangles);
+            }
+
+            if (TryResolveGeneralOneSurfaceTriangulation(
+                    workingVertices,
+                    authoredNormal,
+                    minimumTriangleArea,
+                    out List<OneSurfaceTriangleIndex> localTriangles,
+                    out _))
+            {
+                List<OneSurfaceTriangleIndex> mappedTriangles =
+                    new List<OneSurfaceTriangleIndex>(
+                        localTriangles.Count);
+                for (int triangleIndex = 0;
+                     triangleIndex < localTriangles.Count;
+                     triangleIndex++)
+                {
+                    OneSurfaceTriangleIndex triangle =
+                        localTriangles[triangleIndex];
+                    mappedTriangles.Add(new OneSurfaceTriangleIndex(
+                        workingIndices[triangle.A],
+                        workingIndices[triangle.B],
+                        workingIndices[triangle.C]));
+                }
+                if (solutions.Count == 0 ||
+                    FormatOneSurfaceTriangleIndices(solutions[0]) !=
+                    FormatOneSurfaceTriangleIndices(mappedTriangles))
+                {
+                    solutions.Add(mappedTriangles);
+                }
+            }
+            return solutions;
+        }
+
+        private static bool TryReinsertOneSurfaceBoundaryVertices(
+            List<Vector3> vertices,
+            Vector3 authoredNormal,
+            float minimumTriangleArea,
+            List<OneSurfaceBoundaryRemoval> removals,
+            List<OneSurfaceTriangleIndex> triangles,
+            out string evidence,
+            out string blocker)
+        {
+            StringBuilder builder = new StringBuilder();
+            blocker = string.Empty;
+            for (int removalIndex = removals.Count - 1;
+                 removalIndex >= 0;
+                 removalIndex--)
+            {
+                OneSurfaceBoundaryRemoval removal =
+                    removals[removalIndex];
+                int parentTriangleIndex = -1;
+                int parentCount = 0;
+                int thirdIndex = -1;
+                for (int triangleIndex = 0;
+                     triangleIndex < triangles.Count;
+                     triangleIndex++)
+                {
+                    OneSurfaceTriangleIndex triangle =
+                        triangles[triangleIndex];
+                    if (!OneSurfaceTriangleContainsIndex(
+                            triangle,
+                            removal.PreviousIndex) ||
+                        !OneSurfaceTriangleContainsIndex(
+                            triangle,
+                            removal.NextIndex))
+                    {
+                        continue;
+                    }
+                    parentCount++;
+                    parentTriangleIndex = triangleIndex;
+                    thirdIndex = ResolveOneSurfaceTriangleThirdIndex(
+                        triangle,
+                        removal.PreviousIndex,
+                        removal.NextIndex);
+                }
+                if (parentCount != 1 || thirdIndex < 0)
+                {
+                    blocker =
+                        "reinsertion parent boundary edge does not belong to exactly one selected triangle";
+                    evidence = builder.Length > 0
+                        ? builder.ToString()
+                        : "none";
+                    return false;
+                }
+
+                OneSurfaceTriangleIndex firstReplacement =
+                    new OneSurfaceTriangleIndex(
+                        removal.PreviousIndex,
+                        removal.RemovedIndex,
+                        thirdIndex);
+                OneSurfaceTriangleIndex secondReplacement =
+                    new OneSurfaceTriangleIndex(
+                        removal.RemovedIndex,
+                        removal.NextIndex,
+                        thirdIndex);
+                OneSurfaceTriangleCandidate firstCandidate =
+                    EvaluateOneSurfaceTriangleCandidate(
+                        vertices[firstReplacement.A],
+                        vertices[firstReplacement.B],
+                        vertices[firstReplacement.C],
+                        authoredNormal,
+                        minimumTriangleArea);
+                OneSurfaceTriangleCandidate secondCandidate =
+                    EvaluateOneSurfaceTriangleCandidate(
+                        vertices[secondReplacement.A],
+                        vertices[secondReplacement.B],
+                        vertices[secondReplacement.C],
+                        authoredNormal,
+                        minimumTriangleArea);
+                if (builder.Length > 0)
+                {
+                    builder.Append('|');
+                }
+                builder.Append(removal.RemovedIndex);
+                builder.Append('@');
+                builder.Append(removal.PreviousIndex);
+                builder.Append('-');
+                builder.Append(removal.NextIndex);
+                builder.Append(":parent=");
+                builder.Append(FormatOneSurfaceTriangleIndex(
+                    triangles[parentTriangleIndex]));
+                builder.Append(",replacement=");
+                builder.Append(FormatOneSurfaceTriangleIndex(
+                    firstReplacement));
+                builder.Append('+');
+                builder.Append(FormatOneSurfaceTriangleIndex(
+                    secondReplacement));
+                builder.Append(",areas=");
+                builder.Append(firstCandidate.Area.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append('/');
+                builder.Append(secondCandidate.Area.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append(",normalDots=");
+                builder.Append(firstCandidate.NormalDot.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append('/');
+                builder.Append(secondCandidate.NormalDot.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                if (!firstCandidate.Valid || !secondCandidate.Valid)
+                {
+                    builder.Append(",blocker=");
+                    builder.Append(!firstCandidate.Valid
+                        ? firstCandidate.Failure.ToString()
+                        : secondCandidate.Failure.ToString());
+                    blocker =
+                        "a reinserted boundary subdivision triangle failed final certification";
+                    evidence = builder.ToString();
+                    return false;
+                }
+                builder.Append(",blocker=none");
+                triangles[parentTriangleIndex] = firstReplacement;
+                triangles.Insert(
+                    parentTriangleIndex + 1,
+                    secondReplacement);
+            }
+
+            evidence = builder.Length > 0
+                ? builder.ToString()
+                : "none";
+            return true;
+        }
+
+        private static bool TryCertifyOneSurfaceIndexedTriangulation(
+            List<Vector3> vertices,
+            Vector3 authoredNormal,
+            float minimumTriangleArea,
+            List<OneSurfaceTriangleIndex> triangles,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            if (vertices == null || vertices.Count < 3 ||
+                triangles == null ||
+                triangles.Count != vertices.Count - 2)
+            {
+                blocker =
+                    "the reinserted triangulation does not contain exactly n-2 triangles";
                 return false;
             }
 
-            for (int vertexIndex = 0;
-                 vertexIndex < vertices.Count;
-                 vertexIndex++)
+            for (int triangleIndex = 0;
+                 triangleIndex < triangles.Count;
+                 triangleIndex++)
             {
-                if (!TryResolveOneSurfaceTriangle(
-                        projectedCentre,
-                        vertices[vertexIndex],
-                        vertices[(vertexIndex + 1) % vertices.Count],
+                OneSurfaceTriangleIndex triangle =
+                    triangles[triangleIndex];
+                if (triangle.A < 0 || triangle.B < 0 ||
+                    triangle.C < 0 || triangle.A >= vertices.Count ||
+                    triangle.B >= vertices.Count ||
+                    triangle.C >= vertices.Count ||
+                    triangle.A == triangle.B ||
+                    triangle.B == triangle.C ||
+                    triangle.C == triangle.A ||
+                    !EvaluateOneSurfaceTriangleCandidate(
+                        vertices[triangle.A],
+                        vertices[triangle.B],
+                        vertices[triangle.C],
                         authoredNormal,
-                        minimumTriangleArea,
-                        out _,
-                        out _,
-                        out _,
-                        out _))
+                        minimumTriangleArea).Valid)
                 {
+                    blocker =
+                        "the reinserted triangulation contains an invalid final triangle";
+                    return false;
+                }
+            }
+
+            for (int boundaryIndex = 0;
+                 boundaryIndex < vertices.Count;
+                 boundaryIndex++)
+            {
+                int nextIndex =
+                    (boundaryIndex + 1) % vertices.Count;
+                int ownerCount = 0;
+                for (int triangleIndex = 0;
+                     triangleIndex < triangles.Count;
+                     triangleIndex++)
+                {
+                    OneSurfaceTriangleIndex triangle =
+                        triangles[triangleIndex];
+                    if (OneSurfaceTriangleContainsIndex(
+                            triangle,
+                            boundaryIndex) &&
+                        OneSurfaceTriangleContainsIndex(
+                            triangle,
+                            nextIndex))
+                    {
+                        ownerCount++;
+                    }
+                }
+                if (ownerCount != 1)
+                {
+                    blocker =
+                        "the reinserted triangulation does not preserve every retained boundary segment exactly once";
                     return false;
                 }
             }
             return true;
+        }
+
+        private static List<Vector2> BuildOneSurfaceProjectedIndexLoop(
+            List<int> indices,
+            List<Vector2> projected)
+        {
+            if (indices == null || projected == null)
+            {
+                return null;
+            }
+            List<Vector2> loop = new List<Vector2>(indices.Count);
+            for (int index = 0; index < indices.Count; index++)
+            {
+                int projectedIndex = indices[index];
+                if (projectedIndex < 0 ||
+                    projectedIndex >= projected.Count)
+                {
+                    return null;
+                }
+                loop.Add(projected[projectedIndex]);
+            }
+            return loop;
+        }
+
+        private static bool OneSurfaceTriangleContainsIndex(
+            OneSurfaceTriangleIndex triangle,
+            int index)
+        {
+            return triangle.A == index || triangle.B == index ||
+                triangle.C == index;
+        }
+
+        private static int ResolveOneSurfaceTriangleThirdIndex(
+            OneSurfaceTriangleIndex triangle,
+            int first,
+            int second)
+        {
+            if (triangle.A != first && triangle.A != second)
+            {
+                return triangle.A;
+            }
+            if (triangle.B != first && triangle.B != second)
+            {
+                return triangle.B;
+            }
+            if (triangle.C != first && triangle.C != second)
+            {
+                return triangle.C;
+            }
+            return -1;
+        }
+
+        private static string FormatOneSurfaceBoundaryVertexEvidence(
+            List<Vector3> vertices,
+            List<Vector2> projected,
+            Vector3 authoredNormal,
+            float planeDistance)
+        {
+            StringBuilder builder = new StringBuilder();
+            for (int index = 0; index < vertices.Count; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append('|');
+                }
+                Vector3 position = vertices[index];
+                Vector2 point = projected[index];
+                float residual = Mathf.Abs(
+                    Vector3.Dot(authoredNormal, position) -
+                    planeDistance);
+                builder.Append(index);
+                builder.Append(":p(");
+                builder.Append(position.x.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append('/');
+                builder.Append(position.y.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append('/');
+                builder.Append(position.z.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append("),q(");
+                builder.Append(point.x.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append('/');
+                builder.Append(point.y.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+                builder.Append("),r=");
+                builder.Append(residual.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            }
+            return builder.Length > 0
+                ? builder.ToString()
+                : "none";
+        }
+
+        private static void AppendOneSurfaceCollinearCandidateEvidence(
+            StringBuilder builder,
+            int iteration,
+            OneSurfaceCollinearCandidateAudit candidate,
+            float reducedSignedArea)
+        {
+            if (builder.Length > 0)
+            {
+                builder.Append('|');
+            }
+            builder.Append("i");
+            builder.Append(iteration);
+            builder.Append(':');
+            builder.Append(candidate.PreviousIndex);
+            builder.Append('/');
+            builder.Append(candidate.CurrentIndex);
+            builder.Append('/');
+            builder.Append(candidate.NextIndex);
+            builder.Append(",area=");
+            builder.Append(candidate.LocalArea.ToString(
+                "G9",
+                CultureInfo.InvariantCulture));
+            builder.Append(",normalDot=");
+            builder.Append(candidate.LocalNormalDot.ToString(
+                "G9",
+                CultureInfo.InvariantCulture));
+            builder.Append(",failure=");
+            builder.Append(candidate.LocalFailure);
+            builder.Append(",parameter=");
+            builder.Append(candidate.SegmentParameter.ToString(
+                "G9",
+                CultureInfo.InvariantCulture));
+            builder.Append(",distance=");
+            builder.Append(candidate.ProjectedDistance.ToString(
+                "G9",
+                CultureInfo.InvariantCulture));
+            builder.Append(",cross=");
+            builder.Append(candidate.ProjectedCross.ToString(
+                "G9",
+                CultureInfo.InvariantCulture));
+            builder.Append(",reducedArea=");
+            builder.Append(reducedSignedArea.ToString(
+                "G9",
+                CultureInfo.InvariantCulture));
+            builder.Append(",eligible=");
+            builder.Append(candidate.Eligible);
+            builder.Append(",blocker=");
+            builder.Append(string.IsNullOrEmpty(candidate.Blocker)
+                ? "none"
+                : candidate.Blocker);
+        }
+
+        private static string FormatOneSurfaceIndexList(
+            List<int> indices)
+        {
+            if (indices == null || indices.Count == 0)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            for (int index = 0; index < indices.Count; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append('/');
+                }
+                builder.Append(indices[index]);
+            }
+            return builder.ToString();
+        }
+
+        private static string FormatOneSurfaceTriangleIndices(
+            List<OneSurfaceTriangleIndex> triangles)
+        {
+            if (triangles == null || triangles.Count == 0)
+            {
+                return "none";
+            }
+            StringBuilder builder = new StringBuilder();
+            for (int index = 0; index < triangles.Count; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append('|');
+                }
+                builder.Append(FormatOneSurfaceTriangleIndex(
+                    triangles[index]));
+            }
+            return builder.ToString();
+        }
+
+        private static string FormatOneSurfaceTriangleIndex(
+            OneSurfaceTriangleIndex triangle)
+        {
+            return triangle.A + "/" + triangle.B + "/" + triangle.C;
+        }
+
+        private static string ResolveOneSurfaceEvidence(string evidence)
+        {
+            return string.IsNullOrEmpty(evidence)
+                ? "none"
+                : evidence;
+        }
+
+        private static bool IsOneSurfaceProjectedDiagonalValid(
+            int firstIndex,
+            int secondIndex,
+            List<int> fullBoundary,
+            List<Vector2> projected,
+            float epsilon)
+        {
+            if (firstIndex < 0 || secondIndex < 0 ||
+                firstIndex >= projected.Count ||
+                secondIndex >= projected.Count ||
+                firstIndex == secondIndex ||
+                !IsFiniteFloat(epsilon) || epsilon < 0f)
+            {
+                return false;
+            }
+            if (ChamferPatchDiagonalIntersectsRemainingBoundary(
+                    firstIndex,
+                    secondIndex,
+                    fullBoundary,
+                    projected,
+                    epsilon))
+            {
+                return false;
+            }
+
+            Vector2 midpoint =
+                (projected[firstIndex] + projected[secondIndex]) * 0.5f;
+            return IsFiniteFloat(midpoint.x) &&
+                IsFiniteFloat(midpoint.y) &&
+                IsBoundedPointInsideOrOnPolygon(
+                    midpoint,
+                    projected,
+                    epsilon);
+        }
+
+        private static bool CollectOneSurfaceTriangulationTriangles(
+            OneSurfaceTriangulationState[,] states,
+            int first,
+            int last,
+            List<OneSurfaceTriangleIndex> triangles)
+        {
+            if (last <= first + 1)
+            {
+                return true;
+            }
+            OneSurfaceTriangulationState state = states[first, last];
+            if (!state.Succeeded ||
+                state.SplitIndex <= first ||
+                state.SplitIndex >= last)
+            {
+                return false;
+            }
+
+            int middle = state.SplitIndex;
+            triangles.Add(new OneSurfaceTriangleIndex(
+                first,
+                middle,
+                last));
+            return CollectOneSurfaceTriangulationTriangles(
+                    states,
+                    first,
+                    middle,
+                    triangles) &&
+                CollectOneSurfaceTriangulationTriangles(
+                    states,
+                    middle,
+                    last,
+                    triangles);
+        }
+
+        private static string FormatOneSurfaceTriangulationFailureEvidence(
+            PolygonFace face,
+            int faceIndex,
+            Vector3 authoredNormal,
+            float maximumPlaneResidual,
+            float minimumTriangleArea,
+            OneSurfaceBoundaryFanAudit boundaryFanAudit,
+            OneSurfaceGeneralTriangulationAudit generalAudit,
+            OneSurfaceCollinearReinsertionAudit collinearAudit)
+        {
+            string rejectionTriangle =
+                boundaryFanAudit.RejectedTriangleA >= 0
+                    ? boundaryFanAudit.RejectedTriangleA + "/" +
+                        boundaryFanAudit.RejectedTriangleB + "/" +
+                        boundaryFanAudit.RejectedTriangleC
+                    : "none";
+            return "the one-surface polygon has no complete certified triangulation; " +
+                "face=" + faceIndex +
+                ",provenance=" +
+                    (face == null
+                        ? PolygonFaceProvenanceKind.None
+                        : face.ProvenanceKind) + ":" +
+                    (face == null ? -1 : face.ProvenanceIndex) +
+                ",boundaryVertices=" +
+                    (face == null || face.Vertices == null
+                        ? 0
+                        : face.Vertices.Count) +
+                ",authoredNormal=(" +
+                    authoredNormal.x.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) + "/" +
+                    authoredNormal.y.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) + "/" +
+                    authoredNormal.z.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) + ")" +
+                ",planeResidual=" +
+                    maximumPlaneResidual.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                ",minimumTriangleArea=" +
+                    minimumTriangleArea.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                ",boundaryFan={anchorsTested:" +
+                    boundaryFanAudit.AnchorsTested +
+                    ",stableAnchors:" +
+                    boundaryFanAudit.StableAnchors +
+                    ",bestAnchor:" +
+                    boundaryFanAudit.BestAnchorIndex +
+                    ",bestCertifiedTriangles:" +
+                    boundaryFanAudit.BestCertifiedTriangleCount +
+                    ",bestMinimumArea:" +
+                    boundaryFanAudit.BestMinimumArea.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                    ",bestMinimumNormalDot:" +
+                    boundaryFanAudit.BestMinimumNormalDot.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                    ",rejectedTriangle:" + rejectionTriangle +
+                    ",rejection:" +
+                    boundaryFanAudit.Rejection + "}" +
+                ",generalTriangulation={projectionSucceeded:" +
+                    generalAudit.ProjectionSucceeded +
+                    ",projectionSelfIntersection:" +
+                    generalAudit.ProjectionSelfIntersection +
+                    ",statesEvaluated:" +
+                    generalAudit.StatesEvaluated +
+                    ",validTriangleCandidates:" +
+                    generalAudit.ValidTriangleCandidateCount +
+                    ",rejectedNonFinite:" +
+                    generalAudit.RejectedNonFiniteCount +
+                    ",rejectedArea:" +
+                    generalAudit.RejectedAreaCount +
+                    ",rejectedNormalAgreement:" +
+                    generalAudit.RejectedNormalAgreementCount +
+                    ",rejectedDiagonal:" +
+                    generalAudit.RejectedDiagonalCount +
+                    ",completeSolutionFound:" +
+                    generalAudit.CompleteSolutionFound +
+                    ",selectedMinimumArea:" +
+                    generalAudit.SelectedMinimumArea.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                    ",selectedMinimumNormalDot:" +
+                    generalAudit.SelectedMinimumNormalDot.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                    ",selectedTriangles:" +
+                    (string.IsNullOrEmpty(
+                        generalAudit.SelectedTriangleEvidence)
+                        ? "none"
+                        : generalAudit.SelectedTriangleEvidence) +
+                    ",reason:" +
+                    (string.IsNullOrEmpty(generalAudit.FailureReason)
+                        ? "none"
+                        : generalAudit.FailureReason) + "}" +
+                ",collinearReinsertion={attempted:" +
+                    collinearAudit.Attempted +
+                    ",succeeded:" + collinearAudit.Succeeded +
+                    ",projectionSucceeded:" +
+                    collinearAudit.ProjectionSucceeded +
+                    ",projectionSelfIntersection:" +
+                    collinearAudit.ProjectionSelfIntersection +
+                    ",simplificationAttempts:" +
+                    collinearAudit.SimplificationAttempts +
+                    ",removedVertexCount:" +
+                    collinearAudit.RemovedVertexCount +
+                    ",reinsertionCount:" +
+                    collinearAudit.ReinsertionCount +
+                    ",signedAreaBefore:" +
+                    collinearAudit.SignedAreaBefore.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                    ",signedAreaAfter:" +
+                    collinearAudit.SignedAreaAfter.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                    ",boundaryVertices:" +
+                    ResolveOneSurfaceEvidence(
+                        collinearAudit.BoundaryVertexEvidence) +
+                    ",unstableBoundaryCandidates:" +
+                    ResolveOneSurfaceEvidence(
+                        collinearAudit.CandidateEvidence) +
+                    ",removedIndices:" +
+                    ResolveOneSurfaceEvidence(
+                        collinearAudit.RemovedIndexEvidence) +
+                    ",retainedIndices:" +
+                    ResolveOneSurfaceEvidence(
+                        collinearAudit.RetainedIndexEvidence) +
+                    ",simplifiedTriangles:" +
+                    ResolveOneSurfaceEvidence(
+                        collinearAudit.SimplifiedTriangleEvidence) +
+                    ",reinsertion:" +
+                    ResolveOneSurfaceEvidence(
+                        collinearAudit.ReinsertionEvidence) +
+                    ",reason:" +
+                    ResolveOneSurfaceEvidence(
+                        collinearAudit.FailureReason) + "}";
         }
 
         private static bool TryEmitOneSurfaceTriangle(
@@ -8435,6 +9853,100 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return true;
         }
 
+        private static OneSurfaceTriangleCandidate
+            EvaluateOneSurfaceTriangleCandidate(
+                Vector3 a,
+                Vector3 b,
+                Vector3 c,
+                Vector3 authoredNormal,
+                float minimumTriangleArea)
+        {
+            if (!IsFinite(a) || !IsFinite(b) || !IsFinite(c) ||
+                !IsFinite(authoredNormal) ||
+                authoredNormal.sqrMagnitude <= MinimumEdgeLengthSqr ||
+                !IsFiniteFloat(minimumTriangleArea) ||
+                minimumTriangleArea < 0f)
+            {
+                return new OneSurfaceTriangleCandidate(
+                    false,
+                    0f,
+                    0f,
+                    0f,
+                    OneSurfaceTriangleCandidateFailure.NonFinite);
+            }
+
+            Vector3 geometricNormal = Vector3.Cross(b - a, c - a);
+            if (!IsFinite(geometricNormal) ||
+                geometricNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return new OneSurfaceTriangleCandidate(
+                    false,
+                    0f,
+                    0f,
+                    0f,
+                    OneSurfaceTriangleCandidateFailure.NonFinite);
+            }
+
+            float area = geometricNormal.magnitude * 0.5f;
+            if (!IsFiniteFloat(area) || area <= minimumTriangleArea)
+            {
+                return new OneSurfaceTriangleCandidate(
+                    false,
+                    IsFiniteFloat(area) ? area : 0f,
+                    0f,
+                    0f,
+                    OneSurfaceTriangleCandidateFailure.Area);
+            }
+
+            if (!TryNormalizeMassVector(
+                    geometricNormal,
+                    out Vector3 normalizedGeometricNormal) ||
+                !TryNormalizeMassVector(
+                    authoredNormal,
+                    out Vector3 normalizedAuthoredNormal))
+            {
+                return new OneSurfaceTriangleCandidate(
+                    false,
+                    area,
+                    0f,
+                    0f,
+                    OneSurfaceTriangleCandidateFailure.NonFinite);
+            }
+
+            float normalDot = Mathf.Abs(Vector3.Dot(
+                normalizedGeometricNormal,
+                normalizedAuthoredNormal));
+            if (!IsFiniteFloat(normalDot) ||
+                normalDot < OneSurfaceMinimumRenderNormalDot)
+            {
+                return new OneSurfaceTriangleCandidate(
+                    false,
+                    area,
+                    IsFiniteFloat(normalDot) ? normalDot : 0f,
+                    0f,
+                    OneSurfaceTriangleCandidateFailure.NormalAgreement);
+            }
+
+            float normalDeviation = Mathf.Acos(
+                Mathf.Clamp(normalDot, -1f, 1f)) * Mathf.Rad2Deg;
+            if (!IsFiniteFloat(normalDeviation))
+            {
+                return new OneSurfaceTriangleCandidate(
+                    false,
+                    area,
+                    normalDot,
+                    0f,
+                    OneSurfaceTriangleCandidateFailure.NonFinite);
+            }
+
+            return new OneSurfaceTriangleCandidate(
+                true,
+                area,
+                normalDot,
+                normalDeviation,
+                OneSurfaceTriangleCandidateFailure.None);
+        }
+
         private static bool TryResolveOneSurfaceTriangle(
             Vector3 a,
             Vector3 b,
@@ -8450,17 +9962,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             orientedC = c;
             normalizedGeometricNormal = Vector3.zero;
             normalDeviation = 0f;
-            Vector3 geometricNormal = Vector3.Cross(b - a, c - a);
-            float doubleArea = geometricNormal.magnitude;
-            float area = doubleArea * 0.5f;
-            if (!IsFinite(geometricNormal) ||
-                geometricNormal.sqrMagnitude <= MinimumEdgeLengthSqr ||
-                !IsFiniteFloat(area) ||
-                area <= minimumTriangleArea)
+            OneSurfaceTriangleCandidate candidate =
+                EvaluateOneSurfaceTriangleCandidate(
+                    a,
+                    b,
+                    c,
+                    authoredNormal,
+                    minimumTriangleArea);
+            if (!candidate.Valid)
             {
                 return false;
             }
 
+            Vector3 geometricNormal = Vector3.Cross(b - a, c - a);
             if (Vector3.Dot(geometricNormal, authoredNormal) < 0f)
             {
                 orientedB = c;
@@ -8468,20 +9982,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 geometricNormal = -geometricNormal;
             }
 
-            normalizedGeometricNormal = geometricNormal.normalized;
-            float renderNormalDot = Vector3.Dot(
-                normalizedGeometricNormal,
-                authoredNormal);
-            if (!IsFiniteFloat(renderNormalDot) ||
-                renderNormalDot < OneSurfaceMinimumRenderNormalDot)
+            if (!TryNormalizeMassVector(
+                    geometricNormal,
+                    out normalizedGeometricNormal))
             {
                 return false;
             }
 
-            normalDeviation = Vector3.Angle(
-                normalizedGeometricNormal,
-                authoredNormal);
-            return IsFiniteFloat(normalDeviation);
+            normalDeviation = candidate.NormalDeviationDegrees;
+            return IsFinite(normalizedGeometricNormal) &&
+                IsFiniteFloat(normalDeviation);
         }
 
         private static int ResolvePolygonSurfaceGroup(
@@ -8583,9 +10093,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<Vector3> vertices,
             Vector3 authoredNormal,
             float minimumTriangleArea,
-            out int anchorIndex)
+            out int anchorIndex,
+            out OneSurfaceBoundaryFanAudit audit)
         {
             anchorIndex = -1;
+            audit = new OneSurfaceBoundaryFanAudit
+            {
+                BestAnchorIndex = -1,
+                BestCertifiedTriangleCount = -1,
+                BestMinimumArea = 0f,
+                BestMinimumNormalDot = 0f,
+                RejectedTriangleA = -1,
+                RejectedTriangleB = -1,
+                RejectedTriangleC = -1,
+                Rejection = OneSurfaceTriangleCandidateFailure.None
+            };
             if (vertices == null || vertices.Count < 3 ||
                 !IsFinite(authoredNormal) ||
                 authoredNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
@@ -8596,52 +10118,102 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             authoredNormal.Normalize();
             float bestMinimumNormalDot = -1f;
             float bestMinimumArea = -1f;
+            const float rankingEpsilon = 0.000001f;
             for (int candidate = 0;
                  candidate < vertices.Count;
                  candidate++)
             {
+                audit.AnchorsTested++;
                 Vector3 anchor = vertices[candidate];
                 float minimumNormalDot = 1f;
                 float minimumArea = float.PositiveInfinity;
+                int certifiedTriangleCount = 0;
+                int rejectedA = -1;
+                int rejectedB = -1;
+                int rejectedC = -1;
+                OneSurfaceTriangleCandidateFailure rejection =
+                    OneSurfaceTriangleCandidateFailure.None;
                 bool stable = true;
                 for (int offset = 1;
                      offset < vertices.Count - 1;
                      offset++)
                 {
-                    Vector3 b = vertices[
-                        (candidate + offset) % vertices.Count];
-                    Vector3 c = vertices[
-                        (candidate + offset + 1) % vertices.Count];
-                    Vector3 geometricNormal = Vector3.Cross(
-                        b - anchor,
-                        c - anchor);
-                    float area = CalculatePolygonArea(
-                        new List<Vector3> { anchor, b, c });
-                    if (!IsFinite(geometricNormal) ||
-                        geometricNormal.sqrMagnitude <=
-                            MinimumEdgeLengthSqr ||
-                        !IsFiniteFloat(area) ||
-                        area <= minimumTriangleArea)
+                    int bIndex =
+                        (candidate + offset) % vertices.Count;
+                    int cIndex =
+                        (candidate + offset + 1) % vertices.Count;
+                    OneSurfaceTriangleCandidate triangle =
+                        EvaluateOneSurfaceTriangleCandidate(
+                            anchor,
+                            vertices[bIndex],
+                            vertices[cIndex],
+                            authoredNormal,
+                            minimumTriangleArea);
+                    if (!triangle.Valid)
                     {
                         stable = false;
+                        rejectedA = candidate;
+                        rejectedB = bIndex;
+                        rejectedC = cIndex;
+                        rejection = triangle.Failure;
                         break;
                     }
 
-                    float normalDot = Mathf.Abs(Vector3.Dot(
-                        geometricNormal.normalized,
-                        authoredNormal));
-                    if (!IsFiniteFloat(normalDot) ||
-                        normalDot <
-                            OneSurfaceMinimumRenderNormalDot)
-                    {
-                        stable = false;
-                        break;
-                    }
-
+                    certifiedTriangleCount++;
                     minimumNormalDot = Mathf.Min(
                         minimumNormalDot,
-                        normalDot);
-                    minimumArea = Mathf.Min(minimumArea, area);
+                        triangle.NormalDot);
+                    minimumArea = Mathf.Min(
+                        minimumArea,
+                        triangle.Area);
+                }
+
+                float comparableMinimumArea =
+                    certifiedTriangleCount > 0
+                        ? minimumArea
+                        : 0f;
+                float comparableMinimumNormalDot =
+                    certifiedTriangleCount > 0
+                        ? minimumNormalDot
+                        : 0f;
+                bool betterPartial =
+                    certifiedTriangleCount >
+                        audit.BestCertifiedTriangleCount;
+                bool equalPartial =
+                    certifiedTriangleCount ==
+                        audit.BestCertifiedTriangleCount;
+                bool betterPartialNormal =
+                    comparableMinimumNormalDot >
+                        audit.BestMinimumNormalDot + rankingEpsilon;
+                bool equalPartialNormal = Mathf.Abs(
+                    comparableMinimumNormalDot -
+                    audit.BestMinimumNormalDot) <= rankingEpsilon;
+                bool betterPartialArea =
+                    comparableMinimumArea >
+                        audit.BestMinimumArea + rankingEpsilon;
+                bool equalPartialArea = Mathf.Abs(
+                    comparableMinimumArea -
+                    audit.BestMinimumArea) <= rankingEpsilon;
+                bool lowerPartialAnchor =
+                    audit.BestAnchorIndex < 0 ||
+                    candidate < audit.BestAnchorIndex;
+                if (betterPartial ||
+                    (equalPartial && betterPartialNormal) ||
+                    (equalPartial && equalPartialNormal &&
+                        betterPartialArea) ||
+                    (equalPartial && equalPartialNormal &&
+                        equalPartialArea && lowerPartialAnchor))
+                {
+                    audit.BestAnchorIndex = candidate;
+                    audit.BestCertifiedTriangleCount =
+                        certifiedTriangleCount;
+                    audit.BestMinimumArea = comparableMinimumArea;
+                    audit.BestMinimumNormalDot =
+                        comparableMinimumNormalDot;
+                    audit.RejectedTriangleA = rejectedA;
+                    audit.RejectedTriangleB = rejectedB;
+                    audit.RejectedTriangleC = rejectedC;
+                    audit.Rejection = rejection;
                 }
 
                 if (!stable)
@@ -8649,12 +10221,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
 
+                audit.StableAnchors++;
                 bool betterNormalAgreement =
                     minimumNormalDot >
-                        bestMinimumNormalDot + 0.000001f;
+                        bestMinimumNormalDot + rankingEpsilon;
                 bool equalNormalAgreement = Mathf.Abs(
                     minimumNormalDot - bestMinimumNormalDot) <=
-                        0.000001f;
+                        rankingEpsilon;
                 if (!betterNormalAgreement &&
                     (!equalNormalAgreement ||
                      minimumArea <= bestMinimumArea))
@@ -8667,6 +10240,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 anchorIndex = candidate;
             }
 
+            if (anchorIndex >= 0)
+            {
+                audit.BestAnchorIndex = anchorIndex;
+                audit.BestCertifiedTriangleCount =
+                    vertices.Count - 2;
+                audit.BestMinimumArea = bestMinimumArea;
+                audit.BestMinimumNormalDot =
+                    bestMinimumNormalDot;
+                audit.RejectedTriangleA = -1;
+                audit.RejectedTriangleB = -1;
+                audit.RejectedTriangleC = -1;
+                audit.Rejection =
+                    OneSurfaceTriangleCandidateFailure.None;
+            }
             return anchorIndex >= 0;
         }
 

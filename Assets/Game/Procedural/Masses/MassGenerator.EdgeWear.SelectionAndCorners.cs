@@ -170,6 +170,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool includeAllGeometricCandidates,
             EdgeWearMicroTopologyNormalizationResult
                 microTopologyNormalization,
+            CornerDamageTransactionAuditResult cornerDamageTransaction,
+            float capRingRequestedWidth,
             out EdgeWearCoverageAudit coverageAudit)
         {
             bool maximumCoverageMode =
@@ -267,33 +269,69 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeKey edgeKey = new EdgeKey(edge.Start, edge.End);
                 Vector3 midpoint = (edge.Start + edge.End) * 0.5f;
                 float length = (edge.End - edge.Start).magnitude;
-                int originalSourceEdgeIndex =
-                    microTopologyNormalization == null
-                        ? edgeIndex
-                        : microTopologyNormalization.
-                            ResolveOriginalSourceEdgeIndex(
-                                edgeKey,
-                                edgeIndex);
+                bool cornerDamageCapRing =
+                    cornerDamageTransaction != null &&
+                    cornerDamageTransaction.CapRingKeys.Contains(edgeKey);
+                int originalSourceEdgeIndex;
+                if (cornerDamageTransaction != null &&
+                    cornerDamageTransaction.StableIdentityByOutputKey.
+                        TryGetValue(
+                            edgeKey,
+                            out int committedIdentity))
+                {
+                    originalSourceEdgeIndex = committedIdentity;
+                }
+                else
+                {
+                    originalSourceEdgeIndex =
+                        microTopologyNormalization == null
+                            ? edgeIndex
+                            : microTopologyNormalization.
+                                ResolveOriginalSourceEdgeIndex(
+                                    edgeKey,
+                                    edgeIndex);
+                }
                 bool microGeneratedTransition =
+                    !cornerDamageCapRing &&
                     microTopologyNormalization != null &&
                     microTopologyNormalization.
                         GeneratedTransitionKeys.Contains(edgeKey);
-                ResolveEdgeWearMacroRequestedWidth(
-                    recipe.ShapeSeed,
-                    originalSourceEdgeIndex,
-                    settings.EdgeWearMacroVariationCoverage,
-                    settings.EdgeWearMacroVariation,
-                    requestedWidth,
-                    minimumStyleWidth,
-                    EdgeWearMacroShallowAngleDegrees,
-                    microGeneratedTransition,
-                    out float macroParticipationIdentity01,
-                    out bool macroVariationParticipates,
-                    out float macroIdentity01,
-                    out float macroSampledMultiplier,
-                    out float macroEffectiveMultiplier,
-                    out float variedRequestedWidth,
-                    out bool macroMinimumStyleClamped);
+                float macroParticipationIdentity01;
+                bool macroVariationParticipates;
+                float macroIdentity01;
+                float macroSampledMultiplier;
+                float macroEffectiveMultiplier;
+                float variedRequestedWidth;
+                bool macroMinimumStyleClamped;
+                if (cornerDamageCapRing)
+                {
+                    macroParticipationIdentity01 = 0f;
+                    macroVariationParticipates = false;
+                    macroIdentity01 = 0f;
+                    macroSampledMultiplier = 1f;
+                    macroEffectiveMultiplier = 1f;
+                    variedRequestedWidth = capRingRequestedWidth;
+                    macroMinimumStyleClamped = false;
+                }
+                else
+                {
+                    ResolveEdgeWearMacroRequestedWidth(
+                        recipe.ShapeSeed,
+                        originalSourceEdgeIndex,
+                        settings.EdgeWearMacroVariationCoverage,
+                        settings.EdgeWearMacroVariation,
+                        requestedWidth,
+                        minimumStyleWidth,
+                        EdgeWearMacroShallowAngleDegrees,
+                        microGeneratedTransition,
+                        out macroParticipationIdentity01,
+                        out macroVariationParticipates,
+                        out macroIdentity01,
+                        out macroSampledMultiplier,
+                        out macroEffectiveMultiplier,
+                        out variedRequestedWidth,
+                        out macroMinimumStyleClamped);
+                }
                 EdgeWearEdgeLifecycleRecord lifecycle =
                     new EdgeWearEdgeLifecycleRecord
                     {
@@ -311,6 +349,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             midpoint.y),
                         OriginalSourceEdgeIndex =
                             originalSourceEdgeIndex,
+                        CandidateClass = cornerDamageCapRing
+                            ? EdgeWearCandidateClass.CornerDamageCapRing
+                            : EdgeWearCandidateClass.Ordinary,
+                        Mandatory = cornerDamageCapRing,
                         MicroTopologyGeneratedTransition =
                             microGeneratedTransition
                     };
@@ -320,10 +362,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         Key = edgeKey,
                         MinimumDihedralDegrees =
                             EdgeWearMinimumViableDihedralDegrees,
-                        BaseRequestedWidth = requestedWidth,
-                        MacroVariationCoverage =
-                            settings.EdgeWearMacroVariationCoverage,
-                        MacroVariation = settings.EdgeWearMacroVariation
+                        BaseRequestedWidth = cornerDamageCapRing
+                            ? capRingRequestedWidth
+                            : requestedWidth,
+                        MacroVariationCoverage = cornerDamageCapRing
+                            ? 0f
+                            : settings.EdgeWearMacroVariationCoverage,
+                        MacroVariation = cornerDamageCapRing
+                            ? 0f
+                            : settings.EdgeWearMacroVariation
                     };
                 ApplyResolvedEdgeWearMacroWidth(
                     viability,
@@ -441,22 +488,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
 
-                ResolveEdgeWearMacroRequestedWidth(
-                    recipe.ShapeSeed,
-                    originalSourceEdgeIndex,
-                    settings.EdgeWearMacroVariationCoverage,
-                    settings.EdgeWearMacroVariation,
-                    requestedWidth,
-                    minimumStyleWidth,
-                    evidence.DihedralDegrees,
-                    microGeneratedTransition,
-                    out macroParticipationIdentity01,
-                    out macroVariationParticipates,
-                    out macroIdentity01,
-                    out macroSampledMultiplier,
-                    out macroEffectiveMultiplier,
-                    out variedRequestedWidth,
-                    out macroMinimumStyleClamped);
+                if (!cornerDamageCapRing)
+                {
+                    ResolveEdgeWearMacroRequestedWidth(
+                        recipe.ShapeSeed,
+                        originalSourceEdgeIndex,
+                        settings.EdgeWearMacroVariationCoverage,
+                        settings.EdgeWearMacroVariation,
+                        requestedWidth,
+                        minimumStyleWidth,
+                        evidence.DihedralDegrees,
+                        microGeneratedTransition,
+                        out macroParticipationIdentity01,
+                        out macroVariationParticipates,
+                        out macroIdentity01,
+                        out macroSampledMultiplier,
+                        out macroEffectiveMultiplier,
+                        out variedRequestedWidth,
+                        out macroMinimumStyleClamped);
+                }
                 ApplyResolvedEdgeWearMacroWidth(
                     viability,
                     length,
@@ -500,10 +550,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 lifecycle.ArtisticLengthEligible = artisticLengthEligible;
                 lifecycle.ArtisticAngleEligible = artisticAngleEligible;
                 lifecycle.ArtisticBaseEligible = artisticBaseEligible;
-                lifecycle.ArtisticEligible =
-                    artisticLengthEligible &&
-                    artisticAngleEligible &&
-                    artisticBaseEligible;
+                lifecycle.ArtisticEligible = cornerDamageCapRing ||
+                    (artisticLengthEligible &&
+                     artisticAngleEligible &&
+                     artisticBaseEligible);
                 lifecycle.ArtisticFilterReason = lifecycle.ArtisticEligible
                     ? "eligible"
                     : ResolveEdgeWearArtisticFilterReason(
@@ -600,15 +650,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     Hash01(
                         settings.SurfaceSeed + 0x29AF,
                         deterministicVariationIdentity));
-                float strength = Mathf.Clamp01(
-                    amount01 *
-                    Mathf.Lerp(0.86f, 1.06f, random) *
-                    deterministicVariation);
-                float depthMultiplier = Mathf.Clamp(
-                    Mathf.Lerp(0.88f, 1.08f, random) *
-                    Mathf.Lerp(0.96f, 1.04f, angleScore),
-                    0.78f,
-                    1.15f);
+                float strength = cornerDamageCapRing
+                    ? Mathf.Clamp01(amount01)
+                    : Mathf.Clamp01(
+                        amount01 *
+                        Mathf.Lerp(0.86f, 1.06f, random) *
+                        deterministicVariation);
+                float depthMultiplier = cornerDamageCapRing
+                    ? 1f
+                    : Mathf.Clamp(
+                        Mathf.Lerp(0.88f, 1.08f, random) *
+                        Mathf.Lerp(0.96f, 1.04f, angleScore),
+                        0.78f,
+                        1.15f);
 
                 lifecycle.ArtisticDeterministicVariation =
                     deterministicVariation;
@@ -618,6 +672,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 provisionalCandidates.Add(
                     new EdgeWearBevelCandidate(
                         provisionalCandidateIndex,
+                        originalSourceEdgeIndex,
+                        lifecycle.CandidateClass,
+                        lifecycle.Mandatory,
                         edge.Start,
                         edge.End,
                         faceA,
@@ -713,6 +770,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 bool includeCandidate =
+                    lifecycle.Mandatory ||
                     includeAllGeometricCandidates ||
                     lifecycle.ArtisticEligible;
                 if (!includeCandidate)
@@ -739,6 +797,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 candidates.Add(
                     new EdgeWearBevelCandidate(
                         finalCandidateIndex,
+                        provisional.StableIdentity,
+                        provisional.CandidateClass,
+                        provisional.Mandatory,
                         provisional.Start,
                         provisional.End,
                         provisional.FaceA,
@@ -4473,10 +4534,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         planePoint,
                         trialIndex,
                         factor,
-                        depth);
+                        depth,
+                        out List<PolygonFace> acceptedFaces,
+                        out PolygonFace acceptedCapFace);
                 result.Trials.Add(trial);
                 if (!trial.Succeeded)
                 {
+                    continue;
+                }
+                if (!TryCommitCornerDamageTransactionResult(
+                        result,
+                        trial,
+                        acceptedFaces,
+                        acceptedCapFace,
+                        out string commitBlocker))
+                {
+                    trial.Succeeded = false;
+                    trial.Blocker = commitBlocker;
                     continue;
                 }
 
@@ -4660,8 +4734,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Vector3 planePoint,
             int trialIndex,
             float depthFactor,
-            float depth)
+            float depth,
+            out List<PolygonFace> acceptedFaces,
+            out PolygonFace acceptedCapFace)
         {
+            acceptedFaces = null;
+            acceptedCapFace = null;
             CornerDamageTrialRecord trial =
                 new CornerDamageTrialRecord
                 {
@@ -4823,6 +4901,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 trial.VolumeLossFraction > 0.12 ||
                 trial.MissingOriginalEdgeCount != 0 ||
                 trial.AmbiguousIdentityCount != 0 ||
+                trial.GeneratedIdentityCollisionCount != 0 ||
                 trial.ShortenedDescendantEdgeCount !=
                     selected.IncidentGraphEdgeIndices.Count ||
                 trial.CapRingEdgeCount != capFace.Vertices.Count)
@@ -4836,6 +4915,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             trial.Succeeded = true;
+            acceptedFaces = preparedFaces;
+            acceptedCapFace = capFace;
             return trial;
         }
 
@@ -4910,6 +4991,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             HashSet<int> selectedEdges = new HashSet<int>(
                 selected.IncidentGraphEdgeIndices);
+            HashSet<int> originalIdentities = new HashSet<int>();
+            for (int sourceEdgeIndex = 0;
+                 sourceEdgeIndex < sourceGraph.Edges.Count;
+                 sourceEdgeIndex++)
+            {
+                EdgeWearGraphEdge sourceEdge =
+                    sourceGraph.Edges[sourceEdgeIndex];
+                Vector3 sourceA = sourceGraph.Vertices[
+                    sourceEdge.VertexA].Position;
+                Vector3 sourceB = sourceGraph.Vertices[
+                    sourceEdge.VertexB].Position;
+                EdgeKey sourceKey = new EdgeKey(sourceA, sourceB);
+                originalIdentities.Add(normalization == null
+                    ? sourceEdgeIndex
+                    : normalization.ResolveOriginalSourceEdgeIndex(
+                        sourceKey,
+                        sourceEdgeIndex));
+            }
             Dictionary<int, int> capParentByVertex =
                 new Dictionary<int, int>();
 
@@ -5043,6 +5142,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         selected.GraphVertexIndex,
                         parentA,
                         parentB);
+                if (originalIdentities.Contains(generatedIdentity))
+                {
+                    trial.GeneratedIdentityCollisionCount++;
+                    continue;
+                }
                 if (!generatedIdentities.Add(generatedIdentity))
                 {
                     trial.AmbiguousIdentityCount++;
@@ -5061,6 +5165,130 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         End = end
                     });
             }
+        }
+
+        private static bool TryCommitCornerDamageTransactionResult(
+            CornerDamageTransactionAuditResult result,
+            CornerDamageTrialRecord trial,
+            List<PolygonFace> acceptedFaces,
+            PolygonFace acceptedCapFace,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            if (result == null || trial == null || acceptedFaces == null ||
+                acceptedCapFace == null || !trial.Succeeded)
+            {
+                blocker = "certified corner transaction has no committed geometry";
+                return false;
+            }
+
+            result.StableIdentityByOutputKey.Clear();
+            result.CapRingKeys.Clear();
+            result.CapRingGeneratedIdentities.Clear();
+            result.AffectedOriginalEdgeIndices.Clear();
+            for (int recordIndex = 0;
+                 recordIndex < trial.IdentityRecords.Count;
+                 recordIndex++)
+            {
+                CornerDamageEdgeIdentityRecord record =
+                    trial.IdentityRecords[recordIndex];
+                EdgeKey key = new EdgeKey(record.Start, record.End);
+                int stableIdentity = record.Kind == "cap-ring"
+                    ? record.GeneratedIdentity
+                    : record.ParentOriginalEdgeA;
+                if (stableIdentity < 0 ||
+                    result.StableIdentityByOutputKey.ContainsKey(key))
+                {
+                    blocker =
+                        "certified corner transaction produced duplicate or invalid committed edge identity";
+                    return false;
+                }
+                result.StableIdentityByOutputKey.Add(key, stableIdentity);
+                if (record.Kind == "shortened-descendant")
+                {
+                    result.AffectedOriginalEdgeIndices.Add(
+                        record.ParentOriginalEdgeA);
+                }
+                else if (record.Kind == "cap-ring")
+                {
+                    if (!result.CapRingGeneratedIdentities.Add(
+                            record.GeneratedIdentity))
+                    {
+                        blocker =
+                            "certified corner transaction produced duplicate cap-ring identity";
+                        return false;
+                    }
+                    result.CapRingKeys.Add(key);
+                }
+            }
+
+            if (result.CapRingKeys.Count != trial.CapRingEdgeCount ||
+                result.AffectedOriginalEdgeIndices.Count !=
+                    trial.ShortenedDescendantEdgeCount)
+            {
+                blocker =
+                    "certified corner transaction committed identity counts do not match audit evidence";
+                return false;
+            }
+
+            float shortestCapEdgeLength = float.PositiveInfinity;
+            for (int vertexIndex = 0;
+                 vertexIndex < acceptedCapFace.Vertices.Count;
+                 vertexIndex++)
+            {
+                Vector3 start = acceptedCapFace.Vertices[vertexIndex];
+                Vector3 end = acceptedCapFace.Vertices[
+                    (vertexIndex + 1) % acceptedCapFace.Vertices.Count];
+                shortestCapEdgeLength = Mathf.Min(
+                    shortestCapEdgeLength,
+                    (end - start).magnitude);
+            }
+            if (float.IsNaN(shortestCapEdgeLength) ||
+                float.IsInfinity(shortestCapEdgeLength) ||
+                shortestCapEdgeLength <= PointMergeDistance)
+            {
+                blocker =
+                    "certified corner transaction cap has no stable edge length";
+                return false;
+            }
+
+            result.AcceptedFaces = acceptedFaces;
+            result.AcceptedCapFace = acceptedCapFace;
+            result.AcceptedDepth = trial.Depth;
+            result.ShortestCapEdgeLength = shortestCapEdgeLength;
+            return true;
+        }
+
+        private static float ResolveCornerDamageCapRingRequestedWidth(
+            CornerDamageTransactionAuditResult transaction,
+            float ordinaryRequestedWidth)
+        {
+            if (transaction == null || !transaction.Succeeded)
+            {
+                return 0f;
+            }
+            return Mathf.Min(
+                ordinaryRequestedWidth * 0.50f,
+                transaction.AcceptedDepth * 0.25f,
+                transaction.ShortestCapEdgeLength * 0.20f);
+        }
+
+        private static int CompareCornerDamagePreviewCandidates(
+            EdgeWearBevelCandidate left,
+            EdgeWearBevelCandidate right)
+        {
+            if (left.Mandatory != right.Mandatory)
+            {
+                return left.Mandatory ? -1 : 1;
+            }
+            if (left.Mandatory)
+            {
+                return left.StableIdentity.CompareTo(right.StableIdentity);
+            }
+            int scoreOrder = right.Score.CompareTo(left.Score);
+            return scoreOrder != 0
+                ? scoreOrder
+                : left.CandidateIndex.CompareTo(right.CandidateIndex);
         }
 
         private static int CalculateCornerDamagePolygonTriangleCount(
@@ -5187,6 +5415,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (trial.AmbiguousIdentityCount != 0)
             {
                 return "edge-identity-ambiguous";
+            }
+            if (trial.GeneratedIdentityCollisionCount != 0)
+            {
+                return "cap-ring-generated-identity-collision";
             }
             if (trial.ShortenedDescendantEdgeCount !=
                 expectedShortenedDescendantCount)

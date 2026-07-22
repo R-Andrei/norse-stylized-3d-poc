@@ -152,7 +152,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
         public bool UsesTextureForm =>
             detailEnabled &&
             detailLibrary != null &&
-            detailLibrary.EntryUsesAuthoredMaterialSet(DetailEntryId);
+            detailLibrary.EntryUsesTextureForm(DetailEntryId);
 
         // Compatibility aliases retained for existing callers and serialized
         // terminology. Payload selection is automatic from the library entry.

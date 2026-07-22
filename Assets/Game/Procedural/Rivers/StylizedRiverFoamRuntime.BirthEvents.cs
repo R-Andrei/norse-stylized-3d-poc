@@ -712,6 +712,88 @@ namespace ProgrammaticStylized3D.Rivers
             ResetAutomaticBirthDiagnosticSession();
         }
 
+        private readonly struct ResolvedAutomaticRevealTiming
+        {
+            public ResolvedAutomaticRevealTiming(
+                float pathDistanceMetres,
+                float requestedSpeedMetresPerSecond,
+                float rawDurationSeconds,
+                float resolvedDurationSeconds,
+                bool cadenceLimited)
+            {
+                PathDistanceMetres = pathDistanceMetres;
+                RequestedSpeedMetresPerSecond =
+                    requestedSpeedMetresPerSecond;
+                RawDurationSeconds = rawDurationSeconds;
+                ResolvedDurationSeconds = resolvedDurationSeconds;
+                ActualSpeedMetresPerSecond = pathDistanceMetres /
+                    Mathf.Max(0.0001f, resolvedDurationSeconds);
+                CadenceLimited = cadenceLimited;
+            }
+
+            public float PathDistanceMetres { get; }
+            public float RequestedSpeedMetresPerSecond { get; }
+            public float RawDurationSeconds { get; }
+            public float ResolvedDurationSeconds { get; }
+            public float ActualSpeedMetresPerSecond { get; }
+            public bool CadenceLimited { get; }
+        }
+
+        private ResolvedAutomaticRevealTiming ResolveAutomaticRevealTiming(
+            float pathDistanceMetres,
+            float baseSpeedMetresPerSecond,
+            float patternSpeedMultiplier,
+            float deterministicSpeedJitter)
+        {
+            float resolvedPathDistance = Mathf.Max(0.0001f, pathDistanceMetres);
+            float requestedSpeed = Mathf.Max(
+                0.0001f,
+                baseSpeedMetresPerSecond *
+                Mathf.Clamp(patternSpeedMultiplier, 0.10f, 3.00f) *
+                Mathf.Max(0.0001f, deterministicSpeedJitter));
+            float rawDuration = resolvedPathDistance / requestedSpeed;
+            float materialStepDuration =
+                1f / Mathf.Max(1f, ResolveUpdateRate());
+            float resolvedDuration = Mathf.Max(
+                materialStepDuration,
+                rawDuration);
+            return new ResolvedAutomaticRevealTiming(
+                resolvedPathDistance,
+                requestedSpeed,
+                rawDuration,
+                resolvedDuration,
+                rawDuration < materialStepDuration);
+        }
+
+        private void RecordAutomaticRevealTiming(
+            int eventId,
+            AutomaticFoamSourceEventType sourceType,
+            ResolvedAutomaticRevealTiming timing)
+        {
+            int telemetryIndex = (int)sourceType;
+            if (telemetryIndex <= 0 ||
+                telemetryIndex >= automaticRevealTimingByType.Length)
+            {
+                return;
+            }
+
+            automaticRevealTimingByType[telemetryIndex] =
+                new AutomaticRevealTimingTelemetry
+                {
+                    HasValue = true,
+                    EventId = eventId,
+                    Type = sourceType,
+                    PathDistanceMetres = timing.PathDistanceMetres,
+                    RequestedSpeedMetresPerSecond =
+                        timing.RequestedSpeedMetresPerSecond,
+                    RawDurationSeconds = timing.RawDurationSeconds,
+                    ResolvedDurationSeconds = timing.ResolvedDurationSeconds,
+                    ActualSpeedMetresPerSecond =
+                        timing.ActualSpeedMetresPerSecond,
+                    CadenceLimited = timing.CadenceLimited
+                };
+        }
+
         private enum AutomaticShoreSourceRecipe
         {
             ShoreRibbon,
@@ -1735,8 +1817,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (recipe == AutomaticObjectSourceRecipe.ContactFleck)
             {
-                float eventScale = Mathf.Clamp01(
-                    Mathf.Lerp(0.78f, 1.18f, Hash01(seed + 6.5f)));
+                float eventScale = Hash01(seed + 6.5f);
                 float widthJitter = Mathf.Lerp(0.92f, 1.08f, Hash01(seed + 7.1f));
                 float offsetJitter = Mathf.Lerp(0.85f, 1.15f, Hash01(seed + 8.3f));
                 length = Mathf.Lerp(
@@ -1967,15 +2048,14 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            float formationSpeed = Mathf.Max(
-                0.05f,
-                profile.FormationSpeedMetresPerSecond *
-                Mathf.Clamp(patternFormationSpeedMultiplier, 0.10f, 3.00f) *
-                Mathf.Lerp(0.90f, 1.10f, Hash01(seed + 12.5f)));
-            float buildDuration = Mathf.Clamp(
-                sourcePathDistance / formationSpeed,
-                AutomaticObjectSourceMinimumDuration,
-                AutomaticObjectSourceMaximumDuration);
+            ResolvedAutomaticRevealTiming revealTiming =
+                ResolveAutomaticRevealTiming(
+                    sourcePathDistance,
+                    profile.FormationSpeedMetresPerSecond,
+                    patternFormationSpeedMultiplier,
+                    Mathf.Lerp(0.90f, 1.10f, Hash01(seed + 12.5f)));
+            float formationSpeed =
+                revealTiming.RequestedSpeedMetresPerSecond;
             bool contactCycle = recipe != AutomaticObjectSourceRecipe.ContactFleck;
             float holdDuration = contactCycle
                 ? Mathf.Lerp(
@@ -2017,11 +2097,10 @@ namespace ProgrammaticStylized3D.Rivers
                 startGlobalDistance,
                 endGlobalDistance,
                 source.GlobalDistance,
-                buildDuration,
+                revealTiming,
                 holdDuration,
                 releaseDuration,
                 restDuration,
-                formationSpeed,
                 headTrailMetres,
                 offset,
                 width,
@@ -2046,11 +2125,10 @@ namespace ProgrammaticStylized3D.Rivers
             float startGlobalDistance,
             float endGlobalDistance,
             float objectCentreGlobalDistance,
-            float buildDuration,
+            ResolvedAutomaticRevealTiming revealTiming,
             float holdDuration,
             float releaseDuration,
             float restDuration,
-            float formationSpeedMetresPerSecond,
             float headTrailMetres,
             float contactOffsetMetres,
             float widthMetres,
@@ -2100,9 +2178,8 @@ namespace ProgrammaticStylized3D.Rivers
             bool contactCycle =
                 sourceType == AutomaticFoamSourceEventType.ObjectContactArc ||
                 sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
-            float resolvedBuildDuration = Mathf.Max(
-                AutomaticObjectSourceMinimumDuration,
-                buildDuration);
+            float resolvedBuildDuration =
+                revealTiming.ResolvedDurationSeconds;
             float resolvedHoldDuration = contactCycle
                 ? Mathf.Max(0f, holdDuration)
                 : 0f;
@@ -2129,7 +2206,11 @@ namespace ProgrammaticStylized3D.Rivers
                 ObjectRestDuration = contactCycle
                     ? Mathf.Max(0f, restDuration)
                     : 0f,
-                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond),
+                FormationSpeedMetresPerSecond =
+                    revealTiming.RequestedSpeedMetresPerSecond,
+                RevealPathDistanceMetres = revealTiming.PathDistanceMetres,
+                RawRevealDurationSeconds = revealTiming.RawDurationSeconds,
+                RevealCadenceLimited = revealTiming.CadenceLimited,
                 HeadTrailMetres = Mathf.Clamp(
                     headTrailMetres,
                     AutomaticObjectSourceMinimumHeadTrailMetres,
@@ -2227,6 +2308,10 @@ namespace ProgrammaticStylized3D.Rivers
                     : 0f
             };
 
+            RecordAutomaticRevealTiming(
+                eventId,
+                sourceType,
+                revealTiming);
             activeAutomaticFoamSourceEventCount++;
             foamCompositionStartedCount++;
             latestFoamCompositionEventId = eventId;
@@ -2551,7 +2636,7 @@ namespace ProgrammaticStylized3D.Rivers
             float visibleHalfWidth)
         {
             float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
-            float eventScale = Mathf.Clamp01(Mathf.Lerp(0.72f, 1.16f, Hash01(seed + 6.5f)));
+            float eventScale = Hash01(seed + 6.5f);
             float widthJitter = Mathf.Lerp(0.88f, 1.12f, Hash01(seed + 7.1f));
             float sourceKey = river.VisualSeed * 0.457f +
                 globalDistance * 7.731f +
@@ -2730,20 +2815,14 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            float formationSpeed = Mathf.Max(
-                0.05f,
-                profile.FormationSpeedMetresPerSecond *
-                Mathf.Clamp(patternFormationSpeedMultiplier, 0.10f, 3.00f) *
-                Mathf.Lerp(0.90f, 1.10f, Hash01(seed + 13.5f)));
-            float duration = recipe == AutomaticFreeWaterSourceRecipe.TornFragment
-                ? Mathf.Clamp(
-                    0.35f + formationDistance / formationSpeed * 0.35f,
-                    AutomaticFreeWaterSourceMinimumDuration,
-                    1.35f)
-                : Mathf.Clamp(
-                    formationDistance / formationSpeed,
-                    recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector ? 0.55f : 0.75f,
-                    recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector ? 3.50f : AutomaticFreeWaterSourceMaximumDuration);
+            ResolvedAutomaticRevealTiming revealTiming =
+                ResolveAutomaticRevealTiming(
+                    formationDistance,
+                    profile.FormationSpeedMetresPerSecond,
+                    patternFormationSpeedMultiplier,
+                    Mathf.Lerp(0.90f, 1.10f, Hash01(seed + 13.5f)));
+            float formationSpeed =
+                revealTiming.RequestedSpeedMetresPerSecond;
             float materialStepDuration = 1f / Mathf.Max(1f, ResolveUpdateRate());
             float headTrailMetres = recipe == AutomaticFreeWaterSourceRecipe.TornFragment
                 ? 0f
@@ -2765,8 +2844,7 @@ namespace ProgrammaticStylized3D.Rivers
                 endGlobalDistance,
                 acrossNormalized,
                 centreAcrossMetres,
-                duration,
-                formationSpeed,
+                revealTiming,
                 headTrailMetres,
                 width,
                 feather,
@@ -2815,8 +2893,7 @@ namespace ProgrammaticStylized3D.Rivers
             float endGlobalDistance,
             float centreAcrossNormalized,
             float centreAcrossMetres,
-            float duration,
-            float formationSpeedMetresPerSecond,
+            ResolvedAutomaticRevealTiming revealTiming,
             float headTrailMetres,
             float widthMetres,
             float featherMetres,
@@ -2862,9 +2939,13 @@ namespace ProgrammaticStylized3D.Rivers
                 SideSign = 0f,
                 StartGlobalDistance = startGlobalDistance,
                 EndGlobalDistance = endGlobalDistance,
-                Duration = Mathf.Max(AutomaticFreeWaterSourceMinimumDuration, duration),
+                Duration = revealTiming.ResolvedDurationSeconds,
                 Elapsed = 0f,
-                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond),
+                FormationSpeedMetresPerSecond =
+                    revealTiming.RequestedSpeedMetresPerSecond,
+                RevealPathDistanceMetres = revealTiming.PathDistanceMetres,
+                RawRevealDurationSeconds = revealTiming.RawDurationSeconds,
+                RevealCadenceLimited = revealTiming.CadenceLimited,
                 HeadTrailMetres = Mathf.Clamp(
                     headTrailMetres,
                     0f,
@@ -2895,6 +2976,10 @@ namespace ProgrammaticStylized3D.Rivers
                 LateralPaddingMetres = Mathf.Max(widthMetres * 2f, lateralPaddingMetres)
             };
 
+            RecordAutomaticRevealTiming(
+                eventId,
+                sourceType,
+                revealTiming);
             activeAutomaticFoamSourceEventCount++;
             foamCompositionStartedCount++;
             latestFoamCompositionEventId = eventId;
@@ -3232,15 +3317,14 @@ namespace ProgrammaticStylized3D.Rivers
                         1.18f,
                         Mathf.Clamp01(Mathf.Abs(curvature)))
                 : longitudinalDistance;
-            float formationSpeed = Mathf.Max(
-                0.05f,
-                profile.FormationSpeedMetresPerSecond *
-                patternFormationSpeedMultiplier *
-                Mathf.Lerp(0.88f, 1.12f, Hash01(seed + 12.5f)));
-            float duration = Mathf.Clamp(
-                sourcePathDistance / formationSpeed,
-                AutomaticShoreSourceMinimumDuration,
-                AutomaticShoreSourceMaximumDuration);
+            ResolvedAutomaticRevealTiming revealTiming =
+                ResolveAutomaticRevealTiming(
+                    sourcePathDistance,
+                    profile.FormationSpeedMetresPerSecond,
+                    patternFormationSpeedMultiplier,
+                    Mathf.Lerp(0.88f, 1.12f, Hash01(seed + 12.5f)));
+            float formationSpeed =
+                revealTiming.RequestedSpeedMetresPerSecond;
             float materialStepDuration = 1f / Mathf.Max(1f, ResolveUpdateRate());
             bool isInwardWash = recipe == AutomaticShoreSourceRecipe.InwardWash;
             float minimumHeadTrailMetres = isInwardWash
@@ -3266,8 +3350,7 @@ namespace ProgrammaticStylized3D.Rivers
                 sideSign,
                 startGlobalDistance,
                 endGlobalDistance,
-                duration,
-                formationSpeed,
+                revealTiming,
                 headTrailMetres,
                 shoreInset,
                 width,
@@ -3289,8 +3372,7 @@ namespace ProgrammaticStylized3D.Rivers
             float sideSign,
             float startGlobalDistance,
             float endGlobalDistance,
-            float duration,
-            float formationSpeedMetresPerSecond,
+            ResolvedAutomaticRevealTiming revealTiming,
             float headTrailMetres,
             float shoreInsetMetres,
             float widthMetres,
@@ -3342,9 +3424,13 @@ namespace ProgrammaticStylized3D.Rivers
                 SideSign = sideSign < 0f ? -1f : 1f,
                 StartGlobalDistance = startGlobalDistance,
                 EndGlobalDistance = endGlobalDistance,
-                Duration = Mathf.Max(AutomaticShoreSourceMinimumDuration, duration),
+                Duration = revealTiming.ResolvedDurationSeconds,
                 Elapsed = 0f,
-                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond),
+                FormationSpeedMetresPerSecond =
+                    revealTiming.RequestedSpeedMetresPerSecond,
+                RevealPathDistanceMetres = revealTiming.PathDistanceMetres,
+                RawRevealDurationSeconds = revealTiming.RawDurationSeconds,
+                RevealCadenceLimited = revealTiming.CadenceLimited,
                 HeadTrailMetres = Mathf.Clamp(
                     headTrailMetres,
                     slotMinimumHeadTrailMetres,
@@ -3380,6 +3466,10 @@ namespace ProgrammaticStylized3D.Rivers
                 SourceFillBlend = sourceType == AutomaticFoamSourceEventType.InwardWash ? 0.08f : 0.35f
             };
 
+            RecordAutomaticRevealTiming(
+                eventId,
+                sourceType,
+                revealTiming);
             activeAutomaticFoamSourceEventCount++;
             foamCompositionStartedCount++;
             latestFoamCompositionEventId = eventId;
@@ -3426,6 +3516,10 @@ namespace ProgrammaticStylized3D.Rivers
                 automaticFoamSourceEventGpuData,
                 0,
                 automaticFoamSourceEventGpuData.Length);
+            Array.Clear(
+                automaticRevealTimingByType,
+                0,
+                automaticRevealTimingByType.Length);
             activeAutomaticFoamSourceEventCount = 0;
             automaticSourceEventsRasterizedLastUpdate = 0;
             automaticObjectContactCycleStates.Clear();

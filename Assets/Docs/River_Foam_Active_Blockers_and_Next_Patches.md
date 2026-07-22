@@ -20,6 +20,10 @@
 
 `RG-METRIC-P12l — Binary Candidate × Eligibility intersection` is mechanically valid but rejected by Unity visual evidence. Its `>= 0.5` tests select only the midpoint contour interiors of two antialiased fields, so positive Candidate or Eligibility support below `0.5` remains unselected and can preserve Foam. `RG-METRIC-P12m — Any-Support Binary Chip Selection and Full-Removal Proof` corrected that threshold defect. `RG-METRIC-P12n — Optional Candidate-Straddle Chip Admission A/B` and `RG-METRIC-P12o — Original Analytical Candidates with Boundary-Anchored Eligibility` are visually rejected and removed. `RG-METRIC-P12p — Retire Experimental Cache and Isolate the Rendered Exterior Fringe` is the active implementation: one original analytical Candidate Field multiplied by one rendered Eligibility band whose distance coordinate excludes the inner hard-body rise.
 
+`RG-METRIC-P12q — Binary Morphology Eligibility` is Unity-rejected and fully removed by `RG-METRIC-P12r`. The source is restored to the P12p rendered-edge implementation with no topology route, resource, kernel, control, or fallback retained.
+
+`RG-METRIC-P12s — Optional Presence-Amplitude Soft-Mask Reconstruction A/B` is visually accepted as the production direction. `RG-METRIC-P12t — Soft Reconstruction Baseline and Layer D/E Inspector Reconciliation` promotes that route to the sole Chipping application, removes Exact Rendered Removal and its selector, moves Production Chipping into Layer E, and labels Layer D evaluated-shape controls as diagnostic-only. Unity compilation and final layout validation remain pending.
+
 ### P12g reviewed evidence
 
 - The rejected P12f baseline in `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl::RiverWaterFoamResolveChipEligibility` selected `preChipMask` / `0.08` when `presenceFootprintMode > 0.5`. `RiverWaterFoamHardenSoftVisibility` constructs that mask as `max(smoothstep(0.22, 0.58, soft), smoothstep(0.06, 0.34, soft) * 0.34)`, which has distinct fringe and hard-body rises. Unity `Chip Eligibility Composite` screenshots show both rises being detected as yellow contours, including one inside rendered Foam.
@@ -674,3 +678,311 @@ Create: none. Move/rename: none. Scene, prefab, material, cache, layer, and tag 
 - Packaging: the changed-file archive contains the `15` replacement project files plus a deletion manifest and Windows deletion helper for the `4` retired paths. Applying the archive and manifest to the captured P12o source reproduces the final Assets tree byte-for-byte with zero mismatches; ZIP path safety passes.
 - Compiler availability: no C# compiler is installed. The available Clang HLSL frontend cannot run because its required `hlsl.h` resource header is missing. Unity 6000.5 import and shader compilation remain pending and must not be represented as passed.
 - Unity visual acceptance and GPU timing: pending.
+
+## RG-METRIC-P12r — Remove Binary Topology and Restore the P12p Rendered Edge Band
+
+### P12r authorization and reviewed evidence
+
+- The user explicitly rejected P12q after Unity visual inspection and ordered the 4 Hz topology route deleted rather than retained or refined. The supplied screenshot shows large white, rectilinear topology regions that exclude the actual soft Foam body and therefore fail the required edge-permission contract.
+- The complete current P12q.1 implementation, its direct Inspector producer, runtime lifecycle/binding/resource consumers, compute kernels, shader caller, shared Foam include, memory accounting, and all five canonical documents were reread before implementation.
+- Exact current-versus-P12p comparison identifies fifteen modified existing project files and four P12q-only files. The immutable reconstructed P12p workspace is the restoration authority because it is the last implementation before Binary Morphology was introduced.
+- `RiverWaterFoam.hlsl::RiverWaterFoamResolveChipEligibility` in P12p uses the rendered soft-fringe coordinate from `0.08` to `0.34`; `RiverWaterFoamEvaluateSelectionDiagnostics` uses the original full-rate analytical Candidate Field and multiplies it by that rendered Eligibility band. `RiverWaterFoamApplyChipAndStrands` performs the existing complete selected-pixel removal.
+- The P12q-only path consists of `StylizedRiverFoamRuntime.ChipTopology.cs`, `CS_RiverFoam.ChipTopology.hlsl`, three compute kernels, three `R8` textures, serialized Eligibility-route/metre-width controls, lifecycle dispatches, material texture/mode binding, shader sampling, and memory accounting. No other subsystem consumes those resources.
+- The supplied source has no Git metadata. The immutable P12q.1 and P12p workspaces and packaged archives are the historical comparison authorities.
+
+### P12r objective and acceptance criteria
+
+1. Delete the complete P12q Binary Morphology implementation, including all runtime allocation/update/release code, compute kernels/include, serialized controls, Inspector UI, material properties, texture sampling, memory accounting, documentation, and both P12q-only `.meta` files.
+2. Restore P12p as the sole Presence-Amplitude Eligibility implementation: one original analytical Candidate Field multiplied by the isolated rendered exterior-fringe band.
+3. Restore the P12p default, serialized layout, shader signature, shader caller, debug wording, runtime binding, lifecycle, release path, and memory accounting exactly.
+4. Preserve the original Candidate evaluator, fixed spacing `0.15 m`, transport/source/lifecycle state, Film, Shape, Strands, exact pre-Chip rendered-mask ownership, and complete selected-pixel removal.
+5. Do not add a replacement route, new control, threshold, texture, buffer, kernel, dispatch, cadence, layer, tag, component, scene, prefab, material, or cache change.
+6. Remove active P12q instructions from all canonical documents. Retain only a concise historical rejection/removal record sufficient to prevent accidental reintroduction.
+7. Unity acceptance requires zero C# and shader/compute errors or warnings, no Binary Morphology control, no topology resource allocation/dispatch, original Candidate debug behavior, and the restored P12p Eligibility/Production behavior.
+
+### P12r approved file scope
+
+Modify exactly:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+6. `Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+9. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs`
+10. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+11. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`
+12. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+13. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+14. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+15. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+Delete exactly:
+
+1. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.ChipTopology.cs`
+2. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.ChipTopology.cs.meta`
+3. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.ChipTopology.hlsl`
+4. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.ChipTopology.hlsl.meta`
+
+Create: none. Move/rename: none. Scene, prefab, material, cache, layer, and tag edits are prohibited.
+
+### P12r implementation sequence
+
+1. Record this plan before any implementation edit.
+2. Restore the ten existing implementation files from the immutable P12p source and delete the four P12q-only files.
+3. Synchronize all five canonical documents to P12p ownership and mark P12q rejected/removed without leaving active instructions or tunable controls.
+4. Reread every final modified file and all direct callers/consumers; compare implementation files against P12p byte-for-byte and verify only the canonical documentation intentionally differs.
+5. Validate exact scope, deleted-file absence, zero P12q symbols/properties/kernels/includes, candidate/application byte identity, shader signature/caller parity, delimiter/preprocessor balance, compute-kernel inventory, serialized-field inventory, memory-accounting restoration, and reproducible patch extraction with explicit deletion handling.
+
+### P12r risks and current status
+
+- Risk: P12p remains visually imperfect; this patch is a strict rollback and cleanup, not a new Eligibility fix or tuning pass.
+- Risk: ordinary ZIP extraction cannot delete the four P12q-only files. Delivery must include an explicit deletion helper and deletion manifest.
+- Authorization: approved by the user's explicit delete-and-revert instruction.
+- Read-only review: complete.
+- Canonical plan: recorded before implementation.
+- Implementation: complete inside the approved scope. Ten implementation files match the immutable P12p source byte-for-byte and the four P12q-only files are absent.
+- Post-change audit: `60/60` offline gates pass: `58/58` scope, identity, symbol-removal, delimiter/preprocessor, shader-contract, kernel-inventory, serialized-field, and documentation checks plus safe-archive and byte-identical extraction/deletion reproduction.
+- Compiler availability: no local C# compiler or usable Unity-compatible HLSL compiler is available. Unity 6000.5 compilation and visual validation remain pending and authoritative.
+
+
+## RG-METRIC-P12s — Optional Presence-Amplitude Soft-Mask Reconstruction A/B
+
+### P12s authorization and reviewed evidence
+
+- The user approved testing the previously accepted soft-mask reconstruction family after P12q was deleted and P12r restored P12p.
+- The complete current P12r implementation, the sole shader caller, the original analytical Candidate evaluator, the exact P12p Presence-Amplitude Eligibility/application branches, the accepted Current soft-reconstruction branch, serialized authoring, Inspector production/debug UI, runtime material binding/property IDs, and all five canonical River Foam documents were reviewed before implementation.
+- `RiverWaterFoam.hlsl::RiverWaterFoamApplyChipAndStrands` already contains the accepted Current reconstruction: multiply `coherentSoftVisibility` by `(1 - productionChip)`, reharden the modified signal with `RiverWaterFoamHardenSoftVisibility`, reconstruct the hardened-mask ratio, then apply structural Strands. This is the historical behavior to reuse rather than reimplement from memory.
+- `RiverWaterFoam.hlsl::RiverWaterFoamResolveChipEligibility` already contains the accepted Current soft coordinate: `preChipSoftVisibility`, start `0.06`, `fwidth` normalization, and authored `Chip Edge Width`. The P12s experiment will reuse that coordinate family for Presence-Amplitude with an authored start value while replacing the Current branch's fractional support multiplier with binary exact rendered support.
+- `RiverWaterFoamEvaluateSelectionDiagnostics` currently binarizes Presence-Amplitude Candidate and Eligibility before exact final-mask deletion. P12s must retain that entire P12r route as value `0` while value `1` uses the unchanged continuous analytical Candidate field multiplied by the soft Eligibility band.
+- `SH_CleanStylizedRiver.shader` is the sole production consumer of `RiverWaterFoam.hlsl`. No ground, mass, vegetation, compute, scene, prefab, material, cache, layer, or tag path consumes the proposed controls.
+- The supplied workspace has no Git metadata. P12r is the immutable pre-edit baseline; the P12m archive is the historical source confirming the accepted Current reconstruction arithmetic.
+
+### P12s objective and acceptance criteria
+
+1. Preserve the original analytical Candidate evaluator byte-for-byte. Candidate identity, search bounds, lifecycle, movement, rotation, pulse, irregularity, shape change, readability LOD, and cadence must not change.
+2. Preserve `Exact Rendered Removal (Current)` as enum value `0`, serialized default, fallback, and behaviorally identical P12r route.
+3. Add `Soft-Mask Reconstruction (Experimental)` as a Presence-Amplitude-only application route. Current Presence Footprint remains on its existing accepted soft-reconstruction path regardless of this selector.
+4. Add one authored `Soft Edge Start` control with range `0–0.25` and default `0.06`, matching the accepted historical Current coordinate rather than introducing an unverified constant.
+5. For Presence-Amplitude Soft-Mask Reconstruction, define visible support as binary `preChipRenderedMask > 0`; low rendered amplitude must not reduce Eligibility authority.
+6. For Presence-Amplitude Soft-Mask Reconstruction, compute the continuous Edge band from `preChipSoftVisibility`, authored `Soft Edge Start`, `fwidth`, and existing `Chip Edge Width`; disable Interior Access exactly as in the retained Presence-Amplitude route.
+7. Production for the experimental route is continuous `originalCandidateField × softEdgeBand`. Application must reuse the accepted soft-mask reconstruction and structural-Strand order, not multiply or fade the already-final rendered mask directly.
+8. Debug views must expose the exact route-specific masks: original continuous Candidate and soft Eligibility/Production in the experiment; retained binary masks in Exact Rendered Removal; exact final mask in `Foam Chip And Strand Probe`.
+9. Add no texture, sampler, buffer, kernel, dispatch, render pass, draw call, loop, candidate search expansion, scene edit, prefab edit, material edit, cache change, layer, tag, component, or fixed-grid change.
+10. Unity acceptance requires warning-free import, unchanged Candidate behavior, direct A/B switching, a tunable coherent soft band, visible fringe/body response regenerated from the chipped soft signal, and no regression in the retained exact route or Current Presence Footprint.
+
+### P12s approved file scope
+
+Modify exactly:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+6. `Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+9. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs`
+10. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+11. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+12. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+Create: none. Delete: none. Move/rename: none. Metadata/companion changes: none.
+
+### P12s implementation sequence
+
+1. Record this plan before implementation.
+2. Add the serialized route enum and `Soft Edge Start`, exact clamping/public ownership, Inspector controls, material property IDs/binding, and disabled defaults.
+3. Extend the shared shader contract with the two scalar properties while preserving the sole caller and all unrelated argument order.
+4. Add the route-specific Presence-Amplitude soft Eligibility branch; preserve the P12r exact branch and Current branch.
+5. Add route-specific continuous selection and reuse the existing soft-mask reconstruction; preserve exact selected-pixel deletion for route `0` and the accepted Current arithmetic.
+6. Synchronize Inspector/debug wording and all five canonical documents.
+7. Audit exact scope; candidate-core identity; P12r exact-route identity; Current branch identity; shader property/binding/signature parity; enum/default/clamp consistency; delimiters/preprocessor; no resource/kernel/pass change; formula boundary cases; and byte-identical package reproduction.
+
+### P12s performance, risks, and current status
+
+- Runtime cost is fragment arithmetic only. The experiment adds two scalar uniforms and one uniform route branch. It reuses the existing Candidate loop, derivatives, hardening function, Strands, texture samples, render pass, and draw call.
+- Soft reconstruction performs the existing baseline/modified hardening and ratio arithmetic when a production Chip is present. This cost already exists in Current Presence Footprint; P12s permits the same arithmetic under Presence-Amplitude when selected.
+- Risk: the soft coordinate can still form an imperfect band because it is derivative-normalized. `Soft Edge Start` is exposed specifically for controlled Unity tuning rather than another hard-coded threshold patch.
+- Risk: binary exact rendered support combined with a low `Soft Edge Start` can grant authority to extremely faint positive fringe. This is intentional for the experiment and must be judged in the Candidate, Eligibility, Production, Probe, and Final views.
+- Authorization: approved.
+- Read-only review: complete.
+- Canonical plan: recorded before implementation.
+- Implementation: source-complete inside the approved twelve-file scope; no file or metadata was created, deleted, moved, or renamed.
+- Protected behavior: the complete analytical Candidate core, Current Eligibility/selection arithmetic, P12r exact Eligibility/removal arithmetic, and accepted soft-reconstruction arithmetic pass immutable-baseline identity checks.
+- Offline source/model audit: `93/93` scope, ownership, binding, shader-contract, route, protected-path, resource-count, delimiter/preprocessor, and mathematical boundedness gates pass.
+- Compiler availability: no local C# compiler is installed. The available Clang HLSL frontend cannot run because its required `hlsl.h` resource header is missing. Unity 6000.5 import remains authoritative and pending.
+- Packaging: the twelve-file changed-source archive extracts safely over the immutable P12r baseline and reproduces the complete final workspace byte-for-byte with zero mismatches; no deletion helper is required.
+- Unity visual A/B and measured GPU timing: pending.
+
+## RG-METRIC-P12t — Soft Reconstruction Baseline and Layer D/E Inspector Reconciliation
+
+### P12t authorization and reviewed evidence
+
+- The user accepted P12s as the production direction, explicitly requested Soft-Mask Reconstruction become the base, requested the rejected Exact Rendered Removal route be removed, and authorized a focused Layer D/Layer E Inspector cleanup.
+- The complete current P12s implementation and the twelve approved files were reviewed before editing. The supplied source contains no Git metadata; the immutable `p12s_audit` workspace is the pre-edit comparison authority.
+- `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl::RiverWaterFoamApplyChipAndStrands` contains two Presence-Amplitude routes: exact selected-pixel deletion for selector value `0`, and accepted soft-mask reconstruction for selector value `1`. The accepted reconstruction multiplies the coherent pre-hardened visibility by `(1 - productionChip)`, rehardenes it through `RiverWaterFoamHardenSoftVisibility`, reconstructs the hardened-mask ratio, and applies structural Strands afterward.
+- `RiverWaterFoamResolveChipEligibility` and `RiverWaterFoamEvaluateSelectionDiagnostics` contain route-specific Presence-Amplitude exact-removal and soft-reconstruction branches. The exact-removal-only branch, binary selection branch, route selector argument, and related debug wording are obsolete after the user's acceptance decision.
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs::DrawFoamLayerD` currently owns all Production Chipping controls even though the canonical architecture and fragment implementation place Chipping in render-only Layer E. `DrawFoamLayerE` currently contains visibility/composition and Strands only.
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs` categorizes Candidate, Eligibility, and Production as `Layer D — Chip Selection`; the actual shader path evaluates them in Layer E and mutates no Layer D texture or persistent state.
+- Layer D's `Visual Occupancy Build Time` and `Visual Occupancy Release Time` remain active compute inputs but affect diagnostic evaluated-shape products only; normal Final Foam samples committed Layer C directly. They must remain but be labelled diagnostic-only.
+- `Chip Interior Access` is forced to zero in Presence-Amplitude by `RiverWaterFoamEvaluateSelectionDiagnostics`; the Inspector currently exposes it unconditionally. `Soft Edge Start` only affects Presence-Amplitude and should be shown only in that footprint mode.
+- `SH_CleanStylizedRiver.shader` is the sole production consumer of `RiverWaterFoam.hlsl`; no ground, mass, vegetation, scene, prefab, material, cache, layer, tag, compute resource, or other subsystem consumes the route selector.
+
+### P12t objective and acceptance criteria
+
+1. Make Soft-Mask Reconstruction the sole Chipping application for Presence-Amplitude. Preserve its P12s arithmetic and processing order exactly.
+2. Delete `StylizedRiverFoamPresenceChipApplicationMode`, its serialized field/property, material property ID/binding/default, shader property/uniform, function arguments, route branches, and route-specific Inspector/debug wording.
+3. Delete the Exact Rendered Removal-only Presence-Amplitude Eligibility, binary Candidate/Eligibility selection, and direct final-mask deletion branches.
+4. Preserve the original analytical Candidate evaluator, candidate search, lifecycle, movement, rotation, pulse, irregularity, readability logic, and cadence byte-for-byte.
+5. Preserve Current Presence Footprint behavior and its historical soft reconstruction.
+6. Move the complete Production Chipping Inspector section from Layer D into Layer E without renaming serialized controls or changing defaults.
+7. Relabel Layer D as `Layer D — Evaluated Shape (Diagnostic Only)` and state explicitly that its temporal occupancy controls and previews do not affect normal Final Foam.
+8. Reclassify Candidate, Eligibility, Production, Probe, and Difference debug views under one Layer E Chipping/Rendering category. Add or remove no Debug View.
+9. Show `Presence-Amplitude Edge Start` only when Presence Footprint is Presence-Amplitude. Show `Chip Interior Access` only when Presence Footprint is Current.
+10. Preserve every other active Foam control and shader/runtime consumer. Add no resource, texture, sampler, buffer, kernel, dispatch, pass, draw call, loop, scene edit, prefab edit, material edit, cache change, layer, tag, component, or fixed-grid change.
+11. Unity acceptance requires warning-free import, unchanged accepted P12s visuals, no application selector, Chipping controls under Layer E, diagnostic-only Layer D wording, correct conditional controls, and unchanged Candidate diagnostics.
+
+### P12t approved file scope
+
+Modify exactly:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+6. `Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+9. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs`
+10. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+11. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+12. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+Create: none. Delete: none. Move/rename: none. Metadata, scene, prefab, material, cache, layer, and tag edits are prohibited.
+
+### P12t implementation sequence
+
+1. Record this plan before implementation.
+2. Remove the serialized application selector and its C#/material/shader binding contract.
+3. Collapse Presence-Amplitude Eligibility, selection, and application to the accepted P12s soft-reconstruction route while preserving Candidate and Current arithmetic.
+4. Move Production Chipping authoring into Layer E; relabel Layer D diagnostic-only and conditionally expose the two mode-specific controls.
+5. Reclassify existing Chipping debug views into Layer E and simplify descriptions to the sole production route.
+6. Synchronize the remaining four canonical documents, marking Exact Rendered Removal rejected/removed and P12s soft reconstruction promoted.
+7. Audit exact scope, removed-symbol absence, Candidate and Current byte identity, accepted soft-reconstruction identity, serialized/property/signature parity, Inspector ownership, conditional UI, debug inventory, resource/kernel/pass counts, delimiters/preprocessor, canonical consistency, and byte-identical package reproduction.
+
+### P12t performance and risks
+
+- Runtime cost decreases slightly: one scalar uniform, one uniform route branch, exact-removal-only derivative/selection arithmetic, and direct-deletion branch are removed. No resource or dispatch changes occur.
+- Inspector-only changes have no runtime cost.
+- Risk: P12s remains visually imperfect. P12t freezes and cleans that accepted result; it does not alter Soft Edge Start, Edge Width, Candidate geometry, or the derivative-normalized soft Eligibility formula.
+- Risk: removing the serialized selector changes the component's serialized field set. The field is removed without scene/prefab edits; Unity will ignore the obsolete serialized key on existing assets. No asset rewrite is required for this patch.
+- Authorization: approved.
+- Read-only review: complete.
+- Canonical plan: recorded before implementation.
+- Implementation: source-complete inside the approved twelve-file scope; no file or metadata was created, deleted, moved, or renamed.
+- Removed route: the application enum, serialized field/property, material property ID/binding/default, shader property/uniform, route arguments, exact-removal Eligibility, binary selection, and direct final-mask deletion branches are absent.
+- Preserved behavior: the original analytical Candidate evaluator, Current Presence Footprint selection, and accepted P12s soft reconstruction remain unchanged apart from deleted obsolete arguments/comments.
+- Inspector reconciliation: Production Chipping is under Layer E; Layer D is diagnostic-only; Presence-Amplitude Edge Start and Current-only Interior Access are conditionally displayed; existing Chipping diagnostics are grouped under Layer E.
+- Post-change audit: `64/64` offline scope, removed-symbol, protected-arithmetic, shader-arity, Inspector-contract, debug-inventory, resource-count, delimiter/preprocessor, and documentation gates pass.
+- Packaging: the twelve-file archive applies safely over the captured P12s baseline and reproduces the complete final workspace byte-for-byte with zero mismatches; ZIP path safety passes.
+- Unity compilation and visual validation: pending.
+
+## RG-METRIC-P12u — Unified Automatic Birth Reveal-Speed Contract
+
+### P12u authorization and reviewed evidence
+
+- **Authorization:** approved by the user after the complete Formation Speed audit across Shore Ribbon, Inward Wash, Object Contact Arc, Object Contact Semi-Arc, Object Contact Fleck, Free Water Lace Connector, Cross-Lace Connector, and Torn Fragment.
+- **Authoritative source:** reconstructed post-P12t workspace at `/mnt/data/work_p12u`; the supplied source contains no Git metadata, so pre-edit comparison uses the immutable `/mnt/data/baseline_p12t` copy and SHA-256 inventory.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::TryBeginAutomaticShoreSourceEvent` resolves `distance / speed` and clamps it to `AutomaticShoreSourceMinimumDuration..AutomaticShoreSourceMaximumDuration` (`0.85..14 s`).
+- `StylizedRiverFoamRuntime.BirthEvents.cs::TryBeginAutomaticObjectSourceEvent` resolves Build duration and clamps it to `AutomaticObjectSourceMinimumDuration..AutomaticObjectSourceMaximumDuration` (`0.35..4 s`). Arc/Semi-Arc Hold, Release, and Rest are separate authored phases and must remain unchanged.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::TryBeginAutomaticFreeWaterSourceEvent` clamps Lace to `0.75..5 s`, Cross-Lace to `0.55..3.5 s`, and compresses Torn Fragment timing with `0.35 + distance / speed * 0.35` before a `1.35 s` ceiling.
+- Shore, Object, and Free-Water creation paths apply an undocumented `0.05 m/s` effective-speed floor before duration resolution.
+- `CS_RiverFoam.compute::FoamEvaluateObjectContactFleckSource` completes Fleck reveal during `smoothstep(0.0, 0.18, progress)` rather than across the full event duration.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::TryBeginAutomaticObjectSourceEvent` samples Contact Fleck correlated dimensions only from the upper `78–100%` of their authored ranges. `TryBeginAutomaticFreeWaterSourceEvent` samples all Free-Water correlated dimensions only from the upper `72–100%` of their authored ranges.
+- `StylizedRiverFoamRuntime.Injection.cs::ResolveAutomaticSourceDepositionState` drives all nonpersistent automatic sources with normalized `elapsed / Duration`; the GPU does not independently preserve the requested metres-per-second rate.
+- `StylizedRiverFoamRuntime.State.cs::AutomaticFoamSourceEvent` and the existing 32-slot `automaticFoamSourceEvents` pool provide bounded runtime ownership. Longer honest events may increase pool occupancy and rejected starts; the system must report saturation instead of silently accelerating events.
+- `StylizedRiverEditor.Actions.cs` already provides one-button reports with adjacent clipboard actions. P12u will add one dedicated Play Mode reveal-speed report using the existing report state and disk-output contract.
+
+### P12u objective and acceptance criteria
+
+1. One shared timing resolver owns reveal timing for all eight automatic Layer C source recipes.
+2. Requested reveal speed equals base authored speed × per-pattern multiplier × deterministic jitter; no family-specific duration ceiling or compressed timing formula may change it.
+3. Resolved reveal duration equals `max(materialStepDuration, pathDistance / requestedSpeed)`. The material cadence is the only timing floor.
+4. Arc/Semi-Arc use the shared resolver for Build only. Hold, Release, and Rest remain byte-for-byte behaviorally unchanged.
+5. Contact Fleck reveal consumes normalized progress `0..1` instead of completing at `0.18`.
+6. Contact Fleck and all three Free-Water recipes sample their correlated authored Min/Max ranges over the complete deterministic `0..1` interval.
+7. Shore Ribbon, Inward Wash, Arc, Semi-Arc, Fleck, Lace, Cross-Lace, and Torn Fragment preserve their source geometry, dispatch bounds, deposition ownership, source amount, Remaining Life, breakup, and transport contracts except for the explicitly approved timing/range corrections.
+8. Serialized field names and values remain unchanged. Inspector labels change from Formation Speed to Reveal Speed for clarity only.
+9. One Play Mode report plus adjacent clipboard action prints, for every recipe, the latest observed path distance, requested speed, raw duration, resolved duration, actual speed, cadence-limited state, active count, pool occupancy, and rejected starts. Unobserved recipes must be identified explicitly rather than fabricated.
+10. No new texture, buffer, kernel, dispatch, render pass, shader-rendering path, or persistent GPU resource.
+
+### P12u approved file scope
+
+**Modify:**
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+- `Assets/Docs/River_Foam_Stage6_Architecture.md`
+- `Assets/Docs/River_Rendering_Roadmap.md`
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+
+**Create:**
+
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs.meta`
+
+**Delete / move / rename:** none.
+
+### P12u implementation sequence
+
+1. Add a shared resolved-timing value and resolver in `StylizedRiverFoamRuntime.BirthEvents.cs`.
+2. Replace Shore, Object, and Free-Water family-specific duration formulas with that resolver; remove obsolete automatic duration-limit constants.
+3. Record generic reveal timing on every automatic event and retain one latest timing sample per source type for the report.
+4. Change Fleck and Free-Water correlated sampling to the full `Hash01` range.
+5. Change Contact Fleck GPU reveal from the `0..0.18` window to full normalized progress.
+6. Rename Inspector labels/tooltips only; serialized names remain unchanged.
+7. Add the one-button Play Mode reveal-speed report and adjacent clipboard action.
+8. Synchronize all five canonical documents, then run scope, syntax, contract, model, protected-behavior, and package-reproduction checks.
+
+### P12u invariants and non-goals
+
+- Do not tune Coverage, Activity, pattern weights, source dimensions, Presence, Remaining Life, breakup, Hold, Release, Rest, downstream transport, or Layer D/E rendering.
+- Do not change the eight automatic source shapes or their dispatch/raster coordinate formulas.
+- Do not modify manual/progressive birth duration contracts.
+- Do not add a new source pool, resize the 32-slot automatic pool, or hide saturation.
+- Do not change scene or prefab serialized values.
+
+### P12u performance and risks
+
+- CPU timing resolution remains one small calculation when an event starts. Report telemetry adds a fixed nine-entry CPU array and no per-frame allocations.
+- GPU work per active event is unchanged. Honest slow reveals can keep more events active simultaneously, increasing existing source raster dispatches up to the unchanged 32-event bound.
+- Risk: high Activity plus very slow Reveal Speed can saturate the pool and reject starts. The report must expose pool occupancy and rejected starts; P12u must not silently accelerate events to avoid saturation.
+- Risk: restoring the complete Fleck/Free-Water Min/Max range changes the deterministic size distribution by design. Serialized Min/Max values remain unchanged.
+- **Status:** source implementation complete; Unity validation pending.
+
+### P12u post-implementation reconciliation
+
+- **Actually modified:** the thirteen declared existing files.
+- **Actually created:** `StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs` and its `.meta`.
+- **Actually deleted / moved / renamed:** none.
+- **Scope discrepancy:** none.
+- The shared resolver is the only automatic-source duration authority. Shore, Object, and Free-Water family ceilings/compression and the `0.05 m/s` event-start floors are absent.
+- Arc/Semi-Arc Hold, Release, and Rest arithmetic is unchanged; the resolver controls Build only.
+- Contact Fleck reveal now spans normalized progress `0..1`. Contact Fleck and all Free-Water correlated Min/Max sampling use the complete deterministic `Hash01` range.
+- The Play Mode report covers all eight source types, active counts, current pool occupancy, last-update rejected starts, and latest requested/raw/resolved/actual timing; an adjacent Inspector action copies the report.
+- Static/model audit: exact scope, C#/HLSL delimiter and preprocessor balance, resolver ownership, obsolete-formula absence, call arity, full-range endpoint reachability, one-million-case timing model, serialized-field preservation, kernel/resource-count preservation, protected `Injection.cs` ownership, and package-reproduction gates pass.
+- Unity 6000.5 compilation, live report output, visual formation-speed comparison, and pool-saturation observation remain pending.

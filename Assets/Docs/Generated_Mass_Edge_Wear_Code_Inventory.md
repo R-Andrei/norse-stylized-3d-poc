@@ -15,7 +15,7 @@ Docs/Generated_Mass_Feature_Implementation_Checklist.md
 - `EW-B4.2R13A.9a` remains the exact uniform basic-bevel/recovery fallback when Macro Variation Coverage or Strength is zero.
 - Ordinary production remains `EdgeWearEvaluationMode.None`; the accepted bevel remains explicit editor preview/audit geometry with `geometryCommit=disabled`.
 - `edgeWearMacroVariationCoverage` owns deterministic participation and the migration-stable `edgeWearMacroVariation` field owns normalized control Strength. The resolver maps control `0..1` to effective amplitude `0..0.55`, then applies a `15°..90°` smooth dihedral permission ending at `0.35`.
-- Universal geometric within-edge profiling and EW-S1 object-space normal/material breakup are removed. Width remains constant along each edge. The uniform UV2.z visual response remains. `EW-C1A-RO2` is complete and approves pre-bevel corner removal. `EW-C1A.1 — Pre-bevel corner-cut transaction and provenance proof` is implemented as an explicit diagnostic-only evaluation mode; geometry commit and visual corner damage remain inactive until C1A.2.
+- Universal geometric within-edge profiling and EW-S1 object-space normal/material breakup are removed. Width remains constant along each edge. The uniform UV2.z visual response remains. `EW-C1A.1` proves the transaction. EW-C1A.1a.8 is accepted and frozen. `EW-C1A.2` now commits the certified damaged faces only in an explicit editor preview, requires every dedicated cap-ring bevel, proves unrelated bevel retention, and leaves production geometry unchanged.
 
 ## Dependency boundary
 
@@ -2010,13 +2010,37 @@ Modify only:
 - `MassGenerator.EdgeWear.Diagnostics.Logging.cs::BuildCornerDamageTransactionAuditReport`;
 - `GeneratedMassEditor::RunCornerDamageTransactionAudit`, report file `Library/GeneratedMassCornerDamageTransactionAudit.txt`, clipboard copy, and reveal controls.
 
-### EW-C1A.2 expected additional owners
+### EW-C1A.2 actual code ownership
 
-- `MassSurfaceFeatureGenerator.cs` transports approved corner authoring values.
-- `GeneratedMass.cs` owns serialized controls, recipe/default comparison, preview state, and rebuild invalidation.
-- `MassGenerator.EdgeWear.BoundedSingleEdge.cs` owns cap authored normal/surface-group triangulation and cap-ring one-surface render certification.
+- `MassGenerator.cs`
+  - exposes editor-only `GenerateCornerDamagePreview` and `CornerDamagePreviewStatus`;
+  - runs one frozen unified baseline plus one scoped corner generation;
+  - uses a `[ThreadStatic]` request depth restored in `finally`, without adding a new production evaluation mode.
+- `MassGenerator.EdgeWear.Types.cs`
+  - retains certified damaged faces, cap, depth, stable output-edge identities, cap-ring keys/identities, and affected parent IDs;
+  - adds `EdgeWearCandidateClass.CornerDamageCapRing`, mandatory lifecycle/candidate state, and preview construction evidence.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+  - commits the exact successful trial result instead of discarding its prepared faces;
+  - rejects generated/original identity collisions;
+  - resolves the bounded cap-ring width;
+  - resolves candidate identity from the committed damaged-edge map;
+  - bypasses Macro and artistic filtering only for mandatory cap-ring candidates.
+- `MassGenerator.EdgeWear.Orchestration.cs`
+  - substitutes committed damaged faces after normalization only during the scoped corner request;
+  - orders mandatory ring candidates before ordinary artistic candidates;
+  - selects all mandatory candidates plus ordinary coverage;
+  - captures complete failure evidence and never displays a partial ring.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+  - compares frozen baseline and corner results by stable identity;
+  - requires one cap, complete mandatory candidate/selection/build counts, zero unrelated collateral loss, and a certified unified shell;
+  - produces the complete EW-C1A.2 report.
+- `GeneratedMass.cs`
+  - owns nonserialized mutually exclusive corner-preview state, stale invalidation, production fallback, mesh naming, and report/status exposure.
+- `GeneratedMassEditor.cs`
+  - exposes `Rebuild EW-C1A.2 Corner-Chip Preview`;
+  - writes `Library/GeneratedMassCornerDamagePreview.txt`, copies it automatically, and provides Copy/Reveal controls.
 
-Exact control defaults are not approved by the audit. They must be recorded in the C1A.2 plan and approved before those files are edited.
+No serialized authoring control is added. Controls remain C1A.3 after visual acceptance.
 
 ### Reviewed but unchanged owners
 
@@ -2052,25 +2076,154 @@ Reviewed unchanged consumers:
 - `MassGenerator.EdgeWear.BoundedAllEdges.cs` already routes through the shared triangulator and receives the mandatory result without modification.
 - `GeneratedMassEditor.cs` requires no change; the existing one-click suite and clipboard workflow expose the new telemetry.
 
-### EW-C1A.1a.2 / EW-C1A.1a.3 code ownership
+### EW-C1A.1a.4 code ownership
 
 Modified code owners:
 
-- `MassGenerator.EdgeWear.Types.cs::PolygonSurfaceTriangulationMode`
-  - names `BoundaryFan` and `ProjectedCentreFan` without adding serialized or runtime state.
+- `MassGenerator.EdgeWear.Types.cs`
+  - replaces `ProjectedCentreFan` with non-serialized `GeneralTriangulation`;
+  - adds deterministic triangle-index, candidate, interval-state, direct-fan audit, and general-solver audit records.
 - `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryTriangulateBoundedOneSurfaceFace`
-  - preserves direct boundary triangulation as the first choice;
-  - uses `TryResolveProjectedOneSurfaceCentre` and `IsProjectedOneSurfaceCentreFanStable` for every polygon class when direct triangulation cannot certify;
-  - uses `TryResolveOneSurfaceTriangle` and `TryEmitOneSurfaceTriangle` so both modes share the same area, winding, authored-normal, and authored-group contract;
-  - preserves bevel ownership during fallback emission and accumulates one complete-shell internal fan vertex plus one bevel-region internal fan vertex for each fallback bevel face;
-  - certifies both internal-fan counts as bounded by their corresponding face counts.
-- `MassGenerator.EdgeWear.Diagnostics.Logging.cs::FormatPolygonSurfaceAudit` and `FormatBevelRegionTriangulationModeCounts`
-  - derive complete-shell and bevel-region `centreFanFallbackFaces` from propagated internal fan counts and `boundaryFanFaces` from total face counts without expanding `PlaneCutBevelAuditResult`.
-- `GeneratedMassEditor.cs::AppendMacroProbeEvidence`
-  - prints pass/failure records for strength-zero, coverage-zero, current, and maximum Macro probes.
+  - preserves direct boundary-fan selection as the first path;
+  - calls `TryResolveGeneralOneSurfaceTriangulation` only when no direct anchor certifies;
+  - emits both modes through `TryEmitOneSurfaceTriangle`, preserving one authored normal, one stable surface group, feature identity, and feature strength per polygon;
+  - requires exactly `n - 2` triangles and literal zero complete-shell/bevel-region internal fan vertices.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryResolveGeneralOneSurfaceTriangulation`
+  - reuses `TryProjectChamferPatchLoop`, `ChamferPatchPolygonSelfIntersects`, `ChamferPatchDiagonalIntersectsRemainingBoundary`, and the tolerance-aware `IsBoundedPointInsideOrOnPolygon` retained-loop containment owner;
+  - precomputes only the `O(n^2)` projected diagonal-validity table and evaluates each reachable triangle candidate inside the interval loop;
+  - evaluates every interval split with `O(n^3)` dynamic programming and `O(n^2)` state;
+  - ranks complete solutions by minimum area, minimum normal agreement, then split index;
+  - reconstructs a deterministic `n - 2` indexed triangle list without synthetic vertices.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryFindStableOneSurfaceFanAnchor`
+  - preserves successful direct-anchor ranking;
+  - now returns exact tested-anchor, best partial, rejecting triangle, and rejection-class evidence.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::EvaluateOneSurfaceTriangleCandidate`
+  - centralizes finite, area, winding-compatible, and normalized render-normal agreement `>= 0.5` certification for direct, general, and final emission paths.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::FormatOneSurfaceTriangulationFailureEvidence`
+  - writes face/provenance, boundary count, authored normal, residual, area threshold, direct-fan evidence, solver states, rejection counters, completion status, and triangle-index evidence into the already propagated failure reason.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs::FormatOneSurfaceTriangulationPolicy`
+  - removes false direct/centre-fallback counts that could not represent the complete solver under the approved no-`PlaneCutKernel` scope;
+  - reports `direct-preferred/general-complete`, exact triangle/authored-channel counts, and literal internal-fan counters.
+
+Superseded active owners:
+
+- `PolygonSurfaceTriangulationMode.ProjectedCentreFan`;
+- `TryResolveProjectedOneSurfaceCentre`;
+- `IsProjectedOneSurfaceCentreFanStable`;
+- derived `boundaryFanFaces` / `centreFanFallbackFaces` telemetry.
 
 Reviewed unchanged owners:
 
-- `MassGenerator.EdgeWear.PlaneCutKernel.cs` continues propagating the existing polygon-surface counters and requires `PolygonSurfaceRenderValid == 1`.
-- `MassGenerator.MeshOutput.cs::ValidateGeneratedMassMeshData` retains the `0.5` render-normal agreement guard.
-- `MassGenerator.Types.cs::TriangleSoup`, shaders, materials, serialized controls, corner transaction geometry, topology/recovery solvers, and `EdgeWearEvaluationMode.None` remain unchanged.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs` continues propagating existing polygon-surface counts and failure reasons and requires `PolygonSurfaceRenderValid == 1`.
+- `MassGenerator.EdgeWear.BoundedAllEdges.cs` continues routing final shell triangulation through `TryTriangulateBoundedPreviewFaces`.
+- `MassGenerator.EdgeWear.PatchConstruction.cs`, `MassGenerator.EdgeWear.ContainedOwnership.cs`, and `MassGenerator.EdgeWear.SliverAndTriangulation.cs` retain their existing projection and geometric predicates.
+- `MassGenerator.MeshOutput.cs::ValidateGeneratedMassMeshData` retains the final `0.5` render-normal agreement guard.
+- `MassGenerator.Types.cs::TriangleSoup`, `GeneratedMassEditor.cs`, shaders, materials, serialized controls, corner transaction geometry, topology/recovery solvers, and `EdgeWearEvaluationMode.None` remain unchanged.
+
+
+### EW-C1A.1a.5 code ownership
+
+Modified code owners:
+
+- `MassGenerator.EdgeWear.Types.cs`
+  - adds `PolygonSurfaceTriangulationMode.CollinearReinsertion`;
+  - adds `OneSurfaceBoundaryRemoval`, `OneSurfaceCollinearCandidateAudit`, and `OneSurfaceCollinearReinsertionAudit` for deterministic original-index ownership and exact evidence.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryTriangulateBoundedOneSurfaceFace`
+  - preserves complete-loop direct fan and complete-loop DP as the first two paths;
+  - calls `TryResolveToleranceCollinearOneSurfaceTriangulation` only after both fail with normal-agreement evidence;
+  - emits the resulting original-index `n - 2` triangles through the unchanged `TryEmitOneSurfaceTriangle` path.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryResolveToleranceCollinearOneSurfaceTriangulation`
+  - projects the complete retained boundary without changing `PolygonFace`;
+  - deterministically removes one eligible tolerance-collinear original index at a time from a working loop;
+  - tries direct and general solutions on the simplified loop;
+  - reinserts removals in reverse through unique parent-boundary-edge subdivision;
+  - certifies all original boundary segments and final triangles.
+- `EvaluateOneSurfaceCollinearCandidate`, `ResolveOneSurfaceWorkingBoundarySolutions`, `TryReinsertOneSurfaceBoundaryVertices`, and `TryCertifyOneSurfaceIndexedTriangulation`
+  - own local eligibility, simplified-solution mapping, reverse reinsertion, and final original-boundary certification.
+- `FormatOneSurfaceTriangulationFailureEvidence`
+  - extends the already propagated blocker with boundary positions/projections/residuals, unstable candidate evidence, simplification state, and reinsertion evidence.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs::FormatOneSurfaceTriangulationPolicy`
+  - reports `direct-preferred/general-complete/collinear-reinsert` without adding unpropagated mode counters.
+
+Reviewed unchanged owners:
+
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs` and `MassGenerator.EdgeWear.BoundedAllEdges.cs` continue using the shared complete-shell triangulator and existing failure propagation.
+- `MassGenerator.Types.cs::TriangleSoup` continues carrying authored normals/groups.
+- `MassGenerator.MeshOutput.cs::BuildMeshData` and `ValidateGeneratedMassMeshData` retain winding correction and the final `0.5` render-normal agreement guard.
+- bevel construction, Macro width, candidate selection, topology/recovery, shaders, materials, serialized controls, corner transaction geometry, and `EdgeWearEvaluationMode.None` remain unchanged.
+
+
+### EW-C1A.1a.6 code ownership
+
+Modified code owner:
+
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::EvaluateOneSurfaceTriangleCandidate`
+  - normalizes geometric and authored normals through existing `TryNormalizeMassVector` before computing absolute agreement;
+  - maps robust-normalization failure to existing `OneSurfaceTriangleCandidateFailure.NonFinite`;
+  - preserves finite-cross, minimum-area, `OneSurfaceMinimumRenderNormalDot`, deviation, and result-field ownership.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryResolveOneSurfaceTriangle`
+  - preserves candidate certification and winding correction;
+  - resolves the final oriented geometric normal through existing `TryNormalizeMassVector` instead of Unity `Vector3.normalized`.
+
+Reviewed unchanged owners:
+
+- `MassGenerator.Types.cs::TryNormalizeMassVector` remains the shared finite mathematically non-zero, double-precision normalization contract.
+- `MassGenerator.MeshOutput.cs::BuildMeshData` and `ValidateGeneratedMassMeshData` retain robust authored/geometric normalization, winding correction, and the final `0.5` render-normal agreement guard.
+- EW-C1A.1a.5 direct fan, interval DP, tolerance-collinear simplification/reinsertion, diagnostics, types, callers, source topology, bevel construction, Macro width, recovery, shaders/materials, serialized controls, and `EdgeWearEvaluationMode.None` remain unchanged.
+
+### EW-C1A.1a.7 code ownership
+
+Modified code owner:
+
+- `MassGenerator.MeshOutput.cs::ResolveTransformedAuthoredSurfaceNormals`
+  - runs after all `TriangleSoup.Positions` transforms and before `MeshData` emission;
+  - groups only triangles that already carry an authored surface-group ID;
+  - requires each grouped triangle to carry a valid authored source normal and finite final geometric cross;
+  - orients raw final crosses toward the stored source normal, accumulates them area-weighted in double precision, and explicitly normalizes one final normal per group.
+- `MassGenerator.MeshOutput.cs::BuildMeshData`
+  - consumes the rebuilt final-space group normal for grouped one-surface triangles;
+  - resolves triangle winding against that rebuilt normal;
+  - preserves surface-group material hashing, feature identity/strength, positions, UVs, colours, UV2, and index emission.
+- `MassGenerator.MeshOutput.cs::ValidateTransformedAuthoredSurfaceTriangle`
+  - certifies every grouped triangle against its rebuilt group normal at the existing `0.5` threshold before vertex emission;
+  - emits exact group, triangle, original/rebuilt/geometric normal, agreement, and transformed-position evidence on failure.
+
+Reviewed unchanged owners:
+
+- `MassGenerator.cs::GenerateInternal`, `ApplyDimensions`, and `ApplyMassPlacementFrame` retain all existing final-position transforms and still call `BuildMeshData` only after those transforms.
+- `MassGenerator.Types.cs::TriangleSoup` retains the construction-space authored normal and stable surface-group channels; no channel or producer contract changes.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs` retains EW-C1A.1a.6 direct fan, complete DP, tolerance-collinear reinsertion, explicit normalization, and one-polygon group ownership.
+- `MassGenerator.MeshOutput.cs::ValidateGeneratedMassMeshData` remains byte-for-byte unchanged and retains the final complete-mesh `0.5` guard.
+- `MeshData.cs` and `MeshBuilder.cs` retain normal-channel storage, direct normal assignment, tangent recalculation, and bounds ownership.
+- Macro width, candidate selection, topology/recovery, corner transaction geometry, shaders/materials, serialized controls, scenes/prefabs/assets, and `EdgeWearEvaluationMode.None` remain unchanged.
+
+EW-C1A.1a.7 is the final render-infrastructure repair. After the full Unity gate passes, the active code path returns to EW-C1A.2 visible corner damage and cap-ring chip integration. Artistic normal response remains owned by later EW-N1.
+
+### EW-C1A.1a.8 code ownership
+
+Modified code owner:
+
+- `MassGenerator.MeshOutput.cs::ResolveTransformedAuthoredSurfaceNormals`
+  - retains final transformed-position grouping and authored-hemisphere orientation from EW-C1A.1a.7;
+  - stores each grouped triangle index, explicitly normalized final geometric normal, and raw-cross area weight;
+  - resolves one final shared group normal through deterministic threshold-complete maximin candidate enumeration instead of accepting only the area-weighted sum.
+- `TryResolveBestAuthoredSurfaceNormalCandidate`
+  - evaluates the area-weighted baseline, each triangle normal, every finite pair bisector, and both finite equal-angle centres for every triple;
+  - is complete for determining whether any candidate can satisfy `minimumDot >= 0.5`.
+- `TryEvaluateAuthoredSurfaceNormalCandidate` and `IsBetterAuthoredSurfaceNormalCandidate`
+  - compute exact minimum dot, area-weighted average dot, and worst triangle;
+  - rank by exact minimum, exact average, lexicographic defining triangle indices, and stable candidate kind;
+  - use the fixed epsilon only for worst-triangle evidence ties and never to override a higher primary score.
+- `CreateAuthoredSurfaceNormalInfeasibility`
+  - reports encoded/decoded surface-group provenance, triangle count, original authored normal, area-weighted baseline, best enumerated feasibility candidate, and every grouped triangle normal/area weight;
+  - proves threshold infeasibility without claiming an exact unconstrained below-threshold maximin centre.
+
+Reviewed unchanged owners:
+
+- `MassGenerator.MeshOutput.cs::BuildMeshData`, `ValidateTransformedAuthoredSurfaceTriangle`, and `ValidateGeneratedMassMeshData` retain grouped winding, pre-emission certification, and the final complete-mesh `0.5` guard.
+- `MassGenerator.cs::GenerateInternal`, `ApplyDimensions`, and `ApplyMassPlacementFrame` retain all final-position transforms.
+- `MassGenerator.Types.cs::TriangleSoup` and `TryNormalizeMassVector` retain authored group/normal storage and explicit normalization.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs` retains surface-group encoding, direct fan, complete DP, tolerance-collinear reinsertion, exact `n - 2` output, and all topology/recovery ownership.
+- positions, indices, features, material hashes, UV/colour/UV2/tangent channels, shaders/materials, serialized controls, editor suite logic, and `EdgeWearEvaluationMode.None` remain unchanged.
+
+The resolver is dirty-time-only `O(m^4)` per group with `O(m)` temporary group evidence. Full Unity acceptance freezes EW-C1A.1a and returns immediately to EW-C1A.2 visible corner damage and cap-ring chip integration.

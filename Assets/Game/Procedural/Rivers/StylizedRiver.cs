@@ -114,6 +114,7 @@ namespace ProgrammaticStylized3D.Rivers
         PresenceAmplitude = 1
     }
 
+
     public enum StylizedRiverFoamTransportScheme
     {
         [InspectorName("Donor Cell (Current)")]
@@ -412,6 +413,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MaximumFoamChipMaximumViewScale = 2.5f;
         private const float DefaultFoamChipMaximumViewScale = 1.75f;
         private const float DefaultFoamChipEdgeWidthPixels = 4f;
+        private const float MinimumFoamChipSoftEdgeStart = 0f;
+        private const float MaximumFoamChipSoftEdgeStart = 0.25f;
+        private const float DefaultFoamChipSoftEdgeStart = 0.06f;
         private const float DefaultFoamChipInteriorAccess = 0f;
         private const float MinimumFoamChipFieldSpeed = 0f;
         private const float MaximumFoamChipFieldSpeed = 12f;
@@ -1060,7 +1064,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreFoamPatchSize = 0.35f;
 
-        [Tooltip("How fast automatic shore foam forms along its source path, in metres per second. This is independent of spawn frequency and can be manually aligned with the visible river flow.")]
+        [Tooltip("Base reveal speed in metres per second for automatic Shore Foam source paths. This controls one event's progressive source-head advance and is independent of Activity and later Foam transport.")]
         [Range(
             MinimumShoreFoamFormationSpeedMetresPerSecond,
             MaximumShoreFoamFormationSpeedMetresPerSecond)]
@@ -1080,7 +1084,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashPatternWeight = 0.12f;
 
-        [Tooltip("Per-pattern multiplier for how fast Shore Ribbon sources reveal along their path. One uses the global Formation Speed.")]
+        [Tooltip("Reveal Speed multiplier for Shore Ribbon events. One uses the Shore Foam Base Reveal Speed.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamShoreRibbonFormationSpeedMultiplier = 1.00f;
 
@@ -1128,7 +1132,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonBreakupStrengthMax = 0.38f;
 
-        [Tooltip("Per-pattern multiplier for how fast Inward Wash sources reveal along their path. One uses the global Formation Speed.")]
+        [Tooltip("Reveal Speed multiplier for Inward Wash events. One uses the Shore Foam Base Reveal Speed.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamInwardWashFormationSpeedMultiplier = 1.00f;
 
@@ -1204,7 +1208,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectFoamActivity = 0.35f;
 
-        [Tooltip("Base source reveal speed in metres per second for Object Foam. Per-pattern Formation Speed multipliers can make individual object patterns reveal faster or slower.")]
+        [Tooltip("Base reveal speed in metres per second for Object Foam. Arc/Semi-Arc use it for Build only; Flecks use it across their complete reveal. Per-pattern Reveal Speed multipliers remain available.")]
         [Range(
             MinimumShoreFoamFormationSpeedMetresPerSecond,
             MaximumShoreFoamFormationSpeedMetresPerSecond)]
@@ -1252,7 +1256,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckPatternWeight = 0.20f;
 
-        [Tooltip("Per-pattern multiplier for how fast Object Contact Arc sources build across the upstream contact bridge and two straight downstream wake arms.")]
+        [Tooltip("Reveal Speed multiplier for Object Contact Arc Build across the upstream contact bridge and two straight downstream wake arms.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactArcFormationSpeedMultiplier = 1.00f;
 
@@ -1326,7 +1330,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcBreakupStrengthMax = 0.28f;
 
-        [Tooltip("Per-pattern multiplier for how fast Object Contact Semi-Arc sources build from the arm-free face shoulder, across the upstream connector, and along the single selected-side downstream wake arm.")]
+        [Tooltip("Reveal Speed multiplier for Object Contact Semi-Arc Build from the arm-free face shoulder, across the upstream connector, and along the single selected-side downstream wake arm.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactSemiArcFormationSpeedMultiplier = 1.00f;
 
@@ -1410,7 +1414,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcLopsidednessMax = 1.00f;
 
-        [Tooltip("Per-pattern multiplier for how fast Object Contact Fleck sources reveal along their path.")]
+        [Tooltip("Reveal Speed multiplier for Object Contact Fleck reveal.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactFleckFormationSpeedMultiplier = 1.00f;
 
@@ -1473,7 +1477,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFoamActivity = 0.25f;
 
-        [Tooltip("Base source reveal speed in metres per second for Free Water Foam. Per-pattern Formation Speed multipliers can make individual open-water patterns reveal faster or slower.")]
+        [Tooltip("Base reveal speed in metres per second for Free Water Foam. Per-pattern Reveal Speed multipliers control Lace, Cross-Lace, and Torn Fragment source progression.")]
         [Range(
             MinimumShoreFoamFormationSpeedMetresPerSecond,
             MaximumShoreFoamFormationSpeedMetresPerSecond)]
@@ -1497,7 +1501,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterTornFragmentPatternWeight = 0.25f;
 
-        [Tooltip("Per-pattern multiplier for how fast Free Water Lace Connector sources reveal along their curving stroke.")]
+        [Tooltip("Reveal Speed multiplier for Free Water Lace Connector source-head progression.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamFreeWaterLaceFormationSpeedMultiplier = 1.00f;
 
@@ -1549,7 +1553,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceCurvatureMax = 1.00f;
 
-        [Tooltip("Per-pattern multiplier for how fast Free Water Cross-Lace Connector sources reveal across the river.")]
+        [Tooltip("Reveal Speed multiplier for Free Water Cross-Lace Connector source-head progression.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamFreeWaterCrossLaceFormationSpeedMultiplier = 1.00f;
 
@@ -1593,7 +1597,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterCrossLaceBreakupStrengthMax = 0.55f;
 
-        [Tooltip("Per-pattern multiplier for how fast Free Water Torn Fragment sources reveal across their local patch.")]
+        [Tooltip("Reveal Speed multiplier for the complete Free Water Torn Fragment local sweep.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamFreeWaterFragmentFormationSpeedMultiplier = 1.00f;
 
@@ -1819,10 +1823,18 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamChipMaximumViewScale =
             DefaultFoamChipMaximumViewScale;
 
+
         [Tooltip("Approximate inward width, in rendered pixels, of the canonical pre-Chip Foam edge territory. Zero disables edge permission exactly. The Inspector slider covers 0–256 px, while direct numeric entry accepts any non-negative value for deliberately extreme tests. This is a derivative-normalized local screen-space estimate, not a global geometric distance field.")]
         [Min(0f)]
         [SerializeField] private float foamChipEdgeWidthPixels =
             DefaultFoamChipEdgeWidthPixels;
+
+        [Tooltip("Soft-visibility value treated as the exterior start of the Presence-Amplitude Eligibility coordinate. The default 0.06 matches the accepted historical Current route. Higher values move the detected band inward; lower values include fainter fringe. This control affects Presence-Amplitude only.")]
+        [Range(
+            MinimumFoamChipSoftEdgeStart,
+            MaximumFoamChipSoftEdgeStart)]
+        [SerializeField] private float foamChipSoftEdgeStart =
+            DefaultFoamChipSoftEdgeStart;
 
         [Tooltip("Fraction of activated analytical candidate cells granted permission in the established visible body complementary to Chip Edge Width. Zero keeps every candidate edge-only; one grants every activated candidate full visible-body access. Admission is deterministic per candidate, so connected Chip contours remain intact.")]
         [Range(0f, 1f)]
@@ -3073,6 +3085,11 @@ namespace ProgrammaticStylized3D.Rivers
                 MaximumFoamChipMaximumViewScale);
         public float FoamChipEdgeWidthPixels =>
             Mathf.Max(0f, foamChipEdgeWidthPixels);
+        public float FoamChipSoftEdgeStart =>
+            Mathf.Clamp(
+                foamChipSoftEdgeStart,
+                MinimumFoamChipSoftEdgeStart,
+                MaximumFoamChipSoftEdgeStart);
         public float FoamChipInteriorAccess =>
             Mathf.Clamp01(foamChipInteriorAccess);
         public float FoamChipFieldSpeed =>
@@ -5519,6 +5536,10 @@ namespace ProgrammaticStylized3D.Rivers
             foamChipEdgeWidthPixels = Mathf.Max(
                 0f,
                 foamChipEdgeWidthPixels);
+            foamChipSoftEdgeStart = Mathf.Clamp(
+                foamChipSoftEdgeStart,
+                MinimumFoamChipSoftEdgeStart,
+                MaximumFoamChipSoftEdgeStart);
             foamChipInteriorAccess = Mathf.Clamp01(
                 foamChipInteriorAccess);
             foamChipFieldSpeed = Mathf.Clamp(

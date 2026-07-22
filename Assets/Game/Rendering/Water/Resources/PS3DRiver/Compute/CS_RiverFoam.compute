@@ -2071,7 +2071,7 @@ float FoamEvaluateObjectContactFleckSource(
         width + feather,
         distanceToFleck);
     float progress = saturate(sourceEvent.header.z);
-    float revealMask = smoothstep(0.0, 0.18, progress);
+    float revealMask = smoothstep(0.0, 1.0, progress);
     float coarseAlongGate = 1.0 - smoothstep(
         alongHalf + contactOffset + totalLength,
         alongHalf + contactOffset + totalLength + feather * 2.0,

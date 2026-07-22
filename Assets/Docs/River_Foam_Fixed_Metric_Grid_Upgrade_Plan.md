@@ -4691,3 +4691,91 @@ P12p removes the P12o `ARGBFloat` descriptor allocation, low-frequency compute d
 
 Offline scope, reference, syntax, formula, protected-path, and package checks are required before delivery. Unity 6000.5 import, shader compilation, visual fringe removal, and GPU timing remain authoritative and pending.
 
+## P12r implementation record — restore P12p rendered-edge Eligibility
+
+**Outcome:** P12q is removed completely and the implementation is restored to the immutable P12p source.
+
+**Modified existing files:** five canonical documents plus `StylizedRiver.cs`, `StylizedRiverEditor.Foam.cs`, `StylizedRiverEditor.DebugViews.cs`, `StylizedRiverFoamRuntime.Binding.cs`, `StylizedRiverFoamRuntime.Lifecycle.cs`, `StylizedRiverFoamRuntime.PublicSurface.cs`, `StylizedRiverFoamRuntime.Resources.cs`, `CS_RiverFoam.compute`, `RiverWaterFoam.hlsl`, and `SH_CleanStylizedRiver.shader`.
+
+**Deleted files:** `StylizedRiverFoamRuntime.ChipTopology.cs`, its `.meta`, `CS_RiverFoam.ChipTopology.hlsl`, and its `.meta`.
+
+**Restored behavior:** one original full-rate analytical Candidate Field; one per-fragment P12p rendered Eligibility band; exact `Candidate × Eligibility` Production; exact selected-pixel removal from `preChipRenderedMask`.
+
+**Removed behavior:** all binary-topology allocation, update, erosion, texture binding, sampling, controls, defaults, memory accounting, and fallback logic.
+
+**Validation status:** `58/58` offline exact-scope, P12p identity, deleted-file, topology-symbol removal, delimiter/preprocessor, shader-contract, and documentation gates pass. Unity 6000.5 compilation and visual acceptance remain authoritative and pending.
+
+
+
+## RG-METRIC-P12s implementation record — optional Presence-Amplitude soft-mask reconstruction A/B
+
+**Outcome:** source implemented; Unity compilation and visual acceptance pending.
+
+P12s retains P12r as the default and adds one experimental render-only route:
+
+```text
+Presence-Amplitude Chip Application
+0 = Exact Rendered Removal (Current)
+1 = Soft-Mask Reconstruction (Experimental)
+```
+
+The original analytical Candidate evaluator is unchanged. The experimental Eligibility contract is:
+
+```text
+supportGate = preChipRenderedMask > 0 ? 1 : 0
+softCoordinate = saturate(preChipSoftVisibility)
+softDepthPixels = max(0, softCoordinate - SoftEdgeStart)
+                  / max(fwidth(softCoordinate), 0.001)
+softEdgeBand = supportGate
+               × (1 - smoothstep(EdgeWidth - 0.5,
+                                 EdgeWidth + 0.5,
+                                 softDepthPixels))
+production = continuousCandidate × softEdgeBand
+```
+
+`Soft Edge Start` is serialized in `0–0.25` with default `0.06`, matching the accepted historical Current route. Every positive exact no-Chip rendered pixel receives equal support authority; rendered amplitude does not attenuate Eligibility.
+
+Experimental application reuses the accepted Current reconstruction exactly:
+
+```text
+postChipSoft = coherentSoftVisibility × (1 - production)
+baselineHard = Harden(coherentSoftVisibility)
+modifiedHard = Harden(postChipSoft)
+postChipMask = hardenedShape × saturate(modifiedHard / baselineHard)
+finalMask = postChipMask × structuralStrandKeep
+```
+
+The P12r route remains value `0`, serialized default, and exact final-mask removal. Current Presence Footprint ignores the selector and retains its existing accepted path. Presence-Amplitude Interior Access remains disabled.
+
+Actual source scope is twelve modified existing files: five canonical documents, `StylizedRiver.cs`, `StylizedRiverEditor.Foam.cs`, `StylizedRiverEditor.DebugViews.cs`, runtime binding/constants, `RiverWaterFoam.hlsl`, and `SH_CleanStylizedRiver.shader`. No file or metadata is created, deleted, moved, or renamed.
+
+No texture, sampler, buffer, kernel, dispatch, pass, draw call, loop, candidate-search expansion, fixed-grid, Layer C, Film, Shape, Strand, scene, prefab, material, cache, layer, tag, or component contract changes.
+
+## P12t implementation record — Soft Reconstruction baseline and Layer D/E reconciliation
+
+P12t promotes the visually accepted P12s soft-mask reconstruction to the sole Chipping application. The obsolete Exact Rendered Removal selector and branch contract are deleted across serialized authoring, runtime binding, shader properties, selection diagnostics, and final application. The original full-rate analytical Candidate evaluator and Current Presence Footprint behavior are preserved.
+
+Inspector ownership now matches execution: Layer D contains diagnostic-only temporal evaluated-shape controls; Layer E contains Visibility & Footprint, Production Chipping, Structural Strands, and Final Composition. Presence-Amplitude Edge Start is displayed only for Presence-Amplitude; Chip Interior Access is displayed only for Current. Existing Chipping debug views are regrouped under Layer E without adding or deleting a view.
+
+The patch adds no runtime resource, kernel, dispatch, texture, buffer, pass, draw call, loop, scene, prefab, material, cache, layer, tag, component, or fixed-grid change. Unity 6000.5 compilation and final Inspector/visual validation remain pending.
+
+
+## Implementation record — `RG-METRIC-P12u — Unified Automatic Birth Reveal-Speed Contract`
+
+### Decision
+
+The previous automatic-source timing was not a consistent metres-per-second contract. Source families converted requested speed to duration and then applied independent caps or compression, while GPU progression consumed only normalized elapsed/duration. P12u replaces all family-specific automatic timing with one cadence-limited resolver.
+
+### Implemented contract
+
+1. Every automatic recipe resolves requested speed from its serialized base speed, serialized per-pattern multiplier, and existing deterministic jitter.
+2. Every automatic recipe resolves duration as `max(materialStepDuration, pathDistance / requestedSpeed)`.
+3. Arc/Semi-Arc apply this duration to Build only. Hold, Release, and Rest remain authored separately.
+4. Fleck reveal now spans full normalized progress instead of completing in the first `18%`.
+5. Contact Fleck and all Free-Water recipes now sample correlated Min/Max values across the complete deterministic range.
+6. The original serialized field names and values are preserved; only Inspector labels/tooltips change to Base Reveal Speed / Reveal Speed Multiplier.
+7. One Play Mode report records latest observed timing for every recipe, active-event detail, pool occupancy, and rejected starts and retains the adjacent clipboard-copy workflow.
+
+### Performance
+
+No new kernel, texture, buffer, dispatch class, render pass, or per-cell formula is introduced. Event-start CPU arithmetic is constant. A fixed nine-entry CPU telemetry array is added. Slow events can remain active longer and therefore increase existing raster dispatches, bounded by the unchanged 32-slot automatic-event pool.

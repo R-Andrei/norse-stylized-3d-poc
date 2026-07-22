@@ -34,7 +34,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool applyBoundedSingleEdgePreview =
                 evaluationMode ==
                     EdgeWearEvaluationMode.BoundedSingleEdgePreview;
+            bool runCornerDamagePreview =
+                CornerDamagePreviewRequestActive &&
+                evaluationMode ==
+                    EdgeWearEvaluationMode.UnifiedBoundedPreview;
             bool applyUnifiedBoundedPreview =
+                !runCornerDamagePreview &&
                 evaluationMode ==
                     EdgeWearEvaluationMode.UnifiedBoundedPreview;
             bool runUnifiedBatchAudit =
@@ -49,11 +54,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     EdgeWearEvaluationMode.CornerDamageTransactionAudit;
             bool runUnifiedEvaluation =
                 applyUnifiedBoundedPreview ||
+                runCornerDamagePreview ||
                 runUnifiedBatchAudit ||
                 runUnifiedPreviewBatchAudit ||
                 buildSourceEdgeIndexDebug;
             bool includeAllGeometricCandidates = runUnifiedBatchAudit;
-            bool logUnifiedAudit = !buildSourceEdgeIndexDebug;
+            bool logUnifiedAudit =
+                !buildSourceEdgeIndexDebug &&
+                !runCornerDamagePreview;
             if (!surfaceFeatures.HasValue || faces == null || faces.Count < 4)
             {
                 return null;
@@ -62,7 +70,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MassSurfaceFeatureSettings settings = surfaceFeatures.Value;
             float amount01 = Mathf.Clamp01(settings.EdgeWearAmount * 0.5f);
             if (amount01 <= 0.0001f &&
-                !runCornerDamageTransactionAudit)
+                !runCornerDamageTransactionAudit &&
+                !runCornerDamagePreview)
             {
                 return null;
             }
@@ -87,16 +96,51 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<PolygonFace> edgeWearFaces =
                 microTopologyNormalization.Faces ?? faces;
             Bounds edgeWearBounds = CalculateFaceBounds(edgeWearFaces);
-            if (runCornerDamageTransactionAudit)
+            CornerDamageTransactionAuditResult cornerDamageTransaction = null;
+            float capRingRequestedWidth = 0f;
+            if (runCornerDamageTransactionAudit || runCornerDamagePreview)
             {
-                CaptureCornerDamageTransactionAudit(
-                    EvaluateCornerDamageTransaction(
-                        edgeWearFaces,
-                        microTopologyNormalization,
-                        edgeWearBounds,
-                        maximumDimension,
-                        recipe));
-                return null;
+                cornerDamageTransaction = EvaluateCornerDamageTransaction(
+                    edgeWearFaces,
+                    microTopologyNormalization,
+                    edgeWearBounds,
+                    maximumDimension,
+                    recipe);
+                if (runCornerDamageTransactionAudit)
+                {
+                    CaptureCornerDamageTransactionAudit(
+                        cornerDamageTransaction);
+                    return null;
+                }
+
+                capRingRequestedWidth =
+                    ResolveCornerDamageCapRingRequestedWidth(
+                        cornerDamageTransaction,
+                        requestedWidth);
+                BeginCornerDamagePreviewCapture(
+                    cornerDamageTransaction,
+                    capRingRequestedWidth);
+                if (cornerDamageTransaction == null ||
+                    !cornerDamageTransaction.Succeeded ||
+                    cornerDamageTransaction.AcceptedFaces == null ||
+                    cornerDamageTransaction.AcceptedCapFace == null)
+                {
+                    CaptureCornerDamagePreviewBlocker(
+                        cornerDamageTransaction == null
+                            ? "corner-damage transaction capture was unavailable"
+                            : cornerDamageTransaction.Diagnostic);
+                    return null;
+                }
+                if (capRingRequestedWidth + PointMergeDistance <
+                    minimumStyleWidth)
+                {
+                    CaptureCornerDamagePreviewBlocker(
+                        "cap-ring requested width is below the minimum stable style width");
+                    return null;
+                }
+
+                edgeWearFaces = cornerDamageTransaction.AcceptedFaces;
+                edgeWearBounds = CalculateFaceBounds(edgeWearFaces);
             }
 
             List<EdgeWearBevelCandidate> candidates =
@@ -110,6 +154,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     requestedWidth,
                     includeAllGeometricCandidates,
                     microTopologyNormalization,
+                    cornerDamageTransaction,
+                    capRingRequestedWidth,
                     out EdgeWearCoverageAudit coverageAudit);
             if (candidates.Count == 0)
             {
@@ -147,22 +193,69 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 edgeWearFaces,
                                 coverageAudit));
                 }
+                if (runCornerDamagePreview)
+                {
+                    CaptureCornerDamagePreviewBlocker(
+                        noViableCandidateReason);
+                }
                 return null;
             }
 
-            candidates.Sort((left, right) => right.Score.CompareTo(left.Score));
+            if (runCornerDamagePreview)
+            {
+                candidates.Sort(CompareCornerDamagePreviewCandidates);
+            }
+            else
+            {
+                candidates.Sort((left, right) =>
+                    right.Score.CompareTo(left.Score));
+            }
 
+            int mandatoryCandidateCount = 0;
+            if (runCornerDamagePreview)
+            {
+                for (int candidateIndex = 0;
+                     candidateIndex < candidates.Count;
+                     candidateIndex++)
+                {
+                    if (candidates[candidateIndex].Mandatory)
+                    {
+                        mandatoryCandidateCount++;
+                    }
+                }
+            }
             float coverage01 = Mathf.Clamp01(settings.EdgeWearCoverage * 0.5f);
-            int selectedCount = Mathf.Clamp(
-                Mathf.CeilToInt(candidates.Count * coverage01),
-                0,
-                candidates.Count);
+            int ordinaryCandidateCount =
+                candidates.Count - mandatoryCandidateCount;
+            int selectedCount = runCornerDamagePreview
+                ? mandatoryCandidateCount + Mathf.Clamp(
+                    Mathf.CeilToInt(ordinaryCandidateCount * coverage01),
+                    0,
+                    ordinaryCandidateCount)
+                : Mathf.Clamp(
+                    Mathf.CeilToInt(candidates.Count * coverage01),
+                    0,
+                    candidates.Count);
+            if (runCornerDamagePreview)
+            {
+                CaptureCornerDamagePreviewCandidateSelection(
+                    cornerDamageTransaction == null
+                        ? 0
+                        : cornerDamageTransaction.CapRingKeys.Count,
+                    mandatoryCandidateCount,
+                    Mathf.Min(mandatoryCandidateCount, selectedCount));
+            }
             CaptureEdgeWearArtisticSelectionAudit(
                 coverageAudit,
                 candidates,
                 selectedCount);
             if (selectedCount <= 0)
             {
+                if (runCornerDamagePreview)
+                {
+                    CaptureCornerDamagePreviewBlocker(
+                        "corner preview selected no bevel candidates");
+                }
                 return null;
             }
 
@@ -224,6 +317,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         BuildSourceEdgeIndexDebugEdges(
                             edgeWearFaces,
                             coverageAudit));
+                if (runCornerDamagePreview)
+                {
+                    CaptureCornerDamagePreviewOutcome(
+                        unifiedPreviewStatus,
+                        readinessAudit.Diagnostic);
+                }
             }
 
             if (ready)
@@ -281,6 +380,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 context,
                                 effectiveCoverageAudit,
                                 allEdgeAudit.DebugFocusEdgeIndices));
+                    if (runCornerDamagePreview)
+                    {
+                        CaptureCornerDamagePreviewOutcome(
+                            unifiedPreviewStatus,
+                            cornerBlocker);
+                    }
                     if (previewApplied)
                     {
                         return allEdgePreviewSoup;
@@ -1004,6 +1109,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         ? lifecycle.DihedralDegrees
                         : 0f);
                 records[edgeIndex].GraphEdgeIndex = edgeIndex;
+                if (lifecycle != null)
+                {
+                    records[edgeIndex].Mandatory = lifecycle.Mandatory;
+                    records[edgeIndex].CornerDamageCapRing =
+                        lifecycle.CandidateClass ==
+                            EdgeWearCandidateClass.CornerDamageCapRing;
+                }
                 if (lifecycle != null && lifecycle.Viability != null)
                 {
                     EdgeWearEdgeViabilityRecord viability =

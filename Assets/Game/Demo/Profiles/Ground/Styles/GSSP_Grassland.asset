@@ -18,7 +18,7 @@ MonoBehaviour:
   - id: grassland.clean_meadow
     displayName: Clean Meadow
     materialControls:
-      baseColor: {r: 0.512372, g: 0.6886792, b: 0.4515397, a: 1}
+      baseColor: {r: 0.43714234, g: 0.6320754, b: 0.41442683, a: 1}
       frostColor: {r: 0.68, g: 0.74, b: 0.7, a: 1}
       dampTint: {r: 0.3, g: 0.34, b: 0.23, a: 1}
       dampTintStrength: 0.2
@@ -26,7 +26,7 @@ MonoBehaviour:
       rockyDryTintStrength: 0.16
       vegetationTint: {r: 0.36, g: 0.49, b: 0.25, a: 1}
       vegetationTintStrength: 0.42
-      bankSurfaceLayer: {fileID: 11400000, guid: a9656675b9f44e98ace5e4d4616d991a, type: 2}
+      bankSurfaceLayer: {fileID: 11400000, guid: 2671a799dead9b543be09acb7d5bb9ec, type: 2}
       riverbedSurfaceLayer: {fileID: 0}
       riverbedSurfaceSource: 2
       shoreHydrologyModifier: {fileID: 11400000, guid: 0993d09f3cc2ac545941e48fab022de0, type: 2}
@@ -36,7 +36,7 @@ MonoBehaviour:
       bankMaterialReach: 1
       immediateBankExposure: 0.398
       waterlineMaterialStrength: 0.307
-      bankTransitionSoftness: 0.295
+      bankTransitionSoftness: 0.207
       outerBankExtension: 0.74
       outerBankStrength: 1
       outerBankFade: 0.75
@@ -49,6 +49,8 @@ MonoBehaviour:
       bankDetailFinishVariationMultiplier: 1
       bankLegacyPixelCellInfluenceMultiplier: 1
       riverbedMaterialStrength: 1
+      riverbedMaterialBlendDistance: 0
+      riverbedMaterialBlendSoftness: 0.75
       riverbedDetailScaleMultiplier: 1
       riverbedAuthoredColorStrengthMultiplier: 1
       riverbedAuthoredColorLightingMultiplier: 1
@@ -80,7 +82,7 @@ MonoBehaviour:
       shoreWetHighlightVerticalFalloff: 1
       groundMacroPatchScale: 4.3
       groundMacroPatchPatternSeed: 69
-      broadVariation: 0.05
+      broadVariation: 0.07
       groundMacroPatchTransitionSoftness: 0.36
       groundMacroPatchSeparation: 1.31
       reliefShadingStrength: 0.4
@@ -159,7 +161,7 @@ MonoBehaviour:
       paintedAccentCrestCrownHeight: 0.0349
       paintedAccentFoldIrregularity: 0.771
       paintedAccentFoldEndTaper: 0.702
-      paintedAccentInkColor: {r: 0.4085084, g: 0.509434, b: 0.37246352, a: 1}
+      paintedAccentInkColor: {r: 0.307331, g: 0.3679245, b: 0.28635633, a: 1}
       paintedAccentInkOpacity: 0.574
       paintedAccentInkOpacityInitialized: 1
   - id: grassland.patchy_meadow
@@ -196,6 +198,8 @@ MonoBehaviour:
       bankDetailFinishVariationMultiplier: 1
       bankLegacyPixelCellInfluenceMultiplier: 1
       riverbedMaterialStrength: 1
+      riverbedMaterialBlendDistance: 0.35
+      riverbedMaterialBlendSoftness: 0.75
       riverbedDetailScaleMultiplier: 1
       riverbedAuthoredColorStrengthMultiplier: 1
       riverbedAuthoredColorLightingMultiplier: 1
@@ -343,6 +347,8 @@ MonoBehaviour:
       bankDetailFinishVariationMultiplier: 1
       bankLegacyPixelCellInfluenceMultiplier: 1
       riverbedMaterialStrength: 1
+      riverbedMaterialBlendDistance: 0.35
+      riverbedMaterialBlendSoftness: 0.75
       riverbedDetailScaleMultiplier: 1
       riverbedAuthoredColorStrengthMultiplier: 1
       riverbedAuthoredColorLightingMultiplier: 1
@@ -538,6 +544,8 @@ MonoBehaviour:
       bankDetailFinishVariationMultiplier: 1
       bankLegacyPixelCellInfluenceMultiplier: 1
       riverbedMaterialStrength: 1
+      riverbedMaterialBlendDistance: 0.35
+      riverbedMaterialBlendSoftness: 0.75
       riverbedDetailScaleMultiplier: 1
       riverbedAuthoredColorStrengthMultiplier: 1
       riverbedAuthoredColorLightingMultiplier: 1

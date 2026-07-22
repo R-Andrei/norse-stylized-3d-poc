@@ -7,7 +7,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
     public enum StylizedSurfaceDetailSourceMode
     {
         PrepackedDetail = 0,
-        AuthoredMaterialSet = 1
+        AuthoredMaterialSet = 1,
+        PrepackedDetailWithTextureForm = 2
     }
 
     /// <summary>
@@ -38,6 +39,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
             [Header("Prepacked Detail Source")]
             [SerializeField]
             private Texture2D sourceTexture;
+
+            [Tooltip("Optional pre-normalized grayscale Palette Form paired with the prepacked detail source. Used only by Prepacked Detail With Texture Form entries.")]
+            [SerializeField]
+            private Texture2D prepackedTextureForm;
 
             [Header("Authored Material-Set Sources")]
             [SerializeField]
@@ -82,8 +87,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
             public StylizedSurfaceDetailSourceMode SourceMode => sourceMode;
             public bool UsesAuthoredMaterialSet =>
                 sourceMode == StylizedSurfaceDetailSourceMode.AuthoredMaterialSet;
+            public bool UsesPrepackedTextureForm =>
+                sourceMode ==
+                StylizedSurfaceDetailSourceMode.PrepackedDetailWithTextureForm;
+            public bool UsesTextureForm =>
+                UsesAuthoredMaterialSet || UsesPrepackedTextureForm;
 #if UNITY_EDITOR
             public Texture2D SourceTexture => sourceTexture;
+            public Texture2D PrepackedTextureForm => prepackedTextureForm;
             public Texture2D AuthoredBaseColor => authoredBaseColor;
             public Texture2D AuthoredNormal => authoredNormal;
             public bool FlipAuthoredNormalGreen => flipAuthoredNormalGreen;
@@ -150,6 +161,15 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
                    entryIndex < entries.Count &&
                    entries[entryIndex] != null &&
                    entries[entryIndex].UsesAuthoredMaterialSet;
+        }
+
+        public bool EntryUsesTextureForm(string stableId)
+        {
+            int entryIndex = FindEntryIndex(stableId);
+            return entryIndex >= 0 &&
+                   entryIndex < entries.Count &&
+                   entries[entryIndex] != null &&
+                   entries[entryIndex].UsesTextureForm;
         }
 
         public bool TryResolve(

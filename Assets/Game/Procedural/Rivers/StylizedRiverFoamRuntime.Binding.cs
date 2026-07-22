@@ -121,6 +121,9 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamChipEdgeWidthPixelsId,
                 river != null ? river.FoamChipEdgeWidthPixels : 4f);
             propertyBlock.SetFloat(
+                FoamChipSoftEdgeStartId,
+                river != null ? river.FoamChipSoftEdgeStart : 0.06f);
+            propertyBlock.SetFloat(
                 FoamChipInteriorAccessId,
                 river != null ? river.FoamChipInteriorAccess : 0f);
             propertyBlock.SetFloat(
@@ -290,6 +293,9 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamChipEdgeWidthPixelsId,
                 river.FoamChipEdgeWidthPixels);
             propertyBlock.SetFloat(
+                FoamChipSoftEdgeStartId,
+                river.FoamChipSoftEdgeStart);
+            propertyBlock.SetFloat(
                 FoamChipInteriorAccessId,
                 river.FoamChipInteriorAccess);
             propertyBlock.SetFloat(
@@ -413,6 +419,7 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamChipStableScreenRadiusPixelsId, 2f);
             propertyBlock.SetFloat(FoamChipMaximumViewScaleId, 1.75f);
             propertyBlock.SetFloat(FoamChipEdgeWidthPixelsId, 4f);
+            propertyBlock.SetFloat(FoamChipSoftEdgeStartId, 0.06f);
             propertyBlock.SetFloat(FoamChipInteriorAccessId, 0f);
             propertyBlock.SetFloat(FoamChipFieldSpeedId, 0f);
             propertyBlock.SetFloat(FoamChipFormationTimeId, 2.5f);

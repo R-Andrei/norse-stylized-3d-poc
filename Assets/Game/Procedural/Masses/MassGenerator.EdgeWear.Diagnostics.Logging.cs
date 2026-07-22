@@ -53,6 +53,446 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return BuildCornerDamageTransactionAuditReport(recipe, audit);
         }
 
+        private static CornerDamagePreviewConstructionRecord
+            capturedCornerDamagePreview;
+
+        private static void ResetCornerDamagePreviewCapture()
+        {
+            capturedCornerDamagePreview = null;
+        }
+
+        private static void BeginCornerDamagePreviewCapture(
+            CornerDamageTransactionAuditResult transaction,
+            float capRingRequestedWidth)
+        {
+            capturedCornerDamagePreview =
+                new CornerDamagePreviewConstructionRecord
+                {
+                    Transaction = transaction,
+                    CapRingRequestedWidth = capRingRequestedWidth,
+                    ExpectedMandatoryCount = transaction == null
+                        ? 0
+                        : transaction.CapRingKeys.Count
+                };
+        }
+
+        private static void CaptureCornerDamagePreviewCandidateSelection(
+            int expectedMandatoryCount,
+            int mandatoryCandidateCount,
+            int mandatorySelectedCount)
+        {
+            if (capturedCornerDamagePreview == null)
+            {
+                capturedCornerDamagePreview =
+                    new CornerDamagePreviewConstructionRecord();
+            }
+            capturedCornerDamagePreview.ExpectedMandatoryCount =
+                expectedMandatoryCount;
+            capturedCornerDamagePreview.MandatoryCandidateCount =
+                mandatoryCandidateCount;
+            capturedCornerDamagePreview.MandatorySelectedCount =
+                mandatorySelectedCount;
+        }
+
+        private static void CaptureCornerDamagePreviewBlocker(
+            string blocker)
+        {
+            if (capturedCornerDamagePreview == null)
+            {
+                capturedCornerDamagePreview =
+                    new CornerDamagePreviewConstructionRecord();
+            }
+            capturedCornerDamagePreview.Blocker = blocker ?? string.Empty;
+        }
+
+        private static void CaptureCornerDamagePreviewOutcome(
+            UnifiedEdgeWearPreviewStatus previewStatus,
+            string blocker)
+        {
+            if (capturedCornerDamagePreview == null)
+            {
+                capturedCornerDamagePreview =
+                    new CornerDamagePreviewConstructionRecord();
+            }
+            capturedCornerDamagePreview.CornerPreviewStatus = previewStatus;
+            if (!previewStatus.PreviewApplied)
+            {
+                capturedCornerDamagePreview.Blocker =
+                    !string.IsNullOrEmpty(blocker)
+                        ? blocker
+                        : previewStatus.Diagnostic ?? string.Empty;
+            }
+        }
+
+#if UNITY_EDITOR
+        private static CornerDamagePreviewStatus
+            CompleteCornerDamagePreviewCapture(
+                MassRecipe recipe,
+                UnifiedEdgeWearPreviewStatus baselineStatus,
+                UnifiedEdgeWearPreviewStatus cornerStatus,
+                double baselineMilliseconds,
+                double cornerMilliseconds)
+        {
+            CornerDamagePreviewConstructionRecord capture =
+                capturedCornerDamagePreview;
+            capturedCornerDamagePreview = null;
+            CornerDamagePreviewStatus result =
+                new CornerDamagePreviewStatus
+                {
+                    ShapeSeed = recipe == null ? 0 : recipe.ShapeSeed,
+                    BaselineMilliseconds = baselineMilliseconds,
+                    CornerMilliseconds = cornerMilliseconds,
+                    CandidateCount = cornerStatus.CandidateCount,
+                    ActiveEdgeCount = cornerStatus.ActiveEdgeCount,
+                    DeferredEdgeCount = cornerStatus.DeferredEdgeCount,
+                    RejectedEdgeCount = cornerStatus.RejectedEdgeCount,
+                    BevelFaceCount = cornerStatus.BevelFaceCount,
+                    TriangleCount = cornerStatus.TriangleCount,
+                    DebugEdges = cornerStatus.DebugEdges ??
+                        Array.Empty<EdgeWearDebugEdgeRecord>()
+                };
+
+            CornerDamageTransactionAuditResult transaction =
+                capture == null ? null : capture.Transaction;
+            result.TransactionCertified =
+                transaction != null && transaction.Succeeded;
+            result.SelectedGraphVertexIndex = transaction == null
+                ? -1
+                : transaction.SelectedGraphVertexIndex;
+            result.AcceptedTrialIndex = transaction == null
+                ? -1
+                : transaction.AcceptedTrialIndex;
+            result.AcceptedDepth = transaction == null
+                ? 0f
+                : transaction.AcceptedDepth;
+            result.CapRingRequestedWidth = capture == null
+                ? 0f
+                : capture.CapRingRequestedWidth;
+            result.ExpectedCapRingEdgeCount = capture == null
+                ? 0
+                : capture.ExpectedMandatoryCount;
+            result.MandatoryCandidateCount = capture == null
+                ? 0
+                : capture.MandatoryCandidateCount;
+            result.MandatorySelectedCount = capture == null
+                ? 0
+                : capture.MandatorySelectedCount;
+
+            if (transaction != null)
+            {
+                List<int> affected = new List<int>(
+                    transaction.AffectedOriginalEdgeIndices);
+                affected.Sort();
+                result.AffectedOriginalEdgeIndices = affected.ToArray();
+                List<int> mandatory = new List<int>(
+                    transaction.CapRingGeneratedIdentities);
+                mandatory.Sort();
+                result.MandatoryCapRingIdentities = mandatory.ToArray();
+                if (transaction.AcceptedTrialIndex >= 0 &&
+                    transaction.AcceptedTrialIndex <
+                        transaction.Trials.Count)
+                {
+                    result.CapFaceCount = transaction.Trials[
+                        transaction.AcceptedTrialIndex].CapFaceCount;
+                }
+            }
+
+            HashSet<int> affectedIdentities = new HashSet<int>(
+                result.AffectedOriginalEdgeIndices);
+            HashSet<int> baselineBuilt =
+                CollectCertifiedOrdinaryEdgeIdentities(
+                    baselineStatus.DebugEdges);
+            HashSet<int> cornerBuilt =
+                CollectCertifiedOrdinaryEdgeIdentities(
+                    cornerStatus.DebugEdges);
+            HashSet<int> mandatoryBuilt =
+                CollectCertifiedCapRingEdgeIdentities(
+                    cornerStatus.DebugEdges);
+            result.BaselineBuiltOrdinaryCount = baselineBuilt.Count;
+
+            List<int> collateralLost = new List<int>();
+            foreach (int identity in baselineBuilt)
+            {
+                if (affectedIdentities.Contains(identity))
+                {
+                    continue;
+                }
+                result.UnrelatedBaselineBuiltCount++;
+                if (cornerBuilt.Contains(identity))
+                {
+                    result.UnrelatedRetainedCount++;
+                }
+                else
+                {
+                    collateralLost.Add(identity);
+                }
+            }
+            collateralLost.Sort();
+            result.CollateralLostIdentities = collateralLost.ToArray();
+            result.CollateralLostCount = collateralLost.Count;
+
+            for (int identityIndex = 0;
+                 identityIndex < result.MandatoryCapRingIdentities.Length;
+                 identityIndex++)
+            {
+                if (mandatoryBuilt.Contains(
+                        result.MandatoryCapRingIdentities[identityIndex]))
+                {
+                    result.MandatoryBuiltCount++;
+                }
+            }
+
+            string blocker = capture == null
+                ? "corner preview capture was unavailable"
+                : capture.Blocker ?? string.Empty;
+            bool accepted =
+                baselineStatus.PreviewApplied &&
+                result.TransactionCertified &&
+                transaction != null &&
+                transaction.AcceptedFaces != null &&
+                transaction.AcceptedCapFace != null &&
+                result.CapFaceCount == 1 &&
+                result.ExpectedCapRingEdgeCount > 0 &&
+                result.MandatoryCandidateCount ==
+                    result.ExpectedCapRingEdgeCount &&
+                result.MandatorySelectedCount ==
+                    result.ExpectedCapRingEdgeCount &&
+                result.MandatoryBuiltCount ==
+                    result.ExpectedCapRingEdgeCount &&
+                cornerStatus.PreviewApplied &&
+                result.CollateralLostCount == 0 &&
+                string.IsNullOrEmpty(blocker);
+            result.PreviewApplied = accepted;
+            result.Diagnostic = accepted
+                ? "certified corner chip and complete cap-ring bevel applied; unrelated baseline bevels retained"
+                : ResolveCornerDamagePreviewFailure(
+                    result,
+                    baselineStatus,
+                    cornerStatus,
+                    blocker);
+            result.Report = BuildCornerDamagePreviewReport(
+                result,
+                baselineStatus,
+                cornerStatus);
+            return result;
+        }
+
+        private static HashSet<int>
+            CollectCertifiedOrdinaryEdgeIdentities(
+                EdgeWearDebugEdgeRecord[] records)
+        {
+            HashSet<int> identities = new HashSet<int>();
+            if (records == null)
+            {
+                return identities;
+            }
+            for (int recordIndex = 0;
+                 recordIndex < records.Length;
+                 recordIndex++)
+            {
+                EdgeWearDebugEdgeRecord record = records[recordIndex];
+                if (!record.CornerDamageCapRing &&
+                    record.State == EdgeWearDebugEdgeState.Certified)
+                {
+                    identities.Add(record.EdgeIndex);
+                }
+            }
+            return identities;
+        }
+
+        private static HashSet<int>
+            CollectCertifiedCapRingEdgeIdentities(
+                EdgeWearDebugEdgeRecord[] records)
+        {
+            HashSet<int> identities = new HashSet<int>();
+            if (records == null)
+            {
+                return identities;
+            }
+            for (int recordIndex = 0;
+                 recordIndex < records.Length;
+                 recordIndex++)
+            {
+                EdgeWearDebugEdgeRecord record = records[recordIndex];
+                if (record.CornerDamageCapRing &&
+                    record.Mandatory &&
+                    record.State == EdgeWearDebugEdgeState.Certified)
+                {
+                    identities.Add(record.EdgeIndex);
+                }
+            }
+            return identities;
+        }
+
+        private static string ResolveCornerDamagePreviewFailure(
+            CornerDamagePreviewStatus result,
+            UnifiedEdgeWearPreviewStatus baselineStatus,
+            UnifiedEdgeWearPreviewStatus cornerStatus,
+            string blocker)
+        {
+            if (!string.IsNullOrEmpty(blocker))
+            {
+                return blocker;
+            }
+            if (!baselineStatus.PreviewApplied)
+            {
+                return "ordinary unified baseline preview did not apply";
+            }
+            if (!result.TransactionCertified)
+            {
+                return "corner-damage transaction did not certify";
+            }
+            if (result.CapFaceCount != 1)
+            {
+                return "corner transaction did not produce exactly one cap face";
+            }
+            if (result.ExpectedCapRingEdgeCount <= 0)
+            {
+                return "corner transaction produced no cap-ring identities";
+            }
+            if (result.MandatoryCandidateCount !=
+                result.ExpectedCapRingEdgeCount)
+            {
+                return "not every cap-ring edge became a mandatory bevel candidate";
+            }
+            if (result.MandatorySelectedCount !=
+                result.ExpectedCapRingEdgeCount)
+            {
+                return "not every mandatory cap-ring candidate was selected";
+            }
+            if (!cornerStatus.PreviewApplied)
+            {
+                return string.IsNullOrEmpty(cornerStatus.Diagnostic)
+                    ? "corner preview geometry did not certify"
+                    : cornerStatus.Diagnostic;
+            }
+            if (result.MandatoryBuiltCount !=
+                result.ExpectedCapRingEdgeCount)
+            {
+                return "one or more mandatory cap-ring bevels failed to build";
+            }
+            if (result.CollateralLostCount != 0)
+            {
+                return "unrelated accepted bevel identities were lost";
+            }
+            return "corner preview failed an unspecified acceptance invariant";
+        }
+
+        private static string BuildCornerDamagePreviewReport(
+            CornerDamagePreviewStatus result,
+            UnifiedEdgeWearPreviewStatus baselineStatus,
+            UnifiedEdgeWearPreviewStatus cornerStatus)
+        {
+            StringBuilder builder = new StringBuilder(8192);
+            builder.AppendLine("GeneratedMass EW-C1A.2 corner-chip preview");
+            builder.AppendLine("contract=EW-C1A.2-preview-only");
+            builder.Append("status=");
+            builder.AppendLine(result.PreviewApplied ? "passed" : "failed");
+            builder.Append("shapeSeed=");
+            builder.AppendLine(result.ShapeSeed.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("diagnostic=");
+            builder.AppendLine(result.Diagnostic ?? string.Empty);
+            builder.Append("baselinePreviewApplied=");
+            builder.AppendLine(baselineStatus.PreviewApplied ? "1" : "0");
+            builder.Append("cornerPreviewApplied=");
+            builder.AppendLine(cornerStatus.PreviewApplied ? "1" : "0");
+            builder.Append("transactionCertified=");
+            builder.AppendLine(result.TransactionCertified ? "1" : "0");
+            builder.Append("selectedGraphVertex=");
+            builder.AppendLine(result.SelectedGraphVertexIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("acceptedTrial=");
+            builder.AppendLine(result.AcceptedTrialIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("acceptedDepth=");
+            builder.AppendLine(result.AcceptedDepth.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("capRingRequestedWidth=");
+            builder.AppendLine(result.CapRingRequestedWidth.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("capFaces=");
+            builder.AppendLine(result.CapFaceCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("mandatoryCapRing=");
+            builder.Append(result.ExpectedCapRingEdgeCount);
+            builder.Append('/');
+            builder.Append(result.MandatoryCandidateCount);
+            builder.Append('/');
+            builder.Append(result.MandatorySelectedCount);
+            builder.Append('/');
+            builder.AppendLine(result.MandatoryBuiltCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("ordinaryRetention=");
+            builder.Append(result.BaselineBuiltOrdinaryCount);
+            builder.Append('/');
+            builder.Append(result.UnrelatedBaselineBuiltCount);
+            builder.Append('/');
+            builder.Append(result.UnrelatedRetainedCount);
+            builder.Append('/');
+            builder.AppendLine(result.CollateralLostCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("cornerConstruction=");
+            builder.Append(result.CandidateCount);
+            builder.Append('/');
+            builder.Append(result.ActiveEdgeCount);
+            builder.Append('/');
+            builder.Append(result.DeferredEdgeCount);
+            builder.Append('/');
+            builder.Append(result.RejectedEdgeCount);
+            builder.Append('/');
+            builder.Append(result.BevelFaceCount);
+            builder.Append('/');
+            builder.AppendLine(result.TriangleCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("timingsMilliseconds=baseline:");
+            builder.Append(result.BaselineMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append(",corner:");
+            builder.AppendLine(result.CornerMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append("affectedOriginalIdentities=");
+            AppendCornerDamageIntArray(
+                builder,
+                result.AffectedOriginalEdgeIndices);
+            builder.AppendLine();
+            builder.Append("mandatoryCapRingIdentities=");
+            AppendCornerDamageIntArray(
+                builder,
+                result.MandatoryCapRingIdentities);
+            builder.AppendLine();
+            builder.Append("collateralLostIdentities=");
+            AppendCornerDamageIntArray(
+                builder,
+                result.CollateralLostIdentities);
+            builder.AppendLine();
+            builder.Append("baselineDiagnostic=");
+            builder.AppendLine(baselineStatus.Diagnostic ?? string.Empty);
+            builder.Append("cornerDiagnostic=");
+            builder.AppendLine(cornerStatus.Diagnostic ?? string.Empty);
+            return builder.ToString();
+        }
+
+        private static void AppendCornerDamageIntArray(
+            StringBuilder builder,
+            int[] values)
+        {
+            builder.Append('{');
+            if (values != null)
+            {
+                for (int index = 0; index < values.Length; index++)
+                {
+                    if (index > 0)
+                    {
+                        builder.Append('/');
+                    }
+                    builder.Append(values[index]);
+                }
+            }
+            builder.Append('}');
+        }
+#endif
+
         private static string BuildCornerDamageTransactionAuditReport(
             MassRecipe recipe,
             CornerDamageTransactionAuditResult audit)
@@ -281,6 +721,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 builder.Append(trial.MissingOriginalEdgeCount);
                 builder.Append('/');
                 builder.Append(trial.AmbiguousIdentityCount);
+                builder.Append(",generatedIdentityCollisions=");
+                builder.Append(trial.GeneratedIdentityCollisionCount);
                 builder.Append(",exactFailures=");
                 builder.Append(trial.ExactConstructionFailureCount);
                 builder.Append(",exactReason=");
@@ -1716,9 +2158,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     FormatPolygonSurfaceAudit(planeCutAudit) + "}" +
                 ",planeSurface=" +
                     "faces:" + planeCutAudit.BevelRegionFaceCount +
-                    FormatBevelRegionTriangulationModeCounts(
-                        planeCutAudit.BevelRegionFaceCount,
-                        planeCutAudit.BevelRegionInternalFanVertexCount) +
+                    FormatOneSurfaceTriangulationPolicy() +
                     ",boundaryVertices:" +
                         planeCutAudit.BevelRegionBoundaryVertexCount +
                     ",triangles:" +
@@ -6241,9 +6681,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ",polygonSurface:{" +
                     FormatPolygonSurfaceAudit(audit) + "}" +
                 ",surfaceFaces:" + audit.BevelRegionFaceCount +
-                FormatBevelRegionTriangulationModeCounts(
-                    audit.BevelRegionFaceCount,
-                    audit.BevelRegionInternalFanVertexCount) +
+                FormatOneSurfaceTriangulationPolicy() +
                 ",surfaceTriangles:" +
                     audit.BevelRegionTriangleCount +
                 ",surfaceRenderValid:" +
@@ -6934,9 +7372,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     FormatPolygonSurfaceAudit(audit) + "}" +
                 ", boundedBevelRegion=" +
                     "polygonFaces:" + audit.BevelRegionFaceCount +
-                    FormatBevelRegionTriangulationModeCounts(
-                        audit.BevelRegionFaceCount,
-                        audit.BevelRegionInternalFanVertexCount) +
+                    FormatOneSurfaceTriangulationPolicy() +
                     ",boundaryVertices:" +
                         audit.BevelRegionBoundaryVertexCount +
                     ",triangles:" + audit.BevelRegionTriangleCount +
@@ -7051,37 +7487,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     audit.WindingFailureCount;
         }
 
-        private static string FormatBevelRegionTriangulationModeCounts(
-            int faceCount,
-            int internalFanVertexCount)
+        private static string FormatOneSurfaceTriangulationPolicy()
         {
-            int centreFanFallbackFaces = Mathf.Clamp(
-                internalFanVertexCount,
-                0,
-                faceCount);
-            int boundaryFanFaces = Mathf.Max(
-                0,
-                faceCount - centreFanFallbackFaces);
-            return ",boundaryFanFaces:" + boundaryFanFaces +
-                ",centreFanFallbackFaces:" +
-                    centreFanFallbackFaces;
+            return ",triangulationPolicy:" +
+                "direct-preferred/general-complete/collinear-reinsert";
         }
 
         private static string FormatPolygonSurfaceAudit(
             PlaneCutBevelAuditResult audit)
         {
-            int centreFanFallbackFaces = Mathf.Clamp(
-                audit.PolygonSurfaceInternalFanVertexCount,
-                0,
-                audit.PolygonSurfaceFaceCount);
-            int boundaryFanFaces = Mathf.Max(
-                0,
-                audit.PolygonSurfaceFaceCount -
-                    centreFanFallbackFaces);
             return "faces:" + audit.PolygonSurfaceFaceCount +
-                ",boundaryFanFaces:" + boundaryFanFaces +
-                ",centreFanFallbackFaces:" +
-                    centreFanFallbackFaces +
+                FormatOneSurfaceTriangulationPolicy() +
                 ",boundaryVertices:" +
                     audit.PolygonSurfaceBoundaryVertexCount +
                 ",expectedTriangles:" +
@@ -7118,18 +7534,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static string FormatPolygonSurfaceAudit(
             BoundedSingleEdgeAuditResult audit)
         {
-            int centreFanFallbackFaces = Mathf.Clamp(
-                audit.PolygonSurfaceInternalFanVertexCount,
-                0,
-                audit.PolygonSurfaceFaceCount);
-            int boundaryFanFaces = Mathf.Max(
-                0,
-                audit.PolygonSurfaceFaceCount -
-                    centreFanFallbackFaces);
             return "faces:" + audit.PolygonSurfaceFaceCount +
-                ",boundaryFanFaces:" + boundaryFanFaces +
-                ",centreFanFallbackFaces:" +
-                    centreFanFallbackFaces +
+                FormatOneSurfaceTriangulationPolicy() +
                 ",boundaryVertices:" +
                     audit.PolygonSurfaceBoundaryVertexCount +
                 ",expectedTriangles:" +
@@ -7578,10 +7984,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ", boundedBevelRegion=" +
                     "polygonFaces:" +
                         audit.CertificationAudit.BevelRegionFaceCount +
-                    FormatBevelRegionTriangulationModeCounts(
-                        audit.CertificationAudit.BevelRegionFaceCount,
-                        audit.CertificationAudit
-                            .BevelRegionInternalFanVertexCount) +
+                    FormatOneSurfaceTriangulationPolicy() +
                     ",boundaryVertices:" +
                         audit.CertificationAudit
                             .BevelRegionBoundaryVertexCount +
@@ -7944,10 +8347,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Environment.NewLine + "boundedBevelRegion=" +
                     "polygonFaces:" +
                         audit.CertificationAudit.BevelRegionFaceCount +
-                    FormatBevelRegionTriangulationModeCounts(
-                        audit.CertificationAudit.BevelRegionFaceCount,
-                        audit.CertificationAudit
-                            .BevelRegionInternalFanVertexCount) +
+                    FormatOneSurfaceTriangulationPolicy() +
                     ",boundaryVertices:" +
                         audit.CertificationAudit
                             .BevelRegionBoundaryVertexCount +

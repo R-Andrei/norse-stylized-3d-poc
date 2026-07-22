@@ -1,0 +1,193 @@
+#pragma kernel InitializeField
+#pragma kernel RecenterField
+#pragma kernel SimulateField
+
+struct VegetationInteractorRecord
+{
+    float4 startEnd;
+    float4 parameters;
+};
+
+StructuredBuffer<VegetationInteractorRecord> _Interactors;
+RWTexture2D<float4> _StateAWrite;
+RWTexture2D<float4> _StateBWrite;
+Texture2D<float4> _StateRead;
+RWTexture2D<float4> _StateWrite;
+
+int2 _FieldResolution;
+int2 _FieldOffset;
+float4 _FieldOriginCellSize;
+float _DeltaTime;
+float4 _ResponseParameters;
+int2 _RecenterDelta;
+int _ResetAll;
+int _InteractorCount;
+
+float2 SafeNormalize(float2 value, float2 fallback)
+{
+    float magnitudeSquared = dot(value, value);
+    if (magnitudeSquared <= 0.0000001)
+    {
+        return fallback;
+    }
+
+    return value * rsqrt(magnitudeSquared);
+}
+
+float2 ClampVectorMagnitude(float2 value, float maximum)
+{
+    float magnitudeSquared = dot(value, value);
+    float maximumSquared = maximum * maximum;
+    if (magnitudeSquared <= maximumSquared || magnitudeSquared <= 0.0000001)
+    {
+        return value;
+    }
+
+    return value * (maximum * rsqrt(magnitudeSquared));
+}
+
+int2 PhysicalCell(int2 logicalCell)
+{
+    uint2 resolution = (uint2)_FieldResolution;
+    uint2 wrapped =
+        ((uint2)logicalCell + (uint2)_FieldOffset) & (resolution - 1u);
+    return (int2)wrapped;
+}
+
+float2 WorldPositionForLogicalCell(int2 logicalCell)
+{
+    return _FieldOriginCellSize.xy +
+        ((float2)logicalCell + 0.5) * _FieldOriginCellSize.z;
+}
+
+float4 EvaluateImmediateTarget(float2 worldXZ)
+{
+    float2 accumulatedBend = 0.0;
+    float maximumFlatten = 0.0;
+
+    [loop]
+    for (int index = 0; index < _InteractorCount; index++)
+    {
+        VegetationInteractorRecord record = _Interactors[index];
+        float2 startXZ = record.startEnd.xy;
+        float2 endXZ = record.startEnd.zw;
+        float radius = max(0.001, record.parameters.x);
+        float bendStrength = max(0.0, record.parameters.y);
+        float flattenStrength = saturate(record.parameters.z);
+        float movementBlend = saturate(record.parameters.w);
+
+        float2 segment = endXZ - startXZ;
+        float segmentLengthSquared = dot(segment, segment);
+        float segmentT = segmentLengthSquared > 0.0000001
+            ? saturate(dot(worldXZ - startXZ, segment) / segmentLengthSquared)
+            : 0.0;
+        float2 closest = lerp(startXZ, endXZ, segmentT);
+        float2 radialVector = worldXZ - closest;
+        float distanceToSweep = length(radialVector);
+        if (distanceToSweep >= radius)
+        {
+            continue;
+        }
+
+        float2 movementDirection = SafeNormalize(segment, float2(1.0, 0.0));
+        float2 radialFallback = segmentLengthSquared > 0.0000001
+            ? float2(-movementDirection.y, movementDirection.x)
+            : float2(1.0, 0.0);
+        float2 radialDirection = SafeNormalize(radialVector, radialFallback);
+        float2 displacementDirection = SafeNormalize(
+            lerp(radialDirection, movementDirection, movementBlend),
+            radialDirection);
+
+        float normalizedDistance = saturate(distanceToSweep / radius);
+        float influence = 1.0 - smoothstep(0.15, 1.0, normalizedDistance);
+        influence *= influence;
+        accumulatedBend +=
+            displacementDirection * (bendStrength * influence);
+        maximumFlatten = max(
+            maximumFlatten,
+            flattenStrength * influence);
+    }
+
+    accumulatedBend = ClampVectorMagnitude(accumulatedBend, 1.0);
+    return float4(
+        accumulatedBend,
+        saturate(maximumFlatten),
+        0.0);
+}
+
+float ResponseAlpha(float deltaTime, float timeConstant)
+{
+    return 1.0 - exp(-max(0.0, deltaTime) / max(0.001, timeConstant));
+}
+
+[numthreads(8, 8, 1)]
+void InitializeField(uint3 dispatchId : SV_DispatchThreadID)
+{
+    int2 logicalCell = (int2)dispatchId.xy;
+    if (any(logicalCell >= _FieldResolution))
+    {
+        return;
+    }
+
+    int2 physicalCell = PhysicalCell(logicalCell);
+    _StateAWrite[physicalCell] = 0.0;
+    _StateBWrite[physicalCell] = 0.0;
+}
+
+[numthreads(8, 8, 1)]
+void RecenterField(uint3 dispatchId : SV_DispatchThreadID)
+{
+    int2 logicalCell = (int2)dispatchId.xy;
+    if (any(logicalCell >= _FieldResolution))
+    {
+        return;
+    }
+
+    int2 oldLogicalCell = logicalCell + _RecenterDelta;
+    bool preserved = _ResetAll == 0 &&
+        all(oldLogicalCell >= 0) &&
+        all(oldLogicalCell < _FieldResolution);
+    if (preserved)
+    {
+        return;
+    }
+
+    int2 physicalCell = PhysicalCell(logicalCell);
+    _StateAWrite[physicalCell] = 0.0;
+    _StateBWrite[physicalCell] = 0.0;
+}
+
+[numthreads(8, 8, 1)]
+void SimulateField(uint3 dispatchId : SV_DispatchThreadID)
+{
+    int2 logicalCell = (int2)dispatchId.xy;
+    if (any(logicalCell >= _FieldResolution))
+    {
+        return;
+    }
+
+    int2 physicalCell = PhysicalCell(logicalCell);
+    float4 previousState = _StateRead.Load(int3(physicalCell, 0));
+    float4 targetState = EvaluateImmediateTarget(
+        WorldPositionForLogicalCell(logicalCell));
+
+    float responseAlpha = ResponseAlpha(
+        _DeltaTime,
+        _ResponseParameters.x);
+    float recoveryAlpha = ResponseAlpha(
+        _DeltaTime,
+        _ResponseParameters.y);
+    float bendAlpha = dot(targetState.xy, targetState.xy) > 0.000001
+        ? responseAlpha
+        : recoveryAlpha;
+    float flattenAlpha = targetState.z > 0.0001
+        ? responseAlpha
+        : recoveryAlpha;
+    float4 nextState;
+    nextState.xy = lerp(previousState.xy, targetState.xy, bendAlpha);
+    nextState.z = lerp(previousState.z, targetState.z, flattenAlpha);
+    nextState.w = 0.0;
+    nextState.xy = ClampVectorMagnitude(nextState.xy, 1.0);
+    nextState.zw = saturate(nextState.zw);
+    _StateWrite[physicalCell] = nextState;
+}

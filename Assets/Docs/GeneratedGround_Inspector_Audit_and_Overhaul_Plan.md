@@ -1,3 +1,134 @@
+## 2026-07-22 — GSU-M2.7C.5E.2 Inspector and refresh contract
+
+The authoritative Ground editor baseline for this patch is the user-provided `GeneratedGroundEditor(6).cs`. Under the existing path:
+
+```text
+Hierarchy > Ground > Inspector > Material > River-Coupled Ground Response — Riverbed > Material Coverage
+```
+
+Riverbed authoring now exposes:
+
+- `Material Strength` — existing total Riverbed material amount;
+- `Material Blend Distance` — inward dry-material transition width in metres, `0–2`, default `0.35`; zero restores the historical hard boundary;
+- `Material Blend Softness` — linear-to-cubic transition shape, `0–1`, default `0.75`.
+
+The Inspector states explicitly that this is a **dry material transition**. It is independent from the existing `Wetness Transition` controls farther down the same Riverbed section. The new controls affect the complete resolved substrate response and do not change Riverbed Support, cover exclusion, River geometry, or wetness.
+
+Candidate proof and refresh remain separate project actions:
+
+```text
+Tools > PS3D > Run Generated Mass Sparse Riverbed Assembly Proof
+Tools > PS3D > Install All Sparse Riverbed Surface Candidates
+```
+
+The proof must be a passing `GSU-M2.7C.5E.2`, algorithm-version-6 run before installation. The installer owns exact canonical paths, updates existing assets rather than creating numbered copies, preserves editable `SSMP_Riverbed*` palette/material tuning and `GSLP_Riverbed*` layer tuning, verifies existing GUIDs remain stable, and copies one complete report to the clipboard. It does not assign a candidate to a scene automatically.
+
+No new debug view or Scene overlay is added.
+
+---
+
+## 2026-07-21 — GSU-M2.7C.5E.1.1 Inspector correction note
+
+The corrected M2.7C.5E.1 package does **not** replace `GeneratedGroundEditor.cs`. The previous package copied an archive-baseline editor containing vegetation-coverage APIs that were absent from the user's live branch, causing compilation failure.
+
+Candidate assignment still uses the user's existing live Inspector path:
+
+```text
+Hierarchy > Ground > Inspector > Material > River-Coupled Ground Response — Riverbed > Riverbed Surface Source: Custom Riverbed Surface Layer > Custom Riverbed Surface Layer
+```
+
+Guaranteed palette and material-response editing is performed by selecting the corresponding generated material profile:
+
+```text
+Project > Assets/Game/Demo/Profiles/SurfaceMaterials/SparseRiverbedCandidates > SSMP_RiverbedUltraSparse / SSMP_RiverbedVerySparse / SSMP_RiverbedSparse
+```
+
+The `StylizedSurfaceMaterialProfileEditor` recognizes paired Palette Form payloads and exposes Base, Dark, Light, Cavity, Texture Form Strength, lighting, normal, cavity, roughness, and world-scale controls. Inline duplication of those controls inside the large shared Ground editor is deferred rather than risking another branch-baseline replacement.
+
+---
+
+## 2026-07-21 — GSU-M2.7C.5E.1 Inspector ownership note
+
+> **Superseded delivery detail:** M2.7C.5E.1.1 removes the full `GeneratedGroundEditor.cs` replacement. Palette editing is guaranteed through the generated `SSMP_Riverbed*` assets; inline Ground-editor exposure is deferred.
+
+M2.7C.5E.1 adds no new `GeneratedGround` field, foldout, debug view, Scene overlay, component, or prefab workflow. It creates three ordinary `GroundSurfaceLayerProfile` assets through one explicit project-level installer:
+
+```text
+Tools > PS3D > Install All Sparse Riverbed Surface Candidates
+```
+
+After installation, compare candidates through the existing path:
+
+```text
+Hierarchy > Ground > Inspector > Material > River-Coupled Ground Response — Riverbed > Riverbed Surface Source: Custom Riverbed Surface Layer > Custom Riverbed Surface Layer
+```
+
+Select `Riverbed — Ultra Sparse`, `Riverbed — Very Sparse`, or `Riverbed — Sparse`. Their shared material controls remain editable through the existing embedded material settings or by selecting the corresponding `SSMP_Riverbed*` asset. Installer reruns preserve those palette and response values.
+
+The detail-library and material-profile editors now recognize paired prepacked Palette Form payloads as ordinary texture-form entries. No shader control, runtime override component, material-name branch, or density-specific Inspector code is introduced.
+
+---
+
+## 2026-07-21 — GSU-M2.7C.5D.5 Inspector ownership note
+
+M2.7C.5D.5 adds no GeneratedGround or runtime Inspector control. The existing project-level proof action remains:
+
+```text
+Tools > PS3D > Run Generated Mass Sparse Riverbed Assembly Proof
+```
+
+The action now writes palette-neutral form, runtime-packed structural data, and three recolour previews in addition to the accepted assembly evidence. These outputs prove that Base/Dark/Light/Cavity colour authority can be separated from generated form, but they remain local under `Library/SurfaceMaterialDiagnostics/GeneratedMassSparseRiverbedAssembly`.
+
+The existing `StylizedSurfaceMaterialProfile` palette controls and Ground material-property refresh path remain the intended runtime control surface. M2.7C.5D.5 does not create a profile, detail-library entry, Ground layer, selector item, scene object, debug view, or gameplay override. Those changes remain blocked until M2.7C.5E selects and promotes one candidate.
+
+---
+
+## 2026-07-21 — GSU-M2.7C.5D.4 Inspector ownership note
+
+M2.7C.5D.4 changes only the Editor-only shared substrate generation and its validation metrics. No `GeneratedGround` foldout, runtime field, asset selector, debug view, Scene overlay, or River-specific control is added or changed. The exact-count sparse riverbed proof remains a single project-level menu action:
+
+```text
+Tools > PS3D > Run Generated Mass Sparse Riverbed Assembly Proof
+```
+
+The action now validates a more homogeneous micro-noise substrate and reports additional macro-homogeneity metrics, but it still writes evidence only under `Library/SurfaceMaterialDiagnostics/GeneratedMassSparseRiverbedAssembly` and still blocks runtime integration until a candidate is visually accepted.
+
+Historical sections below that mention the retired handmade sparse-riverbed candidate synthesis command remain superseded context only.
+
+---
+
+## 2026-07-21 — M2.7C.5D.3 Inspector boundary note
+
+M2.7C.5D.3 changes only the existing Editor menu assembly proof:
+
+```text
+Tools > PS3D > Run Generated Mass Sparse Riverbed Assembly Proof
+```
+
+The action generates one shared substrate and three nested exact-count `6 / 9 / 12` Generated Mass rock candidates, runs two deterministic suites, validates frozen sources, placement prefixes, unique-source use, coverage guardrails, scale distribution, spacing/hotspot limits, root sectors, seams, substrate statistics, output dimensions and fingerprints, writes one report, copies it to the clipboard, and writes local evidence under `Library/SurfaceMaterialDiagnostics/GeneratedMassSparseRiverbedAssembly`.
+
+It adds no `GeneratedGround` field, foldout, selector, action button, debug view, Scene overlay, serialized asset, material/profile entry, component, layer, tag, or runtime binding. `SubstrateOnly` and all candidate outputs remain diagnostic files rather than selectable Ground resources.
+
+The retired handmade action `Tools > PS3D > Run Sparse Riverbed Candidate Synthesis` and its two active `.cs` scripts are removed. Historical sections that name that command are superseded records and must not be treated as current workflow.
+
+Runtime/Inspector integration remains blocked until the user visually accepts a complete substrate-first candidate.
+
+---
+
+## 2026-07-21 — M2.7C.5D.2 Inspector boundary note
+
+M2.7C.5D.2 changes only the existing Editor menu assembly proof. It adds no GeneratedGround field, foldout, selector, action button, debug view, Scene overlay, serialized asset, material/profile entry, component, layer, tag, or runtime binding.
+
+The active evidence command remains:
+
+```text
+Tools > PS3D > Run Generated Mass Sparse Riverbed Assembly Proof
+```
+
+The command now produces three replacement candidates—Very Quiet, Quiet, and Natural—using lighter periodic mud, broader weighted size variation, explicit quiet composition, and deterministic presentation reframing. The Dense M2.7C.5D.1 candidate is superseded. Runtime Inspector ownership remains reserved for M2.7C.5E after one complete tile is visually accepted.
+
+Previous Inspector history follows below.
+
 ## 2026-07-21 — GSU-M2.7C.5D.1 inspector boundary note
 
 M2.7C.5D.1 adds no GeneratedGround Inspector field, foldout, selector, debug view, scene overlay, serialized profile, runtime material entry or component. The new command is a project-level Editor evidence action:

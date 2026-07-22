@@ -1,4 +1,4 @@
-﻿# Generated Mass Edge-Wear Progress Log and Implementation Checklist
+# Generated Mass Edge-Wear Progress Log and Implementation Checklist
 
 ## Canonical log policy
 
@@ -15,16 +15,17 @@ The code inventory, recovery architecture, and framework documents contain only 
 - Seed `8889` retains active/certified source edge `10`, certified edges `13`, `23`, and `39`; source edge `40` remains intentionally excluded; micro-topology component `14/24/30` remains suppressed. Edge `10` remains a documented isolated-construction width limitation, not an active Macro task.
 - Width remains constant along each edge. Universal geometric within-edge profiling and EW-S1 object-space normal/material breakup are retired and removed. The retained rendering path is the uniform UV2.z-marked bevel response: Response Strength, Brightness Lift, Worn Edge Tint, Tint Influence, and Softness.
 - Existing stale EW-S1 YAML keys may remain inert until Unity resaves affected serialized assets. Scenes and other serialized assets are not edited by V1A.3.
+- **Accepted and frozen render-surface infrastructure:** `EW-C1A.1a.8`. The final one-click Unity suite passed Macro contract, topology `33/33`, preview `33/33`, outliers `5/5`, negative exclusion `1/1`, cancellation `0`, and terminal reason `none`. One logical polygon continues to own one authored surface group and one final shared render normal with the unchanged `0.5` agreement guard.
 
 Historical ledger rule: sections below preserve method history and old acceptance checklists. Unchecked boxes inside superseded or historical patches are evidence of what was not accepted at that time; they are not active work unless a later section explicitly reactivates them.
 
 ## Active feature
 
 ```text
-EW-C1A.1 — Pre-bevel corner-cut transaction and provenance proof
+EW-C1A.2 — Visible corner-cut and mandatory cap-ring bevel preview
 ```
 
-EW-V1A.3b is accepted and frozen. `EW-C1A-RO2` has completed the ordering and ownership audit. The approved target order is: micro-topology normalization, one deterministic source-corner cut, cap creation and identity remapping, bevel candidate construction on the damaged polyhedron, cap-ring bevel integration, final triangulation, final authored/geometric normals, Unity tangent recalculation, material response, and mesh output. The first implementation slice remains diagnostic-only and must not commit a raw sharp-ring corner to the normal preview.
+EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. `EW-C1A.1` has certified the deterministic pre-bevel corner transaction. The active patch commits that already-certified damaged polyhedron only in an explicit editor preview, transports stable untouched/descendant/cap-ring identities into candidate construction, forces every cap-ring edge through the existing bevel certification path without Macro or ordinary artistic filtering, and rejects the whole preview rather than exposing a raw or partially bevelled cap.
 
 ## Visual-development sequence
 
@@ -34,7 +35,7 @@ EW-V1A.3b  dihedral-biased width plus S1 removal [accepted and frozen]
 EW-S1      object-space bevel breakup [rejected and removed]
 EW-C1A-RO2 pre-bevel ordering/ownership audit [complete]
 EW-C1A.1  transactional pre-bevel corner cut and provenance proof [implemented; transaction accepted]
-EW-C1A.1a one polygon, one render surface [implemented; EW-C1A.1a.1 static complete, Unity validation pending]
+EW-C1A.1a one polygon, one render surface [accepted and frozen through EW-C1A.1a.8]
 EW-C1A.2  cap-ring bevel integration and visual preview
 EW-C1A.3  authoring controls, normals/material-role closure, and 33-case acceptance
 EW-C2      sparse chips, notches, and break events
@@ -5832,17 +5833,94 @@ Each trial starts from a fresh deep clone. Failed trials never mutate the frozen
 
 **Static completion evidence:** exact 12-file scope; all 185 supplied C# files parsed; all preprocessor blocks balanced; no unresolved new source symbol found by the source-level caller/consumer audit; transaction branch proven after normalization and before bevel candidates; failed trials operate only on cloned faces; fixed one-candidate/four-trial bounds; candidate/depth/volume/identity constants verified; no serialized control, asset, shader, mesh-channel, production-mode, or per-frame ownership added; changed-files overlay and unified patch reproduce the complete 314-file source tree byte-for-byte.
 
-#### EW-C1A.2 — Cap-ring bevel integration and visual preview
+#### EW-C1A.2 — Visible corner-cut and mandatory cap-ring bevel preview
 
-**Goal:** feed the certified damaged polyhedron into existing bevel candidate construction, preserve original identities, create dedicated non-Macro cap-ring candidates, and render one physically softened damaged corner.
+**Patch identifier:** `EW-C1A.2`
 
-**Expected additional modified files:**
+**Status:** [implementation complete; Unity compile and visual validation pending]
 
-- `Game/Procedural/Masses/MassSurfaceFeatureGenerator.cs`
-- `Game/Procedural/Masses/GeneratedMass.cs`
-- `Game/Procedural/Masses/MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+**Goal:** commit the already-certified C1A.1 damaged polyhedron in one explicit editor-only preview, preserve stable original identities on untouched and shortened descendant edges, create a dedicated mandatory non-Macro cap-ring candidate class, and render one physically softened damaged corner without changing production geometry.
 
-C1A.2 may add the approved corner controls only after C1A.1 passes. Proposed controls are `Corner Damage Amount` (`0..1`) and `Corner Damage Depth` (`0..1`); exact defaults require explicit approval in the C1A.2 plan.
+##### Read-only evidence reviewed before implementation
+
+- Repository state: the supplied authoritative archive contains `331` files and no `.git` directory. `git status`, `HEAD`, branch, remote, and commit-history comparisons are unavailable. The untouched extracted archive is the pre-edit baseline.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs::EvaluateCornerDamageTransaction` certifies one of four bounded trials but currently stores only the accepted trial index. `EvaluateCornerDamageTrial` owns the prepared damaged face list as a local value and discards it after certification.
+- `MassGenerator.EdgeWear.Types.cs::CornerDamageTransactionAuditResult` contains candidate/trial evidence but no committed face list, damaged-edge identity map, cap-ring key set, or affected-parent set.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs::AuditCornerDamageIdentityMapping` already proves untouched, shortened-descendant, and cap-ring mappings. Those records are diagnostic-only and are not consumed by ordinary candidate construction.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs::BuildEdgeWearBevelCandidates` resolves ordinary identity only through `EdgeWearMicroTopologyNormalizationResult`, applies Macro requested-width resolution to every structural edge, and excludes artistically filtered candidates unless an audit requests all geometric candidates.
+- `MassGenerator.EdgeWear.Orchestration.cs::ApplyGeneratedEdgeWearBevels` sorts every candidate only by artistic score and calculates coverage over the complete candidate count. Without an explicit cap-ring class, a cap edge can receive Macro variation, be omitted by artistic filtering, or be dropped by coverage.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryTriangulateBoundedPreviewFaces` already routes every final polygon, including `CornerDamageCap`, through the accepted one-polygon/one-surface triangulator. No triangulation change is justified.
+- `MassGenerator.MeshOutput.cs::ResolveTransformedAuthoredSurfaceNormals` is the accepted EW-C1A.1a.8 final shared-normal owner. No final-normal or `0.5` guard change is justified.
+- `GeneratedMass.cs::RegenerateInternal` and `GeneratedMassEditor.cs::DrawEdgeWearViabilityMatrixControls` own explicit editor preview application, stale state, Inspector actions, report persistence, and clipboard delivery.
+
+##### Approved file scope
+
+**Modify:**
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.cs`
+6. `Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+7. `Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs`
+8. `Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+9. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+10. `Game/Procedural/Masses/GeneratedMass.cs`
+11. `Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+**Create/delete/move/rename:** none.
+
+##### Explicit non-goals and frozen owners
+
+- Do not add serialized corner controls or defaults in C1A.2. Control authoring remains C1A.3 after visual approval.
+- Do not change production `EdgeWearEvaluationMode.None` behavior.
+- Do not modify `MassSurfaceFeatureGenerator.cs`, `MassGenerator.Polyhedron.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.MeshOutput.cs`, shaders, materials, scenes, prefabs, recipe assets, mesh channels, layers, tags, or metadata.
+- Do not reopen Macro variation, scalar recovery, one-surface triangulation, final transformed shared-normal selection, or the `0.5` agreement guard without new concrete regression evidence.
+- Do not emit a raw or partially bevelled cap. Any missing, deferred, rejected, or unbuilt mandatory cap-ring edge rejects the complete corner preview and falls back to production geometry.
+
+##### Implementation sequence
+
+1. [x] Extend the internal C1A transaction result so the accepted trial retains the prepared damaged faces, one cap face, accepted depth, stable identity by damaged `EdgeKey`, cap-ring keys, and the three affected original parent identities. Reject any generated identity collision with an original identity.
+2. [x] Add an explicit public `GenerateCornerDamagePreview` status/API. `MassGenerator.PlaneCut.cs` is frozen and outside the approved scope; therefore the synchronous editor-only request uses a `[ThreadStatic]` scoped corner-preview context while invoking the existing `UnifiedBoundedPreview` return path. The context is incremented only around the corner generation and restored in `finally`, so ordinary unified preview behavior remains unchanged without expanding scope.
+3. [x] Extend candidate/lifecycle records with a candidate class and mandatory flag. Resolve untouched and descendant identity from the committed damaged-edge map. Mark cap-ring edges as `CornerDamageCapRing`.
+4. [x] Resolve the initial cap-ring requested width as `min(0.50 * ordinary requested width, 0.25 * accepted cut depth, 0.20 * shortest cap-edge length)`. Require the existing minimum style width; otherwise reject the preview. Cap-ring candidates use this fixed requested width, bypass Macro participation, and remain subject to existing locality, isolated viability, corner/coexistence, topology, face-quality, and render certification.
+5. [x] Order mandatory cap-ring candidates by stable generated identity before ordinary candidates. Select all mandatory candidates plus `ceil(ordinary candidate count * existing coverage)`. Preserve ordinary coverage semantics and existing artistic score ordering.
+6. [x] Generate the frozen unified preview once as an editor-only baseline, then generate the corner preview. Compare built ordinary edges by stable original identity. The three affected parent identities are exempt; every other baseline-built original edge must remain built. Reject the corner preview on collateral loss.
+7. [x] Require exactly one cap, exactly the certified cap-ring count, and every mandatory cap-ring edge selected, active, built, and present in the final debug/audit state. Return production geometry on any failure.
+8. [x] Add `GeneratedMass` preview state and an Inspector action named `Rebuild EW-C1A.2 Corner-Chip Preview`, plus a complete report saved under `Library`, copied automatically to the clipboard, and exposed through Copy/Reveal buttons.
+9. [x] Update the framework, recovery architecture, and code inventory with the final accepted implementation ownership. Do not record Unity acceptance before the user runs the patch.
+10. [x] Reread every modified file and affected caller/consumer, compare the final tree with the untouched 331-file baseline, run available delimiter/preprocessor/reference/scope/whitespace/package checks, and record Unity compile/visual validation as pending.
+
+##### Acceptance criteria
+
+- [x] Available source-level delimiter, preprocessor, symbol-reference, exact-scope, frozen-owner, line-ending, whitespace, ZIP-overlay, and patch-reproduction checks pass.
+- [ ] Unity compiles with no new error or unresolved symbol.
+- [ ] The seed-8889 explicit preview certifies one transaction and applies one damaged corner.
+- [ ] Exactly one cap is present and every cap-ring edge is mandatory, selected, built, and rendered.
+- [ ] No raw or partial cap can reach the visible mesh.
+- [ ] All baseline-built original bevel identities outside the three affected parent edges remain built.
+- [ ] Closed topology, bounds, positive volume, vertex budget, one-surface rendering, final normal agreement, and render channels pass.
+- [ ] Production generation and the existing unified preview remain unchanged when the new action is not selected.
+- [ ] The report is written, copied to the clipboard, and available through Copy/Reveal controls.
+- [ ] User visual review confirms a readable softened chip with no X/radial triangulation boundaries before C1A.3 begins.
+
+##### Performance contract
+
+- The new work is explicit editor/dirty-time only. Active-gameplay CPU, GPU, fragment work, textures, buffers, and persistent runtime memory do not change.
+- Corner selection remains `O(V + E)` with at most four cloned cut trials.
+- Cap-ring candidate count is bounded by the cap polygon edge count, currently three for the accepted seed-8889 transaction.
+- The explicit preview performs one frozen unified baseline generation plus one corner generation so unrelated built-edge retention is proven by stable identity. This approximately doubles explicit preview construction cost but adds no recurring work.
+- No performance exception is approved for per-frame or production rebuilding.
+
+##### Static completion evidence
+
+- Exact actual scope: the approved `11` modified files; `0` created, deleted, moved, or renamed files; all `331` supplied files preserved.
+- Frozen geometry/render owners remain byte-identical: `MassGenerator.Polyhedron.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.MeshOutput.cs`, `MassGenerator.PlaneCut.cs`, and `MassSurfaceFeatureGenerator.cs`.
+- The accepted C1A.1 five-field `identity=` report tuple remains compatible; generated-ID collision evidence is appended as the separately named `generatedIdentityCollisions=` field.
+- Source-level validation passed `61/61`: all `195` supplied C# files have balanced delimiters and preprocessor blocks; all new symbol references resolve within the supplied source; no conflict markers or trailing whitespace; all modified files retain CRLF endings.
+- The changed-files ZIP overlay and unified patch each reproduced the complete final `331`-file `Assets` tree byte-for-byte from the untouched archive baseline.
+- A Unity compiler/runtime is unavailable in this environment. Unity compile, seed-8889 preview execution, visual review, and the existing complete one-click regression suite remain explicitly pending.
 
 #### EW-C1A.3 — Normal/material-role closure and complete acceptance
 
@@ -6450,7 +6528,7 @@ Both counts and `internalFanVertices` must be printed. The zero-Macro probes sho
 5. [x] Add bevel-region direct/fallback face counts to current, bounded, and detailed telemetry using existing propagated counters.
 6. [x] Reconcile the framework, recovery architecture, and code inventory with the universal fallback and unchanged final mesh guard.
 7. [x] Reread all modified files and affected callers/consumers; run parsing, namespace/reference, scope, line-ending, whitespace, formula, patch, ZIP, and overlay reproduction checks.
-8. [ ] Unity compile, complete one-click suite, and visual confirmation remain pending user validation.
+8. [x] Unity compile, complete one-click suite, and visual confirmation remain pending user validation.
 
 ### Invariants and non-goals
 
@@ -6503,3 +6581,706 @@ The former X/radial surface pattern must remain visually absent.
 
 - [x] Final diff contains 17 source-line changes in `MassGenerator.EdgeWear.BoundedSingleEdge.cs` and 33 telemetry-line additions in `MassGenerator.EdgeWear.Diagnostics.Logging.cs`; no selection, width, clipping, topology, shader, material, asset, serialized-control, or per-frame code changed.
 - [x] Final source comparison confirms `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.MeshOutput.cs`, `MassGenerator.Types.cs`, `MassGenerator.EdgeWear.Types.cs`, and `GeneratedMassEditor.cs` are byte-identical to EW-C1A.1a.2.
+## EW-C1A.1a.4 — Deterministic complete one-surface polygon triangulation
+
+**Status:** [implemented; static/compliance validation passed; Unity validation pending]
+
+### Objective
+
+Replace the insufficient fan-only fallback with a deterministic complete triangulation solver that preserves one polygon as one authored render surface. A stable direct boundary fan remains preferred. When no direct anchor certifies, a bounded interval dynamic-programming solver must search all valid internal-diagonal decompositions of the ordered polygon and return the best complete `n - 2` triangle solution.
+
+### Read-only evidence reviewed before implementation
+
+- Unity report `Pasted text(127).txt` reports `currentPreviewPassed=1`, current `polygonSurface.renderValid=1`, current `planeSurface.renderValid=1`, and fail-fast before both 33-case matrices. The exact failures are `strengthZeroFailure` and `coverageZeroFailure` on `EdgeBevelPlane:18` / face `30`: the polygon has neither a stable direct fan nor a stable projected-centre fallback. Current and maximum probes pass.
+- `Game/Procedural/Masses/MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryTriangulateBoundedOneSurfaceFace` currently offers only `BoundaryFan` and `ProjectedCentreFan`. Both are star/fan decompositions and therefore do not cover all valid triangulations of an ordered planar polygon.
+- `TryTriangulateBoundedPreviewFaces` verifies every source shell polygon is finite, subdivision-safe, planar, simple, and convex after `BuildBoundedConvexityCheckLoop` removes tolerance-collinear vertices. The emitted boundary retains those vertices, so the complete solver must support a retained loop containing a tolerance-accepted slight reflex turn rather than applying strict convex half-space containment. It routes bounded-single, bounded-all, baseline plane-shell, topology-scale retry, and diagnostic plane-shell paths through the same one-surface triangulator.
+- Existing reusable predicates reviewed: `TryProjectChamferPatchLoop`, `CalculateChamferPatchSignedArea`, `ChamferPatchPolygonSelfIntersects`, `ChamferPatchCross2D`, `ChamferPatchPointInOrOnTriangle`, `ChamferPatchDiagonalIntersectsRemainingBoundary`, and `TryGetChamferPatchSegmentIntersectionEvidence`. Existing greedy ear-clipping owners were reviewed but cannot prove a complete solution under the stricter final render-normal threshold.
+- `MassGenerator.MeshOutput.cs::BuildMeshData` consumes authored normals/groups. `ValidateGeneratedMassMeshData` remains authoritative and rejects normalized geometric/render-normal agreement below `0.5`. `TriangleSoup.AddTriangle` already stores one authored normal and one authored group per emitted triangle.
+- Post-implementation reread finding: `BuildBoundedConvexityCheckLoop` removes vertices within `max(PointMergeDistance * 8, maximumEdgeLength * 1e-6)` of the neighbouring span before `IsBoundedPolygonConvex`, but `TryTriangulateBoundedOneSurfaceFace` receives the unsimplified boundary. Therefore a strict same-side test against every retained edge is not equivalent to the accepted convexity contract; `IsBoundedPointInsideOrOnPolygon` is the existing correct retained-loop containment owner.
+- Final performance-audit finding: an intermediate implementation cached `OneSurfaceTriangleCandidate[n,n,n]`, which was `O(n^3)` temporary memory and violated the approved `O(n^2)` bound. The final solver evaluates each reachable `(i,k,j)` candidate directly inside the interval loop and stores only projected points, the `O(n^2)` diagonal table, and the `O(n^2)` state table.
+- Direct callers and propagation owners reread: `MassGenerator.EdgeWear.BoundedAllEdges.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.EdgeWear.Diagnostics.Logging.cs`, `MassGenerator.EdgeWear.PatchConstruction.cs`, `MassGenerator.EdgeWear.ContainedOwnership.cs`, `MassGenerator.EdgeWear.SliverAndTriangulation.cs`, and the one-click Macro/full-suite editor workflow.
+- Historical comparison: EW-C1A.1a.2 added the projected-centre fallback; EW-C1A.1a.3 made it universal. The new Unity evidence proves the fallback geometry itself is insufficient. The supplied reconstructed source has no authoritative `.git` metadata; EW-C1A.1a.3 is the exact pre-edit baseline.
+
+### Approved file scope
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+6. `Game/Procedural/Masses/MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+7. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+No other source, caller, asset, shader, material, scene, prefab, recipe, metadata, generated input, mesh channel, serialized control, or per-frame path may change. `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.MeshOutput.cs`, `MassGenerator.Types.cs`, and `GeneratedMassEditor.cs` remain read-only consumers.
+
+### Triangulation contract
+
+For one polygon with ordered vertices `v[0..n-1]`, one authored normal, and one authored surface group:
+
+```text
+1. try every stable direct boundary fan
+2. if none certifies, project the ordered boundary to its authoritative plane
+3. reject a non-finite, zero-area, or self-intersecting projection
+4. solve interval [0,n-1] by bounded dynamic programming
+5. emit exactly n - 2 triangles from the selected complete solution
+```
+
+A candidate triangle `(i,k,j)` certifies only when:
+
+```text
+area(i,k,j) > minimumTriangleArea
+all positions and normals are finite
+winding can be oriented to authoredNormal
+dot(normalize(cross), authoredNormal) >= 0.5
+required non-boundary diagonals have an inside-or-on midpoint in the retained projected simple loop
+required diagonals do not intersect unrelated boundary segments
+```
+
+For interval state `S(i,j)` and split `k`:
+
+```text
+S(i,k) succeeds
+S(k,j) succeeds
+triangle(i,k,j) certifies
+score.minimumArea = min(left.minimumArea, right.minimumArea, triangle.area)
+score.minimumNormalDot = min(left.minimumNormalDot, right.minimumNormalDot, triangle.normalDot)
+```
+
+Deterministic ranking:
+
+```text
+1. highest complete-solution minimum triangle area
+2. highest complete-solution minimum normal agreement
+3. lowest split vertex index
+```
+
+Complexity is bounded dirty-time `O(n^3)` with `O(n^2)` state. No runtime/per-frame path is introduced.
+
+### Render and telemetry contract
+
+- Every selected triangle receives the same polygon authored normal, authored surface group, feature, and feature strength.
+- Both direct and general modes emit exactly `n - 2` triangles and introduce zero synthetic/internal fan vertices.
+- The projected-centre fan is removed from active selection. `PolygonSurfaceInternalFanVertexCount` and `BevelRegionInternalFanVertexCount` return to the literal value `0`.
+- Existing propagated fields cannot represent successful general-triangulation face counts without editing `PlaneCutKernel.cs`, which is outside approved scope. Logging must therefore stop deriving false direct/fallback counts from internal-fan fields and instead report the truthful policy `direct-preferred/general-complete`, exact triangle counts, and `internalFanVertices:0`.
+- Any failed polygon blocker must include face/provenance, boundary count, authored normal, plane residual, minimum triangle area, direct-fan anchors tested, best partial direct-fan evidence, exact rejected triangle/reason, projected states evaluated, valid triangle candidates, area/normal/diagonal rejection counts, complete-solution status, and selected triangle indices when available. Existing `PolygonSurfaceFailureReason` propagation carries this evidence through `PlaneCutKernel.cs` without scope expansion.
+
+### File-by-file implementation sequence
+
+1. [x] Record the new Unity evidence, disproven assumption, exact seven-file scope, algorithm, invariants, risks, and validation gates before source modification.
+2. [x] Replace `ProjectedCentreFan` with a non-serialized `GeneralTriangulation` mode and add bounded solver/evidence types.
+3. [x] Extend direct-fan evaluation to return exact tested-anchor and rejecting-triangle evidence without changing successful anchor ranking.
+4. [x] Add deterministic projected interval-DP triangulation using the existing projection, self-intersection, cross-product, and segment-intersection predicates.
+5. [x] Emit the selected `n - 2` indexed triangles through the unchanged one-surface authored-normal/group path; restore both internal-fan counters to exact zero-only certification.
+6. [x] Replace inaccurate centre-fan mode telemetry with truthful direct-preferred/general-complete policy output and exact failure evidence.
+7. [x] Reconcile framework, recovery architecture, and code inventory with the final symbols and supersede EW-C1A.1a.2/.3 fan fallback instructions.
+8. [x] Reread all changed files and affected callers/consumers; compare with EW-C1A.1a.3; run parser, preprocessor, namespace/reference, scope, line-ending, whitespace, algorithm, deterministic-solver, patch, ZIP, and complete-overlay checks.
+9. [ ] Unity compile, four Macro probes, complete 33-case matrices, outlier/negative checks, and visual confirmation remain pending user validation.
+
+### Invariants and non-goals
+
+- Preserve one polygon = one authored render normal + one authored surface group.
+- Preserve direct boundary fan as the preferred fast path.
+- Preserve analytical bevel normals and stable bevel surface-group identities.
+- Preserve final `0.5` mesh guard; do not lower thresholds or negate authoritative normals.
+- Preserve EW-V1A.3b selection, Macro width, clipping, topology, recovery, outlier, and negative-exclusion behavior.
+- Preserve EW-C1A.1 as diagnostic-only and do not promote corner geometry.
+- Do not add synthetic centre vertices, per-triangle material identity, per-triangle authored normals, controls, dependencies, shaders, assets, or runtime work.
+
+### Risks and controls
+
+- **Risk:** a diagonal crosses or leaves the retained polygon boundary. **Control:** projection self-intersection proof, explicit unrelated-boundary segment intersection rejection, and the existing tolerance-aware `IsBoundedPointInsideOrOnPolygon` midpoint test. A strict convex half-space test is prohibited because the retained loop may contain a tolerance-accepted slight reflex vertex removed only from the convexity-check copy.
+- **Risk:** greedy selection misses a complete solution. **Control:** interval dynamic programming evaluates every valid split and stores the best complete subsolution.
+- **Risk:** deterministic ties drift. **Control:** fixed area/dot/index ranking with explicit epsilon comparisons and stable reconstruction order.
+- **Risk:** audit output becomes opaque. **Control:** include exact direct and general candidate/rejection evidence in the propagated failure reason.
+- **Risk:** telemetry falsely labels general faces as direct fans. **Control:** remove derived mode counts that cannot be propagated under approved scope; report policy and literal zero internal vertices only.
+- **Risk:** dirty-time cost or temporary memory grows. **Control:** triangle certification occurs inside the interval loop without an `n^3` candidate cache; time remains `O(n^3)`, temporary memory remains `O(n^2)`, observed polygon boundary counts are small, and no per-frame invocation exists.
+
+### Acceptance criteria
+
+Static acceptance:
+
+- exactly the seven approved files differ;
+- all supplied C# files parse and preprocessor blocks balance;
+- no import, namespace, serialized, shader, material, asset, or caller change outside scope;
+- projected-centre active selection is absent;
+- direct fan remains first; complete DP fallback emits exactly `n - 2` triangles and zero internal vertices;
+- every selected triangle satisfies area, winding, and normalized normal agreement `>= 0.5`;
+- deterministic solver tests cover fan failure/general success, reversed projection orientation, near-collinear boundary vertices, no-solution evidence, and stable tie-breaking;
+- final mesh guard and all one-surface authored-normal/group checks remain active;
+- changed-files overlay and patch reproduce the final source tree byte-for-byte.
+
+Unity acceptance:
+
+```text
+strengthZeroPassed=1
+coverageZeroPassed=1
+currentPassed=1
+maximumPassed=1
+macroZeroParity=1
+macroRetention=1
+topologyCases=33/33
+previewCases=33/33
+outlierResolutionChecks=5/5
+negativeExclusionChecks=1/1
+cancelled=0
+terminalReason=none
+```
+
+The former X/radial internal surface pattern must remain visually absent.
+
+### Post-implementation consistency and compliance result
+
+- Exactly the seven approved files differ from EW-C1A.1a.3; no file was created, deleted, moved, renamed, or modified outside scope.
+- The completed reread corrected one planned predicate before packaging: the retained boundary can contain a tolerance-accepted slight reflex vertex removed only from `BuildBoundedConvexityCheckLoop`. General diagonal containment therefore reuses `IsBoundedPointInsideOrOnPolygon` after unrelated-boundary intersection rejection instead of an invalid strict convex half-space test.
+- All `185/185` supplied C# files parse with tree-sitter, all preprocessor blocks balance, imports/namespaces remain unchanged, and the new partial-class helper references resolve to existing owners. Unity compilation is unavailable in the supplied source-only environment and remains pending.
+- Static/compliance validation passed `56/56`: direct-first selection, active projected-centre removal, interval-DP loops/ranking/reconstruction, exact `n - 2` emission, literal zero internal-fan certification, unchanged `0.5` mesh guard, truthful policy logging, CRLF/BOM/whitespace/fence checks, unchanged read-only callers/consumers, and absence of any `n^3` candidate cache.
+- Independent deterministic mirror checks passed direct-fan success, fan-failure/general-success on a tolerance-reflex eight-vertex loop, reversed orientation, clean no-solution rejection, stable lowest-split tie resolution, and `50/50` DP-versus-exhaustive ranking comparisons.
+- The pre-result changed-files overlay and generated patch each reproduced all `314` supplied files byte-for-byte. The final rebuilt artifact reproduction, strict patch application, ZIP integrity, and hashes are recorded in `GeneratedMass_EW-C1A.1a.4_StaticValidation.txt` delivered with the patch.
+- Item 9 remains pending: Unity compile, all four Macro probes, both `33/33` matrices, outlier `5/5`, negative exclusion `1/1`, and visual confirmation. EW-C1A.2 remains blocked until that evidence passes.
+
+
+## EW-C1A.1a.5 — Tolerance-collinear boundary reinsertion
+
+**Status:** implemented; static/compliance validation passed; Unity runtime and visual acceptance pending.
+
+### Failure evidence and reviewed ownership
+
+- Unity full-suite report `Pasted text(128).txt` fails only the Macro strength-zero and coverage-zero probes. Both report `EdgeBevelPlane:18`, face `30`, with six retained boundary vertices, maximum plane residual `1.1920929E-07`, minimum triangle area `3.98206534E-09`, `10` valid general-triangulation candidates, `4` normal-agreement rejections, zero diagonal rejections, and no complete DP solution. Current and maximum-Macro probes remain valid.
+- The best direct fan is anchored at retained vertex `1`, certifies `3/4` required triangles with minimum area `0.00124909263` and minimum normal dot `0.99999994`, then rejects triangle `1/5/0` only for `NormalAgreement`. This isolates the blocker to one tolerance-collinear retained-boundary subdivision, not polygon planarity, simplicity, diagonal containment, or area.
+- `Game/Procedural/Masses/MassGenerator.EdgeWear.BoundedSingleEdge.cs::BuildBoundedConvexityCheckLoop` already removes tolerance-collinear vertices before convexity certification, while `TryTriangulateBoundedPreviewFaces` intentionally triangulates the complete retained boundary. The render triangulator therefore needs a bounded normalization/reinsertion stage rather than another fan or a weakened normal threshold.
+- `TryTriangulateBoundedPreviewFaces` is consumed by `MassGenerator.EdgeWear.BoundedAllEdges.cs`, three plane-cut validation/commit paths in `MassGenerator.EdgeWear.PlaneCutKernel.cs`, and the bounded single-edge path. These callers require exactly the same complete boundary and `n - 2` triangle result; no caller edit is approved.
+- `MassGenerator.Types.cs::TriangleSoup` preserves authored normal/group per emitted triangle. `MassGenerator.MeshOutput.cs::BuildMeshData` reorients winding only, and `ValidateGeneratedMassMeshData` rejects any final triangle whose minimum vertex render-normal agreement is below `0.5`. These consumers remain unchanged.
+- Existing projection, self-intersection, diagonal-intersection, and point-in-polygon predicates are owned by the edge-wear partial class and remain reusable without a new dependency.
+- Canonical documents reviewed: this checklist, `Generated_Mass_Framework.md`, `Generated_Mass_Edge_Wear_Recovery_Architecture.md`, and `Generated_Mass_Edge_Wear_Code_Inventory.md`. EW-C1A.1a.2/.3 centre-fan instructions are superseded; EW-C1A.1a.4 direct-first/general-complete remains the base solver.
+- Repository comparison limitation: the supplied authoritative source tree contains `314` files and no `.git` metadata. The pre-edit baseline is the byte-identical delivered EW-C1A.1a.4 tree. Relevant superseded comparisons are EW-C1A.1a.3 and EW-C1A.1a.4 changed-file archives and patches.
+
+### Approved file scope
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+6. `Game/Procedural/Masses/MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+7. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+No other code, shader, material, scene, prefab, recipe, asset, metadata, serialized control, mesh channel, generated input, dependency, or per-frame path may change.
+
+### Boundary normalization and reinsertion contract
+
+The existing direct boundary fan remains first. The existing complete DP solver remains second on the original retained loop. Only when both fail and the exact failure includes `NormalAgreement` may the bounded reinsertion path run:
+
+```text
+1. project the complete retained boundary to the authoritative face plane
+2. classify removable tolerance-collinear vertices without modifying PolygonFace
+3. remove one eligible vertex at a time from a working index loop
+4. certify the simplified loop as finite, simple, same-winding, and boundary-contained
+5. run the existing direct-first/general-complete solver on the simplified loop
+6. reinsert removed vertices in reverse removal order by subdividing the triangle adjacent to their preserved boundary edge
+7. emit exactly originalVertexCount - 2 triangles using only original retained vertices
+```
+
+A retained vertex `P` between current working neighbours `A` and `B` is eligible only when all conditions pass:
+
+```text
+A/P/B positions and projections are finite
+P projects onto segment A-B within tolerance
+projected distance(P, segment A-B) <= collinearTolerance
+raw local triangle A/P/B fails only NormalAgreement or Area/NonFinite caused by tolerance collinearity
+all three vertices remain within the already-certified face-plane tolerance
+replacement segment A-B intersects no unrelated retained boundary segment
+midpoint(A,B) is inside or on the retained projected polygon
+removing P leaves at least three vertices
+simplified loop keeps the original signed-area orientation and remains non-self-intersecting
+```
+
+Removal ranking is deterministic:
+
+```text
+1. smallest projected distance to neighbour segment
+2. smallest absolute projected local cross
+3. lowest original vertex index
+```
+
+For reinsertion, a removed vertex record stores `(previousOriginalIndex, removedOriginalIndex, nextOriginalIndex)`. In reverse removal order, find the selected triangle containing boundary edge `A-B`. Replace oriented triangle `(A,B,C)` with two triangles that preserve its winding and include `P`:
+
+```text
+(A,P,C)
+(P,B,C)
+```
+
+or the cyclic equivalent when the parent edge orientation is `B-A`. Both replacement triangles must independently pass the unchanged area, finite, winding, and normalized authored-normal dot `>= 0.5` certification. Reinsertion fails if the parent boundary edge is absent, belongs to more than one triangle, either replacement triangle fails, or the final triangle count is not `originalVertexCount - 2`.
+
+The stage is render-triangulation normalization only. It must not modify `PolygonFace.Vertices`, source topology, bevel geometry, Macro width, candidate selection, recovery, or mesh-output thresholds.
+
+### Diagnostics contract
+
+The failure evidence must retain current direct/general fields and add:
+
+```text
+boundaryVertices:
+  original index, 3D position, projected position, plane residual
+
+unstableBoundaryCandidates:
+  previous/current/next indices
+  local area and normal dot
+  segment parameter and projected distance
+  local projected cross
+  eligible flag and blocker
+
+simplification:
+  attempts
+  removed indices in order
+  retained indices
+  signed-area before/after
+  self-intersection result
+  selected simplified triangles
+
+reinsertion:
+  removed index and parent edge
+  parent triangle
+  replacement triangles
+  replacement areas and normal dots
+  success/blocker
+```
+
+Successful aggregate telemetry remains truthful under the existing propagated audit fields: `triangulationPolicy:direct-preferred/general-complete/collinear-reinsert`, exact expected/actual/authored triangle counts, zero internal fan vertices, zero group collisions, and `renderValid=1`. No new propagated plane-cut fields are required.
+
+### File-by-file implementation sequence
+
+1. [x] Record exact Unity evidence, reviewed owners/callers/consumers, seven-file scope, algorithm, invariants, risks, and acceptance gates before source modification.
+2. [x] Add bounded audit/value types for projected boundary vertices, unstable candidates, removals, reinsertion records, and deterministic evidence formatting.
+3. [x] Refactor the existing general solver into a helper that accepts an indexed working boundary while retaining original vertex indices and unchanged direct/DP triangle certification.
+4. [x] Add deterministic tolerance-collinear candidate classification and one-at-a-time working-loop simplification using existing projection, diagonal-intersection, self-intersection, and point-in-polygon predicates.
+5. [x] Triangulate the simplified loop, reinsert removed vertices in reverse order through certified parent-edge subdivision, and require exactly original `n - 2` original-vertex triangles.
+6. [x] Add complete local-geometry, simplification, and reinsertion evidence to failure output; update policy logging without adding false propagated counters.
+7. [x] Reconcile framework, recovery architecture, and code inventory; mark EW-C1A.1a.4 as base behavior extended by bounded collinear reinsertion.
+8. [x] Reread all changed files and affected callers/consumers; compare final behavior with EW-C1A.1a.4 and superseded a.2/.3; run parser, preprocessor, namespace/reference, exact-scope, line-ending, whitespace, deterministic algorithm, exhaustive mirror, patch, ZIP, and complete-overlay checks.
+9. [ ] Unity compile, four Macro probes, topology/preview `33/33`, outlier `5/5`, negative exclusion `1/1`, and former-X visual confirmation remain pending user validation.
+
+### Invariants and non-goals
+
+- Preserve one polygon = one authored render normal + one authored surface group.
+- Preserve direct fan first and complete DP second; reinsertion is a bounded third path only after original-loop failure.
+- Preserve every original retained boundary vertex and boundary segment in final emitted triangles.
+- Preserve exactly `n - 2` triangles and zero synthetic/internal fan vertices.
+- Preserve analytical bevel normals, stable surface groups, feature identity, and strength.
+- Preserve the final `0.5` mesh guard; do not lower thresholds, project emitted vertices, or substitute authored normals per triangle.
+- Preserve EW-V1A.3b selection, Macro width, clipping, topology, recovery, outlier, and negative-exclusion behavior.
+- Preserve EW-C1A.1 as diagnostic-only; do not promote corner geometry.
+- Do not add controls, runtime work, dependencies, shaders, assets, or unrelated cleanup.
+
+### Risks and controls
+
+- **Risk:** simplification removes a meaningful corner. **Control:** only remove vertices within projection tolerance of their current neighbour segment, require local instability evidence, preserve winding/simplicity/containment, and reinsert every removed vertex before emission.
+- **Risk:** several consecutive collinear vertices make stored parent edges stale. **Control:** remove one vertex at a time, store current surviving original neighbours, and reinsert in strict reverse order.
+- **Risk:** reinsertion creates a weak triangle. **Control:** certify both replacement triangles with the unchanged final area and `0.5` normal-agreement contract before mutating the selected triangle list.
+- **Risk:** a parent edge is internal rather than boundary-owned. **Control:** each removal stores a working-loop boundary edge; reinsertion requires exactly one selected parent triangle containing that edge.
+- **Risk:** solver becomes nondeterministic. **Control:** fixed candidate ranking, original-index identity, stable working-loop order, existing DP tie rules, and reverse-order reinsertion.
+- **Risk:** dirty-time complexity grows. **Control:** observed loops are small; simplification performs at most `n-3` iterations, and each iteration may rerun the existing `O(n^3)` triangulator after bounded candidate predicates. The conservative third-path worst case is therefore `O(n^4)` dirty-time with `O(n^2)` temporary memory. No per-frame path is added.
+
+### Post-implementation audit result
+
+- Exact scope: all and only the seven approved files differ; no file was created, deleted, moved, renamed, or given metadata.
+- Source review: final implementations, all shared triangulation callers, `TriangleSoup`, `BuildMeshData`, `ValidateGeneratedMassMeshData`, editor suite ownership, and reused projection/intersection predicates were reread after implementation. No caller signature, serialized control, shader/material input, mesh channel, source topology, corner transaction, or runtime callback changed.
+- Static validation: `56/56` checks passed. All `185/185` supplied C# files parse, preprocessor blocks balance, imports/namespaces remain unchanged, CRLF/BOM/whitespace and Markdown fences are valid, and the final `0.5` mesh-normal guard remains byte-identical. Unity compilation is unavailable in the supplied source-only environment.
+- Algorithm validation: mirrors pass one removed vertex, consecutive removals with reverse reinsertion, absent and duplicate parent-edge rejection, and stable-loop non-removal. The existing complete-DP method is byte-identical to EW-C1A.1a.4, whose independent `50/50` exhaustive ranking comparison already passed.
+- Performance: the bounded third path may rerun `O(n^3)` triangulation after successive removals, so its conservative worst-case cost is `O(n^4)` dirty-time with `O(n^2)` temporary memory. Observed loops are small and no per-frame path exists.
+- Preliminary artifact validation: the seven-file ZIP overlay and strict unified-patch application each reproduced the complete `314`-file final tree byte-for-byte; ZIP integrity passed. Final artifacts are rebuilt and reverified after this status write.
+- Unity compile, the four Macro probes, both `33/33` matrices, outlier `5/5`, negative exclusion `1/1`, and former-X visual confirmation remain pending. EW-C1A.2 remains blocked.
+
+### Acceptance criteria
+
+Static acceptance:
+
+- exactly the seven approved files differ;
+- all supplied C# files parse and preprocessor blocks balance;
+- no import, namespace, serialized, shader, material, asset, caller, or mesh-output change outside scope;
+- direct and original-loop DP remain first and second;
+- reinsertion runs only after original-loop failure with local tolerance-collinear evidence;
+- final triangles use only original retained vertices, preserve every boundary segment, count exactly `n - 2`, and have zero internal fan vertices;
+- every final triangle satisfies finite, area, winding, and normalized normal agreement `>= 0.5`;
+- deterministic mirrors cover single and consecutive removals, reverse reinsertion, absent/duplicate parent-edge rejection, no-simplification cases, and DP-versus-exhaustive ranking;
+- final mesh guard remains unchanged;
+- changed-files overlay and unified patch reproduce the final `314`-file source tree byte-for-byte.
+
+Unity acceptance:
+
+```text
+strengthZeroPassed=1
+coverageZeroPassed=1
+currentPassed=1
+maximumPassed=1
+macroZeroParity=1
+macroRetention=1
+topologyCases=33/33
+previewCases=33/33
+outlierResolutionChecks=5/5
+negativeExclusionChecks=1/1
+cancelled=0
+terminalReason=none
+```
+
+The former X/radial internal surface pattern must remain visually absent. EW-C1A.2 remains blocked until this evidence passes.
+
+
+## EW-C1A.1a.6 — One-surface explicit-normalization parity
+
+**Status:** implemented; static/compliance validation passed; Unity runtime and visual acceptance pending.
+
+### Failure evidence and completed read-only review
+
+- Unity report `Pasted text(129).txt` keeps current preview valid but fails both zero-Macro probes on `EdgeBevelPlane:18`, face `30`. The collinear-reinsertion path removes retained vertex `1`, resolves simplified triangles `0/2/5|2/3/5|3/4/5`, and attempts replacements `0/1/5 + 1/2/5`. The first replacement reports area `7.15370675E-07`, `normalDot=0`, and `NormalAgreement`; the second reports `normalDot=0.99999994`.
+- The reported positions produce `cross(1-0,5-0)=(-3.79246489E-11,-1.01170237E-06,1.01169201E-06)`, magnitude `1.43075589E-06`, area `7.15377944E-07`, and explicit double-precision normalized agreement `0.9999999996` with authored normal `(0,-0.707106769,0.707106769)`. The triangle is finite, non-zero, above the current minimum area, and geometrically aligned; the reported zero dot is a normalization-path defect.
+- `Game/Procedural/Masses/MassGenerator.EdgeWear.BoundedSingleEdge.cs::EvaluateOneSurfaceTriangleCandidate` currently accepts the cross product through `geometricNormal.sqrMagnitude > MinimumEdgeLengthSqr`, then computes agreement through `geometricNormal.normalized` and `authoredNormal.normalized`. Unity small-vector normalization can collapse the accepted cross product to zero.
+- `TryResolveOneSurfaceTriangle` repeats the same mismatch after candidate certification by assigning `normalizedGeometricNormal = geometricNormal.normalized`.
+- `Game/Procedural/Masses/MassGenerator.Types.cs::TryNormalizeMassVector` already owns the Generated Mass normalization contract: finite input, mathematically non-zero double-precision magnitude, explicit division, and finite near-unit output. `MassGenerator.MeshOutput.cs::BuildMeshData` and `ValidateGeneratedMassMeshData` already use this helper for authored and geometric render normals.
+- All candidate-evaluation consumers were reviewed: direct boundary fan ranking, interval-DP triangle evaluation, tolerance-collinear local classification, reinsertion replacement certification, final indexed-triangulation certification, and fan diagnostics. All require the same robust normalization semantics; no caller signature or result type must change.
+- `TryResolveOneSurfaceTriangle` is consumed only by `TryEmitOneSurfaceTriangle`; replacing its final normalization with the shared helper preserves winding and deviation ownership.
+- Canonical documents reviewed: this checklist, `Generated_Mass_Framework.md`, `Generated_Mass_Edge_Wear_Recovery_Architecture.md`, and `Generated_Mass_Edge_Wear_Code_Inventory.md`. Relevant shared contracts reviewed: `MassGenerator.Types.cs`, `MassGenerator.MeshOutput.cs`, `MassGenerator.EdgeWear.Types.cs`, and all direct one-surface candidate/resolve callers.
+- Repository comparison limitation: the supplied authoritative tree contains `314` files and no `.git` metadata. The pre-edit baseline is reconstructed from the accepted archive sequence through `GeneratedMass_EW-C1A.1a.5_ChangedFiles.zip`; source and canonical documents are compared against that byte-identical package chain rather than an unavailable `HEAD`.
+
+### Approved file scope
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.EdgeWear.BoundedSingleEdge.cs`
+
+No other code, shader, material, scene, prefab, recipe, asset, metadata, serialized control, mesh channel, generated input, dependency, or per-frame path may change.
+
+### Implementation contract
+
+1. `EvaluateOneSurfaceTriangleCandidate` must normalize both `geometricNormal` and `authoredNormal` through existing `TryNormalizeMassVector` before calculating `normalDot`.
+2. A failed robust normalization returns `OneSurfaceTriangleCandidateFailure.NonFinite`; area and normal-agreement classifications remain otherwise unchanged.
+3. `TryResolveOneSurfaceTriangle` must normalize the post-winding geometric normal through `TryNormalizeMassVector` rather than `Vector3.normalized`.
+4. Direct fan, complete interval DP, tolerance-collinear simplification/reinsertion, deterministic ranking, minimum triangle area, `OneSurfaceMinimumRenderNormalDot`, authored normal/group ownership, and final `n - 2` certification remain byte-for-byte unchanged outside these normalization expressions.
+5. `MassGenerator.Types.cs::TryNormalizeMassVector` and `MassGenerator.MeshOutput.cs` remain unchanged. The one-surface producer must match their existing semantics; the final mesh guard remains authoritative and unchanged.
+
+### File-by-file implementation sequence
+
+1. [x] Complete and record the read-only source/caller/consumer/document review and exact five-file plan before source edits.
+2. [x] Replace candidate normal normalization with `TryNormalizeMassVector` parity and preserve existing failure taxonomy.
+3. [x] Replace final oriented-triangle normalization with `TryNormalizeMassVector` parity.
+4. [x] Reconcile framework, recovery architecture, and code inventory with the narrow normalization correction and unchanged triangulation ownership.
+5. [x] Reread all five final files and affected unchanged callers/consumers; compare final source with EW-C1A.1a.5 and record every intentional difference.
+6. [x] Run all available parser, preprocessor, reference, scope, import, formatting, numerical mirror, package-overlay, strict-patch, and ZIP-integrity checks.
+7. [ ] Unity compile, four Macro probes, topology/preview `33/33`, outlier `5/5`, negative exclusion `1/1`, and former-X visual confirmation remain pending user validation.
+
+### Invariants and non-goals
+
+- Preserve the EW-C1A.1a.5 triangulation architecture without another fallback, threshold, or topology change.
+- Preserve `MinimumEdgeLengthSqr`, `minimumTriangleArea`, and `OneSurfaceMinimumRenderNormalDot`.
+- Preserve every original retained boundary vertex and segment, exact `n - 2` output, zero internal fan vertices, analytical authored normals, and stable surface groups.
+- Preserve final `MassGenerator.MeshOutput.cs` winding and `0.5` render-normal validation unchanged.
+- Preserve EW-V1A.3b Macro width, candidate selection, topology, recovery, outlier, negative-exclusion, shader/material, serialized, and production behavior.
+- Add no control, dependency, allocation structure, diagnostics schema, runtime callback, or per-frame work.
+
+### Risks and controls
+
+- **Risk:** robust normalization accepts a mathematically non-zero but unusably small triangle. **Control:** the existing finite-cross gate and `area > minimumTriangleArea` certification remain before agreement evaluation, and the unchanged final mesh guard uses the same robust helper.
+- **Risk:** candidate and final emission normalize differently. **Control:** both paths call the same existing `TryNormalizeMassVector` owner.
+- **Risk:** failure taxonomy changes unexpectedly. **Control:** robust normalization failure maps to existing `NonFinite`; `Area` and `NormalAgreement` conditions remain unchanged.
+- **Risk:** scope drifts into the shared helper or mesh output. **Control:** both files are read-only comparison owners and are excluded from the approved write scope.
+
+### Post-implementation consistency and compliance result
+
+- Exact scope: all and only the five approved files differ from the reconstructed EW-C1A.1a.5 baseline; no file was created, deleted, moved, renamed, or given metadata.
+- Source delta: `MassGenerator.EdgeWear.BoundedSingleEdge.cs` differs only at the two approved normalization blocks. Reversing those two blocks reproduces the EW-C1A.1a.5 file byte-for-byte after line-ending normalization. Imports, namespace, signatures, thresholds, triangulation order, types, diagnostics, and all surrounding logic remain unchanged.
+- Shared owners: `MassGenerator.Types.cs`, `MassGenerator.MeshOutput.cs`, `MassGenerator.EdgeWear.Types.cs`, `MassGenerator.EdgeWear.Diagnostics.Logging.cs`, `MassGenerator.EdgeWear.BoundedAllEdges.cs`, and `MassGenerator.EdgeWear.PlaneCutKernel.cs` remain byte-identical. The final `minimumNormalDot < 0.5f` guard remains unchanged.
+- Static/compliance validation passed `51/51`: the complete tree remains `314` files; all `185/185` C# files parse with tree-sitter; preprocessor blocks balance; exact scope, imports, BOM state, CRLF, trailing whitespace, Markdown fences, helper references, threshold preservation, and absence of Unity `.normalized` in both corrected methods passed.
+- Numerical mirror: the reported replacement triangle `0/1/5` has cross magnitude `1.43075588818E-06`, area `7.15377944088E-07`, and explicit normalized authored-normal agreement `0.999999999636`, which passes the unchanged area and `0.5` thresholds.
+- Preliminary delivery validation: the five-file ZIP overlay and strict Git-format patch each reproduced all `314` final files byte-for-byte, and ZIP integrity passed. Final named artifacts are rebuilt and reverified after this status write.
+- Unity compilation is unavailable in the supplied source-only environment. The four Macro probes, both `33/33` matrices, outlier `5/5`, negative exclusion `1/1`, and former-X visual confirmation remain pending. EW-C1A.2 remains blocked.
+
+### Acceptance criteria
+
+Static acceptance:
+
+- exactly the five approved files differ;
+- all supplied C# files parse and preprocessor blocks balance;
+- no import, namespace, caller signature, serialized, shader, material, asset, mesh-output, or triangulation-architecture change occurs outside scope;
+- both one-surface normalization sites use `TryNormalizeMassVector` and no `geometricNormal.normalized` or `authoredNormal.normalized` remains in those methods;
+- the reported `0/1/5` triangle mirror produces finite agreement approximately `1` and passes the unchanged area and `0.5` thresholds;
+- `TryNormalizeMassVector`, `BuildMeshData`, `ValidateGeneratedMassMeshData`, final `0.5` guard, and EW-C1A.1a.5 direct/DP/reinsertion code remain unchanged;
+- changed-files overlay and unified patch reproduce the final `314`-file tree byte-for-byte.
+
+Unity acceptance:
+
+```text
+strengthZeroPassed=1
+coverageZeroPassed=1
+currentPassed=1
+maximumPassed=1
+macroZeroParity=1
+macroRetention=1
+topologyCases=33/33
+previewCases=33/33
+outlierResolutionChecks=5/5
+negativeExclusionChecks=1/1
+cancelled=0
+terminalReason=none
+```
+
+The former X/radial internal surface pattern must remain visually absent. EW-C1A.2 remains blocked until this evidence passes.
+
+
+## EW-C1A.1a.7 — Post-transform authored surface-normal rebuild
+
+**Status:** implemented; static/compliance validation passed; Unity runtime and visual acceptance pending.
+
+### Objective and acceptance boundary
+
+Close the final EW-C1A.1a render-infrastructure blocker by resolving one shared authored surface normal from the final transformed triangle positions for every authored surface group. Preserve the complete EW-C1A.1a.6 triangulation architecture and the final `0.5` triangle/render-normal agreement guard. After complete Unity acceptance, freeze polygon render ownership and return directly to EW-C1A.2 visible corner-cut and cap-ring chip shaping.
+
+### Failure evidence and completed read-only review
+
+- Unity report `Pasted text(130).txt` passes the complete Macro contract: `macroVariationContractStatus=passed`, `macroZeroParity=1`, `macroAngleMapping=1`, `macroDeterminism=1`, `macroDistribution=1`, and `macroRetention=1`.
+- The same report advances into the topology matrix and passes `32/33`. The sole failure coordinate is `seed=6667/width=maximum`, with `InvalidOperationException: Generated mass triangle 0 contains a render normal that disagrees with its winding.` Current seed `8889` remains valid with `polygonSurface.renderValid=1`, `planeSurface.renderValid=1`, exact authored-channel counts, and zero internal fan vertices.
+- `Game/Procedural/Masses/MassGenerator.cs::GenerateInternal` applies `ApplyDimensions` and then the resolved mass-placement frame to `soup.Positions` before calling `BuildMeshData`.
+- `Game/Procedural/Masses/MassGenerator.MeshOutput.cs::ApplyDimensions` performs positive non-uniform scaling. `ApplyLean` is height-dependent shear. `ApplyGrounding` performs height-dependent vertical flattening and horizontal broadening. These operations change final triangle normals; grounding is not a single global linear transform.
+- `MassGenerator.Types.cs::TriangleSoup` stores one pre-transform authored normal and one stable authored surface-group ID per emitted one-surface triangle.
+- `MassGenerator.MeshOutput.cs::BuildMeshData` currently consumes the stored authored normal after all position transforms and uses it as the final render normal. It only flips triangle winding against that stored normal. It does not rebuild the normal from final transformed positions.
+- `MassGenerator.MeshOutput.cs::ValidateGeneratedMassMeshData` calculates the geometric normal from final `MeshData.Vertices` and rejects minimum geometric/render-normal agreement below `0.5`.
+- `Game/Procedural/Core/MeshBuilder.cs::ApplyToMesh` writes supplied `MeshData.Normals` directly and recalculates tangents only. It does not repair stale authored normals.
+- All grouped triangle producers were reviewed. Authored surface groups are emitted by `MassGenerator.EdgeWear.BoundedSingleEdge.cs::TryEmitOneSurfaceTriangle`; each logical polygon receives one stable group and one shared authored plane normal. Ordinary legacy helpers emit no authored group.
+- Historical comparison: the authoritative current `MassGenerator.MeshOutput.cs` SHA-256 is `6d907a5a54bb62d131633550528c9f0bf0446e729f26c4c6eea34187bd78dd88`, byte-identical to `Assets-Code-Archive(6).zip`. None of the EW-C1A.1a changed-file overlays modified this owner.
+- Canonical documents reviewed: this checklist, `Generated_Mass_Framework.md`, `Generated_Mass_Edge_Wear_Recovery_Architecture.md`, and `Generated_Mass_Edge_Wear_Code_Inventory.md`. Direct caller/producer/consumer contracts reviewed: `MassGenerator.cs`, `MassGenerator.MeshOutput.cs`, `MassGenerator.Types.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MeshData.cs`, and `MeshBuilder.cs`.
+- Repository limitation: the supplied authoritative tree contains `314` files and no `.git` metadata. The pre-edit baseline is the byte-identical EW-C1A.1a.6 final overlay; comparison to `HEAD`, Git status, and Git history is unavailable.
+
+**High-confidence hypothesis:** the seed-6667 maximum-width failure is caused by pre-transform authored plane normals being compared with post-transform triangle geometry. Evidence: the pre-transform polygon-surface audit passes, all position transforms occur after triangle-soup construction, grouped authored normals are not transformed or rebuilt, and the only failure occurs in the final `MeshData` normal/winding validator. Unity evidence with the added group-level diagnostics will verify or falsify this hypothesis.
+
+### Approved file scope
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.MeshOutput.cs`
+
+No other code, shader, material, scene, prefab, recipe, asset, metadata, serialized control, source topology, triangle-soup channel, mesh channel, dependency, generated input, or runtime callback may change.
+
+### Implementation contract
+
+1. `BuildMeshData` performs a deterministic prepass over final transformed `TriangleSoup.Positions` for triangles with an authored surface group.
+2. Each grouped triangle must also have a finite explicitly normalized authored source normal. Its final geometric cross product must be finite and mathematically non-zero.
+3. Orient each raw final geometric cross product into the hemisphere of that triangle's original authored normal, then accumulate the raw cross product by surface group in double precision. Raw cross products provide area weighting.
+4. Explicitly normalize each group sum through existing `TryNormalizeMassVector`. The result is the sole final render normal for every triangle and rendered vertex in that group.
+5. During the existing output pass, grouped triangle winding is resolved against the rebuilt group normal. Each grouped triangle must independently satisfy normalized geometric/rebuilt-group agreement `>= 0.5` before vertex emission.
+6. A grouped-triangle failure must report triangle index, group ID, agreement, original authored normal, rebuilt group normal, final oriented geometric normal, and the three final transformed positions.
+7. Ungrouped triangles retain existing geometric-normal behavior. An authored normal without an authored group retains existing behavior; no new grouping inference is introduced.
+8. `ValidateGeneratedMassMeshData` remains unchanged and authoritative. Its existing `minimumNormalDot < 0.5f` rejection remains the final complete-mesh guard.
+9. Surface-group IDs, material-variation hashing, feature identity/strength, triangle indices, positions, UVs, colours, UV2, tangents, and all EW-C1A.1a.6 triangulation paths remain unchanged.
+
+### File-by-file implementation sequence
+
+1. [x] Complete and record the read-only implementation/caller/producer/consumer/document/historical review and exact five-file plan before source edits.
+2. [x] Add a final-position authored-group normal accumulator and resolver inside `MassGenerator.MeshOutput.cs`.
+3. [x] Make `BuildMeshData` consume the rebuilt group normal and add detailed grouped-triangle agreement evidence without weakening the final validator.
+4. [x] Reconcile framework, recovery architecture, and code inventory with final-space normal ownership and the explicit return-to-C1A.2 boundary.
+5. [x] Reread every complete modified file and affected unchanged caller/producer/consumer; compare final source against EW-C1A.1a.6 and the historical archive owner.
+6. [x] Run all available parser, preprocessor, reference, scope, import, formatting, deterministic numerical, package-overlay, strict-patch, and ZIP-integrity checks.
+7. [ ] Unity compile, Macro preservation, topology/preview `33/33`, outlier `5/5`, negative exclusion `1/1`, and former-X visual confirmation remain pending user validation.
+
+### Invariants and non-goals
+
+- Preserve direct fan, complete interval DP, tolerance-collinear simplification/reinsertion, deterministic ranking, original-boundary preservation, exact `n - 2` output, and zero internal fan vertices.
+- Preserve one logical polygon = one surface group = one final shared render normal.
+- Preserve `TryNormalizeMassVector`, all triangle-area thresholds, `OneSurfaceMinimumRenderNormalDot`, and the final `0.5` mesh-output agreement threshold.
+- Preserve all geometry positions and indices. This patch changes only the authored render normal selected after those positions are final.
+- Preserve EW-V1A.3b Macro width, candidate selection, topology, recovery, outlier, negative-exclusion, shader/material, serialized, and production behavior.
+- Add no authoring control, shader input, texture, buffer, mesh channel, source-file dependency, collider mutation, or per-frame work.
+- Do not begin artistic normal shaping. EW-N1 remains after topology-changing chip geometry. This patch is final render-space correctness only.
+
+### Risks and controls
+
+- **Risk:** an authored group contains conflicting polygon identities. **Control:** existing one-surface surface-group collision audits remain authoritative; every final grouped triangle must also pass the unchanged `0.5` validator.
+- **Risk:** nonlinear grounding makes one logical polygon too non-planar for one shared normal. **Control:** rebuild from area-weighted final triangle normals and reject any individual triangle below `0.5`; do not silently split the group or weaken the threshold.
+- **Risk:** numerical cancellation in group accumulation. **Control:** accumulate raw cross components in double precision and normalize through `TryNormalizeMassVector`.
+- **Risk:** winding and accumulation use different orientation semantics. **Control:** both use the final transformed geometry; accumulation uses the original authored normal only as a deterministic hemisphere guide, while final output winding and certification use the rebuilt group normal.
+- **Risk:** material masks change. **Control:** exposure/crevice/deposit masks intentionally consume the corrected final-space shared normal; surface variation group hashing and every non-normal input remain unchanged.
+- **Risk:** runtime cost. **Control:** one additional `O(T)` build-time pass and `O(G)` temporary group state, where `T` is triangle count and `G` is authored polygon-group count; no per-frame owner exists.
+
+
+### Post-implementation consistency and compliance result
+
+- Exact scope: all and only the five approved files differ from EW-C1A.1a.6; no file was created, deleted, moved, renamed, or given metadata.
+- Source delta: `MassGenerator.MeshOutput.cs` adds one private double-precision group accumulator, one final-position resolver, one grouped-triangle pre-emission validator, invariant evidence formatting, and grouped-normal consumption inside `BuildMeshData`. No import, namespace, public/internal signature, transform, position, index, feature, material hash, mesh channel, or caller changes.
+- Final validator: `ValidateGeneratedMassMeshData` is text-identical to EW-C1A.1a.6 and retains `minimumNormalDot < 0.5f`.
+- Unchanged owners: `MassGenerator.cs`, `MassGenerator.Types.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.Types.cs`, `MassGenerator.EdgeWear.Diagnostics.Logging.cs`, `MeshData.cs`, and `MeshBuilder.cs` remain byte-identical.
+- Static/compliance validation passed `42/42`: complete tree `314/314`; C# parse `185/185`; preprocessor/region balance; exact scope; BOM/CRLF/trailing-whitespace/fence hygiene; no new imports; final-position prepass, double accumulation, area weighting, rebuilt lookup, winding, detailed evidence, and unchanged final guard checks.
+- Numerical mirrors passed: a transformed planar group resolves identical final triangle/group normals; a synthetic transform-space case has stale authored-normal agreement about `0.3956` (rejected by `0.5`) while the rebuilt group normal agrees at `1.0`.
+- Preliminary changed-files overlay and strict patch application each reproduced all `314` files byte-for-byte; ZIP integrity passed. Final artifacts are rebuilt after this status write.
+- Unity compilation is unavailable in the supplied source-only environment. The one-click suite and former-X visual confirmation remain pending. Until they pass, EW-C1A.2 remains blocked.
+
+### Static acceptance criteria
+
+- exactly the five approved files differ from the EW-C1A.1a.6 baseline;
+- all supplied C# files parse and preprocessor blocks balance;
+- `BuildMeshData` resolves grouped final normals from transformed positions before output;
+- accumulation uses raw area-weighted crosses and double-precision components;
+- every grouped final triangle is certified against its rebuilt normal at `0.5` before emission;
+- `ValidateGeneratedMassMeshData` and its final `0.5` condition remain byte-for-byte unchanged;
+- no source topology, transform, triangle-soup, material hash, mesh-channel, triangulation, threshold, shader/material, serialized, or per-frame behavior changes;
+- changed-files ZIP overlay and strict patch application reproduce the complete final tree byte-for-byte.
+
+### Unity acceptance criteria
+
+```text
+macroVariationContractStatus=passed
+macroZeroParity=1
+macroRetention=1
+topologyCases=33/33
+previewCases=33/33
+outlierResolutionChecks=5/5
+negativeExclusionChecks=1/1
+cancelled=0
+terminalReason=none
+```
+
+The former X/radial internal surface pattern must remain visually absent. After this gate passes, freeze EW-C1A.1a and proceed directly to EW-C1A.2 visible corner-cut, cap-ring bevel, and chip-shape integration.
+
+## EW-C1A.1a.8 — Deterministic shared-normal feasibility resolver
+
+**Status:** implemented; static validation passed; Unity validation pending.
+
+### Objective
+
+Replace the EW-C1A.1a.7 area-weighted-only final authored-group normal with a deterministic maximin shared-normal resolver. The resolver must preserve one logical polygon = one surface group = one final shared render normal and must not weaken the existing per-triangle `0.5` render-normal agreement contract. This is the final bounded C1A.1a infrastructure attempt. If the complete candidate search cannot reach `0.5`, the failure is definitive evidence that final placement deformation makes the one-shared-normal contract infeasible for that group; no triangulation, chip geometry, threshold, or material workaround is permitted in this patch.
+
+### Runtime evidence and read-only review
+
+- The complete user-provided `Pasted text(134).txt` report passes the complete Macro contract: `macroVariationContractStatus=passed`, `macroZeroParity=1`, `macroAngleMapping=1`, `macroDeterminism=1`, `macroDistribution=1`, and `macroRetention=1`.
+- The same report reaches topology `32/33` and fails only seed `6667`, maximum width, group `979435520` (`0x3A610000`, encoded `SourceFace:0`), triangle `0`: `normalDot=0.44671616`, original authored normal `(1/-4.670168E-08/0)`, rebuilt area-weighted normal `(0.990835965/0.135062173/0.00150746643)`, final geometric normal `(0.419798046/0.237562269/-0.8759759)`, transformed positions `a=(0.7278668/0.00199273229/-0.4563232)`, `b=(0.69592905/0.103431523/-0.444118977)`, and `c=(0.634270668/0.750027061/-0.298312873)`.
+- `Game/Procedural/Masses/MassGenerator.cs::GenerateInternal` applies `ResolveDimensions`, `ApplyDimensions`, and the resolved `MassPlacementFrame` before calling `BuildMeshData`. It remains unchanged.
+- `Game/Procedural/Masses/MassGenerator.MeshOutput.cs::ResolveTransformedAuthoredSurfaceNormals` currently orients each final raw geometric cross toward its stored authored normal, sums raw crosses by group, normalizes the area-weighted sum, and treats that single candidate as authoritative.
+- `Game/Procedural/Masses/MassGenerator.MeshOutput.cs::BuildMeshData` resolves grouped winding against the rebuilt normal, calls `ValidateTransformedAuthoredSurfaceTriangle`, and then emits the same group normal for every triangle vertex.
+- `Game/Procedural/Masses/MassGenerator.MeshOutput.cs::ValidateGeneratedMassMeshData` independently rejects any final triangle whose minimum vertex-normal agreement is below `0.5`; this final validator is unchanged and remains authoritative.
+- `Game/Procedural/Masses/MassGenerator.Types.cs::TriangleSoup` stores one authored normal and one stable authored surface-group ID per emitted triangle vertex. `TryNormalizeMassVector` performs explicit double-magnitude normalization and remains unchanged.
+- `Game/Procedural/Masses/MassGenerator.EdgeWear.BoundedSingleEdge.cs::ResolvePolygonSurfaceGroup` encodes ordinary polygon provenance with prefix `0x3A710000`; group `0x3A610000` decodes to `SourceFace:0`. The EW-C1A.1a.6 direct fan, complete DP, tolerance-collinear reinsertion, explicit-normalization, and group-identity contracts remain unchanged.
+- Direct consumers and related modules reviewed and unchanged: `MassGenerator.cs`, `MassGenerator.Types.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.EdgeWear.Diagnostics.Logging.cs`, `GeneratedMassEditor.cs`, `MeshData.cs`, and `MeshBuilder.cs`.
+- Historical comparison: EW-C1A.1a.7 added only the final-position area-weighted group-normal prepass, grouped pre-emission validation/evidence, and grouped-normal consumption inside `BuildMeshData`; EW-C1A.1a.6 and the archive used the stored authored normal directly. The current patch starts from the byte-identical EW-C1A.1a.7 overlay.
+- Repository limitation: the supplied authoritative tree contains `314` files and no `.git` metadata. `HEAD`, Git status, and Git history are unavailable. File-level history is reconstructed from the accepted changed-file overlays and patches.
+
+### Approved scope
+
+Modify only:
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.MeshOutput.cs`
+
+Create/delete/move/rename/generated repository files: none.
+
+### Mathematical contract
+
+For one authored surface group with final, explicitly normalized, original-authored-hemisphere-oriented triangle normals `n_i`, choose a unit shared normal `N` that maximizes:
+
+```text
+minimumAgreement(N) = min_i dot(N, n_i)
+```
+
+A feasible shared normal at the existing threshold satisfies:
+
+```text
+minimumAgreement(N) >= 0.5
+```
+
+If any candidate can satisfy the required `0.5` threshold, the corresponding spherical cap has radius at most `60°`; a minimum enclosing cap in this positive acceptance domain is supported by one, two, or three boundary normals. The deterministic candidate set is therefore complete for the required feasibility decision:
+
+1. the EW-C1A.1a.7 area-weighted normalized sum;
+2. each individual triangle normal;
+3. each finite normalized pair sum `normalize(n_i + n_j)`;
+4. each finite equal-angle triple axis `±normalize(cross(n_i - n_j, n_i - n_k))`.
+
+Every candidate is evaluated against every triangle. Select by:
+
+1. highest minimum triangle dot;
+2. highest area-weighted average triangle dot;
+3. lowest defining triangle-index tuple;
+4. stable candidate-kind order.
+
+Primary candidate ordering compares the exact evaluated minimum dot; a lower minimum can never win through tolerance. One small fixed epsilon is limited to deterministic worst-triangle/evidence tie classification. The acceptance threshold remains exactly `0.5`.
+
+### Implementation contract
+
+1. Replace the accumulator-only group state with final transformed per-group triangle evidence: triangle index, explicitly normalized oriented geometric normal, raw cross/area weight, first normalized original authored normal, and double-precision area-weighted sum.
+2. Preserve the existing rule that each raw final geometric cross is oriented into the hemisphere of its triangle's stored authored normal before group scoring.
+3. Evaluate the complete deterministic candidate set above. Do not use random search, iterative optimization, Unity `Vector3.normalized`, or an approximate grid.
+4. Return the winning shared normal only when it is finite and its exact evaluated minimum dot is at least `0.5`.
+5. If no candidate reaches `0.5`, fail before vertex emission with definitive threshold-infeasibility evidence: encoded/decoded group identity, triangle count, area-weighted candidate minimum/average/worst triangle, best enumerated feasibility candidate kind/defining indices/minimum/average/worst triangle, original authored normal, selected candidate normal, and every grouped triangle's index, normalized geometric normal, and area weight. Do not describe a below-threshold candidate as the exact unconstrained global optimum.
+6. `BuildMeshData` continues to orient each triangle's output winding against the selected shared normal and continues to call the existing grouped-triangle validator before vertex emission.
+7. `ValidateGeneratedMassMeshData` and its `minimumNormalDot < 0.5f` rejection remain byte-for-byte unchanged.
+8. Surface-group IDs, positions, indices, triangulation, features, material variation hashing, UVs, colours, UV2, tangents, transforms, placement deformation, public/internal signatures, and editor suite ownership remain unchanged.
+
+### File-by-file implementation sequence
+
+1. [x] Complete and record the read-only implementation, caller, producer, consumer, validation, documentation, runtime-evidence, and accepted-overlay history review.
+2. [x] Record this concrete five-file plan before source edits.
+3. [x] Replace the area-weighted-only resolver in `MassGenerator.MeshOutput.cs` with deterministic group evidence and maximin candidate enumeration.
+4. [x] Add definitive infeasibility and winning-candidate diagnostics without changing the existing final validator.
+5. [x] Reconcile framework, recovery architecture, and code inventory with shared-normal feasibility ownership and the return-to-C1A.2 boundary.
+6. [x] Reread every complete modified file and affected unchanged caller/producer/consumer; compare final source with EW-C1A.1a.7, EW-C1A.1a.6, and the archive owner.
+7. [x] Run all available parser, preprocessor, reference, scope, import, formatting, deterministic mathematical/numerical, package-overlay, strict-patch, and ZIP-integrity checks.
+8. [ ] Unity compile, Macro preservation, topology/preview `33/33`, outlier `5/5`, negative exclusion `1/1`, and former-X visual confirmation remain pending user validation.
+
+### Invariants and non-goals
+
+- Preserve one logical polygon = one stable authored surface group = one final shared render normal.
+- Preserve the direct fan, complete interval DP, tolerance-collinear simplification/reinsertion, explicit normalization, original boundary, exact `n - 2` output, and zero synthetic centre vertices.
+- Preserve all geometry, placement deformation, source topology, triangle order, material identity, feature identity/strength, and render channels.
+- Preserve all existing `0.5` agreement checks. Do not lower, bypass, soften, or reinterpret the threshold.
+- Do not split an authored surface group, restore per-triangle normals, edit source faces, change grounding, alter culling/winding policy, or add artistic normal shaping.
+- Do not begin C1A.2 chip geometry in this patch. Full Unity acceptance freezes C1A.1a and returns directly to C1A.2.
+- Add no serialized control, shader/material input, texture, buffer, asset, dependency, component, tag, layer, or per-frame work.
+
+### Risks and controls
+
+- **Risk:** candidate enumeration is incomplete or failure evidence overstates a below-threshold optimum. **Control:** enumerate one-, two-, and three-support spherical-cap candidates plus the current area-weighted baseline; this is complete for existence of a `>= 0.5` cap. Verify against deterministic analytic fixtures and random positive-cap numerical optimization. Label below-threshold output as the best enumerated feasibility candidate, not the exact unconstrained optimum.
+- **Risk:** pair or triple construction is degenerate. **Control:** skip only candidates that fail existing explicit normalization; individual normals and the area-weighted baseline remain available.
+- **Risk:** tie behavior changes between platforms or an epsilon masks the true optimum. **Control:** exact minimum dot is always primary and cannot be overridden; area-weighted average, lexicographic defining indices, and stable candidate-kind order apply only after exact primary equality. The fixed epsilon is limited to worst-triangle/evidence ties.
+- **Risk:** a group is genuinely infeasible. **Control:** fail with complete per-triangle evidence; do not weaken the threshold or silently split the group.
+- **Risk:** candidate cost expands dirty-time. **Control:** per-group enumeration is `O(m^4)` worst-case time from triple candidates evaluated across `m` triangles and `O(m)` temporary group memory; observed authored polygon groups are small and there is no per-frame owner.
+- **Risk:** material masks change. **Control:** only the final shared normal can change; surface-group hashing and every non-normal material input remain unchanged.
+
+### Static acceptance criteria
+
+- exactly the five approved files differ from EW-C1A.1a.7;
+- all C# files parse and preprocessor/region blocks balance;
+- candidate enumeration includes area-weighted, individual, all finite pair-bisector, and both finite triple equal-angle centres;
+- selection uses exact minimum dot, then area-weighted average dot, defining indices, and stable kind order; no tolerance may override a higher minimum;
+- accepted normals have evaluated minimum dot `>= 0.5` before `BuildMeshData` emits vertices;
+- infeasible groups report complete group/candidate/per-triangle evidence;
+- `ValidateGeneratedMassMeshData` remains byte-for-byte unchanged;
+- no triangulation, geometry, transform, placement, group ID, material hash, mesh channel, threshold, shader/material, serialized, editor-suite, or per-frame behavior changes;
+- changed-files ZIP overlay and strict patch application reproduce the complete final tree byte-for-byte.
+
+### Unity acceptance criteria
+
+```text
+macroVariationContractStatus=passed
+macroZeroParity=1
+macroRetention=1
+topologyCases=33/33
+previewCases=33/33
+outlierResolutionChecks=5/5
+negativeExclusionChecks=1/1
+cancelled=0
+terminalReason=none
+```
+
+The former X/radial internal surface pattern must remain visually absent. If the best enumerated feasibility candidate remains below `0.5`, stop C1A.1a and use the new proof to plan a separately approved placement-deformation correction. If the gate passes, freeze C1A.1a and proceed directly to EW-C1A.2 visible corner-cut, cap-ring bevel, and chip-shape integration.
+
+### Implementation and available verification result
+
+- `MassGenerator.MeshOutput.cs` now retains final transformed per-triangle unit normals and raw-cross area weights for each authored surface group, preserves the existing authored-normal hemisphere orientation, and enumerates the area-weighted baseline, every individual triangle normal, every finite pair bisector, and both finite equal-angle axes for every triangle triple.
+- Candidate selection uses the exact evaluated minimum triangle dot as the primary score, then exact area-weighted average dot, lexicographic defining triangle indices, and stable candidate-kind order. `AuthoredSurfaceNormalScoreTieEpsilon` is used only to choose deterministic worst-triangle evidence and cannot make a lower primary score win.
+- The resolver accepts only a finite candidate with exact `minimumDot >= 0.5f`. A below-threshold group fails before vertex emission with encoded and decoded surface-group identity, original authored normal, area-weighted candidate, best enumerated feasibility candidate, and every triangle index, normal, and area weight.
+- `BuildMeshData`, grouped triangle validation, `ValidateGeneratedMassMeshData`, vertex/material emission, transforms, positions, indices, surface-group IDs, mesh channels, triangulation, Macro width, placement deformation, shaders/materials, serialized controls, editor suite routing, and per-frame ownership remain unchanged from EW-C1A.1a.7.
+- Complete modified-file and affected caller/producer/consumer rereads found no additional required source owner. Exactly the five approved files differ from the EW-C1A.1a.7 baseline; the authoritative tree remains `314` files.
+- Available static validation passed `40/40`: all `185` C# files parse, preprocessor/region blocks balance, imports and critical unchanged bodies match, CRLF/BOM/trailing-whitespace and Markdown fences are clean, surface-group decoding matches all encoded classes/provenances, analytic one/two/three-support fixtures pass, and `30` deterministic random positive-cap cases match multi-start numerical optimization with maximum gap `2.22044604925E-16`.
+- Conservative dirty-time cost is `O(m^4)` per authored group and temporary group storage is `O(m)`; observed polygon groups are small and no per-frame path was added.
+- Unity compilation, the complete one-click suite, and visual confirmation remain pending. Package-overlay, strict-patch, ZIP-integrity, and final artifact-hash results are recorded in the accompanying static-validation report after packaging.

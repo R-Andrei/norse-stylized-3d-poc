@@ -71,6 +71,7 @@ RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
     float preChipMask,
     float preChipRenderedMask,
     float presenceFootprintMode,
+    float softEdgeStart,
     float edgeWidthPixels)
 {
     RiverWaterFoamChipEligibility result;
@@ -109,17 +110,10 @@ RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
         return result;
     }
 
-    // Presence-Amplitude eligibility starts from the exact no-Chip mask
-    // that final composition would render after structural Strand shaping.
-    // The hardened mask has two rises: the visible exterior fringe reaches
-    // 0.34, then the inner hard-body response rises toward one. Clamp and
-    // normalize the exterior-fringe branch before taking derivatives so the
-    // hard-body rise cannot masquerade as a second Foam boundary.
-    static const float VisibleMaskStart = 0.08;
-    static const float RenderedFringeCeiling = 0.34;
-    float edgeSource = saturate(preChipRenderedMask);
-    float renderedCoverage = RiverWaterFoamResolveBaseCoverage(edgeSource);
-    float supportGate = step(0.0001, renderedCoverage);
+    // Presence-Amplitude uses the accepted pre-hardened soft coordinate,
+    // while exact rendered support is binary: every positive no-Chip
+    // rendered pixel counts as Foam regardless of amplitude.
+    float supportGate = preChipRenderedMask > 0.0 ? 1.0 : 0.0;
     result.visibleSupport = supportGate;
     result.interiorRegion = supportGate;
 
@@ -128,20 +122,17 @@ RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
         return result;
     }
 
-    float exteriorFringeSource = min(
-        edgeSource,
-        RenderedFringeCeiling);
-    float exteriorEdgeCoordinate = saturate(
-        (exteriorFringeSource - VisibleMaskStart) /
-        max(RenderedFringeCeiling - VisibleMaskStart, 0.0001));
-    float2 edgeGradient = float2(
-        ddx(exteriorEdgeCoordinate),
-        ddy(exteriorEdgeCoordinate));
+    float edgeSource = saturate(preChipSoftVisibility);
+    float resolvedSoftEdgeStart = clamp(
+        softEdgeStart,
+        0.0,
+        0.25);
     float edgeGradientPerPixel = max(
-        length(edgeGradient),
+        fwidth(edgeSource),
         0.001);
-    float estimatedInwardPixels =
-        exteriorEdgeCoordinate / edgeGradientPerPixel;
+    float estimatedInwardPixels = max(
+        0.0,
+        edgeSource - resolvedSoftEdgeStart) / edgeGradientPerPixel;
     float edgeMembership = 1.0 - smoothstep(
         widthPixels - 0.5,
         widthPixels + 0.5,
@@ -450,6 +441,7 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
     float preChipMask,
     float preChipRenderedMask,
     float presenceFootprintMode,
+    float softEdgeStart,
     float evaluateChipSelection,
     float evaluateChipCandidates,
     float evaluateCandidatesOutsideMaterial,
@@ -500,6 +492,7 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
             preChipMask,
             preChipRenderedMask,
             presenceFootprintMode,
+            softEdgeStart,
             chipEdgeWidthPixels);
     float activation = saturate(chipActivation);
     float interiorAccess = saturate(chipInteriorAccess);
@@ -868,24 +861,14 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
         [branch]
         if (presenceFootprintMode > 0.5)
         {
-            // Presence-Amplitude uses an exact binary any-support
-            // intersection. Every positive value in the existing antialiased
-            // Candidate and Eligibility fields owns the selected pixel.
-            float candidateSelected = result.chipCandidateField > 0.0
-                ? 1.0
-                : 0.0;
-            float eligibilitySelected = chipEligibility.edgeBand > 0.0
-                ? 1.0
-                : 0.0;
-            float productionSelected =
-                candidateSelected * eligibilitySelected;
-
-            // These three diagnostics are the exact three masks consumed by
-            // Presence-Amplitude production.
-            result.chipCandidateField = candidateSelected;
-            result.chipEdgeEligibility = eligibilitySelected;
+            // Presence-Amplitude uses the original continuous analytical
+            // Candidate and soft Eligibility fields. Interior Access remains
+            // disabled.
+            result.chipEdgeEligibility = saturate(
+                chipEligibility.edgeBand);
             result.chipInteriorEligibility = 0.0;
-            result.chipProductionSelection = productionSelected;
+            result.chipProductionSelection = saturate(
+                result.chipCandidateField * chipEligibility.edgeBand);
         }
         else
         {
@@ -1300,8 +1283,6 @@ float RiverWaterFoamApplyChipAndStrands(
     float strandSoftVisibility,
     float2 strandPattern,
     float strandResolution,
-    float presenceFootprintMode,
-    float preChipRenderedMask,
     float productionChipSelection,
     float strandStrength,
     float strandDensity,
@@ -1313,23 +1294,9 @@ float RiverWaterFoamApplyChipAndStrands(
     float productionChip = saturate(productionChipSelection);
     productionChipRemovedMask = 0.0;
 
-    // Presence-Amplitude already owns the exact no-Chip rendered mask after
-    // structural Strands. Production is binary: selected pixels are removed
-    // completely, and unselected pixels preserve the exact pre-Chip mask.
-    [branch]
-    if (presenceFootprintMode > 0.5)
-    {
-        float exactPreChipMask = saturate(preChipRenderedMask);
-        float productionSelected = productionChip >= 0.5
-            ? 1.0
-            : 0.0;
-        productionChipRemovedMask = productionSelected;
-        return productionSelected > 0.5
-            ? 0.0
-            : exactPreChipMask;
-    }
-
-    // Protected compatibility path: exact accepted Current arithmetic.
+    // Accepted soft-mask reconstruction is the sole Chipping application.
+    // Current and Presence-Amplitude both modify the pre-hardened soft signal,
+    // reharden the result, and apply structural Strands afterward.
     float strandSoftShape = saturate(strandSoftVisibility);
     float strand = saturate(strandStrength);
 
@@ -1364,7 +1331,8 @@ float RiverWaterFoamApplyChipAndStrands(
         productionChipRemovedMask = saturate(shape - postChipMask);
     }
 
-    // Current preserves the accepted structural Strand order after Chipping.
+    // Soft-mask reconstruction preserves the accepted structural Strand
+    // order after Chipping.
     float resolvedStrandStrength = strand * saturate(strandResolution);
     float strandAA = max(fwidth(strandSoftShape), 0.001);
     float strandKeep = RiverWaterFoamResolveStructuralStrandKeep(

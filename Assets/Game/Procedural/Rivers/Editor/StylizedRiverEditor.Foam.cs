@@ -33,7 +33,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 DrawFoamLayerC);
             DrawNestedSection(
                 InspectorSection.FoamLayerD,
-                "Layer D — Evaluated Shape",
+                "Layer D — Evaluated Shape (Diagnostic Only)",
                 DrawFoamLayerD);
             DrawNestedSection(
                 InspectorSection.FoamLayerE,
@@ -345,11 +345,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private void DrawFoamLayerD()
         {
+            EditorGUILayout.HelpBox(
+                "Layer D evaluated-shape controls and previews are diagnostic-only. They do not affect normal Final Foam, persistent material, Remaining Life, or Layer E Chipping.",
+                MessageType.Info);
+            EditorGUILayout.LabelField(
+                "Temporal Shape",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                Find("foamVisualOccupancyBuildTime"),
+                new GUIContent(
+                    "Visual Occupancy Build Time",
+                    "Time used by Layer D diagnostic temporal occupancy to build toward the current instantaneous shape target. Normal Final Foam is unchanged."));
+            EditorGUILayout.PropertyField(
+                Find("foamVisualOccupancyReleaseTime"),
+                new GUIContent(
+                    "Visual Occupancy Release Time",
+                    "Time used by Layer D diagnostic temporal occupancy to release coverage after the instantaneous target recedes. Normal Final Foam is unchanged."));
+        }
+
+        private void DrawFoamProductionChipping(
+            SerializedProperty presenceFootprint)
+        {
             EditorGUILayout.LabelField(
                 "Production Chipping",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
-                "Production Chipping uses the original full-rate analytical Candidate Field and one rendered Eligibility band. Presence-Amplitude isolates the visible exterior fringe before estimating Edge Width so the inner hardened body transition cannot create another permission contour. Use Chip Candidate Field, Chip Eligibility Composite, and Production Chip Mask to inspect Candidate × Eligibility.",
+                "Production Chipping is Layer E render-only work. It uses the original full-rate analytical Candidate Field, multiplies it by the soft Eligibility band, and reconstructs the Foam body plus fringe from the chipped pre-hardened signal. Use Chip Candidate Field, Chip Eligibility Composite, Production Chip Mask, and Foam Chip And Strand Probe to inspect the exact relationship.",
                 MessageType.Info);
             EditorGUILayout.PropertyField(
                 Find("foamChipActivation"),
@@ -438,14 +459,35 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamChipEdgeWidthPixels"),
                 new GUIContent(
                     "Chip Edge Width (px)",
-                    "Approximate inward width of the visible Foam edge band in rendered pixels. Presence-Amplitude measures this only through the isolated exterior rendered fringe; Current retains its established soft-visibility estimate. Zero disables edge permission exactly. The slider covers 0–256 px; numeric entry accepts any non-negative value for deliberately extreme bands."),
+                    "Approximate inward width of the soft Foam edge band in rendered pixels. Current and Presence-Amplitude use derivative-normalized soft-visibility coordinates. Zero disables edge permission exactly. The slider covers 0–256 px; numeric entry accepts any non-negative value for deliberately extreme bands."),
                 0f,
                 256f);
-            EditorGUILayout.PropertyField(
-                Find("foamChipInteriorAccess"),
-                new GUIContent(
-                    "Chip Interior Access",
-                    "Fraction of activated candidate identities granted permission in the established body outside Chip Edge Width. Zero is edge-only; one lets every active candidate cut the full visible body. Intermediate values admit complete deterministic candidates, not pixel noise."));
+            bool showPresenceAmplitudeEdgeStart =
+                presenceFootprint.hasMultipleDifferentValues ||
+                presenceFootprint.enumValueIndex ==
+                    (int)StylizedRiverFoamPresenceFootprintMode
+                        .PresenceAmplitude;
+            if (showPresenceAmplitudeEdgeStart)
+            {
+                EditorGUILayout.PropertyField(
+                    Find("foamChipSoftEdgeStart"),
+                    new GUIContent(
+                        "Presence-Amplitude Edge Start",
+                        "Soft-visibility contour treated as the exterior start of the Presence-Amplitude Eligibility coordinate. Default 0.06 matches the historical Current route. Raise it to move the band inward; lower it to include fainter fringe."));
+            }
+
+            bool showCurrentInteriorAccess =
+                presenceFootprint.hasMultipleDifferentValues ||
+                presenceFootprint.enumValueIndex ==
+                    (int)StylizedRiverFoamPresenceFootprintMode.Current;
+            if (showCurrentInteriorAccess)
+            {
+                EditorGUILayout.PropertyField(
+                    Find("foamChipInteriorAccess"),
+                    new GUIContent(
+                        "Chip Interior Access",
+                        "Current Presence Footprint only. Fraction of activated candidate identities granted permission in the established body outside Chip Edge Width. Zero is edge-only; one lets every active candidate cut the full visible body. Presence-Amplitude always disables Interior Access."));
+            }
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
                 "View Readability LOD",
@@ -770,56 +812,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     $"Y {maximumLateralReachInSpacings:0.###} spacing)");
             }
 
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(
-                "Temporal Shape",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(
-                Find("foamVisualOccupancyBuildTime"),
-                new GUIContent(
-                    "Visual Occupancy Build Time",
-                    "Time used by Layer D temporal occupancy to build toward the current instantaneous shape target."));
-            EditorGUILayout.PropertyField(
-                Find("foamVisualOccupancyReleaseTime"),
-                new GUIContent(
-                    "Visual Occupancy Release Time",
-                    "Time used by Layer D temporal occupancy to release coverage after the instantaneous target recedes."));
         }
 
         private void DrawFoamLayerE()
         {
             EditorGUILayout.LabelField(
-                "General Composition",
+                "Visibility & Footprint",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.PropertyField(
                 Find("foamFinalVisibilityMode"),
                 new GUIContent(
                     "Final Foam Visibility Mode",
                     "Render-only choice between concentration-gated Final Foam and lifecycle-faithful coverage. Stored material and lifecycle remain unchanged."));
+            SerializedProperty presenceFootprint = Find(
+                "foamPresenceFootprintMode");
             EditorGUILayout.PropertyField(
-                Find("foamPresenceFootprintMode"),
+                presenceFootprint,
                 new GUIContent(
                     "Presence Footprint",
                     "Current preserves the accepted visibility mapping. Presence-Amplitude prevents Layer E from granting more base footprint authority than the actual stored Presence, so weak transported tails shrink or disappear instead of looking like full-strength Foam. Stored material and lifecycle remain unchanged."));
-            EditorGUILayout.PropertyField(
-                Find("foamColour"),
-                new GUIContent(
-                    "Foam Colour",
-                    "Lit, non-emissive base tint resolved before water bleed-through. Alpha sets the base Foam opacity before the established-interior floor is applied."));
-            EditorGUILayout.PropertyField(
-                Find("foamInteriorOpacityFloor"),
-                new GUIContent(
-                    "Interior Opacity Floor",
-                    "Absolute minimum opacity for established Foam interiors. This may exceed Foam Colour alpha, but it does not affect weak fringe or create Foam outside the incoming silhouette. Zero preserves the accepted pre-5.17A composition."));
-            EditorGUILayout.PropertyField(
-                Find("foamEdgeContrast"),
-                new GUIContent(
-                    "Edge Contrast",
-                    "Controls the existing edge-versus-interior lighting contrast. Negative values suppress the bright rim, zero preserves the accepted pre-5.17A lighting, and positive values intensify the edge without expanding the silhouette."));
 
-            EditorGUILayout.Space(4f);
+            EditorGUILayout.Space(6f);
+            DrawFoamProductionChipping(presenceFootprint);
+
+            EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Foam Strands",
+                "Structural Strands",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.PropertyField(
                 Find("foamStrandStrength"),
@@ -842,9 +860,28 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Strand Reach",
                     "Controls how deeply selected Strand regions penetrate weak-to-medium Foam. Zero stays shallow near weak edges; one permits deeper channels without changing candidate density."));
             EditorGUILayout.HelpBox(
-                "Strands own structural anisotropic lineification. Scale, Density, and Reach shape elongated cuts and remnants.",
+                "Strands run after soft-mask Chipping and own structural anisotropic lineification.",
                 MessageType.None);
 
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Final Composition",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                Find("foamColour"),
+                new GUIContent(
+                    "Foam Colour",
+                    "Lit, non-emissive base tint resolved before water bleed-through. Alpha sets the base Foam opacity before the established-interior floor is applied."));
+            EditorGUILayout.PropertyField(
+                Find("foamInteriorOpacityFloor"),
+                new GUIContent(
+                    "Interior Opacity Floor",
+                    "Absolute minimum opacity for established Foam interiors. This may exceed Foam Colour alpha, but it does not affect weak fringe or create Foam outside the incoming silhouette. Zero preserves the accepted pre-5.17A composition."));
+            EditorGUILayout.PropertyField(
+                Find("foamEdgeContrast"),
+                new GUIContent(
+                    "Edge Contrast",
+                    "Controls the existing edge-versus-interior lighting contrast. Negative values suppress the bright rim, zero preserves the accepted pre-5.17A lighting, and positive values intensify the edge without expanding the silhouette."));
         }
 
         private static void DrawUnboundedNonNegativeSlider(
@@ -1030,8 +1067,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.PropertyField(
                     Find("foamShoreFoamFormationSpeedMetresPerSecond"),
                     new GUIContent(
-                        "Global Formation Speed",
-                        "Base source reveal speed in metres per second. Per-pattern Formation Speed multipliers below can make individual patterns reveal faster or slower."));
+                        "Base Reveal Speed",
+                        "Base source-head reveal speed in metres per second. Per-pattern Reveal Speed multipliers below scale one event's progression; Activity and later Foam transport are separate."));
                 EditorGUILayout.PropertyField(
                     Find("foamShoreFoamPattern"),
                     new GUIContent(
@@ -1064,8 +1101,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamShoreRibbonFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Formation Speed",
-                            "Multiplier applied to Global Formation Speed for Shore Ribbon events only."));
+                            "Reveal Speed Multiplier",
+                            "Multiplier applied to Shore Foam Base Reveal Speed for Shore Ribbon events only."));
                     DrawMinMaxMetreControls(
                         "Length",
                         Find("foamShoreRibbonLengthMinMetres"),
@@ -1111,8 +1148,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamInwardWashFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Formation Speed",
-                            "Multiplier applied to Global Formation Speed for Inward Wash events only."));
+                            "Reveal Speed Multiplier",
+                            "Multiplier applied to Shore Foam Base Reveal Speed for Inward Wash events only."));
                     DrawMinMaxMetreControls(
                         "Length",
                         Find("foamInwardWashLengthMinMetres"),
@@ -1174,8 +1211,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.PropertyField(
                     Find("foamObjectFoamFormationSpeedMetresPerSecond"),
                     new GUIContent(
-                        "Global Formation Speed",
-                        "Base speed used to resolve Build duration for the side-to-side accumulated Arc/Semi-Arc sweeps, and reveal speed for Contact Flecks."));
+                        "Base Reveal Speed",
+                        "Base reveal speed used for Arc/Semi-Arc Build and the complete Contact Fleck reveal. Hold, Release, Rest, Activity, and later Foam transport remain independent."));
 
                 EditorGUILayout.Space(4f);
                 EditorGUILayout.LabelField(
@@ -1250,8 +1287,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamObjectContactArcFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Formation Speed",
-                            "Multiplier applied to Object Foam Global Formation Speed for Contact Arc events only."));
+                            "Reveal Speed Multiplier",
+                            "Multiplier applied to Object Foam Base Reveal Speed for Contact Arc Build only."));
                     DrawMinMaxMetreControls(
                         "Wake Arm Length",
                         Find("foamObjectContactArcLengthMinMetres"),
@@ -1288,8 +1325,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamObjectContactSemiArcFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Formation Speed",
-                            "Multiplier applied to Object Foam Global Formation Speed for Contact Semi-Arc events only."));
+                            "Reveal Speed Multiplier",
+                            "Multiplier applied to Object Foam Base Reveal Speed for Contact Semi-Arc Build only."));
                     DrawMinMaxMetreControls(
                         "Wake Arm Length",
                         Find("foamObjectContactSemiArcLengthMinMetres"),
@@ -1326,8 +1363,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamObjectContactFleckFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Formation Speed",
-                            "Multiplier applied to Object Foam Global Formation Speed for Contact Fleck events only."));
+                            "Reveal Speed Multiplier",
+                            "Multiplier applied to Object Foam Base Reveal Speed across the complete Contact Fleck reveal."));
                     DrawMinMaxMetreControls(
                         "Fleck Length",
                         Find("foamObjectContactFleckLengthMinMetres"),
@@ -1388,8 +1425,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.PropertyField(
                     Find("foamFreeWaterFoamFormationSpeedMetresPerSecond"),
                     new GUIContent(
-                        "Global Formation Speed",
-                        "Base source reveal speed in metres per second for Free Water Foam."));
+                        "Base Reveal Speed",
+                        "Base source-head reveal speed in metres per second for Lace, Cross-Lace, and Torn Fragment events. Activity and later Foam transport are separate."));
                 EditorGUILayout.PropertyField(
                     Find("foamFreeWaterFoamPattern"),
                     new GUIContent(
@@ -1435,8 +1472,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamFreeWaterLaceFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Formation Speed",
-                            "Multiplier applied to Free Water Global Formation Speed for Lace Connector events only."));
+                            "Reveal Speed Multiplier",
+                            "Multiplier applied to Free Water Base Reveal Speed for Lace Connector events only."));
                     DrawMinMaxMetreControls(
                         "Length",
                         Find("foamFreeWaterLaceLengthMinMetres"),
@@ -1476,8 +1513,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamFreeWaterCrossLaceFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Formation Speed",
-                            "Multiplier applied to Free Water Global Formation Speed for Cross-Lace Connector events only."));
+                            "Reveal Speed Multiplier",
+                            "Multiplier applied to Free Water Base Reveal Speed for Cross-Lace Connector events only."));
                     DrawMinMaxMetreControls(
                         "Lateral Length",
                         Find("foamFreeWaterCrossLaceLengthMinMetres"),
@@ -1512,8 +1549,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamFreeWaterFragmentFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Formation Speed",
-                            "Multiplier applied to Free Water Global Formation Speed for Torn Fragment events only."));
+                            "Reveal Speed Multiplier",
+                            "Multiplier applied to Free Water Base Reveal Speed for the complete Torn Fragment sweep."));
                     DrawMinMaxMetreControls(
                         "Length",
                         Find("foamFreeWaterFragmentLengthMinMetres"),

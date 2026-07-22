@@ -16,24 +16,29 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
     /// </summary>
     internal static class GeneratedMassSparseRiverbedTileAssembler
     {
-        internal const int AlgorithmVersion = 1;
+        internal const int AlgorithmVersion = 6;
         internal const int FinalResolution = 1024;
         internal const int WorkResolution = 2048;
         internal const int CandidateCount = 3;
         internal const int ExpectedSourceCount = 18;
-        internal const int MinimumSourceDiversity = 12;
-        internal const float MaximumSourceShare = 0.12f;
+        internal const float MinimumPlacementScale = 0.55f;
+        internal const float MaximumPlacementScale = 1.20f;
+        internal const float MinimumSmallPlacementFraction = 0.65f;
+        internal const float MaximumRootPerimeterFraction = 0.62f;
+        internal const float MinimumSpacingFactor = 1.05f;
+        internal const float NearHotspotRadiusWork = 320f;
+        internal const float BroadHotspotRadiusWork = 640f;
+        internal const int MaximumNearNeighbourCount = 1;
+        internal const int SharedPlacementSeed = 91073;
+        internal const int SharedSubstrateSeed = 0x4D554433;
 
         private const int WorkScale = WorkResolution / FinalResolution;
         private const int QuietBlockSizeFinal = 32;
-        private const int QuietBlockSizeWork = QuietBlockSizeFinal * WorkScale;
         private const int QuietBlockAxis = FinalResolution / QuietBlockSizeFinal;
         private const int QuietBlockCount = QuietBlockAxis * QuietBlockAxis;
         private const int MaximumPlacementAttempts = 6000;
-        private const int PlacementCandidateSamples = 24;
         private const float BaseRockDiameterWork = 94f;
         private const float MinimumOverlapFraction = 0.018f;
-        private const float MinimumSpacingFactor = 0.74f;
         private const float StrongHeightFilterRangeSigma = 0.045f;
         private const float MildHeightFilterRangeSigma = 0.026f;
         private const int StrongHeightFilterPasses = 3;
@@ -51,62 +56,129 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private const float NormalSeamMeanTolerance = 0.150f;
         private const float ScalarSeamMeanTolerance = 0.090f;
         private const float PreviewSeamMeanTolerance = 0.100f;
+        private const float PalettePayloadSeamMeanTolerance = 0.020f;
+        private const float SubstratePaletteFormCenter = 0.62f;
+        private const float SubstratePaletteFormGain = 1.50f;
+        private const float RockFormLowLuminance = 0.14f;
+        private const float RockFormMedianLuminance = 0.405f;
+        private const float RockFormHighLuminance = 0.50f;
+        private const float RockFormDarkMinimum = 0.04f;
+        private const float RockFormBaseMedian = 0.34f;
+        private const float RockFormLightMaximum = 0.56f;
+        private const float PalettePreviewCavityBias = 0.15f;
+        private const float SilhouetteCoverageLower = 0.30f;
+        private const float SilhouetteCoverageUpper = 0.98f;
+        private const int SilhouetteFilterRadius = 3;
 
         private static readonly CandidateDefinition[] CandidateDefinitions =
         {
             new CandidateDefinition(
-                "Quiet_Sparse_Riverbed",
-                "Quiet Sparse Riverbed",
-                91073,
-                0.070f,
-                0.060f,
-                0.080f,
-                0.72f),
+                "Ultra_Sparse_Riverbed",
+                "Ultra Sparse Riverbed",
+                6,
+                0.0025f,
+                0.0100f,
+                3),
             new CandidateDefinition(
-                "Natural_Sparse_Riverbed",
-                "Natural Sparse Riverbed",
-                314159,
-                0.090f,
-                0.080f,
-                0.105f,
-                0.66f),
+                "Very_Sparse_Riverbed",
+                "Very Sparse Riverbed",
+                9,
+                0.0045f,
+                0.0140f,
+                4),
             new CandidateDefinition(
-                "Dense_Sparse_Riverbed",
-                "Dense Sparse Riverbed",
-                731927,
-                0.110f,
-                0.100f,
-                0.125f,
-                0.58f)
+                "Sparse_Riverbed",
+                "Sparse Riverbed",
+                12,
+                0.0065f,
+                0.0180f,
+                5)
         };
+
+        private static readonly PaletteDefinition NeutralPalette =
+            new PaletteDefinition(
+                "Neutral",
+                "Neutral",
+                new Color(0.517f, 0.503f, 0.458f, 1f),
+                new Color(0.140f, 0.150f, 0.140f, 1f),
+                new Color(0.580f, 0.560f, 0.500f, 1f),
+                new Color(0.055f, 0.050f, 0.041f, 1f));
+
+        private static readonly PaletteDefinition HigherContrastPalette =
+            new PaletteDefinition(
+                "Higher_Contrast",
+                "Higher Contrast",
+                new Color(0.517f, 0.503f, 0.458f, 1f),
+                new Color(0.090f, 0.100f, 0.095f, 1f),
+                new Color(0.640f, 0.620f, 0.550f, 1f),
+                new Color(0.045f, 0.041f, 0.034f, 1f));
+
+        private static readonly PaletteDefinition AlternatePalette =
+            new PaletteDefinition(
+                "Alternate",
+                "Alternate",
+                new Color(0.430f, 0.450f, 0.390f, 1f),
+                new Color(0.110f, 0.150f, 0.120f, 1f),
+                new Color(0.620f, 0.640f, 0.530f, 1f),
+                new Color(0.045f, 0.055f, 0.043f, 1f));
+
+        private static readonly PaletteDefinition[] PaletteDefinitions =
+        {
+            NeutralPalette,
+            HigherContrastPalette,
+            AlternatePalette
+        };
+
+        internal sealed class PaletteDefinition
+        {
+            internal PaletteDefinition(
+                string stableId,
+                string displayName,
+                Color baseColor,
+                Color darkColor,
+                Color lightColor,
+                Color cavityColor)
+            {
+                StableId = stableId;
+                DisplayName = displayName;
+                BaseColor = baseColor;
+                DarkColor = darkColor;
+                LightColor = lightColor;
+                CavityColor = cavityColor;
+            }
+
+            internal string StableId { get; }
+            internal string DisplayName { get; }
+            internal Color BaseColor { get; }
+            internal Color DarkColor { get; }
+            internal Color LightColor { get; }
+            internal Color CavityColor { get; }
+        }
 
         internal sealed class CandidateDefinition
         {
             internal CandidateDefinition(
                 string stableId,
                 string displayName,
-                int seed,
-                float targetCoverage,
+                int exactPlacementCount,
                 float minimumCoverage,
                 float maximumCoverage,
-                float minimumQuietFraction)
+                int maximumBroadCenterCount)
             {
                 StableId = stableId;
                 DisplayName = displayName;
-                Seed = seed;
-                TargetCoverage = targetCoverage;
+                ExactPlacementCount = exactPlacementCount;
                 MinimumCoverage = minimumCoverage;
                 MaximumCoverage = maximumCoverage;
-                MinimumQuietFraction = minimumQuietFraction;
+                MaximumBroadCenterCount = maximumBroadCenterCount;
             }
 
             internal string StableId { get; }
             internal string DisplayName { get; }
-            internal int Seed { get; }
-            internal float TargetCoverage { get; }
+            internal int ExactPlacementCount { get; }
             internal float MinimumCoverage { get; }
             internal float MaximumCoverage { get; }
-            internal float MinimumQuietFraction { get; }
+            internal int MaximumBroadCenterCount { get; }
         }
 
         internal sealed class SourceUsage
@@ -141,6 +213,9 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal float RootMean;
             internal float WearMean;
             internal float PreviewMean;
+            internal float PaletteFormMean;
+            internal float PackedDetailMean;
+            internal float PalettePreviewMean;
 
             internal bool Passed =>
                 MaskMean <= MaskSeamMeanTolerance &&
@@ -149,7 +224,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 VariationMean <= ScalarSeamMeanTolerance &&
                 RootMean <= ScalarSeamMeanTolerance &&
                 WearMean <= ScalarSeamMeanTolerance &&
-                PreviewMean <= PreviewSeamMeanTolerance;
+                PreviewMean <= PreviewSeamMeanTolerance &&
+                PaletteFormMean <= PalettePayloadSeamMeanTolerance &&
+                PackedDetailMean <= PalettePayloadSeamMeanTolerance &&
+                PalettePreviewMean <= PreviewSeamMeanTolerance;
         }
 
         internal sealed class CandidateResult
@@ -165,11 +243,20 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal int UniqueSourceCount;
             internal float MaximumObservedSourceShare;
             internal float MaximumRootPerimeterAffectedFraction;
+            internal float MinimumObservedScale;
+            internal float MaximumObservedScale;
+            internal float MeanObservedScale;
+            internal int SmallScaleCount;
+            internal int MediumScaleCount;
+            internal int LargeScaleCount;
+            internal int AccentScaleCount;
+            internal float MinimumNormalizedNeighbourSeparation;
+            internal int MaximumNearNeighbourCount;
+            internal int MaximumBroadCenterCount;
             internal int RejectedForSpacing;
+            internal int RejectedForHotspot;
             internal int RejectedForOverlap;
-            internal int RejectedForQuietBudget;
             internal int RejectedForCoverage;
-            internal int RejectedForLocalRepeat;
             internal SeamEvidence Seams;
             internal Color32[] Moderate;
             internal Color32[] PlacementDebug;
@@ -181,16 +268,59 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal Color32[] RootDarkening;
             internal Color32[] EdgeWear;
             internal Color32[] MipContactSheet;
+            internal Color32[] PaletteForm;
+            internal Color32[] RuntimePackedDetail;
+            internal Color32[] PalettePreviewNeutral;
+            internal Color32[] PalettePreviewHigherContrast;
+            internal Color32[] PalettePreviewAlternate;
+            internal Color32[] PaletteComparison;
+            internal float PaletteFormMinimum;
+            internal float PaletteFormMaximum;
+            internal float PaletteFormSubstrateMean;
+            internal float PaletteFormRockMean;
+            internal float PackedSubstrateSlopeDeviationMean;
+            internal float PackedSubstrateCavityMean;
+            internal float PackedRockSlopeMagnitudeMean;
+            internal float PackedRockCavityMean;
+            internal float PackedRockCavityMaximum;
+            internal float NeutralToHigherContrastMeanDifference;
+            internal float NeutralToAlternateMeanDifference;
+            internal float FractionalSilhouetteCoverageFraction;
+            internal float MaximumAdjacentPaletteFormDifference;
+            internal string PalettePayloadFingerprint;
+            internal string PalettePreviewNeutralFingerprint;
+            internal string PalettePreviewHigherContrastFingerprint;
+            internal string PalettePreviewAlternateFingerprint;
+            internal string SubstrateFingerprint;
             internal string Fingerprint;
             internal string Failure;
 
             internal bool Succeeded => string.IsNullOrEmpty(Failure);
         }
 
+        internal sealed class SubstrateResult
+        {
+            internal Color32[] Color;
+            internal float[] Variation;
+            internal float MeanLuminance;
+            internal float FifthPercentileLuminance;
+            internal float NinetyFifthPercentileLuminance;
+            internal float RmsContrast;
+            internal float OppositeEdgeMeanDifference;
+            internal float MaximumBlockMeanDeviation64;
+            internal float MaximumBlockMeanDeviation128;
+            internal float MaximumBlockMeanDeviation256;
+            internal float BlockMeanRmsDeviation64;
+            internal float BlockMeanRmsDeviation128;
+            internal float BlockMeanRmsDeviation256;
+            internal string Fingerprint;
+        }
+
         internal sealed class SuiteResult
         {
             internal readonly List<CandidateResult> Candidates =
                 new List<CandidateResult>();
+            internal SubstrateResult Substrate;
             internal string Fingerprint;
             internal string Failure;
 
@@ -291,51 +421,67 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         {
             internal readonly Dictionary<int, RasterPixel> Pixels =
                 new Dictionary<int, RasterPixel>();
-            internal readonly HashSet<int> QuietBlocks =
-                new HashSet<int>();
             internal float Radius;
         }
 
-        private sealed class MacroField
+        private sealed class SubstrateField
         {
-            internal readonly Vector2[] Centers;
-            internal readonly float[] Radii;
-            internal readonly float[] Weights;
+            private readonly int seed;
 
-            internal MacroField(DeterministicRandom random)
+            internal SubstrateField(int seed)
             {
-                const int count = 7;
-                Centers = new Vector2[count];
-                Radii = new float[count];
-                Weights = new float[count];
-                for (int index = 0; index < count; index++)
-                {
-                    Centers[index] = new Vector2(
-                        random.Range(0f, WorkResolution),
-                        random.Range(0f, WorkResolution));
-                    Radii[index] = random.Range(210f, 430f);
-                    Weights[index] = random.Range(0.70f, 1.20f);
-                }
+                this.seed = seed;
             }
 
-            internal float Evaluate(Vector2 point)
+            internal SubstrateSample Evaluate(int x, int y)
             {
-                float sum = 0f;
-                float normalizer = 0f;
-                for (int index = 0; index < Centers.Length; index++)
+                float coarseMicro =
+                    PeriodicValueNoise(x, y, 18, seed + 101) - 0.5f;
+                float mediumMicro =
+                    PeriodicValueNoise(x, y, 37, seed + 307) - 0.5f;
+                float fineMicro =
+                    PeriodicValueNoise(x, y, 79, seed + 701) - 0.5f;
+                float speckle =
+                    PeriodicValueNoise(x, y, 151, seed + 1103) - 0.5f;
+                float grain =
+                    PeriodicValueNoise(x, y, 281, seed + 1709) - 0.5f;
+                float tone = coarseMicro * 0.0140f +
+                    mediumMicro * 0.0126f +
+                    fineMicro * 0.0098f +
+                    speckle * 0.0056f +
+                    grain * 0.0035f;
+                float warmDrift =
+                    (mediumMicro - speckle) * 0.0049f +
+                    grain * 0.0021f;
+                Color baseMud = new Color(0.517f, 0.503f, 0.458f, 1f);
+                Color color = new Color(
+                    Mathf.Clamp01(baseMud.r + tone + warmDrift),
+                    Mathf.Clamp01(baseMud.g + tone),
+                    Mathf.Clamp01(baseMud.b + tone - warmDrift * 0.60f),
+                    1f);
+                return new SubstrateSample
                 {
-                    float distance = ToroidalDistance(point, Centers[index]);
-                    float normalized = distance /
-                        Mathf.Max(1f, Radii[index]);
-                    float contribution = Mathf.Exp(
-                        -0.5f * normalized * normalized) * Weights[index];
-                    sum += contribution;
-                    normalizer += Weights[index];
-                }
-
-                return Mathf.Clamp01(
-                    sum / Mathf.Max(0.0001f, normalizer) * 2.45f);
+                    Color = color,
+                    Variation = Mathf.Clamp01(
+                        0.50f +
+                        coarseMicro * 0.050f +
+                        fineMicro * 0.040f +
+                        speckle * 0.025f +
+                        grain * 0.015f)
+                };
             }
+        }
+
+        private struct SubstrateSample
+        {
+            internal Color Color;
+            internal float Variation;
+        }
+
+        private struct BlockMeanDeviationMetrics
+        {
+            internal float MaximumDeviation;
+            internal float RmsDeviation;
         }
 
         private struct DeterministicRandom
@@ -386,6 +532,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             return CandidateDefinitions;
         }
 
+        internal static IReadOnlyList<PaletteDefinition>
+            GetPaletteDefinitions()
+        {
+            return PaletteDefinitions;
+        }
+
         internal static SuiteResult BuildSuite()
         {
             return BuildSuite(true);
@@ -396,6 +548,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             SuiteResult suite = new SuiteResult();
             try
             {
+                suite.Substrate = BuildSubstrate();
                 List<SourceCache> sources = BuildSourceCache();
                 if (sources.Count != ExpectedSourceCount)
                 {
@@ -411,7 +564,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 {
                     CandidateResult candidate = BuildCandidate(
                         CandidateDefinitions[index],
-                        sources);
+                        sources,
+                        suite.Substrate);
                     suite.Candidates.Add(candidate);
                     if (!candidate.Succeeded)
                     {
@@ -427,6 +581,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 }
 
                 suite.Fingerprint = CalculateSuiteFingerprint(suite);
+                if (!retainEvidence)
+                {
+                    ReleaseSubstrateEvidence(suite.Substrate);
+                }
+
                 return suite;
             }
             catch (Exception exception)
@@ -510,47 +669,39 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
         private static CandidateResult BuildCandidate(
             CandidateDefinition definition,
-            IReadOnlyList<SourceCache> sources)
+            IReadOnlyList<SourceCache> sources,
+            SubstrateResult substrate)
         {
             CandidateResult result = new CandidateResult
             {
-                Definition = definition
+                Definition = definition,
+                SubstrateFingerprint = substrate.Fingerprint
             };
             WorkBuffers raw = new WorkBuffers();
-            bool[] occupiedQuietBlocks = new bool[QuietBlockCount];
-            int occupiedQuietBlockCount = 0;
             int occupiedPixelCount = 0;
             int[] sourceCounts = new int[sources.Count];
             DeterministicRandom random =
-                new DeterministicRandom(definition.Seed);
-            MacroField macroField = new MacroField(random);
+                new DeterministicRandom(SharedPlacementSeed);
+            int[] sourceOrder = BuildShuffledSourceOrder(
+                sources.Count,
+                ref random);
+            float[] placementScales = BuildPlacementScales();
 
             for (int attempt = 0;
-                 attempt < MaximumPlacementAttempts;
+                 attempt < MaximumPlacementAttempts &&
+                 result.Placements.Count < definition.ExactPlacementCount;
                  attempt++)
             {
-                float currentCoverage = occupiedPixelCount /
-                    (float)(WorkResolution * WorkResolution);
-                if (currentCoverage >= definition.TargetCoverage)
-                {
-                    break;
-                }
-
-                int sourceIndex = SelectBalancedSource(
-                    sourceCounts,
-                    random);
+                int placementIndex = result.Placements.Count;
+                int sourceIndex = sourceOrder[placementIndex];
                 SourceCache source = sources[sourceIndex];
-                float scale = random.Range(0.75f, 1.25f);
+                float scale = placementScales[placementIndex];
                 float burial = random.Range(0.18f, 0.32f);
                 float rotation = random.Range(0f, 360f);
-                Vector2 center = SelectPlacementCenter(
-                    result.Placements,
-                    macroField,
-                    random,
-                    attempt);
+                Vector2 center = SelectPlacementCenter(ref random);
                 PlacementEvidence placement = new PlacementEvidence
                 {
-                    Index = result.Placements.Count,
+                    Index = placementIndex,
                     StableId = source.Definition.StableId,
                     SourceIndex = sourceIndex,
                     CenterX = center.x,
@@ -569,20 +720,20 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     continue;
                 }
 
-                if (!PassesSpacing(
-                        result.Placements,
-                        placement,
-                        MinimumSpacingFactor))
+                if (!PassesSpacing(result.Placements, placement))
                 {
                     result.RejectedForSpacing++;
                     continue;
                 }
 
-                if (HasLocalStableIdRepeat(
+                CandidateDefinition milestone = ResolveMilestoneDefinition(
+                    placementIndex + 1);
+                if (!PassesHotspotLimits(
                         result.Placements,
-                        placement))
+                        placement,
+                        milestone.MaximumBroadCenterCount))
                 {
-                    result.RejectedForLocalRepeat++;
+                    result.RejectedForHotspot++;
                     continue;
                 }
 
@@ -597,66 +748,37 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 float projectedCoverage =
                     (occupiedPixelCount + newPixels) /
                     (float)(WorkResolution * WorkResolution);
-                if (projectedCoverage > definition.MaximumCoverage + 0.002f)
+                if (projectedCoverage > milestone.MaximumCoverage + 0.001f)
                 {
                     result.RejectedForCoverage++;
                     continue;
                 }
 
-                int addedQuietBlocks = CountNewQuietBlocks(
-                    raster.QuietBlocks,
-                    occupiedQuietBlocks);
-                int maximumOccupiedBlocks = Mathf.FloorToInt(
-                    (1f - definition.MinimumQuietFraction) *
-                    QuietBlockCount);
-                if (occupiedQuietBlockCount + addedQuietBlocks >
-                    maximumOccupiedBlocks)
-                {
-                    result.RejectedForQuietBudget++;
-                    continue;
-                }
-
                 CommitPlacement(raw, raster, placement.Index);
-                foreach (int block in raster.QuietBlocks)
-                {
-                    if (!occupiedQuietBlocks[block])
-                    {
-                        occupiedQuietBlocks[block] = true;
-                        occupiedQuietBlockCount++;
-                    }
-                }
-
                 occupiedPixelCount += newPixels;
                 sourceCounts[sourceIndex]++;
                 result.Placements.Add(placement);
             }
 
-            float workCoverage = occupiedPixelCount /
-                (float)(WorkResolution * WorkResolution);
-            if (workCoverage < definition.MinimumCoverage)
+            if (result.Placements.Count != definition.ExactPlacementCount)
             {
-                result.Failure = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "Coverage stopped at {0:P2}; minimum is {1:P2}.",
-                    workCoverage,
-                    definition.MinimumCoverage);
+                result.Failure = "Committed " + result.Placements.Count +
+                    " placements; expected exactly " +
+                    definition.ExactPlacementCount + ".";
                 return result;
             }
 
-            if (result.Placements.Count < MinimumSourceDiversity)
-            {
-                result.Failure = "Only " + result.Placements.Count +
-                    " placements were committed; at least " +
-                    MinimumSourceDiversity + " are required.";
-                return result;
-            }
-
+            MeasurePlacementComposition(result);
             WorkBuffers processed = BuildProcessedBuffers(
                 raw,
                 result.Placements,
                 sources);
             FinalBuffers final = Downsample(raw, processed);
-            BuildFinalEvidence(result, final, result.Placements, sources);
+            BuildFinalEvidence(
+                result,
+                final,
+                result.Placements,
+                substrate);
             result.OccupiedQuietBlocks = CountOccupiedQuietBlocks(final.Mask);
             result.QuietBlockFraction = 1f -
                 result.OccupiedQuietBlocks / (float)QuietBlockCount;
@@ -670,81 +792,180 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     result.Placements[index]
                         .RootPerimeterAffectedFraction);
             }
-            result.Seams = MeasureSeams(final, result.Moderate);
+            result.Seams = MeasureSeams(
+                final,
+                result.Moderate,
+                result.PaletteForm,
+                result.RuntimePackedDetail,
+                result.PalettePreviewHigherContrast);
             result.Fingerprint = CalculateCandidateFingerprint(result);
             return result;
         }
 
-        private static int SelectBalancedSource(
-            IReadOnlyList<int> counts,
-            DeterministicRandom random)
+        private static int[] BuildShuffledSourceOrder(
+            int sourceCount,
+            ref DeterministicRandom random)
         {
-            int minimum = int.MaxValue;
-            for (int index = 0; index < counts.Count; index++)
+            int[] order = new int[sourceCount];
+            for (int index = 0; index < sourceCount; index++)
             {
-                minimum = Mathf.Min(minimum, counts[index]);
+                order[index] = index;
             }
 
-            int[] candidates = new int[counts.Count];
-            int candidateCount = 0;
-            for (int index = 0; index < counts.Count; index++)
+            for (int index = sourceCount - 1; index > 0; index--)
             {
-                if (counts[index] == minimum)
+                int swapIndex = random.Range(0, index + 1);
+                int value = order[index];
+                order[index] = order[swapIndex];
+                order[swapIndex] = value;
+            }
+
+            return order;
+        }
+
+        private static CandidateDefinition ResolveMilestoneDefinition(
+            int placementCount)
+        {
+            for (int index = 0; index < CandidateDefinitions.Length; index++)
+            {
+                if (placementCount <=
+                    CandidateDefinitions[index].ExactPlacementCount)
                 {
-                    candidates[candidateCount++] = index;
+                    return CandidateDefinitions[index];
                 }
             }
 
-            return candidates[random.Range(0, candidateCount)];
+            return CandidateDefinitions[CandidateDefinitions.Length - 1];
+        }
+
+        private static float[] BuildPlacementScales()
+        {
+            int maximumCount = CandidateDefinitions[
+                CandidateDefinitions.Length - 1].ExactPlacementCount;
+            int[] scaleClasses = new int[maximumCount];
+            int smallCount = Mathf.RoundToInt(maximumCount * 0.75f);
+            for (int index = smallCount; index < maximumCount; index++)
+            {
+                scaleClasses[index] = 1;
+            }
+
+            DeterministicRandom random = new DeterministicRandom(
+                SharedPlacementSeed ^ 0x5343414C);
+            for (int index = scaleClasses.Length - 1; index > 0; index--)
+            {
+                int swapIndex = random.Range(0, index + 1);
+                int value = scaleClasses[index];
+                scaleClasses[index] = scaleClasses[swapIndex];
+                scaleClasses[swapIndex] = value;
+            }
+
+            float[] scales = new float[maximumCount];
+            for (int index = 0; index < scales.Length; index++)
+            {
+                scales[index] = scaleClasses[index] == 0
+                    ? random.Range(0.55f, 0.80f)
+                    : random.Range(0.80f, 1.05f);
+            }
+
+            return scales;
         }
 
         private static Vector2 SelectPlacementCenter(
-            IReadOnlyList<PlacementEvidence> placements,
-            MacroField macroField,
-            DeterministicRandom random,
-            int attempt)
+            ref DeterministicRandom random)
         {
-            Vector2 best = Vector2.zero;
-            float bestScore = float.NegativeInfinity;
-            bool isolated = attempt > 0 && attempt % 9 == 0;
-            for (int sample = 0;
-                 sample < PlacementCandidateSamples;
-                 sample++)
+            return new Vector2(
+                random.Range(0f, WorkResolution),
+                random.Range(0f, WorkResolution));
+        }
+
+        private static void MeasurePlacementComposition(
+            CandidateResult result)
+        {
+            result.MinimumObservedScale = float.PositiveInfinity;
+            result.MinimumNormalizedNeighbourSeparation =
+                float.PositiveInfinity;
+            float scaleSum = 0f;
+            for (int index = 0; index < result.Placements.Count; index++)
             {
-                Vector2 point = new Vector2(
-                    random.Range(0f, WorkResolution),
-                    random.Range(0f, WorkResolution));
-                float macro = macroField.Evaluate(point);
-                float nearest = WorkResolution;
-                for (int index = 0; index < placements.Count; index++)
+                PlacementEvidence placement = result.Placements[index];
+                float scale = placement.UniformScale;
+                result.MinimumObservedScale = Mathf.Min(
+                    result.MinimumObservedScale,
+                    scale);
+                result.MaximumObservedScale = Mathf.Max(
+                    result.MaximumObservedScale,
+                    scale);
+                scaleSum += scale;
+                if (scale < 0.80f)
                 {
-                    nearest = Mathf.Min(
-                        nearest,
-                        ToroidalDistance(
-                            point,
-                            new Vector2(
-                                placements[index].CenterX,
-                                placements[index].CenterY)));
+                    result.SmallScaleCount++;
+                }
+                else if (scale < 1.05f)
+                {
+                    result.MediumScaleCount++;
+                }
+                else if (scale <= MaximumPlacementScale + 0.0001f)
+                {
+                    result.LargeScaleCount++;
+                }
+                else
+                {
+                    result.AccentScaleCount++;
                 }
 
-                float spacingPreference = placements.Count == 0
-                    ? 0.5f
-                    : Mathf.Clamp01(nearest / 360f);
-                float score = isolated
-                    ? spacingPreference * 0.72f +
-                        (1f - macro) * 0.18f +
-                        random.NextFloat() * 0.10f
-                    : macro * 0.78f +
-                        spacingPreference * 0.12f +
-                        random.NextFloat() * 0.10f;
-                if (score > bestScore)
+                int nearNeighbours = 0;
+                int broadCenterCount = 1;
+                for (int otherIndex = 0;
+                     otherIndex < result.Placements.Count;
+                     otherIndex++)
                 {
-                    bestScore = score;
-                    best = point;
+                    if (otherIndex == index)
+                    {
+                        continue;
+                    }
+
+                    PlacementEvidence other =
+                        result.Placements[otherIndex];
+                    float distance = ToroidalDistance(
+                        new Vector2(placement.CenterX, placement.CenterY),
+                        new Vector2(other.CenterX, other.CenterY));
+                    float normalized = distance /
+                        Mathf.Max(1f, placement.Radius + other.Radius);
+                    result.MinimumNormalizedNeighbourSeparation = Mathf.Min(
+                        result.MinimumNormalizedNeighbourSeparation,
+                        normalized);
+                    if (distance < NearHotspotRadiusWork)
+                    {
+                        nearNeighbours++;
+                    }
+
+                    if (distance < BroadHotspotRadiusWork)
+                    {
+                        broadCenterCount++;
+                    }
                 }
+
+                result.MaximumNearNeighbourCount = Mathf.Max(
+                    result.MaximumNearNeighbourCount,
+                    nearNeighbours);
+                result.MaximumBroadCenterCount = Mathf.Max(
+                    result.MaximumBroadCenterCount,
+                    broadCenterCount);
             }
 
-            return best;
+            result.MeanObservedScale = result.Placements.Count > 0
+                ? scaleSum / result.Placements.Count
+                : 0f;
+            if (float.IsPositiveInfinity(result.MinimumObservedScale))
+            {
+                result.MinimumObservedScale = 0f;
+            }
+
+            if (float.IsPositiveInfinity(
+                    result.MinimumNormalizedNeighbourSeparation))
+            {
+                result.MinimumNormalizedNeighbourSeparation = 0f;
+            }
         }
 
         private static PlacementRaster RasterizePlacement(
@@ -814,15 +1035,6 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     visibleHeight,
                     placement,
                     output);
-            }
-
-            foreach (int pixelIndex in output.Pixels.Keys)
-            {
-                int x = pixelIndex % WorkResolution;
-                int y = pixelIndex / WorkResolution;
-                int blockX = x / QuietBlockSizeWork;
-                int blockY = y / QuietBlockSizeWork;
-                output.QuietBlocks.Add(blockY * QuietBlockAxis + blockX);
             }
 
             return output;
@@ -950,8 +1162,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
         private static bool PassesSpacing(
             IReadOnlyList<PlacementEvidence> placements,
-            PlacementEvidence candidate,
-            float spacingFactor)
+            PlacementEvidence candidate)
         {
             Vector2 center = new Vector2(
                 candidate.CenterX,
@@ -960,7 +1171,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             {
                 PlacementEvidence other = placements[index];
                 float minimumDistance =
-                    (candidate.Radius + other.Radius) * spacingFactor;
+                    (candidate.Radius + other.Radius) * MinimumSpacingFactor;
                 float distance = ToroidalDistance(
                     center,
                     new Vector2(other.CenterX, other.CenterY));
@@ -973,34 +1184,80 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             return true;
         }
 
-        private static bool HasLocalStableIdRepeat(
+        private static bool PassesHotspotLimits(
             IReadOnlyList<PlacementEvidence> placements,
-            PlacementEvidence candidate)
+            PlacementEvidence candidate,
+            int maximumBroadCenterCount)
         {
             Vector2 center = new Vector2(
                 candidate.CenterX,
                 candidate.CenterY);
+            int candidateNearNeighbours = 0;
+            int candidateBroadCenterCount = 1;
             for (int index = 0; index < placements.Count; index++)
             {
                 PlacementEvidence other = placements[index];
-                if (!string.Equals(
-                        other.StableId,
-                        candidate.StableId,
-                        StringComparison.Ordinal))
+                float distance = ToroidalDistance(
+                    center,
+                    new Vector2(other.CenterX, other.CenterY));
+                if (distance < NearHotspotRadiusWork)
+                {
+                    candidateNearNeighbours++;
+                    if (CountNeighboursWithin(
+                            placements,
+                            index,
+                            NearHotspotRadiusWork) + 1 >
+                        MaximumNearNeighbourCount)
+                    {
+                        return false;
+                    }
+                }
+
+                if (distance < BroadHotspotRadiusWork)
+                {
+                    candidateBroadCenterCount++;
+                    int existingCenterCountAfter = CountNeighboursWithin(
+                        placements,
+                        index,
+                        BroadHotspotRadiusWork) + 2;
+                    if (existingCenterCountAfter > maximumBroadCenterCount)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return candidateNearNeighbours <= MaximumNearNeighbourCount &&
+                candidateBroadCenterCount <= maximumBroadCenterCount;
+        }
+
+        private static int CountNeighboursWithin(
+            IReadOnlyList<PlacementEvidence> placements,
+            int placementIndex,
+            float radius)
+        {
+            PlacementEvidence placement = placements[placementIndex];
+            Vector2 center = new Vector2(
+                placement.CenterX,
+                placement.CenterY);
+            int count = 0;
+            for (int index = 0; index < placements.Count; index++)
+            {
+                if (index == placementIndex)
                 {
                     continue;
                 }
 
-                float distance = ToroidalDistance(
-                    center,
-                    new Vector2(other.CenterX, other.CenterY));
-                if (distance < 230f)
+                PlacementEvidence other = placements[index];
+                if (ToroidalDistance(
+                        center,
+                        new Vector2(other.CenterX, other.CenterY)) < radius)
                 {
-                    return true;
+                    count++;
                 }
             }
 
-            return false;
+            return count;
         }
 
         private static int CountOverlap(
@@ -1017,22 +1274,6 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             }
 
             return overlap;
-        }
-
-        private static int CountNewQuietBlocks(
-            ICollection<int> blocks,
-            IReadOnlyList<bool> occupied)
-        {
-            int count = 0;
-            foreach (int block in blocks)
-            {
-                if (!occupied[block])
-                {
-                    count++;
-                }
-            }
-
-            return count;
         }
 
         private static void CommitPlacement(
@@ -1151,6 +1392,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 placements,
                 sources);
             Array.Copy(root, processed.Crevice, root.Length);
+            LimitRootPerimeterParticipation(
+                raw,
+                processed,
+                placements,
+                MaximumRootPerimeterFraction);
             BuildProcessedEdgeWear(raw, processed, placements, sources);
             MeasureRootEvidence(raw, processed, placements);
             return processed;
@@ -1521,6 +1767,65 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             return current;
         }
 
+        private static void LimitRootPerimeterParticipation(
+            WorkBuffers raw,
+            WorkBuffers processed,
+            IReadOnlyList<PlacementEvidence> placements,
+            float maximumFraction)
+        {
+            List<int>[] perimeter = new List<int>[placements.Count];
+            List<int>[] affected = new List<int>[placements.Count];
+            for (int index = 0; index < placements.Count; index++)
+            {
+                perimeter[index] = new List<int>();
+                affected[index] = new List<int>();
+            }
+
+            for (int y = 0; y < WorkResolution; y++)
+            {
+                for (int x = 0; x < WorkResolution; x++)
+                {
+                    int index = y * WorkResolution + x;
+                    int owner = raw.Owner[index];
+                    if (owner < 0 ||
+                        !IsOwnerPerimeterPixel(raw, x, y, owner))
+                    {
+                        continue;
+                    }
+
+                    perimeter[owner].Add(index);
+                    if (processed.Crevice[index] > RootAffectedThreshold)
+                    {
+                        affected[owner].Add(index);
+                    }
+                }
+            }
+
+            for (int owner = 0; owner < placements.Count; owner++)
+            {
+                int allowed = Mathf.FloorToInt(
+                    perimeter[owner].Count * maximumFraction);
+                if (affected[owner].Count <= allowed)
+                {
+                    continue;
+                }
+
+                affected[owner].Sort((a, b) =>
+                {
+                    int comparison = processed.Crevice[b].CompareTo(
+                        processed.Crevice[a]);
+                    return comparison != 0 ? comparison : a.CompareTo(b);
+                });
+                for (int index = allowed;
+                     index < affected[owner].Count;
+                     index++)
+                {
+                    processed.Crevice[affected[owner][index]] =
+                        RootAffectedThreshold * 0.92f;
+                }
+            }
+        }
+
         private static void BuildProcessedEdgeWear(
             WorkBuffers raw,
             WorkBuffers processed,
@@ -1828,7 +2133,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 for (int x = 0; x < FinalResolution; x++)
                 {
                     int destination = y * FinalResolution + x;
-                    float mask = 0f;
+                    float maskSum = 0f;
                     float height = 0f;
                     float variation = 0f;
                     float exposure = 0f;
@@ -1846,7 +2151,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                             int sourceX = x * WorkScale + offsetX;
                             int sourceY = y * WorkScale + offsetY;
                             int source = sourceY * WorkResolution + sourceX;
-                            mask = Mathf.Max(mask, raw.Mask[source]);
+                            maskSum += Mathf.Clamp01(raw.Mask[source]);
                             wear = Mathf.Max(wear, processed.EdgeWear[source]);
                             if (raw.Mask[source] <= 0.5f)
                             {
@@ -1868,7 +2173,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         }
                     }
 
-                    final.Mask[destination] = mask;
+                    final.Mask[destination] =
+                        maskSum / (WorkScale * WorkScale);
                     final.EdgeWear[destination] = wear;
                     final.Owner[destination] = owner;
                     if (count > 0)
@@ -1894,11 +2200,194 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             return final;
         }
 
+        private static SubstrateResult BuildSubstrate()
+        {
+            int count = FinalResolution * FinalResolution;
+            SubstrateResult result = new SubstrateResult
+            {
+                Color = new Color32[count],
+                Variation = new float[count]
+            };
+            SubstrateField field = new SubstrateField(SharedSubstrateSeed);
+            int[] histogram = new int[256];
+            double sum = 0.0;
+            double sumSquares = 0.0;
+            for (int y = 0; y < FinalResolution; y++)
+            {
+                for (int x = 0; x < FinalResolution; x++)
+                {
+                    int index = y * FinalResolution + x;
+                    SubstrateSample sample = field.Evaluate(x, y);
+                    result.Color[index] = (Color32)sample.Color;
+                    result.Variation[index] = sample.Variation;
+                    float luminance =
+                        sample.Color.r * 0.2126f +
+                        sample.Color.g * 0.7152f +
+                        sample.Color.b * 0.0722f;
+                    sum += luminance;
+                    sumSquares += luminance * luminance;
+                    histogram[Mathf.Clamp(
+                        Mathf.RoundToInt(luminance * 255f),
+                        0,
+                        255)]++;
+                }
+            }
+
+            result.MeanLuminance = (float)(sum / count);
+            result.RmsContrast = Mathf.Sqrt(Mathf.Max(
+                0f,
+                (float)(sumSquares / count) -
+                    result.MeanLuminance * result.MeanLuminance));
+            result.FifthPercentileLuminance = ResolveHistogramPercentile(
+                histogram,
+                count,
+                0.05f);
+            result.NinetyFifthPercentileLuminance =
+                ResolveHistogramPercentile(histogram, count, 0.95f);
+            result.OppositeEdgeMeanDifference =
+                MeasureSubstrateEdgeDifference(result.Color);
+            BlockMeanDeviationMetrics block64 =
+                MeasureBlockMeanDeviation(result.Color, 64, result.MeanLuminance);
+            BlockMeanDeviationMetrics block128 =
+                MeasureBlockMeanDeviation(result.Color, 128, result.MeanLuminance);
+            BlockMeanDeviationMetrics block256 =
+                MeasureBlockMeanDeviation(result.Color, 256, result.MeanLuminance);
+            result.MaximumBlockMeanDeviation64 = block64.MaximumDeviation;
+            result.MaximumBlockMeanDeviation128 = block128.MaximumDeviation;
+            result.MaximumBlockMeanDeviation256 = block256.MaximumDeviation;
+            result.BlockMeanRmsDeviation64 = block64.RmsDeviation;
+            result.BlockMeanRmsDeviation128 = block128.RmsDeviation;
+            result.BlockMeanRmsDeviation256 = block256.RmsDeviation;
+            result.Fingerprint = CalculateSubstrateFingerprint(result);
+            return result;
+        }
+
+        private static float ResolveHistogramPercentile(
+            IReadOnlyList<int> histogram,
+            int sampleCount,
+            float percentile)
+        {
+            int target = Mathf.Max(
+                1,
+                Mathf.CeilToInt(sampleCount * percentile));
+            int accumulated = 0;
+            for (int index = 0; index < histogram.Count; index++)
+            {
+                accumulated += histogram[index];
+                if (accumulated >= target)
+                {
+                    return index / 255f;
+                }
+            }
+
+            return 1f;
+        }
+
+        private static float MeasureSubstrateEdgeDifference(
+            IReadOnlyList<Color32> color)
+        {
+            double difference = 0.0;
+            int samples = 0;
+            for (int index = 0; index < FinalResolution; index++)
+            {
+                difference += ColorDifference(
+                    color[index * FinalResolution],
+                    color[index * FinalResolution + FinalResolution - 1]);
+                difference += ColorDifference(
+                    color[index],
+                    color[(FinalResolution - 1) * FinalResolution + index]);
+                samples += 2;
+            }
+
+            return (float)(difference / Mathf.Max(1, samples));
+        }
+
+        private static float ColorDifference(Color32 a, Color32 b)
+        {
+            return (
+                Mathf.Abs(a.r - b.r) +
+                Mathf.Abs(a.g - b.g) +
+                Mathf.Abs(a.b - b.b)) /
+                (255f * 3f);
+        }
+
+        private static BlockMeanDeviationMetrics MeasureBlockMeanDeviation(
+            IReadOnlyList<Color32> color,
+            int blockSize,
+            float globalMeanLuminance)
+        {
+            int blocksPerAxis = FinalResolution / blockSize;
+            int samplesPerBlock = blockSize * blockSize;
+            float maximumDeviation = 0f;
+            double sumSquaredDeviation = 0.0;
+            int blockCount = 0;
+            for (int blockY = 0; blockY < blocksPerAxis; blockY++)
+            {
+                int originY = blockY * blockSize;
+                for (int blockX = 0; blockX < blocksPerAxis; blockX++)
+                {
+                    int originX = blockX * blockSize;
+                    double blockSum = 0.0;
+                    for (int localY = 0; localY < blockSize; localY++)
+                    {
+                        int row = (originY + localY) * FinalResolution + originX;
+                        for (int localX = 0; localX < blockSize; localX++)
+                        {
+                            blockSum += ResolveLuminance(color[row + localX]);
+                        }
+                    }
+
+                    float blockMean = (float)(blockSum / samplesPerBlock);
+                    float deviation = Mathf.Abs(blockMean - globalMeanLuminance);
+                    maximumDeviation = Mathf.Max(maximumDeviation, deviation);
+                    sumSquaredDeviation += deviation * deviation;
+                    blockCount++;
+                }
+            }
+
+            return new BlockMeanDeviationMetrics
+            {
+                MaximumDeviation = maximumDeviation,
+                RmsDeviation = blockCount > 0
+                    ? Mathf.Sqrt((float)(sumSquaredDeviation / blockCount))
+                    : 0f
+            };
+        }
+
+        private static float ResolveLuminance(Color32 color)
+        {
+            return (
+                color.r / 255f * 0.2126f +
+                color.g / 255f * 0.7152f +
+                color.b / 255f * 0.0722f);
+        }
+
+        private static string CalculateSubstrateFingerprint(
+            SubstrateResult substrate)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream))
+            {
+                writer.Write(AlgorithmVersion);
+                WritePixels(writer, substrate.Color);
+                writer.Write(substrate.Variation.Length);
+                for (int index = 0;
+                     index < substrate.Variation.Length;
+                     index++)
+                {
+                    writer.Write(ToByte(substrate.Variation[index]));
+                }
+
+                writer.Flush();
+                return CalculateSha256(stream.ToArray());
+            }
+        }
+
         private static void BuildFinalEvidence(
             CandidateResult result,
             FinalBuffers final,
             IReadOnlyList<PlacementEvidence> placements,
-            IReadOnlyList<SourceCache> sources)
+            SubstrateResult substrate)
         {
             int count = FinalResolution * FinalResolution;
             result.Moderate = new Color32[count];
@@ -1909,53 +2398,510 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             result.RootDarkening = new Color32[count];
             result.EdgeWear = new Color32[count];
             result.StableIdDebug = new Color32[count];
-            Color substrateA = new Color(0.16f, 0.14f, 0.11f, 1f);
-            Color substrateB = new Color(0.20f, 0.18f, 0.14f, 1f);
+            result.PaletteForm = new Color32[count];
+            result.RuntimePackedDetail = new Color32[count];
+            float[] silhouetteCoverage =
+                BuildPayloadSilhouetteCoverage(final.Mask);
+            for (int index = 0; index < count; index++)
+            {
+                float rockCoverage = silhouetteCoverage[index];
+                bool hasRockData =
+                    final.Mask[index] > 0.0001f &&
+                    final.Owner[index] >= 0;
+                bool rockCore = final.Mask[index] > 0.5f;
+                result.Mask[index] = Grayscale(ToByte(final.Mask[index]));
+                result.Height[index] = Grayscale(ToByte(final.Height[index]));
+                result.Normals[index] = EncodeWorldNormal(
+                    final.Normals[index]);
+                result.Variation[index] = Grayscale(
+                    ToByte(hasRockData
+                        ? Mathf.Lerp(
+                            substrate.Variation[index],
+                            final.Variation[index],
+                            rockCoverage)
+                        : substrate.Variation[index]));
+                result.RootDarkening[index] = Grayscale(
+                    ToByte(final.RootDarkening[index] * rockCoverage));
+                result.EdgeWear[index] = Grayscale(
+                    ToByte(final.EdgeWear[index] * rockCoverage));
+
+                Color substrateColor = substrate.Color[index];
+                float substrateForm = ResolveSubstratePaletteForm(
+                    substrate.Variation[index]);
+                Color rockColor = substrateColor;
+                float rockForm = substrateForm;
+                if (hasRockData)
+                {
+                    rockColor = GeneratedMassRiverRockProjectionBaker
+                        .EvaluateFrozenModerateMaterial(
+                            final.Height[index],
+                            final.Variation[index],
+                            final.Exposure[index],
+                            final.DirectionalLight[index],
+                            final.RootDarkening[index],
+                            final.EdgeWear[index]);
+                    rockForm = ResolveRockPaletteForm(rockColor);
+                }
+
+                Color moderateColor = Color.Lerp(
+                    substrateColor,
+                    rockColor,
+                    rockCoverage);
+                float paletteForm = Mathf.Lerp(
+                    substrateForm,
+                    rockForm,
+                    rockCoverage);
+                result.StableIdDebug[index] = rockCore && hasRockData
+                    ? ResolveStableIdColor(
+                        placements[final.Owner[index]].SourceIndex)
+                    : substrate.Color[index];
+                result.Moderate[index] = (Color32)moderateColor;
+                result.PaletteForm[index] = EncodePaletteForm(paletteForm);
+                result.RuntimePackedDetail[index] =
+                    BuildRuntimePackedDetailPixel(
+                        final,
+                        substrate,
+                        index,
+                        rockCoverage,
+                        hasRockData);
+            }
+
+            result.PalettePreviewNeutral = BuildPalettePreview(
+                result.PaletteForm,
+                result.RuntimePackedDetail,
+                NeutralPalette);
+            result.PalettePreviewHigherContrast = BuildPalettePreview(
+                result.PaletteForm,
+                result.RuntimePackedDetail,
+                HigherContrastPalette);
+            result.PalettePreviewAlternate = BuildPalettePreview(
+                result.PaletteForm,
+                result.RuntimePackedDetail,
+                AlternatePalette);
+            result.PaletteComparison = BuildPaletteComparison(
+                result.PalettePreviewNeutral,
+                result.PalettePreviewHigherContrast,
+                result.PalettePreviewAlternate,
+                result.PaletteForm);
+            MeasurePalettePayload(result, final);
+            result.PalettePayloadFingerprint =
+                CalculatePairedPayloadFingerprint(result);
+            result.PalettePreviewNeutralFingerprint =
+                CalculatePixelFingerprint(
+                    NeutralPalette.StableId,
+                    result.PalettePreviewNeutral);
+            result.PalettePreviewHigherContrastFingerprint =
+                CalculatePixelFingerprint(
+                    HigherContrastPalette.StableId,
+                    result.PalettePreviewHigherContrast);
+            result.PalettePreviewAlternateFingerprint =
+                CalculatePixelFingerprint(
+                    AlternatePalette.StableId,
+                    result.PalettePreviewAlternate);
+            result.PlacementDebug = BuildPlacementDebug(
+                result.Moderate,
+                placements);
+            result.MipContactSheet = BuildMipContactSheet(result.Moderate);
+        }
+
+        private static float[] BuildPayloadSilhouetteCoverage(
+            IReadOnlyList<float> mask)
+        {
+            int count = FinalResolution * FinalResolution;
+            float[] horizontal = new float[count];
+            float[] coverage = new float[count];
+            int[] weights = { 1, 6, 15, 20, 15, 6, 1 };
+            const float inverseWeightSum = 1f / 64f;
+
+            for (int y = 0; y < FinalResolution; y++)
+            {
+                int row = y * FinalResolution;
+                for (int x = 0; x < FinalResolution; x++)
+                {
+                    float sum = 0f;
+                    for (int offset = -SilhouetteFilterRadius;
+                         offset <= SilhouetteFilterRadius;
+                         offset++)
+                    {
+                        int sampleX = Wrap(x + offset, FinalResolution);
+                        sum += Mathf.Clamp01(mask[row + sampleX]) *
+                            weights[offset + SilhouetteFilterRadius];
+                    }
+
+                    horizontal[row + x] = sum * inverseWeightSum;
+                }
+            }
+
+            for (int y = 0; y < FinalResolution; y++)
+            {
+                for (int x = 0; x < FinalResolution; x++)
+                {
+                    float sum = 0f;
+                    for (int offset = -SilhouetteFilterRadius;
+                         offset <= SilhouetteFilterRadius;
+                         offset++)
+                    {
+                        int sampleY = Wrap(y + offset, FinalResolution);
+                        sum += horizontal[
+                            sampleY * FinalResolution + x] *
+                            weights[offset + SilhouetteFilterRadius];
+                    }
+
+                    int index = y * FinalResolution + x;
+                    float filteredCoverage = sum * inverseWeightSum;
+                    coverage[index] = mask[index] > 0.0001f
+                        ? SmoothStep(
+                            SilhouetteCoverageLower,
+                            SilhouetteCoverageUpper,
+                            filteredCoverage)
+                        : 0f;
+                }
+            }
+
+            return coverage;
+        }
+
+        private static float ResolveSubstratePaletteForm(
+            float substrateVariation)
+        {
+            return Mathf.Clamp(
+                SubstratePaletteFormCenter +
+                (substrateVariation - 0.5f) * SubstratePaletteFormGain,
+                0.54f,
+                0.70f);
+        }
+
+        private static float ResolveRockPaletteForm(Color moderateColor)
+        {
+            float luminance =
+                moderateColor.r * 0.2126f +
+                moderateColor.g * 0.7152f +
+                moderateColor.b * 0.0722f;
+            if (luminance <= RockFormMedianLuminance)
+            {
+                float darkT = Mathf.InverseLerp(
+                    RockFormLowLuminance,
+                    RockFormMedianLuminance,
+                    luminance);
+                return Mathf.Lerp(
+                    RockFormDarkMinimum,
+                    RockFormBaseMedian,
+                    darkT);
+            }
+
+            float lightT = Mathf.InverseLerp(
+                RockFormMedianLuminance,
+                RockFormHighLuminance,
+                luminance);
+            return Mathf.Lerp(
+                RockFormBaseMedian,
+                RockFormLightMaximum,
+                lightT);
+        }
+
+        private static Color32 EncodePaletteForm(float linearForm)
+        {
+            byte encoded = ToByte(
+                Mathf.LinearToGammaSpace(Mathf.Clamp01(linearForm)));
+            return Grayscale(encoded);
+        }
+
+        private static float DecodePaletteForm(Color32 encodedForm)
+        {
+            return Mathf.Clamp01(
+                Mathf.GammaToLinearSpace(encodedForm.r / 255f));
+        }
+
+        private static Color32 BuildRuntimePackedDetailPixel(
+            FinalBuffers final,
+            SubstrateResult substrate,
+            int index,
+            float rockCoverage,
+            bool hasRockData)
+        {
+            float coverage = Mathf.Clamp01(rockCoverage);
+            Vector3 rockNormal = hasRockData
+                ? final.Normals[index]
+                : Vector3.up;
+            Vector3 normal = Vector3.Lerp(
+                Vector3.up,
+                rockNormal,
+                coverage).normalized;
+            float safeY = Mathf.Max(0.25f, Mathf.Abs(normal.y));
+            Vector2 slope = Vector2.ClampMagnitude(
+                new Vector2(normal.x, normal.z) / safeY,
+                1f);
+            float cavity = hasRockData
+                ? Mathf.Clamp01(
+                    final.RootDarkening[index] * 1.05f * coverage)
+                : 0f;
+            float substrateRoughness = Mathf.Clamp(
+                0.68f +
+                (0.5f - substrate.Variation[index]) * 0.10f,
+                0.55f,
+                0.80f);
+            float rockRoughness = hasRockData
+                ? Mathf.Clamp(
+                    0.64f +
+                    (0.5f - final.Variation[index]) * 0.18f +
+                    final.RootDarkening[index] * 0.12f -
+                    final.EdgeWear[index] * 0.08f,
+                    0.35f,
+                    0.90f)
+                : substrateRoughness;
+            float roughness = Mathf.Lerp(
+                substrateRoughness,
+                rockRoughness,
+                coverage);
+            return new Color32(
+                ToByte(slope.x * 0.5f + 0.5f),
+                ToByte(slope.y * 0.5f + 0.5f),
+                ToByte(cavity),
+                ToByte(roughness));
+        }
+
+        private static Color32[] BuildPalettePreview(
+            IReadOnlyList<Color32> paletteForm,
+            IReadOnlyList<Color32> packedDetail,
+            PaletteDefinition palette)
+        {
+            int count = FinalResolution * FinalResolution;
+            Color32[] output = new Color32[count];
+            for (int index = 0; index < count; index++)
+            {
+                float form = DecodePaletteForm(paletteForm[index]);
+                float signedForm = form * 2f - 1f;
+                Color color = signedForm < 0f
+                    ? Color.Lerp(
+                        palette.BaseColor,
+                        palette.DarkColor,
+                        -signedForm)
+                    : Color.Lerp(
+                        palette.BaseColor,
+                        palette.LightColor,
+                        signedForm);
+                float cavityRaw = Mathf.Clamp01(
+                    (packedDetail[index].b / 255f -
+                        PalettePreviewCavityBias) /
+                    Mathf.Max(0.001f, 1f - PalettePreviewCavityBias));
+                float cavity = SmoothStep(0f, 0.82f, cavityRaw);
+                float cavityCore = SmoothStep(0.66f, 0.98f, cavityRaw);
+                color = Color.Lerp(
+                    color,
+                    palette.DarkColor,
+                    Mathf.Clamp01(cavity * 0.42f));
+                color = Color.Lerp(
+                    color,
+                    palette.CavityColor,
+                    cavityCore);
+                output[index] = (Color32)color;
+            }
+
+            return output;
+        }
+
+        private static Color32[] BuildPaletteComparison(
+            Color32[] neutral,
+            Color32[] higherContrast,
+            Color32[] alternate,
+            Color32[] paletteForm)
+        {
+            Color32[] output = new Color32[
+                FinalResolution * FinalResolution];
+            int panelSize = FinalResolution / 2;
+            BlitScaled(
+                neutral,
+                FinalResolution,
+                output,
+                FinalResolution,
+                0,
+                panelSize,
+                panelSize);
+            BlitScaled(
+                higherContrast,
+                FinalResolution,
+                output,
+                FinalResolution,
+                panelSize,
+                panelSize,
+                panelSize);
+            BlitScaled(
+                alternate,
+                FinalResolution,
+                output,
+                FinalResolution,
+                0,
+                0,
+                panelSize);
+            BlitScaled(
+                paletteForm,
+                FinalResolution,
+                output,
+                FinalResolution,
+                panelSize,
+                0,
+                panelSize);
+            return output;
+        }
+
+        private static void MeasurePalettePayload(
+            CandidateResult result,
+            FinalBuffers final)
+        {
+            double substrateForm = 0.0;
+            double rockForm = 0.0;
+            double substrateSlope = 0.0;
+            double substrateCavity = 0.0;
+            double rockSlope = 0.0;
+            double rockCavity = 0.0;
+            int substrateCount = 0;
+            int rockCount = 0;
+            int fractionalCoverageCount = 0;
+            float minimumForm = 1f;
+            float maximumForm = 0f;
+            float maximumRockCavity = 0f;
+            for (int index = 0; index < result.PaletteForm.Length; index++)
+            {
+                float form = DecodePaletteForm(result.PaletteForm[index]);
+                float maskCoverage = Mathf.Clamp01(final.Mask[index]);
+                if (maskCoverage > 0.0001f && maskCoverage < 0.9999f)
+                {
+                    fractionalCoverageCount++;
+                }
+                minimumForm = Mathf.Min(minimumForm, form);
+                maximumForm = Mathf.Max(maximumForm, form);
+                Color32 packed = result.RuntimePackedDetail[index];
+                float slopeX = packed.r / 255f * 2f - 1f;
+                float slopeY = packed.g / 255f * 2f - 1f;
+                float slopeMagnitude = Mathf.Sqrt(
+                    slopeX * slopeX + slopeY * slopeY);
+                float cavity = packed.b / 255f;
+                if (final.Mask[index] > 0.5f)
+                {
+                    rockForm += form;
+                    rockSlope += slopeMagnitude;
+                    rockCavity += cavity;
+                    maximumRockCavity = Mathf.Max(
+                        maximumRockCavity,
+                        cavity);
+                    rockCount++;
+                }
+                else
+                {
+                    substrateForm += form;
+                    substrateSlope += slopeMagnitude;
+                    substrateCavity += cavity;
+                    substrateCount++;
+                }
+            }
+
+            result.PaletteFormMinimum = minimumForm;
+            result.PaletteFormMaximum = maximumForm;
+            result.PaletteFormSubstrateMean = substrateCount > 0
+                ? (float)(substrateForm / substrateCount)
+                : 0f;
+            result.PaletteFormRockMean = rockCount > 0
+                ? (float)(rockForm / rockCount)
+                : 0f;
+            result.PackedSubstrateSlopeDeviationMean = substrateCount > 0
+                ? (float)(substrateSlope / substrateCount)
+                : 0f;
+            result.PackedSubstrateCavityMean = substrateCount > 0
+                ? (float)(substrateCavity / substrateCount)
+                : 0f;
+            result.PackedRockSlopeMagnitudeMean = rockCount > 0
+                ? (float)(rockSlope / rockCount)
+                : 0f;
+            result.PackedRockCavityMean = rockCount > 0
+                ? (float)(rockCavity / rockCount)
+                : 0f;
+            result.PackedRockCavityMaximum = maximumRockCavity;
+            result.NeutralToHigherContrastMeanDifference =
+                MeasureMeanColorDifference(
+                    result.PalettePreviewNeutral,
+                    result.PalettePreviewHigherContrast);
+            result.NeutralToAlternateMeanDifference =
+                MeasureMeanColorDifference(
+                    result.PalettePreviewNeutral,
+                    result.PalettePreviewAlternate);
+            result.FractionalSilhouetteCoverageFraction =
+                fractionalCoverageCount /
+                (float)Mathf.Max(1, final.Mask.Length);
+            result.MaximumAdjacentPaletteFormDifference =
+                MeasureMaximumAdjacentPaletteFormDifference(
+                    result.PaletteForm);
+        }
+
+        private static float MeasureMaximumAdjacentPaletteFormDifference(
+            IReadOnlyList<Color32> paletteForm)
+        {
+            float maximum = 0f;
             for (int y = 0; y < FinalResolution; y++)
             {
                 for (int x = 0; x < FinalResolution; x++)
                 {
                     int index = y * FinalResolution + x;
-                    Color substrate = Color.Lerp(
-                        substrateA,
-                        substrateB,
-                        0.25f);
-                    result.Mask[index] = Grayscale(ToByte(final.Mask[index]));
-                    result.Height[index] = Grayscale(ToByte(final.Height[index]));
-                    result.Normals[index] = EncodeWorldNormal(
-                        final.Normals[index]);
-                    result.Variation[index] = Grayscale(
-                        ToByte(final.Variation[index]));
-                    result.RootDarkening[index] = Grayscale(
-                        ToByte(final.RootDarkening[index]));
-                    result.EdgeWear[index] = Grayscale(
-                        ToByte(final.EdgeWear[index]));
-                    if (final.Mask[index] > 0.5f)
-                    {
-                        result.Moderate[index] = (Color32)
-                            GeneratedMassRiverRockProjectionBaker
-                                .EvaluateFrozenModerateMaterial(
-                                    final.Height[index],
-                                    final.Variation[index],
-                                    final.Exposure[index],
-                                    final.DirectionalLight[index],
-                                    final.RootDarkening[index],
-                                    final.EdgeWear[index]);
-                        result.StableIdDebug[index] = ResolveStableIdColor(
-                            placements[final.Owner[index]].SourceIndex);
-                    }
-                    else
-                    {
-                        result.Moderate[index] = (Color32)substrate;
-                        result.StableIdDebug[index] = (Color32)substrate;
-                    }
+                    int right = y * FinalResolution +
+                        Wrap(x + 1, FinalResolution);
+                    int up = Wrap(y + 1, FinalResolution) *
+                        FinalResolution + x;
+                    float value = DecodePaletteForm(paletteForm[index]);
+                    maximum = Mathf.Max(
+                        maximum,
+                        Mathf.Abs(
+                            value - DecodePaletteForm(paletteForm[right])));
+                    maximum = Mathf.Max(
+                        maximum,
+                        Mathf.Abs(
+                            value - DecodePaletteForm(paletteForm[up])));
                 }
             }
 
-            result.PlacementDebug = BuildPlacementDebug(
-                result.Moderate,
-                placements);
-            result.MipContactSheet = BuildMipContactSheet(result.Moderate);
+            return maximum;
+        }
+
+        private static float MeasureMeanColorDifference(
+            IReadOnlyList<Color32> a,
+            IReadOnlyList<Color32> b)
+        {
+            double difference = 0.0;
+            int count = Mathf.Min(a.Count, b.Count);
+            for (int index = 0; index < count; index++)
+            {
+                difference += ColorDifference(a[index], b[index]);
+            }
+
+            return count > 0 ? (float)(difference / count) : 0f;
+        }
+
+        private static string CalculatePairedPayloadFingerprint(
+            CandidateResult result)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream))
+            {
+                writer.Write(AlgorithmVersion);
+                writer.Write(result.Definition.StableId);
+                WritePixels(writer, result.PaletteForm);
+                WritePixels(writer, result.RuntimePackedDetail);
+                writer.Flush();
+                return CalculateSha256(stream.ToArray());
+            }
+        }
+
+        private static string CalculatePixelFingerprint(
+            string label,
+            Color32[] pixels)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream))
+            {
+                writer.Write(AlgorithmVersion);
+                writer.Write(label ?? string.Empty);
+                WritePixels(writer, pixels);
+                writer.Flush();
+                return CalculateSha256(stream.ToArray());
+            }
         }
 
         private static Color32[] BuildPlacementDebug(
@@ -2187,7 +3133,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
         private static SeamEvidence MeasureSeams(
             FinalBuffers final,
-            Color32[] preview)
+            Color32[] preview,
+            Color32[] paletteForm,
+            Color32[] packedDetail,
+            Color32[] palettePreview)
         {
             SeamEvidence evidence = new SeamEvidence();
             double mask = 0.0;
@@ -2197,6 +3146,9 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             double root = 0.0;
             double wear = 0.0;
             double color = 0.0;
+            double paletteFormDifference = 0.0;
+            double packedDetailDifference = 0.0;
+            double palettePreviewDifference = 0.0;
             int sampleCount = 0;
             for (int index = 0; index < FinalResolution; index++)
             {
@@ -2212,6 +3164,15 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     ref root,
                     ref wear,
                     ref color);
+                AccumulateColorSeam(
+                    paletteForm,
+                    packedDetail,
+                    palettePreview,
+                    index * FinalResolution + FinalResolution - 1,
+                    index * FinalResolution,
+                    ref paletteFormDifference,
+                    ref packedDetailDifference,
+                    ref palettePreviewDifference);
                 AccumulateSeam(
                     final,
                     preview,
@@ -2224,6 +3185,15 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     ref root,
                     ref wear,
                     ref color);
+                AccumulateColorSeam(
+                    paletteForm,
+                    packedDetail,
+                    palettePreview,
+                    (FinalResolution - 1) * FinalResolution + index,
+                    index,
+                    ref paletteFormDifference,
+                    ref packedDetailDifference,
+                    ref palettePreviewDifference);
                 sampleCount += 2;
             }
 
@@ -2235,6 +3205,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             evidence.RootMean = (float)root * inverse;
             evidence.WearMean = (float)wear * inverse;
             evidence.PreviewMean = (float)color * inverse;
+            evidence.PaletteFormMean =
+                (float)paletteFormDifference * inverse;
+            evidence.PackedDetailMean =
+                (float)packedDetailDifference * inverse;
+            evidence.PalettePreviewMean =
+                (float)palettePreviewDifference * inverse;
             return evidence;
         }
 
@@ -2269,6 +3245,35 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 (255f * 3f);
         }
 
+        private static void AccumulateColorSeam(
+            IReadOnlyList<Color32> paletteForm,
+            IReadOnlyList<Color32> packedDetail,
+            IReadOnlyList<Color32> palettePreview,
+            int a,
+            int b,
+            ref double form,
+            ref double packed,
+            ref double preview)
+        {
+            form += ColorDifference(paletteForm[a], paletteForm[b]);
+            packed += PackedColorDifference(
+                packedDetail[a],
+                packedDetail[b]);
+            preview += ColorDifference(palettePreview[a], palettePreview[b]);
+        }
+
+        private static float PackedColorDifference(
+            Color32 a,
+            Color32 b)
+        {
+            return (
+                Mathf.Abs(a.r - b.r) +
+                Mathf.Abs(a.g - b.g) +
+                Mathf.Abs(a.b - b.b) +
+                Mathf.Abs(a.a - b.a)) /
+                (255f * 4f);
+        }
+
         private static void ReleaseCandidateEvidence(
             CandidateResult candidate)
         {
@@ -2282,6 +3287,24 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             candidate.RootDarkening = null;
             candidate.EdgeWear = null;
             candidate.MipContactSheet = null;
+            candidate.PaletteForm = null;
+            candidate.RuntimePackedDetail = null;
+            candidate.PalettePreviewNeutral = null;
+            candidate.PalettePreviewHigherContrast = null;
+            candidate.PalettePreviewAlternate = null;
+            candidate.PaletteComparison = null;
+        }
+
+        private static void ReleaseSubstrateEvidence(
+            SubstrateResult substrate)
+        {
+            if (substrate == null)
+            {
+                return;
+            }
+
+            substrate.Color = null;
+            substrate.Variation = null;
         }
 
         private static string CalculateCandidateFingerprint(
@@ -2292,6 +3315,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             {
                 writer.Write(AlgorithmVersion);
                 writer.Write(result.Definition.StableId);
+                writer.Write(result.SubstrateFingerprint ?? string.Empty);
                 writer.Write(result.Placements.Count);
                 for (int index = 0; index < result.Placements.Count; index++)
                 {
@@ -2304,6 +3328,9 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     writer.Write(placement.BurialFraction);
                 }
 
+                writer.Write(result.MinimumNormalizedNeighbourSeparation);
+                writer.Write(result.MaximumNearNeighbourCount);
+                writer.Write(result.MaximumBroadCenterCount);
                 WritePixels(writer, result.Moderate);
                 WritePixels(writer, result.PlacementDebug);
                 WritePixels(writer, result.StableIdDebug);
@@ -2314,6 +3341,21 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 WritePixels(writer, result.RootDarkening);
                 WritePixels(writer, result.EdgeWear);
                 WritePixels(writer, result.MipContactSheet);
+                WritePixels(writer, result.PaletteForm);
+                WritePixels(writer, result.RuntimePackedDetail);
+                WritePixels(writer, result.PalettePreviewNeutral);
+                WritePixels(writer, result.PalettePreviewHigherContrast);
+                WritePixels(writer, result.PalettePreviewAlternate);
+                WritePixels(writer, result.PaletteComparison);
+                writer.Write(result.PalettePayloadFingerprint ?? string.Empty);
+                writer.Write(
+                    result.PalettePreviewNeutralFingerprint ?? string.Empty);
+                writer.Write(
+                    result.PalettePreviewHigherContrastFingerprint ??
+                    string.Empty);
+                writer.Write(
+                    result.PalettePreviewAlternateFingerprint ??
+                    string.Empty);
                 writer.Flush();
                 return CalculateSha256(stream.ToArray());
             }
@@ -2325,6 +3367,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             using (BinaryWriter writer = new BinaryWriter(stream))
             {
                 writer.Write(AlgorithmVersion);
+                writer.Write(
+                    suite.Substrate != null
+                        ? suite.Substrate.Fingerprint ?? string.Empty
+                        : string.Empty);
                 writer.Write(suite.Candidates.Count);
                 for (int index = 0; index < suite.Candidates.Count; index++)
                 {
@@ -2438,6 +3484,59 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         {
             int wrapped = value % period;
             return wrapped < 0 ? wrapped + period : wrapped;
+        }
+
+        private static float PeriodicValueNoise(
+            int x,
+            int y,
+            int period,
+            int seed)
+        {
+            float coordinateX = x * period / (float)FinalResolution;
+            float coordinateY = y * period / (float)FinalResolution;
+            int x0 = Mathf.FloorToInt(coordinateX);
+            int y0 = Mathf.FloorToInt(coordinateY);
+            float fractionX = coordinateX - x0;
+            float fractionY = coordinateY - y0;
+            int wrappedX0 = Wrap(x0, period);
+            int wrappedY0 = Wrap(y0, period);
+            int wrappedX1 = Wrap(x0 + 1, period);
+            int wrappedY1 = Wrap(y0 + 1, period);
+            float smoothX = fractionX * fractionX *
+                (3f - 2f * fractionX);
+            float smoothY = fractionY * fractionY *
+                (3f - 2f * fractionY);
+            float value00 = HashLattice(
+                wrappedX0,
+                wrappedY0,
+                seed);
+            float value10 = HashLattice(
+                wrappedX1,
+                wrappedY0,
+                seed);
+            float value01 = HashLattice(
+                wrappedX0,
+                wrappedY1,
+                seed);
+            float value11 = HashLattice(
+                wrappedX1,
+                wrappedY1,
+                seed);
+            return Mathf.Lerp(
+                Mathf.Lerp(value00, value10, smoothX),
+                Mathf.Lerp(value01, value11, smoothX),
+                smoothY);
+        }
+
+        private static float HashLattice(int x, int y, int seed)
+        {
+            unchecked
+            {
+                return Hash01(
+                    seed ^
+                    x * 73856093 ^
+                    y * 19349663);
+            }
         }
 
         private static float Hash01(int value)

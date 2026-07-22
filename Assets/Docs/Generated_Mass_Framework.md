@@ -86,7 +86,7 @@ geometryCommit=disabled
 
 remains active. V1A acceptance therefore freezes deterministic edge-to-edge average-width irregularity on the editor visual/geometry foundation; it is not production promotion and it is not completion of the full edge-wear visual feature.
 
-The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b is frozen. The EW-C1A ordering audit is complete and approves a pre-bevel corner cut after micro-topology normalization. EW-C1A.1 is implemented and certified diagnostically. EW-C1A.1a now makes every accepted polygon one render-owned surface before C1A.2 commits corner damage.
+The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b is frozen. The EW-C1A ordering audit is complete and approves a pre-bevel corner cut after micro-topology normalization. EW-C1A.1 is implemented and certified diagnostically. EW-C1A.1a.8 is accepted and frozen: every accepted polygon owns one render surface after final placement deformation. EW-C1A.2 now commits the certified corner transaction only in an explicit editor preview and requires a complete cap-ring bevel before the damaged mesh can be shown.
 
 ## Post-baseline edge-wear visual contract
 
@@ -98,8 +98,8 @@ EW-V1A.3b  dihedral-biased macro hierarchy and S1 removal [accepted and frozen]
 EW-S1      object-space normal/material breakup [rejected and removed]
 EW-C1A-RO2 pre-bevel order and ownership audit [complete]
 EW-C1A.1  transactional pre-bevel cut and provenance proof [implemented; transaction accepted]
-EW-C1A.1a one polygon, one render surface [implemented; Unity visual validation pending]
-EW-C1A.2  cap-ring bevel integration and visual preview
+EW-C1A.1a one polygon, one render surface [accepted and frozen]
+EW-C1A.2  committed corner cut and mandatory cap-ring preview [implemented; Unity validation pending]
 EW-C1A.3  controls, normal/material-role closure, and 33-case acceptance
 EW-C2      sparse edge chips and notches [later]
 EW-N1      final artistic normal shaping [after geometry]
@@ -415,7 +415,7 @@ The scaling occurs once inside `ResolveEdgeWearMacroRequestedWidth`. Coverage, d
 
 The one-click suite evaluates its canonical matrices at Coverage `1`, control Strength `1`, and reports both control and effective Strength. It measures current-preview and Macro-contract elapsed milliseconds, retains per-case matrix timing, stops before matrices when current preview or the Macro contract fails, and stops before the artistic matrix when the topology matrix fails. Fail-fast still writes the combined failure report and terminal reason.
 
-Unity acceptance passed: the normalized maximum reports zero parity, angle mapping, determinism, active distribution, and scalar retention; both matrices passed `33/33`; outlier closure passed `5/5`; negative exclusion passed `1/1`; cancellation is `0`; and terminal reason is `none`. EW-V1A.3b is therefore frozen. `EW-C1A-RO2` completed the required read-only ownership/construction audit and persistent implementation-order plan. `EW-C1A.1` is implemented and the seed-8889 transaction report certified trial `0`; that diagnostic transaction is accepted. EW-C1A.1a visual/non-regression validation is the remaining gate before C1A.2 promotion.
+Unity acceptance passed: the normalized maximum reports zero parity, angle mapping, determinism, active distribution, and scalar retention; both matrices passed `33/33`; outlier closure passed `5/5`; negative exclusion passed `1/1`; cancellation is `0`; and terminal reason is `none`. EW-V1A.3b is therefore frozen. `EW-C1A-RO2` completed the required read-only ownership/construction audit and persistent implementation-order plan. `EW-C1A.1` is implemented and the seed-8889 transaction report certified trial `0`; that diagnostic transaction is accepted. EW-C1A.1a.8 passed the complete Unity gate and is frozen. EW-C1A.2 is the active preview-only corner-chip implementation.
 
 
 ## EW-V1A.3b authoritative dihedral, rendering, and freeze boundary
@@ -445,7 +445,7 @@ multiplier = 1 - (1 - sampledMultiplier) * effectiveStrength * anglePermission
 
 Seed-8889 source edge `10` remains a documented isolated-construction limitation. It requests approximately `0.02250936` at essentially full Macro multiplier but certifies only `0.00725466711` under the existing foreign-vertex, rail, and hull constraints. EW-V1A.3b does not weaken those constraints. Joint vertex-star recovery is deferred.
 
-The complete EW-V1A.3b suite passed, so Macro width work is frozen. `EW-C1A-RO2` completed the ownership and ordering audit and approved pre-bevel corner removal. `EW-C1A.1 — Pre-bevel corner-cut transaction and provenance proof` is implemented and accepted as an explicit editor diagnostic. It does not replace the accepted preview mesh. EW-C1A.1a visual/non-regression validation remains pending before C1A.2.
+The complete EW-V1A.3b suite passed, so Macro width work is frozen. `EW-C1A-RO2` completed the ownership and ordering audit and approved pre-bevel corner removal. `EW-C1A.1 — Pre-bevel corner-cut transaction and provenance proof` is implemented and accepted as an explicit editor diagnostic. It does not replace the accepted preview mesh. EW-C1A.1a.8 is accepted and frozen. C1A.2 is implemented as an explicit editor-only preview pending Unity compile and visual acceptance.
 
 ## EW-C1A pre-bevel geometry and final-normal ownership
 
@@ -472,44 +472,130 @@ A raw corner cut with an un-bevelled sharp cap ring is not an accepted visual re
 The first three corner-damage stages are:
 
 1. `EW-C1A.1`: deterministic candidate selection, cloned four-depth cut transaction, one cap, topology/volume certification, and identity proof; accepted preview remains unchanged. The implemented owner is `EdgeWearEvaluationMode.CornerDamageTransactionAudit`, exposed through `MassGenerator.GenerateCornerDamageTransactionAudit` and `GeneratedMassEditor` as `Run EW-C1A.1 Corner Transaction Audit`. The report is saved to `Library/GeneratedMassCornerDamageTransactionAudit.txt`, copied to the clipboard, and can be revealed from the same Inspector section.
-2. `EW-C1A.2`: feed the damaged polyhedron into ordinary bevel construction, add dedicated constant-width non-Macro cap-ring bevels, and expose the first visual preview.
+2. `EW-C1A.2`: retain the certified damaged polyhedron and stable output-edge identities, feed that exact result into ordinary bevel construction, force every dedicated non-Macro cap-ring candidate before ordinary coverage selection, compare unrelated built bevel identities against the frozen unified baseline, and expose the first editor-only visual preview. Any partial cap ring or collateral bevel loss falls back to production geometry.
 3. `EW-C1A.3`: add approved authoring controls, cap/cap-ring authored normal and surface-group closure, complete 33-case acceptance, and freeze.
 
 The initial cap-ring width is bounded by:
 
 ```text
-min(ordinaryRequestedWidth,
-    0.20 * acceptedCornerDepth,
-    0.15 * shortestCapRingEdgeLength)
+min(0.50 * ordinaryRequestedWidth,
+    0.25 * acceptedCornerDepth,
+    0.20 * shortestCapRingEdgeLength)
 ```
 
 Cap-ring width remains constant and does not participate in Macro variation in C1A.
 
 No final artistic normal-shaping phase occurs before corner damage and chips. `EW-N1` follows all accepted topology-changing edge-wear geometry so it does not need to be rebuilt after every silhouette feature.
 
-## EW-C1A.1a — Polygon render ownership
+## EW-C1A.1a / EW-C1A.1a.4 — Polygon render ownership and complete triangulation
 
-The final shell triangulator treats one `PolygonFace` as one visual surface. `TryTriangulateBoundedPreviewFaces` calls `TryTriangulateBoundedOneSurfaceFace` for source faces, junction faces, bevel faces, endpoint caps, and future `CornerDamageCap` faces.
+The final shell triangulator treats one `PolygonFace` as one visual surface. `TryTriangulateBoundedPreviewFaces` calls `TryTriangulateBoundedOneSurfaceFace` for source faces, junction faces, bevel faces, endpoint caps, and future `CornerDamageCap` faces. Every emitted triangle receives one authoritative polygon normal and one stable authored surface-group identity.
 
-For a convex boundary with `n` real vertices, the triangulator selects the boundary anchor whose direct fan maximizes the minimum triangle area, emits exactly `n - 2` triangles, and never inserts an internal centre vertex. Every emitted triangle receives the normalized `PolygonFace.Normal` and one stable authored surface-group identity.
+A stable direct boundary fan remains the preferred path. It tests every boundary anchor, requires every triangle to satisfy area and normalized render-normal agreement `>= 0.5`, and preserves the existing deterministic ranking by minimum normal agreement, minimum triangle area, and stable anchor order.
 
-This is a render-ownership correction, not a topology merge. Distinct polygon records remain distinct surfaces. The patch changes no source mass, cut plane, bevel candidate, recovery scale, mesh channel, shader, material, serialized control, or per-frame behavior.
-
-EW-C1A.2 remains blocked until Unity proves the existing 33/33 matrices and outlier gates still pass and the reported front-face X/radial boundaries disappear.
-
-## EW-C1A.1a.2 / EW-C1A.1a.3 — Certified one-surface fallback triangulation
-
-EW-C1A.1a.2 supersedes the direct-fan-only acceptance rule from EW-C1A.1a/1a.1. One `PolygonFace` still owns exactly one authored render normal and one stable material surface group. Triangulation geometry may use either of two certified modes:
+EW-C1A.1a.4 supersedes the projected-centre fallback from EW-C1A.1a.2/.3. If no direct anchor certifies, the ordered polygon is projected onto its authoritative plane and solved by complete interval dynamic programming:
 
 ```text
-preferred: direct boundary fan, n - 2 triangles, zero internal vertices
-fallback: projected centre fan, n triangles, one internal centre
+state S(i,j)
+    -> test every split i < k < j
+    -> require S(i,k), S(k,j), and triangle(i,k,j)
+    -> reject diagonals that intersect unrelated boundary segments
+    -> require the diagonal midpoint inside/on the retained simple loop
+    -> rank complete solutions by:
+         1. highest minimum triangle area
+         2. highest minimum normal agreement
+         3. lowest split index
 ```
 
-EW-C1A.1a.3 supersedes the ordinary-only fallback restriction. The fallback is available to every valid polygon class, including `BoundedEdgeBevel` and `EdgeBevelPlane`, when no direct boundary anchor satisfies the unchanged final render-normal agreement threshold. Direct boundary triangulation remains the preferred mode.
+The containment check uses the existing tolerance-aware `IsBoundedPointInsideOrOnPolygon` owner because the retained loop may include a slight reflex vertex removed only from the convexity-check copy. Both modes emit exactly `n - 2` triangles and introduce zero synthetic/internal fan vertices. Every selected triangle must remain finite, exceed the minimum area, orient to the authored normal, and satisfy the unchanged final `0.5` agreement guard. The dynamic solver is `O(n^3)` dirty-time with `O(n^2)` temporary state and has no per-frame owner.
 
-The fallback centre is the arithmetic boundary mean projected onto the authoritative polygon plane. Every fallback triangle is area-certified, oriented to the polygon authored normal, and required to satisfy normalized normal agreement `>= 0.5`. All triangles keep the same authored normal and surface group, so the internal fan is not a material or shading boundary. Bevel fallback triangles retain the analytical bevel normal, bevel feature marking, bevel surface-group identity, and bevel-region counters.
+The old centre-fan mode and its derived direct/fallback face counts are no longer authoritative. The propagated internal-fan counters return to literal zero-only certification. Current telemetry reports the truthful `direct-preferred/general-complete` policy, exact triangle/authored-channel counts, and complete failure evidence through `PolygonSurfaceFailureReason` when no solution exists.
 
-`PolygonSurfaceExpectedTriangleCount` is selected-mode aware. `PolygonSurfaceInternalFanVertexCount` equals the number of certified centre-fan fallback faces. `BevelRegionInternalFanVertexCount` equals the subset belonging to bevel polygons. Telemetry derives direct/fallback face counts for both the complete polygon shell and bevel region. `ValidateGeneratedMassMeshData` and its `0.5` guard are unchanged.
+This remains a render-ownership correction, not a topology merge. Distinct polygon records remain distinct surfaces. It changes no source mass, cut plane, bevel candidate, Macro width, recovery scale, mesh channel, shader, material, serialized control, or runtime behavior. `ValidateGeneratedMassMeshData` and its `0.5` guard remain unchanged.
 
-The full-suite Macro report prints pass/failure evidence for strength-zero, coverage-zero, current, and maximum probes. EW-C1A.2 remains blocked until Unity restores the complete `33/33`, `5/5`, and `1/1` gates and visually confirms the former X/radial pattern remains absent.
+The full-suite Macro report passed strength-zero, coverage-zero, current, and maximum probes together with topology and preview `33/33`, outliers `5/5`, and negative exclusion `1/1`. EW-C1A.1a.8 is frozen; EW-C1A.2 consumes that render infrastructure without modifying it.
+
+
+## EW-C1A.1a.5 tolerance-collinear render triangulation
+
+EW-C1A.1a.4 remains the authoritative direct-first/general-complete polygon triangulator. EW-C1A.1a.5 adds a bounded third path only when the complete retained loop has no certified direct or DP solution and the failure includes raw geometric-normal disagreement caused by a tolerance-collinear boundary subdivision.
+
+The third path is render-triangulation normalization, not geometry modification:
+
+```text
+complete retained PolygonFace stays unchanged
+working projected index loop may remove tolerance-collinear vertices
+simplified loop is triangulated through existing direct/DP owners
+removed vertices are reinserted in reverse order by subdividing their preserved parent boundary edge
+final output uses every original retained vertex and boundary segment
+final triangle count remains n - 2
+```
+
+Every final triangle still carries one polygon-authored normal, one stable surface group, feature identity, and feature strength. Every final triangle must pass finite/area/winding and normalized authored-normal agreement `>= 0.5`. `MassGenerator.MeshOutput.cs` remains unchanged and retains the final `0.5` guard.
+
+The path is deterministic dirty-time work. It adds no control, serialized state, shader/material input, mesh channel, source topology mutation, collider mutation, or per-frame cost.
+
+
+## EW-C1A.1a.6 explicit-normalization parity
+
+EW-C1A.1a.5 triangulation ownership is unchanged. Direct boundary fan, complete interval DP, and bounded tolerance-collinear reinsertion remain the only active render-triangulation paths.
+
+The one-surface triangle producer now uses `MassGenerator.Types.cs::TryNormalizeMassVector` for both candidate agreement evaluation and final oriented geometric-normal resolution. This matches the existing Generated Mass mesh-output contract: finite mathematically non-zero vectors are normalized through double-precision magnitude evaluation and explicit division rather than Unity's small-vector `Vector3.normalized` cutoff.
+
+Minimum triangle area, `OneSurfaceMinimumRenderNormalDot`, exact `n - 2` output, original-boundary preservation, authored polygon normal/group ownership, and the final `MassGenerator.MeshOutput.cs` `0.5` agreement guard remain unchanged. This is a numerical parity correction only; it adds no topology, fallback, control, serialized state, shader/material input, dependency, or per-frame work.
+
+## EW-C1A.1a.7 final transformed-space authored normals
+
+EW-C1A.1a.6 closes the zero-Macro triangulation regression. Its Unity report passes zero parity, angle mapping, determinism, distribution, and retention, then advances to topology `32/33`. The sole remaining failure is seed `6667` at maximum width in final `MeshData` render-normal validation.
+
+Authored `PolygonFace.Normal` values remain construction-space plane ownership. They are not copied unchanged into the final mesh after dimensions, lean, and grounding. `MassGenerator.MeshOutput.cs::BuildMeshData` now resolves one final render normal per authored surface group from the already transformed triangle positions:
+
+```text
+for every triangle in authored surface group G:
+    geometricCross = cross(finalB - finalA, finalC - finalA)
+    orient geometricCross toward the stored construction-space authored normal
+    accumulate the raw cross in double precision
+finalGroupNormal(G) = explicitNormalize(accumulatedCross)
+```
+
+Raw crosses preserve area weighting. Every triangle in the group is then wound against the rebuilt final group normal and must independently satisfy geometric/render-normal agreement `>= 0.5` before emission. `ValidateGeneratedMassMeshData` remains unchanged and repeats the same `0.5` contract across the complete final mesh.
+
+This is final render-space ownership, not artistic normal shaping. It changes no positions, indices, source polygons, triangulation, surface-group IDs, feature channels, material-variation hashes, transforms, shaders, materials, serialized controls, or per-frame behavior. Exposure and deposit masks consume the corrected final shared normal because those masks are emitted with the final mesh.
+
+Unity passed Macro preservation, topology and preview `33/33`, outliers `5/5`, negative exclusion `1/1`, and the former-X visual gate. EW-C1A.1a is frozen. EW-C1A.2 now owns visible corner-cut, mandatory cap-ring bevel, collateral-retention proof, and chip-shape preview. EW-N1 artistic normal response remains later.
+
+## EW-C1A.1a.8 deterministic shared-normal feasibility
+
+EW-C1A.1a.7 remains the final-position owner: grouped triangle normals are derived only after dimensions, lean, grounding, and recentering. EW-C1A.1a.8 changes only how one shared final group normal is selected when the area-weighted candidate does not satisfy every grouped triangle.
+
+For final, explicitly normalized triangle normals `n_i` already oriented into the construction-authored hemisphere, the required contract is:
+
+```text
+choose unit N
+maximize min_i dot(N, n_i)
+accept only when min_i dot(N, n_i) >= 0.5
+```
+
+The resolver evaluates the current area-weighted candidate, every triangle normal, every finite normalized pair sum, and both finite equal-angle centres for every triangle-normal triple. This set is complete for deciding whether a spherical cap of radius at most `60°` exists. Candidate ranking is deterministic: exact highest minimum dot, exact highest area-weighted average dot, lowest defining triangle indices, then stable candidate kind.
+
+A below-threshold result is reported as the best enumerated feasibility candidate, not as the exact unconstrained maximin centre. The failure still proves that no shared normal can satisfy the required `0.5` threshold. Evidence includes encoded and decoded surface-group provenance, triangle count, area-weighted and best-feasibility scores, defining/worst triangle indices, original authored normal, selected candidate normal, and every grouped triangle normal and area weight.
+
+The resolver performs `O(m^4)` dirty-time work and `O(m)` temporary group storage for a group of `m` triangles. It adds no per-frame path. `BuildMeshData` winding, `ValidateTransformedAuthoredSurfaceTriangle`, `ValidateGeneratedMassMeshData`, the exact `0.5` threshold, source polygons, triangulation, positions, indices, surface-group IDs, feature/material channels, shaders, materials, and serialized controls remain unchanged.
+
+This final bounded C1A.1a infrastructure gate passed and is frozen. EW-C1A.2 consumes the existing polygon render ownership unchanged. A future proven below-threshold group would require a separately approved placement-deformation plan; it would not authorize another triangulation or normal-threshold workaround.
+
+
+## EW-C1A.2 preview-only committed corner chip
+
+`MassGenerator.GenerateCornerDamagePreview` is an editor-only synchronous entry point. It first builds the frozen unified preview as a retention baseline, then enters a scoped thread-local corner request and invokes the existing unified preview return path. The request is always restored in `finally`; ordinary unified preview and production `EdgeWearEvaluationMode.None` remain unchanged.
+
+The successful C1A.1 trial now retains its exact prepared `PolygonFace` list, cap face, accepted depth, stable identity by damaged output `EdgeKey`, generated cap-ring identities, and the original identities of the three shortened parent edges. Candidate construction reads that committed identity map before Macro sampling. Cap-ring candidates are marked mandatory, use the fixed C1A.2 width formula, report zero Macro participation, and bypass ordinary artistic filtering and coverage. They still pass the existing convexity, footprint, locality, isolated-width, corner/coexistence, recovery, topology, face-quality, one-surface, and final render-normal gates.
+
+Selection is:
+
+```text
+all mandatory cap-ring candidates ordered by generated identity
++ ceil(ordinary candidate count * existing ordinary coverage)
+```
+
+The complete preview is rejected unless exactly one certified cap exists, every generated cap-ring identity becomes a mandatory candidate, every mandatory candidate is selected and built, the unified corner shell certifies, and every baseline-built original edge outside the three affected parent identities remains certified. Rejection returns production geometry and preserves the complete report. No serialized control, shader, mesh channel, asset, or active-gameplay path is added in C1A.2.

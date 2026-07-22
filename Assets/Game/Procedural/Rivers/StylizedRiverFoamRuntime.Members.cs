@@ -259,6 +259,9 @@ namespace ProgrammaticStylized3D.Rivers
             new AutomaticFoamSourceEvent[AutomaticFoamSourceEventCapacity];
         private readonly FoamSourceEventGpuData[] automaticFoamSourceEventGpuData =
             new FoamSourceEventGpuData[AutomaticFoamSourceEventCapacity];
+        private readonly AutomaticRevealTimingTelemetry[]
+            automaticRevealTimingByType =
+                new AutomaticRevealTimingTelemetry[9];
         private readonly uint[] automaticBirthDebugCounterReadback =
             new uint[AutomaticBirthDebugCounterCount];
         private readonly List<RiverFoamStaticObjectSource>

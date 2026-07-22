@@ -359,9 +359,9 @@
             }
 
             float3 ResolveGroundBankZoneWeights(
-                Varyings input)
+                float shoreMask,
+                float bankDomain)
             {
-                float shoreMask = ResolveGroundShoreMask(input);
                 float softness = saturate(_GroundBankTransitionSoftness);
                 float reach = saturate(_GroundBankMaterialReach);
 
@@ -373,25 +373,30 @@
                 float broadBank = smoothstep(
                     broadCenter - broadHalfWidth,
                     broadCenter + broadHalfWidth,
-                    shoreMask);
+                    saturate(shoreMask));
                 float immediateBank = smoothstep(
                     0.235 - immediateHalfWidth,
                     0.235 + immediateHalfWidth,
-                    shoreMask);
+                    saturate(shoreMask));
                 float waterlineCore = smoothstep(
                     0.355 - waterlineHalfWidth,
                     0.355 + waterlineHalfWidth,
-                    shoreMask);
-
-                float bankDomain =
-                    ResolveGroundRiverBankDomain(input);
+                    saturate(shoreMask));
 
                 return saturate(
                     float3(
                         broadBank,
                         immediateBank,
                         waterlineCore) *
-                    bankDomain);
+                    saturate(bankDomain));
+            }
+
+            float3 ResolveGroundBankZoneWeights(
+                Varyings input)
+            {
+                return ResolveGroundBankZoneWeights(
+                    ResolveGroundShoreMask(input),
+                    ResolveGroundRiverBankDomain(input));
             }
 
             float ResolveGroundOuterBankExtensionBlend(
@@ -416,39 +421,107 @@
                     distanceWeight);
             }
 
-            float ResolveGroundBankMaterialBlend(
-                Varyings input)
+            float ResolveGroundComposedBankMaterialBlend(
+                float3 zones,
+                float outerContribution)
             {
-                float enabled = saturate(_GroundBankLayerEnabled);
-                float strength = saturate(_GroundBankMaterialStrength);
-                float3 zones = ResolveGroundBankZoneWeights(input);
                 float broadContribution = zones.x * 0.65;
                 float immediateContribution =
                     zones.y * saturate(_GroundImmediateBankExposure);
                 float waterlineContribution =
                     zones.z * saturate(_GroundWaterlineMaterialStrength);
-                float outerContribution =
-                    ResolveGroundOuterBankExtensionBlend(input);
                 float composedZones =
                     1.0 -
                     (1.0 - broadContribution) *
                     (1.0 - immediateContribution) *
                     (1.0 - waterlineContribution) *
-                    (1.0 - outerContribution);
+                    (1.0 - saturate(outerContribution));
 
                 return saturate(
-                    enabled *
-                    strength *
+                    saturate(_GroundBankLayerEnabled) *
+                    saturate(_GroundBankMaterialStrength) *
                     composedZones);
             }
 
-            float ResolveGroundRiverbedMaterialBlend(
+            float ResolveGroundBankMaterialBlend(
+                Varyings input)
+            {
+                return ResolveGroundComposedBankMaterialBlend(
+                    ResolveGroundBankZoneWeights(input),
+                    ResolveGroundOuterBankExtensionBlend(input));
+            }
+
+            float ResolveGroundBankEdgeMaterialBlend(
+                Varyings input)
+            {
+                return ResolveGroundComposedBankMaterialBlend(
+                    ResolveGroundBankZoneWeights(
+                        ResolveGroundShoreMask(input),
+                        1.0),
+                    0.0);
+            }
+
+            float ResolveGroundRiverbedMaterialTransitionWeight(
+                Varyings input,
                 float riverbedSupport)
+            {
+                float support = saturate(riverbedSupport);
+                float transitionDistance =
+                    max(0.0, _GroundRiverbedMaterialTransition.x);
+                float transitionEnabled =
+                    step(0.5, _GroundRiverbedLayerEnabled) *
+                    step(0.0001, _GroundRiverbedMaterialStrength) *
+                    step(0.0001, transitionDistance);
+                if (support <= 0.0001 || transitionEnabled <= 0.5)
+                {
+                    return support;
+                }
+
+                float distance01 = saturate(
+                    ResolveGroundRiverbedInwardDistance(input) /
+                    max(0.0001, transitionDistance));
+                float smoothDistance =
+                    distance01 *
+                    distance01 *
+                    (3.0 - 2.0 * distance01);
+                float interiorWeight = lerp(
+                    distance01,
+                    smoothDistance,
+                    saturate(_GroundRiverbedMaterialTransition.y));
+                return support * saturate(interiorWeight);
+            }
+
+            float ResolveGroundRiverbedMaterialTransitionActive(
+                float riverbedSupport)
+            {
+                return saturate(riverbedSupport) *
+                    step(0.5, _GroundRiverbedLayerEnabled) *
+                    step(0.0001, _GroundRiverbedMaterialStrength) *
+                    step(
+                        0.0001,
+                        max(0.0, _GroundRiverbedMaterialTransition.x));
+            }
+
+            float ResolveGroundRiverbedEdgeBankMaterialBlend(
+                Varyings input,
+                float riverbedSupport,
+                float riverbedTransitionWeight)
+            {
+                float edgeWeight = saturate(
+                    saturate(riverbedSupport) -
+                    saturate(riverbedTransitionWeight));
+                return saturate(
+                    ResolveGroundBankEdgeMaterialBlend(input) *
+                    edgeWeight);
+            }
+
+            float ResolveGroundRiverbedMaterialBlend(
+                float riverbedTransitionWeight)
             {
                 return saturate(
                     saturate(_GroundRiverbedLayerEnabled) *
                     saturate(_GroundRiverbedMaterialStrength) *
-                    saturate(riverbedSupport));
+                    saturate(riverbedTransitionWeight));
             }
 
             float4 ResolveGroundBankCoverRetention(

@@ -113,6 +113,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             "GeneratedMassCornerDamageTransactionAudit.txt";
         private static string lastCornerDamageTransactionAuditSummary =
             string.Empty;
+        private const string CornerDamagePreviewReportFileName =
+            "GeneratedMassCornerDamagePreview.txt";
+        private static string lastCornerDamagePreviewSummary =
+            string.Empty;
         private const string EdgeWearArtisticComprehensiveReportFileName =
             "GeneratedMassEdgeWearArtisticComprehensiveAudit.txt";
         private const string EdgeWearArtisticComprehensiveEdgesCsvFileName =
@@ -913,6 +917,100 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
 
             EditorGUILayout.Space(4f);
+            GeneratedMass selectedMass = target as GeneratedMass;
+            if (selectedMass != null &&
+                selectedMass.CornerDamagePreviewEnabled)
+            {
+                MassGenerator.CornerDamagePreviewStatus cornerStatus =
+                    selectedMass.CornerDamagePreviewStatus;
+                string cornerMessage;
+                MessageType cornerMessageType;
+                if (selectedMass.CornerDamagePreviewStale)
+                {
+                    cornerMessage =
+                        "The EW-C1A.2 corner-chip preview is stale. Rebuild it before judging the chip.";
+                    cornerMessageType = MessageType.Warning;
+                }
+                else if (cornerStatus != null &&
+                    cornerStatus.PreviewApplied)
+                {
+                    cornerMessage =
+                        "EW-C1A.2 corner-chip preview active: corner " +
+                        cornerStatus.SelectedGraphVertexIndex +
+                        ", trial " + cornerStatus.AcceptedTrialIndex +
+                        ", mandatory cap ring " +
+                        cornerStatus.MandatoryBuiltCount + "/" +
+                        cornerStatus.ExpectedCapRingEdgeCount +
+                        ", unrelated bevel retention " +
+                        cornerStatus.UnrelatedRetainedCount + "/" +
+                        cornerStatus.UnrelatedBaselineBuiltCount + ".";
+                    cornerMessageType = MessageType.Info;
+                }
+                else
+                {
+                    cornerMessage =
+                        "EW-C1A.2 corner-chip preview did not apply. " +
+                        selectedMass.CornerDamagePreviewDiagnostic;
+                    cornerMessageType = MessageType.Error;
+                }
+                EditorGUILayout.HelpBox(
+                    cornerMessage,
+                    cornerMessageType);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "EW-C1A.2 commits one certified pre-bevel corner cut, requires every cap-ring bevel, and rejects the preview if any unrelated accepted bevel is lost.",
+                    MessageType.None);
+            }
+
+            using (new EditorGUI.DisabledScope(
+                Application.isPlaying ||
+                serializedObject.isEditingMultipleObjects ||
+                activeEdgeWearViabilityMatrixJob != null ||
+                activeEdgeWearValidationSuiteJob != null))
+            {
+                if (GUILayout.Button(
+                        "Rebuild EW-C1A.2 Corner-Chip Preview"))
+                {
+                    if (selectedMass != null)
+                    {
+                        RunCornerDamagePreview(selectedMass);
+                        serializedObject.Update();
+                        Repaint();
+                        SceneView.RepaintAll();
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(lastCornerDamagePreviewSummary))
+            {
+                EditorGUILayout.HelpBox(
+                    lastCornerDamagePreviewSummary,
+                    MessageType.None);
+                string cornerPreviewReportPath = GetEdgeWearLibraryPath(
+                    CornerDamagePreviewReportFileName);
+                using (new EditorGUI.DisabledScope(
+                    !File.Exists(cornerPreviewReportPath)))
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(
+                            "Copy EW-C1A.2 Preview Report"))
+                    {
+                        EditorGUIUtility.systemCopyBuffer =
+                            File.ReadAllText(cornerPreviewReportPath);
+                    }
+                    if (GUILayout.Button(
+                            "Reveal EW-C1A.2 Preview Report"))
+                    {
+                        EditorUtility.RevealInFinder(
+                            cornerPreviewReportPath);
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+            }
+
+            EditorGUILayout.Space(4f);
             DrawEdgeWearViabilityMatrixControls();
 
             if (Application.isPlaying)
@@ -1112,6 +1210,60 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "recipe/settings snapshot.",
                     MessageType.None);
             }
+        }
+
+        private static void RunCornerDamagePreview(
+            GeneratedMass mass)
+        {
+            if (mass == null || mass.Recipe == null)
+            {
+                lastCornerDamagePreviewSummary =
+                    "EW-C1A.2 preview failed: selected mass has no recipe.";
+                return;
+            }
+
+            string report;
+            try
+            {
+                mass.EvaluateCornerDamagePreview();
+                report = mass.CornerDamagePreviewReport;
+                if (string.IsNullOrEmpty(report))
+                {
+                    report =
+                        "GeneratedMass EW-C1A.2 corner-chip preview" +
+                        Environment.NewLine +
+                        "contract=EW-C1A.2-preview-only" +
+                        Environment.NewLine +
+                        "status=failed" + Environment.NewLine +
+                        "diagnostic=preview report was unavailable";
+                }
+            }
+            catch (Exception exception)
+            {
+                report =
+                    "GeneratedMass EW-C1A.2 corner-chip preview" +
+                    Environment.NewLine +
+                    "contract=EW-C1A.2-preview-only" +
+                    Environment.NewLine +
+                    "status=failed" + Environment.NewLine +
+                    "diagnostic=exception: " + exception;
+            }
+
+            string reportPath = GetEdgeWearLibraryPath(
+                CornerDamagePreviewReportFileName);
+            File.WriteAllText(reportPath, report);
+            bool passed = report.IndexOf(
+                "status=passed",
+                StringComparison.Ordinal) >= 0;
+            lastCornerDamagePreviewSummary =
+                "EW-C1A.2 corner-chip preview " +
+                (passed ? "passed" : "failed") +
+                ". Report: " + reportPath;
+            EditorGUIUtility.systemCopyBuffer = report;
+            Debug.Log(
+                lastCornerDamagePreviewSummary +
+                " The complete report was copied to the clipboard.",
+                mass);
         }
 
         private static void RunCornerDamageTransactionAudit(

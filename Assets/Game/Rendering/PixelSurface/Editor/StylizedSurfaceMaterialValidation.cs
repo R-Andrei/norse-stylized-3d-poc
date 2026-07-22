@@ -136,27 +136,27 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     $"{label}: packed backing depth is {packedArray.depth}; expected {requiredBackingDepth} for {logicalEntryCount} logical entries.");
             }
 
-            int authoredEntryCount = 0;
+            int textureFormEntryCount = 0;
             for (int index = 0; index < library.Entries.Count; index++)
             {
                 StylizedSurfaceDetailLibrary.Entry entry =
                     library.Entries[index];
-                if (entry != null && entry.UsesAuthoredMaterialSet)
+                if (entry != null && entry.UsesTextureForm)
                 {
-                    authoredEntryCount++;
+                    textureFormEntryCount++;
                 }
             }
 
             Texture2DArray textureFormArray =
                 library.GeneratedAuthoredColorArray;
-            if (authoredEntryCount == 0)
+            if (textureFormEntryCount == 0)
             {
                 builder.AppendLine(
-                    "Texture-form backing: <none> (expected; no authored entries)");
+                    "Texture-form backing: <none> (expected; no texture-form entries)");
                 if (textureFormArray != null)
                 {
                     failures.Add(
-                        $"{label}: texture-form array exists with zero authored entries.");
+                        $"{label}: texture-form array exists with zero texture-form entries.");
                 }
             }
             else
@@ -168,10 +168,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     textureFormArray,
                     library.SliceResolution);
                 if (textureFormArray != null &&
-                    textureFormArray.depth != authoredEntryCount)
+                    textureFormArray.depth != textureFormEntryCount)
                 {
                     failures.Add(
-                        $"{label}: texture-form backing depth is {textureFormArray.depth}; expected {authoredEntryCount}.");
+                        $"{label}: texture-form backing depth is {textureFormArray.depth}; expected {textureFormEntryCount}.");
                 }
             }
 
@@ -213,7 +213,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     entry.StableId,
                     out _,
                     out _);
-                if (entry.UsesAuthoredMaterialSet != textureFormResolved)
+                if (entry.UsesTextureForm != textureFormResolved)
                 {
                     failures.Add(
                         $"{label}: logical entry '{entry.StableId}' texture-form resolution does not match source mode.");
@@ -444,7 +444,18 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     label + " prepacked",
                     resolved.SourceTexture,
                     false,
-                    false);
+                    resolved.UsesPrepackedTextureForm);
+                if (resolved.UsesPrepackedTextureForm)
+                {
+                    AppendSourceTexture(
+                        builder,
+                        failures,
+                        label + " Palette Form",
+                        resolved.PrepackedTextureForm,
+                        true,
+                        true);
+                }
+
                 return resolved;
             }
 
@@ -497,6 +508,27 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             IDictionary<string, StylizedSurfaceDetailLibraryBuilder.AuthoredColorBuildResult>
                 authoredColorBuilds)
         {
+            if (entry.UsesPrepackedTextureForm)
+            {
+                Texture2D pairedSource = entry.PrepackedTextureForm;
+                if (pairedSource == null || !pairedSource.isReadable)
+                {
+                    failures.Add(
+                        $"{label}: paired Palette Form source is missing or not readable.");
+                    return;
+                }
+
+                builder.AppendLine(
+                    $"Texture-form source: pre-normalized paired payload, algorithm {StylizedSurfaceDetailLibraryBuilder.PrepackedTextureFormAlgorithmVersion}");
+                AppendTextureFormBandCoverage(
+                    builder,
+                    failures,
+                    label,
+                    pairedSource.GetPixels(0),
+                    false);
+                return;
+            }
+
             Texture2D source = entry.AuthoredBaseColor;
             if (source == null)
             {
@@ -527,7 +559,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 builder,
                 failures,
                 label,
-                result.MipPixels[0]);
+                result.MipPixels[0],
+                true);
 
             for (int mip = 0; mip < result.MipPixels.Count; mip++)
             {
@@ -600,7 +633,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             StringBuilder builder,
             ICollection<string> failures,
             string label,
-            IReadOnlyList<Color> formPixels)
+            IReadOnlyList<Color> formPixels,
+            bool pixelsAreGammaEncoded)
         {
             if (formPixels == null || formPixels.Count == 0)
             {
@@ -620,8 +654,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     Mathf.Abs(encoded.r - encoded.g),
                     Mathf.Abs(encoded.r - encoded.b),
                     Mathf.Abs(encoded.g - encoded.b));
-                float value = StylizedSurfaceDetailLibraryBuilder
-                    .DecodeFormValue(encoded);
+                float value = pixelsAreGammaEncoded
+                    ? StylizedSurfaceDetailLibraryBuilder
+                        .DecodeFormValue(encoded)
+                    : Mathf.Clamp01(encoded.r);
                 if (value < 0.45f)
                 {
                     dark++;
@@ -683,7 +719,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 "Dry Smoothness baseline coefficient: 1.000 at every Roughness Variation value");
 
             bool entryUsesTextureForm =
-                entry != null && entry.UsesAuthoredMaterialSet;
+                entry != null && entry.UsesTextureForm;
             if (profile.UsesTextureForm != entryUsesTextureForm)
             {
                 failures.Add(

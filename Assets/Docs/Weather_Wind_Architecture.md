@@ -717,3 +717,242 @@ This clock is for cheap vegetation-local oscillator phase only. It is not author
 - Fixed-step response velocity no longer directly changes micro-detail amplitude, but it remains fully active in response integration and macro-bend prediction.
 - No Weather runtime, editor, compute, resource, cadence, target-field, response-field, or gameplay-query code changed.
 - Source scope, timing-contract, formula, and lexical checks passed. Unity shader import and visual validation remain pending.
+
+---
+
+## WEATHER-V0A — Scene-Owned Weather Root and Legacy Wind Migration
+
+### Status
+
+**WEATHER-V0A accepted and frozen on 2026-07-21.** User validation reported one READY and published scene-owned domain, exactly one active Weather domain, the migrated 128 × 128 field at 0.5 m/cell and 10 Hz, active compute simulation, intact CPU sampling, and intact future wind-line consumer availability. The legacy provider remains disabled rollback data until the later cleanup stage.
+
+### Objective and acceptance criteria
+
+The target scene ownership is:
+
+```text
+Scene
+└── Systems
+    ├── Weather                         [WeatherWindDomain]
+    └── Diagnostics
+        └── Vegetation Benchmark        [VegetationBenchmarkRunner]
+```
+
+The update is accepted only when:
+
+1. One explicit Inspector action creates or reuses `Systems/Weather`, adds or reuses an exact `WeatherWindDomain`, copies all 27 serialized wind-domain configuration properties, disables but does not delete the legacy `VegetationBenchmarkWindProvider`, and reports the transaction.
+2. The destination component contains the same anchor, camera, field, prevailing-wind, noise, gust, response, mapping, and debug configuration as the legacy source.
+3. The migration preserves whether the legacy provider was actively publishing. An active source produces one active destination; an inactive source produces a disabled destination and an explicit report warning rather than silently enabling wind.
+4. The migration is idempotent. A previously migrated `Systems/Weather` destination is reported without creating duplicate roots or domains.
+5. The transaction uses one Undo group and reverts on exceptions. The legacy source remains present for rollback.
+6. `WeatherWindDomain.cs`, compute/HLSL resources, vegetation renderer code, scenes, prefabs, materials, layers, tags, and URP assets remain unchanged.
+
+### Approved file scope
+
+Create:
+
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindInfrastructureMigration.cs` and `.meta`
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Docs/Weather_System_Architecture_Provisional.md`
+- `Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md`
+- `Assets/Docs/Stylized_Vegetation_Architecture.md`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindDomainEditor.cs`
+
+No other project file is authorized.
+
+### Read-only review evidence
+
+- `Assets/AGENTS.md` was read completely. It requires this persistent plan as the first project write, exact file scope, no raw scene editing, source and dependency rereads, and pending Unity checks where Unity is unavailable.
+- The supplied current workspace has no `.git` directory. Branch, `HEAD`, status, diff, and history are unavailable. `WeatherWindDomain.cs`, `WeatherWindDomainEditor.cs`, and `VegetationBenchmarkWindProvider.cs` are byte-identical between the supplied INFRA.1B baseline and current workspace before this update.
+- `WeatherWindDomain` owns 27 serialized configuration properties and all wind runtime resources. Its `OnEnable`, `OnDisable`, and `Update` contracts select one published domain and release/reassign global resources when ownership changes. No runtime edit is required.
+- `VegetationBenchmarkWindProvider` is a hidden, obsolete subclass with no behavior of its own. Its serialized fields are inherited directly from `WeatherWindDomain`, so an editor-only explicit property copy can preserve the complete configuration without retaining vegetation ownership.
+- `WeatherWindDomainEditor` already detects the exact legacy provider type and warns that it should be replaced. It is the narrowest existing Inspector surface for the migration action.
+- The supplied `VisualFrameworkDemo.unity` contains the legacy provider on `VegetationTest` with all 27 serialized fields. The source scene object is inactive in the supplied archive, so migration must preserve `isActiveAndEnabled` rather than assuming the source currently publishes wind. The scene remains read-only; the hierarchy changes only when the user invokes the Editor action.
+- INFRA.1B already creates or reuses the scene root `Systems` and direct child `Diagnostics`. WEATHER-V0A must reuse that root and create a direct `Weather` sibling without depending on vegetation migration code.
+- Vegetation consumers query only the static `WeatherWindDomain.ActiveDomainCount`, `PublishedDomain`, shader globals, and CPU sample contract. They do not depend on the legacy subclass type.
+
+### Explicit serialized-property migration allowlist
+
+```text
+fieldAnchor
+targetCamera
+fieldPlaneY
+fieldResolution
+cellSizeMetres
+updateRateHz
+maximumStepsPerFrame
+prevailingDirection
+baseStrength
+broadNoiseScaleMetres
+broadNoiseTravelSpeed
+turbulenceStrength
+gustNoiseScaleMetres
+gustTravelSpeed
+gustStrength
+gustThreshold
+gustSoftness
+seed
+responseFrequencyHz
+responseDampingRatio
+responseVariation
+maximumWindStrength
+maximumVisualBendMetres
+debugView
+debugSampleStepCells
+debugHeightOffset
+debugArrowScale
+```
+
+This list contains all 27 current serialized configuration properties. Runtime textures, compute handles, ring offsets, simulation state, counters, error strings, static domain ownership, and reports are not serialized and are not copied.
+
+### Migration transaction
+
+1. Validate that the selected source is the exact legacy provider type, belongs to a loaded scene, and is not a persistent asset.
+2. Inspect all loaded `WeatherWindDomain` components without sorting. Reject ambiguous active domains or an occupied `Systems/Weather` hierarchy that cannot safely receive the exact base component.
+3. Begin one Undo group.
+4. Create or reuse the scene-root `Systems` object and its direct `Weather` child; normalize only newly created organizational transforms.
+5. Create or reuse an exact `WeatherWindDomain` destination. Keep a newly created destination inactive while configuration is copied so the legacy source remains the sole publisher during setup.
+6. Copy the explicit 27-property allowlist through `SerializedObject`, apply it without Undo duplication, and validate every property and type.
+7. Record whether the source was active and whether it was the published domain, disable the legacy source, request the destination rebuild, then enable the destination only when the source was active.
+8. Build and copy a report containing source/destination paths, copied-property count, active-state preservation, active-domain count, published-domain result, and rollback statement.
+9. Collapse the Undo group. On exception, revert the complete group and report the failure.
+
+A disabled source remains disabled at the destination. This prevents the migration from silently changing a scene that currently has no active wind. The destination Inspector can then be enabled deliberately.
+
+### Runtime and performance model
+
+- This update adds no runtime class, frame loop, serialized runtime field, shader global, texture, buffer, compute dispatch, draw call, or gameplay query.
+- The active destination uses the existing `WeatherWindDomain` implementation and therefore retains the current 128² default field, approximately 320 KiB persistent texture budget, and fixed-cadence simulation cost.
+- During explicit Editor migration, a temporary second component may exist while inactive. No second active publisher or persistent duplicate field is permitted after the transaction.
+- The disabled legacy component retains serialized rollback data but allocates no active Weather resources.
+
+No `PERFORMANCE EXCEPTION` is active.
+
+### File-by-file implementation sequence
+
+| ID | File | Work | Status |
+| --- | --- | --- | --- |
+| WEATHER-V0A.0 | `Weather_Wind_Architecture.md` | Record evidence, exact scope, property allowlist, migration transaction, performance, and validation before code changes. | Complete |
+| WEATHER-V0A.1 | `WeatherWindInfrastructureMigration.cs` | Implement preflight, hierarchy creation/reuse, explicit property copy, active-state preservation, Undo rollback, idempotence, and clipboard report. | Complete at source level; Unity validation pending |
+| WEATHER-V0A.2 | `WeatherWindDomainEditor.cs` | Replace the passive legacy warning with migration status and one explicit migration button while preserving all current debug/editor behavior. | Complete at source level; Unity validation pending |
+| WEATHER-V0A.3 | Weather and vegetation architecture documents | Freeze INFRA.1B from user evidence and record scene-owned Weather ownership and temporary disabled-shim rollback state. | Complete |
+| WEATHER-V0A.4 | Approved files and frozen dependencies | Run exact-scope, parse, property-list, hierarchy, Undo, active-state, and byte-identity checks; record Unity validation as pending. | Complete at source level; Unity validation pending |
+
+### Validation plan
+
+Static/source validation must confirm:
+
+- exact two-created / five-modified / zero-deleted scope;
+- C# lexical, delimiter, preprocessor, and Tree-sitter parse success for both changed editor sources;
+- the migration allowlist equals all 27 serialized fields in `WeatherWindDomain` exactly once;
+- the migration requires the exact legacy subclass, uses no sorted object search, creates only `Systems/Weather`, and contains one Undo rollback path;
+- source active state controls destination enabled state and the source is disabled, not destroyed;
+- `WeatherWindDomain.cs`, the compatibility shim, compute/HLSL, vegetation runtime/editor consumers, scene, prefab, material, URP, layer, and tag files are byte-identical to the pre-change baseline.
+
+Unity validation is limited to migration, hierarchy/state inspection, wind report comparison, Undo, and vegetation motion. Unity compilation and live behavior remain pending until the patch is imported into Unity 6000.5.0f1.
+
+### Implementation result and post-change consistency audit
+
+#### Actual affected files
+
+Created exactly as declared:
+
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindInfrastructureMigration.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindInfrastructureMigration.cs.meta`
+
+Modified exactly as declared:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Docs/Weather_System_Architecture_Provisional.md`
+- `Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md`
+- `Assets/Docs/Stylized_Vegetation_Architecture.md`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindDomainEditor.cs`
+
+Deleted, moved, renamed, scene, prefab, material, shader, compute, runtime Weather, vegetation runtime, layer, tag, and URP files: none.
+
+#### Implemented behavior
+
+- The legacy provider Inspector now exposes one explicit `Migrate Legacy Wind Provider to Systems/Weather` action.
+- The migration requires the exact compatibility subclass and one loaded scene source. It rejects duplicate `Systems` roots, duplicate `Weather` children, occupied destination objects, additional same-scene domains, and additional active domains in other loaded scenes.
+- The action creates or reuses the scene-root `Systems` object and direct `Weather` child, creates or reuses an exact `WeatherWindDomain`, and copies the complete explicit 27-property configuration allowlist through `SerializedObject`.
+- Newly created destinations remain inactive during configuration. The legacy source is disabled, not destroyed. `RequestRebuild` occurs before the destination is enabled, preventing an avoidable second field initialization.
+- Destination enablement follows the legacy source's actual active state. The report separately records whether the source was the published static domain. An inactive source produces a disabled destination and an explicit warning.
+- Repeated invocation after migration returns an already-migrated report without overwriting the destination or creating duplicate hierarchy objects.
+- Both preflight failures and transactional failures copy a complete failure report. Transactional exceptions revert the single Undo group.
+- INFRA.1B is frozen in the vegetation ledgers from the user's accepted two-layer inventory evidence.
+
+#### Source validation
+
+`WEATHER-V0A_Source_Validation.txt` reports **43/43 passed**:
+
+- exact two-created / five-modified / zero-deleted scope;
+- lexical delimiter and preprocessor balance for both changed editor sources;
+- Tree-sitter C# parse with zero error or missing nodes for both changed editor sources;
+- valid unique new `.meta` GUID;
+- all 27 serialized `WeatherWindDomain` properties matched exactly and appeared once in the migration allowlist;
+- exact legacy-type requirement, unsorted domain discovery, one `Systems/Weather` hierarchy, one Undo rollback path, disabled-not-destroyed source, active-state preservation, idempotence, exact base destination, clipboard reporting, and Inspector action;
+- existing Weather debug/reset/report actions preserved;
+- `WeatherWindDomain.cs`, the compatibility shim, vegetation runtime and editor consumers, Weather HLSL/compute, vegetation wind HLSL, and `VisualFrameworkDemo.unity` byte-identical to the pre-change baseline.
+
+The complete final versions of both changed editor sources, the unchanged Weather runtime producer, compatibility shim, vegetation consumer status paths, canonical Weather documents, INFRA.1B freeze section, and source scene evidence were reread after implementation. The final diff matches every approved plan item and contains no undeclared change.
+
+A Unity executable, Unity reference assemblies, and a C# compiler against Unity assemblies are unavailable in this environment. Unity import/compilation, `SerializedObject` field transfer in the Editor, active-domain handoff, hierarchy Undo/redo, exact source/destination report comparison, and visible vegetation motion are therefore **pending user validation**.
+
+#### Performance reconciliation
+
+- Active gameplay code is byte-identical. The destination uses the existing wind field, textures, fixed-cadence compute work, shader globals, and CPU sample contract.
+- The new code is Editor-only and has no frame loop.
+- Explicit migration performs one 27-property copy and scene hierarchy transaction. A newly created component is inactive during setup, so it does not allocate a second active field.
+- The disabled compatibility source retains serialized rollback data and contributes no active field resources.
+
+**Status:** frozen from user validation. The accepted report recorded `Status: READY`, `Published domain: Yes`, `Active Weather domains: 1`, 327,680 estimated texture bytes, and active simulation dispatches.
+
+
+
+## WEATHER-WIND-V0A.1 — Unsigned Power-of-Two Toroidal Wrap
+
+### Status
+
+**Implemented at source level on 2026-07-21; Unity D3D11 validation pending.** This correction is delivered inside `VEG-V2-INFRA.2` because the accepted WEATHER-V0A domain exposed a D3D11 shader warning in all three compute kernels.
+
+### User evidence
+
+Unity emitted the same warning for `InitializeField`, `RecenterField`, and `SimulateField`:
+
+```text
+integer modulus may be much slower, try using uints if possible
+CS_WeatherWindField.compute(85) (on d3d11)
+```
+
+The common source was `PhysicalCell(int2 logicalCell)`, which used signed `%` for toroidal texture addressing.
+
+### Corrected contract
+
+`WeatherWindDomain.OnValidate()` normalizes the scalar field resolution with `Mathf.ClosestPowerOfTwo` and clamps it to 32–256. `SetCommonComputeParameters()` publishes equal positive resolution components and the normalized non-negative ring offset. Under that invariant, positive modulo and a power-of-two bit mask are exactly equivalent:
+
+```text
+(value % resolution) == (value & (resolution - 1))
+```
+
+`PhysicalCell` now converts the logical cell, ring offset, and resolution to `uint2`, adds them, applies `& (resolution - 1u)`, and converts the wrapped coordinate back to `int2`. Signed integer modulus is removed completely.
+
+### Cross-subsystem impact audit
+
+- `WeatherWindDomain.cs` is unchanged; resolution normalization, recenter offset updates, dispatch count, texture allocation, and simulation cadence are unchanged.
+- `InitializeField`, `RecenterField`, and `SimulateField` still call one shared `PhysicalCell` helper and write the same physical texels.
+- `WeatherWindField.hlsl` and `VegetationWindResponse.hlsl` are byte-identical. Consumer UV mapping, prediction, bend clamping, and vegetation response are unchanged.
+- No texture format, buffer, shader global, CPU gameplay query, noise input, response equation, or dispatch count changed.
+
+Exhaustive source validation compared modulo and bit-mask results for every valid logical coordinate and offset at resolutions 32, 64, 128, and 256; all combinations matched. The remaining required evidence is a Unity D3D11 import with no modulus warning and an unchanged READY Weather report.
+
+
+## WEATHER-V0A Production Ownership — VEG-V2-INFRA.3 Final Cleanup
+
+**Source cleanup complete on 2026-07-21; Unity import validation pending.** The accepted Weather owner remains the exact scene-level `Systems/Weather` `WeatherWindDomain`. `VEG-V2-INFRA.3A` was superseded before application; no live-retirement transaction remains.
+
+`VEG-V2-INFRA.3` deletes the obsolete `VegetationBenchmarkWindProvider` compatibility subclass and the one-time Weather migration utility. The `WeatherWindDomain` runtime producer, compute field, shader globals, CPU queries, report/debug controls, active-state rules, and consumer behavior are unchanged. If the obsolete `VegetationTest` object still exists in the live scene, the user deletes it directly before or immediately after applying this source cleanup.
+
+Final Weather ownership contains no vegetation-specific publisher or migration path. Exactly one active and published `WeatherWindDomain` remains the authoritative contract for vegetation and future Weather consumers.

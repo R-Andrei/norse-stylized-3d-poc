@@ -870,6 +870,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundRiverbedLayerDetailC");
         private static readonly int GroundRiverbedMaterialStrengthId =
             Shader.PropertyToID("_GroundRiverbedMaterialStrength");
+        private static readonly int GroundRiverbedMaterialTransitionId =
+            Shader.PropertyToID("_GroundRiverbedMaterialTransition");
         private static readonly int GroundRiverbedHydrologyEnabledId =
             Shader.PropertyToID("_GroundRiverbedHydrologyEnabled");
         private static readonly int GroundRiverbedHydrologyWetTintColorId =
@@ -1148,6 +1150,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             showVegetationCoverageOverlay;
         public int VegetationCoverageSurfaceRevision =>
             groundGeometryRevision;
+        public int SurfaceGeometryRevision => groundGeometryRevision;
         public Material SharedMaterial =>
             meshRenderer != null
                 ? meshRenderer.sharedMaterial
@@ -3047,6 +3050,92 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return true;
         }
 
+        public bool TryGetSurfaceDomain(
+            out float halfSize,
+            out float domainSize)
+        {
+            return TryResolveVegetationCoverageDomain(
+                out halfSize,
+                out domainSize);
+        }
+
+        public bool TryWorldToSurfaceNormalizedXZ(
+            Vector3 worldPosition,
+            out float normalizedX,
+            out float normalizedZ)
+        {
+            normalizedX = 0f;
+            normalizedZ = 0f;
+            if (!TryResolveVegetationCoverageDomain(
+                    out float halfSize,
+                    out float domainSize))
+            {
+                return false;
+            }
+
+            Vector3 localPoint = transform.InverseTransformPoint(worldPosition);
+            const float BoundaryTolerance = 0.0001f;
+            if (localPoint.x < -halfSize - BoundaryTolerance ||
+                localPoint.x > halfSize + BoundaryTolerance ||
+                localPoint.z < -halfSize - BoundaryTolerance ||
+                localPoint.z > halfSize + BoundaryTolerance)
+            {
+                return false;
+            }
+
+            normalizedX = Mathf.Clamp01(
+                (localPoint.x + halfSize) / domainSize);
+            normalizedZ = Mathf.Clamp01(
+                (localPoint.z + halfSize) / domainSize);
+            return true;
+        }
+
+#if UNITY_EDITOR
+        public bool TryGetSurfaceWorldPosition(
+            float normalizedX,
+            float normalizedZ,
+            out Vector3 worldPosition)
+        {
+            worldPosition = Vector3.zero;
+            if (!TryResolveVegetationCoverageDomain(
+                    out float halfSize,
+                    out float ignoredDomainSize))
+            {
+                return false;
+            }
+
+            float localX = Mathf.Lerp(
+                -halfSize,
+                halfSize,
+                Mathf.Clamp01(normalizedX));
+            float localZ = Mathf.Lerp(
+                -halfSize,
+                halfSize,
+                Mathf.Clamp01(normalizedZ));
+            float localHeight = 0f;
+            if (baseSurface != null && baseSurface.IsValid &&
+                baseSurface.TrySample(
+                    new Vector2(localX, localZ),
+                    out GroundSurfaceSample sample))
+            {
+                localHeight = sample.Height;
+            }
+
+            worldPosition = transform.TransformPoint(
+                new Vector3(localX, localHeight, localZ));
+            return true;
+        }
+
+        public bool TryRaycastGeneratedSurface(
+            Ray worldRay,
+            out Vector3 worldPosition)
+        {
+            return TryRaycastVegetationCoverageSurface(
+                worldRay,
+                out worldPosition);
+        }
+#endif
+
         public float CalculateVegetationCoverageFraction()
         {
             if (!vegetationCoverageInitialized ||
@@ -4729,6 +4818,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             materialProperties.SetFloat(
                 GroundRiverbedMaterialStrengthId,
                 resolvedMaterialControls.RiverbedMaterialStrength);
+            materialProperties.SetVector(
+                GroundRiverbedMaterialTransitionId,
+                new Vector4(
+                    resolvedMaterialControls.RiverbedMaterialBlendDistance,
+                    resolvedMaterialControls.RiverbedMaterialBlendSoftness,
+                    0f,
+                    0f));
 
             GroundHydrologyModifierProfile riverbedHydrologyModifier =
                 resolvedMaterialControls.ResolvedRiverbedHydrologyModifier;

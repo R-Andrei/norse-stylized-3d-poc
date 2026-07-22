@@ -4199,3 +4199,89 @@ Selected Production pixels remove the complete exact `preChipRenderedMask`. Elig
 
 This remains render-only Layer E work. It adds no persistent state, material mutation, topology field, texture, buffer, kernel, dispatch, pass, or cache.
 
+## P12r Layer E architecture correction
+
+P12q's separate binary-topology Eligibility subsystem is removed. Layer E returns to the P12p architecture:
+
+```text
+exact no-Chip rendered Foam
+        +
+original analytical Candidate Field
+        +
+per-fragment rendered exterior-edge Eligibility
+        ↓
+Candidate × Eligibility
+        ↓
+complete selected-pixel removal
+```
+
+There is no Chip topology texture, erosion compute stage, fixed-frequency Chip update, Eligibility-mode selector, or world-space erosion-width control. This removal does not change Layer C material state, transport, sources, Film, Shape, Strands, candidate identity, candidate animation, or final Foam composition. Offline source comparison confirms all ten restored implementation files are byte-identical to P12p.
+
+
+
+## P12s Layer E addendum — selectable soft-mask reconstruction under Presence-Amplitude
+
+P12s does not change Layer ownership. Layer C remains persistent material, Layer D remains visual Film/Shape evaluation, and Layer E remains render-only composition.
+
+The Candidate Field is one unchanged full-rate analytical field for every route. Only Presence-Amplitude Eligibility/application is selectable:
+
+### Exact Rendered Removal — retained default
+
+```text
+binaryCandidate = Candidate > 0
+binaryEligibility = rendered-fringe Eligibility > 0
+Production = binaryCandidate × binaryEligibility
+Final = Production ? 0 : exactPreChipRenderedMask
+```
+
+### Soft-Mask Reconstruction — experimental
+
+```text
+binaryVisibleSupport = exactPreChipRenderedMask > 0
+softEligibility = binaryVisibleSupport
+                  × soft edge band(preChipSoftVisibility,
+                                   SoftEdgeStart,
+                                   ChipEdgeWidth)
+Production = continuousCandidate × softEligibility
+postChipSoft = coherentSoftVisibility × (1 - Production)
+Final = reharden(postChipSoft) × structuralStrandKeep
+```
+
+The experiment uses binary visible support so faint Foam does not weaken permission, while Candidate and edge membership remain continuous. Interior Access is disabled for Presence-Amplitude. Current Presence Footprint remains on the accepted soft-mask reconstruction path and is not affected by the selector.
+
+The architecture adds two scalar uniforms and no resource or cadence. The shared include still has one production consumer. The primary visual risk remains derivative-coordinate quality; `Soft Edge Start` makes that coordinate tunable without changing Candidate geometry or adding another topology system.
+
+## P12t accepted Layer E Chipping contract
+
+Production Chipping is Layer E render-only work. Its sole accepted application is soft-mask reconstruction:
+
+```text
+Original continuous analytical Candidate
+× soft Eligibility permission
+→ modify coherent pre-hardened visibility
+→ reharden Foam body and fringe
+→ apply structural Strands
+→ Final Foam
+```
+
+Presence-Amplitude uses binary exact rendered support to authorize its soft Eligibility coordinate and disables Interior Access. Current retains its historical soft Eligibility plus optional deterministic Interior Access. Exact Rendered Removal and its application selector are removed.
+
+Layer D remains a diagnostic evaluated-shape system. Its Visual Occupancy Build/Release controls and previews do not feed normal Final Foam. Candidate, Eligibility, Production, Chip-and-Strand Probe, and Chip-and-Strand Difference are Layer E diagnostics.
+
+
+## Unified Automatic Source Reveal-Speed Contract — `RG-METRIC-P12u`
+
+Automatic Layer C source timing now has one authoritative definition across Shore Ribbon, Inward Wash, Object Contact Arc, Object Contact Semi-Arc, Object Contact Fleck, Lace Connector, Cross-Lace Connector, and Torn Fragment:
+
+```text
+requested reveal speed = Base Reveal Speed × recipe Reveal Speed Multiplier × deterministic jitter
+resolved reveal duration = max(one Layer C material step, path distance / requested reveal speed)
+```
+
+This is source formation/reveal only. It does not control event Activity, already-born Foam transport, Remaining Life, or final rendering.
+
+Arc/Semi-Arc use Reveal Speed for Build only. Their accepted Build → Hold → progressive Release → Rest lifecycle and persistent-emitter behavior remain unchanged. Flecks consume their complete event duration. Torn Fragments use the same honest path-distance timing as every other source rather than a compressed sweep formula.
+
+The previous Shore `14 s`, Object `4 s`, Lace `5 s`, Cross-Lace `3.5 s`, and Torn Fragment `1.35 s` ceilings are superseded. The material cadence is the only minimum-duration constraint. Extremely slow authored speeds can increase 32-slot pool occupancy and reject new starts; saturation is an explicit runtime condition and is reported rather than hidden by acceleration.
+
+Contact Fleck and Free-Water correlated size/life/presence sampling now reaches the full authored Min/Max intervals. Source grammar, geometry, deposition ownership, source strength, transport, Layer D, and Layer E are otherwise unchanged.

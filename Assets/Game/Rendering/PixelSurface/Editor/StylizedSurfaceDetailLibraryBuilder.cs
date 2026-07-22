@@ -9,6 +9,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
     public static class StylizedSurfaceDetailLibraryBuilder
     {
         internal const int AuthoredColorGenerationAlgorithmVersion = 4;
+        internal const int PrepackedTextureFormAlgorithmVersion = 1;
         internal const int EmptyLibraryBackingAlgorithmVersion = 1;
         internal const float AuthoredColorSeamMeanRatioLimit = 1.15f;
         internal const float AuthoredColorSeamP95RatioLimit = 1.25f;
@@ -132,15 +133,15 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 detailArray.height != library.SliceResolution ||
                 detailArray.depth != library.RequiredPackedBackingDepth;
 
-            int authoredEntryCount = CountAuthoredColorEntries(library);
+            int textureFormEntryCount = CountTextureFormEntries(library);
             Texture2DArray colorArray =
                 library.GeneratedAuthoredColorArray;
-            bool colorInvalid = authoredEntryCount == 0
+            bool colorInvalid = textureFormEntryCount == 0
                 ? colorArray != null
                 : colorArray == null ||
                   colorArray.width != library.SliceResolution ||
                   colorArray.height != library.SliceResolution ||
-                  colorArray.depth != authoredEntryCount;
+                  colorArray.depth != textureFormEntryCount;
             bool mappingInvalid =
                 library.GeneratedAuthoredColorSliceIndices == null ||
                 library.GeneratedAuthoredColorSliceIndices.Count !=
@@ -200,6 +201,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         library,
                         entry,
                         messages);
+                    if (entry.UsesPrepackedTextureForm)
+                    {
+                        ValidatePrepackedTextureFormEntry(
+                            library,
+                            entry,
+                            messages);
+                    }
                 }
             }
 
@@ -251,12 +259,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     hideFlags = HideFlags.HideInHierarchy
                 };
 
-                int authoredColorCount = CountAuthoredColorEntries(library);
-                Texture2DArray authoredColorArray = authoredColorCount > 0
+                int textureFormCount = CountTextureFormEntries(library);
+                Texture2DArray authoredColorArray = textureFormCount > 0
                     ? new Texture2DArray(
                         resolution,
                         resolution,
-                        authoredColorCount,
+                        textureFormCount,
                         TextureFormat.RGBA32,
                         true,
                         false)
@@ -310,19 +318,24 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     }
                     else
                     {
-                        Texture2D source = entry.SourceTexture;
-                        int mipCount = Mathf.Min(
-                            source.mipmapCount,
-                            detailArray.mipmapCount);
-                        for (int mip = 0; mip < mipCount; mip++)
+                        CopySourceMipChain(
+                            entry.SourceTexture,
+                            detailArray,
+                            slice);
+                        if (entry.UsesPrepackedTextureForm)
                         {
-                            detailArray.SetPixels(
-                                source.GetPixels(mip),
-                                slice,
-                                mip);
+                            CopySourceMipChain(
+                                entry.PrepackedTextureForm,
+                                authoredColorArray,
+                                authoredColorSlice);
+                            authoredColorSliceIndices.Add(
+                                authoredColorSlice);
+                            authoredColorSlice++;
                         }
-
-                        authoredColorSliceIndices.Add(-1);
+                        else
+                        {
+                            authoredColorSliceIndices.Add(-1);
+                        }
                     }
                 }
 
@@ -371,7 +384,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 if (logResult)
                 {
                     Debug.Log(
-                        $"Rebuilt '{library.name}' with {logicalDepth} logical detail entry/entries, {backingDepth} packed backing slice(s), and {authoredColorCount} texture-form slice(s) at {resolution}×{resolution}.",
+                        $"Rebuilt '{library.name}' with {logicalDepth} logical detail entry/entries, {backingDepth} packed backing slice(s), and {textureFormCount} texture-form slice(s) at {resolution}×{resolution}.",
                         library);
                 }
 
@@ -443,6 +456,15 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     AppendTextureSignature(
                         builder,
                         entry.SourceTexture);
+                    if (entry.UsesPrepackedTextureForm)
+                    {
+                        builder.Append("prepacked-texture-form-algorithm=")
+                            .Append(PrepackedTextureFormAlgorithmVersion)
+                            .Append('|');
+                        AppendTextureSignature(
+                            builder,
+                            entry.PrepackedTextureForm);
+                    }
                 }
             }
 
@@ -491,7 +513,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             }
         }
 
-        private static int CountAuthoredColorEntries(
+        private static int CountTextureFormEntries(
             StylizedSurfaceDetailLibrary library)
         {
             int count = 0;
@@ -499,9 +521,15 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             {
                 StylizedSurfaceDetailLibrary.Entry entry =
                     library.Entries[index];
-                if (entry != null &&
-                    entry.UsesAuthoredMaterialSet &&
-                    entry.AuthoredBaseColor != null)
+                if (entry == null || !entry.UsesTextureForm)
+                {
+                    continue;
+                }
+
+                bool hasSource = entry.UsesAuthoredMaterialSet
+                    ? entry.AuthoredBaseColor != null
+                    : entry.PrepackedTextureForm != null;
+                if (hasSource)
                 {
                     count++;
                 }
@@ -534,6 +562,34 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 source,
                 entry.DisplayName,
                 false,
+                true,
+                messages);
+        }
+
+        private static void ValidatePrepackedTextureFormEntry(
+            StylizedSurfaceDetailLibrary library,
+            StylizedSurfaceDetailLibrary.Entry entry,
+            ICollection<string> messages)
+        {
+            Texture2D source = entry.PrepackedTextureForm;
+            if (source == null)
+            {
+                messages.Add(
+                    $"Entry '{entry.DisplayName}' has no paired Palette Form texture.");
+                return;
+            }
+
+            if (source.width != library.SliceResolution ||
+                source.height != library.SliceResolution)
+            {
+                messages.Add(
+                    $"Entry '{entry.DisplayName}' Palette Form is {source.width}×{source.height}; expected {library.SliceResolution}×{library.SliceResolution}.");
+            }
+
+            ValidateImporter(
+                source,
+                entry.DisplayName + " Palette Form",
+                true,
                 true,
                 messages);
         }
@@ -718,6 +774,23 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             }
 
             return pixels;
+        }
+
+        private static void CopySourceMipChain(
+            Texture2D source,
+            Texture2DArray destination,
+            int slice)
+        {
+            int mipCount = Mathf.Min(
+                source.mipmapCount,
+                destination.mipmapCount);
+            for (int mip = 0; mip < mipCount; mip++)
+            {
+                destination.SetPixels(
+                    source.GetPixels(mip),
+                    slice,
+                    mip);
+            }
         }
 
         private static void CopyGeneratedMipChain(
@@ -1435,6 +1508,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         false,
                         true,
                         library.SliceResolution);
+                    if (entry.UsesPrepackedTextureForm)
+                    {
+                        NormalizeImporter(
+                            entry.PrepackedTextureForm,
+                            true,
+                            true,
+                            library.SliceResolution);
+                    }
                 }
             }
         }

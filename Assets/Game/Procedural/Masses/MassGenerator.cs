@@ -134,6 +134,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public Vector3 End;
             public bool Selected;
             public bool Focus;
+            public bool Mandatory;
+            public bool CornerDamageCapRing;
             public EdgeWearDebugEdgeState State;
             public string Reason;
             public float Length;
@@ -183,6 +185,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 End = end;
                 Selected = selected;
                 Focus = focus;
+                Mandatory = false;
+                CornerDamageCapRing = false;
                 State = state;
                 Reason = reason ?? string.Empty;
                 Length = length;
@@ -485,6 +489,44 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 CollateralLostEdgeCount == 0 &&
                 CollateralChangedEdgeCount == 0;
         }
+
+        public sealed class CornerDamagePreviewStatus
+        {
+            public bool PreviewApplied;
+            public bool TransactionCertified;
+            public int ShapeSeed;
+            public int SelectedGraphVertexIndex = -1;
+            public int AcceptedTrialIndex = -1;
+            public float AcceptedDepth;
+            public float CapRingRequestedWidth;
+            public int CapFaceCount;
+            public int ExpectedCapRingEdgeCount;
+            public int MandatoryCandidateCount;
+            public int MandatorySelectedCount;
+            public int MandatoryBuiltCount;
+            public int BaselineBuiltOrdinaryCount;
+            public int UnrelatedBaselineBuiltCount;
+            public int UnrelatedRetainedCount;
+            public int CollateralLostCount;
+            public int CandidateCount;
+            public int ActiveEdgeCount;
+            public int DeferredEdgeCount;
+            public int RejectedEdgeCount;
+            public int BevelFaceCount;
+            public int TriangleCount;
+            public double BaselineMilliseconds;
+            public double CornerMilliseconds;
+            public string Diagnostic = string.Empty;
+            public string Report = string.Empty;
+            public int[] AffectedOriginalEdgeIndices =
+                Array.Empty<int>();
+            public int[] MandatoryCapRingIdentities =
+                Array.Empty<int>();
+            public int[] CollateralLostIdentities =
+                Array.Empty<int>();
+            public EdgeWearDebugEdgeRecord[] DebugEdges =
+                Array.Empty<EdgeWearDebugEdgeRecord>();
+        }
 #endif
 
         public readonly struct UnifiedEdgeWearPreviewStatus
@@ -526,6 +568,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Diagnostic = diagnostic ?? string.Empty;
                 DebugEdges = debugEdges ??
                     Array.Empty<EdgeWearDebugEdgeRecord>();
+            }
+        }
+
+#if UNITY_EDITOR
+        [ThreadStatic]
+        private static int cornerDamagePreviewRequestDepth;
+#endif
+
+        private static bool CornerDamagePreviewRequestActive
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return cornerDamagePreviewRequestDepth > 0;
+#else
+                return false;
+#endif
             }
         }
 
@@ -662,6 +721,65 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 out _,
                 out _);
             return CompleteCornerDamageTransactionAuditCapture(recipe);
+        }
+
+        public static MeshData GenerateCornerDamagePreview(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            out CornerDamagePreviewStatus previewStatus)
+        {
+            if (recipe == null)
+            {
+                throw new ArgumentNullException(nameof(recipe));
+            }
+
+            System.Diagnostics.Stopwatch baselineStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            GenerateInternal(
+                recipe,
+                surfaceFeatures,
+                EdgeWearEvaluationMode.UnifiedBoundedPreview,
+                -1,
+                out _,
+                out _,
+                out UnifiedEdgeWearPreviewStatus baselineStatus);
+            baselineStopwatch.Stop();
+
+            ResetCornerDamagePreviewCapture();
+            MeshData cornerMeshData;
+            UnifiedEdgeWearPreviewStatus cornerStatus;
+            System.Diagnostics.Stopwatch cornerStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            cornerDamagePreviewRequestDepth++;
+            try
+            {
+                cornerMeshData = GenerateInternal(
+                    recipe,
+                    surfaceFeatures,
+                    EdgeWearEvaluationMode.UnifiedBoundedPreview,
+                    -1,
+                    out _,
+                    out _,
+                    out cornerStatus);
+            }
+            finally
+            {
+                cornerDamagePreviewRequestDepth--;
+                cornerStopwatch.Stop();
+            }
+
+            previewStatus = CompleteCornerDamagePreviewCapture(
+                recipe,
+                baselineStatus,
+                cornerStatus,
+                baselineStopwatch.Elapsed.TotalMilliseconds,
+                cornerStopwatch.Elapsed.TotalMilliseconds);
+            if (previewStatus != null && previewStatus.PreviewApplied)
+            {
+                return cornerMeshData;
+            }
+
+            return Generate(recipe, surfaceFeatures);
         }
 
         public static MeshData GeneratePlaneCutBevelPreview(

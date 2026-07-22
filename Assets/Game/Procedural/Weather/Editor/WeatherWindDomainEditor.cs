@@ -56,17 +56,6 @@ namespace ProgrammaticStylized3D.Weather.Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Weather Wind Actions", EditorStyles.boldLabel);
 
-            if (target.GetType().FullName ==
-                "ProgrammaticStylized3D.Vegetation.VegetationBenchmarkWindProvider")
-            {
-                EditorGUILayout.HelpBox(
-                    "This is the preserved legacy scene component. Its old analytical " +
-                    "test-wind implementation has been removed; it now runs the shared " +
-                    "Weather Wind Domain through inheritance. Replace it with Weather " +
-                    "Wind Domain later through the Unity Inspector when convenient.",
-                    MessageType.Warning);
-            }
-
             if (GUILayout.Button("Reset Weather Wind Field"))
             {
                 domain.ResetField();

@@ -249,3 +249,31 @@ When full Weather-system development begins, this document should be revised thr
 - interaction with level generation and scene lifecycle.
 
 Until then, this document preserves the accepted direction without pretending that unspecified Weather features have already been designed.
+
+
+---
+
+## 14. Initial scene ownership — WEATHER-V0A
+
+The first concrete Weather hierarchy is intentionally minimal:
+
+```text
+Scene
+└── Systems
+    └── Weather                         [WeatherWindDomain]
+```
+
+`WeatherWindDomain` is attached directly to the `Weather` object in this initial version. Future Weather features may become child modules only after a dedicated Weather architecture review; WEATHER-V0A does not create speculative precipitation, cloud, temperature, event, or regional modules.
+
+The one-time vegetation-owned compatibility publisher and migration utility were removed by `VEG-V2-INFRA.3` after scene-owned Weather was accepted. New and retained scenes use the exact `WeatherWindDomain` directly; there is no production migration or fallback ownership path.
+
+### WEATHER-V0A accepted state
+
+**WEATHER-V0A is frozen on 2026-07-21.** The user-validated scene contains one active and published `WeatherWindDomain` under `Systems/Weather`. The accepted report recorded a READY 128² field, 0.5 m cells, 64 × 64 m world coverage, 10 Hz updates, active compute simulation, available CPU sampling, and available future wind-line consumption. No vegetation-owned Weather provider remains in production source.
+
+`WEATHER-WIND-V0A.1` changes only the compute helper used to wrap logical cells into the toroidal physical texture. Because the runtime producer guarantees a positive power-of-two resolution, unsigned bit masking replaces signed integer modulus without changing the Weather ownership model, field layout, simulation, or consumer contracts.
+
+
+### WEATHER-V0A final cleanup
+
+`VEG-V2-INFRA.3A` was superseded before application. `VEG-V2-INFRA.3` directly removes the obsolete compatibility subclass and migration utility while leaving `WeatherWindDomain` and all runtime Weather behavior unchanged. If a live scene still contains the obsolete test object, it is deleted manually in Unity rather than supported by additional transitional code.

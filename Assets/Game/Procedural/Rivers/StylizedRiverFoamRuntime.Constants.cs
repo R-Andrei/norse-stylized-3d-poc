@@ -173,8 +173,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float AutomaticObjectSourceMaximumEventsPerSecond = 3.0f;
         private const int AutomaticObjectSourceMaximumStartsPerUpdate = 2;
         private const int AutomaticObjectSourceMaximumScansPerUpdate = 32;
-        private const float AutomaticObjectSourceMinimumDuration = 0.35f;
-        private const float AutomaticObjectSourceMaximumDuration = 4.0f;
         private const float AutomaticObjectSourceMinimumHeadTrailMetres = 0.06f;
         private const float AutomaticObjectSourceMaximumHeadTrailMetres = 0.42f;
         private const float AutomaticObjectBirthPatternSeedSalt = 337.183f;
@@ -187,8 +185,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const int AutomaticFreeWaterSourceMaximumStartsPerUpdate = 1;
         private const int AutomaticFreeWaterSourceMaximumScansPerUpdate = 24;
         private const int AutomaticFreeWaterSourceLateralLaneCount = 5;
-        private const float AutomaticFreeWaterSourceMinimumDuration = 0.35f;
-        private const float AutomaticFreeWaterSourceMaximumDuration = 5.0f;
         private const float AutomaticFreeWaterSourceMinimumHeadTrailMetres = 0.06f;
         private const float AutomaticFreeWaterSourceMaximumHeadTrailMetres = 0.55f;
         private const float AutomaticFreeWaterBirthPatternSeedSalt = 719.227f;
@@ -200,8 +196,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float AutomaticShoreSourceMaximumEventsPerSecond = 5.0f;
         private const int AutomaticShoreSourceMaximumStartsPerUpdate = 3;
         private const int AutomaticShoreSourceMaximumScansPerUpdate = 32;
-        private const float AutomaticShoreSourceMinimumDuration = 0.85f;
-        private const float AutomaticShoreSourceMaximumDuration = 14.0f;
         private const float AutomaticShoreSourceMinimumHeadTrailMetres = 0.12f;
         private const float AutomaticShoreSourceMaximumHeadTrailMetres = 0.65f;
         private const float AutomaticShoreWashMinimumHeadTrailMetres = 0.045f;
@@ -609,6 +603,8 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamChipMaximumViewScale");
         private static readonly int FoamChipEdgeWidthPixelsId =
             Shader.PropertyToID("_FoamChipEdgeWidthPixels");
+        private static readonly int FoamChipSoftEdgeStartId =
+            Shader.PropertyToID("_FoamChipSoftEdgeStart");
         private static readonly int FoamChipInteriorAccessId =
             Shader.PropertyToID("_FoamChipInteriorAccess");
         private static readonly int FoamChipFieldSpeedId =

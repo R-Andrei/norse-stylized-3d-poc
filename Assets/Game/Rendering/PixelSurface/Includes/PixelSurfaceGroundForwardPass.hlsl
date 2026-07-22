@@ -238,6 +238,7 @@
             float3 ResolveGroundSimpleBinarySubstrateWeights(
                 float bankMaterialBlend,
                 float riverbedMaterialBlend,
+                float riverbedMaterialTransitionActive,
                 PS3D_StylizedSurfaceDetail bankLayerDetail,
                 PS3D_StylizedSurfaceDetail riverbedLayerDetail)
             {
@@ -249,11 +250,15 @@
                 // Imported texture-form substrates use one combined ownership
                 // decision. Bank and Riverbed keep their relative weights inside
                 // that coverage, so ordinary Ground cannot appear between them.
-                float binaryCutEnabled = step(
-                    0.5,
-                    max(
-                        bankLayerDetail.textureFormPayload,
-                        riverbedLayerDetail.textureFormPayload));
+                float binaryCutEnabled =
+                    step(
+                        0.5,
+                        max(
+                            bankLayerDetail.textureFormPayload,
+                            riverbedLayerDetail.textureFormPayload)) *
+                    (1.0 - step(
+                        0.0001,
+                        saturate(riverbedMaterialTransitionActive)));
                 if (binaryCutEnabled > 0.5 && rawTotal > 0.0001)
                 {
                     float ownershipDelta = rawTotal - 0.5;
@@ -993,22 +998,38 @@
                     ResolveGroundBankMaterialBlend(input);
                 float riverbedSupport =
                     ResolveGroundRiverbedSupportMask(input);
+                float riverbedMaterialTransitionWeight =
+                    ResolveGroundRiverbedMaterialTransitionWeight(
+                        input,
+                        riverbedSupport);
+                float riverbedMaterialTransitionActive =
+                    ResolveGroundRiverbedMaterialTransitionActive(
+                        riverbedSupport);
+                float riverbedEdgeBankMaterialBlend =
+                    ResolveGroundRiverbedEdgeBankMaterialBlend(
+                        input,
+                        riverbedSupport,
+                        riverbedMaterialTransitionWeight);
+                float resolvedBankMaterialBlend = saturate(
+                    bankMaterialBlend + riverbedEdgeBankMaterialBlend);
                 float riverbedMaterialBlend =
-                    ResolveGroundRiverbedMaterialBlend(riverbedSupport);
+                    ResolveGroundRiverbedMaterialBlend(
+                        riverbedMaterialTransitionWeight);
                 float riverbedWetness =
                     ResolveGroundRiverbedWetness(input);
                 PS3D_StylizedSurfaceDetail bankLayerDetail =
                     ResolveGroundBankLayerDetail(
                         input,
-                        bankMaterialBlend);
+                        resolvedBankMaterialBlend);
                 PS3D_StylizedSurfaceDetail riverbedLayerDetail =
                     ResolveGroundRiverbedLayerDetail(
                         input,
                         riverbedMaterialBlend);
                 float3 substrateWeights =
                     ResolveGroundSimpleBinarySubstrateWeights(
-                        bankMaterialBlend,
+                        resolvedBankMaterialBlend,
                         riverbedMaterialBlend,
+                        riverbedMaterialTransitionActive,
                         bankLayerDetail,
                         riverbedLayerDetail);
                 float4 surfaceCoverRetention =

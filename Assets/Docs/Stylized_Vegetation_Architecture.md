@@ -68,7 +68,8 @@ A useful mental model is:
 small procedural family library
     + chunked instance placement
     + shared external Weather/Wind field
-    + shared interaction field
+    + scene-owned immediate interaction field
+    + Ground-owned historical trample fields where explicitly authored
     + shared environmental state inputs
     + fixed-cost vegetation shader logic
 ```
@@ -77,7 +78,8 @@ This means:
 
 - geometry variety comes from procedural recipes and instance variation;
 - motion comes mostly from shared world-space signals;
-- interaction comes mostly from one or more persistent or semi-persistent fields;
+- ordinary actor interaction comes from one transient scene field with no stored trail history;
+- short-lived or persistent trampling comes only from explicit Ground-owned history stamps;
 - snow comes mostly from shared shading and state logic rather than bespoke meshes;
 - the final renderer never loops over arbitrary counts of active movers or abilities.
 
@@ -261,58 +263,48 @@ These should remain optional. The baseline should still work in ordinary outdoor
 
 ## 8. Interaction architecture
 
-### 8.1 Preferred direction: one shared vegetation interaction field
+### 8.1 Two lifetime classes, two owners
 
-The strongest candidate is a river-style interaction field for vegetation.
+Vegetation interaction is split by whether the effect must retain history.
 
-This field could store concepts such as:
+**Immediate displacement** is owned by one scene-level `VegetationInteractionDomain`. It is a moving world-space XZ field centred on an explicit gameplay anchor or fallback camera-ground projection. Ordinary actors register through `VegetationInteractor`, bend and temporarily flatten grass while present or moving, and leave no stored trail state. The field update rate is an exposed `5–60 Hz` control; the initial default is `20 Hz`, and `10 Hz` is an intentional supported tuning target.
 
-- bend direction;
-- bend magnitude;
-- depression or flattening amount;
-- impulse age;
-- rebound or recovery bias;
-- optional effect category such as ordinary movement versus ability shock.
+**Historical trampling** is deferred to `VEG-V2-INTERACT.2`. It will be owned by the affected Ground vegetation infrastructure in fixed Ground-local space so short-lived trails, timed ability damage, and permanent stamps survive camera recentering. Its update rate will be independently exposed across the same `5–60 Hz` range. Ordinary player movement will not write this field by default.
 
-The field should be chunked and bounded, not global full-resolution over the entire world.
+### 8.2 Immediate sources
 
-### 8.2 Sources
+Any moving or stationary object may receive `VegetationInteractor`; the system has no player-specific dependency and does not require a Rigidbody. Initial sources include:
 
-Likely interaction sources:
+- player or enemy bodies parting grass without a trail;
+- animals, crates, rolling objects, or other movers;
+- large actors with wider and stronger immediate displacement;
+- stationary bodies continuing to hold grass aside.
 
-- player movement;
-- enemy movement;
-- footsteps or body sweep;
-- dashes;
-- rolls or slides;
-- ground slams;
-- explosions;
-- spell pulses;
-- large projectiles;
-- moving heavy objects.
+Movement is stamped as a swept capsule between fixed interaction samples so reduced update rates do not create disconnected circles. Radial parting is blended with movement-directed push according to actor speed and recipe controls.
 
-These should stamp into the field rather than directly updating thousands of instances.
+### 8.3 Layer response
 
-### 8.3 Interaction vocabulary
+All vegetation layers sample the same immediate field but retain independent material response:
 
-The visible response can vary by source category:
+- horizontal bend response;
+- temporary flatten response;
+- root-to-tip interaction exponent;
+- maximum world-space interaction bend;
+- interaction lighting-normal response.
 
-- ordinary traversal: short-lived parting and bend;
-- heavier bodies: deeper local flattening and slower rebound;
-- ground slam: radial depression with secondary ripple or rebound ring;
-- magical or elemental abilities: alternative bend color, frost shedding, scorch suppression, or directional burst patterns.
+This lets tall soft grass react strongly while short stiff grass resists the same physical footprint. The root remains planted, Weather remains a separate deformation owner, and the shader combines Weather and interaction before lighting.
 
-### 8.4 Persistent versus temporary reaction
+### 8.4 Deferred trails and ability stamps
 
-Not all interaction needs the same lifetime.
+Historical interaction is opt-in rather than an automatic consequence of movement. `VEG-V2-INTERACT.2` may add:
 
-Possible split:
+- short-lived trails for selected large movers;
+- irregular disc or ellipse stamps for slams and explosions;
+- capsule or line stamps for charges and directional attacks;
+- timed recovery from seconds to minutes;
+- deliberately permanent trampling where save/load ownership is justified.
 
-- **ephemeral bend:** fades in fractions of a second to a few seconds;
-- **temporary memory:** flattened or disturbed region survives longer;
-- **authored special state:** ability leaves behind a frost-bitten, scorched, or trampled mask that persists until cleaned or regenerated.
-
-The canonical baseline should likely focus on ephemeral bend plus a modest temporary memory. Longer-lived ground-state changes can come later.
+The shape footprint, displacement direction, flattening, recovery mode, and recovery time remain separate controls. A roughly circular ability may distort its edge with seeded world-space variation rather than producing a sterile perfect circle.
 
 ---
 
@@ -454,7 +446,8 @@ Likely inputs:
 - instance transform and family parameters;
 - per-instance seed or packed variation values;
 - shared wind state;
-- shared interaction field;
+- scene-owned immediate interaction field;
+- optional Ground-owned trample history when explicitly authored;
 - environmental state parameters;
 - optional terrain or zone masks.
 
@@ -470,7 +463,8 @@ The likely performance cornerstones are:
 - chunk-based placement and culling;
 - world-space shared fields instead of per-instance simulation;
 - quality-scaled density;
-- quality-scaled interaction-field resolution and update frequency;
+- quality-scaled immediate-field resolution and an exposed `5–60 Hz` update rate;
+- independently quality-scaled future trample-field resolution and `5–60 Hz` update rate;
 - LOD transitions from clumps to coverage;
 - sleeping or update suppression when no interactions are nearby;
 - low-frequency updates for persistent field decay where possible.
@@ -548,7 +542,7 @@ This may fit a mythic or diorama-like visual identity better than insisting on l
 
 ### 12.4 Ability-specific authored reactions
 
-Most interactions should share one field, but some exceptional abilities may justify authored overlays:
+Ordinary traversal should use the shared immediate field, while exceptional abilities may submit explicit Ground-owned historical stamps or authored overlays:
 
 - rune shock patterns burned into brush;
 - frost bloom that stiffens and brightens nearby vegetation;
@@ -598,15 +592,17 @@ This is not a committed roadmap, only a likely sane order.
 
 ### V3 - immediate interaction field
 
-- add one shared vegetation interaction field;
-- stamp player motion and one strong ability into it;
-- validate parting, bend, flattening, and rebound.
+- add one scene-owned `VegetationInteractionDomain` and transform-driven `VegetationInteractor` registry;
+- support multiple ordinary actors with no historical trail state;
+- expose a `5–60 Hz` immediate update rate and validate continuous swept displacement at 10 Hz;
+- validate parting, temporary flattening, rebound, layer stiffness differences, and combined Weather lighting response.
 
-### V4 - persistent trails and snow integration
+### V4 - opt-in trample history and snow integration
 
-- add shader-driven snow response;
-- test ordinary winter scenes, exposed ridges, and interaction-driven shedding;
-- confirm that the result reads as intentional rather than as white paint.
+- add fixed Ground-local trail/trample history only for explicitly configured movers and gameplay stamps;
+- expose its update rate independently across `5–60 Hz`;
+- support short-lived, timed, and deliberate permanent recovery modes;
+- add shader-driven snow response and interaction-driven shedding after trample ownership is validated.
 
 ### V5 - world and ecosystem integration
 
@@ -629,9 +625,10 @@ If the project wants a strong result with the least risk, the best current recom
 
 1. use a small generated or baked library of bold vegetation clumps rather than many unique assets;
 2. render them through instancing and chunked placement;
-3. drive them with one shared external Weather/Wind field and one shared vegetation interaction field;
-4. treat snow primarily as a shared shading and state problem rather than a per-plant geometry simulation;
-5. let far vegetation become stylized coverage rather than insisting on literal distant plants.
+3. drive them with one shared external Weather/Wind field and one scene-owned immediate interaction field;
+4. add Ground-owned trample history only for explicitly configured trails or gameplay stamps;
+5. treat snow primarily as a shared shading and state problem rather than a per-plant geometry simulation;
+6. let far vegetation become stylized coverage rather than insisting on literal distant plants.
 
 This direction aligns with the framework's broader preferences:
 
@@ -641,3 +638,73 @@ This direction aligns with the framework's broader preferences:
 - bounded cost instead of unscalable simulation.
 
 The concrete implementation sequence is now defined by `Docs/Vegetation_Rendering_and_Interaction_Architecture.md`. This exploratory document should not be used as an implementation ledger.
+
+## 16. Production ownership and layer hierarchy
+
+The accepted production hierarchy separates Ground, vegetation recipes, shared Weather, and diagnostics:
+
+```text
+Scene
+├── Systems
+│   ├── Weather                         [WeatherWindDomain]
+│   ├── Vegetation Interaction          [VegetationInteractionDomain]
+│   └── Diagnostics
+│       └── Vegetation Benchmark        [VegetationBenchmarkRunner]
+│
+└── GeneratedGround                     [GeneratedGround]
+    └── Vegetation                      [GroundVegetation]
+        ├── Grass_Default               [VegetationLayer]
+        ├── Grass_Tall_Dark             [VegetationLayer]
+        └── Grass_Short_Bright          [VegetationLayer]
+```
+
+Each named recipe is one GameObject with one `VegetationLayer` component directly attached. No additional child GameObject exists merely to hold the component.
+
+A vegetation layer means one independently configured recipe plus one independently paintable coverage field. It does not require a unique biological family. All production layers use the fixed CrossedCards cluster and may differ in height, width, density, colour, stiffness, wind response, lighting, macro patches, or any later recipe setting. Masks may overlap.
+
+`GeneratedGround` owns terrain geometry, transform, domain, height sampling, and surface revision. A `VegetationLayer` consumes that surface and owns its recipe, mask, placement instances, GPU resources, and rendering. `GroundVegetation` is an editor/infrastructure coordinator only; it does not render or own a shared mask.
+
+A production layer never chooses a Ground through an editable object-reference field. It resolves the nearest `GeneratedGround` ancestor automatically, including through the `Vegetation` organizational child. Reparenting changes ownership and rebuilds the layer. A layer outside a Ground hierarchy is invalid and renders nothing.
+
+Production layers do not own benchmark suites. Exactly one scene-level `VegetationBenchmarkRunner` measures the enabled authored stack or an explicitly selected controlled layer. `WeatherWindDomain` remains the scene-owned wind source, while `VegetationInteractionDomain` independently owns immediate actor displacement. Neither shared system is stored on vegetation recipes.
+
+Layer coverage authoring belongs to the selected `VegetationLayer`. Drag stamps mutate only that layer's serialized CPU mask, and one rebuild occurs when a changed brush stroke completes. The deleted legacy Ground vegetation mask and migration paths are no longer part of production ownership.
+
+`GroundVegetation` manages direct recipe children on explicit editor actions only. The scene-level `VegetationBenchmarkRunner` is diagnostics-only and never renders vegetation. Its stack-aware timing mode toggles existing layer render flags for paired baseline windows; controlled-layer mode temporarily varies only the selected layer's density, suppresses siblings, and restores every captured flag and exact density.
+
+`VEG-V2-INFRA.1B` is frozen by user acceptance on 2026-07-21 after a two-layer scene inventory reported one active runner, two ready enabled layers, exact 12-triangle-per-instance accounting, exact 48-byte instance-buffer accounting, and exact aggregate totals.
+
+The current production sequence is authoritative in `Vegetation_Rendering_and_Interaction_Architecture.md`:
+
+1. **Complete and frozen** — production rendering lives in `VegetationLayer`, each layer owns one independent coverage field, and `GroundVegetation` coordinates direct recipe children;
+2. **Complete and frozen** — Weather ownership lives in one scene-level `Systems/Weather` `WeatherWindDomain`;
+3. **Complete and validated** — the scene runner measures the exact authored stack, independently tests a selected layer at benchmark-owned `20/35/50` tiers, adds a non-duplicate exact authored density when required, and restores arbitrary density values exactly;
+4. **Complete and validated** — obsolete combined-renderer, wind-shim, migration, retirement, Ground-mask, and fallback code is deleted; only production layers, the scene runner, and scene Weather remain;
+5. **Complete at source level; Unity validation pending** — CrossedCards is the sole production cluster, controlled benchmarking varies density only, invalid-resolution runs cannot rank cases, and negative timing deltas are treated as baseline fluctuation;
+6. **VEG-V2-INTERACT.1 source implementation active; Unity validation pending** — one scene-owned immediate field accepts multiple transform-driven interactors, exposes a `5–60 Hz` update rate, bends and temporarily flattens every vegetation layer without rebuilding instances, and stores no trail history.
+
+### Arbitrary recipe density and benchmark-owned tiers
+
+Production `VegetationLayer` density is an unrestricted positive integer recipe value. Values such as `37` or `43` clusters/m² remain exact and are not snapped to diagnostic presets. The scene-level `VegetationBenchmarkRunner` owns independent standard tiers of `20`, `35`, and `50` clusters/m².
+
+A complete controlled benchmark begins with one exact current-authored-stack case, so mixed layer recipes such as `35` and `43` clusters/m² are measured together as one real scene configuration. It then runs the selected fixed CrossedCards layer at the standard density tiers. The selected layer's exact current density is added as one controlled case only when it is not already a standard tier. All captured arbitrary values are restored exactly.
+
+
+### Production-only cleanup boundary
+
+`VEG-V2-INFRA.3A` was superseded before Unity application because its scene-retirement transaction added unnecessary transitional machinery. `VEG-V2-INFRA.3` directly deletes obsolete source: the combined legacy renderer and editor, vegetation-owned Weather subclass, migration utilities, rejected retirement utility, Ground-owned vegetation mask, import identifiers, fallback placement domain, and diagnostic-subclass hooks.
+
+The user deletes the obsolete `VegetationTest` GameObject directly in Unity if it still exists. Retained production ownership is limited to `VegetationLayer`, `GroundVegetation`, `VegetationBenchmarkRunner`, and `WeatherWindDomain`. `VEG-V2-FOUNDATION.1` removes the former geometry enum and unused OpaqueStrips/Hybrid paths; the current shader asset name remains historical only and is intentionally not renamed.
+
+
+### CrossedCards production freeze
+
+The two completed INFRA.2A reports validated the runner and restoration paths but could not select a timing winner because almost every delta remained inside observed noise and the measured resolution was `509 × 1285`, not the required `2560 × 1440`. Structural evidence is decisive: CrossedCards submits 12 triangles per cluster, Hybrid 24, and OpaqueStrips 32, while all candidates use the same 48-byte instance data and the user had already selected CrossedCards visually.
+
+`VEG-V2-FOUNDATION.1` therefore freezes one production geometry:
+
+- every `VegetationLayer` builds the same three-card CrossedCards cluster;
+- recipe authoring exposes no geometry selector;
+- the controlled benchmark varies density only at `20`, `35`, and `50` clusters/m², plus one exact non-tier authored density;
+- performance ranking is invalid unless the run uses the required `2560 × 1440` target resolution;
+- negative enabled-minus-disabled deltas are baseline fluctuation, never evidence that vegetation improves performance.

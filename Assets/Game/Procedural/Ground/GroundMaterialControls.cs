@@ -199,6 +199,18 @@ public sealed class GroundMaterialControls
     [SerializeField]
     private float riverbedMaterialStrength = 1f;
 
+    [InspectorName("Material Blend Distance")]
+    [Tooltip("Inward distance in metres over which the dry Riverbed substrate transitions from the resolved Bank surface, or Primary Ground when no Bank layer is active, to the selected Riverbed Surface Layer. Zero preserves the exact-support hard boundary.")]
+    [Range(0f, 2f)]
+    [SerializeField]
+    private float riverbedMaterialBlendDistance = 0.35f;
+
+    [InspectorName("Material Blend Softness")]
+    [Tooltip("Shape of the inward dry-material transition. Zero is linear; one uses a smooth cubic interpolation.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float riverbedMaterialBlendSoftness = 0.75f;
+
     [Header("River-Coupled Riverbed Material Application")]
     [InspectorName("Detail Scale Multiplier")]
     [Tooltip("Multiplies the reusable material's natural world repeat size for this Riverbed application. Values above one make the authored stones larger; values below one make them finer. One preserves the shared material definition.")]
@@ -647,6 +659,10 @@ public sealed class GroundMaterialControls
         Mathf.Clamp(bankLegacyPixelCellInfluenceMultiplier, 0f, 2f);
     public float RiverbedMaterialStrength =>
         Mathf.Clamp01(riverbedMaterialStrength);
+    public float RiverbedMaterialBlendDistance =>
+        Mathf.Clamp(riverbedMaterialBlendDistance, 0f, 2f);
+    public float RiverbedMaterialBlendSoftness =>
+        Mathf.Clamp01(riverbedMaterialBlendSoftness);
     public float RiverbedDetailScaleMultiplier =>
         Mathf.Clamp(riverbedDetailScaleMultiplier, 0.25f, 4f);
     public float RiverbedTextureFormStrengthMultiplier =>
@@ -786,6 +802,8 @@ public sealed class GroundMaterialControls
             bankDetailFinishVariationMultiplier = 1f;
             bankLegacyPixelCellInfluenceMultiplier = 1f;
             riverbedMaterialStrength = 1f;
+            riverbedMaterialBlendDistance = 0.35f;
+            riverbedMaterialBlendSoftness = 0.75f;
             riverbedDetailScaleMultiplier = 1f;
             riverbedAuthoredColorStrengthMultiplier = 1f;
             riverbedAuthoredColorLightingMultiplier = 1f;
@@ -857,6 +875,10 @@ public sealed class GroundMaterialControls
         bankLegacyPixelCellInfluenceMultiplier =
             source.bankLegacyPixelCellInfluenceMultiplier;
         riverbedMaterialStrength = source.riverbedMaterialStrength;
+        riverbedMaterialBlendDistance =
+            source.riverbedMaterialBlendDistance;
+        riverbedMaterialBlendSoftness =
+            source.riverbedMaterialBlendSoftness;
         riverbedDetailScaleMultiplier =
             source.riverbedDetailScaleMultiplier;
         riverbedAuthoredColorStrengthMultiplier =

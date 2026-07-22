@@ -2181,3 +2181,80 @@ Presence-Amplitude Eligibility still reads `preChipRenderedMask`, but distance i
 
 Dependency impact is one shared River shader include and its sole consumer, `SH_CleanStylizedRiver.shader`. No texture, buffer, kernel, dispatch, cache, serialized control, render pass, scene, prefab, material, layer, or tag remains from the experiment. Memory and compute return to the P12m baseline. Unity import and visual validation remain pending.
 
+## P12r — Binary-topology removal and P12p dependency restoration
+
+- P12q's topology partial, topology compute include, three kernels, three `R8` textures, fixed-frequency lifecycle dispatch, serialized Eligibility route/metre-width controls, material texture/mode binding, and memory accounting are removed.
+- The dependency graph returns exactly to P12p: `StylizedRiver` owns only `foamChipEdgeWidthPixels`; runtime binding supplies no Chip Eligibility texture or mode; `CS_RiverFoam.compute` has no Chip-topology include or kernels; `SH_CleanStylizedRiver.shader` consumes only the rendered per-fragment Eligibility path.
+- `RiverWaterFoamResolveChipEligibility` again owns the sole Presence-Amplitude Eligibility signal using the isolated rendered exterior-fringe coordinate. The original Candidate evaluator and complete selected-pixel removal remain unchanged.
+- No new dependency replaces P12q. P12q must not be reintroduced as an active or fallback route.
+- Offline dependency audit passes: all ten restored implementation files match P12p byte-for-byte, all four topology-only files are absent, and no topology symbol/property/kernel remains. Unity compile/import and visual validation remain pending.
+
+
+
+## P12s dependency disposition — optional Presence-Amplitude soft-mask reconstruction
+
+**Status:** source implemented; Unity import and visual A/B pending.
+
+P12s adds no new dependency category. It extends the existing Layer E render-only contract with two scalar material properties:
+
+```text
+_FoamPresenceChipApplicationMode
+_FoamChipSoftEdgeStart
+```
+
+Ownership and flow:
+
+```text
+StylizedRiver serialized authoring
+→ StylizedRiverFoamRuntime material-property binding
+→ SH_CleanStylizedRiver forward fragment
+→ RiverWaterFoamResolveChipEligibility
+→ RiverWaterFoamEvaluateSelectionDiagnostics
+→ RiverWaterFoamApplyChipAndStrands
+```
+
+Route `0`, `Exact Rendered Removal (Current)`, preserves the P12r binary any-support Candidate × isolated rendered-fringe Eligibility and complete deletion from `preChipRenderedMask`.
+
+Route `1`, `Soft-Mask Reconstruction (Experimental)`, preserves the original continuous analytical Candidate field, computes a continuous soft Eligibility coordinate from `preChipSoftVisibility`, authored `Soft Edge Start`, and `Chip Edge Width`, gates it by binary `preChipRenderedMask > 0`, and reuses the accepted rehardened soft-mask reconstruction before structural Strands.
+
+The selector is ignored by Current Presence Footprint, which retains its accepted soft reconstruction. Presence-Amplitude Interior Access remains disabled in both routes.
+
+Impact classification:
+
+- Layer C state, source generation, transport, lifetime, cadence, caches: unchanged.
+- Layer D Film/Shape and `_FoamShapeMask`: unchanged.
+- Layer E Candidate loop/search geometry: unchanged.
+- Textures, samplers, buffers, kernels, dispatches, passes, draw calls: unchanged.
+- Persistent memory: two serialized scalars per River component only; no GPU allocation.
+- Active fragment work: one uniform route branch and existing reconstruction arithmetic when route `1` has production Chip coverage.
+- Shared include consumers: only `SH_CleanStylizedRiver.shader`; no cross-subsystem consumer found.
+
+Validation requirements are exact property/binding parity, shader signature/caller parity, P12r exact-route preservation, Current-route preservation, candidate-core byte identity, and Unity same-frame Candidate/Eligibility/Production/Probe/Final A/B.
+
+## P12t dependency disposition — Soft Reconstruction baseline and Inspector ownership
+
+- Presence-Amplitude Chipping now has one application contract: continuous original analytical Candidate × soft Eligibility, applied to the pre-hardened signal and rehardened before structural Strands.
+- The removed `_FoamPresenceChipApplicationMode` scalar has no remaining authoring, runtime-binding, material-property, shader-uniform, or function-argument dependency.
+- Exact Rendered Removal-only Eligibility, binary selection, and direct final-mask deletion have no remaining consumer.
+- Production Chipping and its Candidate/Eligibility/Production/Probe/Difference diagnostics are Layer E render-only dependencies. Layer D evaluated-shape textures and temporal controls remain diagnostic-only and do not feed normal Final Foam.
+- Runtime resources, kernels, dispatches, textures, buffers, passes, draw calls, cache contracts, and fixed-metric state are unchanged.
+
+
+## P12u dependency disposition — unified automatic birth reveal speed
+
+`RG-METRIC-P12u` changes automatic Layer C source scheduling only. All eight automatic recipes now share one CPU timing contract:
+
+```text
+requested reveal speed = base authored speed × pattern multiplier × deterministic jitter
+raw duration = source path distance / requested reveal speed
+resolved duration = max(one material update step, raw duration)
+```
+
+- Shore Ribbon and Inward Wash no longer use the historical `0.85–14 s` duration clamp.
+- Object Contact Arc and Semi-Arc use the shared duration for Build only; Hold, Release, Rest, persistent-emitter ownership, and phase-shaped GPU evaluation are unchanged.
+- Object Contact Fleck uses the shared duration and consumes normalized progress across the full `0–1` reveal interval.
+- Lace, Cross-Lace, and Torn Fragment no longer use family-specific ceilings or Torn Fragment timing compression.
+- Contact Fleck and all Free-Water correlated Min/Max samples use the complete deterministic `0–1` range.
+- The automatic-event GPU ABI, 32-slot pool, source dispatch ranges, transport, material state, cache, Film, Shape, and rendering dependencies are unchanged.
+- Runtime risk is bounded by the existing 32-event pool. Slow honest events can increase concurrent raster work and rejected starts; the P12u report exposes current occupancy and rejection evidence rather than modifying timing.
+- One editor-only report partial and Inspector action are added. They allocate no runtime GPU resource and use the existing diagnostic report/clipboard contract.

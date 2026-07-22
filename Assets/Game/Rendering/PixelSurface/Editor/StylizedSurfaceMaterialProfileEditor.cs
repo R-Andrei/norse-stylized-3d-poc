@@ -181,7 +181,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
             StylizedSurfaceDetailLibrary.Entry entry =
                 ResolveSelectedEntryFromSerializedProperties();
-            return entry != null && entry.UsesAuthoredMaterialSet;
+            return entry != null && entry.UsesTextureForm;
         }
 
         private StylizedSurfaceDetailLibrary.Entry
@@ -264,7 +264,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             }
 
             EditorGUILayout.HelpBox(
-                entry.UsesAuthoredMaterialSet
+                entry.UsesTextureForm
                     ? "This entry supplies normalized grayscale texture form, packed normal/cavity data, and roughness variation. Palette colours remain the sole visible colour controls."
                     : "This entry supplies prepacked normal, cavity, value/form, and finish variation.",
                 MessageType.None);
@@ -353,8 +353,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 return null;
             }
 
-            return entry.UsesAuthoredMaterialSet
-                ? entry.AuthoredBaseColor
+            if (entry.UsesAuthoredMaterialSet)
+            {
+                return entry.AuthoredBaseColor;
+            }
+
+            return entry.UsesPrepackedTextureForm
+                ? entry.PrepackedTextureForm
                 : entry.SourceTexture;
         }
 
@@ -407,7 +412,23 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             }
             else
             {
-                packedPixels = ResamplePixels(source, size);
+                Texture2D packedSource = entry.SourceTexture;
+                if (packedSource == null || !packedSource.isReadable)
+                {
+                    return;
+                }
+
+                packedPixels = ResamplePixels(packedSource, size);
+                if (entry.UsesPrepackedTextureForm)
+                {
+                    Texture2D formSource = entry.PrepackedTextureForm;
+                    if (formSource == null || !formSource.isReadable)
+                    {
+                        return;
+                    }
+
+                    formPixels = ResamplePixels(formSource, size);
+                }
             }
 
             EnsurePreviewTextureAllocated(size);
@@ -424,9 +445,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             for (int index = 0; index < pixels.Length; index++)
             {
                 Color packed = packedPixels[index];
-                float formSigned = entry.UsesAuthoredMaterialSet
-                    ? (StylizedSurfaceDetailLibraryBuilder.DecodeFormValue(
-                        formPixels[index]) * 2f - 1f) *
+                float normalizedForm = entry.UsesPrepackedTextureForm
+                    ? Mathf.Clamp01(formPixels[index].r)
+                    : entry.UsesAuthoredMaterialSet
+                        ? StylizedSurfaceDetailLibraryBuilder.DecodeFormValue(
+                            formPixels[index])
+                        : 0.5f;
+                float formSigned = entry.UsesTextureForm
+                    ? (normalizedForm * 2f - 1f) *
                       profile.TextureFormStrength
                     : (packed.a * 2f - 1f) *
                       profile.DetailValueStrength;
@@ -439,7 +465,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     0.38f,
                     1.08f,
                     Mathf.Clamp01(Vector3.Dot(normal, lightDirection)));
-                float diffuseResponse = entry.UsesAuthoredMaterialSet
+                float diffuseResponse = entry.UsesTextureForm
                     ? Mathf.Lerp(
                         1f,
                         diffuse,
@@ -448,7 +474,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 float smoothness = ResolvePreviewSmoothness(
                     profile,
                     packed,
-                    entry.UsesAuthoredMaterialSet);
+                    entry.UsesTextureForm);
                 float specular = Mathf.Pow(
                     Mathf.Clamp01(Vector3.Dot(normal, halfDirection)),
                     Mathf.Lerp(8f, 96f, smoothness)) *
@@ -607,6 +633,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             {
                 int hash = 17;
                 hash = hash * 31 + source.GetEntityId().GetHashCode();
+                if (entry.UsesPrepackedTextureForm &&
+                    entry.SourceTexture != null)
+                {
+                    hash = hash * 31 +
+                           entry.SourceTexture.GetEntityId().GetHashCode();
+                }
                 hash = hash * 31 + entry.SourceMode.GetHashCode();
                 hash = hash * 31 + profile.BaseColor.GetHashCode();
                 hash = hash * 31 + profile.DarkColor.GetHashCode();

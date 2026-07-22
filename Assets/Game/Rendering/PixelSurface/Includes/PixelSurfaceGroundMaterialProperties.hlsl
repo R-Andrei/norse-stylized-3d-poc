@@ -60,6 +60,7 @@
                 float4 _GroundRiverbedLayerDetailB;
                 float4 _GroundRiverbedLayerDetailC;
                 float _GroundRiverbedMaterialStrength;
+                float4 _GroundRiverbedMaterialTransition;
                 float _GroundRiverbedHydrologyEnabled;
                 half4 _GroundRiverbedHydrologyWetTintColor;
                 float4 _GroundRiverbedHydrologyCharacterA;

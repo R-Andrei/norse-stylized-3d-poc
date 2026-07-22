@@ -1,5 +1,24 @@
 # Ground / River-Coupled Surface Response Architecture
 
+## 2026-07-22 — GSU-M2.7C.5E.2 dry Riverbed material transition
+
+M2.7C.5E.2 adds a dry-material transition without reopening the frozen A4B.3 wetness/highlight contract. The existing River producer and `TexCoord3` meanings are unchanged:
+
+```text
+TexCoord3.x = exact Riverbed Support
+TexCoord3.y = outward Bank distance
+TexCoord3.z = Bank-domain authorization
+TexCoord3.w = inward Riverbed distance
+```
+
+The dry Riverbed material uses `.x` and `.w` only. `Material Blend Distance` defines an inward band wholly inside Riverbed Support; `Material Blend Softness` shapes its interpolation. Riverbed material is zero at the exact edge and reaches the authored Riverbed material strength in the interior. The complementary edge weight resolves to the active Bank material response, or Primary Ground when no Bank layer is active. One normalized composition weight set owns colour/form, normal slope, cavity, smoothness, specular, roughness/finish, and texture-form lighting response.
+
+The existing Riverbed wetness transition remains separate and unchanged. Exact support still excludes vegetation, snow, frost, and Painted Accents regardless of the dry-material blend. No River geometry, mesh stream, corridor, hydrology modifier, wet highlight, water material, debug view, or runtime draw path is changed.
+
+The old texture-form binary cut is retained only as a historical compatibility path outside this enabled dry transition and when blend distance is zero. It is not allowed to override a nonzero authored Riverbed material transition.
+
+---
+
 ## 2026-07-19 — GSU-M2.0 optional authored-colour consumption
 
 The frozen A4B.3 River masks, placement, UV3 contract, hydrology, and highlight behavior remain unchanged. Bank and Riverbed may now consume a reusable surface material that optionally resolves one authored-colour array slice in addition to its packed-detail slice. Ground owns all bindings and per-application multipliers. River code remains unaware of source maps, generated arrays, and payload mode. Independent Bank/Riverbed scale and response controls remain valid; raw sample reuse is deliberately deferred until profiling justifies a larger evaluator rewrite.

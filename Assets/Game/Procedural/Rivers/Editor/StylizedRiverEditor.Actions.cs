@@ -765,6 +765,49 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
+                "Automatic Birth Reveal-Speed Audit",
+                EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "One Play Mode action captures the latest observed timing for " +
+                "all eight automatic Layer C source recipes, current active " +
+                "events, 32-slot pool occupancy, and rejected starts. The " +
+                "report is written to Library and can be copied directly.",
+                EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying ||
+                       runtime == null ||
+                       river == null))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Write Automatic Birth Reveal-Speed Report",
+                            "Captures requested and actual reveal speed, path " +
+                            "distance, raw/resolved duration, cadence limiting, " +
+                            "active event counts, pool occupancy, and rejected " +
+                            "starts for the live automatic-source session.")))
+                {
+                    runtime.RunAutomaticBirthRevealSpeedReport();
+                    Repaint();
+                }
+            }
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       runtime.TopologyCacheDiagnosticSummary !=
+                           "Automatic birth reveal-speed evidence captured." ||
+                       string.IsNullOrEmpty(
+                           runtime.TopologyCacheDiagnosticReport)))
+            {
+                if (GUILayout.Button("Copy Reveal-Speed Report"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        runtime.TopologyCacheDiagnosticReport;
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
                 "Complete Candidate Sweep",
                 EditorStyles.boldLabel);
             EditorGUILayout.LabelField(

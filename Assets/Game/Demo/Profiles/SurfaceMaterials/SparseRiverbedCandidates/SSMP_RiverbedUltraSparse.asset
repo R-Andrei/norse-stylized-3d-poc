@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f12659a811e34f53a1ea4f46239acb3a, type: 3}
+  m_Name: SSMP_RiverbedUltraSparse
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Rendering.PixelSurface.StylizedSurfaceMaterialProfile
+  displayName: "Riverbed \u2014 Ultra Sparse"
+  payloadMode: 0
+  baseColor: {r: 0.517, g: 0.503, b: 0.458, a: 1}
+  darkColor: {r: 0.09, g: 0.1, b: 0.095, a: 1}
+  lightColor: {r: 0.64, g: 0.62, b: 0.55, a: 1}
+  cavityColor: {r: 0.045, g: 0.041, b: 0.034, a: 1}
+  authoredColorStrength: 1
+  authoredColorTint: {r: 1, g: 1, b: 1, a: 1}
+  authoredColorTintStrength: 0
+  authoredColorLightingStrength: 0.6
+  authoredRoughnessStrength: 1
+  macroContrast: 0
+  legacyPixelCellInfluence: 0
+  detailValueStrength: 0
+  detailEnabled: 1
+  detailLibrary: {fileID: 11400000, guid: ea154cef97b7dc34e8050c6c1884fe59, type: 2}
+  detailEntryId: riverbed-ultra-sparse
+  detailWorldScale: 8
+  detailNormalStrength: 0.85
+  detailCavityStrength: 1
+  detailCavityBias: 0.15
+  detailFormHighlightStrength: 0
+  drySmoothness: 0.16
+  drySpecularStrength: 0.05
+  finishVariationStrength: 0

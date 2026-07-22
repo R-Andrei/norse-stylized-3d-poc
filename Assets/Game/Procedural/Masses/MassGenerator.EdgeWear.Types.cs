@@ -24,7 +24,145 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             None,
             BoundaryFan,
-            ProjectedCentreFan
+            GeneralTriangulation,
+            CollinearReinsertion
+        }
+
+        private enum OneSurfaceTriangleCandidateFailure
+        {
+            None,
+            NonFinite,
+            Area,
+            NormalAgreement
+        }
+
+        private readonly struct OneSurfaceTriangleIndex
+        {
+            public readonly int A;
+            public readonly int B;
+            public readonly int C;
+
+            public OneSurfaceTriangleIndex(int a, int b, int c)
+            {
+                A = a;
+                B = b;
+                C = c;
+            }
+        }
+
+        private readonly struct OneSurfaceTriangleCandidate
+        {
+            public readonly bool Valid;
+            public readonly float Area;
+            public readonly float NormalDot;
+            public readonly float NormalDeviationDegrees;
+            public readonly OneSurfaceTriangleCandidateFailure Failure;
+
+            public OneSurfaceTriangleCandidate(
+                bool valid,
+                float area,
+                float normalDot,
+                float normalDeviationDegrees,
+                OneSurfaceTriangleCandidateFailure failure)
+            {
+                Valid = valid;
+                Area = area;
+                NormalDot = normalDot;
+                NormalDeviationDegrees = normalDeviationDegrees;
+                Failure = failure;
+            }
+        }
+
+        private struct OneSurfaceTriangulationState
+        {
+            public bool Evaluated;
+            public bool Succeeded;
+            public float MinimumArea;
+            public float MinimumNormalDot;
+            public int SplitIndex;
+        }
+
+        private struct OneSurfaceBoundaryFanAudit
+        {
+            public int AnchorsTested;
+            public int StableAnchors;
+            public int BestAnchorIndex;
+            public int BestCertifiedTriangleCount;
+            public float BestMinimumArea;
+            public float BestMinimumNormalDot;
+            public int RejectedTriangleA;
+            public int RejectedTriangleB;
+            public int RejectedTriangleC;
+            public OneSurfaceTriangleCandidateFailure Rejection;
+        }
+
+        private struct OneSurfaceGeneralTriangulationAudit
+        {
+            public int ProjectionSucceeded;
+            public int ProjectionSelfIntersection;
+            public int StatesEvaluated;
+            public int ValidTriangleCandidateCount;
+            public int RejectedNonFiniteCount;
+            public int RejectedAreaCount;
+            public int RejectedNormalAgreementCount;
+            public int RejectedDiagonalCount;
+            public int CompleteSolutionFound;
+            public float SelectedMinimumArea;
+            public float SelectedMinimumNormalDot;
+            public string SelectedTriangleEvidence;
+            public string FailureReason;
+        }
+
+        private readonly struct OneSurfaceBoundaryRemoval
+        {
+            public readonly int PreviousIndex;
+            public readonly int RemovedIndex;
+            public readonly int NextIndex;
+
+            public OneSurfaceBoundaryRemoval(
+                int previousIndex,
+                int removedIndex,
+                int nextIndex)
+            {
+                PreviousIndex = previousIndex;
+                RemovedIndex = removedIndex;
+                NextIndex = nextIndex;
+            }
+        }
+
+        private struct OneSurfaceCollinearCandidateAudit
+        {
+            public int PreviousIndex;
+            public int CurrentIndex;
+            public int NextIndex;
+            public float LocalArea;
+            public float LocalNormalDot;
+            public OneSurfaceTriangleCandidateFailure LocalFailure;
+            public float SegmentParameter;
+            public float ProjectedDistance;
+            public float ProjectedCross;
+            public int Eligible;
+            public string Blocker;
+        }
+
+        private struct OneSurfaceCollinearReinsertionAudit
+        {
+            public int Attempted;
+            public int Succeeded;
+            public int ProjectionSucceeded;
+            public int ProjectionSelfIntersection;
+            public int SimplificationAttempts;
+            public int RemovedVertexCount;
+            public int ReinsertionCount;
+            public float SignedAreaBefore;
+            public float SignedAreaAfter;
+            public string BoundaryVertexEvidence;
+            public string CandidateEvidence;
+            public string RemovedIndexEvidence;
+            public string RetainedIndexEvidence;
+            public string SimplifiedTriangleEvidence;
+            public string ReinsertionEvidence;
+            public string FailureReason;
         }
 
         private sealed class EdgeWearEdgeAggregate
@@ -2052,6 +2190,7 @@ private readonly struct EdgeWearTopologyStats
             public int CapRingEdgeCount;
             public int MissingOriginalEdgeCount;
             public int AmbiguousIdentityCount;
+            public int GeneratedIdentityCollisionCount;
             public readonly List<CornerDamageEdgeIdentityRecord>
                 IdentityRecords =
                     new List<CornerDamageEdgeIdentityRecord>();
@@ -2077,11 +2216,35 @@ private readonly struct EdgeWearTopologyStats
             public float MaximumDimension;
             public double SourceVolume;
             public int AcceptedTrialIndex = -1;
+            public float AcceptedDepth;
+            public float ShortestCapEdgeLength;
+            public List<PolygonFace> AcceptedFaces;
+            public PolygonFace AcceptedCapFace;
             public string Diagnostic = string.Empty;
+            public readonly Dictionary<EdgeKey, int>
+                StableIdentityByOutputKey =
+                    new Dictionary<EdgeKey, int>();
+            public readonly HashSet<EdgeKey> CapRingKeys =
+                new HashSet<EdgeKey>();
+            public readonly HashSet<int> CapRingGeneratedIdentities =
+                new HashSet<int>();
+            public readonly HashSet<int> AffectedOriginalEdgeIndices =
+                new HashSet<int>();
             public readonly List<CornerDamageCandidateRecord> Candidates =
                 new List<CornerDamageCandidateRecord>();
             public readonly List<CornerDamageTrialRecord> Trials =
                 new List<CornerDamageTrialRecord>();
+        }
+
+        private sealed class CornerDamagePreviewConstructionRecord
+        {
+            public CornerDamageTransactionAuditResult Transaction;
+            public float CapRingRequestedWidth;
+            public int ExpectedMandatoryCount;
+            public int MandatoryCandidateCount;
+            public int MandatorySelectedCount;
+            public UnifiedEdgeWearPreviewStatus CornerPreviewStatus;
+            public string Blocker = string.Empty;
         }
 
         private sealed class EdgeWearMicroTopologyNormalizationResult
@@ -2538,6 +2701,9 @@ private struct EdgeWearGraphBuildStats
             public EdgeKey Key;
             public int SourceEdgeIndex = -1;
             public int OriginalSourceEdgeIndex = -1;
+            public EdgeWearCandidateClass CandidateClass =
+                EdgeWearCandidateClass.Ordinary;
+            public bool Mandatory;
             public bool MicroTopologySuppressed;
             public bool MicroTopologyGeneratedTransition;
             public int CandidateIndex = -1;
@@ -2632,9 +2798,18 @@ private struct EdgeWearGraphBuildStats
             }
         }
 
-private readonly struct EdgeWearBevelCandidate
+        private enum EdgeWearCandidateClass
+        {
+            Ordinary,
+            CornerDamageCapRing
+        }
+
+        private readonly struct EdgeWearBevelCandidate
         {
             public readonly int CandidateIndex;
+            public readonly int StableIdentity;
+            public readonly EdgeWearCandidateClass CandidateClass;
+            public readonly bool Mandatory;
             public readonly Vector3 Start;
             public readonly Vector3 End;
             public readonly int FaceA;
@@ -2649,6 +2824,9 @@ private readonly struct EdgeWearBevelCandidate
 
             public EdgeWearBevelCandidate(
                 int candidateIndex,
+                int stableIdentity,
+                EdgeWearCandidateClass candidateClass,
+                bool mandatory,
                 Vector3 start,
                 Vector3 end,
                 int faceA,
@@ -2662,6 +2840,9 @@ private readonly struct EdgeWearBevelCandidate
                 float depthMultiplier)
             {
                 CandidateIndex = candidateIndex;
+                StableIdentity = stableIdentity;
+                CandidateClass = candidateClass;
+                Mandatory = mandatory;
                 Start = start;
                 End = end;
                 FaceA = faceA;

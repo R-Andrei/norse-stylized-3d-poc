@@ -113,6 +113,7 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamChipStableScreenRadiusPixels("Foam Chip Stable Screen Radius Pixels", Range(0, 16)) = 2
         [HideInInspector] _FoamChipMaximumViewScale("Foam Chip Maximum View Scale", Range(1, 2.5)) = 1.75
         [HideInInspector] _FoamChipEdgeWidthPixels("Foam Chip Edge Width Pixels", Float) = 4
+        [HideInInspector] _FoamChipSoftEdgeStart("Foam Chip Soft Edge Start", Range(0, 0.25)) = 0.06
         [HideInInspector] _FoamChipInteriorAccess("Foam Chip Interior Access", Range(0, 1)) = 0
         [HideInInspector] _FoamChipFieldSpeed("Foam Chip Downstream Speed", Float) = 0
         [HideInInspector] _FoamChipFormationTime("Foam Chip Formation Time", Float) = 2.5
@@ -291,6 +292,7 @@ Shader "PS3D/Stylized River Water"
                 float _FoamChipStableScreenRadiusPixels;
                 float _FoamChipMaximumViewScale;
                 float _FoamChipEdgeWidthPixels;
+                float _FoamChipSoftEdgeStart;
                 float _FoamChipInteriorAccess;
                 float _FoamChipFieldSpeed;
                 float _FoamChipFormationTime;
@@ -947,6 +949,7 @@ Shader "PS3D/Stylized River Water"
                         foam.mask,
                         preChipRenderedMask,
                         _FoamPresenceFootprintMode,
+                        _FoamChipSoftEdgeStart,
                         evaluateChipSelection,
                         evaluateChipCandidates,
                         evaluateCandidatesOutsideMaterial,
@@ -981,8 +984,6 @@ Shader "PS3D/Stylized River Water"
                     foam.strandSoftVisibility,
                     foam.strandPattern,
                     foam.strandResolution,
-                    _FoamPresenceFootprintMode,
-                    preChipRenderedMask,
                     selectionDiagnostics.chipProductionSelection,
                     _FoamStrandStrength,
                     _FoamStrandDensity,
@@ -1100,8 +1101,6 @@ Shader "PS3D/Stylized River Water"
                             evaluatedStrandShape,
                             foam.strandPattern,
                             foam.strandResolution,
-                            _FoamPresenceFootprintMode,
-                            evaluatedPreChipRenderedMask,
                             selectionDiagnostics.chipProductionSelection,
                             _FoamStrandStrength,
                             _FoamStrandDensity,

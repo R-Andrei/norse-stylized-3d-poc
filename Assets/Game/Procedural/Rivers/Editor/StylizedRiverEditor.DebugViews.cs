@@ -32,7 +32,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             LayerDPrimary,
             LayerDAdvancedInternals,
             LayerDComparisons,
-            LayerDChipSelection,
             LayerERendering
         }
 
@@ -184,8 +183,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             "Layer D — Primary",
             "Layer D — Advanced Internals",
             "Layer D — Comparisons",
-            "Layer D — Chip Selection",
-            "Layer E — Rendering"
+            "Layer E — Chipping & Rendering"
         };
 
         private static readonly string[] FoamLayerALabels =
@@ -264,28 +262,20 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             (int)StylizedRiverFoamDebugView.FoamTemporalDifference
         };
 
-        private static readonly string[] FoamLayerDChipLabels =
+        private static readonly string[] FoamLayerELabels =
         {
             "Chip Candidate Field",
             "Chip Eligibility Composite",
-            "Production Chip Mask"
-        };
-
-        private static readonly int[] FoamLayerDChipValues =
-        {
-            (int)StylizedRiverFoamDebugView.ChipCandidateField,
-            (int)StylizedRiverFoamDebugView.ChipEligibilityComposite,
-            (int)StylizedRiverFoamDebugView.ProductionChipMask
-        };
-
-        private static readonly string[] FoamLayerELabels =
-        {
+            "Production Chip Mask",
             "Foam Chip And Strand Probe",
             "Foam Chip And Strand Difference"
         };
 
         private static readonly int[] FoamLayerEValues =
         {
+            (int)StylizedRiverFoamDebugView.ChipCandidateField,
+            (int)StylizedRiverFoamDebugView.ChipEligibilityComposite,
+            (int)StylizedRiverFoamDebugView.ProductionChipMask,
             (int)StylizedRiverFoamDebugView.FoamChipAndStrandProbe,
             (int)StylizedRiverFoamDebugView.FoamChipAndStrandDifference
         };
@@ -1045,10 +1035,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return FoamDebugCategory.LayerDComparisons;
             }
 
-            if (System.Array.IndexOf(FoamLayerDChipValues, viewValue) >= 0)
-            {
-                return FoamDebugCategory.LayerDChipSelection;
-            }
 
             if (System.Array.IndexOf(FoamLayerEValues, viewValue) >= 0)
             {
@@ -1074,8 +1060,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     FoamLayerDAdvancedValues[0],
                 FoamDebugCategory.LayerDComparisons =>
                     FoamLayerDComparisonValues[0],
-                FoamDebugCategory.LayerDChipSelection =>
-                    FoamLayerDChipValues[0],
                 FoamDebugCategory.LayerERendering =>
                     FoamLayerEValues[0],
                 _ => FoamLayerCValues[0]
@@ -1114,10 +1098,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     values = FoamLayerDComparisonValues;
                     break;
 
-                case FoamDebugCategory.LayerDChipSelection:
-                    labels = FoamLayerDChipLabels;
-                    values = FoamLayerDChipValues;
-                    break;
 
                 case FoamDebugCategory.LayerERendering:
                     labels = FoamLayerELabels;
@@ -1474,15 +1454,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.ChipCandidateField:
                     return
-                        "Chip construction diagnostic before material permission. Presence-Amplitude shows the binary any-positive-support Candidate region consumed by production. Current shows its existing continuous activated analytical field after lifecycle, rigid motion, view stabilization, rotation, pulse, and shape change.";
+                        "Layer E Chip construction diagnostic before material permission. Shows the original continuous activated analytical Candidate Field after lifecycle, rigid motion, view stabilization, rotation, pulse, and shape change.";
 
                 case StylizedRiverFoamDebugView.ChipEligibilityComposite:
                     return
-                        "Chip permission diagnostic, independent of current candidates and Activation. Dark gray is exact pre-Chip rendered Foam. In Presence-Amplitude, yellow is the binary any-positive-support Edge Eligibility measured from the isolated exterior rendered-fringe coordinate; the inner hardened-body rise is excluded and Interior Access is disabled. In Current, yellow retains the continuous soft-visibility Edge Width band and magenta retains optional Interior Access. Cyan is permission outside visible support and should be absent.";
+                        "Layer E Chip permission diagnostic, independent of current candidates and Activation. Dark gray is exact pre-Chip rendered Foam. Presence-Amplitude shows the continuous soft-visibility Edge Width band using Presence-Amplitude Edge Start and binary exact rendered support; Interior Access is disabled. Current shows its historical continuous soft band plus optional magenta Interior Access. Cyan is permission outside visible support and should be absent.";
 
                 case StylizedRiverFoamDebugView.ProductionChipMask:
                     return
-                        "Production Chip diagnostic. In Presence-Amplitude, magenta is the exact binary Candidate × Eligibility selection consumed by full removal. In Current, magenta retains the existing continuous coverage removed after Candidate, Edge Width, and optional Interior Access permission. Compare with Foam Chip And Strand Probe for the authoritative final Foam mask.";
+                        "Layer E Production Chip diagnostic. Shows the continuous original Candidate × permission signal consumed by soft-mask reconstruction. Compare with Foam Chip And Strand Probe for the authoritative final Foam mask.";
 
                 case StylizedRiverFoamDebugView.FoamFilmSource:
                     return

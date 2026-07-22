@@ -28,7 +28,11 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
         _WidthStabilizationEnabled("Width Stabilization Enabled", Float) = 1
         _WidthStabilizationStartDistance("Width Stabilization Start Distance", Float) = 18
         _WidthStabilizationMaximumMultiplier("Width Stabilization Maximum Multiplier", Float) = 1.2
-        [HideInInspector] _GeometryCandidate("Geometry Candidate", Float) = 0
+        _InteractionBendResponse("Interaction Bend Response", Range(0, 2)) = 1
+        _InteractionFlattenResponse("Interaction Flatten Response", Range(0, 2)) = 1
+        _InteractionHeightExponent("Interaction Height Exponent", Range(0.25, 4)) = 1.5
+        _InteractionMaximumBend("Interaction Maximum Bend", Range(0, 3)) = 0.65
+        _InteractionNormalResponse("Interaction Normal Response", Range(0, 4)) = 1
     }
 
     SubShader
@@ -65,6 +69,7 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
             #include "UnityIndirect.cginc"
             #include "../Includes/VegetationCommon.hlsl"
             #include "../Includes/VegetationWindResponse.hlsl"
+            #include "../Includes/VegetationInteractionField.hlsl"
             #include "../Includes/VegetationLighting.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
@@ -94,7 +99,11 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                 float _WidthStabilizationEnabled;
                 float _WidthStabilizationStartDistance;
                 float _WidthStabilizationMaximumMultiplier;
-                float _GeometryCandidate;
+                float _InteractionBendResponse;
+                float _InteractionFlattenResponse;
+                float _InteractionHeightExponent;
+                float _InteractionMaximumBend;
+                float _InteractionNormalResponse;
             CBUFFER_END
 
             struct Attributes
@@ -166,39 +175,68 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                     _WidthStabilizationEnabled,
                     _WidthStabilizationStartDistance,
                     _WidthStabilizationMaximumMultiplier);
-                float2 fullTipDisplacementXZ;
+                float3 interactionSamplePosition = mul(
+                    _VegetationLocalToWorld,
+                    float4(instanceLocalPosition, 1.0)).xyz;
+                float2 fullTipWindDisplacementXZ;
                 worldPosition = ApplyVegetationWindResponse(
                     worldPosition,
                     rootToTip,
                     stiffness,
                     phase,
                     bladeVariation,
-                    fullTipDisplacementXZ);
+                    fullTipWindDisplacementXZ);
+                float scaledVertexHeight =
+                    input.positionOS.y * scale.y;
+                float2 fullTipInteractionDisplacementXZ;
+                float fullTipInteractionFlatten;
+                worldPosition = ApplyVegetationInteractionResponse(
+                    worldPosition,
+                    interactionSamplePosition,
+                    rootToTip,
+                    scaledVertexHeight,
+                    _InteractionBendResponse,
+                    _InteractionFlattenResponse,
+                    _InteractionHeightExponent,
+                    _InteractionMaximumBend,
+                    fullTipInteractionDisplacementXZ,
+                    fullTipInteractionFlatten);
 
                 float3 baseNormalWS =
                     TransformVegetationNormalToWorld(input.normalOS, yaw);
                 float3 bladeLateralWS = cross(
                     baseNormalWS,
                     float3(0.0, 1.0, 0.0));
-                float scaledVertexHeight =
-                    input.positionOS.y * scale.y;
                 float inverseBladeHeight =
                     rootToTip / max(scaledVertexHeight, 0.0001);
-                float normalSlopeScale =
-                    2.0 * rootToTip * inverseBladeHeight *
-                    clamp(_WindNormalResponse, 0.0, 4.0);
-                float2 windSlopeXZ =
-                    fullTipDisplacementXZ * normalSlopeScale;
+                float commonSlopeScale =
+                    2.0 * rootToTip * inverseBladeHeight;
+                float interactionNormalAmount =
+                    clamp(_InteractionNormalResponse, 0.0, 4.0);
+                float2 deformationSlopeXZ =
+                    fullTipWindDisplacementXZ *
+                        (commonSlopeScale *
+                         clamp(_WindNormalResponse, 0.0, 4.0)) +
+                    fullTipInteractionDisplacementXZ *
+                        (commonSlopeScale * interactionNormalAmount);
+                float interactionVerticalTangentScale = max(
+                    0.05,
+                    1.0 - saturate(
+                        fullTipInteractionFlatten *
+                        interactionNormalAmount));
                 float3 deformedCenterlineTangentWS = float3(
-                    windSlopeXZ.x,
-                    1.0,
-                    windSlopeXZ.y);
+                    deformationSlopeXZ.x,
+                    interactionVerticalTangentScale,
+                    deformationSlopeXZ.y);
                 float3 windDeformedNormalWS = cross(
                     deformedCenterlineTangentWS,
                     bladeLateralWS);
+                float2 combinedTipDisplacementXZ =
+                    fullTipWindDisplacementXZ +
+                    fullTipInteractionDisplacementXZ;
                 float signedNormalBendRatio = dot(
                     baseNormalWS.xz,
-                    fullTipDisplacementXZ) * inverseBladeHeight;
+                    combinedTipDisplacementXZ) * inverseBladeHeight;
 
                 Varyings output;
                 output.positionCS = TransformWorldToHClip(worldPosition);
@@ -215,20 +253,16 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
             half4 Frag(Varyings input, bool isFrontFace : SV_IsFrontFace) : SV_Target
             {
                 float rawSignedSilhouettePosition = input.uv.x * 2.0 - 1.0;
-                float visibleHalfWidth = 1.0;
-                if (_GeometryCandidate > 0.5)
-                {
-                    float taperRange = max(0.0001, 1.0 - _TaperStart);
-                    float taperT = saturate((input.uv.y - _TaperStart) / taperRange);
-                    taperT *= taperT * (3.0 - 2.0 * taperT);
-                    float allowedWidth = lerp(
-                        0.92,
-                        max(0.02, _TipWidthRatio * 0.92),
-                        taperT);
-                    visibleHalfWidth = max(
-                        0.0001,
-                        allowedWidth - _AlphaCutoff * 0.08);
-                }
+                float taperRange = max(0.0001, 1.0 - _TaperStart);
+                float taperT = saturate((input.uv.y - _TaperStart) / taperRange);
+                taperT *= taperT * (3.0 - 2.0 * taperT);
+                float allowedWidth = lerp(
+                    0.92,
+                    max(0.02, _TipWidthRatio * 0.92),
+                    taperT);
+                float visibleHalfWidth = max(
+                    0.0001,
+                    allowedWidth - _AlphaCutoff * 0.08);
 
                 float signedSilhouettePosition =
                     rawSignedSilhouettePosition / visibleHalfWidth;
@@ -246,12 +280,9 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                     0.00000025);
                 float pixelsPerSignedUnit = rsqrt(signedGradientSquared);
 
-                if (_GeometryCandidate > 0.5)
-                {
-                    clip(
-                        visibleHalfWidth -
-                        abs(rawSignedSilhouettePosition));
-                }
+                clip(
+                    visibleHalfWidth -
+                    abs(rawSignedSilhouettePosition));
 
                 float edgeDistance =
                     1.0 - saturate(abs(signedSilhouettePosition));

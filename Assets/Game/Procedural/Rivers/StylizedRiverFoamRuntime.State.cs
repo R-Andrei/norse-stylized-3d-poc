@@ -132,6 +132,19 @@ namespace ProgrammaticStylized3D.Rivers
             public float NextStartTime;
         }
 
+        private struct AutomaticRevealTimingTelemetry
+        {
+            public bool HasValue;
+            public int EventId;
+            public AutomaticFoamSourceEventType Type;
+            public float PathDistanceMetres;
+            public float RequestedSpeedMetresPerSecond;
+            public float RawDurationSeconds;
+            public float ResolvedDurationSeconds;
+            public float ActualSpeedMetresPerSecond;
+            public bool CadenceLimited;
+        }
+
         private struct AutomaticFoamSourceEvent
         {
             public bool Active;
@@ -149,6 +162,9 @@ namespace ProgrammaticStylized3D.Rivers
             public float ObjectReleaseDuration;
             public float ObjectRestDuration;
             public float FormationSpeedMetresPerSecond;
+            public float RevealPathDistanceMetres;
+            public float RawRevealDurationSeconds;
+            public bool RevealCadenceLimited;
             public float HeadTrailMetres;
             public float ShoreInsetMetres;
             public float WidthMetres;

@@ -4,7 +4,6 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using ProgrammaticStylized3D.Rendering.PixelSurface;
-using ProgrammaticStylized3D.Vegetation;
 
 namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 {
@@ -69,30 +68,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty showPaintedAccentProjectedGlyphDebug;
         private SerializedProperty paintedAccentGlyphFamilyPreview;
         private SerializedProperty paintedAccentPlacementOverlayWeight;
-        private SerializedProperty vegetationCoverageResolution;
-        private SerializedProperty vegetationCoveragePixels;
-        private SerializedProperty vegetationCoverageRevision;
-        private SerializedProperty vegetationCoverageInitialized;
-        private SerializedProperty vegetationCoveragePaintMode;
-        private SerializedProperty vegetationCoverageBrushRadius;
-        private SerializedProperty vegetationCoverageBrushStrength;
-        private SerializedProperty vegetationCoverageEraseMode;
-        private SerializedProperty showVegetationCoverageOverlay;
-
-        private bool vegetationCoverageStrokeActive;
-        private bool vegetationCoverageStrokeChanged;
-        private int vegetationCoverageStrokeControlId;
-        private GeneratedGround vegetationCoverageStrokeGround;
-        private int lastObservedVegetationCoverageRevision = int.MinValue;
-        private int vegetationCoverageOverlayRevision = int.MinValue;
-        private int vegetationCoverageOverlaySurfaceRevision = int.MinValue;
-        private int vegetationCoverageOverlayResolution = -1;
-        private int vegetationCoverageOverlayTransformHash = int.MinValue;
-        private readonly List<Vector3> vegetationCoverageOverlayPoints =
-            new List<Vector3>();
-        private readonly List<float> vegetationCoverageOverlayValues =
-            new List<float>();
-
         private int paintedAccentPlacementDebugSignature = int.MinValue;
         private bool paintedAccentPlacementDebugSnapshotBuildFailed;
         private GroundPaintedAccentPlacementDebugSnapshot
@@ -142,6 +117,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty bankDetailFinishVariationMultiplier;
         private SerializedProperty bankLegacyPixelCellInfluenceMultiplier;
         private SerializedProperty riverbedMaterialStrength;
+        private SerializedProperty riverbedMaterialBlendDistance;
+        private SerializedProperty riverbedMaterialBlendSoftness;
         private SerializedProperty riverbedDetailScaleMultiplier;
         private SerializedProperty riverbedAuthoredColorStrengthMultiplier;
         private SerializedProperty riverbedAuthoredColorLightingMultiplier;
@@ -473,42 +450,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 serializedObject.FindProperty(
                     "paintedAccentPlacementOverlayWeight");
 
-            vegetationCoverageResolution =
-                serializedObject.FindProperty(
-                    "vegetationCoverageResolution");
-
-            vegetationCoveragePixels =
-                serializedObject.FindProperty(
-                    "vegetationCoveragePixels");
-
-            vegetationCoverageRevision =
-                serializedObject.FindProperty(
-                    "vegetationCoverageRevision");
-
-            vegetationCoverageInitialized =
-                serializedObject.FindProperty(
-                    "vegetationCoverageInitialized");
-
-            vegetationCoveragePaintMode =
-                serializedObject.FindProperty(
-                    "vegetationCoveragePaintMode");
-
-            vegetationCoverageBrushRadius =
-                serializedObject.FindProperty(
-                    "vegetationCoverageBrushRadius");
-
-            vegetationCoverageBrushStrength =
-                serializedObject.FindProperty(
-                    "vegetationCoverageBrushStrength");
-
-            vegetationCoverageEraseMode =
-                serializedObject.FindProperty(
-                    "vegetationCoverageEraseMode");
-
-            showVegetationCoverageOverlay =
-                serializedObject.FindProperty(
-                    "showVegetationCoverageOverlay");
-
             shapeSeed =
                 recipe.FindPropertyRelative("shapeSeed");
 
@@ -635,6 +576,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             riverbedMaterialStrength =
                 groundMaterialControls.FindPropertyRelative(
                     "riverbedMaterialStrength");
+
+            riverbedMaterialBlendDistance =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedMaterialBlendDistance");
+
+            riverbedMaterialBlendSoftness =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedMaterialBlendSoftness");
 
             riverbedDetailScaleMultiplier =
                 groundMaterialControls.FindPropertyRelative(
@@ -879,25 +828,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             specularStrength =
                 groundMaterialControls.FindPropertyRelative("specularStrength");
 
-            GeneratedGround enabledGround = target as GeneratedGround;
-            lastObservedVegetationCoverageRevision =
-                enabledGround != null
-                    ? enabledGround.VegetationCoverageRevision
-                    : int.MinValue;
-
             Undo.undoRedoPerformed += HandleUndoRedo;
-            SceneView.duringSceneGui -=
-                HandleVegetationCoverageSceneGUI;
-            SceneView.duringSceneGui +=
-                HandleVegetationCoverageSceneGUI;
         }
 
         private void OnDisable()
         {
-            CompleteVegetationCoverageStroke();
             Undo.undoRedoPerformed -= HandleUndoRedo;
-            SceneView.duringSceneGui -=
-                HandleVegetationCoverageSceneGUI;
         }
 
         private void HandleUndoRedo()
@@ -915,17 +851,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 {
                     ground.RefreshSurfaceStyleState();
                 }
-            }
-
-            GeneratedGround coverageGround = target as GeneratedGround;
-            if (coverageGround != null &&
-                coverageGround.VegetationCoverageRevision !=
-                    lastObservedVegetationCoverageRevision)
-            {
-                RebuildVegetationBenchmarksUsingGround(coverageGround);
-                lastObservedVegetationCoverageRevision =
-                    coverageGround.VegetationCoverageRevision;
-                InvalidateVegetationCoverageOverlay();
             }
 
             Repaint();
@@ -3957,6 +3882,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 bankSurfaceLayer,
                 riverbedSurfaceLayer,
                 riverbedMaterialStrength,
+                riverbedMaterialBlendDistance,
+                riverbedMaterialBlendSoftness,
                 riverbedDetailScaleMultiplier,
                 riverbedAuthoredColorStrengthMultiplier,
                 riverbedAuthoredColorLightingMultiplier,
@@ -4105,6 +4032,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 sharedBankSurfaceLayer,
                 materialControls.FindPropertyRelative("riverbedSurfaceLayer"),
                 materialControls.FindPropertyRelative("riverbedMaterialStrength"),
+                materialControls.FindPropertyRelative(
+                    "riverbedMaterialBlendDistance"),
+                materialControls.FindPropertyRelative(
+                    "riverbedMaterialBlendSoftness"),
                 materialControls.FindPropertyRelative(
                     "riverbedDetailScaleMultiplier"),
                 materialControls.FindPropertyRelative(
@@ -4549,6 +4480,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             SerializedProperty bankLayer,
             SerializedProperty customRiverbedLayer,
             SerializedProperty materialStrength,
+            SerializedProperty materialBlendDistance,
+            SerializedProperty materialBlendSoftness,
             SerializedProperty detailScaleMultiplier,
             SerializedProperty authoredColorStrengthMultiplier,
             SerializedProperty authoredColorLightingMultiplier,
@@ -4725,6 +4658,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             {
                 EditorGUI.BeginChangeCheck();
                 EditorGUILayout.PropertyField(materialStrength);
+
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.LabelField(
+                    "Dry Material Transition",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.HelpBox(
+                    "Transitions the complete dry Riverbed material inward from the resolved Bank substrate at the Ground Riverbed Support edge, or from Primary Ground when no Bank layer is active. The transition remains entirely inside Riverbed Support and is independent from Wetness Transition below. Zero distance preserves the historical hard boundary.",
+                    MessageType.None);
+                EditorGUILayout.PropertyField(materialBlendDistance);
+                using (new EditorGUI.DisabledScope(
+                    materialBlendDistance == null ||
+                    materialBlendDistance.floatValue <= 0.0001f))
+                {
+                    EditorGUILayout.PropertyField(materialBlendSoftness);
+                }
+
                 changed |= EditorGUI.EndChangeCheck();
             }
 
@@ -5567,7 +5516,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                    enabledProperty.boolValue &&
                    library != null &&
                    idProperty != null &&
-                   library.EntryUsesAuthoredMaterialSet(
+                   library.EntryUsesTextureForm(
                        idProperty.stringValue);
         }
 
@@ -6198,8 +6147,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 }
             }
 
-            DrawVegetationCoverageAuthoring();
-
             EditorGUILayout.HelpBox(
                 "GroundModifier and StylizedRiver components are discovered below this GeneratedGround object in the Hierarchy. Their own artistic controls remain on those components.",
                 MessageType.Info);
@@ -6315,539 +6262,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     BuildSurfaceMaskDiagnosticsClipboardReport(ground);
             }
             EditorGUI.indentLevel--;
-        }
-
-        private void DrawVegetationCoverageAuthoring()
-        {
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(
-                "Vegetation Coverage Authoring",
-                EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Ground owns one compact coverage mask. Uninitialized coverage authorizes the full Ground. Initialize Empty for additive patch painting or Initialize Full for subtractive authoring.",
-                MessageType.None);
-
-            if (targets.Length != 1)
-            {
-                EditorGUILayout.HelpBox(
-                    "Vegetation coverage status and Scene painting require exactly one selected GeneratedGround.",
-                    MessageType.Info);
-                return;
-            }
-
-            GeneratedGround ground = target as GeneratedGround;
-            if (ground == null)
-            {
-                return;
-            }
-
-            bool initialized = vegetationCoverageInitialized.boolValue;
-            bool storageValid = ground.VegetationCoverageStorageValid;
-            int serializedByteCount = vegetationCoveragePixels.arraySize;
-            int serializedRevision = vegetationCoverageRevision.intValue;
-            EditorGUILayout.LabelField(
-                "Initialized",
-                initialized ? "Yes" : "No — full authorization fallback");
-            EditorGUILayout.LabelField(
-                "Resolution",
-                $"{ground.VegetationCoverageResolution} × " +
-                ground.VegetationCoverageResolution);
-            EditorGUILayout.LabelField(
-                "Serialized Storage",
-                $"{serializedByteCount:N0} bytes");
-            EditorGUILayout.LabelField(
-                "Average Coverage",
-                $"{ground.CalculateVegetationCoverageFraction() * 100f:0.###}%");
-            EditorGUILayout.LabelField(
-                "Revision",
-                serializedRevision.ToString());
-
-            if (initialized && !storageValid)
-            {
-                EditorGUILayout.HelpBox(
-                    "The initialized coverage storage does not match Resolution × Resolution. Existing bytes are preserved. Use Clear Empty or Fill Full to explicitly rebuild the mask.",
-                    MessageType.Error);
-            }
-            else if (!initialized)
-            {
-                EditorGUILayout.HelpBox(
-                    "This Ground currently behaves as fully authorized for vegetation until you explicitly initialize its mask.",
-                    MessageType.Warning);
-            }
-
-            using (new EditorGUI.DisabledScope(initialized))
-            {
-                EditorGUILayout.PropertyField(
-                    vegetationCoverageResolution,
-                    new GUIContent(
-                        "Coverage Resolution",
-                        "One byte per texel. Existing initialized masks keep their serialized resolution and are never resized implicitly."));
-            }
-
-            EditorGUILayout.BeginHorizontal();
-            if (!initialized)
-            {
-                if (GUILayout.Button("Initialize Empty"))
-                {
-                    ApplyVegetationCoverageAction(
-                        "Initialize Empty Vegetation Coverage",
-                        value => value.InitializeVegetationCoverage(false));
-                }
-
-                if (GUILayout.Button("Initialize Full"))
-                {
-                    ApplyVegetationCoverageAction(
-                        "Initialize Full Vegetation Coverage",
-                        value => value.InitializeVegetationCoverage(true));
-                }
-            }
-            else
-            {
-                if (GUILayout.Button("Clear Empty"))
-                {
-                    ApplyVegetationCoverageAction(
-                        "Clear Vegetation Coverage",
-                        value => value.FillVegetationCoverage(0f));
-                }
-
-                if (GUILayout.Button("Fill Full"))
-                {
-                    ApplyVegetationCoverageAction(
-                        "Fill Vegetation Coverage",
-                        value => value.FillVegetationCoverage(1f));
-                }
-            }
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUI.BeginChangeCheck();
-            using (new EditorGUI.DisabledScope(!initialized || !storageValid))
-            {
-                EditorGUILayout.PropertyField(
-                    vegetationCoveragePaintMode,
-                    new GUIContent(
-                        "Enable Scene Painting",
-                        "Claims non-Alt left-button Scene input only while enabled. Coverage changes immediately; dependent vegetation rebuilds once when a changed stroke ends."));
-                EditorGUILayout.PropertyField(
-                    vegetationCoverageEraseMode,
-                    new GUIContent(
-                        "Erase",
-                        "Subtract coverage instead of adding it."));
-                vegetationCoverageBrushRadius.floatValue =
-                    EditorGUILayout.Slider(
-                        new GUIContent(
-                            "Brush Radius",
-                            "World-space brush radius in metres."),
-                        Mathf.Max(0.05f, vegetationCoverageBrushRadius.floatValue),
-                        0.05f,
-                        Mathf.Max(0.1f, ground.PatchSize));
-                vegetationCoverageBrushStrength.floatValue =
-                    EditorGUILayout.Slider(
-                        new GUIContent(
-                            "Brush Strength",
-                            "Coverage added or removed at the brush centre per paint stamp."),
-                        Mathf.Clamp01(vegetationCoverageBrushStrength.floatValue),
-                        0f,
-                        1f);
-            }
-
-            EditorGUILayout.PropertyField(
-                showVegetationCoverageOverlay,
-                new GUIContent(
-                    "Show Coverage Overlay",
-                    "Shows revision-cached coverage samples conformed to the generated Ground surface."));
-
-            if (EditorGUI.EndChangeCheck())
-            {
-                serializedObject.ApplyModifiedProperties();
-                lastObservedVegetationCoverageRevision =
-                    ground.VegetationCoverageRevision;
-                InvalidateVegetationCoverageOverlay();
-                SceneView.RepaintAll();
-            }
-
-            if (initialized && storageValid &&
-                ground.VegetationCoveragePaintMode)
-            {
-                EditorGUILayout.HelpBox(
-                    ground.VegetationCoverageEraseMode
-                        ? "Scene Painting active: ERASE. Left-drag removes coverage; hold Alt for Scene navigation."
-                        : "Scene Painting active: PAINT. Left-drag adds coverage; hold Alt for Scene navigation.",
-                    ground.VegetationCoverageEraseMode
-                        ? MessageType.Warning
-                        : MessageType.Info);
-            }
-        }
-
-        private void ApplyVegetationCoverageAction(
-            string undoName,
-            GroundAction action)
-        {
-            serializedObject.ApplyModifiedProperties();
-
-            for (int index = 0; index < targets.Length; index++)
-            {
-                GeneratedGround ground = targets[index] as GeneratedGround;
-                if (ground == null)
-                {
-                    continue;
-                }
-
-                int previousRevision =
-                    ground.VegetationCoverageRevision;
-                Undo.RegisterCompleteObjectUndo(ground, undoName);
-                action(ground);
-                if (ground.VegetationCoverageRevision != previousRevision)
-                {
-                    EditorUtility.SetDirty(ground);
-                    RebuildVegetationBenchmarksUsingGround(ground);
-                }
-                lastObservedVegetationCoverageRevision =
-                    ground.VegetationCoverageRevision;
-            }
-
-            InvalidateVegetationCoverageOverlay();
-            serializedObject.Update();
-            Repaint();
-            SceneView.RepaintAll();
-        }
-
-        private void HandleVegetationCoverageSceneGUI(SceneView sceneView)
-        {
-            if (sceneView == null ||
-                targets.Length != 1 ||
-                EditorApplication.isPlayingOrWillChangePlaymode)
-            {
-                CompleteVegetationCoverageStroke();
-                return;
-            }
-
-            GeneratedGround ground = target as GeneratedGround;
-            if (ground == null ||
-                Selection.gameObjects.Length != 1 ||
-                Selection.activeGameObject != ground.gameObject)
-            {
-                CompleteVegetationCoverageStroke();
-                return;
-            }
-
-            Event current = Event.current;
-            if (current == null)
-            {
-                return;
-            }
-
-            if (ground.ShowVegetationCoverageOverlay &&
-                current.type == EventType.Repaint)
-            {
-                DrawVegetationCoverageOverlay(ground);
-            }
-
-            if (!ground.VegetationCoverageInitialized ||
-                !ground.VegetationCoverageStorageValid ||
-                !ground.VegetationCoveragePaintMode)
-            {
-                CompleteVegetationCoverageStroke();
-                return;
-            }
-
-            if (current.type == EventType.MouseMove)
-            {
-                sceneView.Repaint();
-            }
-
-            if (current.type == EventType.Repaint)
-            {
-                DrawVegetationCoveragePaintStatus(ground);
-            }
-
-            Ray ray = HandleUtility.GUIPointToWorldRay(current.mousePosition);
-            bool hasSurfaceHit =
-                ground.TryRaycastVegetationCoverageSurface(
-                    ray,
-                    out Vector3 surfaceHit);
-
-            if (hasSurfaceHit && current.type == EventType.Repaint)
-            {
-                Color previousColor = Handles.color;
-                Handles.color = ground.VegetationCoverageEraseMode
-                    ? new Color(1f, 0.25f, 0.15f, 1f)
-                    : new Color(0.25f, 1f, 0.35f, 1f);
-                Handles.DrawWireDisc(
-                    surfaceHit,
-                    ground.transform.up,
-                    ground.VegetationCoverageBrushRadius);
-                Handles.color = previousColor;
-            }
-
-            int controlId = GUIUtility.GetControlID(
-                "GeneratedGroundVegetationCoveragePaint".GetHashCode(),
-                FocusType.Passive);
-            if (current.type == EventType.Layout && !current.alt)
-            {
-                HandleUtility.AddDefaultControl(controlId);
-            }
-
-            if (current.alt)
-            {
-                CompleteVegetationCoverageStroke();
-                return;
-            }
-
-            if (current.type == EventType.MouseDown &&
-                current.button == 0 &&
-                hasSurfaceHit)
-            {
-                Undo.RegisterCompleteObjectUndo(
-                    ground,
-                    ground.VegetationCoverageEraseMode
-                        ? "Erase Vegetation Coverage"
-                        : "Paint Vegetation Coverage");
-                vegetationCoverageStrokeActive = true;
-                vegetationCoverageStrokeChanged = false;
-                vegetationCoverageStrokeControlId = controlId;
-                vegetationCoverageStrokeGround = ground;
-                GUIUtility.hotControl = controlId;
-                ApplyVegetationCoveragePaintStamp(ground, surfaceHit);
-                current.Use();
-                return;
-            }
-
-            if (current.type == EventType.MouseDrag &&
-                current.button == 0 &&
-                vegetationCoverageStrokeActive &&
-                GUIUtility.hotControl == vegetationCoverageStrokeControlId)
-            {
-                if (hasSurfaceHit)
-                {
-                    ApplyVegetationCoveragePaintStamp(ground, surfaceHit);
-                }
-                current.Use();
-                return;
-            }
-
-            if (current.type == EventType.MouseUp &&
-                current.button == 0 &&
-                vegetationCoverageStrokeActive)
-            {
-                CompleteVegetationCoverageStroke();
-                current.Use();
-                return;
-            }
-
-            if ((current.type == EventType.KeyDown &&
-                 current.keyCode == KeyCode.Escape) ||
-                current.type == EventType.MouseLeaveWindow)
-            {
-                CompleteVegetationCoverageStroke();
-            }
-        }
-
-        private void ApplyVegetationCoveragePaintStamp(
-            GeneratedGround ground,
-            Vector3 worldPosition)
-        {
-            if (ground == null ||
-                !ground.PaintVegetationCoverage(
-                    worldPosition,
-                    ground.VegetationCoverageBrushRadius,
-                    ground.VegetationCoverageBrushStrength,
-                    ground.VegetationCoverageEraseMode))
-            {
-                return;
-            }
-
-            vegetationCoverageStrokeChanged = true;
-            lastObservedVegetationCoverageRevision =
-                ground.VegetationCoverageRevision;
-            EditorUtility.SetDirty(ground);
-            InvalidateVegetationCoverageOverlay();
-            Repaint();
-            SceneView.RepaintAll();
-        }
-
-        private void CompleteVegetationCoverageStroke()
-        {
-            if (!vegetationCoverageStrokeActive)
-            {
-                return;
-            }
-
-            GeneratedGround ground = vegetationCoverageStrokeGround;
-            bool changed = vegetationCoverageStrokeChanged;
-            int controlId = vegetationCoverageStrokeControlId;
-
-            vegetationCoverageStrokeActive = false;
-            vegetationCoverageStrokeChanged = false;
-            vegetationCoverageStrokeControlId = 0;
-            vegetationCoverageStrokeGround = null;
-
-            if (GUIUtility.hotControl == controlId)
-            {
-                GUIUtility.hotControl = 0;
-            }
-
-            if (changed && ground != null)
-            {
-                RebuildVegetationBenchmarksUsingGround(ground);
-                lastObservedVegetationCoverageRevision =
-                    ground.VegetationCoverageRevision;
-            }
-
-            serializedObject.UpdateIfRequiredOrScript();
-            Repaint();
-            SceneView.RepaintAll();
-        }
-
-        private void DrawVegetationCoveragePaintStatus(
-            GeneratedGround ground)
-        {
-            Handles.BeginGUI();
-            string mode = ground.VegetationCoverageEraseMode
-                ? "ERASE"
-                : "PAINT";
-            GUI.Box(
-                new Rect(12f, 12f, 290f, 44f),
-                $"Vegetation Coverage: {mode}\n" +
-                $"Radius {ground.VegetationCoverageBrushRadius:0.##} m  " +
-                $"Strength {ground.VegetationCoverageBrushStrength:0.##}  " +
-                "Alt: navigate",
-                EditorStyles.helpBox);
-            Handles.EndGUI();
-        }
-
-        private void DrawVegetationCoverageOverlay(
-            GeneratedGround ground)
-        {
-            EnsureVegetationCoverageOverlay(ground);
-            if (vegetationCoverageOverlayPoints.Count == 0)
-            {
-                return;
-            }
-
-            Color previousColor = Handles.color;
-            CompareFunction previousZTest = Handles.zTest;
-            Handles.zTest = CompareFunction.LessEqual;
-
-            for (int index = 0;
-                 index < vegetationCoverageOverlayPoints.Count;
-                 index++)
-            {
-                float coverage = vegetationCoverageOverlayValues[index];
-                if (coverage <= 0.01f)
-                {
-                    Handles.color = new Color(1f, 0.15f, 0.1f, 0.28f);
-                }
-                else if (coverage >= 0.99f)
-                {
-                    Handles.color = new Color(0.15f, 1f, 0.25f, 0.28f);
-                }
-                else
-                {
-                    Handles.color = new Color(1f, 0.72f, 0.1f, 0.34f);
-                }
-
-                Vector3 point = vegetationCoverageOverlayPoints[index];
-                float size = HandleUtility.GetHandleSize(point) * 0.018f;
-                Handles.DotHandleCap(
-                    0,
-                    point,
-                    Quaternion.identity,
-                    size,
-                    EventType.Repaint);
-            }
-
-            Handles.zTest = previousZTest;
-            Handles.color = previousColor;
-        }
-
-        private void EnsureVegetationCoverageOverlay(
-            GeneratedGround ground)
-        {
-            int transformHash = ground.transform.localToWorldMatrix.GetHashCode();
-            int resolution = ground.VegetationCoverageResolution;
-            if (vegetationCoverageOverlayRevision ==
-                    ground.VegetationCoverageRevision &&
-                vegetationCoverageOverlaySurfaceRevision ==
-                    ground.VegetationCoverageSurfaceRevision &&
-                vegetationCoverageOverlayResolution == resolution &&
-                vegetationCoverageOverlayTransformHash == transformHash)
-            {
-                return;
-            }
-
-            vegetationCoverageOverlayPoints.Clear();
-            vegetationCoverageOverlayValues.Clear();
-
-            int sampleCount = Mathf.Min(32, resolution);
-            if (sampleCount >= 2)
-            {
-                for (int sampleZ = 0; sampleZ < sampleCount; sampleZ++)
-                {
-                    int z = Mathf.RoundToInt(
-                        sampleZ * (resolution - 1f) / (sampleCount - 1f));
-                    for (int sampleX = 0;
-                         sampleX < sampleCount;
-                         sampleX++)
-                    {
-                        int x = Mathf.RoundToInt(
-                            sampleX * (resolution - 1f) / (sampleCount - 1f));
-                        if (!ground.TryGetVegetationCoverageTexelWorldPosition(
-                                x,
-                                z,
-                                out Vector3 worldPosition,
-                                out float coverage))
-                        {
-                            continue;
-                        }
-
-                        vegetationCoverageOverlayPoints.Add(
-                            worldPosition + ground.transform.up * 0.015f);
-                        vegetationCoverageOverlayValues.Add(coverage);
-                    }
-                }
-            }
-
-            vegetationCoverageOverlayRevision =
-                ground.VegetationCoverageRevision;
-            vegetationCoverageOverlaySurfaceRevision =
-                ground.VegetationCoverageSurfaceRevision;
-            vegetationCoverageOverlayResolution = resolution;
-            vegetationCoverageOverlayTransformHash = transformHash;
-        }
-
-        private void InvalidateVegetationCoverageOverlay()
-        {
-            vegetationCoverageOverlayRevision = int.MinValue;
-            vegetationCoverageOverlaySurfaceRevision = int.MinValue;
-            vegetationCoverageOverlayResolution = -1;
-            vegetationCoverageOverlayTransformHash = int.MinValue;
-            vegetationCoverageOverlayPoints.Clear();
-            vegetationCoverageOverlayValues.Clear();
-        }
-
-        private static void RebuildVegetationBenchmarksUsingGround(
-            GeneratedGround ground)
-        {
-            if (ground == null)
-            {
-                return;
-            }
-
-            VegetationBenchmark[] benchmarks =
-                Object.FindObjectsByType<VegetationBenchmark>(
-                    FindObjectsInactive.Include);
-            for (int index = 0; index < benchmarks.Length; index++)
-            {
-                VegetationBenchmark benchmark = benchmarks[index];
-                if (benchmark == null ||
-                    benchmark.CoverageGround != ground)
-                {
-                    continue;
-                }
-
-                benchmark.RebuildBenchmark();
-                EditorUtility.SetDirty(benchmark);
-            }
         }
 
         private void OnSceneGUI()

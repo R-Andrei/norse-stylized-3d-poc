@@ -80,7 +80,10 @@ float2 ClampVectorMagnitude(float2 value, float maximum)
 
 int2 PhysicalCell(int2 logicalCell)
 {
-    return (logicalCell + _FieldOffset) % _FieldResolution;
+    uint2 resolution = (uint2)_FieldResolution;
+    uint2 wrapped =
+        ((uint2)logicalCell + (uint2)_FieldOffset) & (resolution - 1u);
+    return (int2)wrapped;
 }
 
 float2 WorldPositionForLogicalCell(int2 logicalCell)
