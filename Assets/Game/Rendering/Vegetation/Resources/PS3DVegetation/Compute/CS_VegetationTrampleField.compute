@@ -1,0 +1,715 @@
+#pragma kernel InitializeField
+#pragma kernel SimulateField
+
+#define PS3D_INTERACTION_DIRECTION_RADIAL 0
+#define PS3D_INTERACTION_DIRECTION_WORLD_X_BIASED 1
+#define PS3D_INTERACTION_DIRECTION_HYBRID 2
+
+#define PS3D_TRAMPLE_STAMP_SHAPE_CIRCLE 0
+#define PS3D_TRAMPLE_STAMP_SHAPE_CONE 1
+#define PS3D_TRAMPLE_STAMP_SHAPE_LINE 2
+
+#define PS3D_TRAMPLE_DISPLACEMENT_RADIAL_OUTWARD 0
+#define PS3D_TRAMPLE_DISPLACEMENT_FIXED_WORLD_DIRECTION 1
+#define PS3D_TRAMPLE_DISPLACEMENT_AWAY_FROM_CENTRELINE 2
+#define PS3D_TRAMPLE_DISPLACEMENT_FLATTEN_ONLY 3
+
+struct VegetationTrampleWriterRecord
+{
+    float4 startEnd;
+    float4 parameters;
+    float4 directionParameters;
+    float4 persistenceParameters;
+};
+
+struct VegetationTrampleStampRecord
+{
+    float4 originEnd;
+    float4 shapeParameters;
+    float4 directionParameters;
+    float4 effectParameters;
+    float4 recoveryParameters;
+    float4 fixedDirectionParameters;
+};
+
+StructuredBuffer<VegetationTrampleWriterRecord> _Writers;
+StructuredBuffer<VegetationTrampleStampRecord> _Stamps;
+RWTexture2D<float4> _StateAWrite;
+RWTexture2D<float4> _StateBWrite;
+RWTexture2D<float2> _TimingWrite;
+Texture2D<float4> _StateRead;
+RWTexture2D<float4> _StateWrite;
+RWTexture2D<float2> _TimingState;
+
+int2 _FieldResolution;
+float4 _GroundDomain;
+float4x4 _GroundLocalToWorld;
+float _DeltaTime;
+int _WriterCount;
+int _StampCount;
+
+float2 SafeNormalize(float2 value, float2 fallback)
+{
+    float magnitudeSquared = dot(value, value);
+    if (magnitudeSquared <= 0.0000001)
+    {
+        return fallback;
+    }
+    return value * rsqrt(magnitudeSquared);
+}
+
+float2 ClampVectorMagnitude(float2 value, float maximum)
+{
+    float magnitudeSquared = dot(value, value);
+    float maximumSquared = maximum * maximum;
+    if (magnitudeSquared <= maximumSquared || magnitudeSquared <= 0.0000001)
+    {
+        return value;
+    }
+    return value * (maximum * rsqrt(magnitudeSquared));
+}
+
+uint HashWorldCell(int2 cell)
+{
+    uint hashValue =
+        (uint)cell.x * 0x8da6b343u ^
+        (uint)cell.y * 0xd8163841u;
+    hashValue ^= hashValue >> 13;
+    hashValue *= 0x85ebca6bu;
+    hashValue ^= hashValue >> 16;
+    return hashValue;
+}
+
+
+uint HashStampLattice(int2 cell, uint seed)
+{
+    uint value = (uint)cell.x * 0x9e3779b9u ^
+        (uint)cell.y * 0x85ebca6bu ^ seed * 0xc2b2ae35u;
+    value ^= value >> 16;
+    value *= 0x7feb352du;
+    value ^= value >> 15;
+    value *= 0x846ca68bu;
+    value ^= value >> 16;
+    return value;
+}
+
+float HashStamp01(int2 cell, uint seed)
+{
+    return (HashStampLattice(cell, seed) & 0x00ffffffu) / 16777215.0;
+}
+
+float StampValueNoise(float2 position, uint seed)
+{
+    int2 baseCell = (int2)floor(position);
+    float2 fraction = frac(position);
+    float2 smoothFraction = fraction * fraction * (3.0 - 2.0 * fraction);
+    float value00 = HashStamp01(baseCell, seed);
+    float value10 = HashStamp01(baseCell + int2(1, 0), seed);
+    float value01 = HashStamp01(baseCell + int2(0, 1), seed);
+    float value11 = HashStamp01(baseCell + int2(1, 1), seed);
+    return lerp(
+        lerp(value00, value10, smoothFraction.x),
+        lerp(value01, value11, smoothFraction.x),
+        smoothFraction.y);
+}
+
+float SignedStampNoise(float2 worldXZ, float scale, uint seed)
+{
+    return StampValueNoise(worldXZ / max(0.1, scale), seed) * 2.0 - 1.0;
+}
+
+float StableWorldXSide(float2 worldXZ, float cellSize)
+{
+    int2 lattice = (int2)floor(worldXZ / max(0.01, cellSize));
+    return (HashWorldCell(lattice) & 1u) == 0u ? -1.0 : 1.0;
+}
+
+float ResolveWorldXSide(
+    float radialX,
+    float2 worldXZ,
+    float radius,
+    float cellSize)
+{
+    float centrelineHalfWidth = max(cellSize * 0.35, radius * 0.04);
+    if (radialX < -centrelineHalfWidth)
+    {
+        return -1.0;
+    }
+    if (radialX > centrelineHalfWidth)
+    {
+        return 1.0;
+    }
+    return StableWorldXSide(worldXZ, cellSize);
+}
+
+float2 ShapeDirection(
+    float2 radialDirection,
+    float2 radialVector,
+    float2 movementDirection,
+    float movementBlend,
+    int directionMode,
+    float worldXBias,
+    float worldZStrength,
+    float2 worldXZ,
+    float radius,
+    float cellSize)
+{
+    float2 radialMovementDirection = SafeNormalize(
+        lerp(radialDirection, movementDirection, movementBlend),
+        radialDirection);
+    if (directionMode == PS3D_INTERACTION_DIRECTION_RADIAL)
+    {
+        return radialMovementDirection;
+    }
+
+    float worldXSide = ResolveWorldXSide(
+        radialVector.x,
+        worldXZ,
+        radius,
+        cellSize);
+    float2 sourceDirection =
+        directionMode == PS3D_INTERACTION_DIRECTION_WORLD_X_BIASED
+            ? radialDirection
+            : radialMovementDirection;
+    float2 biasedDirection = lerp(
+        sourceDirection,
+        float2(worldXSide, 0.0),
+        saturate(worldXBias));
+    biasedDirection.y *= saturate(worldZStrength);
+    return SafeNormalize(biasedDirection, float2(worldXSide, 0.0));
+}
+
+float2 WorldPositionForCell(int2 cell)
+{
+    float2 resolution = max((float2)_FieldResolution, 1.0);
+    float2 uv = ((float2)cell + 0.5) / resolution;
+    float domainSize = max(0.001, _GroundDomain.y);
+    float halfSize = _GroundDomain.x;
+    float2 localXZ = uv * domainSize - halfSize;
+    float3 worldPosition = mul(
+        _GroundLocalToWorld,
+        float4(localXZ.x, 0.0, localXZ.y, 1.0)).xyz;
+    return worldPosition.xz;
+}
+
+struct TrampleTarget
+{
+    float2 bend;
+    float2 abilityBend;
+    float flatten;
+    float recoveryDelay;
+    float recoveryDuration;
+    float persistent;
+};
+
+float EvaluateAbilityStampShape(
+    VegetationTrampleStampRecord record,
+    float2 worldXZ,
+    out float2 radialVector,
+    out float2 centrelineVector,
+    out float2 facingDirection)
+{
+    radialVector = 0.0;
+    centrelineVector = 0.0;
+    facingDirection = SafeNormalize(
+        record.directionParameters.yz,
+        float2(0.0, 1.0));
+    float influence = 0.0;
+
+    int shape = clamp(
+        (int)round(record.shapeParameters.x),
+        PS3D_TRAMPLE_STAMP_SHAPE_CIRCLE,
+        PS3D_TRAMPLE_STAMP_SHAPE_LINE);
+    float irregularity = saturate(record.directionParameters.w);
+    float irregularityScale = max(0.1, record.effectParameters.z);
+    uint seed = asuint(record.recoveryParameters.z);
+    float signedNoise = SignedStampNoise(
+        worldXZ,
+        irregularityScale,
+        seed);
+
+    if (shape == PS3D_TRAMPLE_STAMP_SHAPE_LINE)
+    {
+        float2 startXZ = record.originEnd.xy;
+        float2 endXZ = record.originEnd.zw;
+        float2 segment = endXZ - startXZ;
+        float segmentLengthSquared = dot(segment, segment);
+        float segmentT = segmentLengthSquared > 0.0000001
+            ? saturate(dot(worldXZ - startXZ, segment) / segmentLengthSquared)
+            : 0.0;
+        float2 closest = lerp(startXZ, endXZ, segmentT);
+        float2 midpoint = (startXZ + endXZ) * 0.5;
+        centrelineVector = worldXZ - closest;
+        radialVector = worldXZ - midpoint;
+        facingDirection = SafeNormalize(segment, facingDirection);
+        float halfWidth = max(0.025, record.shapeParameters.w * 0.5);
+        float effectiveHalfWidth = halfWidth * max(
+            0.25,
+            1.0 + signedNoise * irregularity);
+        float normalizedDistance = length(centrelineVector) /
+            max(0.001, effectiveHalfWidth);
+        if (normalizedDistance < 1.0)
+        {
+            influence = 1.0 - smoothstep(0.65, 1.0, normalizedDistance);
+        }
+    }
+    else
+    {
+        float2 originXZ = record.originEnd.xy;
+        radialVector = worldXZ - originXZ;
+        centrelineVector = radialVector;
+        float radius = max(0.05, record.shapeParameters.y);
+        float effectiveRadius = radius * max(
+            0.25,
+            1.0 + signedNoise * irregularity);
+        float radialDistance = length(radialVector);
+        float normalizedRadius = radialDistance / max(0.001, effectiveRadius);
+        bool insideShape = normalizedRadius < 1.0;
+        float normalizedShapeDistance = normalizedRadius;
+
+        if (insideShape && shape == PS3D_TRAMPLE_STAMP_SHAPE_CONE)
+        {
+            float arcCoverage = clamp(
+                record.shapeParameters.z,
+                0.017453292,
+                6.28318531);
+            if (arcCoverage < 6.2830)
+            {
+                float halfArc = arcCoverage * 0.5;
+                float effectiveHalfArc = clamp(
+                    halfArc * (1.0 + signedNoise * irregularity * 0.25),
+                    0.008726646,
+                    3.14159265);
+                float2 radialDirection = SafeNormalize(
+                    radialVector,
+                    facingDirection);
+                float angle = acos(clamp(
+                    dot(radialDirection, facingDirection),
+                    -1.0,
+                    1.0));
+                if (angle > effectiveHalfArc)
+                {
+                    insideShape = false;
+                }
+                else
+                {
+                    normalizedShapeDistance = max(
+                        normalizedRadius,
+                        angle / max(0.0001, effectiveHalfArc));
+                }
+            }
+        }
+
+        if (insideShape)
+        {
+            influence = 1.0 - smoothstep(
+                0.65,
+                1.0,
+                normalizedShapeDistance);
+        }
+    }
+
+    return influence;
+}
+
+float StableStampSide(
+    float signedSide,
+    float2 worldXZ,
+    float scale,
+    uint seed)
+{
+    if (signedSide < -0.0001)
+    {
+        return -1.0;
+    }
+    if (signedSide > 0.0001)
+    {
+        return 1.0;
+    }
+    int2 cell = (int2)floor(worldXZ / max(0.1, scale));
+    return (HashStampLattice(cell, seed) & 1u) == 0u ? -1.0 : 1.0;
+}
+
+float2 ResolveAbilityDisplacementDirection(
+    VegetationTrampleStampRecord record,
+    float2 radialVector,
+    float2 centrelineVector,
+    float2 facingDirection,
+    float2 worldXZ)
+{
+    int mode = clamp(
+        (int)round(record.directionParameters.x),
+        PS3D_TRAMPLE_DISPLACEMENT_RADIAL_OUTWARD,
+        PS3D_TRAMPLE_DISPLACEMENT_FLATTEN_ONLY);
+    if (mode == PS3D_TRAMPLE_DISPLACEMENT_FLATTEN_ONLY)
+    {
+        return 0.0;
+    }
+    if (mode == PS3D_TRAMPLE_DISPLACEMENT_FIXED_WORLD_DIRECTION)
+    {
+        return SafeNormalize(
+            record.fixedDirectionParameters.xy,
+            facingDirection);
+    }
+    if (mode == PS3D_TRAMPLE_DISPLACEMENT_AWAY_FROM_CENTRELINE)
+    {
+        int shape = clamp(
+            (int)round(record.shapeParameters.x),
+            PS3D_TRAMPLE_STAMP_SHAPE_CIRCLE,
+            PS3D_TRAMPLE_STAMP_SHAPE_LINE);
+        if (shape == PS3D_TRAMPLE_STAMP_SHAPE_CIRCLE)
+        {
+            return SafeNormalize(
+                radialVector,
+                facingDirection);
+        }
+        float2 perpendicular = float2(
+            -facingDirection.y,
+            facingDirection.x);
+        float signedSide = dot(
+            centrelineVector,
+            perpendicular);
+        uint seed = asuint(record.recoveryParameters.z);
+        float side = StableStampSide(
+            signedSide,
+            worldXZ,
+            record.effectParameters.z,
+            seed);
+        float2 sideFallback = perpendicular * side;
+        if (shape == PS3D_TRAMPLE_STAMP_SHAPE_LINE)
+        {
+            return SafeNormalize(
+                centrelineVector,
+                sideFallback);
+        }
+        return sideFallback;
+    }
+    return SafeNormalize(
+        radialVector,
+        facingDirection);
+}
+
+TrampleTarget EvaluateTarget(float2 worldXZ)
+{
+    TrampleTarget target;
+    target.bend = 0.0;
+    target.abilityBend = 0.0;
+    target.flatten = 0.0;
+    target.recoveryDelay = 0.0;
+    target.recoveryDuration = 0.0;
+    target.persistent = 0.0;
+    bool hasTimedTarget = false;
+    float cellSize = max(
+        0.01,
+        _GroundDomain.y / max(1.0, (float)_FieldResolution.x));
+
+    [loop]
+    for (int index = 0; index < _WriterCount; index++)
+    {
+        VegetationTrampleWriterRecord record = _Writers[index];
+        float2 startXZ = record.startEnd.xy;
+        float2 endXZ = record.startEnd.zw;
+        float radius = max(0.001, record.parameters.x);
+        float bendStrength = max(0.0, record.parameters.y);
+        float flattenStrength = saturate(record.parameters.z);
+        float movementBlend = saturate(record.parameters.w);
+        int directionMode = clamp(
+            (int)round(record.directionParameters.x),
+            PS3D_INTERACTION_DIRECTION_RADIAL,
+            PS3D_INTERACTION_DIRECTION_HYBRID);
+        float worldXBias = saturate(record.directionParameters.y);
+        float worldZStrength = saturate(record.directionParameters.z);
+        bool persistent = record.persistenceParameters.x > 0.5;
+        float recoveryDelay = max(0.0, record.persistenceParameters.y);
+        float recoveryDuration = max(0.05, record.persistenceParameters.z);
+
+        float2 segment = endXZ - startXZ;
+        float segmentLengthSquared = dot(segment, segment);
+        float segmentT = segmentLengthSquared > 0.0000001
+            ? saturate(dot(worldXZ - startXZ, segment) / segmentLengthSquared)
+            : 0.0;
+        float2 closest = lerp(startXZ, endXZ, segmentT);
+        float2 radialVector = worldXZ - closest;
+        float distanceToSweep = length(radialVector);
+        if (distanceToSweep >= radius)
+        {
+            continue;
+        }
+
+        float2 movementDirection = SafeNormalize(segment, float2(1.0, 0.0));
+        float2 radialFallback = segmentLengthSquared > 0.0000001
+            ? float2(-movementDirection.y, movementDirection.x)
+            : float2(1.0, 0.0);
+        float2 radialDirection = SafeNormalize(radialVector, radialFallback);
+        float2 displacementDirection = ShapeDirection(
+            radialDirection,
+            radialVector,
+            movementDirection,
+            movementBlend,
+            directionMode,
+            worldXBias,
+            worldZStrength,
+            worldXZ,
+            radius,
+            cellSize);
+
+        float normalizedDistance = saturate(distanceToSweep / radius);
+        float influence = 1.0 - smoothstep(0.15, 1.0, normalizedDistance);
+        influence *= influence;
+        target.bend += displacementDirection * (bendStrength * influence);
+        target.flatten = max(
+            target.flatten,
+            flattenStrength * influence);
+        if (influence > 0.0001)
+        {
+            if (persistent)
+            {
+                target.persistent = 1.0;
+            }
+            else
+            {
+                target.recoveryDelay = hasTimedTarget
+                    ? max(target.recoveryDelay, recoveryDelay)
+                    : recoveryDelay;
+                target.recoveryDuration = hasTimedTarget
+                    ? max(target.recoveryDuration, recoveryDuration)
+                    : recoveryDuration;
+                hasTimedTarget = true;
+            }
+        }
+    }
+
+    [loop]
+    for (int stampIndex = 0; stampIndex < _StampCount; stampIndex++)
+    {
+        VegetationTrampleStampRecord record = _Stamps[stampIndex];
+        float2 stampRadialVector = 0.0;
+        float2 stampCentrelineVector = 0.0;
+        float2 stampFacingDirection = float2(0.0, 1.0);
+        float stampInfluence = EvaluateAbilityStampShape(
+            record,
+            worldXZ,
+            stampRadialVector,
+            stampCentrelineVector,
+            stampFacingDirection);
+        if (stampInfluence <= 0.0001)
+        {
+            continue;
+        }
+
+        float2 displacementDirection = ResolveAbilityDisplacementDirection(
+            record,
+            stampRadialVector,
+            stampCentrelineVector,
+            stampFacingDirection,
+            worldXZ);
+        float2 candidateBend = displacementDirection *
+            (max(0.0, record.effectParameters.x) * stampInfluence);
+        candidateBend = ClampVectorMagnitude(candidateBend, 1.0);
+        if (length(candidateBend) > length(target.abilityBend) + 0.00001)
+        {
+            target.abilityBend = candidateBend;
+        }
+        target.flatten = max(
+            target.flatten,
+            saturate(record.effectParameters.y) * stampInfluence);
+
+        bool persistent = record.effectParameters.w > 0.5;
+        if (persistent)
+        {
+            target.persistent = 1.0;
+        }
+        else
+        {
+            float recoveryDelay = max(0.0, record.recoveryParameters.x);
+            float recoveryDuration = max(0.05, record.recoveryParameters.y);
+            target.recoveryDelay = hasTimedTarget
+                ? max(target.recoveryDelay, recoveryDelay)
+                : recoveryDelay;
+            target.recoveryDuration = hasTimedTarget
+                ? max(target.recoveryDuration, recoveryDuration)
+                : recoveryDuration;
+            hasTimedTarget = true;
+        }
+    }
+
+    target.bend = ClampVectorMagnitude(target.bend, 1.0);
+    target.abilityBend = ClampVectorMagnitude(target.abilityBend, 1.0);
+    target.flatten = saturate(target.flatten);
+    if (target.persistent > 0.5)
+    {
+        target.recoveryDelay = 0.0;
+        target.recoveryDuration = 0.0;
+    }
+    return target;
+}
+
+[numthreads(8, 8, 1)]
+void InitializeField(uint3 dispatchId : SV_DispatchThreadID)
+{
+    int2 cell = (int2)dispatchId.xy;
+    if (any(cell >= _FieldResolution))
+    {
+        return;
+    }
+    _StateAWrite[cell] = 0.0;
+    _StateBWrite[cell] = 0.0;
+    _TimingWrite[cell] = 0.0;
+}
+
+float CubicHermiteRecoveryValue(
+    float segmentProgress,
+    float startValue,
+    float endValue,
+    float startSlope,
+    float endSlope,
+    float segmentDuration)
+{
+    float t = saturate(segmentProgress);
+    float t2 = t * t;
+    float t3 = t2 * t;
+    float basisStart = 2.0 * t3 - 3.0 * t2 + 1.0;
+    float basisStartTangent = t3 - 2.0 * t2 + t;
+    float basisEnd = -2.0 * t3 + 3.0 * t2;
+    float basisEndTangent = t3 - t2;
+    return basisStart * startValue +
+        basisStartTangent * segmentDuration * startSlope +
+        basisEnd * endValue +
+        basisEndTangent * segmentDuration * endSlope;
+}
+
+float RecoveryRestoredWeight(float progress)
+{
+    float clampedProgress = saturate(progress);
+    if (clampedProgress <= 0.5)
+    {
+        return CubicHermiteRecoveryValue(
+            clampedProgress / 0.5,
+            0.0,
+            0.15,
+            0.0,
+            0.5,
+            0.5);
+    }
+    if (clampedProgress <= 0.9)
+    {
+        return CubicHermiteRecoveryValue(
+            (clampedProgress - 0.5) / 0.4,
+            0.15,
+            0.90,
+            0.5,
+            1.0,
+            0.4);
+    }
+    return CubicHermiteRecoveryValue(
+        (clampedProgress - 0.9) / 0.1,
+        0.90,
+        1.0,
+        1.0,
+        0.0,
+        0.1);
+}
+
+float RecoveryRemainingWeight(float progress)
+{
+    return 1.0 - saturate(RecoveryRestoredWeight(progress));
+}
+
+[numthreads(8, 8, 1)]
+void SimulateField(uint3 dispatchId : SV_DispatchThreadID)
+{
+    int2 cell = (int2)dispatchId.xy;
+    if (any(cell >= _FieldResolution))
+    {
+        return;
+    }
+
+    float4 previous = _StateRead.Load(int3(cell, 0));
+    float2 previousTiming = _TimingState[cell];
+    float previousMagnitude = max(length(previous.xy), previous.z);
+    bool previousPersistent =
+        previousMagnitude > 0.0001 && previous.w > 0.5;
+    TrampleTarget target = EvaluateTarget(WorldPositionForCell(cell));
+    float targetMagnitude = max(
+        max(length(target.bend), length(target.abilityBend)),
+        target.flatten);
+
+    float4 next = previous;
+    float2 nextTiming = previousTiming;
+    if (targetMagnitude > 0.0001)
+    {
+        next.xy = ClampVectorMagnitude(previous.xy + target.bend, 1.0);
+        if (length(target.abilityBend) > length(next.xy) + 0.00001)
+        {
+            next.xy = target.abilityBend;
+        }
+        next.z = max(previous.z, target.flatten);
+        if (target.persistent > 0.5 || previousPersistent)
+        {
+            next.w = 1.0;
+            nextTiming = 0.0;
+        }
+        else
+        {
+            next.w = 0.0;
+            nextTiming.x = max(
+                max(0.0, previousTiming.x),
+                target.recoveryDelay);
+            nextTiming.y = max(
+                max(0.05, previousTiming.y),
+                target.recoveryDuration);
+        }
+    }
+    else if (previousMagnitude > 0.0001)
+    {
+        if (previousPersistent)
+        {
+            next.w = 1.0;
+            nextTiming = 0.0;
+        }
+        else
+        {
+            float duration = max(0.05, previousTiming.y);
+            float previousPhase = previousTiming.x;
+            float nextPhase = previousPhase - max(0.0, _DeltaTime);
+            float previousProgress = saturate(
+                max(0.0, -previousPhase) / duration);
+            float nextProgress = saturate(
+                max(0.0, -nextPhase) / duration);
+            float previousWeight = RecoveryRemainingWeight(previousProgress);
+            float nextWeight = RecoveryRemainingWeight(nextProgress);
+
+            if (nextWeight <= 0.0001)
+            {
+                next = 0.0;
+                nextTiming = 0.0;
+            }
+            else
+            {
+                if (previousPhase <= 0.0 || nextPhase <= 0.0)
+                {
+                    float recoveryRatio = nextWeight /
+                        max(0.0001, previousWeight);
+                    next.xyz *= saturate(recoveryRatio);
+                }
+                next.w = 0.0;
+                nextTiming = float2(nextPhase, duration);
+            }
+        }
+    }
+    else
+    {
+        next = 0.0;
+        nextTiming = 0.0;
+    }
+
+    next.xy = ClampVectorMagnitude(next.xy, 1.0);
+    next.z = saturate(next.z);
+    if (max(length(next.xy), next.z) <= 0.0001)
+    {
+        next = 0.0;
+        nextTiming = 0.0;
+    }
+    _StateWrite[cell] = next;
+    _TimingState[cell] = nextTiming;
+}

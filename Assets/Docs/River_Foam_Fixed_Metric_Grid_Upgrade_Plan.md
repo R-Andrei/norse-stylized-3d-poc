@@ -4757,7 +4757,7 @@ P12t promotes the visually accepted P12s soft-mask reconstruction to the sole Ch
 
 Inspector ownership now matches execution: Layer D contains diagnostic-only temporal evaluated-shape controls; Layer E contains Visibility & Footprint, Production Chipping, Structural Strands, and Final Composition. Presence-Amplitude Edge Start is displayed only for Presence-Amplitude; Chip Interior Access is displayed only for Current. Existing Chipping debug views are regrouped under Layer E without adding or deleting a view.
 
-The patch adds no runtime resource, kernel, dispatch, texture, buffer, pass, draw call, loop, scene, prefab, material, cache, layer, tag, component, or fixed-grid change. Unity 6000.5 compilation and final Inspector/visual validation remain pending.
+The patch adds no runtime resource, kernel, dispatch, texture, buffer, pass, draw call, loop, scene, prefab, material, cache, layer, tag, component, or fixed-grid change. The user accepted the resulting visual Chipping baseline as imperfect but sufficient; P12t is frozen and closed.
 
 
 ## Implementation record — `RG-METRIC-P12u — Unified Automatic Birth Reveal-Speed Contract`
@@ -4779,3 +4779,56 @@ The previous automatic-source timing was not a consistent metres-per-second cont
 ### Performance
 
 No new kernel, texture, buffer, dispatch class, render pass, or per-cell formula is introduced. Event-start CPU arithmetic is constant. A fixed nine-entry CPU telemetry array is added. Slow events can remain active longer and therefore increase existing raster dispatches, bounded by the unchanged 32-slot automatic-event pool.
+
+
+## Implementation record — `RG-METRIC-P13A — Authoritative Birth Material and Coverage-Separated Transport`
+
+### Decision
+
+The former three-channel state used one scalar as both cell occupancy and material Presence. Source profiles, subcell coverage, valid-fluid clipping, transport diffusion, and birth overlap could therefore weaken authored Initial Presence and prevent new Initial Life from refreshing older weak material. P13A separates geometric occupancy from intrinsic material without adding storage.
+
+### Persistent state contract
+
+```text
+material amount = Coverage × Presence
+R = material amount
+G = material amount × Remaining Life
+B = material amount × Material Pattern
+A = Coverage
+
+Presence = R / A
+Remaining Life = G / R
+Material Pattern = B / R
+```
+
+A guarded zero-alpha fallback migrates transient pre-P13 RGB state without clearing visible material. New writes always include alpha Coverage.
+
+### Birth and overlap contract
+
+1. Source shape, taper, breakup, reveal progression, subcell width, family shaping, and valid-fluid clipping produce Coverage only.
+2. Initial Presence and Initial Life are encoded as exact intrinsic values wherever nonzero Coverage is born.
+3. Initial Presence is not passed through source-fill probability and is not multiplied by source geometry.
+4. Existing weak or dying material cannot reject a fresh source. Overlap uses maximum Coverage, Presence, and Life; Pattern changes only where Coverage genuinely expands.
+5. Negative topology, Neutral Lifetime, Supported Aging, and Negative Aging remain byte-identical authorities after birth.
+
+### Transport contract
+
+- Donor Cell remains the conservative first-order path and transports all packed moments with one donor state.
+- TVD Superbee reconstructs bounded Coverage only, then re-encodes that Coverage with the selected donor's intrinsic Presence, Remaining Life, and Pattern. This prevents independent channel limiting from inventing invalid ratios.
+- Mixing of physically different material through conservative flux produces explicit moment-weighted properties; ordinary movement alone does not silently attenuate a uniform material's decoded Presence or Life.
+- Valid-fluid clipping reduces Coverage proportionally instead of clamping intrinsic Presence.
+- Unit-capacity clipping after convergent flux also resolves Coverage coherently and preserves the decoded intrinsic ratios rather than saturating packed channels independently.
+
+### Final visibility and Inspector contract
+
+- `Concentration + Lifetime`: local Coverage concentration and Remaining Life both participate in visibility.
+- `Lifecycle-Faithful`: meaningful Coverage establishes occupancy; continuous patterned life erosion is disabled while Layer C Life is positive, so explicit Layer C aging owns ordinary death.
+- `Coverage-Only`: serialized value `Current`; Presence is stored but not used as final amplitude.
+- `Presence-Amplitude`: the resolved Coverage/Life shape and its exact Presence-weighted counterpart use identical Presence-independent wake/warp/surface-coupling weights. Uniform Presence remains exactly proportional through the completed resolved mask.
+- `Material Transport Scheme`, `Final Foam Visibility Mode`, and `Presence Footprint` are moved together to `Foam > Transport & Visibility Contract`. An always-visible read-only panel describes each selected mode, the combined behaviour, and Coverage/Presence/Life/Pattern meanings.
+
+### Scope and performance
+
+Nineteen existing files are modified: five canonical documents, six River authoring/editor/diagnostic C# files, two runtime state/diagnostic C# files, four compute contract/implementation files, and the shared River Foam include plus its sole production shader consumer. No file, metadata, scene, prefab, material, cache, texture, buffer, kernel, dispatch, pass, draw call, layer, tag, or component is created, removed, moved, or renamed.
+
+Persistent memory and dispatch counts are unchanged. TVD arithmetic changes but remains one bounded reconstruction per interior face; cost is unmeasured. More visible/live Foam is an intentional correctness consequence and requires later explicit tuning rather than hidden suppression. Offline model/static validation passes 25/25 checks; Unity compilation, live visual/lifetime evidence, and profiler measurements remain pending.

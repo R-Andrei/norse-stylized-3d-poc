@@ -15,7 +15,7 @@ Docs/Generated_Mass_Feature_Implementation_Checklist.md
 - `EW-B4.2R13A.9a` remains the exact uniform basic-bevel/recovery fallback when Macro Variation Coverage or Strength is zero.
 - Ordinary production remains `EdgeWearEvaluationMode.None`; the accepted bevel remains explicit editor preview/audit geometry with `geometryCommit=disabled`.
 - `edgeWearMacroVariationCoverage` owns deterministic participation and the migration-stable `edgeWearMacroVariation` field owns normalized control Strength. The resolver maps control `0..1` to effective amplitude `0..0.55`, then applies a `15°..90°` smooth dihedral permission ending at `0.35`.
-- Universal geometric within-edge profiling and EW-S1 object-space normal/material breakup are removed. Width remains constant along each edge. The uniform UV2.z visual response remains. `EW-C1A.1` proves the transaction. EW-C1A.1a.8 is accepted and frozen. `EW-C1A.2` now commits the certified damaged faces only in an explicit editor preview, requires every dedicated cap-ring bevel, proves unrelated bevel retention, and leaves production geometry unchanged.
+- Universal geometric within-edge profiling and EW-S1 object-space normal/material breakup are removed. Width remains constant along each edge. The uniform UV2.z visual response remains. `EW-C1A.1` proves the transaction. EW-C1A.1a.8 is accepted and frozen. `EW-C1A.2a` commits certified damaged faces, requires every dedicated cap-ring bevel, proves unrelated bevel retention, and leaves production geometry unchanged. EW-C1A.3 exposes one normal Corner Chipping authoring group, keeps one raw chip action, routes the existing edge-wear preview through the post-chip topology when enabled, and folds the 33-case single-chip gate into the existing one-click suite. EW-C1A.3a adds score-ordered fully certified corner fallback and uniform cap-ring width search after the first matrix passed only `14/33`, without adding controls or changing production generation.
 
 ## Dependency boundary
 
@@ -38,7 +38,7 @@ Production/shared construction
 
 | File | Responsibility |
 |---|---|
-| `MassGenerator.cs` | Shared constants and eight explicit evaluation-mode entry points: production `None`; editor-only `SourceEdgeIndexDebug`, `PlaneCutPreview`, `LegacyDiagnosticAudit`, `BoundedSingleEdgePreview`, `UnifiedBoundedPreview`, `UnifiedBatchAudit`, and `UnifiedPreviewBatchAudit`. |
+| `MassGenerator.cs` | Shared constants and explicit evaluation-mode entry points: production `None`; editor-only source-index, plane-cut, legacy, bounded, unified matrix, corner transaction, corner geometry, and corner integration modes. |
 | `MassGenerator.Types.cs` | Core polygon, edge, vertex-key, mesh-output support records, plus source, rejected plane, bounded bevel, and bounded endpoint-cap provenance. |
 | `MassGenerator.Helpers.cs` | Shared polygon sanitization, welding, geometry predicates, and utility methods. |
 | `MassGenerator.Polyhedron.cs` | Convex half-space clipping, cap construction, and polygon-face maintenance. |
@@ -48,7 +48,7 @@ Production/shared construction
 
 | File | Responsibility |
 |---|---|
-| `MassGenerator.EdgeWear.Orchestration.cs` | Runs only for explicit editor evaluation modes. It owns source-index debug, plane-cut, bounded-single-edge, unified preview, topology-batch, artistic-preview parity, and legacy comparison routing; ordinary production generation exits immediately. |
+| `MassGenerator.EdgeWear.Orchestration.cs` | Runs only for explicit evaluation modes. It owns source-index debug, plane-cut, bounded-single-edge, unified preview/matrices, corner transaction, corner geometry-only early return, corner integration, and legacy comparison routing; ordinary production generation exits immediately. |
 | `MassGenerator.EdgeWear.Graph.cs` | Source topology graph and generic topology audits. |
 | `MassGenerator.EdgeWear.SelectionAndCorners.cs` | Deterministic edge selection, width feasibility, corner positions, and rail solving. |
 | `MassGenerator.EdgeWear.Types.cs` | Edge-wear graph, provenance, diagnostic, and builder result records. |
@@ -2013,34 +2013,40 @@ Modify only:
 ### EW-C1A.2 actual code ownership
 
 - `MassGenerator.cs`
-  - exposes editor-only `GenerateCornerDamagePreview` and `CornerDamagePreviewStatus`;
-  - runs one frozen unified baseline plus one scoped corner generation;
-  - uses a `[ThreadStatic]` request depth restored in `finally`, without adding a new production evaluation mode.
+  - exposes the raw `GenerateCornerDamageGeometryPreview` endpoint;
+  - makes `GenerateUnifiedEdgeWearPreview` corner-aware and returns both unified and corner status;
+  - exposes `GenerateUnifiedEdgeWearPreviewBaseline` as the exact frozen ordinary path used for disabled parity and integration retention;
+  - retains the combined corner integration API as an internal/source-compatibility path, not a separate Inspector workflow;
+  - adds only editor evaluation behavior; production `EdgeWearEvaluationMode.None` remains unchanged.
 - `MassGenerator.EdgeWear.Types.cs`
-  - retains certified damaged faces, cap, depth, stable output-edge identities, cap-ring keys/identities, and affected parent IDs;
-  - adds `EdgeWearCandidateClass.CornerDamageCapRing`, mandatory lifecycle/candidate state, and preview construction evidence.
+  - retains certified semantic damaged faces, cap, requested/resolved/accepted depth evidence, stable output-edge identities, cap-ring keys/identities, affected parent IDs, cap-edge lengths, and the exact densely attributed construction face clone.
 - `MassGenerator.EdgeWear.SelectionAndCorners.cs`
-  - commits the exact successful trial result instead of discarding its prepared faces;
-  - rejects generated/original identity collisions;
-  - resolves the bounded cap-ring width;
-  - resolves candidate identity from the committed damaged-edge map;
-  - bypasses Macro and artistic filtering only for mandatory cap-ring candidates.
+  - commits the successful semantic trial, certifies the construction clone, rejects generated/original identity collisions, resolves live corner settings, and classifies mandatory cap-ring candidates.
 - `MassGenerator.EdgeWear.Orchestration.cs`
-  - substitutes committed damaged faces after normalization only during the scoped corner request;
-  - orders mandatory ring candidates before ordinary artistic candidates;
-  - selects all mandatory candidates plus ordinary coverage;
-  - captures complete failure evidence and never displays a partial ring.
+  - geometry mode triangulates semantic `AcceptedFaces` and returns before candidate discovery;
+  - integration mode substitutes the dense construction clone after normalization, builds ordinary plus mandatory cap-ring candidates, and rejects partial rings or unrelated collateral loss.
 - `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
-  - compares frozen baseline and corner results by stable identity;
-  - requires one cap, complete mandatory candidate/selection/build counts, zero unrelated collateral loss, and a certified unified shell;
-  - produces the complete EW-C1A.2 report.
+  - owns the raw corner and corner-plus-edge-wear report contracts;
+  - exposes semantic/construction provenance counts and complete depth/ring/retention evidence used by the C1A.3 matrix.
+- `MassSurfaceFeatureGenerator.cs`
+  - transports the six clamped Corner Chipping values with trailing optional constructor defaults; it is unchanged by C1A.3.
 - `GeneratedMass.cs`
-  - owns nonserialized mutually exclusive corner-preview state, stale invalidation, production fallback, mesh naming, and report/status exposure.
+  - owns the six serialized controls/defaults and one raw corner-preview state;
+  - routes the existing unified edge-wear preview through the corner-aware generator entry point and retains the integrated corner status for the common Scene marker;
+  - collapses the prior integration compatibility method onto the normal unified preview.
 - `GeneratedMassEditor.cs`
-  - exposes `Rebuild EW-C1A.2 Corner-Chip Preview`;
-  - writes `Library/GeneratedMassCornerDamagePreview.txt`, copies it automatically, and provides Copy/Reveal controls.
+  - exposes `Corner Chipping` with exactly the six existing controls;
+  - exposes one `Rebuild Corner Chip Preview` action and the existing `Rebuild Edge-Wear Bevel Preview` action; no separate integration action, report-control group, or transaction-audit controls remain;
+  - writes/copies the raw chip report automatically and draws one `Corner Chip` Scene label;
+  - owns the asynchronous 33-case C1A.3 matrix as an internal stage of the existing one-click suite, including exact disabled parity, deterministic selection, transaction/provenance, complete ring, retention, and normal/tangent channel checks.
 
-No serialized authoring control is added. Controls remain C1A.3 after visual acceptance.
+The controls remain disabled by default and production `EdgeWearEvaluationMode.None` remains unchanged. C1A.3 changes editor authoring and acceptance only; it does not promote corner chipping into ordinary production generation.
+
+#### EW-C1A.2a provenance bridge ownership
+
+The semantic accepted list retains `PolygonFaceProvenanceKind.CornerDamageCap` and is never passed directly to bounded isolated viability. `MassGenerator.EdgeWear.SelectionAndCorners.cs::TryBuildCornerDamageConstructionFaces` creates the only permitted construction adapter: one copied polygon per semantic face, dense `SourceFace` index equal to face-list position, exact vertex-order/value parity, and unchanged feature data. `MassGenerator.EdgeWear.Orchestration.cs::ApplyGeneratedEdgeWearBevels` consumes `AcceptedConstructionFaces`; transaction reports and cap-count acceptance continue to consume `AcceptedFaces` and `AcceptedCapFace`.
+
+`MassGenerator.EdgeWear.BoundedSingleEdge.cs::AuditBoundedSingleEdgeBevel` and `MassGenerator.EdgeWear.PlaneCutKernel.cs::ClonePolygonFacesForPlaneCutAudit` remain unchanged. Their dense source-baseline contract is the consumer that requires the adapter; it is not relaxed or made corner-aware.
 
 ### Reviewed but unchanged owners
 
@@ -2227,3 +2233,32 @@ Reviewed unchanged owners:
 - positions, indices, features, material hashes, UV/colour/UV2/tangent channels, shaders/materials, serialized controls, editor suite logic, and `EdgeWearEvaluationMode.None` remain unchanged.
 
 The resolver is dirty-time-only `O(m^4)` per group with `O(m)` temporary group evidence. Full Unity acceptance freezes EW-C1A.1a and returns immediately to EW-C1A.2 visible corner damage and cap-ring chip integration.
+
+
+### EW-C1A.3a code ownership
+
+Modified code owners:
+
+- `MassGenerator.cs`
+  - owns the editor-scoped candidate-rank and uniform ring-scale attempt context; disposable scope restoration prevents state leakage;
+  - owns `GenerateCornerDamageFullCertificationSearch`, reuses one frozen ordinary baseline, searches ranked corners and ring scales, accepts the first complete `CornerDamagePreviewStatus`, and retains the deepest failure otherwise; candidate-local `InvalidOperationException` construction blockers advance the search while unexpected exceptions still propagate;
+  - makes the raw geometry endpoint resolve the same fully certified candidate before emitting only semantic damaged faces;
+  - extends `CornerDamagePreviewStatus` with candidate/attempt counts, accepted rank, committed scale, failure stage/reason, and attempt trace.
+- `MassGenerator.EdgeWear.Types.cs`
+  - records the selected eligible candidate rank in the existing corner transaction result.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+  - ranks eligible corners by repeated application of the unchanged score/epsilon-tie contract and selects the editor-requested rank;
+  - applies the scoped common ring multiplier after the unchanged ordinary/depth/edge width limits.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+  - copies eligible count and selected rank into preview status;
+  - appends the full-search summary and exact attempt evidence to existing corner reports.
+- `Editor/GeneratedMassEditor.cs`
+  - extends the existing C1A matrix rows and determinism comparison with accepted rank, attempted counts, ring scale, and failure stage;
+  - advances report contracts to `EW-C1A.3a`; it adds no Inspector control, foldout, button, or separate workflow.
+
+Reviewed unchanged owners:
+
+- `MassGenerator.EdgeWear.Orchestration.cs` continues substituting the certified construction faces and building mandatory cap-ring plus ordinary candidates.
+- `MassGenerator.Polyhedron.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, and `MassGenerator.MeshOutput.cs` retain clipping, shell construction, triangulation, topology, and final-normal ownership.
+- `GeneratedMass.cs` and `MassSurfaceFeatureGenerator.cs` retain the existing six controls, defaults, preview actions, and settings transport.
+- shaders, materials, assets, mesh channels, and production `EdgeWearEvaluationMode.None` remain unchanged.

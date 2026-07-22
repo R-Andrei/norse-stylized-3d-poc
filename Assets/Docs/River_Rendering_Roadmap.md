@@ -1356,15 +1356,34 @@ The experiment restores the accepted pre-hardened reconstruction sequence rather
 
 Candidate identity, geometry, animation, search budget, fixed spacing `0.15 m`, Layer C, Film, Shape, sources, transport, materials, scenes, passes, and GPU resources remain unchanged. Source implementation is complete; Unity import, same-frame visual A/B, and measured GPU timing are pending.
 
-## `RG-METRIC-P12t` — Soft Reconstruction baseline and Inspector cleanup — implemented, Unity validation pending
+## `RG-METRIC-P12t` — Soft Reconstruction baseline and Inspector cleanup — frozen and closed
 
 P12s soft-mask reconstruction is promoted to the sole Presence-Amplitude Chipping application. Exact Rendered Removal, its serialized selector, scalar binding, shader property, binary selection, and direct final-mask deletion branch are removed. The original analytical Candidate Field, Current Presence Footprint behavior, soft Eligibility formula, rehardened reconstruction, and Strand order remain.
 
-Production Chipping authoring and all Chipping diagnostics now belong to Layer E. Layer D is explicitly diagnostic-only. Presence-Amplitude Edge Start and Current-only Interior Access are conditionally shown. No resource, kernel, dispatch, pass, draw-call, memory, scene, prefab, material, cache, layer, tag, component, or fixed-grid change is included.
+Production Chipping authoring and all Chipping diagnostics now belong to Layer E. Layer D is explicitly diagnostic-only. Presence-Amplitude Edge Start and Coverage-Only Interior Access are conditionally shown. No resource, kernel, dispatch, pass, draw-call, memory, scene, prefab, material, cache, layer, tag, component, or fixed-grid change is included. The user accepted the visual result as imperfect but sufficient; this baseline is frozen.
 
 
 ## P12u — unified automatic birth reveal speed
 
 Automatic Layer C source formation is repaired across all eight recipes. Base Reveal Speed and per-pattern Reveal Speed Multiplier now produce honest metres-per-second progression; resolved duration is path distance divided by requested speed with only the Layer C material-step floor. Historical family duration ceilings, the Torn Fragment compressed timing formula, and the Fleck `0–0.18` reveal window are removed. Arc/Semi-Arc Hold, Release, and Rest remain unchanged.
 
-Contact Fleck and all Free-Water recipes now use their complete authored Min/Max distributions. A one-button Play Mode report with adjacent clipboard copy exposes latest per-recipe timing, actual speed, cadence limiting, active count, 32-slot pool occupancy, and rejected starts. No rendering-stage or GPU-resource change is introduced.
+Contact Fleck and all Free-Water recipes now use their complete authored Min/Max distributions. A one-button Play Mode report with adjacent clipboard copy exposes latest per-recipe timing, actual speed, cadence limiting, active count, 32-slot pool occupancy, and rejected starts. No rendering-stage or GPU-resource change is introduced. The user reports that the resulting reveal behaviour works as expected; P12u is frozen and closed, while report capture and profiling remain optional evidence work.
+
+
+## P13A — authoritative material, Coverage-separated transport, and explicit visibility
+
+P13A removes the hidden coupling that allowed source geometry, subcell width, valid-fluid coverage, numerical transport, and overlap to suppress authored Initial Presence or Initial Life. The existing ARGBHalf persistent state now stores Coverage separately in alpha while RGB remain material amount and its Life/Pattern moments.
+
+The selected policy axes remain independent and are now co-located in the Inspector:
+
+```text
+Foam > Transport & Visibility Contract
+    Material Transport Scheme
+    Final Foam Visibility Mode
+    Presence Footprint
+    read-only resolved contract
+```
+
+Donor Cell is deliberately more diffuse; TVD Superbee reconstructs bounded Coverage and preserves one coherent donor material state. Convergent capacity and valid-fluid clipping reduce Coverage coherently without independently changing intrinsic material ratios. Concentration + Lifetime allows Coverage dilution and Life to reduce visibility; Lifecycle-Faithful leaves ordinary survival to explicit Layer C aging. Coverage-Only ignores Presence amplitude; Presence-Amplitude carries exact intrinsic Presence through identical Presence-independent shape-coupling weights so uniform Presence remains exactly proportional in the completed resolved mask.
+
+Negative topology remains unchanged and may still kill selected Foam rapidly. P12t Candidate/Eligibility/soft reconstruction and P12u reveal scheduling remain frozen. No scene tuning, allocation, kernel, dispatch, pass, or draw-call change is included. Offline mathematical/static validation passes 25/25 checks; Unity import, live lifetime validation, and measured performance remain pending.

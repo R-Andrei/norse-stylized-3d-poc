@@ -45,6 +45,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DisturbancePressure,
             DisturbanceWake,
             DisturbanceRipples,
+            FoamTransportVisibilityContract,
             FoamLayerA,
             FoamLayerAMajorSupport,
             FoamLayerAConnectors,

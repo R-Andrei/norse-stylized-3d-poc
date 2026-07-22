@@ -37,7 +37,9 @@ float4 SampleStateBilinear(float2 pixelCoordinate)
         lerp(c, d, blend.x),
         blend.y);
 
-    state.w = 0.0;
+    // P13A stores geometric Coverage in alpha. Bilinear sampling retains the
+    // complete packed moment vector; the owning caller performs any required
+    // state clamp or valid-fluid clip after sampling.
     return state;
 }
 

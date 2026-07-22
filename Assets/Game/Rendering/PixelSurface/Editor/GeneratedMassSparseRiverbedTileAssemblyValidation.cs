@@ -49,6 +49,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private const float MinimumFractionalSilhouetteCoverageFraction =
             0.00005f;
         private const float MaximumAdjacentPaletteFormDifference = 0.45f;
+        private const float MinimumFeatureMaskMaximum = 0.90f;
+        private const float MinimumFeatureMaskMean = 0.001f;
+        private const float MaximumFeatureMaskMean = 0.025f;
+        private const float MinimumSubstrateOnlyFormMean = 0.54f;
+        private const float MaximumSubstrateOnlyFormMean = 0.70f;
+        private const float MinimumSubstrateOnlyRoughnessMean = 0.55f;
+        private const float MaximumSubstrateOnlyRoughnessMean = 0.80f;
 
         private sealed class AcceptedSourceContract
         {
@@ -170,7 +177,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             if (failures.Count > 0)
             {
                 Debug.LogError(
-                    "[GSU-M2.7C.5E.2] Generated Mass smooth-payload " +
+                    "[GSU-M2.7C.5E.2.2] Generated Mass feature-payload " +
                     "ultra-sparse assembly proof failed " + failures.Count +
                     " check(s). Report written to " + ReportPath +
                     " and copied to the clipboard.");
@@ -178,7 +185,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             else if (warnings.Count > 0)
             {
                 Debug.LogWarning(
-                    "[GSU-M2.7C.5E.2] Generated Mass smooth-payload " +
+                    "[GSU-M2.7C.5E.2.2] Generated Mass feature-payload " +
                     "ultra-sparse assembly proof passed with " +
                     warnings.Count + " source-drift warning(s). Report " +
                     "written to " + ReportPath +
@@ -187,7 +194,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             else
             {
                 Debug.Log(
-                    "[GSU-M2.7C.5E.2] Generated Mass smooth-payload " +
+                    "[GSU-M2.7C.5E.2.2] Generated Mass feature-payload " +
                     "ultra-sparse assembly proof passed mechanical " +
                     "validation. Report written to " + ReportPath +
                     " and copied to the clipboard. Visual substrate and " +
@@ -910,6 +917,44 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     FormatFloat(MaximumAdjacentPaletteFormDifference) + ".");
             }
 
+            if (candidate.FeatureMaskMaximum < MinimumFeatureMaskMaximum ||
+                candidate.FeatureMaskMean < MinimumFeatureMaskMean ||
+                candidate.FeatureMaskMean > MaximumFeatureMaskMean)
+            {
+                failures.Add(
+                    candidate.Definition.StableId +
+                    ": feature-mask mean/maximum is " +
+                    FormatFloat(candidate.FeatureMaskMean) + " / " +
+                    FormatFloat(candidate.FeatureMaskMaximum) +
+                    "; accepted mean " +
+                    FormatFloat(MinimumFeatureMaskMean) + "–" +
+                    FormatFloat(MaximumFeatureMaskMean) +
+                    ", minimum maximum " +
+                    FormatFloat(MinimumFeatureMaskMaximum) + ".");
+            }
+
+            if (candidate.SubstrateOnlyFormMean <
+                    MinimumSubstrateOnlyFormMean ||
+                candidate.SubstrateOnlyFormMean >
+                    MaximumSubstrateOnlyFormMean ||
+                candidate.SubstrateOnlyRoughnessMean <
+                    MinimumSubstrateOnlyRoughnessMean ||
+                candidate.SubstrateOnlyRoughnessMean >
+                    MaximumSubstrateOnlyRoughnessMean)
+            {
+                failures.Add(
+                    candidate.Definition.StableId +
+                    ": substrate-only form/roughness means are " +
+                    FormatFloat(candidate.SubstrateOnlyFormMean) + " / " +
+                    FormatFloat(candidate.SubstrateOnlyRoughnessMean) +
+                    "; accepted form " +
+                    FormatFloat(MinimumSubstrateOnlyFormMean) + "–" +
+                    FormatFloat(MaximumSubstrateOnlyFormMean) +
+                    ", roughness " +
+                    FormatFloat(MinimumSubstrateOnlyRoughnessMean) + "–" +
+                    FormatFloat(MaximumSubstrateOnlyRoughnessMean) + ".");
+            }
+
             if (string.IsNullOrEmpty(candidate.PalettePayloadFingerprint) ||
                 string.IsNullOrEmpty(
                     candidate.PalettePreviewNeutralFingerprint) ||
@@ -1070,8 +1115,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         {
             StringBuilder builder = new StringBuilder(32768);
             builder.AppendLine(
-                "GENERATED MASS SMOOTH PALETTE-NEUTRAL SPARSE RIVERBED " +
-                "RUNTIME PAYLOAD PROOF — GSU-M2.7C.5E.2");
+                "GENERATED MASS FEATURE-AWARE PALETTE-NEUTRAL SPARSE RIVERBED " +
+                "RUNTIME PAYLOAD PROOF — GSU-M2.7C.5E.2.2");
             builder.AppendLine(
                 "Generated UTC: " +
                 DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
@@ -1195,17 +1240,17 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     "exact-count 6/9/12 placements, unique sources, " +
                     "radius-aware spacing, anti-hotspot limits, mostly-small " +
                     "scales, root-sector limits, toroidal seams, low-macro " +
-                    "micro-noise substrate gates, fractionally smoothed " +
-                    "paired palette payload, distinct recolour previews, " +
+                    "micro-noise substrate gates, feature-aware packed " +
+                    "palette payload, distinct recolour previews, " +
                     "mip evidence and complete output generation passed.");
             }
 
             builder.AppendLine();
             builder.AppendLine(
-                "PENDING GATE: inspect the smoothed PaletteForm, " +
+                "PENDING GATE: inspect the feature-aware PaletteForm, " +
                 "RuntimePackedDetail and HigherContrast 3x3 outputs, then " +
-                "refresh the three installed candidates and validate the " +
-                "controllable dry Riverbed transition in scene.");
+                "refresh the three installed candidates and validate Bank " +
+                "and Riverbed feature-free edge clearances in scene.");
             return builder.ToString();
         }
 
@@ -1355,6 +1400,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     candidate.FractionalSilhouetteCoverageFraction) + " / " +
                 FormatFloat(
                     candidate.MaximumAdjacentPaletteFormDifference));
+            builder.AppendLine(
+                "    feature mask mean/max and substrate-only form/roughness: " +
+                FormatFloat(candidate.FeatureMaskMean) + " / " +
+                FormatFloat(candidate.FeatureMaskMaximum) + " — " +
+                FormatFloat(candidate.SubstrateOnlyFormMean) + " / " +
+                FormatFloat(candidate.SubstrateOnlyRoughnessMean));
             builder.AppendLine(
                 "    palette payload fingerprint: " +
                 candidate.PalettePayloadFingerprint);

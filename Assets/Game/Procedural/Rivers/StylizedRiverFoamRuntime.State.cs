@@ -217,8 +217,8 @@ namespace ProgrammaticStylized3D.Rivers
             // Arc/Semi-Arc normalized material-step duration; w = feather metres
             // except Object Arc/Semi-Arc contact point 2.x.
             public Vector4 Shore;
-            // x = amount, y = remaining life, z = pattern seed,
-            // w = source fill feature size.
+            // x = authored intrinsic Presence, y = authored normalized
+            // Remaining Life, z = pattern seed, w = pattern feature size.
             public Vector4 Material;
             // x = source fill seed except Object Arc/Semi-Arc negative-half
             // first-segment split; y/z = breakup scale/strength except Object
@@ -227,8 +227,9 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector4 Variation;
             // x/y = formation speed / moving-head trail except Object Arc/Semi-Arc
             // contact point 3.y / point 4.x; z = source path length metres;
-            // w = source fill blend except Object Arc/Semi-Arc positive-half
-            // first-segment split.
+            // w = reserved legacy source-fill blend except Object Arc/Semi-Arc
+            // positive-half first-segment split. P13A no longer lets it reinterpret
+            // Initial Presence as geometric probability.
             public Vector4 Kinematics;
             // x = object/free-water centre lateral metres; y/z = object half extents
             // except Object Arc/Semi-Arc contact point 4.y / front split;

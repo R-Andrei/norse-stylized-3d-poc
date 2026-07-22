@@ -89,14 +89,26 @@
             {
 #if defined(PS3D_GROUND_HAS_RIVERBED_SUPPORT)
                 float enabled = ResolveGroundRiverCoupledEnabled();
-                float encodedDomain =
-                    saturate((float)input.riverCoupledMasks.z);
+                float bankInwardDistance = max(
+                    0.0,
+                    (float)input.riverCoupledMasks.z);
                 float riverbedSupport =
                     ResolveGroundRiverbedSupportMask(input);
                 return saturate(
                     enabled *
-                    encodedDomain *
+                    step(0.0001, bankInwardDistance) *
                     (1.0 - riverbedSupport));
+#else
+                return 0.0;
+#endif
+            }
+
+            float ResolveGroundRiverBankInwardDistance(Varyings input)
+            {
+#if defined(PS3D_GROUND_HAS_RIVERBED_SUPPORT)
+                return
+                    ResolveGroundRiverCoupledEnabled() *
+                    max(0.0, (float)input.riverCoupledMasks.z);
 #else
                 return 0.0;
 #endif
@@ -121,6 +133,56 @@
                 float first = saturate(firstContribution);
                 float second = saturate(secondContribution);
                 return 1.0 - (1.0 - first) * (1.0 - second);
+            }
+
+            float ResolveGroundSurfaceApplicationTransition(
+                float regionWeight,
+                float inwardDistance,
+                float4 transitionSettings)
+            {
+                float region = saturate(regionWeight);
+                float transitionDistance = max(0.0, transitionSettings.x);
+                if (region <= 0.0001 || transitionDistance <= 0.0001)
+                {
+                    return region;
+                }
+
+                float distance01 = saturate(
+                    max(0.0, inwardDistance) /
+                    max(0.0001, transitionDistance));
+                float smoothDistance =
+                    distance01 *
+                    distance01 *
+                    (3.0 - 2.0 * distance01);
+                float transitionWeight = lerp(
+                    distance01,
+                    smoothDistance,
+                    saturate(transitionSettings.y));
+                return region * saturate(transitionWeight);
+            }
+
+            float ResolveGroundSurfaceFeatureRetention(
+                float regionWeight,
+                float inwardDistance,
+                float4 transitionSettings)
+            {
+                float clearance = max(0.0, transitionSettings.z);
+                float fadeDistance = max(0.0, transitionSettings.w);
+                float enabled =
+                    step(0.0001, clearance) *
+                    step(0.0001, regionWeight);
+                float hardRetention = step(
+                    clearance,
+                    max(0.0, inwardDistance));
+                float softRetention = smoothstep(
+                    clearance,
+                    clearance + max(0.0001, fadeDistance),
+                    max(0.0, inwardDistance));
+                float retention = lerp(
+                    hardRetention,
+                    softRetention,
+                    step(0.0001, fadeDistance));
+                return lerp(1.0, retention, enabled);
             }
 
             float ResolveGroundComposedShoreWetness(
@@ -343,19 +405,15 @@
                 float bankMaterialBlend,
                 float riverbedMaterialBlend)
             {
-                float rawBank = saturate(bankMaterialBlend);
-                float rawRiverbed = saturate(riverbedMaterialBlend);
-                float rawTotal = rawBank + rawRiverbed;
-                float secondaryCoverage = saturate(rawTotal);
-                float normalization = rawTotal > 0.0001
-                    ? secondaryCoverage / rawTotal
-                    : 0.0;
+                float bankApplication = saturate(bankMaterialBlend);
+                float riverbedApplication = saturate(riverbedMaterialBlend);
+                float lowerLayerRetention = 1.0 - riverbedApplication;
 
                 return saturate(
                     float3(
-                        1.0 - secondaryCoverage,
-                        rawBank * normalization,
-                        rawRiverbed * normalization));
+                        (1.0 - bankApplication) * lowerLayerRetention,
+                        bankApplication * lowerLayerRetention,
+                        riverbedApplication));
             }
 
             float3 ResolveGroundBankZoneWeights(
@@ -446,82 +504,53 @@
             float ResolveGroundBankMaterialBlend(
                 Varyings input)
             {
-                return ResolveGroundComposedBankMaterialBlend(
+                float rawBankBlend = ResolveGroundComposedBankMaterialBlend(
                     ResolveGroundBankZoneWeights(input),
                     ResolveGroundOuterBankExtensionBlend(input));
+                float applicationTransition =
+                    ResolveGroundSurfaceApplicationTransition(
+                        ResolveGroundRiverBankDomain(input),
+                        ResolveGroundRiverBankInwardDistance(input),
+                        _GroundBankMaterialTransition);
+                return saturate(rawBankBlend * applicationTransition);
             }
 
             float ResolveGroundBankEdgeMaterialBlend(
                 Varyings input)
             {
-                return ResolveGroundComposedBankMaterialBlend(
+                float rawBankBlend = ResolveGroundComposedBankMaterialBlend(
                     ResolveGroundBankZoneWeights(
                         ResolveGroundShoreMask(input),
                         1.0),
                     0.0);
+                float applicationTransition =
+                    ResolveGroundSurfaceApplicationTransition(
+                        1.0,
+                        ResolveGroundRiverBankInwardDistance(input),
+                        _GroundBankMaterialTransition);
+                return saturate(rawBankBlend * applicationTransition);
             }
 
-            float ResolveGroundRiverbedMaterialTransitionWeight(
-                Varyings input,
-                float riverbedSupport)
+            float ResolveGroundRiverbedMaterialApplicationEnabled()
             {
-                float support = saturate(riverbedSupport);
-                float transitionDistance =
-                    max(0.0, _GroundRiverbedMaterialTransition.x);
-                float transitionEnabled =
+                return
                     step(0.5, _GroundRiverbedLayerEnabled) *
-                    step(0.0001, _GroundRiverbedMaterialStrength) *
-                    step(0.0001, transitionDistance);
-                if (support <= 0.0001 || transitionEnabled <= 0.5)
-                {
-                    return support;
-                }
-
-                float distance01 = saturate(
-                    ResolveGroundRiverbedInwardDistance(input) /
-                    max(0.0001, transitionDistance));
-                float smoothDistance =
-                    distance01 *
-                    distance01 *
-                    (3.0 - 2.0 * distance01);
-                float interiorWeight = lerp(
-                    distance01,
-                    smoothDistance,
-                    saturate(_GroundRiverbedMaterialTransition.y));
-                return support * saturate(interiorWeight);
-            }
-
-            float ResolveGroundRiverbedMaterialTransitionActive(
-                float riverbedSupport)
-            {
-                return saturate(riverbedSupport) *
-                    step(0.5, _GroundRiverbedLayerEnabled) *
-                    step(0.0001, _GroundRiverbedMaterialStrength) *
-                    step(
-                        0.0001,
-                        max(0.0, _GroundRiverbedMaterialTransition.x));
-            }
-
-            float ResolveGroundRiverbedEdgeBankMaterialBlend(
-                Varyings input,
-                float riverbedSupport,
-                float riverbedTransitionWeight)
-            {
-                float edgeWeight = saturate(
-                    saturate(riverbedSupport) -
-                    saturate(riverbedTransitionWeight));
-                return saturate(
-                    ResolveGroundBankEdgeMaterialBlend(input) *
-                    edgeWeight);
+                    step(0.0001, _GroundRiverbedMaterialStrength);
             }
 
             float ResolveGroundRiverbedMaterialBlend(
-                float riverbedTransitionWeight)
+                Varyings input,
+                float riverbedSupport)
             {
+                float applicationTransition =
+                    ResolveGroundSurfaceApplicationTransition(
+                        riverbedSupport,
+                        ResolveGroundRiverbedInwardDistance(input),
+                        _GroundRiverbedMaterialTransition);
                 return saturate(
-                    saturate(_GroundRiverbedLayerEnabled) *
+                    ResolveGroundRiverbedMaterialApplicationEnabled() *
                     saturate(_GroundRiverbedMaterialStrength) *
-                    saturate(riverbedTransitionWeight));
+                    applicationTransition);
             }
 
             float4 ResolveGroundBankCoverRetention(

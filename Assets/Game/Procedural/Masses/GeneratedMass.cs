@@ -371,8 +371,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             "_BoundedEdgeBevelPreview";
         private const string UnifiedEdgeWearPreviewMeshNameSuffix =
             "_UnifiedEdgeWearBevelPreview";
-        private const string CornerDamagePreviewMeshNameSuffix =
-            "_CornerDamagePreview";
+        private const string CornerDamageGeometryPreviewMeshNameSuffix =
+            "_CornerChipGeometryPreview";
+        private const string CornerDamageIntegrationPreviewMeshNameSuffix =
+            "_CornerChipEdgeWearPreview";
 
         private enum PreviewGenerationMode
         {
@@ -380,7 +382,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             PlaneCut,
             BoundedSingleEdge,
             UnifiedEdgeWear,
-            CornerDamage
+            CornerDamageGeometry,
+            CornerDamageIntegration
         }
         private static readonly ProfilerMarker SynchronizeProfilerMarker =
             new ProfilerMarker("GeneratedMass.Synchronize");
@@ -519,6 +522,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float EdgeWearTintStrength;
             public float EdgeWearMacroVariationCoverage;
             public float EdgeWearMacroVariation;
+            public bool CornerChippingEnabled;
+            public float CornerChipDepth;
+            public float CornerChipDepthVariation;
+            public float CornerChipTopFacingPreference;
+            public float CornerChipCapRingWidthScale;
+            public float CornerChipCapRingWearStrength;
             public float CreaseAmount;
             public float CreaseWidth;
             public float CreaseLength;
@@ -829,6 +838,35 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [FormerlySerializedAs("edgeWearBreakup")]
         private float edgeWearMacroVariation;
 
+        [Tooltip("Enables one deterministic corner chip. Corner-chip preview shows the raw cut; the normal edge-wear preview applies the cut before rebuilding bevels from the current settings.")]
+        [SerializeField]
+        private bool cornerChippingEnabled;
+
+        [Tooltip("Requested corner-chip depth as a fraction of the shortest edge incident to the selected corner.")]
+        [Range(0.04f, 0.35f)]
+        [SerializeField]
+        private float cornerChipDepth = 0.18f;
+
+        [Tooltip("Deterministic signed variation around Corner Chip Depth. Zero uses the requested depth exactly.")]
+        [Range(0f, 0.50f)]
+        [SerializeField]
+        private float cornerChipDepthVariation = 0.15f;
+
+        [Tooltip("How strongly corner selection favours upward-exposed corners. 0.5 preserves the original C1A.1 score balance; higher values favour visible upper corners.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float cornerChipTopFacingPreference = 0.65f;
+
+        [Tooltip("Requested cap-ring bevel width relative to the current ordinary Edge Wear Width. Geometric depth and cap-edge safety limits may reduce the final width.")]
+        [Range(0.20f, 1.25f)]
+        [SerializeField]
+        private float cornerChipCapRingWidthScale = 0.75f;
+
+        [Tooltip("Multiplier for the existing edge-wear material strength on the three mandatory cap-ring bevels.")]
+        [Range(0f, 1.50f)]
+        [SerializeField]
+        private float cornerChipCapRingWearStrength = 1f;
+
         [Tooltip("Reserved ConcaveCrease amount for the future atlas-based crack/seam feature. Current Patch 14C does not render secondary crease meshes.")]
         [Range(0f, 2f)]
         [SerializeField]
@@ -984,6 +1022,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             unifiedEdgeWearPreviewDebugEdges =
                 Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
         [NonSerialized]
+        private bool cornerDamageGeometryPreviewEnabled;
+        [NonSerialized]
+        private bool cornerDamageGeometryPreviewStale;
+        [NonSerialized]
+        private MassGenerator.CornerDamagePreviewStatus
+            cornerDamageGeometryPreviewStatus;
+        [NonSerialized]
         private bool cornerDamagePreviewEnabled;
         [NonSerialized]
         private bool cornerDamagePreviewStale;
@@ -1053,6 +1098,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public float EdgeWearMacroVariationCoverage =>
             edgeWearMacroVariationCoverage;
         public float EdgeWearMacroVariation => edgeWearMacroVariation;
+        public bool CornerChippingEnabled => cornerChippingEnabled;
+        public float CornerChipDepth => cornerChipDepth;
+        public float CornerChipDepthVariation => cornerChipDepthVariation;
+        public float CornerChipTopFacingPreference =>
+            cornerChipTopFacingPreference;
+        public float CornerChipCapRingWidthScale =>
+            cornerChipCapRingWidthScale;
+        public float CornerChipCapRingWearStrength =>
+            cornerChipCapRingWearStrength;
         public float CreaseAmount => creaseAmount;
         public float CreaseWidth => creaseWidth;
         public float CreaseLength => creaseLength;
@@ -1131,10 +1185,49 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 unifiedEdgeWearPreviewDebugEdges ??
                     Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
 
+        public bool CornerDamageGeometryPreviewEnabled =>
+            cornerDamageGeometryPreviewEnabled;
+        public bool CornerDamageGeometryPreviewStale =>
+            cornerDamageGeometryPreviewStale;
+        public bool CornerDamageGeometryPreviewApplied =>
+            cornerDamageGeometryPreviewStatus != null &&
+            cornerDamageGeometryPreviewStatus.PreviewApplied;
+        public MassGenerator.CornerDamagePreviewStatus
+            CornerDamageGeometryPreviewStatus =>
+                cornerDamageGeometryPreviewStatus;
+        public string CornerDamageGeometryPreviewReport =>
+            cornerDamageGeometryPreviewStatus == null
+                ? string.Empty
+                : cornerDamageGeometryPreviewStatus.Report ?? string.Empty;
+        public string CornerDamageGeometryPreviewDiagnostic =>
+            cornerDamageGeometryPreviewStatus == null
+                ? string.Empty
+                : cornerDamageGeometryPreviewStatus.Diagnostic ?? string.Empty;
+
+        public bool CornerDamageIntegrationPreviewEnabled =>
+            unifiedEdgeWearPreviewEnabled &&
+            cornerDamagePreviewStatus != null;
+        public bool CornerDamageIntegrationPreviewStale =>
+            unifiedEdgeWearPreviewStale || cornerDamagePreviewStale;
+        public bool CornerDamageIntegrationPreviewApplied =>
+            cornerDamagePreviewStatus != null &&
+            cornerDamagePreviewStatus.PreviewApplied;
+        public MassGenerator.CornerDamagePreviewStatus
+            CornerDamageIntegrationPreviewStatus => cornerDamagePreviewStatus;
+        public string CornerDamageIntegrationPreviewReport =>
+            cornerDamagePreviewStatus == null
+                ? string.Empty
+                : cornerDamagePreviewStatus.Report ?? string.Empty;
+        public string CornerDamageIntegrationPreviewDiagnostic =>
+            cornerDamagePreviewStatus == null
+                ? string.Empty
+                : cornerDamagePreviewStatus.Diagnostic ?? string.Empty;
+
+        // Compatibility aliases retain the previous combined-preview API.
         public bool CornerDamagePreviewEnabled =>
-            cornerDamagePreviewEnabled;
+            CornerDamageIntegrationPreviewEnabled;
         public bool CornerDamagePreviewStale =>
-            cornerDamagePreviewStale;
+            CornerDamageIntegrationPreviewStale;
         public bool CornerDamagePreviewApplied =>
             cornerDamagePreviewStatus != null &&
             cornerDamagePreviewStatus.PreviewApplied;
@@ -1246,7 +1339,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             sourceEdgeIndexDebugShapeSeed = -1;
         }
 
-        public void EvaluateCornerDamagePreview()
+        public void EvaluateCornerDamageGeometryPreview()
         {
             if (Application.isPlaying || regenerationInProgress)
             {
@@ -1254,6 +1347,38 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             regenerationInProgress = true;
+            DisableOtherPreviewModesForCornerDamage();
+            cornerDamageGeometryPreviewEnabled = true;
+            cornerDamageGeometryPreviewStale = false;
+            ClearCornerDamageGeometryPreviewStatus();
+            try
+            {
+                RegenerateInternal(
+                    PreviewGenerationMode.CornerDamageGeometry);
+            }
+            catch
+            {
+                cornerDamageGeometryPreviewStale = true;
+                throw;
+            }
+            finally
+            {
+                regenerationInProgress = false;
+            }
+        }
+
+        public void EvaluateCornerDamageIntegrationPreview()
+        {
+            EvaluateUnifiedEdgeWearPreview();
+        }
+
+        public void EvaluateCornerDamagePreview()
+        {
+            EvaluateCornerDamageGeometryPreview();
+        }
+
+        private void DisableOtherPreviewModesForCornerDamage()
+        {
             planeCutBevelPreviewEnabled = false;
             planeCutBevelPreviewStale = false;
             ClearPlaneCutBevelPreviewStatus();
@@ -1263,22 +1388,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             unifiedEdgeWearPreviewEnabled = false;
             unifiedEdgeWearPreviewStale = false;
             ClearUnifiedEdgeWearPreviewStatus();
-            cornerDamagePreviewEnabled = true;
+            cornerDamageGeometryPreviewEnabled = false;
+            cornerDamageGeometryPreviewStale = false;
+            ClearCornerDamageGeometryPreviewStatus();
+            cornerDamagePreviewEnabled = false;
             cornerDamagePreviewStale = false;
             ClearCornerDamagePreviewStatus();
-            try
-            {
-                RegenerateInternal(PreviewGenerationMode.CornerDamage);
-            }
-            catch
-            {
-                cornerDamagePreviewStale = true;
-                throw;
-            }
-            finally
-            {
-                regenerationInProgress = false;
-            }
         }
 
         public void EvaluateUnifiedEdgeWearPreview()
@@ -1295,6 +1410,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             boundedEdgePreviewEnabled = false;
             boundedEdgePreviewStale = false;
             ClearBoundedEdgePreviewStatus();
+            cornerDamageGeometryPreviewEnabled = false;
+            cornerDamageGeometryPreviewStale = false;
+            ClearCornerDamageGeometryPreviewStatus();
             cornerDamagePreviewEnabled = false;
             cornerDamagePreviewStale = false;
             ClearCornerDamagePreviewStatus();
@@ -1330,6 +1448,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             unifiedEdgeWearPreviewEnabled = false;
             unifiedEdgeWearPreviewStale = false;
             ClearUnifiedEdgeWearPreviewStatus();
+            cornerDamageGeometryPreviewEnabled = false;
+            cornerDamageGeometryPreviewStale = false;
+            ClearCornerDamageGeometryPreviewStatus();
             cornerDamagePreviewEnabled = false;
             cornerDamagePreviewStale = false;
             ClearCornerDamagePreviewStatus();
@@ -1394,6 +1515,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             unifiedEdgeWearPreviewEnabled = false;
             unifiedEdgeWearPreviewStale = false;
             ClearUnifiedEdgeWearPreviewStatus();
+            cornerDamageGeometryPreviewEnabled = false;
+            cornerDamageGeometryPreviewStale = false;
+            ClearCornerDamageGeometryPreviewStatus();
             cornerDamagePreviewEnabled = false;
             cornerDamagePreviewStale = false;
             ClearCornerDamagePreviewStatus();
@@ -1454,6 +1578,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             unifiedEdgeWearPreviewEnabled = false;
             unifiedEdgeWearPreviewStale = false;
             ClearUnifiedEdgeWearPreviewStatus();
+            cornerDamageGeometryPreviewEnabled = false;
+            cornerDamageGeometryPreviewStale = false;
+            ClearCornerDamageGeometryPreviewStatus();
             cornerDamagePreviewEnabled = false;
             cornerDamagePreviewStale = false;
             ClearCornerDamagePreviewStatus();
@@ -1484,6 +1611,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             unifiedEdgeWearPreviewDiagnostic = string.Empty;
             unifiedEdgeWearPreviewDebugEdges =
                 Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+        }
+
+        private void ClearCornerDamageGeometryPreviewStatus()
+        {
+            cornerDamageGeometryPreviewStatus = null;
         }
 
         private void ClearCornerDamagePreviewStatus()
@@ -1581,6 +1713,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (unifiedEdgeWearPreviewEnabled)
                 {
                     unifiedEdgeWearPreviewStale = true;
+                }
+                if (cornerDamageGeometryPreviewEnabled)
+                {
+                    cornerDamageGeometryPreviewStale = true;
                 }
                 if (cornerDamagePreviewEnabled)
                 {
@@ -1741,6 +1877,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             else
             {
                 ClearUnifiedEdgeWearPreviewStatus();
+            }
+
+            if (cornerDamageGeometryPreviewEnabled)
+            {
+                cornerDamageGeometryPreviewStale = true;
+                if (cornerDamageGeometryPreviewStatus != null)
+                {
+                    cornerDamageGeometryPreviewStatus.PreviewApplied = false;
+                }
+            }
+            else
+            {
+                ClearCornerDamageGeometryPreviewStatus();
             }
 
             if (cornerDamagePreviewEnabled)
@@ -2122,7 +2271,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     MassGenerator.GenerateUnifiedEdgeWearPreview(
                         recipe,
                         featureSettings,
-                        out unifiedStatus);
+                        out unifiedStatus,
+                        out cornerDamageStatus);
+                cornerDamagePreviewStatus = cornerDamageStatus;
+                cornerDamagePreviewStale = false;
                 unifiedEdgeWearPreviewApplied =
                     unifiedStatus.PreviewApplied;
                 unifiedEdgeWearPreviewCandidateCount =
@@ -2149,13 +2301,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             MassGenerator.EdgeWearDebugEdgeRecord>();
                 SetSourceEdgeIndexDebugFromCurrentEvaluation(
                     unifiedEdgeWearPreviewDebugEdges,
-                    "current edge-wear eligibility graph built from unified preview");
+                    cornerDamageStatus != null &&
+                        cornerDamageStatus.PreviewApplied
+                        ? "current edge-wear eligibility graph built after corner chipping"
+                        : "current edge-wear eligibility graph built from unified preview");
                 unifiedEdgeWearPreviewStale = false;
             }
-            else if (previewMode == PreviewGenerationMode.CornerDamage)
+            else if (previewMode ==
+                PreviewGenerationMode.CornerDamageGeometry)
             {
                 sourceMeshData =
-                    MassGenerator.GenerateCornerDamagePreview(
+                    MassGenerator.GenerateCornerDamageGeometryPreview(
+                        recipe,
+                        featureSettings,
+                        out cornerDamageStatus);
+                cornerDamageGeometryPreviewStatus = cornerDamageStatus;
+                cornerDamageGeometryPreviewStale = false;
+            }
+            else if (previewMode ==
+                PreviewGenerationMode.CornerDamageIntegration)
+            {
+                sourceMeshData =
+                    MassGenerator.GenerateCornerDamageIntegrationPreview(
                         recipe,
                         featureSettings,
                         out cornerDamageStatus);
@@ -2166,7 +2333,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         ? Array.Empty<
                             MassGenerator.EdgeWearDebugEdgeRecord>()
                         : cornerDamageStatus.DebugEdges,
-                    "current edge-wear eligibility graph built from corner-damage preview");
+                    "current edge-wear eligibility graph built after corner chipping");
             }
             else
             {
@@ -2211,11 +2378,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 meshName += UnifiedEdgeWearPreviewMeshNameSuffix;
             }
-            else if (previewMode == PreviewGenerationMode.CornerDamage &&
+            else if (previewMode ==
+                    PreviewGenerationMode.CornerDamageGeometry &&
+                cornerDamageGeometryPreviewStatus != null &&
+                cornerDamageGeometryPreviewStatus.PreviewApplied)
+            {
+                meshName += CornerDamageGeometryPreviewMeshNameSuffix;
+            }
+            else if (previewMode ==
+                    PreviewGenerationMode.CornerDamageIntegration &&
                 cornerDamagePreviewStatus != null &&
                 cornerDamagePreviewStatus.PreviewApplied)
             {
-                meshName += CornerDamagePreviewMeshNameSuffix;
+                meshName += CornerDamageIntegrationPreviewMeshNameSuffix;
             }
 #endif
 
@@ -2481,6 +2656,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             edgeWearMacroVariationCoverage =
                 values.EdgeWearMacroVariationCoverage;
             edgeWearMacroVariation = values.EdgeWearMacroVariation;
+            cornerChippingEnabled = values.CornerChippingEnabled;
+            cornerChipDepth = values.CornerChipDepth;
+            cornerChipDepthVariation = values.CornerChipDepthVariation;
+            cornerChipTopFacingPreference =
+                values.CornerChipTopFacingPreference;
+            cornerChipCapRingWidthScale =
+                values.CornerChipCapRingWidthScale;
+            cornerChipCapRingWearStrength =
+                values.CornerChipCapRingWearStrength;
             creaseAmount = values.CreaseAmount;
             creaseWidth = values.CreaseWidth;
             creaseLength = values.CreaseLength;
@@ -2562,6 +2746,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                    FloatApproximately(
                        edgeWearMacroVariation,
                        values.EdgeWearMacroVariation) &&
+                   cornerChippingEnabled ==
+                       values.CornerChippingEnabled &&
+                   FloatApproximately(
+                       cornerChipDepth,
+                       values.CornerChipDepth) &&
+                   FloatApproximately(
+                       cornerChipDepthVariation,
+                       values.CornerChipDepthVariation) &&
+                   FloatApproximately(
+                       cornerChipTopFacingPreference,
+                       values.CornerChipTopFacingPreference) &&
+                   FloatApproximately(
+                       cornerChipCapRingWidthScale,
+                       values.CornerChipCapRingWidthScale) &&
+                   FloatApproximately(
+                       cornerChipCapRingWearStrength,
+                       values.CornerChipCapRingWearStrength) &&
                    FloatApproximately(creaseAmount, values.CreaseAmount) &&
                    FloatApproximately(creaseWidth, values.CreaseWidth) &&
                    FloatApproximately(creaseLength, values.CreaseLength) &&
@@ -2694,6 +2895,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearTintStrength = 0.18f,
                 EdgeWearMacroVariationCoverage = 1f,
                 EdgeWearMacroVariation = 0.32f,
+                CornerChippingEnabled = false,
+                CornerChipDepth = 0.18f,
+                CornerChipDepthVariation = 0.15f,
+                CornerChipTopFacingPreference = 0.65f,
+                CornerChipCapRingWidthScale = 0.75f,
+                CornerChipCapRingWearStrength = 1f,
                 CreaseAmount = 1f,
                 CreaseWidth = 1f,
                 CreaseLength = 1f,
@@ -3086,7 +3293,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 creaseAmount,
                 creaseWidth,
                 creaseLength,
-                creaseBranching);
+                creaseBranching,
+                cornerChippingEnabled,
+                cornerChipDepth,
+                cornerChipDepthVariation,
+                cornerChipTopFacingPreference,
+                cornerChipCapRingWidthScale,
+                cornerChipCapRingWearStrength);
         }
 
         private void EnsureGeneratedMesh()

@@ -9,10 +9,17 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
     public static class StylizedSurfaceDetailLibraryBuilder
     {
         internal const int AuthoredColorGenerationAlgorithmVersion = 4;
-        internal const int PrepackedTextureFormAlgorithmVersion = 1;
+        internal const int PrepackedTextureFormAlgorithmVersion = 2;
         internal const int EmptyLibraryBackingAlgorithmVersion = 1;
         internal const float AuthoredColorSeamMeanRatioLimit = 1.15f;
         internal const float AuthoredColorSeamP95RatioLimit = 1.25f;
+        internal const float MinimumFeatureTextureFormMean = 0.001f;
+        internal const float MaximumFeatureTextureFormMean = 0.025f;
+        internal const float MinimumFeatureTextureFormMaximum = 0.90f;
+        internal const float MinimumFeatureSubstrateFormMean = 0.54f;
+        internal const float MaximumFeatureSubstrateFormMean = 0.70f;
+        internal const float MinimumFeatureSubstrateRoughnessMean = 0.55f;
+        internal const float MaximumFeatureSubstrateRoughnessMean = 0.80f;
 
         private const int AuthoredColorSeamRepairBandAt256 = 8;
         private const float MinimumMeanBoundaryDifference = 1f / 255f;
@@ -218,8 +225,43 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             StylizedSurfaceDetailLibrary library,
             bool logResult = true)
         {
-            if (library == null || buildInProgress)
+            return Rebuild(
+                library,
+                out _,
+                logResult);
+        }
+
+        internal static bool Rebuild(
+            StylizedSurfaceDetailLibrary library,
+            out IReadOnlyList<string> failureMessages,
+            bool logResult = true)
+        {
+            List<string> failures = new List<string>();
+            failureMessages = failures;
+            if (library == null)
             {
+                failures.Add("The detail library is missing.");
+                if (logResult)
+                {
+                    Debug.LogError(
+                        "Could not rebuild a missing detail library.");
+                }
+
+                return false;
+            }
+
+            if (buildInProgress)
+            {
+                failures.Add(
+                    $"A detail-library rebuild is already in progress; " +
+                    $"'{library.name}' was not rebuilt.");
+                if (logResult)
+                {
+                    Debug.LogError(
+                        failures[0],
+                        library);
+                }
+
                 return false;
             }
 
@@ -230,6 +272,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 IReadOnlyList<string> validation = Validate(library);
                 if (validation.Count > 0)
                 {
+                    failures.AddRange(validation);
                     if (logResult)
                     {
                         Debug.LogError(
@@ -592,6 +635,56 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 true,
                 true,
                 messages);
+
+            if (entry.UsesFeatureTextureForm && source.isReadable)
+            {
+                Color32[] pixels = source.GetPixels32(0);
+                if (pixels == null || pixels.Length == 0)
+                {
+                    messages.Add(
+                        $"Entry '{entry.DisplayName}' feature-aware Palette Form has no readable pixels.");
+                    return;
+                }
+
+                double featureSum = 0.0;
+                double substrateFormSum = 0.0;
+                double substrateRoughnessSum = 0.0;
+                float featureMaximum = 0f;
+                for (int index = 0; index < pixels.Length; index++)
+                {
+                    Color32 pixel = pixels[index];
+                    float feature = pixel.a / 255f;
+                    featureSum += feature;
+                    featureMaximum = Mathf.Max(featureMaximum, feature);
+                    substrateFormSum += DecodeSrgbByte(pixel.g);
+                    substrateRoughnessSum += DecodeSrgbByte(pixel.b);
+                }
+
+                float inverseCount = 1f / pixels.Length;
+                float featureMean = (float)(featureSum * inverseCount);
+                float substrateFormMean =
+                    (float)(substrateFormSum * inverseCount);
+                float substrateRoughnessMean =
+                    (float)(substrateRoughnessSum * inverseCount);
+                if (featureMaximum < MinimumFeatureTextureFormMaximum ||
+                    featureMean < MinimumFeatureTextureFormMean ||
+                    featureMean > MaximumFeatureTextureFormMean)
+                {
+                    messages.Add(
+                        $"Entry '{entry.DisplayName}' feature mask mean/max is {featureMean:F5}/{featureMaximum:F5}; expected mean {MinimumFeatureTextureFormMean:F5}–{MaximumFeatureTextureFormMean:F5} and maximum at least {MinimumFeatureTextureFormMaximum:F5}.");
+                }
+
+                if (substrateFormMean < MinimumFeatureSubstrateFormMean ||
+                    substrateFormMean > MaximumFeatureSubstrateFormMean ||
+                    substrateRoughnessMean <
+                        MinimumFeatureSubstrateRoughnessMean ||
+                    substrateRoughnessMean >
+                        MaximumFeatureSubstrateRoughnessMean)
+                {
+                    messages.Add(
+                        $"Entry '{entry.DisplayName}' substrate-only form/roughness means are {substrateFormMean:F5}/{substrateRoughnessMean:F5}; expected form {MinimumFeatureSubstrateFormMean:F2}–{MaximumFeatureSubstrateFormMean:F2} and roughness {MinimumFeatureSubstrateRoughnessMean:F2}–{MaximumFeatureSubstrateRoughnessMean:F2}.");
+                }
+            }
         }
 
         private static void ValidateAuthoredMaterialEntry(
@@ -1159,6 +1252,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             return Mathf.Clamp01(
                 Mathf.GammaToLinearSpace(
                     Mathf.Clamp01(encodedForm.r)));
+        }
+
+        internal static float DecodeSrgbByte(byte encodedValue)
+        {
+            return Mathf.Clamp01(
+                Mathf.GammaToLinearSpace(encodedValue / 255f));
         }
 
         private static Color EncodeFormValue(float linearForm)

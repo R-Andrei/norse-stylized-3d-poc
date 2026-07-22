@@ -520,19 +520,22 @@ namespace ProgrammaticStylized3D.Rivers
                             corridorShoreInfluence,
                             groundSample.RockyDry,
                             groundSample.ReservedSurfaceMask));
-                    float riverBankDomain =
-                        ResolveRiverBankDomain(crossPoint);
                     float riverbedSupport =
                         ResolveRiverbedSupport(crossPoint);
+                    float bankOutwardDistance = Mathf.Max(
+                        0f,
+                        acrossDistance - visibleHalfWidth);
+                    float bankInwardDistance = Mathf.Max(
+                        0f,
+                        handoffHalfWidth - acrossDistance);
+                    // UV3: Riverbed support, Bank outward distance,
+                    // Bank inward distance from terrain handoff, and
+                    // Riverbed inward distance from exact support.
                     riverMaterialMasks.Add(
                         new Vector4(
                             riverbedSupport,
-                            riverBankDomain > 0.5f
-                                ? Mathf.Max(
-                                    0f,
-                                    acrossDistance - visibleHalfWidth)
-                                : 0f,
-                            riverBankDomain,
+                            bankOutwardDistance,
+                            bankInwardDistance,
                             riverbedSupport > 0.5f
                                 ? Mathf.Max(
                                     0f,
@@ -1250,18 +1253,6 @@ namespace ProgrammaticStylized3D.Rivers
                 CrossRegion.Centre => 1f,
                 CrossRegion.FlatBedEdge => 1f,
                 CrossRegion.BedSlope => 1f,
-                _ => 0f
-            };
-        }
-
-        private static float ResolveRiverBankDomain(CrossPoint point)
-        {
-            return point.Region switch
-            {
-                CrossRegion.BedSlope when point.T >= 0.9999f => 1f,
-                CrossRegion.HiddenCover => 1f,
-                CrossRegion.OuterBlend => 1f,
-                CrossRegion.BuriedApron => 1f,
                 _ => 0f
             };
         }

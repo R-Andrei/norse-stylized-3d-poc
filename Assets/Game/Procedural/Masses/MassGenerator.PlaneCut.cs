@@ -162,7 +162,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                   edgeWearEvaluationMode ==
                     EdgeWearEvaluationMode.UnifiedBatchAudit ||
                   edgeWearEvaluationMode ==
-                    EdgeWearEvaluationMode.UnifiedPreviewBatchAudit)) &&
+                    EdgeWearEvaluationMode.UnifiedPreviewBatchAudit ||
+                  edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.CornerDamageGeometryPreview ||
+                  edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.CornerDamageIntegrationPreview)) &&
                 planeCutPreviewSoup != null)
             {
                 return planeCutPreviewSoup;

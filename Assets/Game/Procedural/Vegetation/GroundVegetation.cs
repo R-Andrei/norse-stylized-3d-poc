@@ -23,6 +23,9 @@ namespace ProgrammaticStylized3D.Vegetation
             }
         }
 
+        public VegetationTrampleDomain TrampleDomain =>
+            GetComponent<VegetationTrampleDomain>();
+
         public int DirectLayerCount
         {
             get
@@ -77,6 +80,17 @@ namespace ProgrammaticStylized3D.Vegetation
             builder.Append("Resolved Ground: ")
                 .AppendLine(SurfaceGround != null ? SurfaceGround.name : "None");
             builder.Append("Direct recipe layers: ").AppendLine(layers.Count.ToString());
+            VegetationTrampleDomain trampleDomain = TrampleDomain;
+            builder.Append("Historical trample domain: ")
+                .AppendLine(trampleDomain != null ? "Present" : "Not present");
+            if (trampleDomain != null)
+            {
+                builder.Append("Historical field ready: ")
+                    .AppendLine(trampleDomain.ResourcesReady ? "Yes" : "No");
+                builder.Append("Historical update rate: ")
+                    .Append(trampleDomain.UpdateRateHz.ToString("0.###"))
+                    .AppendLine(" Hz");
+            }
 
             long totalInstances = 0L;
             long totalTriangles = 0L;

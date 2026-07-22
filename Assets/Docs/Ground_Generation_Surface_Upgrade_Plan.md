@@ -1,3 +1,1012 @@
+## 2026-07-22 — GSU-M2.7C.5E.2.3.3: Emergency rollback to the last compiling feature-aware baseline
+
+**Status:** Implemented and statically audited; Unity compilation pending.
+
+### Objective
+
+Restore project and ForwardLit compilation immediately by removing the unvalidated E2.3/E2.3.1/E2.3.2 whole-feature metadata architecture and returning the affected Ground/sparse-riverbed files to the last user-confirmed compiling E2.2.1 implementation. Retain only Unity's required `_CLUSTER_LIGHT_LOOP` keyword replacement.
+
+### Acceptance criteria
+
+- `GeneratedGround.cs` and the Ground editor compile against the restored E2.2.1 contracts.
+- `PS3D/Pixel Ground Surface Lit` no longer contains feature-ID decoding, feature metadata arrays, whole-feature centre reconstruction, derivative-based feature lookup, or E2.3 constant-buffer additions.
+- The sparse-riverbed proof/installer return to E2.2 / algorithm 7 contracts and no longer require feature-layout metadata.
+- Existing E2.2.1 feature-aware substrate/rock suppression remains available with `Discrete Feature Edge Clearance` and `Discrete Feature Return Fade`.
+- The shader declares `_CLUSTER_LIGHT_LOOP`, not deprecated `_FORWARD_PLUS`.
+- No scene, prefab, material asset, layer, tag, renderer, draw call, mesh stream, or unrelated subsystem is changed.
+
+### Reviewed evidence
+
+- User Console evidence: E2.3 and E2.3.1 repeatedly crash the FXC shader compiler process while compiling `PS3D/Pixel Ground Surface Lit - ForwardLit`.
+- `GeneratedMassSparseRiverbedAssemblyReport(1).txt`: E2.3.2 algorithm 9 fails feature-ID reconstruction for Very Sparse (`0.41375`) and Sparse (`0.49202`, decoded maximum `13`). The proof therefore blocks installation.
+- `PixelSurfaceMaterialDetail.hlsl::PS3D_AssignStylizedSurfaceTextureForm` in E2.3.2 divides an 8-bit sRGB-encoded premultiplied feature ID by an independently quantized 8-bit alpha mask. The report demonstrates that this contract is not reconstruction-safe.
+- E2.2.1 is the last supplied implementation that compiled and ran in the user's project. Its limitations are visual, not project-breaking.
+- Git metadata is absent from the supplied archive. Live branch, `HEAD`, status, and unrelated working-tree changes cannot be inspected. Baselines are reconstructed from `Assets-Code-Archive(9).zip` and the accepted E2.1 → E2.2 → E2.2.1 patch sequence.
+
+### Approved file scope
+
+- Four canonical Ground documents.
+- `GeneratedGround.cs`, `GroundMaterialControls.cs`, `GroundSurfaceLayerProfile.cs`, and `GeneratedGroundEditor.cs`.
+- Ground surface ShaderLab/HLSL files changed by E2.3–E2.3.2.
+- Sparse-riverbed assembler, proof validator, installer, detail-library builder/validation, detail-library profile, and material profile changed by E2.3–E2.3.2.
+
+### Implementation sequence
+
+1. **Complete:** record the emergency rollback plan before implementation edits.
+2. **Complete:** restored all affected runtime/editor contracts exactly to E2.2.1.
+3. **Complete:** retained `_CLUSTER_LIGHT_LOOP` as the sole intentional delta from E2.2.1 ShaderLab.
+4. **Complete:** removed all E2.3/E2.3.1/E2.3.2 feature metadata and whole-feature symbols.
+5. **Complete:** exact-scope, symbol, lexical, delimiter, preprocessor, property-binding, sample-count, and package-reapplication checks passed.
+6. **Complete for available checks:** post-change consistency/compliance audit recorded; Unity C# and shader compilation remain pending in the user project.
+
+### Invariants and non-goals
+
+- This is a stability rollback, not another attempt to solve whole-rock edge culling.
+- Do not preserve E2.3 Bank–Riverbed continuity code if doing so retains any dependency on the broken E2.3 architecture.
+- Do not modify generated assets or require an installer run to recover compilation.
+- Do not claim that the original edge-rock or green-line visual defects are solved.
+
+### Implementation result and audit
+
+- Final delta is exactly 20 existing files: four canonical documents and sixteen Ground/PixelSurface implementation files. No file was added, deleted, moved, or renamed inside `Assets`.
+- Nineteen implementation/document files are byte-identical to reconstructed E2.2.1. `SH_PixelGroundSurfaceLit.shader` differs from E2.2.1 only by `_FORWARD_PLUS` → `_CLUSTER_LIGHT_LOOP`.
+- All E2.3/E2.3.1/E2.3.2 feature metadata arrays, feature-ID decode, whole-feature centre reconstruction, derivative lookup, profile layout transport, and algorithm-8/9 installer contracts are absent.
+- E2.2 algorithm version `7`, E2.2 proof identity, E2.2.1 installer reporting/rollback, generic application blending, and per-pixel feature-aware substrate replacement are restored.
+- Changed C# files produced zero Pygments error tokens. Changed C#/HLSL/ShaderLab delimiter and HLSL/ShaderLab preprocessor checks passed.
+- Ground ForwardLit texture-sample counts match E2.2.1 exactly. No draw-call, mesh-stream, texture-memory, or runtime-CPU architecture change is introduced by this rollback.
+- A clean reapplication of the packaged delta to the reconstructed E2.3.2 baseline matched the audited work tree exactly.
+- Unity compilation is unavailable in this environment and is the only immediate acceptance gate.
+
+## 2026-07-22 — GSU-M2.7C.5E.2.3.2: Direct Feature-ID Whole-Rock Culling and FXC Compile Restoration
+
+### Status
+
+- Read-only review: **complete**.
+- Canonical plan: **complete — this section is the first project write**.
+- Palette Form feature-ID payload: **complete for the approved source change**.
+- Feature metadata texture-array build and resolution: **complete for the approved source change**.
+- Runtime direct metadata lookup: **complete for the approved source change**.
+- Installer in-place metadata refresh: **complete for the approved source change**.
+- Proof/report and validation updates: **complete for the approved source change**.
+- Architecture-document updates: **complete**.
+- Post-change consistency/compliance audit: **complete for available static checks; Unity compilation remains pending**.
+- Unity C# and ForwardLit compilation: **pending in Unity 6000.5.0f1**.
+- Runtime whole-feature and layer-continuity validation: **pending after successful compilation**.
+
+### Objective
+
+Restore project compilation by removing the FXC-hostile twelve-feature nearest-centre search and its two `float4[12]` material constant arrays from the Ground ForwardLit fragment path. Preserve complete-rock boundary retention, Bank-under-Riverbed continuity, same-surface continuation, the existing installed candidate assets, and the installer’s canonical in-place refresh contract. Replace fragment-time feature search with one direct feature-ID lookup into a tiny generated metadata texture array.
+
+### Observed failure and reviewed evidence
+
+- Unity `6000.5.0f1` repeatedly reports `Lost connection with shader compiler process. Suspected crash in FXC` while compiling `PS3D/Pixel Ground Surface Lit - ForwardLit` after M2.7C.5E.2.3 and again after M2.7C.5E.2.3.1.
+- M2.7C.5E.2.3.1 already removed runtime loops, `break`, and variable indexing, but the shader still crashes. The surviving new fragment path consists of twenty-four explicit feature comparisons, two twelve-entry material constant arrays, derivative-based centre-distance reconstruction, and expanded ForwardLit source.
+- `PixelSurfaceGroundResponse.hlsl`: `ResolveGroundBankWholeFeatureRetention` and `ResolveGroundRiverbedWholeFeatureRetention` still perform twelve candidate checks each before calling the valid common `ResolveGroundWholeFeatureRetention` calculation.
+- `PixelSurfaceGroundForwardPass.hlsl`: Bank and Riverbed already sample a feature-aware Palette Form. Its `B` channel currently carries substrate roughness while its `A` channel carries feature coverage.
+- `PixelSurfaceMaterialDetail.hlsl`: feature-aware payload decode currently resolves combined form from `R`, substrate form from `G`, substrate roughness from `B`, and feature coverage from `A`.
+- `GeneratedMassSparseRiverbedTileAssembler.cs`: exact rock ownership is already available per output texel through `FinalBuffers.Owner`, and exact deterministic centre/radius metadata is already produced in `CandidateResult.FeatureLayout`.
+- `StylizedSurfaceDetailLibraryBuilder.cs`: the generated packed and Palette Form arrays are library-owned sub-assets. This is the correct ownership location for one additional tiny metadata array aligned to the existing texture-form slice mapping.
+- `GeneratedMassSparseRiverbedSurfaceInstaller.cs`: already parses the machine-readable feature layout and updates the three canonical assets in place while preserving GUIDs and authored material/layer tuning.
+- `GeneratedGround.cs`: currently uploads two twelve-entry vector arrays through a `MaterialPropertyBlock`; this upload and the corresponding constant-buffer arrays are the path to retire.
+- `GeneratedGroundEditor(6).cs` is the authoritative editor baseline. This patch does not modify it.
+- Git metadata is absent from the supplied archives, so live branch, `HEAD`, status, and unrelated working-tree changes cannot be inspected. The working baseline was reconstructed from `Assets-Code-Archive(9).zip` plus the accepted D3→E2.3.1 patch sequence.
+
+### Approved file scope
+
+Modify only:
+
+- `Assets/Game/Procedural/Ground/GroundSurfaceLayerProfile.cs`
+- `Assets/Game/Procedural/Ground/GeneratedGround.cs`
+- `Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceDetailLibrary.cs`
+- `Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssembler.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssemblyValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedSurfaceInstaller.cs`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+Create/delete/move/rename inside `Assets`: none.
+
+### Quantized feature-ID validation update
+
+Static byte-quantization simulation of the approved premultiplied ID encoding found that 8-bit sRGB `B` plus 8-bit linear `A` can produce a maximum pre-round reconstruction error of approximately `0.21` for the validator's `A > 0.02` samples. The reconstructed value still rounds to the correct integer feature ID because the error remains below `0.5`. The acceptance ceiling is therefore `0.25`, not the originally planned `0.08`; decoded IDs must still be exactly bounded to `1–placementCount`. This changes only validation tolerance for quantization and does not change runtime decoding, payload bytes, metadata selection, or feature identity.
+
+### Direct feature-ID payload contract
+
+For feature-aware Palette Form entries:
+
+- `R`: complete substrate-plus-feature form, sRGB encoded;
+- `G`: substrate-only form, sRGB encoded;
+- `B`: normalized feature ID multiplied by feature coverage, sRGB encoded;
+- `A`: linear discrete-feature coverage.
+
+Feature ID `0` means substrate. Exact generated rocks use stable IDs `1–12` matching placement order. Runtime decodes `B / A`, rounds to the nearest valid ID, and directly selects one metadata texel. Premultiplying ID by coverage preserves the ID through bilinear edge interpolation against substrate.
+
+### Metadata-array contract
+
+- Add one generated linear `RGBAHalf` metadata `Texture2DArray` to `StylizedSurfaceDetailLibrary`.
+- Width is `12`, height is `1`, no mipmaps, point filtering, clamp wrapping.
+- Depth matches the existing texture-form array depth so the existing texture-form slice index also selects the metadata slice.
+- Each texel stores `(centreU, centreV, supportRadius, substrateRoughnessMean)` for one exact feature ID.
+- Non-feature texture-form slices contain zero centre/radius and neutral substrate roughness.
+- Source feature layouts remain Editor-only entry data and participate in the library signature. Runtime materials and Ground components do not serialize or upload twelve-entry feature arrays.
+
+### Runtime contract
+
+- Remove `_GroundBankFeatureLayout[12]` and `_GroundRiverbedFeatureLayout[12]` from `UnityPerMaterial`.
+- Remove the twenty-four nearest-feature comparisons and all search helpers.
+- Bind Bank and Riverbed metadata arrays through the existing material-property refresh path.
+- On relevant feature pixels only, point-sample one metadata texel using the decoded feature ID and existing texture-form slice.
+- Reuse the existing derivative-based complete-feature retention equation with the directly selected centre/radius.
+- Feed metadata `W` into feature retention as substrate roughness, replacing the old Palette Form `B` use.
+- Preserve Bank-under-Riverbed composition and equivalent-surface reuse from E2.3.
+- Preserve `_CLUSTER_LIGHT_LOOP` from E2.3.1.
+
+### Performance and resource contract
+
+- Remove twenty-four feature-centre comparisons and 384 bytes of material constant-array data.
+- Add at most one point-sampled metadata-array read on feature pixels when whole-feature transition is enabled.
+- Add one tiny generated metadata array: `12 × 1 × texture-form-depth × RGBAHalf`; for the three installed candidates this is 288 bytes before object overhead.
+- No draw calls, mesh streams, ordinary surface texture samples, texture-array slices, per-frame CPU processing, or runtime allocations may be added.
+
+### File-by-file implementation sequence
+
+1. **Complete — canonical plan:** record the compile failure, reviewed paths, approved scope, direct-ID payload, metadata-array ownership, runtime contract, performance contract, risks, and acceptance criteria.
+2. **Complete — proof payload:** advanced the algorithm version, encoded stable feature IDs in Palette Form `B`, preserved `R/G/A`, and updated payload metrics/fingerprints/report validation.
+3. **Complete — library:** added Editor-only entry feature layout, generated metadata array ownership/resolution, signature participation, metadata build/validation, and stale-array detection.
+4. **Complete — installer:** moved parsed layout ownership from material profiles to canonical library entries, required the new proof version, retained in-place rebuilding/GUID preservation, and verified metadata resolution.
+5. **Complete — runtime:** removed constant feature arrays/uploads/searches, bound metadata arrays, decoded feature ID, point-sampled one metadata texel, and reused complete-feature retention directly.
+6. **Complete — docs:** recorded the superseding compile-safe architecture and unchanged Inspector controls.
+7. **Complete for available checks — final audit:** compared exact scope, reread modified files and direct contracts, verified no editor-baseline drift, ran lexical/structural/property/sample-count/package checks, and recorded pending Unity compilation.
+
+### Acceptance criteria
+
+- Unity ForwardLit compiles without losing the FXC process.
+- No `float4[12]` feature-layout arrays or twelve-entry feature searches remain in the Ground shader path.
+- Exact feature IDs are deterministic, bounded to each candidate’s exact placement count, and stable across repeated proof runs.
+- Every installed feature-aware entry resolves a metadata slice aligned with its Palette Form slice.
+- Whole-rock retention uses the directly selected feature centre/radius and retains the existing complete-feature behavior.
+- Bank-under-Riverbed continuity and identical-surface continuation remain unchanged.
+- Existing canonical asset paths and GUIDs remain stable; material and layer tuning is preserved.
+- No file outside the approved scope changes.
+
+### Post-change implementation and audit evidence
+
+Actual project-file delta against the reconstructed accepted M2.7C.5E.2.3.1 baseline is exactly the eighteen files in the approved scope. No file was added, deleted, moved, or renamed inside `Assets`.
+
+Implemented behavior:
+
+- assembler algorithm version advanced to `9` and Palette Form `B` now carries premultiplied deterministic feature ID while `R/G/A` preserve combined form, substrate form, and feature coverage;
+- proof validation requires decoded IDs `1–placementCount`, a maximum pre-round error of `0.25`, deterministic feature layouts, and unchanged paired-payload/channel contracts;
+- source centre/radius layouts moved from runtime material-profile arrays to Editor-only library-entry data;
+- library rebuilding creates one generated `12 × 1 × texture-form-depth` linear `RGBAHalf` metadata array with no mipmaps, point filtering, and clamp wrapping, aligned to the Palette Form slice mapping;
+- installer requires a passing `GSU-M2.7C.5E.2.3.2`, algorithm-version-9 proof, updates the three canonical entries/assets in place, preserves existing profile/layer tuning and GUID behavior, and verifies aligned metadata resolution;
+- `GeneratedGround` no longer allocates or uploads two twelve-entry feature arrays; it binds only the generated Bank/Riverbed metadata arrays and readiness/equivalence flags;
+- ForwardLit no longer contains the two feature arrays, loops, variable indexing, unrolled twenty-four-entry search, or nearest-feature helpers. Relevant feature pixels decode one ID and point-sample one metadata texel before reusing the accepted complete-feature retention equation;
+- E2.3 Bank-under-Riverbed continuity, same-effective-surface reuse, application controls, and `_CLUSTER_LIGHT_LOOP` remain intact.
+
+Available static checks passed:
+
+- full tree comparison reports exactly the eighteen approved modifications;
+- all nine changed C# files produce zero Pygments C# error tokens and pass string/comment-aware delimiter checks;
+- all changed HLSL/ShaderLab files pass delimiter and preprocessor-balance checks;
+- obsolete feature-array/search symbols are absent from active code and no feature loop or `break` remains in the Ground forward pass;
+- ForwardLit ordinary surface sampling remains four detail/form array reads plus one ordinary texture read; the new source contains two conditional metadata sample sites, one for Bank and one for Riverbed, with same-surface reuse still bypassing the duplicate Riverbed detail path;
+- C# shader property IDs, ShaderLab metadata-array properties, HLSL texture/sampler declarations, generated-array ownership, and stable-ID resolution paths are present and cross-referenced;
+- independent 8-bit sRGB/alpha quantization simulation across feature IDs `1–12` and every nonzero alpha byte reconstructs the correct rounded ID; the maximum error for validated `A > 0.02` samples is approximately `0.2003`, below the `0.25` gate;
+- the three-candidate metadata payload is `12 × 1 × 3 × 8 = 288` bytes before Unity object overhead;
+- `GeneratedGroundEditor.cs`, `GroundMaterialControls.cs`, `StylizedRiverCorridorGeometry.cs`, and frozen Generated Mass projection files are byte-identical to the reconstructed E2.3.1 baseline.
+
+No local Unity Editor, C# compiler, FXC, or DXC executable is available. The project-compilation restoration, actual proof output, AssetDatabase metadata-array rebuild, installer GUID preservation, runtime whole-rock retention, layer continuity, and GPU timing remain pending in Unity `6000.5.0f1`.
+
+### Risks and validation limits
+
+- Bilinear/mip interpolation can mix feature ID with substrate at silhouettes. Premultiplying normalized ID by feature coverage and decoding by `B/A` is selected to preserve identity at those edges; proof validation must measure ID reconstruction failures.
+- At the lowest mips, separate sparse features could theoretically share a footprint. The retention path is relevant only when sampled feature coverage is nonzero near an application transition; visual and target-GPU validation remain required.
+- The metadata-array read adds one dependent sample on relevant feature pixels. Its measured GPU cost remains pending.
+- No Unity Editor or FXC process is available here. Static checks cannot prove that the external compiler process no longer crashes.
+
+---
+
+## 2026-07-22 — GSU-M2.7C.5E.2.3.1: Compile correction — profile namespace, FXC-safe feature search, clustered-light keyword
+
+### Status
+
+- Read-only review: **complete**.
+- Canonical plan: **complete — this section is the first project write**.
+- C# namespace correction: **complete**.
+- FXC-safe whole-feature search correction: **complete**.
+- URP clustered-light keyword correction: **complete**.
+- Static consistency/compliance audit: **complete for available checks**.
+- Unity C# and shader compilation: **pending in Unity 6000.5.0f1**.
+- Runtime whole-feature and layer-continuity validation: **pending after successful compilation**.
+
+### Objective
+
+Correct the immediate compile failures introduced by M2.7C.5E.2.3 without changing its whole-feature layout data, runtime surface behavior, texture-sample count, installed assets, or Inspector controls.
+
+Observed Unity evidence:
+
+- `GeneratedGround.cs(786,17)` and `(789,17)` report that `StylizedSurfaceMaterialProfile` does not exist in the current context.
+- `PS3D/Pixel Ground Surface Lit`, ForwardLit fragment compilation repeatedly loses the FXC shader-compiler process.
+- Unity warns that `_FORWARD_PLUS` is deprecated and requests `_CLUSTER_LIGHT_LOOP`.
+
+### Reviewed implementation and findings
+
+- `Assets/Game/Procedural/Ground/GeneratedGround.cs`: M2.7C.5E.2.3 allocates the two twelve-entry feature-layout staging arrays through `StylizedSurfaceMaterialProfile.MaximumDiscreteFeatureCount`, but the file imports `ProgrammaticStylized3D.Geometry` and `ProgrammaticStylized3D.Rivers` only. The profile type is declared in `ProgrammaticStylized3D.Rendering.PixelSurface`; the missing namespace import directly explains both CS0103 errors.
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl`: the M2.7C.5E.2.3 Bank and Riverbed nearest-feature searches use runtime loop counts, `break`, and variable indexing into material constant arrays inside the ForwardLit fragment path. Unity reports an FXC process crash rather than an HLSL syntax diagnostic. **Inference — high confidence:** this new dynamic loop/indexing shape is the compiler-crash trigger because it is the only newly introduced high-complexity FXC construct in the failing whole-feature path. Verification requires Unity shader compilation after replacing it.
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl`: callers require the same nearest-feature result and need no behavior change.
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl`: the fixed maximum remains twelve and the two `float4[12]` constant arrays remain valid; no property contract change is needed.
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader`: ForwardLit still declares `#pragma multi_compile _ _FORWARD_PLUS`. The user-provided Unity warning explicitly identifies this keyword as deprecated and requests `_CLUSTER_LIGHT_LOOP`.
+- `Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs`: declares `MaximumDiscreteFeatureCount = 12` in namespace `ProgrammaticStylized3D.Rendering.PixelSurface`; no profile change is required.
+- Git metadata is unavailable in the supplied archives, so branch, `HEAD`, status, history, and unrelated live working-tree changes cannot be inspected here.
+
+### Approved correction scope
+
+Modify only:
+
+- `Assets/Game/Procedural/Ground/GeneratedGround.cs`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+
+Create/delete/move/rename inside `Assets`: none.
+
+### Implementation contract
+
+1. Add the missing `ProgrammaticStylized3D.Rendering.PixelSurface` namespace import to `GeneratedGround.cs`. Do not alter feature-layout counts, buffers, property IDs, uploads, or material refresh behavior.
+2. Preserve the existing two twelve-entry material constant arrays and all whole-feature mathematics.
+3. Replace each runtime loop and variable array index with twelve explicit constant-index, uniform-count-gated checks. Use one small helper to compare a candidate against the current nearest feature. This preserves the nearest-centre result while avoiding the FXC-hostile loop/indexing form.
+4. Do not add texture samples, draw calls, mesh streams, buffers, keywords, runtime allocations, or per-frame CPU work.
+5. Replace only the deprecated ForwardLit keyword declaration `_FORWARD_PLUS` with `_CLUSTER_LIGHT_LOOP`, as requested by Unity. Do not change lighting formulas or other shader variants.
+
+### Acceptance criteria
+
+- The two CS0103 errors are eliminated.
+- ForwardLit compiles without losing the shader compiler process.
+- The `_FORWARD_PLUS` deprecation warning no longer originates from `SH_PixelGroundSurfaceLit.shader`.
+- Bank and Riverbed still select the nearest one of at most twelve deterministic feature entries and use the unchanged centre/radius retention formula.
+- Texture sample count, runtime texture memory, draw calls, serialized data, and surface assets remain unchanged.
+- No file outside the approved correction scope changes.
+
+### Post-change audit evidence
+
+- `GeneratedGround.cs` now imports `ProgrammaticStylized3D.Rendering.PixelSurface`; both staging arrays still use `StylizedSurfaceMaterialProfile.MaximumDiscreteFeatureCount` and remain twelve entries.
+- `PixelSurfaceGroundResponse.hlsl` retains `ResolveGroundWholeFeatureRetention` unchanged. The Bank and Riverbed selectors now use explicit constant indices `0–11`, gated by the uniform feature count, and contain no feature-search loop, `break`, or variable array index.
+- `SH_PixelGroundSurfaceLit.shader` changes only the ForwardLit clustered-light variant keyword from `_FORWARD_PLUS` to `_CLUSTER_LIGHT_LOOP`.
+- Static delimiter, preprocessor, symbol-reference, constant-index coverage, scope-diff, and package-reapplication checks passed.
+- Unity compilation remains pending. The FXC-crash diagnosis is not considered verified until Unity compiles the ForwardLit pass successfully.
+
+### Risks and validation limits
+
+- Explicit constant-index checks increase generated HLSL source size slightly but preserve the same maximum of twelve feature comparisons and avoid dynamic constant-array indexing.
+- The `_CLUSTER_LIGHT_LOOP` keyword change is project-version-specific to the reported Unity/URP compiler request; this project is fixed to Unity `6000.5.0f1`.
+- No local Unity Editor, FXC process, or C# compiler is available in this environment. Runtime behavior and GPU timing are unchanged by design but remain unmeasured after this correction.
+
+---
+
+## 2026-07-22 — GSU-M2.7C.5E.2.3: Whole-Feature Boundary Culling and Lower-Layer Continuity
+
+### Status
+
+- Read-only review: **complete**.
+- Canonical plan: **complete — this section is the first project write**.
+- Whole-feature layout payload/report contract: **complete for the approved source change**.
+- Installed profile metadata refresh: **complete for the approved source change**.
+- Bank and Riverbed whole-feature retention: **complete for the approved source change**.
+- Bank-under-Riverbed continuity and equivalent-surface reuse: **complete for the approved source change**.
+- Architecture and Inspector documentation: **complete**.
+- Post-change consistency/compliance audit: **complete for available static checks; Unity execution remains pending**.
+- Unity compilation, proof run, installer refresh, and visual validation: **pending in Unity 6000.5.0f1**.
+
+### Outcome required
+
+Replace the E2.2 per-fragment feature attenuation that produces partial or dissolving rocks with one deterministic retention decision for each complete generated rock. Keep the existing Palette Form and packed-detail texture samples, texture-array memory, draw calls, and payload resolution unchanged. Correct the Bank-to-Riverbed composition so an upper Riverbed transition always blends over a fully resolved Bank/Primary-Ground lower layer and can never expose a narrow Primary-Ground strip. When Bank and Riverbed resolve to the same surface material with equivalent application settings, reuse the Bank result through the internal boundary instead of independently suppressing or resampling the same feature payload.
+
+### Approved file scope
+
+Modify only:
+
+- `Assets/Game/Procedural/Ground/GroundMaterialControls.cs`
+- `Assets/Game/Procedural/Ground/GroundSurfaceLayerProfile.cs`
+- `Assets/Game/Procedural/Ground/GeneratedGround.cs`
+- `Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs`
+- `Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssembler.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssemblyValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedSurfaceInstaller.cs`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+Create/delete/move/rename: none.
+
+No texture, texture-array, material asset, layer asset, scene, prefab, mesh stream, component, renderer, tag, layer, shader pass, or draw-call addition is authorized. No frozen Generated Mass recipe, source mesh, placement count, candidate density, palette, or payload image channel change is authorized.
+
+### Reviewed evidence and current baseline
+
+- `Assets/AGENTS.md`: mandatory read-only review, canonical-plan-first write, exact implementation scope, final consistency audit, Unity `6000.5.0f1`, low-runtime-cost requirement, and no false validation claims.
+- Reconstructed source baseline: `/mnt/data/Assets-Code-Archive(9).zip` with D3 → D4 → D5 → E1, user-provided `GeneratedGroundEditor(6).cs`, then E2 → E2.1 → E2.2 → E2.2.1 applied in order. The archive contains no `.git` metadata; branch, `HEAD`, history, and live unrelated changes are unavailable.
+- Authoritative editor ancestry: `/mnt/data/GeneratedGroundEditor(6).cs` remains the required pre-E2 editor baseline; current E2.2.1 editor changes are limited to the accepted generic Bank/Riverbed transition additions on top of that source.
+- User screenshots `aa3550b9-4076-47f3-af45-8a2dbe851caf.png`, `ebf93db2-ce65-4f6f-96ff-b8ccb4bb6479.png`, `61788914-ce24-4c10-b6ed-4e9576b78bd5.png`, and `f8207cd6-2c3d-48b8-98b6-90773bb9b6f5.png`: rocks remain partially visible, spatially clipped, or reduced to slivers for every practical Edge Clearance / Return Fade combination.
+- User screenshots `6e55bca1-aed0-4125-9ca2-e2ce735f2891.png` and `27f1e7bf-f4dc-4d15-bd3d-e118bbe7c180.png`: a narrow Primary-Ground-coloured line appears between Bank and Riverbed, including when both use the same installed sparse surface.
+- `PixelSurfaceGroundResponse.hlsl > ResolveGroundSurfaceFeatureRetention`: current retention is calculated independently at every fragment from local inward distance. It cannot make one rock-wide keep/reject decision and therefore necessarily permits eaten silhouettes.
+- `PixelSurfaceGroundForwardPass.hlsl > ResolveGroundBankLayerDetail / ResolveGroundRiverbedLayerDetail`: current feature suppression is applied after sampling from the existing two arrays; no additional texture sample is required for a whole-feature decision.
+- `GeneratedMassSparseRiverbedTileAssembler.CandidateResult.Placements`: the proof already retains deterministic centre, radius, scale, and source evidence for every one of the exact `6 / 9 / 12` rocks. Normalized centre/radius metadata can be emitted without changing generated images.
+- `StylizedSurfaceMaterialProfile`: current profile owns payload identity, world repeat, and response tuning but has no installed deterministic feature-layout metadata.
+- `GeneratedMassSparseRiverbedSurfaceInstaller`: current installer owns the three canonical material profiles and already updates them in place while preserving palette/tuning and GUIDs. It is the correct owner for installing proof-emitted layout metadata.
+- `PixelSurfaceGroundForwardPass.hlsl > Frag`: current lower Bank continuation is multiplied by interpolated Riverbed Support before substrate weights are resolved. This allows Bank-domain loss and upper-layer gain to overlap imperfectly and expose Primary Ground.
+- `PixelSurfaceGroundResponse.hlsl > ResolveGroundSubstrateCompositionWeights`: the final three weights are sequential only when the provided lower Bank weight is continuous. The weighting function itself does not require replacement.
+- `GeneratedGround.ApplySurfaceLayerDetailProperties`: one detail repeat covers `layer.DetailWorldScale × application multiplier`; normalized layout metadata can be converted to world offsets and radii without another texture or mesh channel.
+
+### Implementation contract
+
+1. Advance proof identity to `GSU-M2.7C.5E.2.3`, assembler algorithm version `8`, while preserving all generated image bytes and rock placement decisions from algorithm `7`.
+2. Emit one machine-readable normalized feature-layout line for every candidate. Each entry contains toroidal centre `u/v` and a conservative normalized support radius derived from the existing placement radius plus the accepted silhouette-filter support padding. Validate count, finite values, normalized bounds, and exact deterministic repetition.
+3. Add hidden serialized normalized feature-layout metadata to `StylizedSurfaceMaterialProfile`. The layout is payload metadata, not palette tuning. Expose read-only count/data through the material and Ground-layer contracts.
+4. Update the installer to require a passing algorithm-8 proof, parse every candidate layout, and replace only the hidden layout metadata on the existing canonical `SSMP_Riverbed*` profiles. Preserve all palette, response, world-scale, layer tuning, paths, and GUIDs. Verify installed layout count/data.
+5. Retain the existing serialized `bankFeatureEdgeClearance` / `riverbedFeatureEdgeClearance` fields for compatibility, but redefine their public and Inspector meaning as **Discrete Feature Safety Margin**. Effective feature-free distance is `Material Blend Distance + Safety Margin`. Retain Return Fade storage but rename its authored meaning to **Whole Feature Return Fade**.
+6. Upload at most twelve normalized centre/radius vectors for each active Bank and Riverbed application through `MaterialPropertyBlock.SetVectorArray`. Add no per-frame CPU work; values update only during the existing material-property refresh path.
+7. On feature-aware rock pixels, select the nearest toroidal feature centre from the current normalized detail UV. Reconstruct that centre's application-boundary distance from the interpolated inward-distance field and its screen-space world-XZ gradient, subtract the feature radius in world metres, and calculate one feature-wide hard/smooth retention value. Apply that same value to complete form, slope, cavity, and roughness replacement.
+8. Execute derivative reconstruction only inside the uniform feature-layout-enabled material path. Execute the centre loop only when sampled feature coverage is nonzero. Keep texture-array sample count unchanged.
+9. Keep the resolved Bank lower layer available across the complete Riverbed application domain before Riverbed weight is evaluated. Remove the fractional Riverbed-Support multiplication that currently permits a lower-layer dip.
+10. Detect Bank and Riverbed applications that reference the same `GroundSurfaceLayerProfile` and have equivalent complete dry-application settings. In that case, reuse Bank detail through the internal boundary and skip the duplicate Riverbed detail sampling/feature culling. Different settings or different layers continue to blend Riverbed directly over the fully resolved Bank/Primary-Ground result.
+11. Keep Shore wetness, Riverbed wetness, support masks, cover-retention rules, corridor geometry, and hydrology controls independent and unchanged.
+
+### Invariants and non-goals
+
+- No additional texture lookup, texture-array slice, runtime texture allocation, draw call, mesh stream, dispatch, or runtime-generated mask.
+- No per-frame C# feature search or metadata rebuild.
+- No material-name, candidate-name, Bank-only, or Riverbed-only shader branch. Current slots consume one generic normalized feature-layout contract.
+- No arbitrary project-wide same-name asset deletion. Installer remains restricted to its canonical paths.
+- No claim that screenshot defects are fixed until Unity compilation, proof/install reports, and scene evidence pass.
+
+### File-by-file implementation sequence
+
+1. **Complete — canonical plan:** record evidence, exact scope, whole-feature metadata/retention contract, lower-layer continuity rule, same-surface reuse, performance invariants, and validation.
+2. **Complete — controls/editor:** preserved serialized fields, replaced misleading per-pixel terminology with Safety Margin and Whole Feature Return Fade, and documented that Material Blend Distance is included automatically.
+3. **Complete — profile/runtime transport:** added hidden normalized feature metadata, Ground-layer forwarding, fixed property arrays, conservative equivalent-application detection, and existing material-refresh transport.
+4. **Complete — proof/installer:** emits and validates deterministic layout metadata, parses and updates existing canonical profiles in place, verifies count/data, and advances report identities to E2.3 / algorithm 8.
+5. **Complete — HLSL:** implemented nearest-feature whole-retention reconstruction with conservative derivative fallback, retained the exact sample count, made Bank lower-layer continuity complete, and reuses Bank detail for equivalent same-surface applications.
+6. **Complete — architecture docs:** superseded per-pixel Edge Clearance behavior and recorded sequential lower-layer continuity for current and future application slots.
+7. **Complete for available static checks — final audit:** compared exact delta with scope; reread producers/consumers/contracts; verified editor ancestry, payload logic, sample count, serialized names, installer paths/GUID policy and shader interfaces; clean patch reapplication reproduces the edited tree exactly. Unavailable Unity checks remain pending.
+
+### Acceptance criteria
+
+- Every feature texel associated with one rock receives the same retention decision within numerical tolerance; no spatial clipping contour can pass through that rock.
+- Safety Margin `0` still excludes complete rocks from the full Material Blend Distance. Whole Feature Return Fade `0` makes a hard whole-rock return; positive values fade the entire rock uniformly.
+- Algorithm-8 proof emits exactly `6 / 9 / 12` finite normalized centre/radius entries matching candidate placements and repeats identically.
+- Installer rerun updates the existing three material profiles in place, preserves GUIDs and authored tuning, and creates no copies.
+- Bank remains the resolved lower surface throughout Riverbed transition. Primary Ground cannot appear solely because Bank and Riverbed application weights overlap.
+- Equivalent same-layer Bank/Riverbed applications reuse the Bank detail result and do not execute a duplicate Riverbed texture-form/detail sample path.
+- Ground forward-pass texture sample count remains unchanged from E2.2.1.
+- No file outside the approved scope changes.
+
+### Post-change implementation and audit evidence
+
+Actual project-file delta against the reconstructed E2.2.1 baseline modifies exactly the fifteen approved files listed in this section. Create/delete/move/rename inside `Assets`: none.
+
+Implemented behavior:
+
+- proof identity advances to `GSU-M2.7C.5E.2.3`, algorithm version `8`; placement, candidate count, substrate formula, image channels and image-generation formulas remain unchanged;
+- every candidate now emits exactly one normalized centre/support-radius entry per accepted rock, and the layout participates in deterministic payload/candidate fingerprints;
+- installed `StylizedSurfaceMaterialProfile` assets carry a hidden maximum-12 layout array; the installer parses the report, updates that metadata at the canonical existing paths, preserves palette/layer tuning and verifies installed values;
+- existing serialized Edge Clearance/Return Fade fields remain compatible, while public/Inspector semantics become Discrete Feature Safety Margin and Whole Feature Return Fade;
+- Ground uploads two fixed twelve-vector buffers through the existing material-property refresh path plus counts/equivalent-application state;
+- the shader selects the nearest toroidal feature only on sampled feature pixels, reconstructs its centre boundary distance from the coherent world-XZ gradient, subtracts conservative feature radius, and applies one common retention value to feature form, slope, cavity and roughness;
+- degenerate derivative reconstruction conservatively rejects the complete feature instead of falling back to fragment-local clipping;
+- Bank continuation beneath Riverbed is authorized across the complete Riverbed application domain rather than multiplied by fractional Riverbed Support;
+- equivalent same-layer Bank/Riverbed applications reuse the Bank detail result and skip the duplicate Riverbed detail/form sampling path.
+
+Available static checks passed:
+
+- reconstructed-tree comparison reports exactly fifteen approved modifications and no other project delta;
+- C# Pygments lexical scan reports zero error tokens and balanced parentheses/brackets/braces for all eight modified C# files;
+- HLSL delimiter and preprocessor-balance scans pass for all three modified include files;
+- function-signature/reference scans find one gradient definition with two coherent call sites and complete Bank/Riverbed whole-feature wrapper call paths;
+- Ground forward-pass source contains the same five texture-sampling statements as E2.2.1 (`4 ×` texture-array and `1 ×` ordinary texture); no sampler, texture declaration, slice or draw path was added;
+- independent affine-distance simulation produces the same retention value across all sampled pixels of one feature, including inside Whole Feature Return Fade;
+- authoritative `GeneratedGroundEditor(6).cs` lineage is preserved; the E2.3 editor delta is limited to the existing shared application-transition help/enablement block;
+- existing payload source mode, library builder, material validator, River corridor geometry, ShaderLab file, wetness/hydrology paths, frozen Generated Mass recipes and source meshes remain unchanged from E2.2.1;
+- applying the fifteen-file staged patch to a fresh reconstructed E2.2.1 baseline reproduces the final edited `Assets` tree exactly.
+
+No Unity Editor, C# compiler, or HLSL frontend is available in this environment. Unity compilation, shader compilation, algorithm-8 proof execution, installer refresh/GUID preservation, MaterialPropertyBlock vector-array transport, target-GPU timing and visual confirmation remain pending in Unity `6000.5.0f1`.
+
+### Risks and validation limits
+
+- Screen-space gradient reconstruction is exact for the current linearly interpolated distance field within one rasterized triangle; numerical continuity across triangle edges must be inspected in Unity.
+- A conservative support radius can reject a rock slightly earlier than its visible silhouette. This is preferable to permitting partial features but remains a visual tuning risk.
+- Same-surface reuse is valid only when the layer reference and complete dry-application settings are equivalent. The equivalence check must be explicit and conservative.
+- Unity compilation, shader compilation, MaterialPropertyBlock vector-array transport, actual sample execution, and scene results are unavailable in this environment and remain mandatory validation gates.
+
+---
+
+## 2026-07-22 — GSU-M2.7C.5E.2.2.1: Feature-Payload Library Rebuild Validation and Rollback Correction
+
+### Status
+
+- Read-only review: **complete**.
+- Canonical plan: **complete — this section is the first project write**.
+- Explicit sRGB feature-payload validation correction: **complete for the approved source change**.
+- Detailed library-rebuild failure transport: **complete for the approved source change**.
+- Installer rollback safety: **complete for the approved source change**.
+- Feature-aware material-validation consistency: **complete for the approved source change**.
+- Post-change consistency/compliance audit: **complete for available static checks; Unity execution remains pending**.
+- Unity compilation and corrected installer run: **pending in Unity 6000.5.0f1**.
+
+### Outcome required
+
+Correct the E2.2 installer failure without regenerating the accepted algorithm-7 payloads or changing any runtime surface, shader, Ground, River, material-profile, layer-profile, scene, prefab, or texture-sampling contract. Feature-aware Palette Form `G/B` channels are stored as sRGB-encoded bytes but represent linear substrate-only form and roughness. Editor validation must decode those channels explicitly before applying linear thresholds. The installer must report the exact builder rejection and must restore the canonical detail-library asset exactly if configuration or rebuild fails.
+
+### Approved file scope
+
+Modify only:
+
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedSurfaceInstaller.cs`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+
+Create/delete/move/rename: none.
+
+No payload regeneration, assembler, assembly validator, source-mode enum, detail-library runtime schema, material profile, Ground layer, shader/HLSL, GeneratedGround, authoritative `GeneratedGroundEditor(6).cs`, scene, prefab, component, texture, tag, layer, or renderer change is authorized.
+
+### Reviewed evidence and current baseline
+
+- `Assets/AGENTS.md`: mandatory read-only review → persistent plan → exact implementation → final audit; exact scope and no false Unity claims.
+- Reconstructed current source: `/mnt/data/Assets-Code-Archive(9).zip`, SHA-256 `55292f20bb2213ab86a0749e1db455cbf40da62816f038b0f509af5a6e88958c`, with D3 → D4 → D5 → E1 → E1.1 → E2 → E2.1 → E2.2 packages applied in order. No `.git` metadata is present, so branch, `HEAD`, history, and live unrelated changes remain unavailable.
+- E2.2 patch source: `/mnt/data/GSU_M2_7C_5E_2_2_Feature_Aware_Surface_Application_Transition.zip`, SHA-256 `0626e80322d78a1736899bc4a02fddce20aea893f36b59a5d356695657b434cd`.
+- Authoritative Ground editor remains user-provided `/mnt/data/GeneratedGroundEditor(6).cs`, SHA-256 `e3af41c8e6c641b7d5d3e1aa9aa051f2efe0a692dae0b275fca0adf5d5cfbd4b`; it is outside this correction scope and must remain byte-identical.
+- User installer report: `/mnt/data/GeneratedMassSparseRiverbedSurfaceInstallReport.txt`, SHA-256 `962539370673e19c68c0f86d8e16beebe320945adad7aad1e5d44083aa92de8f`. It proves all three packed payloads imported, all three feature-aware Palette Form PNGs updated, the canonical library configuration was written, and the rebuild then returned only the generic failure `The sparse-riverbed detail library rebuild failed.`
+- `GeneratedMassSparseRiverbedTileAssembler.cs > EncodePalettePayload`: accepted E2.2 payload stores `R/G/B` through `Mathf.LinearToGammaSpace` and stores `A` as linear feature coverage. The assembler proof validates decoded linear substrate-only means.
+- `StylizedSurfaceDetailLibraryBuilder.cs > ValidatePrepackedTextureFormEntry`: current feature validation reads `Texture2D.GetPixels`, accumulates `pixel.g` and `pixel.b` directly, then compares them with linear ranges `0.54–0.70` and `0.55–0.80`. This mixes encoded RGB values with linear thresholds and is the identified rebuild blocker.
+- `StylizedSurfaceDetailLibraryBuilder.cs > Rebuild`: current public result is Boolean only. With `logResult=false`, the caller receives no validation details.
+- `GeneratedMassSparseRiverbedSurfaceInstaller.cs > InstallAllCandidates`: current installer configures and saves the canonical library before calling `Rebuild(library, false)`. On failure it leaves the modified source-mode/entry state in place and reports only one generic line.
+- `StylizedSurfaceMaterialValidation.cs > AppendTextureFormReport`: the current generic prepacked-form diagnostic treats RGB disagreement as invalid grayscale and requires at least five percent dark-band coverage. Those assumptions do not apply to feature-aware `R/G/B/A` payloads and would incorrectly reject the accepted sparse feature payload after installation.
+- `StylizedSurfaceDetailLibrary.cs`: complete entry/source-mode/generated-array ownership reviewed. No runtime schema change is required.
+
+### Implementation contract
+
+1. Read feature-aware Palette Form pixels as `Color32` and explicitly decode `G/B` from sRGB to linear before computing substrate-only means. Keep `A` as unmodified linear feature coverage.
+2. Add a backward-compatible builder overload that returns exact rebuild failure messages while retaining the existing `Rebuild(library, bool)` API for all current callers.
+3. Keep ordinary paired grayscale and authored-material validation behavior unchanged.
+4. Add a feature-aware material diagnostic path that validates/reports combined form, substrate-only form, substrate roughness, and feature coverage without applying ordinary grayscale-channel-equality or five-percent dark-band rules.
+5. Before changing an existing canonical sparse-riverbed library, persist and capture its complete `.asset` bytes. If configuration, validation, rebuild, or an exception fails, restore those bytes and force reimport. If the installer created the library in the failing run, delete that newly created asset instead.
+6. Remove staged `Created/Updated/Unchanged library` action text when rollback occurs and report the rollback result explicitly.
+7. Add every exact builder failure to the installer report. Retain one generic fallback only when the builder returns no detail.
+8. Advance installer/report identity to `GSU-M2.7C.5E.2.2.1`. Continue accepting the existing passing E2.2 algorithm-7 proof; no proof rerun is required.
+
+### Invariants and non-goals
+
+- Do not alter payload bytes, feature thresholds, candidate identities, array formats, array depths, profile/layer tuning, GUID policy, installer canonical paths, shader behavior, runtime sampling, draw calls, or memory.
+- Do not add a new source mode or bump the prepacked texture-form generation/signature version; the payload contract is unchanged.
+- Do not delete or overwrite external same-name assets.
+- Do not claim Unity compilation or a successful installer run from static inspection.
+
+### File-by-file implementation sequence
+
+1. **Complete — canonical plan:** record source evidence, exact failure cause, narrow scope, explicit colour-space contract, detailed-error API, rollback behavior, direct material-validator consistency, invariants, and validation.
+2. **Complete — builder:** decode feature `G/B` explicitly and add detailed rebuild-failure transport without breaking existing callers.
+3. **Complete — material validation:** add feature-aware diagnostics that match the accepted packed-channel contract.
+4. **Complete — installer:** snapshot canonical library state, configure/rebuild transactionally, restore/delete on failure, and include exact builder failures in the copied report.
+5. **Complete for available static checks — final audit:** reread final modified files and direct contracts; compare exact source delta; verify authoritative editor and all runtime/shader/payload files remain unchanged; run available syntax/reference/package checks; record Unity validation as pending.
+
+### Acceptance criteria
+
+- Feature-aware `G/B` means are measured in decoded linear space and accepted payload ranges match the passing proof.
+- Feature mask `A` remains linear and is not gamma-decoded.
+- A builder validation failure appears verbatim in the installer report.
+- Existing callers of `Rebuild(library, bool)` remain source-compatible.
+- A failed refresh restores the pre-run canonical library bytes and GUID, or removes a library created by the failing run.
+- A successful corrected refresh updates the existing canonical library in place and preserves its GUID, material tuning, and layer tuning.
+- No file outside the approved scope changes.
+
+### Post-change implementation and audit evidence
+
+Actual project-file delta against the reconstructed E2.2 baseline modifies exactly:
+
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedSurfaceInstaller.cs`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+
+Create/delete/move/rename inside `Assets`: none.
+
+Implemented behavior:
+
+- feature-aware Palette Form validation now reads raw `Color32` bytes, decodes `G/B` explicitly through `Mathf.GammaToLinearSpace`, and keeps alpha as a linear feature mask;
+- builder thresholds are shared with feature-aware material diagnostics so the same payload cannot pass one validator and fail another for different assumptions;
+- the existing public `Rebuild(library, bool)` API remains intact and forwards to an additive detailed-failure overload;
+- material validation now reports builder failures and uses a feature-aware channel report instead of ordinary grayscale/chroma and five-percent dark-band rules;
+- the installer captures the canonical library asset bytes and GUID before configuration, includes exact builder failures in its report, removes staged library action text on failure, restores the prior asset bytes/GUID after a failed existing-library rebuild, and deletes a library created by a failing run;
+- installer/report identity advances to `GSU-M2.7C.5E.2.2.1`, while proof acceptance remains the existing passing E2.2 algorithm-7 output.
+
+Available static checks passed:
+
+- complete reconstructed-tree comparison reports exactly the four approved modifications;
+- C# lexical scanning reports zero error tokens and balanced parentheses/braces/brackets for all three modified source files;
+- existing and additive builder overload call sites resolve by source shape;
+- feature RGB decoding and linear alpha handling are present in both builder and material validation;
+- rollback byte capture/write, forced synchronous reimport, and GUID verification are present in the installer transaction;
+- independent byte-level sRGB simulation confirms a linear form value `0.62` is stored near byte `206` (`0.808` raw, outside the old linear maximum) and decodes to approximately `0.617`, while linear roughness `0.68` is stored near byte `215` (`0.843` raw) and decodes to approximately `0.680`;
+- authoritative `GeneratedGroundEditor(6).cs`, assembler, assembly validator, detail-library runtime schema, material-profile runtime schema, and all Ground HLSL files remain byte-identical to E2.2;
+- conflict-marker and trailing-whitespace scans pass.
+
+No Unity Editor or C# compiler is available in this environment. Unity compilation, AssetDatabase rollback execution, actual array rebuild, installer pass, GUID preservation, and material validation remain pending the corrected Unity `6000.5.0f1` run.
+
+### Risks and validation limits
+
+- Raw asset-byte rollback depends on the canonical library remaining at its fixed asset path; the installer already enforces that path and asset type.
+- The current failed E2.2 run may already have left the canonical library stale. The corrected installer is expected to rebuild it successfully; rollback can preserve only the state present immediately before the corrected run.
+- Unity compilation, importer behavior, AssetDatabase reimport, and actual rebuild success remain pending until the corrected installer is executed in Unity `6000.5.0f1`.
+
+---
+
+## 2026-07-22 — GSU-M2.7C.5E.2.2: Feature-Aware Surface-Application Transition
+
+### Status
+
+- Read-only review: **complete**.
+- Canonical plan: **complete — this section is the first project write**.
+- Packed feature-payload generation: **complete for the approved source change**.
+- Feature-payload library/runtime transport: **complete for the approved source change**.
+- Generic Bank/Riverbed feature-edge controls: **complete for the approved source change**.
+- Feature-aware shader composition: **complete for the approved source change**.
+- Proof/installer validation updates: **complete for the approved source change**.
+- Architecture-document updates: **complete**.
+- Post-change consistency/compliance audit: **complete for available static checks; Unity execution remains pending**.
+- Unity compilation, proof, reinstall, GPU comparison, and production-camera validation: **pending in Unity 6000.5.0f1**.
+
+### Outcome required
+
+Preserve the accepted M2.7C.5E.2.1 generic Bank-to-Ground and Riverbed-to-resolved-Bank/Ground material transitions, but stop discrete sparse-rock features from being partially dissolved where a surface application fades. The complete base substrate must continue blending normally. Discrete rock form, slope, cavity, and rock-specific finish must be removed before the application boundary so the transition region resolves to the imported surface's substrate-only payload rather than a partially eaten rock.
+
+The runtime implementation must preserve the existing two texture-array samples per active imported surface. No additional texture, texture-array slice, draw call, runtime allocation, per-frame CPU process, mesh stream, scene object, or renderer is authorized.
+
+### Approved file scope
+
+Modify only:
+
+- `Assets/Game/Procedural/Ground/GroundMaterialControls.cs`
+- `Assets/Game/Procedural/Ground/GeneratedGround.cs`
+- `Assets/Game/Procedural/Ground/GroundSurfaceLayerProfile.cs`
+- `Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs`
+- `Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceDetailLibrary.cs`
+- `Assets/Game/Rendering/PixelSurface/Profiles/StylizedSurfaceMaterialProfile.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceMaterialValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssembler.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssemblyValidation.cs`
+- `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedSurfaceInstaller.cs`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+- `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+
+Create/delete/move/rename: none.
+
+No corridor geometry/channel, Ground mesh, River mesh, water shader, vegetation source, Painted Accent source, frozen Generated Mass source recipe, rock placement, candidate density, material-profile asset, scene, prefab, component, tag, layer, or renderer change is authorized.
+
+### Reviewed evidence and current baseline
+
+- `Assets/AGENTS.md`: mandatory read-only review → persistent plan → exact implementation → final consistency audit; Unity `6000.5.0f1`; exact scope; no false compile/runtime claims; shared-shader impact audit required.
+- Reconstructed source baseline: `/mnt/data/Assets-Code-Archive(9).zip` with D3 → D4 → D5 → E1 → E2 → E2.1 packages applied in order. The archive contains no `.git` metadata, so branch, `HEAD`, history, and unrelated live working-tree state are unavailable.
+- Authoritative Ground editor baseline: user-provided `/mnt/data/GeneratedGroundEditor(6).cs`, SHA-256 `e3af41c8e6c641b7d5d3e1aa9aa051f2efe0a692dae0b275fca0adf5d5cfbd4b`, plus only the accepted E2.1 Bank/Riverbed generic transition additions. The reconstructed editor diff against that file contains only those additions.
+- User production screenshot after E2.1 proves the material transition works but a rock intersecting the transition is still partially dissolved. The accepted diagnosis is that one application weight currently fades substrate and discrete rock response together.
+- `GeneratedMassSparseRiverbedTileAssembler.cs > BuildFinalEvidence`: algorithm version 6 currently writes Palette Form as grayscale RGBA. `R/G/B` are duplicates and `A` is opaque, leaving three channels available in the already sampled sRGB RGBA32 texture-form payload.
+- `GeneratedMassSparseRiverbedTileAssembler.cs > BuildRuntimePackedDetailPixel`: the existing packed detail already contains combined slope/cavity/roughness. Substrate slope and cavity are neutral, and substrate roughness is already calculated before rock interpolation.
+- `StylizedSurfaceDetailLibraryBuilder.cs`: texture-form arrays are already `RGBA32`, sRGB, bilinear, mipmapped, and copied without adding a sample. Prepacked texture-form payloads preserve all four source channels.
+- `GeneratedMassSparseRiverbedSurfaceInstaller.cs > NormalizePayloadImporter`: Palette Form is imported as uncompressed sRGB RGBA with alpha from input, bilinear filtering, repeat wrap, and mips. The existing import path can preserve the expanded payload without a new asset.
+- `PixelSurfaceMaterialDetail.hlsl > PS3D_AssignStylizedSurfaceTextureForm`: runtime currently reads only `formSample.r`. `PixelSurfaceGroundForwardPass.hlsl` samples the texture-form array once for Bank and once for Riverbed; no other shader consumes `PS3D_StylizedSurfaceDetail`, so the shared-include impact is limited to Ground.
+- `GroundMaterialControls.cs` and E2.1 transport already pack each application's material transition into one `float4`; `.z/.w` are unused and can carry feature-edge clearance and feature-return fade distance without new shader properties or CBUFFER entries.
+- E2.1 corridor inward-distance fields already provide the spatial input required by both Bank and Riverbed feature handling. No corridor regeneration contract change is required beyond the existing E2.1 rebuild.
+
+### Packed feature-payload contract
+
+Sparse candidates advance to assembler algorithm version `7`. The existing `*_PaletteForm.png` remains one sRGB `RGBA32` source and is repacked as:
+
+```text
+R = combined substrate + rock Palette Form, gamma encoded
+G = substrate-only Palette Form under the rock, gamma encoded
+B = substrate-only roughness/finish, gamma encoded
+A = discrete-feature coverage mask, linear
+```
+
+The existing `*_RuntimePackedDetail.png` remains unchanged in layout:
+
+```text
+RG = combined world-space slope
+B  = combined cavity
+A  = combined roughness
+```
+
+No additional output texture is created. Neutral/contrast/alternate previews continue reading channel R for the complete preview. Validation additionally decodes G/B/A and proves that substrate-only data and feature coverage survive seams and mips.
+
+### Feature-payload identity contract
+
+Add one additive library source mode for prepacked paired payloads with discrete-feature channels. Existing modes retain their numeric values and behavior. The new mode:
+
+- resolves through the existing packed and texture-form arrays;
+- marks the material/layer as feature-aware through existing runtime property vectors;
+- does not reinterpret ordinary authored-material or grayscale texture-form entries;
+- remains generic and is not keyed to riverbed names, candidate IDs, or rock-specific shader branches.
+
+The existing detail control vector encodes texture-form payload mode as:
+
+```text
+0 = no texture form
+1 = ordinary texture form
+2 = feature-aware texture form
+```
+
+No new material property is required.
+
+### Generic application feature-edge contract
+
+Each current surface application slot receives two additional settings stored beside its existing material transition:
+
+- `Discrete Feature Edge Clearance`: inward feature-free distance from the application boundary, `0–2 m`; zero disables feature suppression for direct A/B timing and visual comparison.
+- `Discrete Feature Return Fade`: transition width after the clearance where features return, `0–1 m`; zero performs a hard return after the feature-free zone.
+
+Defaults for Bank and Riverbed are `0.50 m` clearance and `0.15 m` return fade. The accepted sparse candidates use an 8 m world tile and approximately sub-0.5 m rock diameters, so the default clearance is intended to remove rocks intersecting the actual application boundary before they can be partially blended. This remains a visually validated default, not a proof of arbitrary future feature size.
+
+The existing material-transition vector is reused:
+
+```text
+x = Material Blend Distance
+y = Material Blend Softness
+z = Discrete Feature Edge Clearance
+w = Discrete Feature Return Fade
+```
+
+Future application slots must use the same value contract.
+
+### Shader composition contract
+
+After the existing packed-detail and texture-form samples are decoded, feature-aware payloads retain both combined and substrate-only values. A sparse conditional feature-retention operation uses the slot's inward boundary distance and feature settings to:
+
+- interpolate combined Palette Form toward substrate-only Palette Form;
+- attenuate combined slope toward neutral substrate slope;
+- attenuate cavity and cavity core toward zero;
+- interpolate combined roughness toward substrate-only roughness;
+- leave ordinary texture-form and non-texture-form materials unchanged.
+
+The base substrate still uses the existing complete material application weight and therefore blends into the lower resolved surface normally. Feature suppression occurs before final sequential Ground → Bank → Riverbed composition. The operation adds no texture lookup. A coherent uniform/payload gate skips it when clearance is zero or the material is not feature-aware, and a sparse feature-mask gate limits the interpolation arithmetic to feature texels.
+
+### Inspector contract
+
+Expose the same feature controls under both current application transitions:
+
+```text
+Hierarchy > Ground > Inspector > Material
+> River-Coupled Ground Response — River Bank
+> Material Coverage > Application Transition
+> Discrete Feature Edge Clearance / Discrete Feature Return Fade
+```
+
+```text
+Hierarchy > Ground > Inspector > Material
+> River-Coupled Ground Response — Riverbed
+> Material Coverage > Application Transition
+> Discrete Feature Edge Clearance / Discrete Feature Return Fade
+```
+
+Help text must state that the controls affect only feature-aware payloads. Setting clearance to zero skips feature-retention arithmetic while retaining identical texture samples and draw calls, providing the requested performance/visual A/B path.
+
+### Installer refresh contract
+
+The installer must continue replacing canonical files/assets in place. It must:
+
+- require a passing E2.2 algorithm-7 proof;
+- overwrite the existing Palette Form and packed PNG paths;
+- update the existing library entries to the new feature-aware source mode;
+- preserve library/profile/layer GUIDs;
+- preserve all user-authored SSMP and GSLP tuning;
+- report `Created`, `Updated`, or `Unchanged`;
+- create no numbered copies.
+
+### Performance contract
+
+Runtime deltas:
+
+- texture samples: `+0`;
+- draw calls: `+0`;
+- runtime texture-array dimensions/slices/formats: unchanged;
+- runtime texture memory: unchanged;
+- runtime CPU work and allocations: unchanged;
+- mesh streams/vertices: unchanged;
+- fragment cost: one inexpensive feature-mode/mask gate after existing sampling; retention arithmetic runs only for feature-aware feature texels while clearance is nonzero.
+
+Unity GPU timing remains required because static instruction counting cannot prove target-hardware cost.
+
+### File-by-file implementation sequence
+
+1. **Complete — canonical plan:** record evidence, exact scope, packed channel contract, additive source mode, generic controls, shader operation, installer behavior, performance contract, risks, and validation.
+2. **Complete — payload generation:** advance to algorithm 7; encode combined form, substrate form, substrate roughness, and feature coverage in the existing Palette Form texture; preserve existing rock placement and packed-detail output.
+3. **Complete — proof validation/report:** validate expanded channel ranges, seams, feature-mask coverage, payload determinism, and preview stability; update report identity and output contract.
+4. **Complete — library/profile transport:** add the feature-aware paired source mode and expose generic `UsesFeatureTextureForm` resolution through library → material → Ground layer.
+5. **Complete — application controls/transport:** add Bank/Riverbed clearance and return-fade fields/defaults/copy/properties; pack them into the existing transition vectors; update the authoritative editor controls.
+6. **Complete — shader:** decode expanded payload channels, gate feature work by nonzero clearance plus feature mode/mask, compute generic retention from existing inward-distance fields only for affected texels, and apply it to form/slope/cavity/roughness before sequential composition without extra samples.
+7. **Complete — installer/validation:** require E2.2 algorithm 7, update canonical entries in place to the new mode, preserve GUIDs/tuning, and validate expanded source/runtime payloads.
+8. **Complete — architecture documents:** record generic feature-aware transition ownership, packed-channel semantics, unchanged sample/memory budgets, and supersession of uniform feature/material fading.
+9. **Complete for available static checks — final audit:** compare final diff to scope and E2.1 baseline; reread modified files and direct contracts; verify editor provenance, protected files, shader-property parity, source-mode compatibility, payload math, installer idempotence, package reapplication, and all available static checks. Unity compile/run/GPU/visual checks remain pending when unavailable.
+
+### Acceptance criteria
+
+- Palette Form payload uses the specified RGBA contract and remains deterministic/seam-safe.
+- Existing ordinary texture-form and authored-material entries render unchanged.
+- Bank and Riverbed both expose the generic feature-edge settings.
+- Clearance zero produces the previous E2.1 feature behavior without changing samples or draw calls.
+- Nonzero clearance produces substrate-only response near the application boundary for feature-aware sparse candidates.
+- Complete application blending, wetness, cover retention, and sequential Ground/Bank/Riverbed composition remain unchanged.
+- Installer reruns update the existing canonical assets and preserve GUIDs and tuning.
+- No file outside the approved scope changes.
+
+### Post-change implementation and audit evidence
+
+Actual project-file delta against the reconstructed accepted E2.1 baseline is exactly the eighteen approved modifications listed in this section. No file is created, deleted, moved, or renamed.
+
+Implemented behavior:
+
+- sparse-riverbed assembler algorithm version advances from `6` to `7` without changing rock placement, source order, density, scale, root, or accepted material-response calculations;
+- the existing Palette Form PNG/array stores combined form in `R`, substrate-only form in `G`, substrate-only roughness in `B`, and filtered discrete-feature coverage in `A`;
+- the existing packed-detail payload remains unchanged in format and slice count;
+- one additive source-mode value, `PrepackedDetailWithFeatureTextureForm = 3`, opts materials into the expanded channel contract while preserving serialized values and behavior for modes `0–2`;
+- feature-aware identity resolves through library → material profile → Ground layer → existing per-application detail vector;
+- Bank and Riverbed both store and expose the shared feature clearance/return-fade settings through `GroundSurfaceApplicationBlendSettings`;
+- existing transition vectors carry material distance/softness in `x/y` and feature clearance/return fade in `z/w`; no shader property or CBUFFER field is added;
+- feature work is gated after existing texture sampling by nonzero clearance, feature-aware mode, and nonzero feature coverage; only affected feature texels compute retention/interpolation;
+- ordinary payloads and clearance-zero feature-aware payloads skip the retention operation;
+- installer validation requires a passing `GSU-M2.7C.5E.2.2`, algorithm-version-7 proof and updates the canonical library entry mode in place; existing GUID/tuning-preservation behavior is unchanged.
+
+Available static checks passed:
+
+- exact tree comparison reports only the eighteen approved modified files;
+- C# lexical scanning reports zero error tokens for all eleven modified C# files;
+- C#/HLSL delimiter and HLSL preprocessor-balance checks pass;
+- conflict-marker and trailing-whitespace scans pass;
+- all `GroundSurfaceApplicationBlendSettings` constructor sites use the four-value contract;
+- serialized Inspector property names match the four new Bank/Riverbed fields;
+- feature-aware source-mode resolution is complete across library, material profile, Ground layer, runtime transport, builder, validator, and installer;
+- Ground forward-pass texture-sample counts are unchanged: four `SAMPLE_TEXTURE2D_ARRAY` calls and one ordinary `SAMPLE_TEXTURE2D` call before and after the patch;
+- default retention simulation yields zero feature contribution through `0.50 m`, cubic return from `0.50–0.65 m`, and full contribution at/after `0.65 m`; clearance zero resolves to full retention and skips the retention gate;
+- simulation from the supplied candidate masks predicts feature-mask means/maxima of approximately `0.00410/1.0`, `0.00581/1.0`, and `0.00763/1.0` for Ultra/Very/Sparse, inside the validator's `0.001–0.025` mean and `≥0.90` maximum gates;
+- deterministic substrate-form simulation predicts substrate-only form mean approximately `0.6200` and roughness mean approximately `0.6800`, inside the validator and library-builder gates;
+- the authoritative editor lineage is preserved: the reconstructed E2.1 editor differs from user-supplied `GeneratedGroundEditor(6).cs` only by the accepted generic material-transition additions, and this patch adds only the approved shared feature controls/drawer wiring;
+- `StylizedRiverCorridorGeometry.cs`, `SH_PixelGroundSurfaceLit.shader`, frozen rock baker/validator, `MassGenerator.cs`, and `MeshData.cs` are byte-identical to the E2.1 baseline.
+
+Static analysis is not Unity compilation, shader compilation, proof execution, installation, target-GPU timing, or production-camera validation. Those gates remain pending in Unity `6000.5.0f1`.
+
+### Risks and validation limits
+
+- Pixel-level feature suppression cannot make an arbitrary feature atomically present or absent without feature-center/identity data. The clearance is therefore sized to remove any rock intersecting the actual application boundary; feature return farther inside remains a controlled fade. Production-camera validation is mandatory.
+- Mip filtering averages the feature mask and substrate channels. The proof validator must inspect and report payload seams/ranges, but only Unity scene comparison can confirm acceptable distant behavior.
+- The new source mode is additive. Incorrect mode assignment would either ignore feature channels or reinterpret an old grayscale payload; installer and library validation must detect this.
+- No Unity Editor, shader compiler, or target GPU is available in this environment. Compile, generated-output, in-scene, and performance claims remain pending.
+
+---
+
+## 2026-07-22 — GSU-M2.7C.5E.2.1: Generic Surface-Application Blend Correction
+
+### Status
+
+- Read-only review: **complete**.
+- Canonical plan: **complete — this section is the first project write**.
+- Shared surface-application blend contract: **complete for the approved source change**.
+- Bank-to-Ground application transition: **complete for the approved source change**.
+- Riverbed-to-resolved-Bank/Ground application transition: **complete for the approved source change**.
+- Sequential complete-response composition: **complete for the approved source change**.
+- Authoritative Inspector update: **complete for the approved source change**.
+- Architecture-document updates: **complete**.
+- Post-change consistency/compliance audit: **complete for available static checks; Unity execution remains pending**.
+- Unity compilation, corridor regeneration, and production-camera validation: **pending in Unity 6000.5.0f1**.
+
+### Outcome required
+
+Replace the rejected Riverbed-specific M2.7C.5E.2 material-blend architecture with one generic surface-application transition contract used by every currently supported secondary Ground surface slot. The immediate visible defect is the River Bank-to-Primary-Ground boundary. Bank must therefore receive the same application-level `Material Blend Distance` and `Material Blend Softness` controls as Riverbed. Riverbed must continue blending into the already-resolved Bank/Ground result. Future surface slots must reuse the same C#/HLSL contract rather than receive another semantic-specific blend implementation.
+
+The accepted M2.7C.5E.2 sparse-rock silhouette smoothing and installer update-in-place behavior remain frozen and are not modified by this correction.
+
+### Approved file scope
+
+Modify only:
+
+- `Assets/Game/Procedural/Ground/GroundMaterialControls.cs`
+- `Assets/Game/Procedural/Ground/GeneratedGround.cs`
+- `Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverCorridorGeometry.cs`
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl`
+- `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+- `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+- `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+
+Create/delete/move/rename: none.
+
+No assembler, payload validator, installer, surface-library schema, material-profile schema, scene, prefab, material/profile asset, texture asset, component, layer, tag, renderer, draw-call, water shader, vegetation source, Painted Accent source, frozen Generated Mass source, or rock-response change is authorized.
+
+### Reviewed evidence and current baseline
+
+- `Assets/AGENTS.md`: mandatory review → persistent plan → exact implementation → post-change audit; Unity `6000.5.0f1`; exact scope; no false compile/runtime claims; shared-shader impact audit required.
+- Reconstructed current source baseline: `/mnt/data/Assets-Code-Archive(9).zip` with accepted D3 → D4 → D5 → baseline-safe E1.1 → E2 packages applied in order. The supplied archive has no `.git` metadata, so branch, `HEAD`, history, and unrelated live working-tree state are unavailable.
+- `GeneratedGroundEditor.cs` in the E2 baseline is the user-provided authoritative `/mnt/data/GeneratedGroundEditor(6).cs`, SHA-256 `e3af41c8e6c641b7d5d3e1aa9aa051f2efe0a692dae0b275fca0adf5d5cfbd4b`, plus only the rejected E2 Riverbed transition additions. No vegetation editor implementation is present.
+- User production screenshots prove the visible hard material boundary is the River Bank-to-Primary-Ground handoff. The user explicitly requires blending controls on both Bank and Riverbed and requires the settings to belong to each surface application slot.
+- `GroundMaterialControls.cs`: Bank owns semantic composition controls (`Bank Material Strength`, reach, immediate exposure, waterline strength, core softness, outer extension/fade) but has no generic application-boundary distance/softness pair. Riverbed alone owns the E2 `riverbedMaterialBlendDistance/Softness` pair.
+- `PixelSurfaceGroundForwardPass.hlsl > ResolveGroundSimpleBinarySubstrateWeights`: imported texture-form surfaces still replace continuous coverage with a fixed `0.5` ownership cut. This is the direct code path capable of converting an otherwise soft Bank mask into the observed fully opaque edge.
+- `PixelSurfaceGroundResponse.hlsl`: Bank and Riverbed blending are separate semantic functions. E2 inserts Bank only as a special complementary Riverbed-edge case instead of composing layers sequentially.
+- `StylizedRiverCorridorGeometry.cs`: `TEXCOORD3.y` is outward distance from Riverbed Support; `.z` is a Boolean Bank-domain flag; `.w` is Riverbed inward distance. The producer already knows `handoffHalfWidth` and `acrossDistance`, so it can publish Bank inward distance to the terrain handoff without adding a stream or changing topology.
+- `PixelSurfaceGroundForwardTypes.hlsl`: the existing `float4` attribute and `half4` varying preserve all four UV3 components. No varying-layout change is required.
+- Existing E2 assembler/validator/installer changes were reviewed and are outside this correction: algorithm-6 silhouette smoothing and canonical in-place refresh remain unchanged.
+
+### Generic application contract
+
+C# exposes one immutable `GroundSurfaceApplicationBlendSettings` value contract containing:
+
+- `Distance`: application-boundary transition distance in metres, clamped to `0–2 m`;
+- `Softness`: interpolation shape, clamped to `0–1`.
+
+`GroundMaterialControls` stores one pair per current application slot:
+
+- Bank application: `bankMaterialBlendDistance`, `bankMaterialBlendSoftness`;
+- Riverbed application: existing `riverbedMaterialBlendDistance`, `riverbedMaterialBlendSoftness`.
+
+Both default to `0.35 m / 0.75`. Riverbed serialized field names remain unchanged so E2 values survive. Bank receives new fields. Future slots must expose the same value contract and route through the same shader resolver.
+
+HLSL exposes one generic transition function that accepts:
+
+- region/support weight;
+- inward distance from that application boundary;
+- the slot's distance/softness vector.
+
+Zero distance returns the unmodified historical region weight. Nonzero distance yields zero application weight at the boundary and rises to the slot's authored strength at the configured inward distance. One weight drives the complete layer response.
+
+### Corridor channel correction
+
+Repack the existing River corridor UV3 stream without adding a channel:
+
+```text
+TEXCOORD3.x = exact Riverbed Support
+TEXCOORD3.y = outward Bank distance from Riverbed Support
+TEXCOORD3.z = inward Bank distance from the terrain handoff
+TEXCOORD3.w = inward Riverbed distance from Riverbed Support
+```
+
+Bank-domain authorization is derived from positive `.z` and `(1 - Riverbed Support)`. Ordinary GeneratedGround remains zero in all UV3 components and therefore unauthorized. The final terrain-handoff vertex publishes zero Bank inward distance, providing the exact Bank application boundary. Hidden corridor geometry beyond the handoff remains unauthorized for Bank material/hydrology and is covered by Primary Ground.
+
+### Sequential surface composition contract
+
+Remove the imported texture-form `0.5` binary ownership cut. All surface types use weighted sequential composition:
+
+```text
+resolved = Primary Ground
+resolved = Blend(resolved, Bank, Bank application weight)
+resolved = Blend(resolved, Riverbed, Riverbed application weight)
+```
+
+Equivalent normalized final weights are:
+
+```text
+Ground   = (1 - Bank) * (1 - Riverbed)
+Bank     = Bank * (1 - Riverbed)
+Riverbed = Riverbed
+```
+
+The Bank application weight combines its existing semantic composition with its generic boundary transition. Inside the Riverbed transition, the Bank edge response is evaluated as the already-resolved lower layer. If no Bank layer exists, Primary Ground remains underneath.
+
+The same final weights must drive:
+
+- palette/albedo and texture form;
+- packed slope/normal;
+- cavity;
+- roughness/finish;
+- dry smoothness;
+- dry specular;
+- texture-form scene-lighting response.
+
+Wetness transitions and submerged-cover exclusion remain independent.
+
+### Inspector contract
+
+Expose identical application-transition controls in both current slots:
+
+```text
+Hierarchy > Ground > Inspector > Material
+> River-Coupled Ground Response — Bank
+> Material Coverage
+> Material Blend Distance
+> Material Blend Softness
+```
+
+```text
+Hierarchy > Ground > Inspector > Material
+> River-Coupled Ground Response — Riverbed
+> Material Coverage
+> Material Blend Distance
+> Material Blend Softness
+```
+
+Bank semantic composition controls remain available under their existing groups and are not renamed into application blending. Tooltips must distinguish semantic coverage from the final application-boundary transition. Shared-style and local override paths must expose the same fields.
+
+### File-by-file implementation sequence
+
+1. **Complete — canonical plan:** record the rejected E2 architecture, immediate Bank defect, exact scope, generic C#/HLSL contract, UV3 repack, sequential composition, invariants, risks, and validation.
+2. **Complete — material controls:** add the shared value contract and Bank application fields/properties/default/copy transport while preserving Riverbed serialized names.
+3. **Complete — corridor producer:** repack UV3.z as Bank inward distance and preserve x/y/w contracts.
+4. **Complete — material transport:** add `_GroundBankMaterialTransition` through C#, ShaderLab, and CBUFFER; keep Riverbed transport through the same value contract.
+5. **Complete — shader response/composition:** add the generic transition resolver, use it for Bank and Riverbed, remove the binary ownership cut, and resolve sequential final weights across every material channel.
+6. **Complete — Inspector:** add Bank controls in local/shared paths and use one shared application-transition drawing helper for Bank and Riverbed.
+7. **Complete — architecture docs:** supersede the Riverbed-only E2 blend contract and update the frozen UV3 mapping and generic application ownership.
+8. **Complete for available static checks — post-change audit:** reread all final modified files and direct contracts; verify exact scope, authoritative editor ancestry, UV3 producer/varying/consumer parity, shader-property parity, sequential weights, no assembler/installer drift, syntax/lexical/preprocessor checks, package reapplication, and pending Unity gates.
+
+### Acceptance criteria
+
+- Bank and Riverbed expose identical application-level distance and softness controls in local and shared-style Inspector paths.
+- `TEXCOORD3.z` is Bank inward distance end-to-end; Bank authorization derives from that value without adding a stream.
+- Imported and non-imported surfaces use the same continuous sequential weight composition; no fixed `0.5` texture-form ownership cut remains.
+- Bank blends into Primary Ground at the terrain handoff; Riverbed blends into the resolved Bank/Ground result at Riverbed Support.
+- One final weight set drives all material channels.
+- Wetness, cover exclusion, stone payloads, and installer behavior are unchanged.
+- No file outside the approved scope changes.
+
+### Post-change implementation and audit evidence
+
+Actual source delta against the reconstructed M2.7C.5E.2 baseline is exactly the twelve approved modified files. No file is created, deleted, moved, or renamed.
+
+Implemented behavior:
+
+- `GroundSurfaceApplicationBlendSettings` now supplies one clamped distance/softness value contract shared by Bank and Riverbed application slots;
+- Bank stores new `bankMaterialBlendDistance` / `bankMaterialBlendSoftness` values, while Riverbed preserves its existing serialized field names and routes through the same contract;
+- `_GroundBankMaterialTransition` is transported through `GeneratedGround`, ShaderLab, and the Ground material CBUFFER alongside the existing Riverbed transition vector;
+- the authoritative `GeneratedGroundEditor(6).cs` baseline now exposes the same shared Application Transition drawer in local and shared-style Bank and Riverbed Material Coverage sections;
+- corridor `TEXCOORD3.z` now stores Bank inward distance from the terrain handoff; the existing four-component producer/varying/fragment path is unchanged;
+- `ResolveGroundSurfaceApplicationTransition` is the single HLSL distance/softness resolver used by both slots;
+- the imported texture-form `0.5` binary ownership cut and the rejected Riverbed-only edge special case are removed;
+- final Ground/Bank/Riverbed weights use sequential composition and drive the existing complete material-response path;
+- Shore/Riverbed wetness, exact-support cover exclusion, algorithm-6 rock payload generation, and installer refresh code are unchanged.
+
+Available static checks passed:
+
+- complete tree comparison reports exactly the twelve approved modifications;
+- C# and HLSL lexical scans report zero error tokens, and comment/string-excluded delimiter checks pass for every modified code/include file;
+- ShaderLab/HLSL raw delimiter and HLSL preprocessor-balance checks pass;
+- C#/ShaderLab/CBUFFER/consumer property parity passes for `_GroundBankMaterialTransition` and the existing Riverbed transition;
+- obsolete binary-cut and Riverbed-only transition symbols have no remaining active-code references;
+- the corridor producer, existing `float4` attribute, existing `half4` varying, and fragment consumers preserve the complete x/y/z/w channel contract;
+- Clang 17 HLSL frontend syntax validation passes for the exact generic transition and sequential-composition functions; DXIL code generation/validation is unavailable in this Clang build;
+- numerical simulation confirms transition endpoints and monotonicity for linear/cubic softness and confirms sequential weights remain non-negative and sum to one within floating-point tolerance;
+- `GeneratedMassSparseRiverbedTileAssembler.cs`, its validator, and `GeneratedMassSparseRiverbedSurfaceInstaller.cs` are byte-identical to M2.7C.5E.2;
+- the generic `SH_PixelSurfaceLit.shader` is byte-identical, and every new material-property-dependent HLSL function remains inside `PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES`.
+
+Unity and a standalone C# compiler are unavailable in this environment. Unity compilation, regenerated corridor UV3 data, live MaterialPropertyBlock values, and production-camera blend quality remain pending.
+
+### Risks and validation limits
+
+- Repacking UV3.z reopens the frozen A4B.3 channel meaning. All producer, varying, resolver, debug, and architecture references must be updated consistently. Unity corridor regeneration is mandatory.
+- Bank inward distance is half-precision in the existing varying. Its `0–20 m` expected range remains representable, but production-camera validation must confirm no visible banding.
+- Removing the binary cut changes imported Bank and Riverbed transition behavior by design. Existing non-imported surfaces should remain visually compatible because they already used continuous weights; all imported candidates require scene validation.
+- Unity and a standalone project compiler are unavailable in this environment. Compilation, corridor regeneration, actual material weights, and visual acceptance remain pending in Unity.
+
+---
+
 ## 2026-07-22 — GSU-M2.7C.5E.2: Controllable Riverbed Material Blend, Smooth Sparse-Rock Payload, and Idempotent Refresh
 
 ### Status

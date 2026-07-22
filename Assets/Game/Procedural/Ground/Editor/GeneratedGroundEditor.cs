@@ -108,6 +108,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty riverbedHydrologySource;
         private SerializedProperty riverbedHydrologyModifier;
         private SerializedProperty bankMaterialStrength;
+        private SerializedProperty bankMaterialBlendDistance;
+        private SerializedProperty bankMaterialBlendSoftness;
+        private SerializedProperty bankFeatureEdgeClearance;
+        private SerializedProperty bankFeatureReturnFade;
         private SerializedProperty bankDetailScaleMultiplier;
         private SerializedProperty bankAuthoredColorStrengthMultiplier;
         private SerializedProperty bankAuthoredColorLightingMultiplier;
@@ -119,6 +123,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty riverbedMaterialStrength;
         private SerializedProperty riverbedMaterialBlendDistance;
         private SerializedProperty riverbedMaterialBlendSoftness;
+        private SerializedProperty riverbedFeatureEdgeClearance;
+        private SerializedProperty riverbedFeatureReturnFade;
         private SerializedProperty riverbedDetailScaleMultiplier;
         private SerializedProperty riverbedAuthoredColorStrengthMultiplier;
         private SerializedProperty riverbedAuthoredColorLightingMultiplier;
@@ -541,6 +547,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             bankMaterialStrength =
                 groundMaterialControls.FindPropertyRelative("bankMaterialStrength");
 
+            bankMaterialBlendDistance =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankMaterialBlendDistance");
+
+            bankMaterialBlendSoftness =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankMaterialBlendSoftness");
+
+            bankFeatureEdgeClearance =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankFeatureEdgeClearance");
+
+            bankFeatureReturnFade =
+                groundMaterialControls.FindPropertyRelative(
+                    "bankFeatureReturnFade");
+
             bankDetailScaleMultiplier =
                 groundMaterialControls.FindPropertyRelative(
                     "bankDetailScaleMultiplier");
@@ -584,6 +606,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             riverbedMaterialBlendSoftness =
                 groundMaterialControls.FindPropertyRelative(
                     "riverbedMaterialBlendSoftness");
+
+            riverbedFeatureEdgeClearance =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedFeatureEdgeClearance");
+
+            riverbedFeatureReturnFade =
+                groundMaterialControls.FindPropertyRelative(
+                    "riverbedFeatureReturnFade");
 
             riverbedDetailScaleMultiplier =
                 groundMaterialControls.FindPropertyRelative(
@@ -3843,6 +3873,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 ref showMaterialRiverCoupledBank,
                 bankSurfaceLayer,
                 bankMaterialStrength,
+                bankMaterialBlendDistance,
+                bankMaterialBlendSoftness,
+                bankFeatureEdgeClearance,
+                bankFeatureReturnFade,
                 bankMaterialReach,
                 immediateBankExposure,
                 waterlineMaterialStrength,
@@ -3884,6 +3918,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 riverbedMaterialStrength,
                 riverbedMaterialBlendDistance,
                 riverbedMaterialBlendSoftness,
+                riverbedFeatureEdgeClearance,
+                riverbedFeatureReturnFade,
                 riverbedDetailScaleMultiplier,
                 riverbedAuthoredColorStrengthMultiplier,
                 riverbedAuthoredColorLightingMultiplier,
@@ -3984,6 +4020,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 ref showMaterialRiverCoupledBank,
                 sharedBankSurfaceLayer,
                 materialControls.FindPropertyRelative("bankMaterialStrength"),
+                materialControls.FindPropertyRelative(
+                    "bankMaterialBlendDistance"),
+                materialControls.FindPropertyRelative(
+                    "bankMaterialBlendSoftness"),
+                materialControls.FindPropertyRelative(
+                    "bankFeatureEdgeClearance"),
+                materialControls.FindPropertyRelative(
+                    "bankFeatureReturnFade"),
                 materialControls.FindPropertyRelative("bankMaterialReach"),
                 materialControls.FindPropertyRelative("immediateBankExposure"),
                 materialControls.FindPropertyRelative("waterlineMaterialStrength"),
@@ -4036,6 +4080,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "riverbedMaterialBlendDistance"),
                 materialControls.FindPropertyRelative(
                     "riverbedMaterialBlendSoftness"),
+                materialControls.FindPropertyRelative(
+                    "riverbedFeatureEdgeClearance"),
+                materialControls.FindPropertyRelative(
+                    "riverbedFeatureReturnFade"),
                 materialControls.FindPropertyRelative(
                     "riverbedDetailScaleMultiplier"),
                 materialControls.FindPropertyRelative(
@@ -4143,6 +4191,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             ref bool expanded,
             SerializedProperty bankLayer,
             SerializedProperty bankMaterialStrengthProperty,
+            SerializedProperty materialBlendDistance,
+            SerializedProperty materialBlendSoftness,
+            SerializedProperty featureEdgeClearance,
+            SerializedProperty featureReturnFade,
             SerializedProperty coreBankReach,
             SerializedProperty immediateExposure,
             SerializedProperty waterlineStrength,
@@ -4241,7 +4293,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             {
                 EditorGUI.BeginChangeCheck();
                 EditorGUILayout.PropertyField(bankMaterialStrengthProperty);
+                changed |= EditorGUI.EndChangeCheck();
+                changed |= DrawSurfaceApplicationTransitionControls(
+                    "Bank",
+                    "the terrain handoff into the Bank application region",
+                    materialBlendDistance,
+                    materialBlendSoftness,
+                    featureEdgeClearance,
+                    featureReturnFade);
 
+                EditorGUI.BeginChangeCheck();
                 EditorGUILayout.Space(2f);
                 EditorGUILayout.LabelField(
                     "Core Bank",
@@ -4351,6 +4412,49 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUI.indentLevel--;
             return changed;
+        }
+
+        private static bool DrawSurfaceApplicationTransitionControls(
+            string applicationName,
+            string boundaryDescription,
+            SerializedProperty materialBlendDistance,
+            SerializedProperty materialBlendSoftness,
+            SerializedProperty featureEdgeClearance,
+            SerializedProperty featureReturnFade)
+        {
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Application Transition",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                $"Transitions the complete {applicationName} surface from {boundaryDescription}. The same weight controls palette/form, normal, cavity, roughness/finish, smoothness, specular, and texture-form lighting. Zero distance preserves the unmodified application-region weight.",
+                MessageType.None);
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(materialBlendDistance);
+            using (new EditorGUI.DisabledScope(
+                materialBlendDistance == null ||
+                materialBlendDistance.floatValue <= 0.0001f))
+            {
+                EditorGUILayout.PropertyField(materialBlendSoftness);
+            }
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Discrete Feature Handling",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "Feature-aware payloads can retain their substrate-only form and finish near this application boundary while suppressing discrete features such as rocks. This adds no texture sample. Set Edge Clearance to zero to disable the feature-aware transition for visual or GPU timing comparison.",
+                MessageType.None);
+            EditorGUILayout.PropertyField(featureEdgeClearance);
+            using (new EditorGUI.DisabledScope(
+                featureEdgeClearance == null ||
+                featureEdgeClearance.floatValue <= 0.0001f))
+            {
+                EditorGUILayout.PropertyField(featureReturnFade);
+            }
+
+            return EditorGUI.EndChangeCheck();
         }
 
         private static bool DrawSurfaceMaterialApplicationControls(
@@ -4482,6 +4586,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             SerializedProperty materialStrength,
             SerializedProperty materialBlendDistance,
             SerializedProperty materialBlendSoftness,
+            SerializedProperty featureEdgeClearance,
+            SerializedProperty featureReturnFade,
             SerializedProperty detailScaleMultiplier,
             SerializedProperty authoredColorStrengthMultiplier,
             SerializedProperty authoredColorLightingMultiplier,
@@ -4658,23 +4764,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             {
                 EditorGUI.BeginChangeCheck();
                 EditorGUILayout.PropertyField(materialStrength);
-
-                EditorGUILayout.Space(2f);
-                EditorGUILayout.LabelField(
-                    "Dry Material Transition",
-                    EditorStyles.miniBoldLabel);
-                EditorGUILayout.HelpBox(
-                    "Transitions the complete dry Riverbed material inward from the resolved Bank substrate at the Ground Riverbed Support edge, or from Primary Ground when no Bank layer is active. The transition remains entirely inside Riverbed Support and is independent from Wetness Transition below. Zero distance preserves the historical hard boundary.",
-                    MessageType.None);
-                EditorGUILayout.PropertyField(materialBlendDistance);
-                using (new EditorGUI.DisabledScope(
-                    materialBlendDistance == null ||
-                    materialBlendDistance.floatValue <= 0.0001f))
-                {
-                    EditorGUILayout.PropertyField(materialBlendSoftness);
-                }
-
                 changed |= EditorGUI.EndChangeCheck();
+                changed |= DrawSurfaceApplicationTransitionControls(
+                    "Riverbed",
+                    "the Riverbed Support boundary into the Riverbed application region over the already-resolved Bank/Primary-Ground surface",
+                    materialBlendDistance,
+                    materialBlendSoftness,
+                    featureEdgeClearance,
+                    featureReturnFade);
             }
 
             EditorGUILayout.Space(4f);

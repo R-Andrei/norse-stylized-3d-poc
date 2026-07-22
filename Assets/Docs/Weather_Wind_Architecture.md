@@ -13,7 +13,7 @@ Visual response cache: gameplay-anchor-centred 2D XZ field
 Initial field resolution: 128 × 128
 Initial cell size: 0.5 m
 Initial covered area: 64 × 64 m
-Initial update cadence: 16 Hz
+Initial update cadence: 10 Hz
 ```
 
 This document is the canonical architecture and implementation ledger for shared Weather-owned wind. Wind is not owned by vegetation. Vegetation, future stylized wind lines, and gameplay systems consume the Weather wind contract according to their own response rules.
@@ -156,7 +156,7 @@ This model is a reusable Weather baseline, not a final authored weather-event sy
 
 ### Runtime work
 
-- One full 128 × 128 compute update at 16 Hz.
+- One full 128 × 128 compute update at the configured cadence; the baseline default is 10 Hz and the approved Inspector range is 5–60 Hz.
 - One additional recenter dispatch only when the gameplay anchor crosses a field-cell boundary.
 - One bilinear response-field sample per vegetation vertex.
 - No per-grass CPU updates.
@@ -956,3 +956,1216 @@ Exhaustive source validation compared modulo and bit-mask results for every vali
 `VEG-V2-INFRA.3` deletes the obsolete `VegetationBenchmarkWindProvider` compatibility subclass and the one-time Weather migration utility. The `WeatherWindDomain` runtime producer, compute field, shader globals, CPU queries, report/debug controls, active-state rules, and consumer behavior are unchanged. If the obsolete `VegetationTest` object still exists in the live scene, the user deletes it directly before or immediately after applying this source cleanup.
 
 Final Weather ownership contains no vegetation-specific publisher or migration path. Exactly one active and published `WeatherWindDomain` remains the authoritative contract for vegetation and future Weather consumers.
+
+---
+
+## WEATHER-WIND-TRAILS-V0.0 — Canonical trail architecture and Weather cadence baseline
+
+**Status:** Cadence source change and provisional-document reconciliation complete at source level on 2026-07-22; Unity import/compilation and Inspector validation pending. Wind-trail runtime, shader, editor diagnostics, and scene setup remain unimplemented.
+
+### Objective and acceptance criteria
+
+Record the approved V0 architecture for Weather-owned stylized wind trails before implementation, align the current Weather cadence control with the accepted scene baseline, and reconcile the provisional Weather diagnostics text with the implementation.
+
+This patch passes when:
+
+- `WeatherWindDomain` exposes `Update Rate Hz` over `5–60 Hz` with `10 Hz` as the new-component baseline;
+- the existing serialized `VisualFrameworkDemo` value of `10 Hz` remains untouched;
+- the current Inspector debug modes remain exactly `Off`, `Wind Field`, and `Response Error`;
+- the provisional Weather document describes those implemented diagnostics accurately;
+- no trail runtime component, shader, scene component, material asset, Ground dependency, renderer feature, layer, tag, or package is introduced in this patch.
+
+### User-approved architectural decisions
+
+- Weather remains the sole authoritative wind owner. Trails consume `WeatherWindDomain.SampleTargetWindXZ` and never consume vegetation response bend or velocity as authoritative flow.
+- V0 trail height uses the Weather field anchor Y plus a configurable altitude range and shallow deterministic vertical deviation. V0 has no `GeneratedGround` dependency.
+- The future trail renderer is attached directly to the existing `Systems/Weather` object. It resolves its co-located domain once with `GetComponent<WeatherWindDomain>()`, uses `domain.TargetCamera`, and uses `domain.FieldAnchor`/resolved anchor state. It does not expose redundant Weather-domain or camera assignments.
+- The future renderer runs only while its co-located domain exists, is active and enabled, has ready resources, and equals `WeatherWindDomain.PublishedDomain`.
+- V0 uses one hidden runtime material created from a serialized Shader reference with `HideFlags.HideAndDontSave`. No `.mat` asset or Weather Materials folder is created. The serialized Shader reference provides build retention; `Shader.Find` alone is not the contract.
+- Production rendering uses one fixed-capacity combined camera-facing ribbon mesh and one transparent URP pass. Trail centreline geometry is generated only when a slot changes; head/tail travel and fading are shader-side.
+- Spawn selection uses bounded strong-wind and spacing scoring over a deterministic jittered candidate lattice. Streamlines use one captured `SimulationTime` and repeated explicit-time CPU target samples, with midpoint/RK2 integration and bounded early termination.
+- The current debug modes and Inspector option names remain unchanged.
+
+### Reviewed evidence before the first write
+
+- `Assets/AGENTS.md` was read completely. It requires a read-only dependency review, this persistent canonical plan as the first write, exact scope, implementation strictly from the plan, and a post-change audit.
+- `Assets/Docs/Weather_Wind_Trails_Implementation_Handoff.md` was reviewed as the continuation proposal. Its core target/response separation and combined-ribbon recommendation remain valid, while the Ground dependency and material-asset proposal are superseded by the user-approved decisions above.
+- `Assets/Game/Procedural/Weather/WeatherWindDomain.cs` was read completely. `updateRateHz` is serialized under `Field Resolution`, currently declares `Range(8f, 30f)`, defaults to `16f`, is clamped to `8f–30f` in `OnValidate`, participates in `SimulationConfigurationHash`, drives the fixed step in `Update` and `PublishShaderGlobals`, and is included in the comprehensive report.
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindDomainEditor.cs` was read completely. It uses `DrawDefaultInspector`, so changing the serialized field's `Range` exposes the approved range without a custom control or editor modification. It currently implements `Off`, `Wind Field`, and `Response Error` and rebuilds only when the simulation hash changes.
+- `Assets/Game/Rendering/Weather/Resources/PS3DWeather/Compute/CS_WeatherWindField.compute`, `Assets/Game/Rendering/Weather/Includes/WeatherWindField.hlsl`, and `Assets/Game/Rendering/Vegetation/Includes/VegetationWindResponse.hlsl` were read. They consume the published fixed-step timing contract and require no cadence-specific source change.
+- `Assets/Game/Demo/Scenes/VisualFrameworkDemo.unity` was inspected read-only. The accepted `Systems/Weather` domain serializes `fieldResolution: 128`, `cellSizeMetres: 0.5`, and `updateRateHz: 10`; this patch does not edit the scene.
+- The supplied project snapshot contains no `.git` directory. Branch, `HEAD`, status, diff, and history cannot be independently verified from this archive and are not represented as current evidence.
+
+### Approved files for this patch
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindDomain.cs`
+- `Assets/Docs/Weather_System_Architecture_Provisional.md`
+
+Create, delete, move, rename, generate, metadata, scene, prefab, material, shader, compute, HLSL, vegetation, Ground, River, URP, layer, and tag changes: none.
+
+### File-by-file implementation sequence
+
+| Item | File | Required result | Status |
+| --- | --- | --- | --- |
+| WTL-V0.0-A | `Weather_Wind_Architecture.md` | Record this objective, evidence, exact scope, approved architecture, cadence decision, risks, validation, and statuses before source edits. | Complete |
+| WTL-V0.0-B | `WeatherWindDomain.cs` | Change only the serialized cadence range and default plus its matching `OnValidate` clamp: `5–60 Hz`, default `10 Hz`. Preserve timing, catch-up, hashing, resource, report, and consumer contracts. | Complete at source level; Unity validation pending |
+| WTL-V0.0-C | `Weather_System_Architecture_Provisional.md` | Replace stale `Target Wind` / `Response Wind` wording with the implemented `Wind Field` / `Response Error` definitions and record the configurable 5–60 Hz cadence with 10 Hz baseline. | Complete |
+| WTL-V0.0-D | All approved files and frozen dependencies | Reconcile exact scope, reread complete final files and affected contracts, run structural/static checks, and record Unity validation honestly. | Complete at source level; Unity validation pending |
+
+### Cadence contract and performance
+
+The approved serialized range is `5–60 Hz`; the default for newly added or reset component data is `10 Hz`. Existing scenes retain their serialized value. The current demo scene already uses `10 Hz`, so no scene migration or scene write is required.
+
+For a 128 × 128 field, simulation-cell evaluations per second are:
+
+```text
+5 Hz  = 81,920 cell updates/s
+10 Hz = 163,840 cell updates/s
+16 Hz = 262,144 cell updates/s
+30 Hz = 491,520 cell updates/s
+60 Hz = 983,040 cell updates/s
+```
+
+This excludes recenter dispatches and per-cell spring substeps. The range permits explicit quality/performance testing; `10 Hz` remains the baseline because it is the accepted scene state and continuous render-time response prediction already exists in `WeatherWindField.hlsl`. `60 Hz` is a ceiling, not a recommended default. No performance exception is approved.
+
+### Prospective wind-trail implementation scope after this patch
+
+The next approved implementation must be separately declared from the final current source state. The intended V0 files are:
+
+Create:
+
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs` and `.meta`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs` and `.meta`
+- `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader` and `.meta`
+
+Modify through Unity only:
+
+- `Assets/Game/Demo/Scenes/VisualFrameworkDemo.unity` to add exactly one trail renderer to the existing `Systems/Weather` GameObject and serialize the shader reference
+
+Modify for status/evidence:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+
+Explicitly excluded unless later evidence and approval expand the plan:
+
+- material asset or Materials folder;
+- `GeneratedGround` source or reference;
+- `WeatherWindDomain` simulation changes beyond the cadence control in this patch;
+- Weather compute/HLSL contracts;
+- vegetation source or shaders;
+- renderer features, URP assets, layers, tags, packages, or new hierarchy children.
+
+### Risks and validation
+
+- Raising cadence increases full-field compute work approximately linearly. Unity profiling at representative `5`, `10`, `30`, and `60 Hz` values is required before treating the upper range as a production quality tier.
+- `maximumStepsPerFrame = 4` remains unchanged. At high configured cadence and low frame rate, the existing bounded catch-up policy can discard accumulated simulation time; this patch intentionally does not redesign timing behavior.
+- Unity 6000.5.0f1 import/compilation is unavailable in this archive environment. Required user validation is: confirm the Inspector slider spans `5–60`, the current scene remains `10`, changing the value rebuilds the simulation through the existing hash path, and the Weather report prints the selected rate.
+
+### Post-change consistency and compliance audit
+
+Actual affected files exactly match the approved scope:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindDomain.cs`
+- `Assets/Docs/Weather_System_Architecture_Provisional.md`
+
+Created, deleted, moved, renamed, generated, metadata, scene, prefab, material, shader, compute, HLSL, vegetation, Ground, River, URP, layer, and tag files: none.
+
+Intentional source differences:
+
+- `WeatherWindDomain.updateRateHz` now declares `Range(5f, 60f)` and initializes new component data at `10f` instead of the historical `Range(8f, 30f)` / `16f` default.
+- `WeatherWindDomain.OnValidate` now clamps the cadence to `5f–60f`.
+- The current architecture summary and current runtime-work section identify `10 Hz` as the baseline and `5–60 Hz` as the Inspector range. Historical sections that accurately describe earlier 16 Hz work remain historical.
+- The provisional parent now documents the approved but unimplemented wind-trail V0 architecture, the absence of Ground/material-asset dependencies, the implemented `Wind Field` / `Response Error` diagnostics, and the cadence range/default.
+
+Preserved contracts:
+
+- Both fixed-step calculations remain `1f / Mathf.Max(1f, updateRateHz)`.
+- `updateRateHz` remains part of `SimulationConfigurationHash`, so Inspector cadence changes use the existing rebuild path.
+- The comprehensive report continues to print the selected rate.
+- `maximumStepsPerFrame`, accumulator truncation, simulation time, resource allocation, texture formats, shader-global timing, CPU target sampling, compute kernels, vegetation response, debug enum values, and Scene serialization are unchanged.
+- The accepted demo scene remains serialized at `updateRateHz: 10`; no raw scene write occurred.
+
+Static validation passed **28/28** checks: exact source patterns, removal of the old range/default, fixed-step/hash/report preservation, debug enum preservation, C# lexical and delimiter balance, canonical-plan uniqueness, documentation wording, balanced Markdown fences, LF-only content, and byte identity for `WeatherWindDomainEditor.cs`, `CS_WeatherWindField.compute`, `WeatherWindField.hlsl`, `VegetationWindResponse.hlsl`, and `VisualFrameworkDemo.unity`.
+
+The supplied snapshot contains no `.git` directory, Unity executable, Unity reference assemblies, or C# compiler configured against Unity. Git comparison, Unity 6000.5.0f1 import/compilation, live Inspector range, rebuild behavior, and report output are pending and are not represented as passed.
+
+
+---
+
+## WEATHER-WIND-TRAILS-V0.1 — Runtime placement, streamline, and mesh core
+
+**Status:** Runtime source and metadata implementation complete on 2026-07-22. Exact-scope, structural, dependency-freeze, bounded-allocation, and analytical placement/path checks passed. The user reported Unity import/compilation with no errors after applying V0.1. Live component installation, Play Mode behavior, and allocation profiling remain pending.
+
+### Objective and acceptance criteria
+
+Implement the bounded runtime core for Weather-owned wind trails without rendering, editor tooling, material creation, or scene installation. The new component must resolve the co-located published `WeatherWindDomain`, select camera-relevant strong-wind seeds with active/cooldown separation, build bidirectional midpoint/RK2 streamlines from one captured Weather simulation-time snapshot, prepare one fixed-capacity combined ribbon mesh contract, expire/recycle fixed slots, and expose allocation-on-demand diagnostics for the later custom Inspector.
+
+This patch passes at source level when:
+
+- the component resolves only `GetComponent<WeatherWindDomain>()`, `domain.TargetCamera`, and the domain's resolved anchor state; no hierarchy-wide search or serialized Weather/camera/Ground reference exists;
+- runtime operation is gated by a non-null active co-located domain, `domain.ResourcesReady`, and `WeatherWindDomain.PublishedDomain == domain`;
+- all candidate, path, trail, cooldown, vertex, and index storage is allocated only during initialization/reconfiguration and reused thereafter;
+- each candidate sweep captures one `domain.SimulationTime` and uses only `domain.SampleTargetWindXZ(worldXZ, capturedTime)` for candidate and path decisions;
+- accepted seeds satisfy the configured absolute wind floor and active/cooldown separation;
+- a deterministic jittered lattice and deterministic weighted choice among the strongest eligible subset avoid rigid placement and absolute-maximum pinning;
+- each accepted path is built backward and forward around the seed with midpoint/RK2 integration, bounded point count, field/view/curvature/self-approach termination, minimum path length, and forward tangent-to-target-wind validation;
+- active/cooldown state clears when the Weather simulation-configuration hash changes, `SimulationTime` rewinds, or the field origin jumps by at least half the field span on either XZ axis, preventing paths from surviving a rebuild, manual field reset, resource recreation, or large anchor teleport with stale flow provenance;
+- Y placement uses only the resolved Weather anchor Y, deterministic altitude, and shallow deterministic vertical deviation;
+- one fixed combined mesh reserves two vertices per centreline point and six indices per segment, with cumulative path distance and lifecycle/presentation data required by the later shader;
+- no rendering submission, runtime material, shader, custom editor, scene, Ground, vegetation, compute, shared HLSL, URP, layer, tag, package, or hierarchy change occurs.
+
+### Reviewed evidence before this plan write
+
+- `Assets/AGENTS.md` was read completely. It requires this persistent plan as the first modifying action, exact scope, strict plan traceability, bounded runtime work, and a final consistency/compliance audit.
+- `Assets/Docs/Weather_Wind_Trails_Implementation_Handoff.md` and `WEATHER-WIND-TRAILS-V0.0` were reread. The approved V0 removes Ground and material-asset dependencies, attaches directly to `Systems/Weather`, and consumes CPU target wind rather than vegetation response.
+- `Assets/Game/Procedural/Weather/WeatherWindDomain.cs` was read completely. The required public contracts are `PublishedDomain`, `FieldAnchor`, `TargetCamera`, `ResourcesReady`, `MaximumWindStrength`, `SimulationTime`, `SimulationConfigurationHash`, `GetFieldWorldRectXZ()`, `GetDebugAnchorPosition()`, and `SampleTargetWindXZ(Vector2, float)`.
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindDomainEditor.cs` was read completely. Existing Weather diagnostics remain separate and unchanged; the future trail editor must consume runtime diagnostic APIs rather than reconstructing target-wind state.
+- `Assets/Game/Rendering/Weather/Includes/WeatherWindField.hlsl`, `Assets/Game/Rendering/Weather/Resources/PS3DWeather/Compute/CS_WeatherWindField.compute`, and `Assets/Game/Rendering/Vegetation/Includes/VegetationWindResponse.hlsl` were read completely. They confirm target/response separation and require no change for CPU runtime placement.
+- The supplied source snapshot has no `.git` directory or Unity executable. Git history/status and Unity compilation cannot be produced in this environment and must remain pending.
+
+### Approved files for this patch
+
+Create:
+
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs.meta`
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+
+Create/delete/move/rename/generate beyond the declared C# metadata companion, shader, material, editor, scene, prefab, Ground, vegetation, compute, HLSL, River, URP, renderer-feature, layer, tag, package, or hierarchy changes: none.
+
+### Runtime configuration and bounded budgets
+
+Initial serialized defaults:
+
+```text
+Maximum active trails: 8
+Candidate lattice: 8 × 8 = 64 candidates
+Spawn attempts: 4/s
+Maximum candidate sweeps per frame: 2 (fixed internal catch-up cap)
+Strongest weighted subset: 6 candidates
+Minimum authoritative wind strength: 0.18
+Strength score exponent: 2.0
+Minimum active/cooldown separation: 6 m
+Separation cooldown: 1.5 s
+Maximum centreline points: 24
+Integration step: 0.5 m
+Minimum path wind strength: 0.12
+Minimum completed path length: 3.5 m
+Maximum turn per segment: 55 degrees
+Minimum final tangent/wind alignment: 0.35
+Lifetime: 1.5–3.0 s
+Width: 0.04–0.10 m
+Presentation speed data: 2–5 m/s
+Visible tail-length data: 2.5–5.0 m
+Altitude above resolved Weather anchor: 1.0–2.5 m
+Maximum vertical deviation: 0.15 m
+```
+
+At the baseline maximum, storage is 8 × 24 × 2 = 384 vertices and 8 × 23 × 6 = 1,104 unsigned 16-bit indices (368 triangles). At four successful spawns per second, the intended analytical target-wind cost remains hundreds of CPU function evaluations per second rather than a per-frame field scan. The actual count is reported by the runtime component and must be verified in Unity.
+
+### File-by-file implementation sequence
+
+| Item | File | Required result | Status |
+| --- | --- | --- | --- |
+| WTL-V0.1-A | `Weather_Wind_Architecture.md` | Record objective, exact scope, evidence, defaults, runtime algorithms, budgets, risks, and validation before source creation. | Complete |
+| WTL-V0.1-B | `WeatherWindTrailRenderer.cs` | Implement lifecycle/dependency gating, fixed storage, deterministic candidates, strength/separation selection, cooldowns, RK2 paths, expiry/recycling, combined mesh preparation, diagnostics, and profiler markers. No draw or material work. | Complete at source level; Unity validation pending |
+| WTL-V0.1-C | `WeatherWindTrailRenderer.cs.meta` | Add one unique Unity C# metadata companion. | Complete |
+| WTL-V0.1-D | Approved files and frozen dependencies | Reread final source and contracts, reconcile exact scope, run structural/static checks, record intentional differences and unavailable Unity evidence. | Complete at source level; Unity validation pending |
+
+### Runtime algorithm contract
+
+Candidate work runs only at the configured spawn cadence and only while a free trail slot exists. An `N × N` lattice covers `domain.GetFieldWorldRectXZ()`. Each cell receives deterministic XZ jitter and altitude from the local trail seed, spawn epoch, cell coordinates, and independent hash channels. Candidates behind the camera or outside an expanded viewport are rejected before target-wind sampling. Remaining candidates sample the explicit captured simulation time, reject values below the absolute floor, calculate nearest active/cooldown seed distance, reject values below the minimum, and combine normalized strength and additional spacing preference into one score.
+
+The component retains a fixed top subset without sorting or managed collections. Selection is deterministic weighted randomness over that subset. Every attempted sweep increments the spawn epoch, including failed sweeps, so repeated failures do not evaluate one permanently identical lattice.
+
+The component tracks `domain.SimulationConfigurationHash`, `domain.SimulationTime`, and `domain.FieldOriginXZ` while ready. A configuration-hash change or backwards `SimulationTime` movement clears active and cooldown slots before new sampling; the latter covers `ResetField()` and resource recreation when configuration values are unchanged. Normal toroidal recenter movement preserves active world-space trails; a field-origin jump of at least half the field span on either axis is treated as a large anchor teleport and clears active/cooldown state.
+
+For an accepted seed, the component integrates backward with `-normalize(W)` and forward with `normalize(W)`. Each segment uses midpoint/RK2:
+
+```text
+d0 = normalize(W(p, capturedTime))
+dm = normalize(W(p + 0.5 × step × d0, capturedTime))
+pNext = p + step × dm
+```
+
+The backward side is reversed when assembling the final path, so final centreline order remains downwind from tail to head. The completed path is rejected if too short or if any final XZ segment has target-wind alignment below the configured floor. All samples use the captured time.
+
+### Mesh contract for V0.2
+
+The component allocates one dynamic mesh with one interleaved vertex stream and one fixed index buffer. Each point contributes left/right vertices containing:
+
+```text
+POSITION: centreline world position
+NORMAL: centreline tangent
+TEXCOORD0.x: signed half-width
+TEXCOORD0.y: cumulative path distance in metres
+TEXCOORD1: birth time, inverse lifetime, presentation speed, visible tail length
+COLOR: opacity, normalized accepted strength, deterministic variation, active flag
+```
+
+Inactive or unused slot vertices collapse to zero position with zero active alpha. Only the affected fixed slot range is uploaded when a trail spawns, expires, or is cleared. Bounds cover the current Weather field rectangle and approved altitude/deviation range. V0.1 performs no draw submission and creates no material.
+
+### Risks and validation
+
+- The analytical CPU path function is continuous while vegetation samples a bilinear GPU cache. Matching procedural inputs are proven by existing Weather architecture; exact float equality is not. Unity Scene diagnostics later compare paths with `Wind Field` arrows.
+- Viewport rejection depends on the current camera and altitude. The runtime report records visible, calm, spacing, and path rejection counts so an over-restrictive default is diagnosable.
+- Combined transparent-mesh sorting is a V0.2 visual risk, not a V0.1 runtime-core blocker.
+- Fixed arrays avoid intentional steady-state managed allocations. Unity Profiler remains required because engine API internals cannot be proven allocation-free by source inspection alone.
+- Unity import/compilation passed by user report after V0.1. Component installation, deterministic live replay, visual debug, and Profiler evidence remain pending until the later editor/scene patch makes the runtime component directly testable in the live project.
+
+### Post-change consistency and compliance audit
+
+Actual affected files exactly match the approved V0.1 scope:
+
+Create:
+
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs.meta`
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+
+Created, deleted, moved, renamed, generated, shader, material, custom-editor, scene, prefab, Ground, vegetation, compute, shared-HLSL, River, URP, renderer-feature, layer, tag, package, and hierarchy changes beyond that declaration: none.
+
+Implemented runtime behavior:
+
+- one co-located `WeatherWindDomain` lookup occurs at lifecycle resolution; camera state is read from `domain.TargetCamera` without `Camera.main` or hierarchy searches;
+- runtime readiness requires component mesh resources, the active/enabled co-located domain, `domain.ResourcesReady`, `WeatherWindDomain.PublishedDomain == domain`, and a resolved camera;
+- a deterministic jittered lattice evaluates only expanded-viewport candidates, samples one captured `SimulationTime`, applies the authoritative wind floor, active/cooldown seed separation, strength/spacing scoring, a fixed top subset, and deterministic weighted choice;
+- midpoint/RK2 integration builds backward and forward sides, reverses the backward side into final downwind order, terminates on fixed bounds, and validates every final segment against explicit-time target wind;
+- fixed arrays own all trail, cooldown, candidate, scratch, vertex, and index state; array allocations occur only in `EnsureResources()` and are replaced only after configuration dirtiness;
+- the fixed mesh uses 16-bit indices and the V0.2 vertex contract. The baseline capacity is 384 vertices, 1,104 indices, and 368 triangles; one slot upload is 48 vertices at the 24-point baseline;
+- no material is created and no rendering command is submitted;
+- active and cooldown state clears when the source becomes unavailable, the Weather configuration hash changes, Weather simulation time rewinds, or field origin jumps by at least half the field span. Normal toroidal recenter increments preserve active world-space trails.
+
+Static validation passed **59/59** checks after the final lifecycle revision. Checks covered C# delimiter/string/comment balance, exact plan uniqueness and scope, one co-located `GetComponent`, absence of hierarchy/Ground/render/material/LINQ dependencies, published-domain/resource gates, explicit-time target samples, deterministic top-subset logic, active/cooldown separation, RK2 and alignment validation, configuration/time-rewind/teleport resets, fixed mesh formulas and semantics, slot-range upload, profiler/report contracts, allocation confinement, `OnValidate` destruction prohibition, metadata GUID format/uniqueness, LF/trailing-whitespace rules, and byte identity of frozen Weather-domain, provisional-document, Weather editor, compute, Weather HLSL, vegetation HLSL, and scene dependencies.
+
+A separate analytical replay ported the current CPU target-wind/hash equations and current `VisualFrameworkDemo` camera/Weather serialized values. At simulation times `0`, `5`, `10`, `20`, `39.3`, and `60` seconds, the 8 × 8 lattice produced 13 expanded-viewport candidates per snapshot and respectively `8`, `4`, `7`, `2`, `3`, and `8` candidates above the `0.18` floor. All 32 above-floor candidates in that replay produced paths satisfying the source algorithm's `3.5 m` minimum and `0.35` alignment floor; completed lengths were `6.0–11.5 m`. This verifies that the initial values are not analytically self-blocking for the current serialized scene. It does not prove Unity camera API parity, component compilation, runtime allocations, or final visual quality.
+
+Preserved dependencies are byte-identical to the V0.0 patched state or supplied pristine snapshot as applicable:
+
+- `WeatherWindDomain.cs`
+- `Weather_System_Architecture_Provisional.md`
+- `WeatherWindDomainEditor.cs`
+- `CS_WeatherWindField.compute`
+- `WeatherWindField.hlsl`
+- `VegetationWindResponse.hlsl`
+- `VisualFrameworkDemo.unity`
+
+The supplied snapshot contains no `.git` directory, Unity executable, Unity reference assemblies, or configured C# compiler. Git status/history/diff remain unavailable. The user subsequently reported Unity import/compilation with no errors for V0.1; actual live Mesh API behavior, deterministic live replay, zero-GC proof, and Profiler measurements remain pending and are not represented as passed.
+
+
+---
+
+## WEATHER-WIND-TRAILS-V0.2 — Transparent ribbon rendering and runtime material
+
+**Status:** Runtime rendering source, shader source, and metadata implementation complete at source level on 2026-07-22. Exact-scope, structural, shader-contract, and frozen-dependency checks passed. Unity shader import/compilation, live draw submission, visual validation, and profiling remain pending.
+
+### Objective and acceptance criteria
+
+Add the first rendering implementation for the accepted V0.1 trail mesh without changing trail placement, path construction, Weather simulation, vegetation response, scene ownership, or serialized scene state. The runtime component must create one hidden material from its serialized shader reference, animate the travelling head/tail window shader-side, and submit at most one transparent mesh draw for the resolved Weather target camera while active trails exist.
+
+This patch passes at source level when:
+
+- `WeatherWindTrailRenderer` creates and destroys exactly one `HideFlags.HideAndDontSave` runtime material together with its existing runtime mesh resources;
+- rendering uses the existing interleaved world-space mesh contract without changing its vertex stride, attributes, capacity formulas, slot upload policy, or path algorithms;
+- the shader expands each centreline vertex into a camera-facing ribbon, applies a travelling head/tail visibility window from cumulative path distance and lifecycle data, produces soft cross-width edges and bounded lifetime fading, and writes premultiplied transparent colour;
+- one `Graphics.RenderMesh` submission is issued only in Play Mode, only for the resolved target camera, only while the component/domain/material/mesh are ready, and only while at least one trail is active;
+- the pass uses `Cull Off`, `ZWrite Off`, `ZTest LEqual`, `Blend One OneMinusSrcAlpha`, no lighting, no camera depth-texture sample, no opaque-texture sample, no renderer feature, and no material asset;
+- the supplied scene, Weather producer/editor/compute/HLSL, vegetation consumer, URP assets, layers, tags, packages, Ground, River, and hierarchy remain unchanged.
+
+### Reviewed evidence before the first write
+
+- `Assets/AGENTS.md` was reread completely. It requires this persistent plan as the first modifying write, exact scope, implementation from the recorded contract, frozen-dependency comparison, and honest Unity validation status.
+- `WEATHER-WIND-TRAILS-V0.0`, `WEATHER-WIND-TRAILS-V0.1`, and the complete current `WeatherWindTrailRenderer.cs` were reread. V0.1 already stores world-space centre position, world-space tangent, signed half-width, cumulative path distance, birth time, inverse lifetime, presentation speed, visible tail length, opacity, accepted strength, deterministic variation, and active state in one 52-byte interleaved vertex. No vertex-layout change is required.
+- `VegetationRendererBase.SubmitIndirectRender` and `RebuildVegetation` were inspected as current project examples for `RenderParams`, camera-restricted SRP submission, `GetEntityId()`, disabled shadows, and hidden runtime-material lifecycle.
+- `SH_StylizedVegetationBenchmark.shader`, the current River and Pixel Surface URP shaders, and the shared URP Core include conventions were inspected for project pass tags and ShaderLab structure.
+- Unity's current `Graphics.RenderMesh` scripting contract was checked against the official Unity documentation: one frame submission accepts `RenderParams`, mesh, submesh, and object-to-world transform. The planned world-space mesh uses `Matrix4x4.identity`.
+- `PC_RPAsset.asset`, `Mobile_RPAsset.asset`, `PC_Renderer.asset`, and `Mobile_Renderer.asset` were inspected. Mobile does not request camera depth or opaque textures; the V0.2 shader therefore relies only on ordinary `ZTest` and does not sample either texture.
+- The supplied project snapshot still contains no `.git` directory, Unity executable, Unity reference assemblies, or configured compiler. Git comparison and Unity import/compile/render evidence remain unavailable in this environment.
+
+### Approved files for this patch
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+
+Create:
+
+- `Assets/Game/Rendering/Weather/Shaders.meta`
+- `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader`
+- `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader.meta`
+
+Delete, move, rename, generate, material, custom-editor, scene, prefab, Ground, vegetation, Weather producer/editor/compute/shared-HLSL, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+### Invariants and non-goals
+
+- `WeatherWindDomain` remains the sole wind producer. Rendering consumes only V0.1-generated trail data and does not resample or alter Weather fields.
+- The V0.1 candidate, spacing, cooldown, RK2, reset, expiry, fixed-array, fixed-index, and slot-range-upload contracts remain unchanged.
+- World-space vertex positions and tangents remain world-space. The render transform is identity.
+- The serialized `trailShader` reference is the build-retention and shader-selection contract. No `Shader.Find`, material asset, Resources load, Addressables dependency, or renderer feature is added.
+- Runtime material property changes do not create per-frame `MaterialPropertyBlock`, arrays, strings, collections, or materials.
+- V0.2 renders only in Play Mode. Edit-mode and Scene-view rendering belong to the later editor-diagnostics patch.
+- Rendering is restricted to `domain.TargetCamera`; no `Camera.main`, hierarchy search, all-camera callback, or additional camera is introduced.
+- No soft-particle intersection fade is added because Mobile does not provide a camera depth texture. Ordinary opaque-depth occlusion is the V0 contract.
+- No motion vectors, shadows, light probes, lighting, fog, bloom integration, or post-process dependency is introduced.
+
+### File-by-file implementation sequence
+
+| Item | File | Required result | Status |
+| --- | --- | --- | --- |
+| WTL-V0.2-A | `Weather_Wind_Architecture.md` | Record objective, evidence, exact scope, rendering/material/shader contract, budgets, risks, and validation before implementation. | Complete |
+| WTL-V0.2-B | `WeatherWindTrailRenderer.cs` | Add visual controls, shader-property IDs, hidden material lifecycle, render readiness/error reporting, one bounded Play-Mode `Graphics.RenderMesh` submission, and render counters/Profiler marker without changing V0.1 mesh/path algorithms. | Complete at source level; Unity validation pending |
+| WTL-V0.2-C | `Shaders.meta`, `SH_WeatherWindTrails.shader`, and `.meta` | Add the approved Weather shader folder metadata and one URP unlit transparent camera-facing ribbon shader matching the existing vertex contract. | Complete at source level; Unity validation pending |
+| WTL-V0.2-D | Approved files and frozen dependencies | Reread complete final files, compare exact scope and frozen hashes, run structural/semantic/static checks, and record Unity validation honestly. | Complete at source level; Unity validation pending |
+
+### Runtime material and submission contract
+
+`EnsureResources()` treats the serialized shader and supported runtime material as part of readiness. After the fixed mesh is created, it creates exactly one material:
+
+```text
+new Material(trailShader)
+name = PS3D Weather Wind Trails Runtime Material
+hideFlags = HideFlags.HideAndDontSave
+```
+
+The material receives colour, edge softness, head/tail distance softness, lifetime fade fractions, strength-opacity influence, and deterministic-variation influence only when resources/configuration are rebuilt. `_TrailPresentationTime` is the only per-frame material property update.
+
+After expiry, spawning, and bounds maintenance, the component submits only when all of the following hold:
+
+```text
+Application.isPlaying
+runtime readiness is true
+activeTrailCount > 0
+trailMesh != null
+runtimeMaterial != null
+resolvedCamera != null
+```
+
+The draw contract is:
+
+```text
+RenderParams.camera = resolvedCamera
+RenderParams.worldBounds = trailMesh.bounds
+RenderParams.layer = gameObject.layer
+RenderParams.entityId = gameObject.GetEntityId()
+shadowCastingMode = Off
+receiveShadows = false
+Graphics.RenderMesh(..., submesh 0, Matrix4x4.identity)
+```
+
+One call is permitted per active frame. No draw is submitted with zero active trails.
+
+### Shader contract
+
+The shader reads the V0.1 attributes exactly:
+
+```text
+POSITION: world-space centreline position
+NORMAL: world-space centreline tangent
+TEXCOORD0.x: signed half-width in metres
+TEXCOORD0.y: cumulative centreline distance in metres
+TEXCOORD1: birth time, inverse lifetime, presentation speed, visible tail length
+COLOR: opacity, normalized strength, deterministic variation, active flag
+```
+
+The vertex stage normalizes the tangent, calculates view direction from the centre to the active camera, calculates a perpendicular ribbon side from tangent and view direction with deterministic fallback axes for near-parallel vectors, offsets by signed half-width, and transforms the resulting world position with `TransformWorldToHClip`.
+
+The fragment stage calculates:
+
+```text
+age = presentationTime - birthTime
+age01 = age × inverseLifetime
+headDistance = max(0, age) × presentationSpeed
+tailDistance = headDistance - visibleTailLength
+```
+
+It multiplies a soft head gate, soft tail gate, cross-width edge mask, fade-in, fade-out, vertex opacity, active flag, bounded strength influence, bounded variation influence, and `_TrailColor.a`. Output RGB is premultiplied by final alpha and uses `Blend One OneMinusSrcAlpha`.
+
+### Initial visual defaults
+
+```text
+Trail colour: slightly cool off-white (0.92, 0.97, 1.00, 1.00)
+Cross-width edge softness: 0.35
+Head softness: 0.35 m
+Tail softness: 0.55 m
+Lifetime fade-in fraction: 0.12
+Lifetime fade-out fraction: 0.28
+Strength-opacity influence: 0.25
+Variation-opacity influence: 0.12
+```
+
+These are initial calibration values, not visually accepted final values. The later Inspector/scene patch exposes them for capture-based tuning.
+
+### Performance and resource budget
+
+The baseline remains 384 vertices, 1,104 unsigned 16-bit indices, and 368 triangles. The vertex/index memory and slot uploads are unchanged from V0.1. V0.2 adds:
+
+- one hidden runtime `Material` per enabled trail component;
+- one material float update per active frame;
+- at most one transparent draw submission per active frame and resolved target camera;
+- one unlit vertex/fragment pass over the projected ribbon pixels;
+- no new texture, buffer, compute dispatch, renderer feature, camera texture, material asset, or per-trail draw.
+
+The dominant unmeasured cost is transparent pixel coverage/overdraw. CPU draw-submission and geometry costs are bounded by one call and the fixed mesh. No performance exception is approved.
+
+### Risks and validation
+
+- Camera-facing cross products can degenerate when tangent and view direction are nearly parallel. The shader must use a bounded fallback axis and static checks must confirm the fallback exists.
+- One combined transparent mesh sorts as one renderer. Sparse six-metre placement reduces overlap but does not prove correct crossing order; Unity visual capture is required.
+- Bright off-white premultiplied trails can bloom strongly in HDR. V0.2 adds bounded colour/opacity controls but does not tune against a final capture.
+- A missing or unsupported serialized shader must produce `NOT READY`, no material, no draw, and a concrete report error without affecting Weather.
+- Unity validation must confirm shader import on PC and Mobile URP configurations, one trail draw in Frame Debugger, correct opaque-depth occlusion, no material leak after enable/disable, and zero steady-state `GC.Alloc` after warm-up.
+
+
+### Post-change consistency and compliance audit
+
+Actual affected files exactly match the approved V0.2 scope.
+
+Modified:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+
+Created:
+
+- `Assets/Game/Rendering/Weather/Shaders.meta`
+- `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader`
+- `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader.meta`
+
+Deleted, moved, renamed, generated, material, custom-editor, scene, prefab, Ground, vegetation, Weather producer/editor/compute/shared-HLSL, River, URP, renderer-feature, layer, tag, package, and hierarchy changes beyond that declaration: none.
+
+Implemented runtime behavior:
+
+- the serialized shader is now required and checked for platform support before mesh/material resources are considered ready;
+- one `HideFlags.HideAndDontSave` runtime material is created from that shader and destroyed with the existing runtime mesh on disable, destruction, reconfiguration, missing-shader transition, or unsupported-shader transition;
+- eight bounded visual controls are serialized on the component and applied to the runtime material only during resource/configuration rebuild; `_TrailPresentationTime` is the only property changed for each submitted frame;
+- `SubmitTrailRender()` is called after expiry, domain-state reconciliation, candidate spawning, and bounds maintenance, but submits only in Play Mode with at least one active trail and non-null mesh, material, and resolved target camera;
+- one `RenderParams` value restricts rendering to `resolvedCamera`, uses the existing mesh bounds, disables shadows, preserves the component GameObject layer and entity identity, and submits submesh zero with `Matrix4x4.identity` because the mesh stores world-space positions;
+- the report now records shader support, runtime-material readiness, Play-Mode target-camera rendering, total render submissions, and the active count in the latest submission;
+- V0.1 candidate selection, separation, cooldown, path integration, reset rules, vertex/index formulas, fixed buffers, and slot-range uploads are unchanged.
+
+Implemented shader behavior:
+
+- one URP `UniversalForward` transparent unlit pass uses `Cull Off`, `ZWrite Off`, `ZTest LEqual`, and premultiplied `Blend One OneMinusSrcAlpha`;
+- the shader consumes exactly the existing five vertex attributes with no added stream or stride change;
+- the vertex stage treats centre position and tangent as world-space data, calculates a camera-facing perpendicular, includes an explicit fallback-axis path for near-parallel tangent/view vectors, offsets by signed half-width, and transforms directly to clip space;
+- the fragment stage rejects inactive/expired geometry, moves a soft head/tail window along cumulative path distance, softens cross-width edges with derivatives, applies bounded lifetime, strength, and deterministic-variation opacity, and outputs premultiplied off-white colour;
+- the shader does not include lighting, sample `_CameraDepthTexture` or `_CameraOpaqueTexture`, require a renderer feature, or create any texture dependency.
+
+Static validation passed **122/122** checks before the final documentation reconciliation. The checks covered exact file existence and scope, LF/trailing-whitespace hygiene, C# and ShaderLab/HLSL lexical and delimiter balance, one material creation/destruction contract, missing/unsupported shader gates, one Play-Mode/active-trail `Graphics.RenderMesh` call without an explicit argument modifier, target-camera restriction, identity transform, world bounds, disabled shadows, `GetEntityId()`, absence of `Shader.Find`, `Camera.main`, hierarchy, Ground, vegetation, depth-texture, opaque-texture, and lighting dependencies, render-state tokens, camera-facing fallback, premultiplied output, travelling window, lifetime fade, complete C#/shader property parity, unchanged five-attribute/52-byte mesh contract, valid unique folder/shader metadata GUIDs, and canonical-plan path coverage.
+
+SHA-256 comparison confirmed these reviewed dependencies remain byte-identical to the V0.1 input state:
+
+- `WeatherWindDomain.cs`
+- `WeatherWindDomainEditor.cs`
+- `WeatherWindField.hlsl`
+- `CS_WeatherWindField.compute`
+- `VegetationWindResponse.hlsl`
+- `VisualFrameworkDemo.unity`
+- `PC_RPAsset.asset`
+- `Mobile_RPAsset.asset`
+- `PC_Renderer.asset`
+- `Mobile_Renderer.asset`
+
+The first Unity compilation of V0.2 reported `CS9194` at the `Graphics.RenderMesh` call because the installed Unity API metadata exposes the first parameter as a readonly `in` parameter while the project compiles with C# language version 9.0. C# 9 does not permit an explicit `ref` argument for that parameter. The call now passes the local `RenderParams` value without an explicit argument modifier. This preserves the same rendering data and is compatible with the installed compiler/API contract. Unity recompilation, shader import, one-draw Frame Debugger evidence, camera-facing/depth-occlusion visual behavior, transparent sorting, HDR/bloom response, material lifecycle, steady-state allocation, and CPU/GPU timing remain pending and are not represented as passed.
+
+## WEATHER-WIND-TRAILS-V0.2A — C# 9 RenderMesh invocation correction
+
+**Status:** Accepted on 2026-07-22. Unity recompilation passed with no reported errors after removing the explicit `ref` modifier.
+
+### Reported failure
+
+Unity compilation reported:
+
+```text
+Assets\Game\Procedural\Weather\WeatherWindTrailRenderer.cs(2013,21): error CS9194: Argument 1 may not be passed with the 'ref' keyword in language version 9.0. To pass 'ref' arguments to 'in' parameters, upgrade to language version 12.0 or greater.
+```
+
+The failure is limited to the call-site argument modifier. It does not indicate a problem with the `RenderParams` contents, mesh contract, shader contract, or rendering architecture.
+
+### Expected and actual affected files
+
+Modify:
+
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Docs/Weather_Wind_Architecture.md`
+
+Create, delete, move, rename, generate, metadata, shader, scene, material, Weather producer, vegetation, Ground, compute, shared-HLSL, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+### Correction
+
+The V0.2 call:
+
+```csharp
+Graphics.RenderMesh(ref renderParams, trailMesh, 0, Matrix4x4.identity);
+```
+
+was corrected to:
+
+```csharp
+Graphics.RenderMesh(renderParams, trailMesh, 0, Matrix4x4.identity);
+```
+
+The installed Unity API exposes the first parameter as readonly `in`; omitting the argument modifier is valid C# 9 call syntax and avoids the unsupported `ref`-to-`in` conversion. No language-version change is required or authorized.
+
+### Consistency and validation
+
+The correction changes no field values, bounds, camera restriction, layer, entity identity, shadow settings, submesh, transform, material properties, draw count, mesh data, or lifecycle behavior. Static checks confirm there is exactly one `Graphics.RenderMesh` call, no remaining `ref renderParams` token, balanced C# structure, and exact two-file scope. Unity recompilation remains required before V0.2A is accepted.
+
+
+---
+
+## WEATHER-WIND-TRAILS-V0.3 — Inspector and Scene diagnostics
+
+**Status:** Historical V0.3 source record. Its Scene text legend and copy-only report workflow were corrected by `WEATHER-WIND-TRAILS-V0.3A`; current editor behavior is defined by the V0.3A section below.
+
+### Objective and acceptance criteria
+
+Add one compact custom Inspector for `WeatherWindTrailRenderer` and selected-object Scene-view diagnostics for the runtime data already exposed by V0.1–V0.2A. The patch must not change runtime trail placement, path integration, mesh/shader contracts, rendering behavior, scene state, Weather simulation, vegetation response, or serialized defaults.
+
+This patch passes at source level when:
+
+- the Inspector preserves every existing serialized renderer control through the standard serialized Inspector drawing path;
+- one Actions group provides `Reset Wind Trail Simulation` and `Copy Wind Trail Report`, with clipboard copying as the primary report handoff path;
+- one compact `Show Scene Diagnostics` control gates all editor visualization instead of adding multiple runtime debug modes or a separate debug component;
+- selected-object Scene diagnostics draw the last candidate sweep using status-specific markers and active trails using their current centreline points;
+- the Scene legend states that points represent the last candidate sweep and lines represent active generated paths;
+- editor callbacks subscribe and unsubscribe symmetrically, editor code remains under the existing `Editor` folder and namespace, and no `UnityEditor` reference enters runtime code;
+- the current runtime component, shader, scene, Weather producer/editor/compute/HLSL, vegetation consumer, Ground, River, URP assets, layers, tags, packages, and hierarchy remain unchanged.
+
+### Reviewed evidence before the first write
+
+- `Assets/AGENTS.md` was reread completely. It requires a persistent canonical plan before implementation, exact approved scope, full post-change reread, and honest Unity validation status.
+- The complete current `WeatherWindTrailRenderer.cs` was reread after the user-confirmed V0.2A C# compilation pass. Its public diagnostics surface already provides `BuildComprehensiveReport`, `ResetTrailSimulation`, `TryGetLastCandidate`, `TryGetTrailPoint`, `GetTrailPointCount`, active/candidate counts, resource readiness, and current error state. No runtime-source expansion is required for V0.3.
+- `WeatherWindDomainEditor.cs` was reread completely as the subsystem pattern for custom Inspector actions, clipboard reporting, selected-object `SceneView.duringSceneGui` drawing, balanced callback lifecycle, and Play Mode repainting.
+- `VegetationInteractionDomainEditor.cs` and relevant `VegetationLayerEditor.cs` action/report patterns were inspected as supporting editor conventions.
+- The current runtime and shader contracts from V0.1, V0.2, and V0.2A were compared. Editor diagnostics can consume public CPU data only; no GPU readback, mesh readback, field resampling, material access, or render-path change is required.
+- The supplied project snapshot contains no `.git` directory, Unity executable, Unity reference assemblies, or configured Unity compiler. Git comparison and Unity compilation remain unavailable in this patch environment.
+
+### Approved files for this patch
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+
+Create:
+
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs.meta`
+
+Delete, move, rename, generate, runtime-source, shader, material, scene, prefab, Weather producer/editor/compute/shared-HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+### Inspector contract
+
+The custom Inspector uses the normal serialized drawing path for all existing trail controls. It adds only:
+
+```text
+Weather Wind Trail Actions
+  Reset Wind Trail Simulation
+  Copy Wind Trail Report
+
+Scene Diagnostics
+  Show Scene Diagnostics
+```
+
+The Inspector also shows a compact readiness summary derived from the runtime component's existing public status and counts. It does not duplicate every report field, create a second debug interface, expose material internals, or add temporary tuning controls.
+
+### Scene diagnostic contract
+
+Diagnostics draw only while the trail component's GameObject is the active selection and `Show Scene Diagnostics` is enabled.
+
+Candidate markers use the last completed candidate sweep:
+
+```text
+OutsideViewport = muted grey
+BelowWindFloor = blue
+TooClose = orange
+Eligible = green
+Selected = yellow
+```
+
+Active trail centrelines are drawn as bright cyan-white line segments with compact endpoint markers. The most recently selected candidate remains the explicit yellow seed marker for the latest completed sweep. The diagnostics use the component's public CPU arrays through `TryGetLastCandidate`, `GetTrailPointCount`, and `TryGetTrailPoint`; they do not inspect the runtime mesh or material and do not alter simulation state.
+
+The Scene legend states:
+
+```text
+Points = last candidate sweep.
+Lines = active generated paths.
+```
+
+### Performance and non-goals
+
+All added work is editor-only and selected-object-only. Candidate drawing is bounded by the serialized lattice capacity (maximum 16 × 16 = 256 points), and path drawing is bounded by 16 trails × 48 points. No player-build code, runtime allocation, draw call, shader pass, compute dispatch, GPU readback, scene component, or serialized runtime field is added.
+
+The patch does not install the component into the demo scene. Scene installation and first visual tuning remain `WEATHER-WIND-TRAILS-V0.4`.
+
+### Risks and validation
+
+- `SceneView.duringSceneGui` must be unsubscribed in `OnDisable`; static checks and Unity selection/reload testing must verify no duplicate callback.
+- Diagnostics may be visually dense at the maximum 16 × 16 lattice. The single Inspector toggle is the approved suppression mechanism; no additional filtering controls are added in V0.3.
+- The report must copy the exact runtime-generated string. Editor code must not reconstruct or summarize report telemetry.
+- Unity validation must confirm editor compilation, Inspector control preservation, clipboard copy, reset behavior, Scene markers/paths, callback cleanup across selection/domain reload, and absence of new runtime errors.
+
+
+### Post-change consistency and compliance audit
+
+Actual affected files exactly match the approved V0.3 scope.
+
+Modified:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+
+Created:
+
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs.meta`
+
+Deleted, moved, renamed, generated, runtime-source, shader, material, scene, prefab, Weather producer/editor/compute/shared-HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+Implemented editor behavior:
+
+- the custom Inspector preserves all existing serialized renderer controls through `DrawDefaultInspector`;
+- a compact status section reports runtime readiness, resolved Weather domain and camera, active/capacity counts, last visible/eligible candidate counts, mesh capacity, and the component's existing concrete error string;
+- `Reset Wind Trail Simulation` calls the runtime component's existing bounded reset API and is disabled until runtime resources exist;
+- `Copy Wind Trail Report` copies the exact `BuildComprehensiveReport()` result to `EditorGUIUtility.systemCopyBuffer` and logs one contextual confirmation;
+- one non-serialized `Show Scene Diagnostics` toggle controls all Scene-view visualization; no runtime debug enum, component, field, material control, or second diagnostic interface was added;
+- Scene diagnostics run only for the selected component GameObject, show the last candidate sweep with status-specific point colours, show active trail centrelines and endpoints through the existing public CPU diagnostic APIs, restore `Handles.zTest` after drawing, and repaint continuously only during Play Mode;
+- `SceneView.duringSceneGui` subscription is idempotent in `OnEnable` and removed in `OnDisable`.
+
+Static validation passed **35/35** checks before this final documentation update. Checks covered custom-editor binding, balanced Scene callback lifecycle, default serialized Inspector preservation, reset and clipboard actions, the single Scene-diagnostics toggle, candidate/path public-API usage, selected-object gating, Play Mode repainting, depth-test restoration, legend wording, all candidate-status mappings, absence of `UnityEditor` from runtime code, C# structural balance, namespace/class declarations, LF/trailing-whitespace hygiene, valid unique metadata GUID, canonical-plan presence, and SHA-256 identity of the V0.2A runtime component and all V0.2 shader/metadata files.
+
+The complete final editor file and relevant public runtime diagnostic surface were reread after implementation. No runtime trail placement, path integration, lifecycle, fixed-buffer, mesh, material, shader, render-submission, Weather, vegetation, or scene behavior changed. Unity editor compilation, Inspector rendering, clipboard behavior, reset behavior, selected-object candidate/path drawing, callback cleanup across selection and domain reload, and Scene-view visual density remain pending and are not represented as passed.
+
+---
+
+## WEATHER-WIND-TRAILS-V0.3A — Inspector workflow correction
+
+**Status:** Editor workflow correction and source-level post-change audit complete on 2026-07-22. Unity editor compilation and live shader-assignment/report/Scene validation remain pending.
+
+### Objective and acceptance criteria
+
+Correct two editor-workflow faults reported during the first live V0.3 validation:
+
+1. The Scene view currently renders a text legend/status panel even though the same information belongs in the component Inspector.
+2. A newly attached `WeatherWindTrailRenderer` remains `NOT READY` because its serialized `trailShader` reference is empty, while the V0.3 validation instructions omitted the required manual shader assignment.
+
+Observed evidence:
+
+- The user-provided Scene-view capture shows the `Weather Wind Trail Diagnostics` text panel rendered over the Scene view.
+- The user-provided runtime report states `Serialized trail shader: None`, `Runtime material ready: No`, and `A serialized wind-trail shader is required.` after the component was attached to the existing Weather object.
+- `WeatherWindTrailRenderer.cs` declares the private serialized field `trailShader` and requires it in `CanRun`; the exact shader asset already exists at `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader`.
+- `WeatherWindTrailRendererEditor.cs` currently calls `DrawLegend` from `DuringSceneGui` and provides report copying without displaying the complete report in the Inspector.
+
+This correction passes at source level when:
+
+- the exact default shader asset is assigned to an empty `trailShader` serialized property when the component Inspector resolves that asset;
+- the assigned reference remains serialized on the scene component, preserving build retention without runtime `Shader.Find` dependency;
+- the Scene view contains only optional candidate markers and active-path geometry, with no GUI text panel;
+- a dedicated Inspector report section displays the exact `BuildComprehensiveReport()` string and provides its adjacent `Copy Report` action;
+- `Reset Wind Trail Simulation` remains available as the only simulation action;
+- no runtime, shader, scene-YAML, material-asset, Weather-domain, vegetation, Ground, renderer, layer, tag, or hierarchy code changes occur.
+
+### Approved files
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+
+Create, delete, move, rename, metadata, runtime-source, shader, material, raw scene/prefab, Weather producer/compute/HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+### Implementation sequence
+
+1. Add an editor-only exact-path resolver for `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader`.
+2. When the selected component's serialized `trailShader` property is empty and the asset resolves, record Undo, assign the shader through `SerializedObject`, apply the property, and mark the component dirty so the scene stores the reference.
+3. Remove the Scene GUI legend call and implementation. Preserve the optional selected-object candidate markers and active path lines.
+4. Move report copying into a new Inspector report section that displays the exact runtime-generated report in a selectable scroll area.
+5. Reread the final editor source and relevant runtime serialized/report contracts; run structural, scope, forbidden-dependency, exact-path, and whitespace checks.
+
+### Invariants and non-goals
+
+- Do not change `WeatherWindTrailRenderer.cs`, the shader, or any serialized runtime default.
+- Do not create a material asset or use `Shader.Find` as runtime fallback.
+- Do not reconstruct report telemetry in editor code; display and copy the exact runtime-generated report.
+- Do not remove candidate/path Scene diagnostics; remove only the Scene text overlay.
+- Do not raw-edit the demo scene. The editor assignment marks the existing component dirty and Unity serializes the reference when the user saves normally.
+- Do not add a second debug component, runtime debug enum, or preview-specific Inspector.
+
+### Risks and validation
+
+- Automatic assignment must occur only when the serialized shader reference is empty and the exact shader asset exists; an explicit user-assigned shader must never be overwritten.
+- The editor must tolerate the shader asset being temporarily unavailable during import and retry on the next Inspector draw.
+- Unity validation must confirm that opening the component Inspector assigns `SH_WeatherWindTrails`, changes the report to shader/material-ready in Play Mode, shows the full report in the Inspector, copies the exact report, and leaves the Scene view free of diagnostic text.
+
+
+### Post-change consistency and compliance audit
+
+Actual affected files exactly match the approved V0.3A scope.
+
+Modified:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+
+Created, deleted, moved, renamed, metadata, runtime-source, shader, material, raw scene/prefab, Weather producer/compute/HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+Implemented corrections:
+
+- the custom Inspector resolves the exact shader asset at `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader` only when the component's serialized `trailShader` property is empty;
+- assignment uses `AssetDatabase.LoadAssetAtPath<Shader>`, `Undo.RecordObject`, the existing serialized property, `ApplyModifiedProperties`, and `EditorUtility.SetDirty`, so an existing user-assigned shader is preserved and no runtime `Shader.Find` fallback is added;
+- the Inspector status now shows the resolved trail shader;
+- the full exact `BuildComprehensiveReport()` output appears in a dedicated selectable, scrollable `Weather Wind Trail Report` foldout with its adjacent `Copy Report` button;
+- `Reset Wind Trail Simulation` remains in the Actions section, while report copying is no longer duplicated there;
+- the Scene diagnostic text legend/status panel and all `Handles.BeginGUI`/GUI-area drawing were removed;
+- optional selected-object candidate markers and active centreline geometry remain behind the existing `Show Scene Diagnostics` toggle.
+
+Static validation passed **27/27** checks. Checks covered exact two-file scope, exact shader asset path, empty-only assignment, Undo and serialized-property persistence, absence of `Shader.Find`, exact runtime-report display and copy, removal of the Scene GUI legend, preservation of candidate/path geometry and callback lifecycle, balanced C# structure, LF-only content, and trailing-whitespace hygiene. The existing project contains a verified `EditorGUILayout.SelectableLabel` usage pattern in `VegetationBenchmarkRunnerEditor.cs`; the V0.3A report uses the same API with the text-area style inside a bounded Inspector scroll view.
+
+The complete final editor source and the relevant runtime `trailShader`, `TrailShader`, `BuildComprehensiveReport`, `ResourcesReady`, and `RuntimeReady` contracts were reread. No runtime trail placement, candidate selection, streamline integration, mesh, material, shader, render submission, Weather, vegetation, or scene behavior changed. Unity editor compilation, automatic shader assignment on the existing component, scene-dirty persistence, runtime material creation, Inspector report display/copy, and absence of Scene-view text remain pending and are not represented as passed.
+
+---
+
+## WEATHER-WIND-TRAILS-V0.4 — Play Mode ownership and visual-calibration Inspector
+
+**Status:** Plan recorded on 2026-07-22 before implementation. Runtime/editor implementation and source-level audit pending.
+
+### Objective and acceptance criteria
+
+Finalize the installed V0 trail workflow for visual evaluation without changing the accepted wind simulation, placement algorithm, streamline geometry, shader, or serialized visual defaults. This patch combines the small Play Mode-ownership correction with a compact calibration-oriented Inspector because a standalone ownership patch is not justified.
+
+User-provided runtime evidence after V0.3A confirms:
+
+- the component is installed on the existing Weather object and resolves the co-located published `WeatherWindDomain` and `Main Camera`;
+- the exact serialized shader resolves as `PS3D/Weather/Weather Wind Trails`, is supported, and creates the hidden runtime material;
+- the fixed mesh allocates 384 vertices and 1,104 indices;
+- user-reported Unity import evidence before applying this V0.4 archive found that the V0.2/V0.3A interleaved vertex attributes were supplied in the non-standard order `Position, Normal, TexCoord0, TexCoord1, Color`; Unity automatically reordered them to `Position, Normal, Color, TexCoord0, TexCoord1` and emitted a warning;
+- candidate/path generation is active, accepted seeds respect the 6 m minimum separation with reported examples above 9 m, generated paths report alignment `1`, and one bounded render submission occurs per active frame;
+- the component currently continues candidate/path simulation in Edit Mode because `[ExecuteAlways]` remains on the runtime component, even though rendering is Play Mode-only.
+
+The patch passes at source level when:
+
+- `WeatherWindTrailRenderer` no longer uses `[ExecuteAlways]` and performs no resource allocation, spawning, expiration, path integration, mesh upload, or render submission outside Play Mode;
+- the report and Inspector distinguish `Editor idle` from a runtime readiness failure;
+- the reset action and Scene candidate/path diagnostics are available only during Play Mode;
+- the custom Inspector replaces the unstructured default field dump with three existing-control groups: `Visual Calibration`, `Placement & Density`, and collapsed `Advanced Generation`;
+- every serialized field remains exposed exactly once, with no new tuning field, preview interface, debug component, shader property, or materially different default;
+- the current shader, scene, Weather domain/editor/compute/HLSL, vegetation, Ground, URP assets, layers, tags, packages, and hierarchy remain unchanged.
+
+### Approved affected files
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+
+Create, delete, move, rename, metadata, shader, material, raw scene/prefab, Weather producer/editor/compute/shared-HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+The demo-scene component installation is already user-completed through Unity and evidenced by the supplied runtime reports. The supplied source archive does not contain that latest serialized scene state, and repository rules prohibit reconstructing it through a raw YAML edit. This patch therefore does not deliver or overwrite `VisualFrameworkDemo.unity`.
+
+### Reviewed evidence before the first write
+
+- `Assets/AGENTS.md` was reread completely.
+- The complete current `WeatherWindTrailRenderer.cs`, `WeatherWindTrailRendererEditor.cs`, and `SH_WeatherWindTrails.shader` were reread.
+- The V0.1–V0.3A canonical sections and the original handoff V0.4 scene-installation requirement were reviewed.
+- The user-provided reports show successful shader/material readiness, active trails, fixed mesh capacity, candidate filtering, separation, valid path construction, and active render submissions. The first report also proves Edit Mode simulation occurred because it contains spawn attempts, active trails, and mesh uploads with zero render submissions.
+- The current source snapshot contains no Git metadata or Unity executable; Git comparison and Unity compilation are unavailable in this environment.
+
+### Implementation sequence
+
+1. Remove `[ExecuteAlways]`; add explicit Play Mode guards to enable/update/reset/resource paths and make `RuntimeReady` Play Mode-owned.
+2. Update the runtime report to use `EDITOR IDLE` outside Play Mode and suppress stale runtime errors there.
+3. Replace `DrawDefaultInspector` with explicit serialized groups containing every existing field exactly once.
+4. Disable reset and Scene diagnostics outside Play Mode while preserving automatic exact-path shader assignment and the full selectable/copyable report.
+5. Reread the complete final runtime/editor sources, compare all frozen dependencies, and record exact scope and validation results below.
+
+### Invariants and non-goals
+
+- Do not change the candidate algorithm, spacing, RK2 integration, path limits, vertex semantics/stride/capacity, material creation, shader equations, render call, Weather cadence, or any serialized tuning default. The interleaved field and descriptor declaration order may be corrected to Unity's required standard attribute order without changing those semantics.
+- Do not add a visual preset, temporary preview, second report interface, new debug enum, or additional Inspector control.
+- Do not raw-edit the scene. The current user-owned scene installation remains authoritative.
+- Do not claim visual acceptance without a Game-view capture. This patch prepares the compact calibration surface; appearance tuning remains evidence-driven.
+- Do not claim Frame Debugger, GC, CPU, GPU, desktop/Mobile, transparency sorting, bloom, or depth-occlusion validation without Unity evidence.
+
+### Required validation
+
+- Unity must compile the runtime and editor changes without new errors.
+- Outside Play Mode, the report must show `EDITOR IDLE`, runtime resources/counters must remain inactive, reset must be disabled, and Scene diagnostics must draw nothing.
+- In Play Mode, the component must return to `READY`, generate/render trails, and preserve the fixed capacities and one-submit-per-active-frame behavior.
+- The Inspector must expose every existing field exactly once under the three approved groups, preserve automatic shader assignment, and retain the full report/copy workflow.
+- A Game-view capture is required before changing visual defaults or shader behavior.
+
+### Post-change consistency and compliance audit
+
+**Status:** Runtime/editor source implementation and source-level audit complete on 2026-07-22. Unity compilation and live behavior remain pending.
+
+Actual affected files exactly match the approved V0.4 scope.
+
+Modified:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+
+Created, deleted, moved, renamed, metadata, shader, material, raw scene/prefab, Weather producer/editor/compute/shared-HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+Implemented behavior:
+
+- `[ExecuteAlways]` was removed from `WeatherWindTrailRenderer`;
+- `OnEnable` allocates the fixed arrays, mesh, and hidden runtime material only while `Application.isPlaying`;
+- `Update`, `ResetTrailSimulation`, `CanRun`, and `EnsureResources` now have explicit Play Mode ownership guards, preventing Edit Mode spawning, expiration, path integration, mesh upload, or render submission;
+- `RuntimeReady` is false outside Play Mode without representing editor idleness as a runtime fault;
+- the report header is now `Weather Wind Trails V0.4 Calibration Report`; outside Play Mode it reports `EDITOR IDLE` and `No (Play Mode only)`, resolves the co-located Weather domain/camera for useful editor context, and suppresses stale runtime error output;
+- the Inspector no longer emits the unstructured `DrawDefaultInspector` field list;
+- every one of the 41 existing serialized fields is exposed exactly once under `Visual Calibration`, `Placement & Density`, or collapsed `Advanced Generation`; no serialized field or default was added, removed, or changed;
+- exact-path automatic shader assignment, runtime status, full selectable report, adjacent `Copy Report`, and the single Scene-diagnostics toggle remain;
+- reset is disabled outside Play Mode, and Scene candidate/path geometry neither draws nor repaints outside Play Mode;
+- the interleaved `TrailVertex` field order and `SetVertexBufferParams` descriptor order are both now `Position, Normal, Color, TexCoord0, TexCoord1`, matching Unity's required standard order while preserving the same shader semantics, 52-byte stride, 384-vertex capacity, and 1,104-index topology; this prevents Unity from silently adjusting the layout and removes the reported warning.
+
+Static validation passed **87/87** checks before this final documentation update. Checks covered exact three-file scope; absence of `[ExecuteAlways]`; Play Mode gates on runtime readiness, enable, update, reset, `CanRun`, and resource creation; editor-idle report/status behavior; absence of `DrawDefaultInspector`; presence and default expansion state of the three Inspector groups; exact-once exposure of all 41 serialized fields; preserved exact-path shader assignment, report copy, and selected-object diagnostics; disabled Edit Mode reset/Scene diagnostics; matching standard `Position, Normal, Color, TexCoord0, TexCoord1` declaration order in both `TrailVertex` and `SetVertexBufferParams`; preserved 52-byte stride and shader semantic/property contract; balanced C# braces/parentheses; LF-only and trailing-whitespace hygiene; and SHA-256 identity of the shader, Weather domain/editor/compute/HLSL, vegetation wind consumer, demo scene, and provisional Weather document.
+
+The complete final runtime and editor files were reread after implementation. Candidate selection, scoring, spacing, cooldown, RK2 path integration, fixed vertex/index contract, slot uploads, material properties, shader equations, render submission, Weather simulation, vegetation response, scene state, and all serialized defaults remain unchanged.
+
+Unity compilation, `EDITOR IDLE` Inspector/report behavior, absence of Edit Mode allocations/counters, Play Mode return to `READY`, grouped Inspector rendering, reset/Scene gating, Game-view appearance, Frame Debugger one-draw evidence, steady-state GC, CPU/GPU timing, depth occlusion, transparency sorting, bloom response, and desktop/Mobile compatibility remain pending and are not represented as passed. A Game-view capture is required before any visual-default or shader-tuning patch.
+
+---
+
+## WEATHER-WIND-TRAILS-V0.5 — Calm visual baseline, uniform body opacity, and occasional broad waves
+
+**Status:** Runtime, editor, shader, migration, and source-level post-change audit complete on 2026-07-22. Unity compilation and live visual/performance validation remain pending.
+
+### Objective and acceptance criteria
+
+Calibrate the first visible wind-trail implementation from the user-provided Game-view evidence and expose the two newly requested artistic behaviours as ordinary Inspector controls.
+
+Observed evidence:
+
+- The user-confirmed V0.4 implementation compiles, no longer emits the non-standard vertex-layout warning, and renders visible wind trails.
+- The supplied Game-view capture shows one narrow, pale-grey trail with low body opacity and a short visible extent relative to the vegetation field.
+- The user reports that trails move too quickly, exist for only about two to three seconds, are too transparent, fade across their body edges, appear too frequently, attract too much attention through repeated spawning/despawning, and are too short on average.
+- The user requires no more than two to three visible trails at once, approximately four-to-seven-second lifetimes, slower presentation than the underlying gust pattern, a whiter and less transparent body, longer average visible and generated length, and an occasional broader wave.
+- The user explicitly requires controls for uniform body opacity and occasional larger waves rather than hard-coding either behaviour.
+
+The patch passes at source level when:
+
+- `Uniform Body Opacity` is an exposed serialized control. When enabled, opacity remains spatially constant across the trail body; width/head/tail boundaries use geometry taper and minimal raster anti-aliasing rather than broad alpha gradients. When disabled, the existing soft alpha-body mode remains available and `Edge Softness` remains editable.
+- `Occasional Broad Wave Chance` and `Occasional Broad Wave Strength` are exposed serialized controls. A deterministic subset of accepted trails receives one bounded lateral XZ macro-wave, with zero endpoint offset, after authoritative streamline integration.
+- Broad-wave deformation is accepted only when the resulting path remains inside the Weather field/camera limits, avoids self-approach, and satisfies the existing target-wind alignment threshold; otherwise the undeformed authoritative path is retained.
+- The recommended serialized baseline becomes: maximum active trails `3`; spawn attempts `1/s`; separation `8 m`; cooldown `3 s`; lifetime `4–7 s`; presentation speed `1.2–2.0 m/s`; visible tail `5–8 m`; maximum centreline points `32`; minimum completed path `4 m`; white colour; opacity `0.95`; uniform body opacity enabled; short lifetime fades `0.03/0.05`; strength/variation opacity influence `0`; broad-wave chance `0.22`; broad-wave strength `0.45 m`.
+- Presentation speed is bounded against generated path length, visible-tail length, and lifetime so a short trail cannot completely leave its centreline substantially before its configured lifetime ends.
+- Existing installed components migrate once from exact V0.4 baseline values to the V0.5 baseline while preserving any field whose serialized value no longer equals the old baseline.
+- The migration is versioned and hidden; it does not add a permanent preset/debug action or overwrite later user tuning.
+- The existing Play Mode-only ownership, co-located Weather resolution, fixed arrays, candidate selection, spacing, RK2 integration, mesh layout, hidden runtime material, one render submission, report/copy workflow, and Scene diagnostics remain intact.
+
+### Approved affected files
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+- `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader`
+
+Create, delete, move, rename, metadata, scene, prefab, material asset, Weather producer/editor/compute/shared-HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+### Reviewed evidence before the first implementation edit
+
+- `Assets/AGENTS.md` was reread completely.
+- The complete fixed V0.4 `WeatherWindTrailRenderer.cs` and `WeatherWindTrailRendererEditor.cs` were reread.
+- The complete current `SH_WeatherWindTrails.shader` was reread and its C#/shader property contract was compared with `ApplyRuntimeMaterialProperties` and `TrailVertex`.
+- The V0.1–V0.4 canonical sections, current fixed vertex layout, current report, current Inspector grouping, and current Play Mode ownership were reviewed.
+- The supplied source snapshot contains no Git metadata or Unity executable; Git comparison and Unity compilation are unavailable in this environment and remain pending.
+
+### File-by-file implementation sequence
+
+1. `WeatherWindTrailRenderer.cs`
+   - add the versioned exact-old-default migration;
+   - apply the calibrated initializers and validation clamps;
+   - add uniform-body and broad-wave serialized controls, property IDs, configuration hashing, report fields, and runtime material publication;
+   - add fixed broad-wave scratch/state storage without steady-state allocation;
+   - apply deterministic lateral deformation after RK2 integration, validate it, and fall back to the undeformed path when invalid;
+   - recompute path distances, tangents, and alignment after accepted deformation;
+   - cap presentation speed against useful path occupancy;
+   - preserve the standard interleaved vertex order and all Play Mode-only lifecycle gates.
+2. `WeatherWindTrailRendererEditor.cs`
+   - expose `Uniform Body Opacity` in Visual Calibration;
+   - keep `Edge Softness` visible but disabled while uniform mode is enabled;
+   - expose broad-wave chance and strength together in Visual Calibration;
+   - invoke/persist the versioned migration through Undo when the Inspector first observes an old installed component;
+   - preserve automatic shader assignment, status, report/copy, reset, and Scene diagnostics.
+3. `SH_WeatherWindTrails.shader`
+   - add `_UniformBodyOpacity` with a default of enabled;
+   - in uniform mode, keep spatial alpha constant across the visible body, clip outside the head/tail window, taper physical ribbon width near the head/tail, and retain only a narrow derivative-based edge anti-alias transition;
+   - in soft mode, preserve the existing head/tail/edge alpha masks;
+   - retain short whole-trail lifetime fades and premultiplied transparent output.
+4. Reread all complete final files, compare every frozen dependency and contract, run structural/property/scope/allocation/default/migration checks, and record the final actual-file and pending-Unity evidence below.
+
+### Invariants and non-goals
+
+- Weather target wind remains the authoritative centreline source. Broad waves are bounded presentation deformation, not a second wind simulation.
+- Do not sample vegetation response, Ground, colliders, depth textures, opaque textures, or GPU readback.
+- Do not add per-frame path rebuilding, managed collections, material instances per trail, new GameObjects, renderer features, or scene objects.
+- Do not change the vertex semantic order `Position, Normal, Color, TexCoord0, TexCoord1`, 52-byte stride, unsigned 16-bit indices, or one combined mesh.
+- Do not raw-edit the already user-modified scene. The versioned component migration must update exact old defaults through normal Unity serialization.
+- Do not make every trail broad-wave-shaped. The default chance is deliberately low and independently editable.
+- Do not claim visual acceptance, occupancy balance, lifetime feel, transparency quality, bloom response, Frame Debugger count, GC, CPU/GPU cost, or desktop/Mobile compatibility without new Unity evidence.
+
+### Performance model and validation
+
+At the new default capacity, fixed geometry decreases from V0.4's `8 × 24 × 2 = 384` vertices and `8 × 23 × 6 = 1,104` indices to `3 × 32 × 2 = 192` vertices and `3 × 31 × 6 = 558` indices. Broad-wave work is `O(S)` only for a successful spawn and uses fixed scratch arrays already sized to centreline capacity. No new per-frame or per-spawn managed allocation is permitted.
+
+Required Unity validation:
+
+1. Compile C# and shader code with no new errors or warnings; confirm the standard vertex-layout warning remains absent.
+2. Confirm the installed component migrates exact V0.4 defaults once to the V0.5 values while a deliberately edited test value remains unchanged.
+3. In Play Mode, verify no more than three trails are active, trails typically persist four to seven seconds, and the report shows bounded broad-wave use and the reduced `192 / 558` default mesh capacity.
+4. Toggle `Uniform Body Opacity` and confirm enabled mode has a solid body with only narrow edge anti-aliasing, while disabled mode restores editable soft edge/head/tail alpha behaviour.
+5. Set broad-wave chance temporarily to `1`, confirm visibly broader but still wind-aligned paths, then restore `0.22` and confirm only an occasional trail receives the deformation.
+6. Capture the normal Game view and the complete report for the next visual/performance decision.
+
+
+### Post-change consistency and compliance audit
+
+Actual affected files exactly match the approved V0.5 scope.
+
+Modified:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+- `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader`
+
+Created, deleted, moved, renamed, metadata, scene, prefab, material asset, Weather producer/editor/compute/shared-HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+Implemented runtime and baseline changes:
+
+- the calm baseline now uses at most `3` active trails, `1` spawn attempt per second, `8 m` minimum separation, and `3 s` post-expiry occupancy cooldown;
+- lifetime is `4–7 s`, presentation speed is `1.2–2.0 m/s`, visible tail length is `5–8 m`, completed paths require at least `4 m`, and centreline capacity is `32` points;
+- a generated speed is capped to `(pathLength + tailLength) / lifetime`, preventing a short trail's visible window from fully leaving its path substantially before the configured lifetime expires;
+- colour is white, per-trail opacity is `0.95`, lifetime fade fractions are `0.03/0.05`, and default strength/variation opacity influences are zero;
+- `Uniform Body Opacity` is serialized and enabled by default. The runtime publishes `_UniformBodyOpacity`; the shader uses physical head/tail width taper, hard visible-window clipping, and derivative-width edge anti-aliasing in uniform mode. Disabling it restores the previous soft head/tail/cross-width alpha masks and re-enables `Edge Softness` in the Inspector;
+- `Occasional Broad Wave Chance` and `Occasional Broad Wave Strength` are serialized at `0.22` and `0.45 m`. A deterministic accepted subset receives one endpoint-zero lateral XZ wave after RK2 construction;
+- broad-wave paths are remeasured and resampled against the authoritative target wind. A deformed path is retained only if it remains inside the safe field/camera region, does not self-approach, and meets the existing minimum segment alignment; otherwise fixed scratch storage restores the undeformed path;
+- active, total, and last-path broad-wave diagnostics are included in the exact runtime report;
+- a hidden serialized baseline version upgrades exact V0.4 values once. Integer/float/colour replacements occur only when the current value still equals the old baseline; non-default user tuning is preserved. New uniform/broad-wave controls receive their approved first baseline. The custom Inspector records Undo and marks the component dirty when it observes an old installed component;
+- all new broad-wave arrays are allocated only during the existing resource build and released with the existing resources. No managed collection or reference-object allocation was added to candidate, path, spawn, update, or render paths.
+
+Inspector changes:
+
+- `Uniform Body Opacity` appears in `Visual Calibration`;
+- `Edge Softness` remains visible but is disabled while uniform opacity is enabled;
+- broad-wave chance and strength appear together under `Occasional Broad Waves`;
+- all other non-hidden serialized fields remain exposed exactly once;
+- exact-path shader assignment, Play Mode status, complete selectable report, adjacent copy action, reset action, and selected-object Scene diagnostics remain intact.
+
+Performance and contract reconciliation:
+
+- default fixed geometry decreases from `384` vertices / `1,104` indices to `192` vertices / `558` indices because the capacity changes from eight 24-point trails to three 32-point trails;
+- broad-wave deformation is `O(S)` only for a successful spawn selected by the chance control and uses one fixed `Vector2[S]` backup array plus existing fixed path arrays;
+- the C#/shader material-property contract includes `_UniformBodyOpacity` with no missing property;
+- the standard mesh declaration order remains `Position, Normal, Color, TexCoord0, TexCoord1`, the vertex stride remains 52 bytes, indices remain unsigned 16-bit, and render submission remains one combined `Graphics.RenderMesh` call;
+- Play Mode-only ownership, co-located published Weather resolution, target-wind sampling, deterministic candidate placement, separation, RK2 integration, hidden single material, and target-camera-only rendering remain unchanged.
+
+Pre-documentation static validation passed **85/85** checks. A final post-documentation audit passed **80/80** checks and analytically replayed the default `0.45 m` broad wave across 4–15.5 m straight paths; the worst segment alignment was `0.8325`, above the configured `0.35` floor. Checks covered exact four-file scope; C#/ShaderLab structural balance; calibrated defaults; versioned exact-old-value migration; fixed scratch storage and release; no reference allocation in broad-wave construction; deterministic chance; endpoint envelope; bounds/self-approach/alignment fallback; lifespan-aware speed cap; complete C#/shader property parity; uniform-mode window clipping, width taper, narrow edge anti-aliasing, and retained soft fallback; standard vertex/descriptor order; exact-once Inspector exposure; disabled edge-softness editing in uniform mode; broad-wave controls; migration Undo/persistence; Play Mode ownership; one material construction; one render submission; absence of Ground/vegetation-response dependencies; report coverage; LF-only content; and no trailing whitespace.
+
+The complete final runtime, editor, shader, and canonical V0.5 section were reread after implementation. No undeclared dependency or file appeared. Unity C# compilation, shader import, one-time scene-component migration, uniform/nonuniform visual comparison, forced/default broad-wave frequency, active occupancy, four-to-seven-second observed lifetime, Game-view appearance, vertex-layout warning absence, Frame Debugger draw count, steady-state GC, CPU/GPU timing, transparency sorting, bloom response, depth occlusion, and desktop/Mobile compatibility remain pending and are not represented as passed.
+
+---
+
+## WEATHER-WIND-TRAILS-V0.6 — Length-resolved spawn/alive/despawn lifecycle and pointed endpoints
+
+**Status:** Runtime, editor, shader, migration, and source-level audit complete on 2026-07-22. Unity compilation and live visual validation remain pending.
+
+### Objective and user-approved behavior
+
+Replace the finite moving-window/lifetime model that could clamp against the end of a centreline, shrink with a flat front, or disappear while still visibly present. Every accepted trail now owns one guaranteed complete lifecycle:
+
+```text
+length-resolved spawn -> authored alive phase -> length-resolved despawn
+```
+
+The user approved these requirements:
+
+- spawn and despawn duration are not directly authored because trails have different visible lengths;
+- normal travel speed remains inside the authored travel-speed range;
+- a separate lifecycle tip-speed allowance may temporarily let an endpoint move up to `travel speed + allowance` during growth or contraction;
+- alive duration is directly authored at a default range of `7–11 s`;
+- Inspector diagnostics show the resolved spawn, despawn, and total-duration intervals produced by the current controls;
+- both visible endpoints remain physically pointed; no trail may shrink against a flat front or vanish mid-air;
+- a trail is accepted only when its generated path can contain its complete spawn, alive, and despawn sequence.
+
+### Approved affected files
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+- `Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader`
+
+Create, delete, move, rename, metadata, scene, prefab, material asset, Weather producer/editor/compute/shared-HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+### Lifecycle equations and invariant
+
+For one accepted trail:
+
+```text
+v = resolved normal travel speed
+E = resolved lifecycle tip-speed allowance, clamped below v
+L = resolved visible body length
+A = resolved alive duration
+
+spawn duration   S = L / (v + E)
+despawn duration D = L / (2E)
+```
+
+Spawn phase:
+
+```text
+tail speed = 0
+head speed = v + E
+```
+
+Alive phase:
+
+```text
+tail speed = v
+head speed = v
+```
+
+Despawn phase:
+
+```text
+tail speed = v + E
+head speed = v - E
+```
+
+The despawn endpoints therefore approach at `2E`, while their centre continues at normal speed `v`. `E` is clamped to at most `0.9v`, so the head always continues forward and never stops or reverses.
+
+The required usable centreline length is:
+
+```text
+requiredPath = vA + L/2 + vL/(2E)
+```
+
+The hard runtime invariant is:
+
+> An active trail always has enough generated centreline for its complete spawn, alive, and despawn sequence. The shader never clamps a moving head to the path endpoint, and CPU expiry occurs only after the two pointed endpoints have met.
+
+### Resolution and fallback order
+
+For each successful streamline, the runtime samples deterministic desired values from the authored ranges and resolves them against actual usable path length:
+
+1. retain the desired body length when minimum speed can support at least the minimum alive duration;
+2. otherwise reduce body length, never below the authored minimum;
+3. retain the desired alive duration when possible, otherwise reduce it, never below the authored minimum;
+4. select the highest speed not exceeding the deterministic desired speed that fits the path, never below the authored minimum and never above the authored maximum;
+5. reject the candidate if the minimum body length, minimum alive duration, and minimum speed still cannot fit.
+
+No fit operation increases normal travel speed. Spawn/despawn endpoint speed can exceed normal speed only by the separately authored and bounded allowance.
+
+### Path construction
+
+The selected visible candidate is now the actual spawn point. Streamline construction integrates forward only from that seed through the authoritative target wind using the existing captured-time RK2 contract. Paths may continue outside the camera viewport, but remain inside the Weather field safety rectangle and retain all wind-strength, turn, self-approach, broad-wave fallback, and segment-alignment checks.
+
+Default centreline capacity increases from `32` to `80` points at the existing `0.5 m` integration step, allowing approximately `39.5 m` of generated path. At the default controls, the complete lifecycle requires approximately `13.4–29.3 m`, depending on resolved length, speed, and alive duration.
+
+### Shader and endpoint geometry
+
+The old global lifetime fades and head/tail alpha-softness controls are removed. Lifecycle values are supplied per trail in two vertex `float4` attributes:
+
+```text
+lifecycleMotion = birth time, travel speed, body length, alive duration
+lifecycleTiming = spawn duration, despawn duration, pointed-end length, total lifetime
+```
+
+The shader resolves exact head and tail arc distances for all three phases. Both endpoints taper physical ribbon width to zero over the authored pointed-end distance. Vertices outside the visible interval are centreline-clamped to the exact endpoint before expansion, and the interpolated distance is clamped with them. This prevents the fragment cutoff from exposing a full-width flat cross-section between fixed centreline samples.
+
+`Uniform Body Opacity` remains editable. Enabled mode keeps body alpha spatially uniform apart from narrow raster edge anti-aliasing; disabled mode restores editable cross-width softness, but endpoint shape remains physically pointed in both modes. There is no whole-trail fade or emergency mid-air disappearance.
+
+### Defaults and Inspector
+
+Default lifecycle controls:
+
+```text
+Alive Duration:                 7–11 s
+Travel Speed:                  1.0–1.5 m/s
+Visible Body Length:           5.5–8.5 m
+Lifecycle Tip Speed Allowance: 0.75 m/s
+Pointed End Length:            0.75 m
+Centreline Capacity:           80 points
+```
+
+The Inspector exposes no editable spawn/despawn duration. It displays read-only resolved intervals derived from body length, speed, allowance, and alive duration. With defaults these are approximately:
+
+```text
+Spawn:         2.44–4.86 s
+Despawn:       3.67–5.67 s
+Total lifetime 13.11–21.52 s
+```
+
+The full runtime report records both the configured intervals and the actual body length, normal speed, effective allowance, spawn duration, alive duration, despawn duration, total lifetime, and required path length of the last accepted trail.
+
+### Migration
+
+Serialized baseline version advances from `1` to `2`. `FormerlySerializedAs` preserves the installed component's old lifetime and visible-tail values as the new alive-duration and visible-body fields before migration. Exact V0.5 defaults migrate once:
+
+```text
+Centreline points 32 -> 80
+Alive duration    4–7 -> 7–11 s
+Travel speed      1.2–2.0 -> 1.0–1.5 m/s
+Body length       5–8 -> 5.5–8.5 m
+```
+
+Values changed away from the exact old defaults remain untouched. New allowance and pointed-end controls receive their declared first defaults. The custom Inspector retains Undo and dirty-state persistence for the migration.
+
+### Performance and fixed resources
+
+At the default `3 × 80` capacity:
+
+```text
+Vertices: 3 × 80 × 2 = 480
+Indices:  3 × 79 × 6 = 1,422
+Triangles: 474
+Vertex stride: 68 bytes
+```
+
+The stride rises from 52 to 68 bytes because of the second lifecycle `float4`; the complete fixed vertex payload remains approximately 31.9 KiB, plus approximately 2.8 KiB of 16-bit indices. Path integration and lifecycle fitting occur only on bounded spawn attempts. The speed fit uses a fixed 20-iteration scalar binary search and creates no managed objects. No per-frame path rebuild, new draw, new material, or new simulation dispatch is introduced.
+
+The standard vertex declaration order remains:
+
+```text
+Position, Normal, Color, TexCoord0, TexCoord1, TexCoord2
+```
+
+### Source-level validation and pending Unity evidence
+
+Source-level checks confirm:
+
+- exact four-file scope;
+- balanced C# and ShaderLab/HLSL structure;
+- no stale direct lifetime, lifetime-fade, head-softness, tail-softness, path-viewport, backward-path, or old trail-lifetime runtime references;
+- versioned exact-default migration and `FormerlySerializedAs` coverage;
+- forward-only authoritative RK2 paths beginning at the visible candidate;
+- no path-viewport termination after seed acceptance;
+- required-path fitting never raises speed above the sampled authored value;
+- endpoint allowance remains below normal speed;
+- CPU total-lifetime expiry matches shader total lifetime;
+- complete C#/shader lifecycle attribute and material-property parity;
+- physical endpoint taper and exact endpoint-clamped vertex placement;
+- standard vertex/descriptor ordering with `TexCoord2` appended;
+- fixed arrays and no managed allocation in lifecycle fitting;
+- Inspector exposure of all active controls and read-only resolved timing;
+- LF-only content and no trailing whitespace.
+
+Unity compilation, shader import, baseline migration, the absence of the vertex-layout warning, actual resolved report values, guaranteed full phase sequencing, front/tail pointedness throughout spawn and despawn, absence of mid-air disappearance, occupancy behavior under longer total lifetimes, Frame Debugger draw count, steady-state GC, CPU/GPU timing, depth behavior, transparency sorting, bloom response, and desktop/Mobile compatibility remain pending and are not represented as passed.

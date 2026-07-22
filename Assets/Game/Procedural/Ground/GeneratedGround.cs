@@ -906,6 +906,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundShoreWetHighlightShaping");
         private static readonly int GroundBankMaterialStrengthId =
             Shader.PropertyToID("_GroundBankMaterialStrength");
+        private static readonly int GroundBankMaterialTransitionId =
+            Shader.PropertyToID("_GroundBankMaterialTransition");
         private static readonly int GroundBankMaterialReachId =
             Shader.PropertyToID("_GroundBankMaterialReach");
         private static readonly int GroundImmediateBankExposureId =
@@ -4818,13 +4820,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             materialProperties.SetFloat(
                 GroundRiverbedMaterialStrengthId,
                 resolvedMaterialControls.RiverbedMaterialStrength);
+            GroundSurfaceApplicationBlendSettings
+                riverbedApplicationBlend =
+                    resolvedMaterialControls.RiverbedSurfaceApplicationBlend;
             materialProperties.SetVector(
                 GroundRiverbedMaterialTransitionId,
                 new Vector4(
-                    resolvedMaterialControls.RiverbedMaterialBlendDistance,
-                    resolvedMaterialControls.RiverbedMaterialBlendSoftness,
-                    0f,
-                    0f));
+                    riverbedApplicationBlend.Distance,
+                    riverbedApplicationBlend.Softness,
+                    riverbedApplicationBlend.FeatureEdgeClearance,
+                    riverbedApplicationBlend.FeatureReturnFade));
 
             GroundHydrologyModifierProfile riverbedHydrologyModifier =
                 resolvedMaterialControls.ResolvedRiverbedHydrologyModifier;
@@ -4937,6 +4942,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             materialProperties.SetFloat(
                 GroundBankMaterialStrengthId,
                 resolvedMaterialControls.BankMaterialStrength);
+            GroundSurfaceApplicationBlendSettings bankApplicationBlend =
+                resolvedMaterialControls.BankSurfaceApplicationBlend;
+            materialProperties.SetVector(
+                GroundBankMaterialTransitionId,
+                new Vector4(
+                    bankApplicationBlend.Distance,
+                    bankApplicationBlend.Softness,
+                    bankApplicationBlend.FeatureEdgeClearance,
+                    bankApplicationBlend.FeatureReturnFade));
             materialProperties.SetFloat(
                 GroundBankMaterialReachId,
                 resolvedMaterialControls.BankMaterialReach);
@@ -5207,7 +5221,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                                 0f,
                                 2f))
                         : 1f,
-                    hasTextureForm ? 1f : 0f,
+                    hasTextureForm
+                        ? layer != null && layer.UsesFeatureTextureForm
+                            ? 2f
+                            : 1f
+                        : 0f,
                     hasTextureForm && layer != null
                         ? layer.RoughnessVariationStrength * Mathf.Clamp(
                             roughnessVariationMultiplier,

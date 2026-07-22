@@ -191,6 +191,19 @@
                     }
                 }
 
+                [branch]
+                if (_GroundBankMaterialTransition.z > 0.0001 &&
+                    result.featureTextureFormPayload > 0.5 &&
+                    result.featureMask > 0.001)
+                {
+                    result = PS3D_ApplyStylizedSurfaceFeatureRetention(
+                        result,
+                        ResolveGroundSurfaceFeatureRetention(
+                            ResolveGroundRiverBankDomain(input),
+                            ResolveGroundRiverBankInwardDistance(input),
+                            _GroundBankMaterialTransition));
+                }
+
                 return result;
             }
 
@@ -232,54 +245,20 @@
                     }
                 }
 
-                return result;
-            }
-
-            float3 ResolveGroundSimpleBinarySubstrateWeights(
-                float bankMaterialBlend,
-                float riverbedMaterialBlend,
-                float riverbedMaterialTransitionActive,
-                PS3D_StylizedSurfaceDetail bankLayerDetail,
-                PS3D_StylizedSurfaceDetail riverbedLayerDetail)
-            {
-                float rawBank = saturate(bankMaterialBlend);
-                float rawRiverbed = saturate(riverbedMaterialBlend);
-                float rawTotal = rawBank + rawRiverbed;
-                float secondaryCoverage = saturate(rawTotal);
-
-                // Imported texture-form substrates use one combined ownership
-                // decision. Bank and Riverbed keep their relative weights inside
-                // that coverage, so ordinary Ground cannot appear between them.
-                float binaryCutEnabled =
-                    step(
-                        0.5,
-                        max(
-                            bankLayerDetail.textureFormPayload,
-                            riverbedLayerDetail.textureFormPayload)) *
-                    (1.0 - step(
-                        0.0001,
-                        saturate(riverbedMaterialTransitionActive)));
-                if (binaryCutEnabled > 0.5 && rawTotal > 0.0001)
+                [branch]
+                if (_GroundRiverbedMaterialTransition.z > 0.0001 &&
+                    result.featureTextureFormPayload > 0.5 &&
+                    result.featureMask > 0.001)
                 {
-                    float ownershipDelta = rawTotal - 0.5;
-                    float antialiasWidth = max(
-                        fwidth(ownershipDelta),
-                        0.0005);
-                    secondaryCoverage = smoothstep(
-                        -antialiasWidth,
-                        antialiasWidth,
-                        ownershipDelta);
+                    result = PS3D_ApplyStylizedSurfaceFeatureRetention(
+                        result,
+                        ResolveGroundSurfaceFeatureRetention(
+                            ResolveGroundRiverbedSupportMask(input),
+                            ResolveGroundRiverbedInwardDistance(input),
+                            _GroundRiverbedMaterialTransition));
                 }
 
-                float normalization = rawTotal > 0.0001
-                    ? secondaryCoverage / rawTotal
-                    : 0.0;
-
-                return saturate(
-                    float3(
-                        1.0 - secondaryCoverage,
-                        rawBank * normalization,
-                        rawRiverbed * normalization));
+                return result;
             }
 
             half3 ResolvePixelGroundSurfaceColor(
@@ -998,23 +977,18 @@
                     ResolveGroundBankMaterialBlend(input);
                 float riverbedSupport =
                     ResolveGroundRiverbedSupportMask(input);
-                float riverbedMaterialTransitionWeight =
-                    ResolveGroundRiverbedMaterialTransitionWeight(
-                        input,
-                        riverbedSupport);
-                float riverbedMaterialTransitionActive =
-                    ResolveGroundRiverbedMaterialTransitionActive(
-                        riverbedSupport);
-                float riverbedEdgeBankMaterialBlend =
-                    ResolveGroundRiverbedEdgeBankMaterialBlend(
-                        input,
-                        riverbedSupport,
-                        riverbedMaterialTransitionWeight);
+                float riverbedMaterialApplicationEnabled =
+                    ResolveGroundRiverbedMaterialApplicationEnabled();
+                float bankUnderRiverbedBlend =
+                    ResolveGroundBankEdgeMaterialBlend(input) *
+                    saturate(riverbedSupport) *
+                    riverbedMaterialApplicationEnabled;
                 float resolvedBankMaterialBlend = saturate(
-                    bankMaterialBlend + riverbedEdgeBankMaterialBlend);
+                    bankMaterialBlend + bankUnderRiverbedBlend);
                 float riverbedMaterialBlend =
                     ResolveGroundRiverbedMaterialBlend(
-                        riverbedMaterialTransitionWeight);
+                        input,
+                        riverbedSupport);
                 float riverbedWetness =
                     ResolveGroundRiverbedWetness(input);
                 PS3D_StylizedSurfaceDetail bankLayerDetail =
@@ -1026,12 +1000,9 @@
                         input,
                         riverbedMaterialBlend);
                 float3 substrateWeights =
-                    ResolveGroundSimpleBinarySubstrateWeights(
+                    ResolveGroundSubstrateCompositionWeights(
                         resolvedBankMaterialBlend,
-                        riverbedMaterialBlend,
-                        riverbedMaterialTransitionActive,
-                        bankLayerDetail,
-                        riverbedLayerDetail);
+                        riverbedMaterialBlend);
                 float4 surfaceCoverRetention =
                     ResolveGroundBankCoverRetention(bankMaterialBlend) *
                     (1.0 - saturate(riverbedSupport));

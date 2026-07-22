@@ -651,7 +651,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         settings.SurfaceSeed + 0x29AF,
                         deterministicVariationIdentity));
                 float strength = cornerDamageCapRing
-                    ? Mathf.Clamp01(amount01)
+                    ? Mathf.Clamp01(
+                        amount01 *
+                        settings.CornerChipCapRingWearStrength)
                     : Mathf.Clamp01(
                         amount01 *
                         Mathf.Lerp(0.86f, 1.06f, random) *
@@ -4386,7 +4388,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearMicroTopologyNormalizationResult normalization,
                 Bounds normalizedBounds,
                 float maximumDimension,
-                MassRecipe recipe)
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings settings)
         {
             CornerDamageTransactionAuditResult result =
                 new CornerDamageTransactionAuditResult
@@ -4396,7 +4399,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     MaximumDimension = maximumDimension,
                     MinimumStableEdgeLength = maximumDimension * 0.0012f,
                     MinimumStableFaceArea =
-                        maximumDimension * maximumDimension * 0.000001f
+                        maximumDimension * maximumDimension * 0.000001f,
+                    RequestedDepthFraction = settings.CornerChipDepth,
+                    DepthVariation = settings.CornerChipDepthVariation,
+                    TopFacingPreference =
+                        settings.CornerChipTopFacingPreference
                 };
             result.SourceVolume =
                 CalculatePlaneCutPolyhedronVolume(normalizedFaces);
@@ -4428,7 +4435,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 PointMergeDistance * 8f,
                 maximumDimension * 0.00001f);
 
-            CornerDamageCandidateRecord selected = null;
+            List<CornerDamageCandidateRecord> eligibleCandidates =
+                new List<CornerDamageCandidateRecord>();
             for (int vertexIndex = 0;
                  vertexIndex < graph.Vertices.Count;
                  vertexIndex++)
@@ -4444,34 +4452,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         result.MinimumStableEdgeLength,
                         structuralTolerance,
                         recipe.ShapeSeed,
+                        settings.CornerChipTopFacingPreference,
                         vertexIndex,
                         vertex);
                 result.Candidates.Add(candidate);
-                if (!candidate.Eligible)
+                if (candidate.Eligible)
                 {
-                    continue;
-                }
-
-                result.EligibleCandidateCount++;
-                if (selected == null ||
-                    candidate.Score > selected.Score + 0.0000001f ||
-                    (Mathf.Abs(candidate.Score - selected.Score) <=
-                         0.0000001f &&
-                     candidate.GraphVertexIndex <
-                         selected.GraphVertexIndex))
-                {
-                    selected = candidate;
+                    eligibleCandidates.Add(candidate);
                 }
             }
 
-            if (selected == null)
+            eligibleCandidates = RankCornerDamageCandidates(
+                eligibleCandidates);
+            result.EligibleCandidateCount = eligibleCandidates.Count;
+            if (eligibleCandidates.Count == 0)
             {
                 result.Diagnostic =
                     "no normalized source corner satisfies the C1A.1 eligibility contract";
                 return result;
             }
 
+            int selectedCandidateRank =
+                ResolveCornerDamageCandidateRankOverride();
+            if (selectedCandidateRank < 0 ||
+                selectedCandidateRank >= eligibleCandidates.Count)
+            {
+                result.Diagnostic =
+                    "requested corner candidate rank is outside the eligible set";
+                return result;
+            }
+
+            CornerDamageCandidateRecord selected =
+                eligibleCandidates[selectedCandidateRank];
             result.CandidateFound = true;
+            result.SelectedCandidateRank = selectedCandidateRank;
             result.SelectedGraphVertexIndex =
                 selected.GraphVertexIndex;
             result.SelectedPosition = selected.Position;
@@ -4502,9 +4516,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float depthIdentity = Hash01(
                 unchecked(recipe.ShapeSeed + CornerDamageDepthSalt),
                 selected.GraphVertexIndex);
+            float requestedDepthFraction = Mathf.Clamp(
+                settings.CornerChipDepth,
+                0.04f,
+                0.35f);
+            float depthVariation = Mathf.Clamp(
+                settings.CornerChipDepthVariation,
+                0f,
+                0.50f);
+            float signedDepthVariation = depthIdentity * 2f - 1f;
+            float resolvedDepthFraction = Mathf.Clamp(
+                requestedDepthFraction *
+                    (1f + signedDepthVariation * depthVariation),
+                0.04f,
+                0.35f);
+            result.RequestedDepthFraction = requestedDepthFraction;
+            result.DepthVariation = depthVariation;
+            result.DepthVariationIdentity = depthIdentity;
+            result.ResolvedDepthFraction = resolvedDepthFraction;
+            result.ShortestIncidentEdgeLength =
+                selected.MinimumIncidentEdgeLength;
             result.BaseDepth =
                 selected.MinimumIncidentEdgeLength *
-                Mathf.Lerp(0.08f, 0.16f, depthIdentity);
+                resolvedDepthFraction;
 
             for (int trialIndex = 0;
                  trialIndex < CornerDamageDepthTrialFactors.Length;
@@ -4514,7 +4548,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float depth = Mathf.Clamp(
                     result.BaseDepth * factor,
                     2f * result.MinimumStableEdgeLength,
-                    selected.MinimumIncidentEdgeLength * 0.18f);
+                    selected.MinimumIncidentEdgeLength * 0.35f);
                 Vector3 planePoint =
                     selected.Position - outwardNormal * depth;
                 CutPlane plane = new CutPlane(
@@ -4570,6 +4604,49 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return result;
         }
 
+        private static List<CornerDamageCandidateRecord>
+            RankCornerDamageCandidates(
+                List<CornerDamageCandidateRecord> candidates)
+        {
+            List<CornerDamageCandidateRecord> remaining =
+                candidates == null
+                    ? new List<CornerDamageCandidateRecord>()
+                    : new List<CornerDamageCandidateRecord>(candidates);
+            List<CornerDamageCandidateRecord> ranked =
+                new List<CornerDamageCandidateRecord>(remaining.Count);
+            while (remaining.Count > 0)
+            {
+                int bestIndex = 0;
+                for (int candidateIndex = 1;
+                     candidateIndex < remaining.Count;
+                     candidateIndex++)
+                {
+                    if (IsCornerDamageCandidatePreferred(
+                            remaining[candidateIndex],
+                            remaining[bestIndex]))
+                    {
+                        bestIndex = candidateIndex;
+                    }
+                }
+
+                ranked.Add(remaining[bestIndex]);
+                remaining.RemoveAt(bestIndex);
+            }
+            return ranked;
+        }
+
+        private static bool IsCornerDamageCandidatePreferred(
+            CornerDamageCandidateRecord candidate,
+            CornerDamageCandidateRecord selected)
+        {
+            return selected == null ||
+                candidate.Score > selected.Score + 0.0000001f ||
+                (Mathf.Abs(candidate.Score - selected.Score) <=
+                     0.0000001f &&
+                 candidate.GraphVertexIndex <
+                     selected.GraphVertexIndex);
+        }
+
         private static CornerDamageCandidateRecord
             BuildCornerDamageCandidate(
                 List<PolygonFace> normalizedFaces,
@@ -4580,6 +4657,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float minimumStableEdgeLength,
                 float tolerance,
                 int shapeSeed,
+                float topFacingPreference,
                 int vertexIndex,
                 EdgeWearGraphVertex vertex)
         {
@@ -4712,11 +4790,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             candidate.RandomScore = Hash01(
                 unchecked(shapeSeed + CornerDamageSelectionSalt),
                 vertexIndex);
+            float upwardWeight =
+                0.30f * Mathf.Clamp01(topFacingPreference);
+            float nonUpwardWeight = 1f - upwardWeight;
             candidate.Score =
-                candidate.SharpnessScore * 0.55f +
-                candidate.SizeScore * 0.25f +
-                candidate.UpwardExposureScore * 0.15f +
-                candidate.RandomScore * 0.05f;
+                nonUpwardWeight *
+                    (candidate.SharpnessScore * 0.6470588235f +
+                     candidate.SizeScore * 0.2941176471f +
+                     candidate.RandomScore * 0.0588235294f) +
+                candidate.UpwardExposureScore * upwardWeight;
             candidate.Eligible = true;
             return candidate;
         }
@@ -5231,6 +5313,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
 
+            result.CapEdgeLengths.Clear();
             float shortestCapEdgeLength = float.PositiveInfinity;
             for (int vertexIndex = 0;
                  vertexIndex < acceptedCapFace.Vertices.Count;
@@ -5239,9 +5322,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 start = acceptedCapFace.Vertices[vertexIndex];
                 Vector3 end = acceptedCapFace.Vertices[
                     (vertexIndex + 1) % acceptedCapFace.Vertices.Count];
+                float capEdgeLength = (end - start).magnitude;
+                result.CapEdgeLengths.Add(capEdgeLength);
                 shortestCapEdgeLength = Mathf.Min(
                     shortestCapEdgeLength,
-                    (end - start).magnitude);
+                    capEdgeLength);
             }
             if (float.IsNaN(shortestCapEdgeLength) ||
                 float.IsInfinity(shortestCapEdgeLength) ||
@@ -5252,25 +5337,157 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
 
+            if (!TryBuildCornerDamageConstructionFaces(
+                    acceptedFaces,
+                    out List<PolygonFace> acceptedConstructionFaces,
+                    out int constructionSourceFaceCountAttributed,
+                    out string constructionBlocker))
+            {
+                blocker = constructionBlocker;
+                return false;
+            }
+
             result.AcceptedFaces = acceptedFaces;
+            result.AcceptedConstructionFaces =
+                acceptedConstructionFaces;
             result.AcceptedCapFace = acceptedCapFace;
+            result.ConstructionSourceFaceCountExpected =
+                acceptedFaces.Count;
+            result.ConstructionSourceFaceCountAttributed =
+                constructionSourceFaceCountAttributed;
             result.AcceptedDepth = trial.Depth;
+            result.AcceptedRetryFactor = trial.DepthFactor;
             result.ShortestCapEdgeLength = shortestCapEdgeLength;
+            return true;
+        }
+
+        private static bool TryBuildCornerDamageConstructionFaces(
+            List<PolygonFace> semanticFaces,
+            out List<PolygonFace> constructionFaces,
+            out int attributedSourceFaceCount,
+            out string blocker)
+        {
+            constructionFaces = null;
+            attributedSourceFaceCount = 0;
+            blocker = string.Empty;
+            if (semanticFaces == null || semanticFaces.Count < 4)
+            {
+                blocker =
+                    "certified corner transaction has no construction face set";
+                return false;
+            }
+
+            List<PolygonFace> cloned =
+                new List<PolygonFace>(semanticFaces.Count);
+            for (int faceIndex = 0;
+                 faceIndex < semanticFaces.Count;
+                 faceIndex++)
+            {
+                PolygonFace semanticFace = semanticFaces[faceIndex];
+                if (semanticFace == null ||
+                    semanticFace.Vertices == null ||
+                    semanticFace.Vertices.Count < 3)
+                {
+                    blocker =
+                        "certified corner transaction contains an invalid semantic face";
+                    return false;
+                }
+
+                PolygonFace constructionFace = new PolygonFace(
+                    new List<Vector3>(semanticFace.Vertices),
+                    semanticFace.Normal,
+                    semanticFace.Feature,
+                    semanticFace.FeatureStrength,
+                    PolygonFaceProvenanceKind.SourceFace,
+                    faceIndex);
+                if (constructionFace.Vertices.Count !=
+                        semanticFace.Vertices.Count ||
+                    constructionFace.Feature != semanticFace.Feature ||
+                    Mathf.Abs(
+                        constructionFace.FeatureStrength -
+                        semanticFace.FeatureStrength) > 0.0000001f ||
+                    Vector3.Dot(
+                        constructionFace.Normal,
+                        semanticFace.Normal) < 0.999999f ||
+                    constructionFace.ProvenanceKind !=
+                        PolygonFaceProvenanceKind.SourceFace ||
+                    constructionFace.ProvenanceIndex != faceIndex)
+                {
+                    blocker =
+                        "corner construction face attribution did not preserve the semantic face contract";
+                    return false;
+                }
+
+                for (int vertexIndex = 0;
+                     vertexIndex < semanticFace.Vertices.Count;
+                     vertexIndex++)
+                {
+                    if (!constructionFace.Vertices[vertexIndex].Equals(
+                            semanticFace.Vertices[vertexIndex]))
+                    {
+                        blocker =
+                            "corner construction face attribution changed semantic geometry";
+                        return false;
+                    }
+                }
+
+                cloned.Add(constructionFace);
+                attributedSourceFaceCount++;
+            }
+
+            if (attributedSourceFaceCount != semanticFaces.Count)
+            {
+                blocker =
+                    "corner construction source-face attribution is incomplete";
+                return false;
+            }
+
+            constructionFaces = cloned;
             return true;
         }
 
         private static float ResolveCornerDamageCapRingRequestedWidth(
             CornerDamageTransactionAuditResult transaction,
-            float ordinaryRequestedWidth)
+            float ordinaryRequestedWidth,
+            float widthScale,
+            out float ordinaryLimit,
+            out float depthLimit,
+            out float edgeLimit,
+            out string winningLimit)
         {
+            ordinaryLimit = 0f;
+            depthLimit = 0f;
+            edgeLimit = 0f;
+            winningLimit = "none";
             if (transaction == null || !transaction.Succeeded)
             {
                 return 0f;
             }
-            return Mathf.Min(
-                ordinaryRequestedWidth * 0.50f,
-                transaction.AcceptedDepth * 0.25f,
-                transaction.ShortestCapEdgeLength * 0.20f);
+
+            ordinaryLimit = ordinaryRequestedWidth * Mathf.Clamp(
+                widthScale,
+                0.20f,
+                1.25f);
+            depthLimit = transaction.AcceptedDepth * 0.25f;
+            edgeLimit = transaction.ShortestCapEdgeLength * 0.20f;
+            float limitingWidth = Mathf.Min(
+                ordinaryLimit,
+                depthLimit,
+                edgeLimit);
+            if (limitingWidth == ordinaryLimit)
+            {
+                winningLimit = "ordinary-width";
+            }
+            else if (limitingWidth == depthLimit)
+            {
+                winningLimit = "accepted-depth";
+            }
+            else
+            {
+                winningLimit = "shortest-cap-edge";
+            }
+            return limitingWidth *
+                ResolveCornerDamageCapRingScaleOverride();
         }
 
         private static int CompareCornerDamagePreviewCandidates(

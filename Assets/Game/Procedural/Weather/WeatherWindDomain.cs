@@ -55,8 +55,8 @@ namespace ProgrammaticStylized3D.Weather
         [SerializeField, Min(0.1f)]
         private float cellSizeMetres = 0.5f;
 
-        [SerializeField, Range(8f, 30f)]
-        private float updateRateHz = 16f;
+        [SerializeField, Range(5f, 60f)]
+        private float updateRateHz = 10f;
 
         [SerializeField, Range(1, 8)]
         private int maximumStepsPerFrame = 4;
@@ -267,7 +267,7 @@ namespace ProgrammaticStylized3D.Weather
                 32,
                 256);
             cellSizeMetres = Mathf.Clamp(cellSizeMetres, 0.1f, 4f);
-            updateRateHz = Mathf.Clamp(updateRateHz, 8f, 30f);
+            updateRateHz = Mathf.Clamp(updateRateHz, 5f, 60f);
             maximumStepsPerFrame = Mathf.Clamp(maximumStepsPerFrame, 1, 8);
             baseStrength = Mathf.Max(0f, baseStrength);
             broadNoiseScaleMetres = Mathf.Max(1f, broadNoiseScaleMetres);

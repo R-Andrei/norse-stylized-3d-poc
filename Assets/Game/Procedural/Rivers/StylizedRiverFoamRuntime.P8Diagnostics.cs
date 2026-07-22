@@ -337,7 +337,7 @@ namespace ProgrammaticStylized3D.Rivers
                 "Transport CFL and multi-substep policy: " +
                 (cflExact ? "PASS" : "FAIL"));
             report.AppendLine(
-                "Conservative Presence/life/pattern transport: " +
+                "Conservative material-amount/life/pattern transport: " +
                 (conservativeTransportExact ? "PASS" : "FAIL"));
             report.AppendLine(
                 "Curvilinear area/face metric policy: " +
@@ -523,6 +523,7 @@ namespace ProgrammaticStylized3D.Rivers
             int endpointCases = 0;
             int reverseCases = 0;
             int geometryCases = 0;
+            int decodedInvariantCases = 0;
             bool exact = true;
             for (int index = 0; index < 512; index++)
             {
@@ -531,44 +532,60 @@ namespace ProgrammaticStylized3D.Rivers
                 float faceLength = P8RandomRange(random, 0.01f, 1.5f);
                 float speed = P8RandomRange(random, 0.01f, 2.0f);
                 float dt = P8RandomRange(random, 0.001f, 0.04f);
+                float donorCoverage = P8RandomRange(random, 0.2f, 1f);
+                float receiverCoverage = P8RandomRange(random, 0f, 0.8f);
                 float donorPresence = P8RandomRange(random, 0.2f, 1f);
-                float receiverPresence = P8RandomRange(random, 0f, 0.8f);
-                float donorLife = P8RandomRange(random, 0f, 1f);
-                float receiverLife = P8RandomRange(random, 0f, 1f);
+                float receiverPresence = receiverCoverage > 0.0001f
+                    ? P8RandomRange(random, 0.2f, 1f)
+                    : 0f;
+                float donorLife = P8RandomRange(random, 0.05f, 1f);
+                float receiverLife = receiverCoverage > 0.0001f
+                    ? P8RandomRange(random, 0.05f, 1f)
+                    : 0f;
                 float donorPattern = P8RandomRange(random, 0f, 1f);
                 float receiverPattern = P8RandomRange(random, 0f, 1f);
 
-                float donorPresenceMass = donorPresence * donorArea;
-                float receiverPresenceMass = receiverPresence * receiverArea;
-                float donorLifeMoment =
-                    donorPresenceMass * donorLife;
-                float receiverLifeMoment =
-                    receiverPresenceMass * receiverLife;
-                float donorPatternMoment =
-                    donorPresenceMass * donorPattern;
+                float donorCoverageMass = donorCoverage * donorArea;
+                float receiverCoverageMass = receiverCoverage * receiverArea;
+                float donorMaterialMass =
+                    donorCoverage * donorPresence * donorArea;
+                float receiverMaterialMass =
+                    receiverCoverage * receiverPresence * receiverArea;
+                float donorLifeMoment = donorMaterialMass * donorLife;
+                float receiverLifeMoment = receiverMaterialMass * receiverLife;
+                float donorPatternMoment = donorMaterialMass * donorPattern;
                 float receiverPatternMoment =
-                    receiverPresenceMass * receiverPattern;
+                    receiverMaterialMass * receiverPattern;
                 float fraction = Mathf.Min(
                     0.45f,
                     speed * faceLength * dt / donorArea);
-                float presenceFlux = donorPresenceMass * fraction;
+                float coverageFlux = donorCoverageMass * fraction;
+                float materialFlux = donorMaterialMass * fraction;
                 float lifeFlux = donorLifeMoment * fraction;
                 float patternFlux = donorPatternMoment * fraction;
 
-                float beforePresence = donorPresenceMass +
-                    receiverPresenceMass;
+                float beforeCoverage = donorCoverageMass +
+                    receiverCoverageMass;
+                float beforeMaterial = donorMaterialMass +
+                    receiverMaterialMass;
                 float beforeLife = donorLifeMoment + receiverLifeMoment;
                 float beforePattern = donorPatternMoment +
                     receiverPatternMoment;
-                donorPresenceMass -= presenceFlux;
-                receiverPresenceMass += presenceFlux;
+                donorCoverageMass -= coverageFlux;
+                receiverCoverageMass += coverageFlux;
+                donorMaterialMass -= materialFlux;
+                receiverMaterialMass += materialFlux;
                 donorLifeMoment -= lifeFlux;
                 receiverLifeMoment += lifeFlux;
                 donorPatternMoment -= patternFlux;
                 receiverPatternMoment += patternFlux;
                 bool interiorExact = P8Approximately(
-                        beforePresence,
-                        donorPresenceMass + receiverPresenceMass,
+                        beforeCoverage,
+                        donorCoverageMass + receiverCoverageMass,
+                        0.00002f) &&
+                    P8Approximately(
+                        beforeMaterial,
+                        donorMaterialMass + receiverMaterialMass,
                         0.00002f) &&
                     P8Approximately(
                         beforeLife,
@@ -578,49 +595,109 @@ namespace ProgrammaticStylized3D.Rivers
                         beforePattern,
                         donorPatternMoment + receiverPatternMoment,
                         0.00002f);
-                exact &= interiorExact;
+
+                float decodedCoverage = receiverCoverageMass /
+                    receiverArea;
+                float decodedMaterial = receiverMaterialMass /
+                    receiverArea;
+                float decodedPresence = decodedCoverage > 0.0001f
+                    ? decodedMaterial / decodedCoverage
+                    : 0f;
+                float decodedLife = decodedMaterial > 0.0001f
+                    ? (receiverLifeMoment / receiverArea) /
+                        decodedMaterial
+                    : 0f;
+                float decodedPattern = decodedMaterial > 0.0001f
+                    ? (receiverPatternMoment / receiverArea) /
+                        decodedMaterial
+                    : 0f;
+                bool decodedValid = decodedCoverage >= -0.0001f &&
+                    decodedCoverage <= 1.0001f &&
+                    decodedPresence >= -0.0001f &&
+                    decodedPresence <= 1.0001f &&
+                    decodedLife >= -0.0001f &&
+                    decodedLife <= 1.0001f &&
+                    decodedPattern >= -0.0001f &&
+                    decodedPattern <= 1.0001f &&
+                    decodedMaterial <= decodedCoverage + 0.0001f;
+
+                exact &= interiorExact && decodedValid;
                 interiorCases++;
+                decodedInvariantCases++;
                 geometryCases += donorArea != receiverArea ? 1 : 0;
 
-                float endpointPresenceBefore = donorPresence * donorArea;
-                float endpointFlux = endpointPresenceBefore * fraction;
-                float endpointPresenceAfter = endpointPresenceBefore -
-                    endpointFlux;
+                float endpointCoverageBefore = donorCoverage * donorArea;
+                float endpointMaterialBefore =
+                    donorCoverage * donorPresence * donorArea;
+                float endpointCoverageFlux =
+                    endpointCoverageBefore * fraction;
+                float endpointMaterialFlux =
+                    endpointMaterialBefore * fraction;
                 bool endpointExact = P8Approximately(
-                    endpointPresenceBefore - endpointPresenceAfter,
-                    endpointFlux,
-                    0.00002f);
+                        endpointCoverageBefore -
+                            (endpointCoverageBefore - endpointCoverageFlux),
+                        endpointCoverageFlux,
+                        0.00002f) &&
+                    P8Approximately(
+                        endpointMaterialBefore -
+                            (endpointMaterialBefore - endpointMaterialFlux),
+                        endpointMaterialFlux,
+                        0.00002f);
                 exact &= endpointExact;
                 endpointCases++;
 
-                float reverseDonor = receiverPresence * receiverArea;
-                float reverseReceiver = donorPresence * donorArea;
+                float reverseDonorCoverage =
+                    receiverCoverage * receiverArea;
+                float reverseReceiverCoverage = donorCoverage * donorArea;
+                float reverseDonorMaterial =
+                    receiverCoverage * receiverPresence * receiverArea;
+                float reverseReceiverMaterial =
+                    donorCoverage * donorPresence * donorArea;
                 float reverseFraction = Mathf.Min(
                     0.45f,
                     speed * faceLength * dt / receiverArea);
-                float reverseFlux = reverseDonor * reverseFraction;
-                float reverseBefore = reverseDonor + reverseReceiver;
-                reverseDonor -= reverseFlux;
-                reverseReceiver += reverseFlux;
+                float reverseCoverageFlux =
+                    reverseDonorCoverage * reverseFraction;
+                float reverseMaterialFlux =
+                    reverseDonorMaterial * reverseFraction;
+                float reverseCoverageBefore =
+                    reverseDonorCoverage + reverseReceiverCoverage;
+                float reverseMaterialBefore =
+                    reverseDonorMaterial + reverseReceiverMaterial;
+                reverseDonorCoverage -= reverseCoverageFlux;
+                reverseReceiverCoverage += reverseCoverageFlux;
+                reverseDonorMaterial -= reverseMaterialFlux;
+                reverseReceiverMaterial += reverseMaterialFlux;
                 bool reverseExact = P8Approximately(
-                    reverseBefore,
-                    reverseDonor + reverseReceiver,
-                    0.00002f);
+                        reverseCoverageBefore,
+                        reverseDonorCoverage + reverseReceiverCoverage,
+                        0.00002f) &&
+                    P8Approximately(
+                        reverseMaterialBefore,
+                        reverseDonorMaterial + reverseReceiverMaterial,
+                        0.00002f);
                 exact &= reverseExact;
                 reverseCases++;
             }
 
             bool closedBoundaryExact = true;
-            float closedBefore = 0.73f * 0.41f;
-            float closedAfter = closedBefore;
+            float closedCoverageBefore = 0.73f * 0.41f;
+            float closedMaterialBefore = closedCoverageBefore * 0.75f;
             closedBoundaryExact &= P8Approximately(
-                closedBefore,
-                closedAfter);
+                closedCoverageBefore,
+                closedCoverageBefore) &&
+                P8Approximately(
+                    closedMaterialBefore,
+                    closedMaterialBefore);
             exact &= closedBoundaryExact;
 
             report.AppendLine(
                 $"Interior conservative interfaces: {interiorCases}; " +
-                $"Presence/life/pattern totals preserved={exact}");
+                $"Coverage/material-amount/life/pattern totals preserved=" +
+                $"{exact}");
+            report.AppendLine(
+                $"Decoded Presence/Life/Pattern bounded cases: " +
+                $"{decodedInvariantCases}");
             report.AppendLine(
                 $"Widen/narrow unequal-area cases: {geometryCases}");
             report.AppendLine(
@@ -915,7 +992,7 @@ namespace ProgrammaticStylized3D.Rivers
                 $"Exact-cell mapping cases: {checkedCells}; " +
                 $"exact={coordinateMappingExact}");
             report.AppendLine(
-                $"Synthetic GPU packed-state remap: {gpuRemapExact}");
+                $"Synthetic GPU P13A + legacy-migration remap: {gpuRemapExact}");
             report.AppendLine(
                 "REPLACEMENT POLICY VERDICT: " +
                 (exact ? "PASS" : "FAIL"));
@@ -970,21 +1047,46 @@ namespace ProgrammaticStylized3D.Rivers
                 };
                 Color[] source = new Color[
                     previous.ColumnCount * previous.RowCount];
+                Color[] expectedRemapped = new Color[source.Length];
                 for (int y = 0; y < previous.RowCount; y++)
                 {
                     for (int x = 0; x < previous.ColumnCount; x++)
                     {
-                        float presence = 0.25f +
+                        int sourceIndex = y * previous.ColumnCount + x;
+                        float coverage = 0.25f +
                             ((x * 3 + y * 5) % 7) * 0.08f;
+                        float presence = 0.35f +
+                            ((x * 5 + y * 3) % 6) * 0.10f;
                         float life = 0.15f +
                             ((x + y * 2) % 5) * 0.13f;
                         float pattern = 0.10f +
                             ((x * 2 + y) % 6) * 0.11f;
-                        source[y * previous.ColumnCount + x] = new Color(
-                            presence,
-                            presence * Mathf.Clamp01(life),
-                            presence * Mathf.Clamp01(pattern),
-                            0f);
+                        bool legacySample = ((x + y) & 1) != 0;
+                        if (legacySample)
+                        {
+                            float legacyAmount = coverage;
+                            source[sourceIndex] = new Color(
+                                legacyAmount,
+                                legacyAmount * Mathf.Clamp01(life),
+                                legacyAmount * Mathf.Clamp01(pattern),
+                                0f);
+                            expectedRemapped[sourceIndex] = new Color(
+                                legacyAmount,
+                                legacyAmount * Mathf.Clamp01(life),
+                                legacyAmount * Mathf.Clamp01(pattern),
+                                legacyAmount);
+                        }
+                        else
+                        {
+                            float materialAmount = coverage * presence;
+                            Color packed = new Color(
+                                materialAmount,
+                                materialAmount * Mathf.Clamp01(life),
+                                materialAmount * Mathf.Clamp01(pattern),
+                                coverage);
+                            source[sourceIndex] = packed;
+                            expectedRemapped[sourceIndex] = packed;
+                        }
                     }
                 }
                 upload.SetPixels(source);
@@ -1122,7 +1224,7 @@ namespace ProgrammaticStylized3D.Rivers
                             previousY >= 0 &&
                             previousY < previous.RowCount;
                         Color expected = overlaps
-                            ? source[
+                            ? expectedRemapped[
                                 previousY * previous.ColumnCount + previousX]
                             : Color.clear;
                         Color observed =
@@ -1572,7 +1674,7 @@ namespace ProgrammaticStylized3D.Rivers
                 $"{kernelResolved}/{kernelDeclared} " +
                 $"(index={remapPersistentStateKernel})");
             report.AppendLine(
-                $"Packed Presence/life/pattern copy and valid-fluid clip: " +
+                $"Packed material-amount/life/pattern/Coverage copy and valid-fluid clip: " +
                 $"{packedStateExact}");
             report.AppendLine(
                 $"Curvature-aware cell area/lateral face: {metricExact}");

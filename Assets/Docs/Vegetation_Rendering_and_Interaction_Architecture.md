@@ -2,11 +2,11 @@
 
 ## Status
 
-**Planning baseline — 2026-07-18**
+**Canonical architecture and implementation ledger — interaction milestone accepted through 2026-07-22**
 
-This document defines the initial production architecture, measurable performance targets, visual contract, and validation gates for dense interactive vegetation in the Norse Stylized 3D PoC.
+This document defines the production architecture, measurable performance targets, visual contract, implementation history, and validation gates for dense interactive vegetation in the Norse Stylized 3D PoC.
 
-It is a design and implementation target, not a claim that the vegetation system is already implemented or Unity-validated.
+The production ownership and interaction stack is implemented through `VEG-V2-INTERACT.2B.2`. The user has directly accepted the immediate response, Ground-owned historical trails, delayed asymmetric recovery, and circle/cone/line ability stamps in Unity. Historical patch sections retain their original source-validation limitations and failed intermediate approaches as evidence; `VEG-V2-CLOSE.1` is the authoritative closure status.
 
 ```text
 Engine: Unity 6.5
@@ -131,8 +131,8 @@ The patch must not be treated as performance-accepted or representation-frozen u
 | --- | --- | --- | --- |
 | V1 | Production static renderer: vegetation profile, GeneratedGround read-only sampling bridge, deterministic placement, chunks, culling, LOD, static diagnostics. | Consume external wind contract only. | Planned |
 | V2 | Stylized internal lighting and vegetation patch-edge ground shadow after a cross-subsystem Ground shader audit. | Use external main-light and wind data; no wind simulation. | Planned |
-| V3 | Full-visible-domain immediate actor interaction using a low-frequency swept interaction field. | Add actor deformation independently to external wind response. | Planned |
-| V4 | Persistent broad trail/compression field with recovery; no grass footprints. | Compose trails with external wind and immediate interaction. | Planned |
+| V3 | Full-visible-domain immediate actor interaction using a swept scene field, fixed-world direction modes, and displaced-grass Weather suppression. | Compose actor deformation with external wind response without trail history. | Implemented at source level by INTERACT.1/1A; Unity validation pending |
+| V4 | Opt-in Ground-owned trample history for selected large movers and queued circle, cone-sector, and line ability stamps, with timed or session-persistent recovery. | Compose explicit history with external wind and immediate interaction; ordinary player movement remains history-free. | Moving trails user-validated through INTERACT.2A.2; ability stamps complete at source level in INTERACT.2B, Unity validation pending |
 | V5 | Production authoring, mass/river exclusions, quality tiers, ecosystem integration, and replacement of the V0 test provider by the canonical Weather/Wind system. | Canonical Weather/Wind system becomes the sole authoritative producer. | Planned |
 
 ---
@@ -473,20 +473,20 @@ Immediate scene domain
     fast response and recovery
     no persistent trail state
 
-Future Ground trample domain
-    opt-in large-object trails and ability stamps
-    fixed Ground-local history
-    timed or permanent recovery
-    implemented separately in VEG-V2-INTERACT.2
+Ground-owned historical trample domain
+    opt-in large-object swept trails
+    fixed Ground-local history shared by all recipes on that Ground
+    timed or session-persistent recovery
+    queued circle, cone-sector, and line ability stamps
 ```
 
-Both domain update rates are user controls with the accepted range `5–60 Hz`. INTERACT.1 exposes the immediate-domain control. INTERACT.2 must expose the same range for the Ground-owned trail/trample field.
+Both domain update rates are independent user controls with the accepted range `5–60 Hz`. INTERACT.1 owns the scene immediate cadence. INTERACT.2A owns the Ground historical cadence. Ordinary interactors default to `Trail Mode = Off`, so enabling immediate interaction never silently creates history.
 
 ### 8.2 Immediate visible-domain field
 
-`VEG-V2-INTERACT.1` implements one scene-owned `VegetationInteractionDomain`. It follows an explicit gameplay anchor or a fallback camera-ground projection and initially uses a 256² `ARGBHalf` response field at 0.25 m/cell, covering 64 × 64 m. The domain recentres toroidally so camera/anchor movement preserves overlapping response cells and clears only newly exposed cells.
+`VEG-V2-INTERACT.1` implements one scene-owned `VegetationInteractionDomain`. It follows an explicit gameplay anchor or a fallback camera-ground projection and initially uses a 256² `ARGBHalf` response field at 0.25 m/cell, covering 64 × 64 m. `VEG-V2-INTERACT.1B` adds a configurable central recenter margin: the toroidal field remains stationary while the anchor stays inside that margin, then recentres in one accumulated cell shift. This preserves overlapping response cells while avoiding a recenter dispatch for ordinary quarter-metre anchor motion.
 
-The fixed update rate is configurable from `5–60 Hz`, default `20 Hz`. The shader interpolates between the previous and current fixed-step fields every rendered frame. Separate response and recovery time constants smooth low-rate updates without converting immediate displacement into a stored trail.
+The fixed update rate is configurable from `5–60 Hz`, default `20 Hz`. Previous/current field interpolation remains the response path while cells are actively supported. Releasing cells bypass stale previous-state interpolation and apply analytical render-time decay from the latest committed state using the configured immediate recovery time. Swept capsules also expose a `Sweep Tail Retention` control so the previous end of a low-cadence sweep can release more strongly than the current actor end without creating disconnected gaps. These mechanisms reduce the visual wake at 10–15 Hz without increasing the compute update rate or creating stored trail history.
 
 Every production vegetation layer samples the same field. Shader cost is fixed with respect to actor count: actor loops occur only in the bounded compute update, never per blade or per cluster.
 
@@ -494,19 +494,24 @@ Every production vegetation layer samples the same field. Shader cost is fixed w
 
 Any moving or stationary GameObject may receive `VegetationInteractor`. No player class, Rigidbody, CharacterController, tag, or layer is required. Motion is derived from transform positions sampled by the published domain.
 
-Initial interactor controls are:
+Interactor controls are divided into footprint, direction shaping, movement response, and capacity priority:
 
 ```text
 radius
 horizontal bend strength
 temporary flatten strength
+direction mode: Radial / World X Biased / Hybrid
+world-X bias
+world-Z strength
 movement-direction influence
 full movement-response speed
 maximum sweep distance
 priority
 ```
 
-Each fixed update submits a swept capsule from the previous sampled XZ position to the current position. Movement beyond the configured sweep limit is treated as a teleport and does not draw a long path through the field. A stationary actor still produces radial parting around its body.
+The fixed directional basis is world space: lateral is world `±X`, and map-up/down is world `±Z`. Actor rotation, facing, and camera rotation do not redefine those axes. `Radial` preserves the accepted radial plus optional movement-directed behavior. `World X Biased` ignores movement direction and redirects the radial result toward world `±X`; `Hybrid` redirects the accepted radial/movement result. `World X Bias` controls redirection toward pure world `±X`, while `World Z Strength` independently multiplies the final biased Z component before normalization. Setting `World Z Strength` to zero therefore removes Z displacement regardless of the X-bias value.
+
+Each fixed update submits a swept capsule from the previous sampled XZ position to the current position. Movement beyond the configured sweep limit is treated as a teleport and does not draw a long path through the field. A stationary actor still produces radial or fixed-world-X parting according to its selected direction mode. Cells near the exact actor X centreline use a deterministic world-cell side choice so the split remains stable rather than flickering.
 
 ### 8.4 Ordinary actor behavior
 
@@ -514,16 +519,18 @@ The player and ordinary enemies use immediate displacement only unless gameplay 
 
 ```text
 actor present
-    radial grass parting
-    optional movement-directed lean
+    per-interactor radial, fixed-world-X-biased, or hybrid parting
+    optional movement-directed lean only in Radial/Hybrid modes
+    independently attenuated world-Z displacement in world-X modes
     temporary flattening
 
 actor leaves
-    response returns to zero through the immediate recovery time
+    the swept tail is attenuated toward the previous sample by Sweep Tail Retention
+    releasing cells decay analytically every rendered frame through the immediate recovery time
     no persistent trail remains
 ```
 
-A swept update can leave a fraction-of-a-second wake while the immediate field recovers. This is response continuity, not persistent trail state.
+The field can still retain at most one fixed-step of source-position uncertainty because actor occupancy is sampled at the configured cadence. INTERACT.1B removes the additional full-strength swept-tail hold and stale previous-field interpolation that previously made this uncertainty resemble a visible trail.
 
 ### 8.5 Per-layer response
 
@@ -536,19 +543,44 @@ Every `VegetationLayer` exposes independent immediate-response controls:
 | Interaction Height Exponent | how much of the lower blade remains rigid |
 | Maximum Interaction Bend | world-space bend cap and conservative bounds expansion |
 | Interaction Normal Response | lighting-normal response to interaction bend |
+| Wind Influence On Displaced Grass | Weather response retained as effective interaction displacement approaches full strength; `1` preserves normal wind and `0` can suppress it completely at full displacement |
 
-This allows tall soft and short stiff recipes to react differently while sharing the same physical footprint. Roots remain planted. Flattening is capped so a blade cannot be pushed below its root height by interaction alone.
+This allows tall soft and short stiff recipes to react differently while sharing the same physical footprint. Roots remain planted. Flattening is capped so a blade cannot be pushed below its root height by interaction alone. Interaction is sampled once before Weather deformation; the same interpolated sample drives wind attenuation and immediate displacement without duplicating field texture reads.
 
-### 8.6 Deferred Ground-owned trample history
+### 8.6 Ground-owned historical trample field
 
-`VEG-V2-INTERACT.2` will add a separate Ground-owned field for explicitly requested history. It must support:
+`VEG-V2-INTERACT.2A` adds one optional `VegetationTrampleDomain` to the existing Ground `Vegetation` root. `VEG-V2-INTERACT.2A.1` adds delayed timed recovery, and `VEG-V2-INTERACT.2A.2` replaces the symmetric return with the accepted asymmetric slow–fast–slow curve. The domain owns two fixed Ground-local `ARGBHalf` deformation textures, one fixed Ground-local `RGFloat` timing texture, and one bounded writer buffer. Every recipe under that Ground samples the same stored deformation footprint through per-material binding immediately before draw; multiple Grounds therefore keep independent history without global texture conflicts. The timing texture is compute-only and adds no vegetation-shader sample.
 
-- optional short-lived swept trails for large moving objects;
-- irregular disc/ellipse stamps for slams or explosions;
-- capsule/line stamps for charges and directional attacks;
-- timed recovery from seconds to approximately a minute;
-- deliberately permanent state where gameplay requires it;
-- a `5–60 Hz` update-rate control independent from the immediate scene field.
+Only `VegetationInteractor` components whose `Trail Mode` is not `Off` write history. The historical sampler uses domain-owned movement history, independent from the immediate domain cadence. Writers accumulate movement until `Trail Stamp Spacing`, reject movement below `Minimum Trail Speed`, and submit a continuous swept capsule between accepted stamps. Timed writes carry independent delay and recovery-duration values. Restamping a cell resets or extends its hold phase; a weaker overlapping write cannot shorten an existing longer hold or recovery duration. The historical field never edits recipe coverage or rebuilds vegetation.
+
+Trail modes are:
+
+| Mode | Meaning |
+| --- | --- |
+| Off | no historical writes; default for player and ordinary actors |
+| Timed | stored bend/flatten state remains fully held for `Recovery Delay Seconds`, then follows a fixed asymmetric slow–fast–slow return over `Recovery Duration Seconds`: approximately 15% restored at 50% time, 90% restored at 90% time, and fully restored at completion |
+| Session Persistent | zero recovery while the runtime field exists; cleared by Reset Field, Ground/scene reload, or component teardown; no save-file permanence is claimed |
+
+The field update rate is independently configurable from `5–60 Hz`, default `12 Hz`. Each Ground permits exactly one active trample domain. Duplicate domains are invalid and do not publish resources.
+
+Every `VegetationLayer` exposes historical-response controls:
+
+| Control | Purpose |
+| --- | --- |
+| Trample Bend Response | horizontal stored-bend multiplier |
+| Trample Flatten Response | stored flatten multiplier |
+| Trample Height Exponent | lower-blade rigidity under stored state |
+| Maximum Trample Bend | world-space historical bend cap and conservative bounds expansion |
+| Trample Normal Response | lighting-normal response to historical deformation |
+| Wind Influence On Trampled Grass | Weather retained as historical deformation approaches full strength |
+
+Historical deformation composes with Weather and immediate displacement in the vertex stage. The shader samples the historical field once, with one previous/current bilinear pair, and contains no writer loop.
+
+`VEG-V2-INTERACT.2B` adds gameplay-authored one-shot stamps to the same historical field. The public API supports `Circle`, `Cone`, and `Line`. Circle and cone share one radial-sector implementation: a 360-degree arc is a circle, while a smaller arc is a cone facing an authored world-XZ direction. Line is a width-controlled capsule between authored world endpoints. Every stamp independently specifies bend, flattening, displacement mode, recovery mode, delay, duration, deterministic edge irregularity, noise scale, seed, and priority. Requests are queued on intersecting Ground domains and consumed once by the next historical fixed step; no temporary actor, coverage edit, vegetation rebuild, new historical texture, or vegetation-shader sample is required.
+
+Ability displacement modes are `Radial Outward`, `Fixed World Direction`, `Away From Centreline`, and `Flatten Only`. For overlapping ability stamps, the stronger bend direction is retained rather than averaging opposed vectors toward zero; flattening takes the maximum. Session-persistent state dominates timed state, while timed restamping can extend but cannot shorten the existing delay or recovery duration.
+
+`VegetationTrampleStampTester` is a dedicated optional test harness intended for temporary attachment to the player or another scene object. It stores editable named configurations, uses the attached transform as the stamp origin and facing basis, previews the selected shape with Gizmos, and exposes Inspector actions for selected stamping, previous/next/random configuration selection, and bounded randomized variants. The tester calls the exact public runtime stamp API and is not required by gameplay code.
 
 Ordinary actors remain history-free by default. Persistent state must not be stored in the camera-centred immediate field because recentering would discard it.
 
@@ -567,7 +599,7 @@ INTERACT.1 should support the normal visible-domain load:
 
 The immediate domain defaults to 48 uploaded records and exposes a `1–96` capacity control. Active interactors register directly; no per-frame hierarchy search occurs. When candidates exceed capacity, priority is ordered first and distance to the field anchor second. The comprehensive report exposes registered, in-domain candidate, uploaded, and overflow counts.
 
-The future INTERACT.2 ability-stamp capacity is not part of the immediate actor buffer and will be budgeted independently.
+INTERACT.2B ability stamps use a separate bounded request queue and structured buffer owned by each historical Ground domain. The default budget is 128 pending requests and 32 uploaded one-shot stamps per historical fixed step. When no ability requests are queued, the existing stamp loop executes zero iterations and recurring historical texture ownership remains unchanged.
 
 ---
 
@@ -790,7 +822,7 @@ Suggested reductions:
 - retain the fixed 18-vertex / 12-triangle CrossedCards cluster;
 - 256² immediate field;
 - immediate interaction control remains available across `5–60 Hz`; begin Low-quality tuning at 10 Hz;
-- future persistent trail/trample control also remains `5–60 Hz`; its Low-quality tuning value is deferred to INTERACT.2;
+- Ground historical trail/trample control remains `5–60 Hz`; begin Low-quality tuning at 8–10 Hz;
 - no grass shadow casting;
 - simplified lighting;
 - maximum two visible grass materials.
@@ -800,7 +832,7 @@ Suggested reductions:
 - higher cluster retention or authored density;
 - retain the fixed 18-vertex / 12-triangle CrossedCards cluster;
 - immediate interaction control remains `5–60 Hz`; begin Medium-quality tuning at 20 Hz;
-- future trail/trample control remains independently adjustable across `5–60 Hz`;
+- Ground historical trail/trample control remains independently adjustable across `5–60 Hz`; begin Medium-quality tuning at 12–16 Hz;
 - richer gust variation;
 - up to four visible vegetation materials.
 
@@ -809,7 +841,7 @@ Suggested reductions:
 - maximum authored density;
 - fixed production CrossedCards geometry;
 - immediate interaction control remains `5–60 Hz`; begin High-quality tuning at 30 Hz;
-- optional 512² future trample field only if measured and visibly justified;
+- optional 512² historical trample field only if measured and visibly justified;
 - optional receive-shadow or enhanced lighting;
 - no assumption that real grass shadow casting becomes enabled.
 
@@ -901,9 +933,30 @@ With 32 ordinary and large immediate interactors inside the visible domain:
 - response textures remain stable while the camera/anchor domain scrolls;
 - no visible full-domain clearing or snapping.
 
-Persistent trail update cost and ability-stamp acceptance are deferred to INTERACT.2.
+### 17.4 Historical trample acceptance
 
-### 17.4 Production acceptance
+With one active `VegetationTrampleDomain` and opt-in moving writers:
+
+- ordinary interactors whose Trail Mode is Off never enter the historical candidate list;
+- timed trails form continuous swept footprints at 5–15 Hz, remain fully held for their configured recovery delay, then follow the fixed asymmetric slow–fast–slow curve: approximately 15% restored at 50% recovery time, 90% restored at 90% time, and fully restored at completion;
+- session-persistent trails remain until Reset Field or runtime-domain teardown;
+- all recipes on one Ground share the same stored footprint while retaining independent visual response;
+- no coverage mutation, vegetation rebuild, instance-buffer rewrite, per-cluster CPU loop, or shader-side writer loop;
+- duplicate active trample domains for one Ground are rejected;
+- uploaded/overflow telemetry and the 64-byte writer-buffer memory report are correct;
+- the default 256² historical textures remain approximately 1 MiB per Ground.
+
+With queued ability requests:
+
+- a 360-degree radial sector covers the complete circle, while smaller arcs reject cells outside the authored cone half-angle;
+- line requests use a width-controlled capsule with rounded endpoints;
+- deterministic edge irregularity remains stable for fixed world position, scale, and seed;
+- requests are consumed once on the next historical fixed step and do not repeat on later steps;
+- stronger overlapping ability bend directions are retained instead of cancelling through vector averaging;
+- session-persistent state dominates timed state, while timed restamping cannot shorten an existing delay or recovery duration;
+- queue acceptance, rejection/replacement, pending count, uploaded count, and 96-byte record memory are reported accurately.
+
+### 17.5 Production acceptance
 
 - no GameObject per grass cluster;
 - no Transform per grass cluster;
@@ -6695,7 +6748,7 @@ Unity 6000.5.0f1 is unavailable in this environment. Shader import, Unity compil
 
 ## VEG-V2-INTERACT.1 — Multi-Actor Immediate Grass Displacement
 
-**Status:** implementation authorized; read-only review complete; source implementation pending.
+**Status:** source implementation complete and statically validated; Unity validation pending. Direction shaping and displaced-grass Weather composition are refined by `VEG-V2-INTERACT.1A`.
 
 ### Objective
 
@@ -6763,8 +6816,8 @@ Scope amendment before folder-meta creation: Visible Meta Files requires committ
 
 1. `VegetationInteractor` maintains a static active registry and non-serialized previous fixed-sample position. Serialized controls define radius, bend strength, flatten strength, movement-direction influence, full movement-response speed, teleport/sweep limit, and priority. It derives motion from transforms and requires no Rigidbody, CharacterController, player type, tag, or layer.
 2. `VegetationInteractionDomain` maintains exactly one published scene field, a reusable filtered/sorted actor list, one fixed-stride GPU actor buffer, two `ARGBHalf` response textures, a power-of-two toroidal offset, and a `5–60 Hz` fixed-step accumulator. It does not call `FindObjectsByType` in its update loop.
-3. The compute field evaluates a swept capsule for each uploaded actor, combines radial and movement-directed bend, records normalized bend/flatten response, applies separate attack and recovery time constants, preserves overlapping cells during recenter, and clears newly exposed cells. It contains no persistence beyond the short immediate response.
-4. The shader samples previous/current response textures and interpolates between fixed updates. The root remains planted; horizontal bend and vertical flattening are weighted by blade height. Weather and interaction tip displacements are combined for deformation normals and bend-side shading.
+3. The compute field evaluates a swept capsule for each uploaded actor, records normalized bend/flatten response, applies separate attack and recovery time constants, preserves overlapping cells during recenter, and clears newly exposed cells. INTERACT.1A expands direction shaping from the original radial/movement path to explicit `Radial`, fixed `World X Biased`, and `Hybrid` modes. It contains no persistence beyond the short immediate response.
+4. The shader samples previous/current response textures and interpolates between fixed updates. INTERACT.1A samples this interpolated state once before Weather, uses it to attenuate Weather according to the recipe, then applies interaction deformation. The root remains planted; horizontal bend and vertical flattening are weighted by blade height. Weather and interaction tip displacements are combined for deformation normals and bend-side shading.
 5. Per-layer recipe controls are material-only except maximum interaction bend, which participates in conservative bounds and therefore in the structural hash. Duplicate-as-empty copies every interaction response control.
 6. The domain Inspector exposes reset and clipboard-report actions. Selected domain/interactor gizmos show field bounds, anchor, radius, and movement direction without GPU readback.
 
@@ -6775,11 +6828,13 @@ Scope amendment before folder-meta creation: Visible Meta Files requires committ
 | Field resolution | 256² | 64²–512² power of two |
 | Cell size | 0.25 m | 0.10–2.0 m |
 | World coverage | 64 × 64 m | derived |
+| Recenter margin | 1.5 m | 0.25–8 m, clamped below half-field extent |
 | Update rate | 20 Hz | 5–60 Hz |
 | Maximum fixed steps/frame | 4 | 1–8 |
 | Maximum uploaded interactors | 48 | 1–96 |
 | Immediate response time | 0.06 s | 0.01–1.0 s |
 | Immediate recovery time | 0.18 s | 0.01–2.0 s |
+| Sweep tail retention | 0.10 | 0–1 |
 | Default actor radius | 0.55 m | 0.05–20 m |
 | Default actor bend strength | 1.0 | 0–2 |
 | Default actor flatten strength | 0.20 | 0–1 |
@@ -6787,13 +6842,13 @@ Scope amendment before folder-meta creation: Visible Meta Files requires committ
 
 ### Performance model
 
-At 256², two `ARGBHalf` response textures consume `2 × 256 × 256 × 8 = 1,048,576` bytes. The default 48-record actor buffer uses `48 × 32 = 1,536` bytes. One compute dispatch runs per fixed interaction step; each field cell loops only over the uploaded actor count. Rendering adds two bilinear field samples per vegetation vertex for fixed-step interpolation and no actor loop, CPU per-instance update, coverage rebuild, or instance-buffer mutation.
+At 256², two `ARGBHalf` response textures consume `2 × 256 × 256 × 8 = 1,048,576` bytes. The current 48-record actor buffer uses `48 × 48 = 2,304` bytes after INTERACT.1A direction shaping. One compute dispatch runs per fixed interaction step; each field cell loops only over the uploaded actor count. Rendering adds two bilinear field samples per vegetation vertex. INTERACT.1B keeps active-cell interpolation and adds analytical release decay without another texture read, actor loop, CPU per-instance update, coverage rebuild, or instance-buffer mutation.
 
 The first patch deliberately chooses direct bounded actor iteration over spatial binning. The accepted capacity ceiling is 48 ordinary records, and the report exposes uploaded/overflow counts. Spatial binning is justified only if measured interaction compute cost exceeds the budget under the documented stress scene.
 
 ### Validation plan
 
-Static validation must prove exact scope, C# delimiter/preprocessor balance, compute/HLSL delimiter balance, exact 32-byte actor record agreement, power-of-two field constraints, `5–60 Hz` clamps, no per-frame hierarchy scan, no persistent/trail symbols or state, no instance-layout change, complete recipe-copy coverage, conservative bounds inclusion, fixed Weather/interaction composition, and byte identity of Ground, coverage, Weather, instance data, mesh builder, lighting includes, benchmark runner, and source scene.
+INTERACT.1 static validation proved the original exact 32-byte actor record, power-of-two field constraints, `5–60 Hz` clamps, no per-frame hierarchy scan, no persistent/trail state, no instance-layout change, complete recipe-copy coverage, conservative bounds inclusion, and fixed Weather/interaction composition. INTERACT.1A supersedes only the actor-record and direction-composition portions with the current 48-byte record and single-sample Weather-suppression path.
 
 Unity validation must confirm clean import/compile, one active domain, player-agnostic interactor registration, stationary radial parting, continuous movement displacement at 10 Hz, no lingering trail after recovery, independent per-layer response controls, correct field recentering, restoration after domain disable, and a copied comprehensive report.
 
@@ -6818,11 +6873,976 @@ Unity validation must confirm clean import/compile, one active domain, player-ag
 
 - `VegetationInteractor` is transform-driven, player-agnostic, and has no `Update`, `LateUpdate`, or `FixedUpdate`. It registers explicitly and supplies a fixed-sample swept capsule with radius, bend, temporary flattening, movement-direction influence, teleport limit, and priority.
 - `VegetationInteractionDomain` owns one published moving XZ field, accepts a `5–60 Hz` fixed update rate, defaults to `20 Hz`, uploads at most the configured actor capacity, recentres toroidally, interpolates previous/current fixed-step responses in the shader, and stores no trail or gameplay-history state.
-- The compute kernel uses two 32-byte actor vectors, unsigned power-of-two wrapping, bounded actor iteration, separate immediate response/recovery time constants, and no unused pressure path.
+- At the INTERACT.1 freeze, the compute kernel used two `float4` values / 32 bytes per actor. INTERACT.1A expands the current contract to three `float4` values / 48 bytes for direction mode and fixed-axis controls; unsigned power-of-two wrapping, bounded actor iteration, and response/recovery timing remain unchanged.
 - Every production layer receives material controls for bend, flattening, root-to-tip response, maximum world-space bend, and interaction-normal response. Maximum bend is a final shader cap and conservative bounds expansion; the other response controls are material-only.
 - Weather deformation remains separate. The shader applies Weather and then interaction, combines both horizontal tip displacements for lighting, and includes temporary flattening in the deformation normal while respecting a zero interaction-normal response.
 - Duplicate-as-empty copies the complete production recipe including all five interaction-response controls.
 
 **Performance reconciliation:** the default 256² field uses two `ARGBHalf` textures (`1,048,576` bytes total) plus a 48-record structured actor buffer (`1,536` bytes). Active CPU work is registry filtering, deterministic priority/distance sorting, one bounded upload, and fixed-step dispatch scheduling. Active GPU field work is one 256² compute dispatch per interaction step with at most the uploaded actor count per cell. Vegetation adds two bilinear field samples per vertex but no actor loop, CPU instance mutation, coverage mutation, or vegetation rebuild. No `PERFORMANCE EXCEPTION` is active; Unity profiling under the documented stress scene remains mandatory before increasing field resolution or actor capacity.
 
-**Validation evidence:** the dedicated source validator passed `104 / 104` checks. It verified exact scope, C#/HLSL/compute/shader delimiter balance, preprocessor balance, unique metas, `5–60 Hz` controls, power-of-two normalization, no hierarchy scan, no interactor frame callback, exact 32-byte CPU/GPU record agreement, swept-capsule evaluation, fixed-step interpolation, final bend capping, flatten-safe geometry and normals, complete recipe-copy coverage, conservative bounds, and byte identity of all declared frozen dependencies. Unity assemblies and an executable Unity Editor are unavailable in this environment, so Unity compilation, shader/compute import, runtime dispatch, visual response, recentering, and profiling remain pending and are not claimed.
+**Validation evidence:** the INTERACT.1 source validator passed `104 / 104` checks for its original radial/movement contract. INTERACT.1A separately validates the current 48-byte direction record, fixed-world-X modes, independent world-Z attenuation, one interaction sample path, and displaced-grass Weather control while preserving the original field, sweep, bounds, and frozen dependencies. Unity assemblies and an executable Unity Editor are unavailable in this environment, so Unity compilation, shader/compute import, runtime dispatch, visual response, recentering, and profiling remain pending and are not claimed.
+
+## VEG-V2-INTERACT.1A — World-X Direction Bias and Displaced-Grass Wind Suppression
+
+**Status:** source implementation complete; post-change source audit passed; Unity validation pending.
+
+### Objective
+
+Refine the immediate interaction field without adding history. Each `VegetationInteractor` must choose between the accepted current radial behavior and fixed-map-axis side-biased behavior. World-X-biased interaction must favor displacement along world `±X`, independently attenuate world-Z displacement, and remain independent of actor facing, actor movement direction, and camera rotation. Each vegetation recipe must also control how much Weather deformation remains while that recipe is currently displaced.
+
+This patch does not add short-lived trails, ability stamps, timed recovery history, permanent trampling, Ground-owned interaction textures, save/load, or actor-specific gameplay dependencies. Those remain owned by `VEG-V2-INTERACT.2`.
+
+### Acceptance criteria
+
+1. `VegetationInteractor` exposes `Radial`, `World X Biased`, and `Hybrid` direction modes.
+2. `World X Bias` and `World Z Strength` are explicit `0..1` controls. The axis basis is fixed world X/Z; actor rotation and movement direction do not redefine it.
+3. `Radial` preserves the accepted current radial plus optional movement-directed behavior.
+4. `World X Biased` ignores movement direction for displacement direction and blends the radial result toward a stable `±X` result. `Hybrid` starts from the accepted radial/movement result and then applies the same world-X bias.
+5. Grass near the interactor X centreline receives a deterministic world-space left/right choice rather than an unstable zero vector or flickering split.
+6. Every `VegetationLayer` exposes `Wind Influence On Displaced Grass`: `1` preserves current Weather response; values toward `0` suppress Weather proportionally to effective interaction bend/flatten strength.
+7. Interaction is sampled once per vertex path for both wind suppression and deformation. The existing previous/current field interpolation remains two texture samples total, not four.
+8. The interaction field remains transient, actor bounded, and independent from vegetation instance rebuilding.
+
+### Read-only review evidence
+
+- The authoritative source was reconstructed from `Assets-Code-Archive(8).zip` plus the accepted INFRA.1B, WEATHER-V0A, INFRA.2, INFRA.2A, INFRA.3 deletion state, FOUNDATION.1, and INTERACT.1 patches. The workspace has no `.git` directory; branch, `HEAD`, status, diff, and history are unavailable.
+- `VegetationInteractor.cs::VegetationInteractorSample` currently contains start/end XZ, radius, bend, flatten, speed-derived movement blend, and priority. The serialized actor controls provide only radial/movement shaping.
+- `VegetationInteractionDomain.cs::GpuInteractorRecord` and `CS_VegetationInteractionField.compute::VegetationInteractorRecord` are exactly two `float4` values / 32 bytes. The fourth parameter currently stores movement blend; no world-axis mode or axis controls exist.
+- `CS_VegetationInteractionField.compute::EvaluateImmediateTarget` computes radial displacement and optionally blends it toward swept movement direction. It has no fixed world-X basis or deterministic centreline side selection.
+- `SH_StylizedVegetationBenchmark.shader::Vert` applies Weather before calling `ApplyVegetationInteractionResponse`; interaction is therefore unavailable when Weather displacement is calculated.
+- `VegetationInteractionField.hlsl::SampleVegetationInteraction` already returns the interpolated bend and flatten field. Passing that sample into the deformation function allows both wind suppression and interaction deformation without an additional field sample.
+- `VegetationRendererBase.cs` owns material-only interaction response properties and hashes. `VegetationLayerAuthoring.cs` copies an explicit production-property allowlist; the new recipe control must be added to both paths.
+- Current active documentation still describes radial plus movement-directed parting as the ordinary behavior and does not document fixed world-X mode or displaced-grass Weather suppression. Those active sections must be replaced in place and the INTERACT.1 contract marked refined by INTERACT.1A.
+
+### Approved file scope
+
+Modify:
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+Assets/Game/Procedural/Vegetation/VegetationInteractor.cs
+Assets/Game/Procedural/Vegetation/VegetationInteractionDomain.cs
+Assets/Game/Procedural/Vegetation/VegetationRendererBase.cs
+Assets/Game/Procedural/Vegetation/Editor/VegetationLayerAuthoring.cs
+Assets/Game/Rendering/Vegetation/Includes/VegetationInteractionField.hlsl
+Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationInteractionField.compute
+Assets/Game/Rendering/Vegetation/Shaders/SH_StylizedVegetationBenchmark.shader
+```
+
+Create, delete, move, rename, scene, prefab, material, Weather implementation, Ground, coverage, geometry, instance-layout, layer, tag, and URP files: none.
+
+### Implementation contract
+
+1. Add a serialized public direction-mode enum and `World X Bias` / `World Z Strength` controls to `VegetationInteractor`. Preserve speed-derived movement blend for `Radial` and `Hybrid`; `World X Biased` ignores it for direction shaping.
+2. Expand the CPU/GPU interaction record from 32 to 48 bytes using a third `float4`: mode, world-X bias, world-Z strength, and reserved zero. Update stride validation and memory reporting.
+3. In compute, retain the current swept-capsule footprint and falloff. Build a deterministic world-X side from the signed radial X offset; within a narrow centreline band use a stable world-cell hash. Blend the mode source direction toward pure world `±X` by `World X Bias`, then multiply the resulting world-Z component by `World Z Strength` before final normalization. This makes the two controls independent: `World Z Strength = 0` always removes final Z displacement.
+4. Refactor `VegetationInteractionField.hlsl` so the shader samples once, derives effective interaction strength, and passes the sample into position deformation.
+5. Add material-only `Wind Influence On Displaced Grass` to `VegetationRendererBase`, its lighting hash, runtime material upload, shader property/CBUFFER, and duplicate-recipe allowlist.
+6. In the vertex shader, sample interaction before Weather, derive effective layer displacement strength from bend and flatten responses, attenuate the complete Weather-deformed position and full-tip Weather displacement, then apply interaction deformation and combined normal logic.
+7. Replace the active interaction documentation in both architecture documents and mark prior radial-only guidance as refined, not concurrently authoritative.
+
+### Performance and compatibility model
+
+The actor record grows from 32 to 48 bytes. At the default 48-interactor capacity the buffer grows from `1,536` to `2,304` bytes, an increase of `768` bytes. Compute dispatch dimensions, field textures, actor loop ceiling, update cadence, field sampling count, draw count, instance buffer, and placement rebuild behavior remain unchanged. Shader work adds bounded scalar/vector shaping and a Weather interpolation multiplier; interaction texture sampling remains the existing previous/current pair.
+
+Existing serialized actors receive enum zero (`Radial`), `World X Bias = 0.85`, and `World Z Strength = 0.20` from field initializers for newly added data. Because enum zero preserves the current direction path, existing scene behavior remains radial until the user selects another mode. Existing vegetation recipes receive `Wind Influence On Displaced Grass = 1`, preserving current Weather behavior.
+
+### Validation plan
+
+Static validation must prove exact file scope, C#/HLSL/compute delimiter and preprocessor balance, exact 48-byte CPU/GPU record agreement, enum/mode parity, `0..1` clamps, stable centreline selection, no actor-relative basis in world-X mode, one interaction sample call in the vertex path, complete recipe-copy coverage, material-only hashing, unchanged field textures/update limits, and byte identity of Ground, Weather, instance layout, geometry, coverage, benchmark runner, and scene files.
+
+Unity validation must confirm radial parity, fixed world-X behavior independent of actor rotation/movement direction, controllable world-Z inhibition, stable centreline splitting, `Wind Influence On Displaced Grass = 1` parity, visible suppression toward `0`, immediate recovery with no trail, and exact control locations.
+
+### Implementation sequence
+
+| Item | Files | Status |
+| --- | --- | --- |
+| INTERACT.1A.0 | Canonical plan and active-guidance replacement | Complete |
+| INTERACT.1A.1 | Interactor mode and 48-byte upload contract | Complete at source level; Unity validation pending |
+| INTERACT.1A.2 | Compute world-X shaping and centreline stability | Complete at source level; Unity validation pending |
+| INTERACT.1A.3 | Single-sample shader refactor and wind suppression | Complete at source level; Unity validation pending |
+| INTERACT.1A.4 | Recipe control, hash, material upload, duplication | Complete at source level; Unity validation pending |
+| INTERACT.1A.5 | Documentation reconciliation | Complete |
+| INTERACT.1A.6 | Source validation and final compliance audit | Complete at source level; Unity validation pending |
+
+
+### VEG-V2-INTERACT.1A post-change consistency and compliance audit
+
+**Actual scope:** exactly the nine approved files were modified; no files were created, deleted, moved, or renamed. Ground, Weather runtime/compute, coverage, vegetation instance data, cluster geometry, benchmark runner, scene, prefab, material, layer, tag, and URP files remained byte-identical to the reconstructed accepted baseline.
+
+**Implemented behavior:**
+
+- `VegetationInteractor` now exposes `Direction Mode`, `World X Bias`, and `World Z Strength`. Enum zero is `Radial`, preserving existing serialized behavior. `World X Biased` ignores actor movement direction; `Hybrid` starts from the accepted radial/movement result. All fixed-axis shaping uses world X/Z and no actor-forward or camera-relative basis.
+- The actor upload contract is three `Vector4` / `float4` values, 48 bytes. The added vector stores mode, world-X bias, world-Z strength, and reserved zero. At the default capacity of 48 records, buffer memory is `2,304` bytes.
+- The compute field preserves the existing swept-capsule footprint, influence falloff, overlap accumulation, response/recovery, toroidal recentering, and actor ceiling. Near the exact X centreline, a deterministic hash of the absolute world field cell chooses `-X` or `+X`.
+- `World X Bias` blends the applicable source direction toward pure world `±X`. `World Z Strength` then multiplies the final biased Z component before normalization, so zero always removes Z displacement independently of X bias.
+- The shader samples the interpolated interaction state once. That sample determines effective per-recipe displacement strength, attenuates the complete Weather-deformed position and full-tip Weather vector, and is then passed directly into immediate deformation. The previous/current interaction field remains exactly two bilinear texture reads total.
+- `Wind Influence On Displaced Grass` is a material-only recipe control. Its default `1` preserves the accepted Weather response. At full effective interaction, `0` can remove Weather displacement; intermediate values retain the requested fraction. The control participates in the material hash/upload and duplicate-as-empty allowlist but not the structural rebuild hash.
+
+**Performance reconciliation:** field texture memory, compute dispatch dimensions, actor loop ceiling, `5–60 Hz` cadence, draw count, vegetation instance layout, and placement rebuild behavior are unchanged. The actor buffer increases by `768` bytes at the default 48-record capacity. Shader texture sampling does not increase; added work is bounded direction shaping plus one Weather-retention interpolation. No `PERFORMANCE EXCEPTION` is active.
+
+**Validation evidence:** the dedicated INTERACT.1A source validator passed `72 / 72` checks. It verified exact scope, delimiter/preprocessor balance, enum parity, `0..1` controls and clamps, exact 48-byte CPU/GPU layout, stable world-cell centreline selection, actor-movement independence in World-X mode, independent final-Z suppression, swept-capsule preservation, unchanged field resources/update range, one interaction sample call, two total field texture reads, material-only Weather-retention hashing, complete recipe copying, numerical direction invariants, documentation reconciliation, and byte identity of thirteen frozen dependencies. Unity 6000.5.0f1 and Unity reference assemblies are unavailable here; C# compilation, shader/compute import, scene serialization, visual direction response, gust suppression, and runtime profiling remain pending and are not claimed.
+
+
+## VEG-V2-INTERACT.1B — Recenter Hysteresis and Low-Cadence Immediate Release Compensation
+
+**Status:** Planned and authorized. Canonical plan recorded before implementation.
+
+### Objective and acceptance criteria
+
+Preserve the accepted INTERACT.1A immediate-displacement behavior at low update rates while removing two avoidable costs/artifacts:
+
+1. ordinary anchor movement must not dispatch a full-field recenter at almost every simulation step;
+2. grass behind a moving immediate interactor must begin visible recovery without waiting for stale fixed-step interpolation to complete;
+3. the correction must not increase the `5–60 Hz` update rate, add persistent history, add actor loops to the vegetation shader, add field textures, change vegetation instance data, or change the existing interactor/recipe contracts.
+
+Acceptance requires:
+
+- a serialized `Recenter Margin` control on `VegetationInteractionDomain`, clamped to the usable half-field extent;
+- no recenter while the anchor remains inside the current field-centre margin;
+- one accumulated toroidal recenter when the margin is exceeded;
+- a serialized `Sweep Tail Retention` control where `1` preserves the old uniform swept capsule and `0` allows the previous sweep endpoint to contribute zero target strength while the current endpoint remains full;
+- current endpoint occupancy and stationary interactor behavior remain unchanged;
+- releasing cells use analytical render-time decay controlled by the existing `Immediate Recovery Time` rather than interpolating from the older stronger field;
+- active cells retain previous/current interpolation for smooth low-rate response;
+- diagnostics distinguish Edit Mode inactivity from runtime failure and report recenter margin, sweep-tail retention, render-time recovery compensation, and recenter-dispatch percentage.
+
+### Read-only review evidence
+
+- User runtime reports for accepted INTERACT.1A showed `112 / 128 = 87.5%` and `312 / 339 ≈ 92.0%` recenter-to-simulation dispatch ratios at `15 Hz`, with a 256² field and 0.25 m cells. `VegetationInteractionDomain.Update` calls `RecenterIfNeeded()` every rendered frame, and `ComputeDesiredOriginCell()` centres the field to the anchor at single-cell precision; any 0.25 m cell crossing therefore dispatches `RecenterField`.
+- `CS_VegetationInteractionField.compute::EvaluateImmediateTarget` computes `segmentT` but applies the same target influence along the complete previous-to-current swept capsule. At low cadence, the previous endpoint is therefore held as strongly as the actor's current endpoint for the entire next fixed interval.
+- `CS_VegetationInteractionField.compute::SimulateField` stores zero in state `.w`; no current-target support marker is available to the renderer.
+- `VegetationInteractionField.hlsl::SampleVegetationInteraction` always returns `lerp(previousState, currentState, interpolation)`. When a cell begins recovery, the older stronger state continues contributing for the full interpolation interval before the next fixed step.
+- `VegetationInteractionDomain.PublishShaderGlobals` currently publishes interpolation, fixed-step duration, simulation time, and enabled state. Interaction HLSL does not consume simulation time, so the third timing component can carry immediate recovery time without another global vector.
+- `VegetationInteractionDomainEditor` uses `DrawDefaultInspector`, so domain controls require no bespoke serialized-property code. Its current runtime status labels non-playing resources as `NOT READY`, which is ambiguous despite Edit Mode intentionally clearing the field.
+- `VegetationInteractor`, `VegetationRendererBase`, the vegetation shader, Weather, Ground, coverage, instance data, geometry, benchmark runner, scenes, prefabs, materials, layers, tags, and URP settings do not need modification for this correction.
+
+### Approved file scope
+
+Modify only:
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+Assets/Game/Procedural/Vegetation/VegetationInteractionDomain.cs
+Assets/Game/Procedural/Vegetation/Editor/VegetationInteractionDomainEditor.cs
+Assets/Game/Rendering/Vegetation/Includes/VegetationInteractionField.hlsl
+Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationInteractionField.compute
+```
+
+Create, delete, move, rename, scene, prefab, material, interactor, vegetation recipe, Weather, Ground, coverage, instance-layout, geometry, benchmark, layer, tag, and URP files: none.
+
+### Implementation contract
+
+1. Add `Recenter Margin` under the immediate field controls, exposed across `0.25–8 m` and dynamically clamped below the field half-extent. Initial resource creation remains exactly centred. Runtime recentering compares the anchor cell with the current field centre and keeps the current origin while both axis deltas remain inside the margin. When exceeded, recenter to the latest centred origin in one toroidal shift.
+2. Add `Sweep Tail Retention` under immediate response, range `0–1`, default `0.10`. Compute multiplies moving swept-capsule influence by a smooth previous-to-current weight from that retention to `1`. Stationary capsules do not apply the longitudinal attenuation.
+3. Store current target support in state `.w` during `SimulateField`. The support marker is current-step metadata, not historical trample state.
+4. Publish `(interpolation, fixedStep, recoveryTime, enabled)` through `_VegetationInteractionFieldTiming`.
+5. In `SampleVegetationInteraction`, active/supporting cells retain previous/current interpolation. Releasing cells start from the latest committed current state and apply `exp(-renderAge / recoveryTime)` every rendered frame, where `renderAge = interpolation × fixedStep`. This changes no field sample count.
+6. Update the report/editor wording and recenter gizmos to describe the actual hysteretic field bounds.
+7. Update active documentation in place and freeze INTERACT.1A as user-validated, while retaining persistent/history interaction as deferred INTERACT.2 work.
+
+### Performance and compatibility model
+
+- Recenter hysteresis reduces full 256² recenter dispatch frequency; it adds only bounded CPU integer comparisons per rendered frame.
+- Sweep-tail attenuation adds a few scalar operations inside the existing bounded compute actor loop.
+- Render-time recovery adds one exponential for releasing sampled vertices; field reads remain exactly two bilinear samples and there is still no actor loop in the vegetation shader.
+- Field memory, actor-buffer memory, dispatch dimensions, draw count, instance data, placement rebuild behavior, and update-rate range remain unchanged.
+- `Sweep Tail Retention = 1` reproduces the prior uniform swept capsule. Existing response/recovery controls remain authoritative. No `PERFORMANCE EXCEPTION` is active.
+
+### Validation plan
+
+Static validation must prove exact six-file scope, C#/HLSL/compute balance, dynamic margin clamp, no resource rebuild hash dependency for tuning controls, hysteresis before recenter dispatch, stationary-sweep parity, tail weight endpoints, state-W support marker, unchanged two field reads, active interpolation versus release decay branches, recovery-time timing publication, report fields, documentation reconciliation, and byte identity of frozen dependencies.
+
+Unity validation must confirm at 10–15 Hz: normal interaction parity, substantially reduced recenter-dispatch percentage, continuous fast-motion coverage, visibly earlier grass recovery behind the actor, no durable trail, `Sweep Tail Retention = 1` old-behavior parity, and Edit Mode report status `INACTIVE — PLAY MODE SIMULATION NOT RUNNING`.
+
+### Implementation sequence
+
+| Item | Files | Status |
+| --- | --- | --- |
+| INTERACT.1B.0 | Canonical plan and active-guidance update | Complete |
+| INTERACT.1B.1 | Recenter margin and hysteretic origin selection | Complete at source level; Unity validation pending |
+| INTERACT.1B.2 | Swept-tail target attenuation | Complete at source level; Unity validation pending |
+| INTERACT.1B.3 | Current-support marker and render-time recovery | Complete at source level; Unity validation pending |
+| INTERACT.1B.4 | Diagnostics/editor wording and gizmo reconciliation | Complete at source level; Unity validation pending |
+| INTERACT.1B.5 | Documentation reconciliation | Complete |
+| INTERACT.1B.6 | Source validation and final compliance audit | Complete at source level; Unity validation pending |
+
+
+### VEG-V2-INTERACT.1B post-change consistency and compliance audit
+
+**Actual scope:** exactly the six approved files were modified. No files were created, deleted, moved, or renamed. `VegetationInteractor`, vegetation recipes/renderer/shader, Weather, Ground, coverage, instance layout, geometry, benchmark runner, scenes, prefabs, materials, layers, tags, and URP files remained byte-identical to the accepted INTERACT.1A baseline.
+
+**Implemented behavior:**
+
+- `VegetationInteractionDomain` exposes `Recenter Margin`, default `1.5 m`. Resource creation still centres the 256² field exactly. Runtime origin selection retains the current origin while the anchor remains within the rounded-up margin in both axes, then shifts once to the latest centred origin. The margin is dynamically clamped to remain at least two cells inside the half-field extent.
+- `Sweep Tail Retention`, default `0.10`, is uploaded through `_ResponseParameters.z`. Moving swept capsules apply a smooth previous-to-current multiplier from the configured retention to full strength. Stationary actor footprints bypass this attenuation. `1` reproduces the former uniform swept target; `0` allows the previous endpoint to release completely while current actor occupancy remains full.
+- The compute state `.w` now carries a binary current-target-support marker. It is transient interpolation metadata only and does not add trail history.
+- `_VegetationInteractionFieldTiming` now publishes interpolation, fixed-step duration, immediate recovery time, and enabled state. Supported cells retain previous/current interpolation. Unsupported cells use the latest committed current state and apply exact exponential decay over the rendered fraction of the next fixed interval. The existing compute recovery update and render-time continuation obey the same time constant.
+- Runtime reports now distinguish intentional Edit Mode inactivity from failure and report margin, sweep retention, release compensation, and cumulative recenter percentage. Selected-domain gizmos display the actual hysteretic field bounds, its central recenter margin, and the current anchor.
+
+**Performance reconciliation:** field memory, actor-buffer memory, update cadence, compute thread dimensions, actor ceiling, draw count, vegetation instance data, and field sample count remain unchanged. Hysteresis is bounded CPU integer math and is expected to remove most recenter compute dispatches observed in the accepted 15 Hz reports. Sweep weighting adds bounded scalar math inside the existing compute actor loop. Releasing vertices add one exponential after the existing two field reads; there is no shader actor loop or extra texture sample. No `PERFORMANCE EXCEPTION` is active.
+
+**Consistency reconciliation:** active architecture sections and the initial-default table now describe the 48-byte INTERACT.1A actor record, recenter margin, sweep-tail retention, and low-cadence release behavior. The concise architecture document was updated in place. Historical plans remain labelled by patch identity and do not override the active interaction contract. INTERACT.1A is frozen as user-validated for fixed-world-X shaping and displaced-grass wind suppression; INTERACT.2 remains the separate owner of intentional trail/ability history.
+
+**Validation evidence:** the dedicated INTERACT.1B source validator passed `84 / 84` checks. It verified exact scope, delimiter/preprocessor balance, dynamic margin clamping, absence of resource-hash churn, hysteretic origin selection, accumulated recenter deltas, stationary-sweep parity, sweep-weight endpoints, support metadata, unchanged two-texture sampling, active interpolation and analytical release branches, exact exponential continuation, diagnostic reconciliation, documentation consistency, and byte identity of seventeen frozen dependencies. Unity 6000.5.0f1 and Unity reference assemblies are unavailable in this environment; C# compilation, compute/shader import, actual recenter reduction, visual wake reduction, and runtime profiling remain pending and are not claimed.
+
+## VEG-V2-INTERACT.2A — Ground-Owned Opt-In Trample History
+
+### Objective and acceptance criteria
+
+Add intentional historical grass deformation without changing the accepted INTERACT.1B ordinary-player behavior. Immediate displacement remains scene-owned, camera-anchored, and history-free. Historical trample state is opt-in per `VegetationInteractor`, fixed to one `GeneratedGround` domain, shared by every recipe under that Ground, and updated at an independently configurable `5–60 Hz`.
+
+Acceptance requires:
+
+- `Trail Mode = Off` by default and therefore no historical player trail unless explicitly enabled;
+- `Timed` trails recover using the interactor-authored recovery time;
+- `Session Persistent` trails remain until the field, Ground, or scene resets and do not claim save-file persistence;
+- moving trail writers use their own sample history and swept-capsule stamping, so immediate and historical cadences cannot corrupt one another;
+- all direct vegetation layers on one Ground sample one shared fixed Ground-local field;
+- no coverage mutation, vegetation rebuild, instance-buffer rewrite, per-cluster CPU loop, or shader-side actor loop;
+- per-layer bend, flatten, wind-retention, normal, height, and maximum-bend controls;
+- one clipboard report and selected-domain bounds gizmo;
+- ability-driven irregular discs and line/capsule requests remain deferred to INTERACT.2B.
+
+### Approved scope
+
+Create:
+
+```text
+Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs
+Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs.meta
+Assets/Game/Procedural/Vegetation/Editor/VegetationTrampleDomainEditor.cs
+Assets/Game/Procedural/Vegetation/Editor/VegetationTrampleDomainEditor.cs.meta
+Assets/Game/Rendering/Vegetation/Includes/VegetationTrampleField.hlsl
+Assets/Game/Rendering/Vegetation/Includes/VegetationTrampleField.hlsl.meta
+Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute
+Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute.meta
+```
+
+Modify:
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+Assets/Game/Procedural/Vegetation/GroundVegetation.cs
+Assets/Game/Procedural/Vegetation/Editor/GroundVegetationEditor.cs
+Assets/Game/Procedural/Vegetation/VegetationInteractor.cs
+Assets/Game/Procedural/Vegetation/VegetationRendererBase.cs
+Assets/Game/Procedural/Vegetation/Editor/VegetationLayerAuthoring.cs
+Assets/Game/Rendering/Vegetation/Shaders/SH_StylizedVegetationBenchmark.shader
+```
+
+No scene, prefab, material, `GeneratedGround`, coverage, instance-layout, cluster-geometry, Weather, immediate-field, layer/tag, or URP file is authorized.
+
+### Reviewed evidence and constraints
+
+- `Assets/AGENTS.md` was read completely. It requires this persistent plan as the first write, exact scope, source/caller/consumer review, a final compliance audit, and honest Unity-only pending checks.
+- `VegetationInteractionDomain.Update` and `VegetationInteractor.CaptureSample` prove that the accepted immediate domain consumes one cadence-specific previous-position history. A historical domain running independently cannot reuse that mutable history; `VegetationTrampleDomain` therefore owns a separate per-interactor probe/stamp history without changing the accepted immediate sampler.
+- `GeneratedGround.TryGetSurfaceDomain` and `TryWorldToSurfaceNormalizedXZ` expose the fixed square Ground domain. The historical field may map world positions through the Ground transform without changing Ground code.
+- `VegetationRendererBase.SubmitIndirectRender` owns each layer's runtime material immediately before draw. This is the correct point to bind the trample textures and Ground mapping per layer, allowing multiple Grounds without global texture ownership.
+- `VegetationLayerEditor.DrawProductionProperties` iterates inherited visible serialized properties, so new recipe controls require no editor-file change. `VegetationLayerAuthoring` uses an explicit allowlist and must copy every new recipe control.
+- The immediate field remains two global interpolated ARGBHalf textures and is not modified. The historical field uses its own two fixed-domain ARGBHalf textures and one bounded trail-writer buffer.
+
+### Implementation sequence
+
+1. Replace active documentation that still labels `GroundVegetation` as coordination-only and V4 as wholly future work. Preserve the immediate/history ownership distinction.
+2. Keep the accepted immediate sampler unchanged. Add `Off`, `Timed`, and `Session Persistent` trail modes plus radius, bend, flatten, recovery, minimum speed, stamp spacing, and priority controls; store the independent trail probe/stamp history inside each Ground trample domain.
+3. Add `VegetationTrampleDomain` on the existing `Vegetation` root. Resolve the nearest `GroundVegetation` and `GeneratedGround`; allocate a fixed Ground-domain field only in Play Mode; collect only opt-in moving writers; upload bounded swept-capsule records; update at `5–60 Hz`; and expose reset/report/gizmo diagnostics.
+4. Add a compute field whose original INTERACT.2A state stored horizontal bend, flattening, and a per-cell exponential recovery rate. **Superseded by INTERACT.2A.1:** timed state now uses a separate delay/duration timing texture and smooth eased recovery; session-persistent state remains explicit and dominant.
+5. Bind the correct domain textures and world-to-Ground mapping to each layer material immediately before draw. Add a shader include that samples the field once and combines historical deformation with Weather and immediate interaction.
+6. Add material-only trample bend/flatten/height/normal/wind-retention controls plus one structural maximum-bend control. Expand conservative bounds by immediate plus trample maxima and copy all controls during duplicate-as-empty.
+7. Add the Ground-root Inspector action to add/select the optional trample domain, and include field status in the Ground stack report.
+8. Run exact-scope, parser/delimiter/preprocessor, CPU/GPU stride, cadence, separate-history, no-allocation steady-loop, mapping, recovery, shader-sample, property/hash/upload/copy, frozen-dependency, and documentation-consistency checks. Record the post-change audit here.
+
+### Performance and memory model
+
+At the default `256²` resolution, two ARGBHalf historical textures require `256 × 256 × 8 × 2 = 1,048,576` bytes. A bounded 64-byte record for 48 opt-in trail writers requires `3,072` bytes. Compute work is one `256²` dispatch only on fixed historical steps, not every rendered frame. The vertex shader adds two bilinear historical texture reads per vegetation vertex and no actor loop. Ordinary interactors with `Trail Mode = Off` do not enter the historical candidate list.
+
+### Non-goals and risks
+
+- No ability-stamp API, irregular edge noise, cone, disc, ellipse, or line attack is included; INTERACT.2B owns those writers.
+- No save/load persistence is claimed. `Session Persistent` lasts only while the runtime field exists.
+- No automatic component or scene mutation occurs. Existing Ground vegetation roots receive an Inspector action to add the optional field explicitly.
+- The field is square because the current Ground surface contract is square. A future chunked world may replace this with chunk-owned fields.
+- Multiple Grounds are supported by per-material binding; duplicate domains targeting the same Ground are invalid and reported.
+
+### Validation requirements
+
+Static validation must prove exact scope, no immediate-field byte changes, domain-owned separate trail histories, default trail mode Off, `5–60 Hz` clamp, fixed Ground mapping, exact CPU/GPU record stride, no per-frame hierarchy scan, no coverage/rebuild calls, timed and session-persistent recovery semantics, one trample sample in the vertex path, complete material hash/upload/copy coverage, bounds expansion, and byte identity of frozen Ground, Weather, coverage, instance-layout, geometry, immediate compute/include, benchmark runner, and scene files.
+
+Unity validation must confirm: ordinary player parity with no trail; a large timed writer leaves a continuous trail and recovers; a session-persistent writer remains until Reset Field; 5/10/15/60 Hz controls are accepted; two recipes share the footprint but respond independently; disabling/removing the domain returns historical response to zero; and the clipboard report matches the configured Ground and writer counts.
+
+### Status
+
+| Item | Status |
+| --- | --- |
+| INTERACT.2A.0 Canonical plan and active documentation reconciliation | Complete |
+| INTERACT.2A implementation item 1 — separate histories and opt-in controls | Complete; user validated |
+| INTERACT.2A implementation item 2 — fixed Ground-owned field | Complete; user validated; original timed-recovery model superseded by 2A.1 |
+| INTERACT.2A implementation item 3 — per-layer binding and shader composition | Complete; user validated |
+| INTERACT.2A implementation item 4 — Ground-root authoring and diagnostics | Complete; user validated |
+| INTERACT.2A implementation item 5 — source validation and compliance | Complete |
+
+
+
+### VEG-V2-INTERACT.2A post-change consistency and compliance audit
+
+**Accepted starting state:** the user validated INTERACT.1B after moving for an extended period at `15 Hz`: `1,091` simulation dispatches, `51` recenter dispatches, and a `4.7%` recenter ratio. The user also confirmed the low-cadence grass-responsiveness problem was fixed. INTERACT.1B is therefore frozen; its domain, editor, HLSL include, and compute kernel remain byte-identical in this patch.
+
+**Actual scope:** exactly the eight approved files were created and exactly the eight approved files were modified. No file was deleted, moved, or renamed. `GeneratedGround`, vegetation coverage, instance data, CrossedCards geometry, immediate-interaction implementation, Weather runtime/compute, benchmark runner, scene, prefab, material, layer, tag, and URP files remained byte-identical to the reconstructed accepted baseline.
+
+**Implemented ownership and authoring:**
+
+- `VegetationTrampleDomain` is an optional component on the existing Ground-owned `Vegetation` root and requires `GroundVegetation`. It resolves the nearest ancestor `GeneratedGround`, rejects duplicate active domains for the same Ground, and owns one fixed Ground-local historical field shared by every direct vegetation recipe under that Ground.
+- `GroundVegetationEditor` exposes `Add Historical Trample Domain` or selects the existing component. No automatic scene mutation occurs.
+- `VegetationInteractor` now exposes an opt-in `Historical Trample Trail` section. `Trail Mode` defaults to `Off`; the available modes are `Timed` and `Session Persistent`. Radius, bend, flattening, recovery time, minimum speed, stamp spacing, and priority are independently authored. Immediate sampling and its accepted cadence-specific history are unchanged.
+- Each trample domain owns a separate per-interactor probe/stamp history. Historical updates therefore cannot corrupt the immediate domain's previous-position state when the two domains use different rates.
+
+**Field and recovery behavior:**
+
+- The historical field uses two `256²` ARGBHalf textures by default, a bounded 64-byte writer record, and an independent `5–60 Hz` fixed cadence. It does not recenter; world positions are mapped into the owning Ground's fixed local XZ domain.
+- Only interactors with a non-Off trail mode, sufficient movement speed, and sufficient accumulated stamp distance upload writers. The domain writes swept capsules and applies a teleport guard, preventing disconnected trail gaps without creating pathological long sweeps.
+- **Superseded timed model:** the original INTERACT.2A implementation stored an exponential recovery rate. INTERACT.2A.1 replaces it with a fully held recovery delay followed by a smooth eased recovery duration. Session-persistent state remains until field reset, domain teardown, Ground teardown, or scene reset and does not claim save-file persistence.
+- Overlapping writers combine horizontal bend and maximum flattening. Existing session-persistent state is not weakened by later timed state.
+
+**Rendering integration:**
+
+- `VegetationRendererBase` binds the matching Ground's historical field immediately before each indirect draw. This supports multiple Grounds without global texture ownership and binds a neutral field when no matching domain is ready.
+- Each recipe exposes `Trample Bend Response`, `Trample Flatten Response`, `Trample Height Exponent`, `Maximum Trample Bend`, `Trample Normal Response`, and `Wind Influence On Trampled Grass`. Only maximum bend is structural because it expands conservative bounds; the remaining controls are material-only. Duplicate-as-empty copies all six values.
+- The vegetation vertex path samples the historical field once as one previous/current pair, combines Weather retention from immediate and historical interaction, then applies immediate and historical deformation. Historical bend and flattening contribute to deformation normals. There is no writer loop in the vegetation shader.
+
+**Performance reconciliation:** default persistent historical GPU memory is `1,048,576` bytes for two `256²` ARGBHalf textures plus `3,072` bytes for 48 writer records. Compute performs one full-field dispatch only on historical fixed steps. Ordinary interactors with `Trail Mode = Off` are skipped before upload. No coverage mutation, vegetation rebuild, instance-buffer rewrite, per-cluster CPU interaction loop, new draw, or shader-side writer loop was introduced. The vertex path adds two bilinear historical texture reads per vegetation vertex. No `PERFORMANCE EXCEPTION` is active.
+
+**Validation evidence:** the dedicated INTERACT.2A source validator passed `100 / 100` checks. It verified exact scope, no deletions, C#/HLSL/compute delimiter and preprocessor balance, trail-mode/default/control clamps, unchanged immediate sampler, fixed Ground ownership, independent histories, absence of recenter and hierarchy scans, opt-in/minimum-speed/stamp-spacing/teleport guards, duplicate-domain rejection, exact 64-byte CPU/GPU writer parity, timed and session-persistent recovery semantics, swept capsules, absence of ability APIs, exactly two historical texture reads and one shader sample call, Ground-local mapping, Weather/immediate/trample composition, deformation-normal response, per-Ground material binding, complete property/hash/upload/copy/bounds coverage, valid unique metas, documentation reconciliation, and byte identity of seventeen frozen dependencies. Unity 6000.5.0f1 and Unity reference assemblies are unavailable here; C# compilation, compute/shader import, scene serialization, visual trail continuity/recovery, session-persistent reset behavior, multiple-Ground binding, and runtime profiling remain pending and are not claimed.
+
+
+## VEG-V2-INTERACT.2A.1 — Delayed Historical Trample Recovery
+
+**Status:** canonical plan active; implementation pending at plan-write time.
+
+### Objective and acceptance criteria
+
+Replace the accepted INTERACT.2A immediate exponential historical recovery with an explicit two-phase timed model:
+
+```text
+stamp / restamp
+    fully held for Recovery Delay Seconds
+    smooth eased return during Recovery Duration Seconds
+    restored
+```
+
+Acceptance requires:
+
+- `VegetationInteractor` exposes `Recovery Delay Seconds` and `Recovery Duration Seconds`; the obsolete single `Trail Recovery Time Seconds` control is removed;
+- default timed behavior is `6 s` hold plus `2 s` recovery;
+- delay accepts `0–300 s`; recovery duration accepts `0.05–30 s`;
+- session-persistent trails ignore both timed controls and retain current reset semantics;
+- a timed cell does not lose bend or flatten strength during its hold phase;
+- recovery uses a smoothstep-derived remaining-weight curve rather than immediate exponential decay or linear interpolation;
+- restamping restarts or extends the hold phase, while weaker overlapping writes cannot shorten an existing longer delay or recovery duration;
+- the existing 64-byte CPU/GPU writer record is retained by using the already-reserved persistence vector components;
+- deformation sampling remains the existing two deformation-texture reads and one `SampleVegetationTrample` call; the new timing state is compute-only;
+- no vegetation rebuild, coverage mutation, actor hierarchy scan, ability stamp, save-file persistence, immediate-field change, or per-frame CPU trail decay is introduced.
+
+### Reviewed evidence
+
+- `Assets/Game/Procedural/Vegetation/VegetationInteractor.cs`: `trailRecoveryTimeSeconds` is the sole timed authoring value and defaults to `8`; it is serialized under `Historical Trample Trail`.
+- `Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs`: `UploadTrailWriters` converts the single value into an exponential recovery rate (`4.6051702 / seconds`) and stores it in `DirectionParameters.w`; the writer record already contains unused `PersistenceParameters.yzw`.
+- `Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute`: state `.w` currently stores the recovery rate, and every timed cell begins exponential decay on the first simulation step without current support.
+- `Assets/Game/Rendering/Vegetation/Includes/VegetationTrampleField.hlsl`: the vegetation shader consumes only deformation `xyz`; recovery metadata is compute-only.
+- `Assets/Game/Procedural/Vegetation/Editor/VegetationTrampleDomainEditor.cs`: the default Inspector already surfaces serialized interactor controls through `VegetationInteractor`; no custom interactor editor change is required.
+- The supplied user validation states INTERACT.2A works as described but the immediate slow recovery appears mechanical; the accepted target example is `6 s` delay plus `2 s` recovery.
+- No Git metadata exists in the supplied reconstructed workspace. The accepted INTERACT.2A source tree is the comparison baseline.
+
+### Approved scope
+
+Modify only:
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+Assets/Game/Procedural/Vegetation/VegetationInteractor.cs
+Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs
+Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute
+```
+
+Create/delete: none. Scenes, prefabs, materials, Ground runtime, immediate interaction, Weather, coverage, instance data, geometry, vegetation shader/includes, layers, tags, and URP settings remain frozen.
+
+### Implementation sequence
+
+1. Replace the single serialized interactor recovery value with delay and duration controls, public accessors, tooltips, defaults, and validation clamps.
+2. Keep the 64-byte writer layout; upload persistent flag, delay, and duration through `PersistenceParameters.xyz`.
+3. Add one fixed Ground-local `RGFloat` compute timing texture. Store a signed phase clock and recovery duration per cell while keeping deformation in the existing previous/current `ARGBHalf` pair.
+4. During timed simulation, hold deformation while the phase clock is positive. After it crosses zero, calculate previous and next smoothstep remaining weights and multiply deformation by their ratio so the stored state follows one non-linear recovery curve without preserving a separate original-strength texture.
+5. On restamp, preserve or strengthen deformation, restart/extend delay, and retain the longer recovery duration. Persistent state continues to dominate timed state.
+6. Update memory/report text and current architecture language. Remove active documentation that describes immediate exponential recovery or one combined recovery-time control.
+7. Run exact-scope, syntax, CPU/GPU layout, timing-curve, restamp, persistence, frozen-dependency, and documentation checks. Reread all final changed files and affected consumers.
+
+### Performance and risk model
+
+- Default timing allocation: `256² × RGFloat = 524,288 bytes`; total historical textures become `1,572,864 bytes` instead of `1,048,576 bytes`.
+- Writer stride and upload capacity remain `64 bytes × 48 = 3,072 bytes`.
+- The compute dispatch count, update cadence, vegetation texture reads, material bindings, instance buffers, and draw count remain unchanged.
+- The added per-cell work is a small fixed set of scalar operations in the existing historical compute pass.
+- **Resolved design risk:** `RGHalf` cannot reliably decrement a 300-second phase clock at 5–60 Hz because half-float spacing becomes larger than one fixed step. The timing texture therefore uses `RGFloat`. Validation will numerically exercise curve progression, boundary crossing, and restamping across the full authored ranges.
+- **Risk:** in-place timing UAV access must stay one-thread-per-cell with no cross-cell reads. The compute kernel already assigns one dispatch thread to one cell, so no ordering dependency is introduced.
+
+### Validation requirements
+
+- Exact five-file diff and no new/deleted files.
+- C#/compute delimiter and preprocessor balance.
+- No obsolete `TrailRecoveryTimeSeconds`/`trailRecoveryTimeSeconds` references.
+- New control defaults and clamps exactly match the plan.
+- CPU/GPU writer records remain four `float4`/`Vector4` fields and 64 bytes.
+- Timing texture is created, initialized, validated, bound, reported, and released.
+- Timed cells hold exactly through delay, follow the smoothstep remaining curve during duration, and clear at completion.
+- Restamping cannot reduce existing deformation or shorten the existing delay/duration.
+- Session-persistent cells do not enter timed recovery.
+- Vegetation trample HLSL and shader remain byte-identical.
+- Immediate interaction, Ground, Weather, coverage, instance data, geometry, scene, and other frozen dependencies remain byte-identical.
+- Unity compilation, compute import, visual hold/recovery, and runtime memory/profile validation remain pending when Unity is unavailable.
+
+### Plan status
+
+| Item | Status |
+| --- | --- |
+| INTERACT.2A.1.0 Canonical plan and active-document reconciliation | Complete |
+| INTERACT.2A.1.1 Interactor delay/duration controls | Complete at source level; Unity validation pending |
+| INTERACT.2A.1.2 Compute timing state and eased recovery | Complete at source level; Unity validation pending |
+| INTERACT.2A.1.3 Restamp/persistence semantics | Complete at source level; Unity validation pending |
+| INTERACT.2A.1.4 Diagnostics and memory reconciliation | Complete at source level; Unity validation pending |
+| INTERACT.2A.1.5 Source validation and final compliance audit | Complete at source level; Unity validation pending |
+
+
+### VEG-V2-INTERACT.2A.1 post-change consistency and compliance audit
+
+**Actual scope:** exactly the approved five modified files; no created or deleted files.
+
+**Intentional implementation differences from INTERACT.2A:**
+
+- `VegetationInteractor` removes the single `Trail Recovery Time Seconds` field and exposes `Recovery Delay Seconds` (`0–300`, default `6`) plus `Recovery Duration Seconds` (`0.05–30`, default `2`). `Off` and `Session Persistent` semantics are unchanged.
+- The 64-byte writer record is unchanged. `PersistenceParameters.x` remains the session-persistent flag; `.y` and `.z` now carry recovery delay and recovery duration. `DirectionParameters.w` is reserved/zero instead of containing an exponential rate.
+- `VegetationTrampleDomain` adds one compute-only `RGFloat` timing texture and includes it in allocation, validation, initialization, dispatch binding, reporting, and release. Default historical texture memory is now `1,572,864 bytes`; default writer-buffer memory remains `3,072 bytes`.
+- The compute field stores deformation in the accepted previous/current `ARGBHalf` pair and stores a signed phase clock plus recovery duration in the timing texture. Positive phase holds state unchanged. Negative phase measures recovery progress. A ratio of consecutive `1 - smoothstep(progress)` weights advances the stored deformation along one smooth absolute recovery curve without another original-strength texture.
+- Restamping preserves or strengthens deformation, restarts or extends the hold phase, and retains the longer existing recovery duration. Session-persistent state dominates timed state and bypasses timed recovery.
+- The trample shader include, production vegetation shader, per-layer response controls, material binding, draw path, immediate interaction, Ground ownership, coverage, instance data, geometry, Weather, and scene remain byte-identical.
+
+**Precision correction recorded before final implementation:** the planned `RGHalf` timer was rejected after numerical review showed that half-float spacing near a 300-second delay can exceed a 5–60 Hz timestep. `RGFloat` advances correctly at the maximum delay at 5, 12, and 60 Hz.
+
+**Validation evidence:** the dedicated INTERACT.2A.1 source validator passed `80 / 80` checks. It verified exact scope, no created/deleted files, C#/compute delimiter and preprocessor balance, obsolete-control removal, exact defaults/ranges/clamps, unchanged 64-byte CPU/GPU writer layout, complete RGFloat timing-texture lifecycle, compute-only timing ownership, smoothstep recovery, removal of exponential historical decay, full hold behavior, recovery-ratio math, restamp delay/duration extension, persistent dominance, completion clearing, absence of ability APIs, numerical progression at delay/duration/rate extremes, RGFloat countdown precision, active-document reconciliation, and byte identity of eighteen frozen dependencies.
+
+Unity 6000.5.0f1 and Unity reference assemblies are unavailable in this environment. C# compilation, `RGFloat` random-write support/import on the project target APIs, scene serialization of the replacement controls, visual six-second hold/two-second recovery, restamping during recovery, session-persistent behavior, reported memory, and runtime profiling remain pending and are not claimed.
+
+## VEG-V2-INTERACT.2A.2 — Asymmetric Slow–Fast–Slow Trample Recovery
+
+**Status:** source implementation and static validation complete; Unity validation pending.
+
+### Objective and acceptance criteria
+
+Replace the accepted INTERACT.2A.1 symmetric recovery mapping with one fixed asymmetric slow–fast–slow return curve. Recovery delay, recovery duration, timed/session-persistent ownership, restamping, timing storage, update cadence, and vegetation sampling remain unchanged.
+
+The normalized recovery target is:
+
+```text
+recovery time       restored deformation
+0%                  0%
+50%                 15%
+90%                 90%
+100%                100%
+```
+
+Acceptance requires:
+
+- grass remains fully held for the existing authored `Recovery Delay Seconds`;
+- during the first half of `Recovery Duration Seconds`, only approximately 15% of the stored bend/flatten deformation is removed;
+- from 50–90% of the recovery duration, restoration accelerates from approximately 15% to 90%;
+- during the final 10%, the remaining approximately 10% settles to the original state;
+- the mapping is monotonic and continuously differentiable through the 50% and 90% boundaries;
+- no piecewise-linear corners, zero-velocity pauses at internal boundaries, overshoot, or negative recovery velocity;
+- the curve is fixed rather than adding technical per-writer curve controls;
+- restamping, persistent-state dominance, writer layout, timing texture, compute cadence, memory, deformation textures, vegetation shader reads, draw count, and layer response controls remain unchanged.
+
+### Reviewed evidence
+
+- `Assets/AGENTS.md` was read completely. It requires this persistent plan as the first project write, exact scope, caller/consumer review, a final compliance audit, and explicit Unity-only pending checks.
+- `Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute::RecoveryRemainingWeight` currently returns `1 - smoothstep(0, 1, progress)`, which restores exactly 50% of deformation at 50% normalized recovery time. This does not match the accepted user target of approximately 15% restored at that point.
+- `CS_VegetationTrampleField.compute::SimulateField` advances stored deformation through the ratio of consecutive absolute remaining weights. Replacing only `RecoveryRemainingWeight` preserves the accepted delay, restamp, completion, and timing-texture architecture.
+- `Assets/Game/Procedural/Vegetation/VegetationInteractor.cs::recoveryDurationSeconds` describes a generic smooth eased curve. Its tooltip must be reconciled with the new fixed asymmetric mapping.
+- `Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs::BuildReport` identifies INTERACT.2A.1 and only reports generic smooth recovery. It must identify INTERACT.2A.2 and report the accepted 50%/15%, 90%/90% curve contract.
+- `Assets/Game/Rendering/Vegetation/Includes/VegetationTrampleField.hlsl` and `Assets/Game/Rendering/Vegetation/Shaders/SH_StylizedVegetationBenchmark.shader` consume only the existing deformation textures and remain frozen.
+- No Git metadata exists in the reconstructed supplied workspace. `/mnt/data/veg_interact2a1_workspace/current` is the accepted INTERACT.2A.1 source baseline. The pre-edit SHA-256 values for the interactor, trample domain, and trample compute files are `9f874e1e...f39f4d7`, `7c08aba5...43229caf`, and `2f97c75d...8fb7709d` respectively.
+- User validation states INTERACT.2A.1 works, but its recovery animation remains too evenly distributed. The accepted target is asymmetric slow–fast–slow behavior with approximate key points at `(0,0)`, `(0.5,0.15)`, `(0.9,0.9)`, and `(1,1)`.
+
+### Approved scope
+
+Modify only:
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+Assets/Game/Procedural/Vegetation/VegetationInteractor.cs
+Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs
+Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute
+```
+
+Create/delete: none. Scenes, prefabs, materials, Ground runtime, immediate interaction, Weather, coverage, instance data, geometry, vegetation shader/includes, timing/deformation formats, layers, tags, and URP settings remain frozen.
+
+### Implementation sequence
+
+1. Replace active architecture wording that describes only generic symmetric easing with the fixed asymmetric key-point contract. Update the concise architecture in place rather than adding conflicting guidance.
+2. Update the interactor recovery-duration tooltip and historical-domain report/version text without changing serialized fields, defaults, ranges, or writer upload data.
+3. Replace `RecoveryRemainingWeight` with a restored-weight function composed of three cubic-Hermite intervals through `(0,0)`, `(0.5,0.15)`, `(0.9,0.9)`, and `(1,1)`. Use continuous normalized-progress slopes `0`, `0.5`, `1.0`, and `0` at those four knots. Return `1 - restoredWeight` to the existing ratio-based state update.
+4. Numerically validate exact key points, monotonicity, range `[0,1]`, derivative continuity at 50% and 90%, zero endpoint slopes, no overshoot, ratio progression at supported update rates, unchanged delay, and exact completion.
+5. Run exact-scope, syntax/preprocessor, stale-text, frozen-dependency, and documentation consistency checks. Reread all final changed files and direct consumers and record the post-change audit here.
+
+### Performance and compatibility model
+
+- No texture, buffer, record, property, shader sample, draw, dispatch, update-rate, or memory change.
+- The existing compute pass replaces one `smoothstep` with one of three bounded cubic-Hermite evaluations selected by normalized recovery progress.
+- Work remains one thread per historical field cell at the configured fixed cadence. No new loop or branch depends on writer count.
+- Serialized `Recovery Delay Seconds` and `Recovery Duration Seconds` remain byte-compatible because no field name, type, order, default, or range changes.
+- **Risk:** poorly selected Hermite tangents could overshoot or reverse. The fixed slopes are subject to exhaustive numerical validation over `[0,1]`; implementation is blocked if any sampled derivative is negative or any value exits `[0,1]`.
+
+### Validation requirements
+
+- Exact five-file diff; no created/deleted files.
+- C#/compute delimiter and preprocessor balance.
+- Existing delay/duration fields, defaults, ranges, accessors, writer layout, timing texture, and persistence semantics unchanged.
+- Exact recovered values at normalized times `0`, `0.5`, `0.9`, and `1` within floating-point tolerance.
+- Nonnegative derivative and values inside `[0,1]` over at least 10,001 samples.
+- Left/right derivative continuity at internal boundaries within tolerance and zero endpoint derivatives.
+- Stored remaining deformation decreases monotonically and reaches zero for representative `5`, `12`, and `60 Hz` updates and minimum/default/maximum recovery durations.
+- Vegetation trample include, production vegetation shader, renderer, Ground, immediate interaction, Weather, coverage, instance data, geometry, scene, and other frozen dependencies byte-identical.
+- Unity compilation, compute import, and visual curve validation remain pending when Unity is unavailable.
+
+### Plan status
+
+| Item | Status |
+| --- | --- |
+| INTERACT.2A.2.0 Canonical plan and reviewed evidence | Complete |
+| INTERACT.2A.2.1 Active-document reconciliation | Complete |
+| INTERACT.2A.2.2 Asymmetric compute recovery mapping | Complete at source level; Unity validation pending |
+| INTERACT.2A.2.3 Tooltip and diagnostic reconciliation | Complete |
+| INTERACT.2A.2.4 Source validation and final compliance audit | Complete at source level; Unity validation pending |
+
+
+### VEG-V2-INTERACT.2A.2 post-change consistency and compliance audit
+
+**Actual scope:** exactly the approved five files were modified. No file was created, deleted, moved, or renamed. No scene, prefab, material, Ground runtime, immediate-interaction, Weather, coverage, instance-layout, geometry, shader/include, layer, tag, or URP file changed.
+
+**Intentional implementation differences from INTERACT.2A.1:**
+
+- `CS_VegetationTrampleField.compute::RecoveryRemainingWeight` no longer uses the symmetric `1 - smoothstep(0,1,progress)` mapping. It now evaluates a fixed restored-weight curve through `(0,0)`, `(0.5,0.15)`, `(0.9,0.9)`, and `(1,1)`, then returns the remaining weight to the unchanged ratio-based state update.
+- The curve uses three cubic-Hermite intervals with shared normalized-time slopes `0`, `0.5`, `1.0`, and `0` at the four knots. Internal left/right slopes therefore match at 50% and 90%, while the start and finish have zero slope. The mapping has no internal stop, linear corner, overshoot, or reversal.
+- Representative restored values are `4.375%` at 25% time, `15%` at 50%, `50%` at 70%, `90%` at 90%, and `96.25%` at 95%. This implements the accepted restrained first half, accelerated middle, and gentle final settling.
+- `VegetationInteractor` serialized recovery fields, defaults, ranges, public accessors, and writer upload contract are unchanged; only the recovery-duration tooltip was reconciled.
+- `VegetationTrampleDomain` runtime behavior is unchanged; only the report identity and recovery-curve description now identify INTERACT.2A.2.
+- Recovery delay, restamping, persistent-state dominance, completion clearing, `RGFloat` timing state, deformation textures, update cadence, field memory, writer memory, material bindings, vegetation texture reads, draw count, and per-layer response remain unchanged.
+
+**Performance reconciliation:** the historical compute pass replaces one symmetric `smoothstep` with one bounded three-branch cubic-Hermite mapping. No allocation, upload, dispatch, draw, texture sample, writer loop, per-frame CPU work, or memory is added. No `PERFORMANCE EXCEPTION` is active.
+
+**Final reread and dependency audit:** the complete final versions of all five modified files were reread. `VegetationTrampleField.hlsl`, `SH_StylizedVegetationBenchmark.shader`, `VegetationRendererBase`, `GroundVegetation`, the immediate interaction domain/compute/include, `GeneratedGround`, Weather runtime/compute, coverage, instance data, cluster geometry, and `VisualFrameworkDemo.unity` were rechecked as direct consumers or frozen contracts and remain byte-identical to the accepted INTERACT.2A.1 baseline.
+
+**Validation evidence:** the dedicated INTERACT.2A.2 validator passed `78 / 78` checks. It verified exact scope, no created/deleted files, C#/compute delimiter and preprocessor balance, unchanged serialization and runtime contracts outside tooltip/report text, exact compute isolation to the recovery mapping, exact key points, values inside `[0,1]`, monotonicity over 100,001 samples, derivative continuity at 50% and 90%, zero endpoint derivatives, restrained/middle/final curve behavior, monotonic ratio progression and exact completion at representative `5`, `12`, and `60 Hz` cadences and minimum/default/maximum recovery durations, active-document reconciliation, and byte identity of eighteen frozen dependencies.
+
+Unity 6000.5.0f1, Unity reference assemblies, and a standalone HLSL compiler are unavailable in this environment. Unity C# compilation, compute-shader import, GPU execution, and visual confirmation of the asymmetric recovery remain pending and are not claimed.
+
+
+## VEG-V2-INTERACT.2B — Circle, Cone, and Line Ability Trample Stamps
+
+**Status:** user-validated and accepted in Unity after the corrective `VEG-V2-INTERACT.2B.1` and `VEG-V2-INTERACT.2B.2` patches.
+
+### Objective and acceptance criteria
+
+Add explicit gameplay-driven historical trample events without temporary actors, coverage mutation, or vegetation rebuilds. The runtime API must support exactly three user-facing shapes:
+
+- `Circle`: radial footprint with 360-degree coverage;
+- `Cone`: the same radial-sector footprint with authored coverage below 360 degrees and an authored world-XZ facing direction;
+- `Line`: a width-controlled capsule between authored world-space start and end positions.
+
+Each request must independently control bend strength, flatten strength, displacement mode, recovery mode, recovery delay, recovery duration, deterministic edge irregularity, irregularity scale, seed, and priority. Timed requests must use the accepted delayed asymmetric recovery curve. Session-persistent requests remain until field reset or runtime teardown.
+
+Acceptance requires:
+
+- one public plain-data stamp request with validated factory helpers for circle, cone, and line;
+- one static submission entry point that forwards the request to every intersecting active Ground trample domain and returns the accepted-domain count;
+- bounded per-domain queueing with no hierarchy scan and no allocation in the historical compute step;
+- one separate GPU ability-stamp buffer consumed once on the next fixed historical update;
+- circle/cone radial-sector evaluation, capsule line evaluation, deterministic seeded edge breakup, and no sterile perfect border when irregularity is nonzero;
+- displacement modes `Radial Outward`, `Fixed World Direction`, `Away From Centreline`, and `Flatten Only`;
+- stronger overlapping bend direction retained, maximum flatten retained, session persistence dominant, and timed schedules extended but never shortened;
+- no new deformation/timing texture, no new vegetation shader read, no draw, instance-layout, coverage, or recipe change;
+- a dedicated optional `VegetationTrampleStampTester` component and custom Inspector that exercise the exact runtime API from a player-attached object;
+- editable named test configurations, selected/previous/next/random configuration actions, and bounded randomized variants rather than unconstrained random values;
+- complete clipboard diagnostics covering queue capacity, pending/uploaded/dropped requests, supported shapes, and buffer memory.
+
+### Reviewed evidence
+
+- `Assets/AGENTS.md` was read completely. It requires this persistent plan as the first project write, exact scope, complete caller/consumer review, final consistency audit, and explicit Unity-only pending validation.
+- `Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs::Update` currently uploads opt-in moving trail writers and dispatches one `SimulateField` kernel at an independently configurable `5–60 Hz`. It owns fixed Ground-local deformation/timing textures and is the correct owner for queued ability requests.
+- `VegetationTrampleDomain.cs::ActiveDomains`, `ResolveOwnership`, `SweptCircleIntersectsGround`, and `FindDomainForGround` establish active-domain registration and Ground-local ownership without hierarchy scans. The ability submission API can route against this registry and conservatively test shape bounds against each Ground.
+- `VegetationTrampleDomain.cs::GpuWriterRecord` and `CS_VegetationTrampleField.compute::VegetationTrampleWriterRecord` form the accepted 64-byte moving-trail contract. Ability requests require a separate record and buffer so trail serialization and validated writer behavior remain unchanged.
+- `CS_VegetationTrampleField.compute::EvaluateTarget` currently loops only over moving trail writers, writes bend/flatten targets, and reuses the validated delay/duration/persistence state machine. Ability evaluation can feed the same `TrampleTarget` without changing deformation texture ownership or recovery semantics.
+- `CS_VegetationTrampleField.compute::RecoveryRestoredWeight` is the user-validated INTERACT.2A.2 asymmetric curve and remains frozen.
+- `Assets/Game/Rendering/Vegetation/Includes/VegetationTrampleField.hlsl` and `Assets/Game/Rendering/Vegetation/Shaders/SH_StylizedVegetationBenchmark.shader` consume only the existing historical deformation textures and require no modification.
+- `Assets/Game/Procedural/Vegetation/VegetationInteractor.cs` remains the moving-object owner. Ability events are separate and must not be represented by temporary interactors.
+- `Assets/Game/Procedural/Vegetation/Editor/VegetationTrampleDomainEditor.cs` exposes reset/report actions. It may report queue state but test-shape controls belong to a dedicated tester component as explicitly requested.
+- No Git metadata exists in the reconstructed supplied workspace. `/mnt/data/veg_interact2a2_workspace/current` is the accepted source baseline. Pre-edit SHA-256 values are `ca309cb3...51d985d6` for `VegetationTrampleDomain.cs`, `d4de5c36...8b3a9841` for its editor, and `bde9ed6a...45ab1ab` for the compute shader.
+- User validation states INTERACT.2A.2 works as expected. The requested next contract is circle, cone-as-partial-circle, and line, with a player-attached button-driven test script and sensible configuration switching/randomization.
+
+### Approved scope
+
+Create:
+
+```text
+Assets/Game/Procedural/Vegetation/VegetationTrampleStamp.cs
+Assets/Game/Procedural/Vegetation/VegetationTrampleStamp.cs.meta
+Assets/Game/Procedural/Vegetation/VegetationTrampleStampTester.cs
+Assets/Game/Procedural/Vegetation/VegetationTrampleStampTester.cs.meta
+Assets/Game/Procedural/Vegetation/Editor/VegetationTrampleStampTesterEditor.cs
+Assets/Game/Procedural/Vegetation/Editor/VegetationTrampleStampTesterEditor.cs.meta
+```
+
+Modify:
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs
+Assets/Game/Procedural/Vegetation/Editor/VegetationTrampleDomainEditor.cs
+Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute
+```
+
+Delete/move/rename: none. Scenes, prefabs, materials, `VegetationInteractor`, `GroundVegetation`, Ground runtime, immediate interaction, Weather, coverage, instance data, geometry, vegetation shader/includes, layers, tags, and URP settings remain frozen.
+
+### Implementation sequence
+
+1. Replace active deferred-ability wording with the exact circle/cone/line contract and update the concise architecture in place.
+2. Add public enums and a validated `VegetationTrampleStampRequest` plain-data struct with `CreateCircle`, `CreateCone`, and `CreateLine` factories. Circle/cone share radial-sector data; line stores world start/end and width.
+3. Extend each active `VegetationTrampleDomain` with a bounded pending queue, separate structured GPU stamp buffer, static submission routing, conservative Ground-intersection checks, deterministic priority/sequence ordering, and queue/upload/drop diagnostics. Consume uploaded requests exactly once at the next fixed step.
+4. Extend the existing compute target evaluation with a separate ability-stamp loop. Implement deterministic value-noise border breakup, radial-sector and capsule influence, the four displacement modes, strongest-direction retention, maximum flattening, and the existing persistence/timing schedule rules. Keep moving-writer and recovery code unchanged.
+5. Add `VegetationTrampleStampTester` with serializable named configurations, default circle/cone/line presets, transform-relative origin/facing, selected and randomized stamping, previous/next/random selection, bounded variation controls, Gizmo previews, last-result diagnostics, and a custom Inspector with Play-Mode buttons.
+6. Update the domain Inspector/report for ability queue status. Run exact-scope, C#/compute syntax, record-stride, shape-math, queue, deterministic-noise, overlap, stale-text, frozen-dependency, and documentation checks. Reread all final changed files and direct consumers and record the post-change audit here.
+
+### Performance and compatibility model
+
+- Existing historical textures remain two `ARGBHalf` deformation textures plus one `RGFloat` timing texture. Vegetation shader sampling and draw behavior are unchanged.
+- Moving trail writers retain the accepted 64-byte record and buffer. Ability stamps use a separate 96-byte record, default 32-record upload buffer (`3,072` bytes), and default 128-request CPU queue.
+- The existing full-field compute dispatch gains a second loop only when `_StampCount > 0`; when no ability request is queued, that loop executes zero iterations. One-shot requests are removed from the pending queue when uploaded and are not resubmitted on later steps.
+- Submission uses the static active-domain registry and conservative shape bounds; it does not call `FindObjectsByType`, scan layers, rebuild vegetation, or mutate coverage.
+- Test presets and randomization run only on explicit Inspector actions. The tester is optional and contains no `Update`, `LateUpdate`, or `FixedUpdate`.
+- **Risk:** opposed stamp directions can cancel if accumulated. Ability bend selection must compare weighted magnitudes and retain the stronger vector. Moving-trail accumulation remains unchanged.
+- **Risk:** random borders can flicker if time-dependent. Irregularity must use only absolute world position, authored scale, and seed.
+- **Risk:** queue overflow can silently lose gameplay events. Submission and reporting must count rejected/full-queue requests, and priority ordering must be deterministic.
+
+### Validation requirements
+
+- Exact eleven-file scope: six created and five modified; no deletions.
+- C#/compute delimiter, preprocessor, namespace, and serialized-field checks.
+- Public request factories produce finite, clamped, normalized shape data and preserve exact user-facing circle/cone/line semantics.
+- Circle 360-degree coverage accepts all directions; cone coverage rejects positions outside the authored half-angle; line uses closest-point capsule distance including rounded ends.
+- Irregularity zero reproduces the analytic shape; nonzero irregularity is deterministic for fixed world position/seed and varies for different seeds.
+- Ability records are exactly 96 bytes in C# and HLSL; existing moving-writer records remain exactly 64 bytes.
+- Queue capacity, deterministic priority/sequence ordering, one-step consumption, upload counts, and overflow/rejection reporting are structurally verified.
+- Existing delayed asymmetric recovery, session persistence, moving trails, timing/deformation formats, update rate, shader sampling, and layer response remain unchanged.
+- Tester has no frame loop, calls the exact runtime API, creates sensible default configurations, bounds randomized variation, and exposes Inspector buttons plus Gizmo preview.
+- Direct consumers and frozen dependencies remain byte-identical. Unity compilation, compute import, runtime queueing, visual shape/irregularity, multi-Ground routing, and tester-button behavior remain pending when Unity is unavailable.
+
+### Plan status
+
+| Item | Status |
+| --- | --- |
+| INTERACT.2B.0 Canonical plan and reviewed evidence | Complete |
+| INTERACT.2B.1 Active-document reconciliation | Complete |
+| INTERACT.2B.2 Public stamp API and domain queue | Complete and user-validated after 2B.1/2B.2 corrections |
+| INTERACT.2B.3 Compute circle/cone/line evaluation | Complete and user-validated after 2B.2 |
+| INTERACT.2B.4 Dedicated test component and Inspector | Complete and user-validated |
+| INTERACT.2B.5 Source validation and final compliance audit | Complete; accepted by user runtime validation |
+
+### INTERACT.2B post-change consistency and compliance audit
+
+**Actual scope:** matched the approved eleven-file declaration exactly: six created files, five modified files, and no deletions. No scene, prefab, material, Ground runtime, `VegetationInteractor`, immediate-interaction, Weather, coverage, instance-layout, vegetation shader/include, layer, tag, or URP file changed.
+
+**Intentional implementation differences from INTERACT.2A.2:**
+
+- added the validated public `VegetationTrampleStampRequest` API and `Circle`, `Cone`, and `Line` shape contracts;
+- added one bounded per-Ground CPU request queue and one separate 96-byte-record GPU ability buffer;
+- added one ability-evaluation loop to the existing historical compute dispatch, active only when `_StampCount > 0`;
+- added deterministic world-space edge irregularity and the four accepted displacement modes;
+- treated a 360-degree cone arc as complete circle coverage without angular breakup, and used true closest-centreline vectors at rounded line ends;
+- added the optional player-attached tester, named presets, bounded randomized variants, Gizmo previews, and Play-Mode Inspector actions;
+- extended only the historical-domain report and Inspector status with ability queue/buffer telemetry.
+
+**Preserved behavior:** the 64-byte moving-writer record and complete moving-writer loop, delayed asymmetric recovery function, historical textures and formats, update cadence, session-persistent precedence, layer response, vegetation shader sampling, immediate interaction, Weather composition, Ground ownership, scene content, and production rendering paths remain unchanged. One-shot requests are removed from the queue immediately after upload and therefore cannot repeat on subsequent fixed steps.
+
+**Validation evidence:** the dedicated INTERACT.2B validator passed `178 / 178` checks before this audit entry. It verified exact scope, C#/compute lexical and preprocessor balance, valid unique metas, request enums/factories/clamps, 96-byte C#/HLSL ability-record parity, unchanged 64-byte writer parity, deterministic bounded queue ordering and consumption, absence of hierarchy/layer scans, tester actions/presets/randomization and absence of frame loops, circle/cone/line analytic inclusion tests, full 360-degree coverage, rounded line caps, deterministic seeded irregularity, strongest-direction handling, frozen moving-writer and recovery blocks, active-document reconciliation, and byte identity of twelve direct frozen dependencies. The final delivered validator is rerun after this audit entry and records `179 / 179` checks.
+
+The original source-validation environment lacked Unity. Subsequent user runtime validation confirmed the circle, cone, and line tester behavior after the 2B.1 buffer correction and the 2B.2 D3D11 evaluator correction. Multi-Ground routing was not separately reported and remains unmeasured rather than assumed.
+
+## VEG-V2-INTERACT.2B.1 — Ability Stamp Buffer Binding and D3D11 Shape Initialization Fix
+
+**Status:** `_Stamps` buffer correction accepted in Unity; the aggregate shape-initialization attempt was insufficient and is superseded by `VEG-V2-INTERACT.2B.2`.
+
+### Objective and acceptance criteria
+
+Correct two Unity-runtime faults reported after applying INTERACT.2B:
+
+- `Compute shader (CS_VegetationTrampleField): Property (_Stamps) at kernel index (1) is not set` during `SimulateField` dispatch when no one-shot ability stamp has been uploaded yet;
+- D3D11 warning `use of potentially uninitialized variable (EvaluateAbilityStampShape)` at the ability-shape evaluation call.
+
+Acceptance requires:
+
+- the `_Stamps` structured buffer contains one deterministic zero record immediately after resource creation and whenever a fixed simulation step has zero uploaded ability stamps;
+- `_Stamps` remains bound unconditionally before every `SimulateField` dispatch;
+- `_StampCount == 0` continues to execute zero ability-loop iterations and cannot change the historical field;
+- `AbilityStampEvaluation` is explicitly zero-initialized before any shape-specific branch or early return, so every returned member is provably initialized on D3D11;
+- circle, cone, line, trail, delayed recovery, queue, memory, update cadence, tester, layer response, shader sampling, and Ground ownership remain unchanged.
+
+### Reviewed evidence
+
+- `Assets/AGENTS.md` was read completely. It requires this persistent plan as the first project write, exact scope, strict implementation from the plan, and a final consistency/compliance audit.
+- User runtime evidence reports `_Stamps` unset at `SimulateField` dispatch and D3D11 reporting a potentially uninitialized `EvaluateAbilityStampShape` return value. The warnings persist after leaving Play Mode, so they are not treated as import-state noise.
+- `Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs::EnsureResources` creates `stampBuffer` and `stampUploadRecords`, but `UploadAbilityStamps` returns immediately when the pending queue is empty and therefore never uploads initial contents to the structured buffer.
+- `VegetationTrampleDomain.cs::DispatchSimulation` already binds `_Stamps` unconditionally. This binding remains required; the corrective change primes the buffer rather than making binding conditional.
+- `Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute::EvaluateAbilityStampShape` assigns individual members before several early returns, but the D3D11 compiler does not prove the complete structure is initialized. Explicit aggregate zero-initialization removes that ambiguity without changing shape math.
+- The current authoritative source is `/mnt/data/veg_interact2b_workspace/current`; no `.git` metadata is present in the supplied workspace.
+
+### Approved scope
+
+Modify only:
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Game/Procedural/Vegetation/VegetationTrampleDomain.cs
+Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute
+```
+
+Create/delete/move/rename: none. Tester, request API, domain editor, interactors, Ground, immediate interaction, vegetation shaders/includes, Weather, scenes, prefabs, materials, instance data, geometry, layers, tags, and URP settings remain frozen.
+
+### Implementation sequence
+
+1. Record this corrective plan and reviewed runtime evidence.
+2. Add a private zero-stamp-buffer priming helper in `VegetationTrampleDomain` that writes one default `GpuStampRecord` into slot zero.
+3. Invoke the helper after stamp-buffer allocation and on every no-stamp upload step; keep `_StampCount = 0` and unconditional `_Stamps` binding unchanged.
+4. Explicitly aggregate-initialize `AbilityStampEvaluation` to zero before assigning its facing fallback and entering shape branches.
+5. Run exact-scope, syntax, stride, zero-record, unconditional-binding, zero-count-no-op, D3D11-initialization, frozen-behavior, and frozen-dependency checks. Reread all modified files and direct consumers and record the final audit here.
+
+### Performance and compatibility model
+
+- No new allocation or buffer is added. The existing default stamp buffer remains `32 × 96 = 3,072` bytes.
+- Priming writes one 96-byte record at resource creation and one 96-byte record on fixed steps with no queued stamps. This is a bounded safety upload and does not add a dispatch, texture read, vegetation draw, instance update, or queue scan.
+- `_StampCount` remains zero on no-stamp steps, so the compute ability loop performs zero iterations and the primed record is never evaluated.
+- Explicit HLSL structure initialization compiles to deterministic zero defaults and does not change accepted shape outputs because every used member is subsequently assigned exactly as before.
+
+### Validation requirements
+
+- Exact three-file modified scope and no created/deleted files.
+- C# and compute delimiter/preprocessor balance.
+- `stampBuffer.SetData(... count: 1)` or equivalent deterministic zero-record upload exists after allocation and in the zero-pending path.
+- `_Stamps` remains bound outside any positive-count condition before every `SimulateField` dispatch.
+- `_StampCount` remains `0` when no stamp is uploaded.
+- `AbilityStampEvaluation evaluation = (AbilityStampEvaluation)0;` or equivalent full initialization occurs before all branches and early returns.
+- Ability-shape equations, request record stride, queue capacity, moving writers, recovery mapping, texture formats, and direct frozen dependencies remain byte-identical.
+- Unity compilation, D3D11 compute import, absence of the runtime error, and absence of the shader warning remain pending when Unity is unavailable.
+
+### Plan status
+
+| Item | Status |
+| --- | --- |
+| INTERACT.2B.1.0 Canonical plan and reviewed evidence | Complete |
+| INTERACT.2B.1.1 Zero-record stamp-buffer priming | Complete and user-validated |
+| INTERACT.2B.1.2 Explicit D3D11 shape-result initialization | Superseded; did not remove the warning |
+| INTERACT.2B.1.3 Source validation and final compliance audit | Complete; corrective follow-up recorded |
+
+
+### INTERACT.2B.1 post-change consistency and compliance audit
+
+**Actual scope:** matched the approved three-file declaration exactly: one canonical Markdown document, `VegetationTrampleDomain.cs`, and `CS_VegetationTrampleField.compute` were modified. No file was created, deleted, moved, or renamed. No Weather, scene, prefab, material, Ground, interactor, tester, domain-editor, shader/include, coverage, instance-data, geometry, layer, tag, or URP file changed.
+
+**Intentional implementation differences from INTERACT.2B:**
+
+- the existing ability-stamp graphics buffer is primed with one explicit zero `GpuStampRecord` immediately after allocation;
+- no-stamp fixed steps set the uploaded count to zero and re-prime slot zero before returning;
+- `_Stamps` remains bound unconditionally before every `SimulateField` dispatch and `_StampCount` remains zero on no-stamp steps;
+- `EvaluateAbilityStampShape` now aggregate-zero-initializes the complete `AbilityStampEvaluation` result before assigning the accepted facing fallback and entering the unchanged shape branches.
+
+**Preserved behavior:** request shapes, shape equations, seeded irregularity, displacement modes, queue capacity and ordering, 96-byte stamp records, 64-byte moving-writer records, historical textures and formats, delayed asymmetric recovery, moving trails, update cadence, session persistence, layer response, tester actions, vegetation shader sampling, immediate interaction, Ground ownership, and memory capacity remain unchanged. The primed record is not evaluated while `_StampCount == 0`.
+
+**Performance reconciliation:** no allocation, buffer, texture, dispatch, draw, shader sample, instance update, or queue scan was added. The corrective safety path uploads one 96-byte zero record at resource creation and on fixed steps with no queued ability request. No `PERFORMANCE EXCEPTION` is active.
+
+**Final reread and dependency audit:** the complete final versions of all three modified files were reread. The request API, tester and tester editor, trample-domain editor, interactor, Ground vegetation root, trample HLSL include, production vegetation shader, renderer, immediate interaction runtime/compute/include, coverage, instance data, cluster geometry, Weather runtime/compute, and `VisualFrameworkDemo.unity` were rechecked as direct consumers or frozen contracts and remain byte-identical to the accepted INTERACT.2B baseline.
+
+**Validation evidence:** the dedicated INTERACT.2B.1 validator passed `52 / 52` checks before this audit entry. It verified exact scope, C#/compute delimiter and preprocessor balance, deterministic zero-record upload after allocation and in the empty-queue path, zero stamp count, unconditional buffer binding before dispatch, full HLSL result initialization, exact isolation of both source changes, retained record strides and queue/recovery/shape contracts, absence of Weather scope, and byte identity of every unscoped project file. The final delivered validator was rerun after this audit entry and records `54 / 54` checks.
+
+The original source-validation environment lacked Unity. User runtime evidence after this patch no longer reported the `_Stamps` binding error, so the zero-record/binding correction is accepted. The aggregate initialization did not remove the D3D11 warning and is retained only as a failed historical attempt.
+
+
+## VEG-V2-INTERACT.2B.2 — D3D11 Scalar Ability-Shape Evaluation Fix
+
+**Status:** user-validated and accepted in Unity; circle, cone, and line stamping works as expected and the D3D11 warning no longer appears.
+
+### Objective and acceptance criteria
+
+Remove the remaining D3D11 compute warning:
+
+```text
+Shader warning in 'CS_VegetationTrampleField': use of potentially uninitialized variable (EvaluateAbilityStampShape) at kernel SimulateField
+```
+
+Acceptance requires:
+
+- the ability-shape evaluator no longer returns `AbilityStampEvaluation` or any aggregate structure;
+- every shape-evaluation output is explicitly initialized before shape logic;
+- shape evaluation has one scalar return value and no early return paths;
+- the ability displacement resolver consumes explicit scalar/vector arguments rather than an aggregate evaluation record;
+- circle, cone, line, seeded edge irregularity, displacement modes, overlap rules, delayed recovery, persistent recovery, queues, buffers, textures, update cadence, and shader consumers remain unchanged;
+- Unity D3D11 compute import produces no potentially-uninitialized warning.
+
+### Reviewed evidence
+
+- `Assets/AGENTS.md` was read completely. It requires this canonical plan as the first project write, exact scope, implementation strictly from the plan, and a recorded final consistency/compliance audit.
+- User runtime evidence after INTERACT.2B.1 still reports `use of potentially uninitialized variable (EvaluateAbilityStampShape)` at `SimulateField`. Therefore `(AbilityStampEvaluation)0` did not satisfy Unity's D3D11/FXC definite-assignment analysis.
+- `Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute::EvaluateAbilityStampShape` currently returns `AbilityStampEvaluation` through multiple early-return branches. The aggregate is zero-cast at function entry, but the warning remains at the call in `EvaluateTarget`.
+- `CS_VegetationTrampleField.compute::ResolveAbilityDisplacementDirection` consumes only `radialVector`, `centrelineVector`, and `facingDirection`; the aggregate record is not an architectural contract and can be removed without changing the stamp buffer or public API.
+- `VegetationTrampleStamp.cs`, `VegetationTrampleDomain.cs`, `VegetationTrampleStampTester.cs`, both relevant editors, and the complete current compute file were read as the producer, uploader, caller, and test consumers. Their data layout and runtime contracts require no change.
+- INTERACT.2B and INTERACT.2B.1 sources were compared. INTERACT.2B.1 changed only zero-buffer priming and aggregate zero initialization; the buffer correction remains accepted and frozen.
+- No `.git` metadata or standalone D3D11 HLSL compiler is present in the supplied workspace. Historical comparison therefore uses the accepted patch archives and current reconstructed source.
+
+### Approved scope
+
+Modify only:
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Game/Rendering/Vegetation/Resources/PS3DVegetation/Compute/CS_VegetationTrampleField.compute
+```
+
+Create/delete/move/rename: none. C# runtime, request API, tester, editors, Ground, immediate interaction, vegetation shaders/includes, Weather, scenes, prefabs, materials, coverage, instance data, geometry, layers, tags, and URP settings remain frozen.
+
+### Implementation sequence
+
+1. Record this plan and the failed INTERACT.2B.1 runtime evidence.
+2. Remove `AbilityStampEvaluation` and replace the aggregate-return evaluator with `float EvaluateAbilityStampShape(..., out float2 radialVector, out float2 centrelineVector, out float2 facingDirection)`.
+3. Explicitly initialize all three vector outputs and the scalar influence at function entry.
+4. Replace all early returns with guarded branches and one final scalar return.
+5. Change `ResolveAbilityDisplacementDirection` to accept the three explicit vectors.
+6. Change the ability-stamp loop to initialize local vectors, call the scalar evaluator, and pass explicit vectors to the resolver.
+7. Run exact-scope, syntax, function-contract, single-return, no-aggregate, shape-equation, frozen-behavior, and frozen-dependency checks; reread both modified files and direct contracts; record the final audit here.
+
+### Invariants and non-goals
+
+- The accepted `_Stamps` zero-record priming and unconditional buffer binding remain unchanged.
+- No stamp record, buffer stride, queue limit, texture format, memory allocation, dispatch count, shader sample, or gameplay API changes.
+- No geometry or visual tuning change is authorized. Circle, cone, and line coverage must be mathematically identical to INTERACT.2B.1.
+- No Weather work is included.
+
+### Risks and validation
+
+- Risk: changing control flow could alter boundary behavior. Mitigation: preserve every threshold, noise sample, radius/width calculation, cone-angle calculation, and influence equation verbatim; validate source equivalence with deterministic CPU mirrors over representative inputs.
+- Risk: D3D11 may still reject `out` definite assignment. Mitigation: initialize caller locals and assign every `out` value at evaluator entry; use one final return and no aggregate result.
+- Unity compilation and D3D11 compute import remain required runtime validation because no Unity or FXC compiler is available in this environment.
+
+### Plan status
+
+| Item | Status |
+| --- | --- |
+| INTERACT.2B.2.0 Canonical plan and reviewed evidence | Complete |
+| INTERACT.2B.2.1 Scalar single-return shape evaluator | Complete and user-validated |
+| INTERACT.2B.2.2 Explicit-vector displacement resolver and caller | Complete and user-validated |
+| INTERACT.2B.2.3 Source validation and final compliance audit | Complete; accepted by user runtime validation |
+
+
+### INTERACT.2B.2 post-change consistency and compliance audit
+
+**Actual scope:** matched the approved two-file declaration exactly. Only the canonical vegetation architecture document and `CS_VegetationTrampleField.compute` changed. No file was created, deleted, moved, or renamed. No C# runtime, request API, tester, editor, Ground, immediate-interaction, vegetation-shader/include, Weather, scene, prefab, material, coverage, instance-data, geometry, layer, tag, or URP file changed.
+
+**Intentional difference from INTERACT.2B.1:** the `AbilityStampEvaluation` aggregate and aggregate-return function were removed. `EvaluateAbilityStampShape` now returns only scalar influence, assigns three explicit `out float2` values at entry, uses guarded branches with one final return, and has no early-return path. `ResolveAbilityDisplacementDirection` and the stamp loop consume those explicit vectors directly. Caller locals are also initialized before the call.
+
+**Preserved behavior:** every circle, cone, and line threshold, seeded-noise source, radius/width calculation, cone-angle calculation, edge-irregularity multiplier, smoothstep influence equation, displacement mode, overlap rule, recovery rule, queue/buffer contract, texture format, update cadence, and shader consumer remains unchanged. A deterministic 20,000-case CPU mirror comparison of the INTERACT.2B.1 and INTERACT.2B.2 shape-control flows produced zero mismatches and zero numeric error.
+
+**Accepted prior correction retained:** INTERACT.2B.1 zero-record stamp-buffer priming, zero `_StampCount` behavior, and unconditional `_Stamps` binding remain byte-identical. The current user report contains only the D3D11 shape warning; the earlier missing-buffer runtime error was not reintroduced.
+
+**Performance reconciliation:** no allocation, texture, buffer, dispatch, loop iteration, shader sample, draw, instance update, or runtime API was added. The patch changes only compute-shader local control flow and parameter passing. No `PERFORMANCE EXCEPTION` is active.
+
+**Final reread and dependency audit:** both modified files and the complete final compute shader were reread. `VegetationTrampleStamp.cs`, `VegetationTrampleDomain.cs`, `VegetationTrampleStampTester.cs`, `VegetationTrampleStampTesterEditor.cs`, and `VegetationTrampleDomainEditor.cs` were reread as producer, uploader, caller, and test contracts and remain byte-identical to INTERACT.2B.1. The accepted INTERACT.2B and INTERACT.2B.1 patch sources were compared directly.
+
+**Validation evidence:** the dedicated INTERACT.2B.2 validator passed `74 / 74` checks before this audit entry. It verified exact two-file scope, no creates/deletes, no Weather change, compute delimiter and kernel balance, absence of the aggregate evaluation type, scalar single-return evaluation, explicit output initialization at both callee and caller, explicit-vector resolver wiring, preservation of all shape constants/equations and critical buffer/recovery contracts, isolation of the compute diff to the planned evaluator/resolver/caller regions, byte identity of every unscoped project file, and 20,000 deterministic old/new shape cases with zero mismatch. The final delivered validator is rerun after this audit entry.
+
+The source-validation environment lacked Unity and FXC. The user subsequently confirmed that the patch works as expected; this closes the D3D11 warning and ability-shape runtime validation for the tested configuration.
+
+## VEG-V2-CLOSE.1 — Accepted Vegetation Interaction Milestone Closure
+
+**Status:** documentation-only closure complete; user-accepted interaction milestone frozen.
+
+### Objective and acceptance criteria
+
+Close the current Vegetation V2 production-ownership and interaction milestone after direct user validation of the immediate field, Ground-owned historical trails, delayed asymmetric recovery, circle/cone/line ability stamps, the empty-stamp buffer correction, and the final D3D11 scalar shape-evaluation correction. This closure changes documentation only. It must not alter runtime C#, editor code, compute shaders, vegetation shaders/includes, serialized assets, scenes, prefabs, materials, Ground, Weather, coverage, instance layout, geometry, layers, tags, or URP settings.
+
+Acceptance requires:
+
+- active status text identifies `VEG-V2-INTERACT.1B` through `VEG-V2-INTERACT.2B.2` as user-validated and accepted;
+- the accepted runtime contracts are summarized without replacing their detailed historical plans and audits;
+- the proposed large interaction stress benchmark is explicitly not scheduled because the user states realistic simultaneous actor scale is approximately five and at most ten, while a hundred on-screen interactable actors would already be constrained by non-vegetation systems;
+- no unsupported performance claim is introduced: source cost models remain analytical, the user-observed behavior remains user evidence, and no new profiler measurement is claimed;
+- the next vegetation implementation objective remains unselected for the new thread rather than being silently replaced by benchmarking, LOD, culling, snow, or another speculative feature;
+- all vegetation runtime and rendering files remain byte-identical to the accepted `VEG-V2-INTERACT.2B.2` source baseline.
+
+### Reviewed evidence
+
+- `Assets/AGENTS.md` was read completely. It requires a read-only review, a persistent canonical plan as the first project write, exact affected-file scope, implementation strictly from the plan, and a recorded final consistency/compliance audit.
+- The supplied source set contains no `.git` directory. The local interaction reconstruction is `/mnt/data/veg_2b2_workspace/current`, derived from the user-supplied `Assets-Code-Archive(8).zip` and accepted patch overlays through `VEG-V2-INTERACT.2B.2`; no replacement Git clone was used. Because `VEG-V2-INFRA.3` represented deletions through an external apply script, the non-destructive local overlay still contains legacy benchmark files that the accepted cleanup declared obsolete. Those stale local files are outside this closure patch and do not override the user's applied Unity project state.
+- The user supplied an INTERACT.1B runtime report showing `51` recenter dispatches over `1,091` simulation dispatches (`4.7%`) after the previous `88–92%` ratio, and stated that grass responsiveness was fixed.
+- The user directly confirmed that INTERACT.2A worked as described, that delayed recovery worked, that the asymmetric slow–fast–slow curve worked as expected, and that circle/cone/line ability stamps worked as expected after INTERACT.2B.2.
+- The final D3D11 warning was eliminated only after replacing the aggregate shape-evaluation return with scalar influence plus explicitly initialized vector outputs. The earlier aggregate-zero initialization attempt in INTERACT.2B.1 was insufficient and remains historical evidence, not an active recommendation.
+- The user rejected a 48/100-actor interaction stress benchmark as disproportionate to the expected gameplay scale and requested a small closure patch plus an exhaustive continuation handoff.
+
+### Expected affected files
+
+Modify:
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+```
+
+Create/delete/move/rename project files: none. Generated delivery artifacts are outside the project source and are listed in the patch manifest and handoff.
+
+### Implementation sequence
+
+1. Reconcile the canonical document's active status and INTERACT.2B/2B.1/2B.2 status wording with the user's runtime acceptance.
+2. Add one concise accepted-milestone summary, preserve the detailed historical plans, and record the rejected stress-benchmark proposal as out of the current continuation scope.
+3. Reconcile the exploratory stylized architecture's production sequence so the complete interaction stack is no longer described as Unity-validation-pending.
+4. Compare every runtime/rendering vegetation file against the pre-closure baseline and require byte identity.
+5. Generate a changed-files-only documentation patch, manifest, source-validation report, and exhaustive continuation handoff.
+6. Reread both final documents and record the actual affected-file reconciliation and final compliance audit here.
+
+### Performance and scope conclusion
+
+This update executes only at documentation authoring/import time. It adds no active-gameplay CPU or GPU work, no dirty-triggered rebuild, no memory allocation, no buffer, no texture, no draw, no shader sample, and no build/runtime storage other than a small Markdown increase. The highest-priority active-gameplay cost is unchanged. At the stated realistic scale of approximately five to ten actors, no additional interaction stress benchmark is required by current user acceptance. This is a scope decision, not a measured proof of unlimited scalability. No `PERFORMANCE EXCEPTION` is active.
+
+### Plan status
+
+| Item | Status |
+| --- | --- |
+| CLOSE.1.0 Canonical closure plan and evidence | Complete |
+| CLOSE.1.1 Canonical status reconciliation | Complete |
+| CLOSE.1.2 Exploratory architecture reconciliation | Complete |
+| CLOSE.1.3 Runtime byte-identity and documentation validation | Complete |
+| CLOSE.1.4 Final compliance audit and handoff | Complete |
+
+### VEG-V2-CLOSE.1 post-change consistency and compliance audit
+
+**Actually affected project files:** matched the declared two-file scope exactly. `Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md` and `Assets/Docs/Stylized_Vegetation_Architecture.md` were modified. No project file was created, deleted, moved, renamed, generated, or modified unexpectedly.
+
+**Intentional documentation differences:** the canonical status now identifies the production ownership and interaction stack as implemented through `VEG-V2-INTERACT.2B.2`; INTERACT.2B is marked user-validated after its two corrective patches; INTERACT.2B.1 distinguishes the accepted zero-buffer binding correction from its failed aggregate-initialization attempt; INTERACT.2B.2 is marked user-validated; and the exploratory architecture's production sequence now matches the accepted state. The closure records the user's realistic five-to-ten-actor expectation and the explicit decision not to schedule a 48/100-actor stress benchmark.
+
+**Preserved implementation:** every file under `Assets/Game/Procedural/Vegetation` and `Assets/Game/Rendering/Vegetation` is byte-identical to the pre-closure `VEG-V2-INTERACT.2B.2` source baseline. No active-gameplay path, dirty-triggered path, serialization contract, shader contract, buffer, texture, allocation, dispatch, draw, update cadence, queue, recovery curve, coverage field, instance layout, geometry, Ground integration, Weather integration, tester behavior, scene, prefab, material, layer, tag, or URP setting changed.
+
+**Performance reconciliation:** this patch adds only Markdown text. Active-gameplay CPU/GPU cost, dirty-triggered runtime cost, memory, and runtime I/O are unchanged. Repository/build storage increases only by the size of the added documentation text. The decision not to add a large synthetic stress suite avoids new editor tooling and test-only runtime machinery; it does not constitute a measured scalability claim. No `PERFORMANCE EXCEPTION` is active.
+
+**Validation evidence:** the dedicated closure validator passed all checks before this audit entry. It verified no creates/deletes, exact two-file changed scope, byte identity of both vegetation runtime/rendering trees, accepted-status wording, preserved failed-attempt history, recorded `51 / 1,091 = 4.7%` runtime evidence, recorded five-to-ten actor scope, explicit rejection of the large stress benchmark, an unselected next implementation objective, balanced Markdown fences, one H1 per document, and no generated artifacts inside the project. The validator is rerun after this audit entry, and the delivered report contains the final count.
+
+**Unity validation:** no Unity validation is required for this documentation-only closure because no Unity-imported implementation or serialized asset changed. The user-provided runtime acceptance is preserved as evidence and is not reclassified as automated or profiler validation.
+

@@ -13,6 +13,10 @@ struct PS3D_StylizedSurfaceDetail
     float roughness;
     float roughnessVariationStrength;
     float textureFormPayload;
+    float featureTextureFormPayload;
+    float substrateFormSigned;
+    float substrateRoughness;
+    float featureMask;
 };
 
 PS3D_StylizedSurfaceDetail PS3D_ZeroStylizedSurfaceDetail()
@@ -28,6 +32,10 @@ PS3D_StylizedSurfaceDetail PS3D_ZeroStylizedSurfaceDetail()
     result.roughness = 0.5;
     result.roughnessVariationStrength = 0.0;
     result.textureFormPayload = 0.0;
+    result.featureTextureFormPayload = 0.0;
+    result.substrateFormSigned = 0.0;
+    result.substrateRoughness = 0.5;
+    result.featureMask = 0.0;
     return result;
 }
 
@@ -57,6 +65,7 @@ PS3D_StylizedSurfaceDetail PS3D_DecodeStylizedSurfaceDetail(
         smoothstep(0.66, 0.98, cavityRaw) * cavityStrength;
 
     result.textureFormPayload = step(0.5, detailC.z);
+    result.featureTextureFormPayload = step(1.5, detailC.z);
     float packedVariation = packedSample.a * 2.0 - 1.0;
     result.formSigned =
         packedVariation * max(0.0, detailB.z) *
@@ -80,8 +89,32 @@ PS3D_StylizedSurfaceDetail PS3D_AssignStylizedSurfaceTextureForm(
     float normalizedForm = saturate(formSample.r);
     detail.formSigned =
         (normalizedForm * 2.0 - 1.0) * strength;
+    detail.substrateFormSigned =
+        (saturate(formSample.g) * 2.0 - 1.0) * strength;
+    detail.substrateRoughness = saturate(formSample.b);
+    detail.featureMask =
+        saturate(formSample.a) * detail.featureTextureFormPayload;
     detail.textureFormStrength = strength;
     detail.sceneLightingResponse = saturate(formA.w);
+    return detail;
+}
+
+PS3D_StylizedSurfaceDetail PS3D_ApplyStylizedSurfaceFeatureRetention(
+    PS3D_StylizedSurfaceDetail detail,
+    float edgeRetention)
+{
+    float retention = saturate(edgeRetention);
+    detail.formSigned = lerp(
+        detail.substrateFormSigned,
+        detail.formSigned,
+        retention);
+    detail.slope *= retention;
+    detail.cavity *= retention;
+    detail.cavityCore *= retention;
+    detail.roughness = lerp(
+        detail.substrateRoughness,
+        detail.roughness,
+        retention);
     return detail;
 }
 

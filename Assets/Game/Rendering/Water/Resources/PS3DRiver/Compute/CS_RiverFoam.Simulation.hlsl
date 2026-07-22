@@ -2,6 +2,7 @@ static const float FoamMaterialStateEpsilon = 0.0001;
 
 struct FoamMaterialState
 {
+    float coverage;
     float presence;
     float remainingLife;
     float materialPattern;
@@ -10,14 +11,32 @@ struct FoamMaterialState
 FoamMaterialState FoamDecodeMaterialState(float4 packed)
 {
     FoamMaterialState state;
-    state.presence = saturate(packed.x);
-    if (state.presence > FoamMaterialStateEpsilon)
+    float materialAmount = saturate(packed.x);
+    float storedCoverage = saturate(packed.w);
+
+    // P13A writes explicit Coverage to alpha. Preserve a transient legacy
+    // fallback for a positive pre-P13 RGB state whose alpha is still zero:
+    // the former Presence amount becomes Coverage and intrinsic Presence is
+    // one, preserving the visible material amount until the state is replaced.
+    bool legacyPackedState =
+        storedCoverage <= 0.00000001 &&
+        materialAmount > 0.0;
+    state.coverage = legacyPackedState
+        ? materialAmount
+        : storedCoverage;
+
+    if (state.coverage > FoamMaterialStateEpsilon &&
+        materialAmount > 0.0)
     {
-        state.remainingLife = saturate(packed.y / state.presence);
-        state.materialPattern = saturate(packed.z / state.presence);
+        state.presence = legacyPackedState
+            ? 1.0
+            : saturate(materialAmount / max(state.coverage, 0.00000001));
+        state.remainingLife = saturate(packed.y / max(materialAmount, 0.00000001));
+        state.materialPattern = saturate(packed.z / max(materialAmount, 0.00000001));
     }
     else
     {
+        state.presence = 0.0;
         state.remainingLife = 0.0;
         state.materialPattern = 0.0;
     }
@@ -27,67 +46,111 @@ FoamMaterialState FoamDecodeMaterialState(float4 packed)
 
 float4 FoamEncodeMaterialState(FoamMaterialState state)
 {
+    state.coverage = saturate(state.coverage);
     state.presence = saturate(state.presence);
     state.remainingLife = saturate(state.remainingLife);
     state.materialPattern = saturate(state.materialPattern);
-    if (state.presence <= FoamMaterialStateEpsilon ||
+    if (state.coverage <= FoamMaterialStateEpsilon ||
+        state.presence <= 0.0 ||
         state.remainingLife <= 0.0)
     {
         return 0.0.xxxx;
     }
 
+    float materialAmount = state.coverage * state.presence;
     return float4(
-        state.presence,
-        state.presence * state.remainingLife,
-        state.presence * state.materialPattern,
-        0.0);
+        materialAmount,
+        materialAmount * state.remainingLife,
+        materialAmount * state.materialPattern,
+        state.coverage);
 }
 
 float4 FoamClampPackedMaterialState(float4 packed)
 {
-    float presence = saturate(packed.x);
-    float lifeMoment = clamp(packed.y, 0.0, presence);
-    float patternMoment = clamp(packed.z, 0.0, presence);
-    if (presence <= FoamMaterialStateEpsilon || lifeMoment <= 0.0)
+    // Clamp capacity coherently. Transport may temporarily converge more than
+    // one cell of Coverage, but capacity resolution must not independently
+    // reshape the material moments and thereby invent new Presence or Life.
+    float rawMaterialAmount = max(0.0, packed.x);
+    float rawCoverage = max(0.0, packed.w);
+    if (rawCoverage <= 0.00000001 &&
+        rawMaterialAmount > 0.0)
+    {
+        rawCoverage = rawMaterialAmount;
+    }
+
+    rawMaterialAmount = min(rawMaterialAmount, rawCoverage);
+    float rawLifeMoment = clamp(packed.y, 0.0, rawMaterialAmount);
+    float rawPatternMoment = clamp(packed.z, 0.0, rawMaterialAmount);
+    if (rawCoverage <= FoamMaterialStateEpsilon ||
+        rawMaterialAmount <= 0.0 ||
+        rawLifeMoment <= 0.0)
     {
         return 0.0.xxxx;
     }
 
-    return float4(presence, lifeMoment, patternMoment, 0.0);
+    FoamMaterialState state;
+    state.coverage = saturate(rawCoverage);
+    state.presence = saturate(
+        rawMaterialAmount / max(rawCoverage, 0.00000001));
+    state.remainingLife = saturate(
+        rawLifeMoment / max(rawMaterialAmount, 0.00000001));
+    state.materialPattern = saturate(
+        rawPatternMoment / max(rawMaterialAmount, 0.00000001));
+    return FoamEncodeMaterialState(state);
 }
 
-float4 FoamMergeBornPresence(float4 existingPacked, float4 sourcePacked)
+float4 FoamMergeBornMaterial(float4 existingPacked, float4 sourcePacked)
 {
     FoamMaterialState existing = FoamDecodeMaterialState(existingPacked);
     FoamMaterialState source = FoamDecodeMaterialState(sourcePacked);
-    float addedPresence = max(
-        0.0,
-        source.presence - existing.presence);
-    float combinedPresence = max(
-        existing.presence,
-        source.presence);
-    if (combinedPresence <= FoamMaterialStateEpsilon)
+    if (source.coverage <= FoamMaterialStateEpsilon ||
+        source.presence <= 0.0 ||
+        source.remainingLife <= 0.0)
     {
-        return 0.0.xxxx;
+        return FoamEncodeMaterialState(existing);
+    }
+    if (existing.coverage <= FoamMaterialStateEpsilon ||
+        existing.presence <= 0.0 ||
+        existing.remainingLife <= 0.0)
+    {
+        return FoamEncodeMaterialState(source);
     }
 
+    float addedCoverage = max(
+        0.0,
+        source.coverage - existing.coverage);
+    float combinedCoverage = max(
+        existing.coverage,
+        source.coverage);
+
     FoamMaterialState combined;
-    combined.presence = combinedPresence;
-    combined.remainingLife = saturate(
-        (existing.presence * existing.remainingLife +
-         addedPresence * source.remainingLife) /
-        combinedPresence);
-    combined.materialPattern = saturate(
-        (existing.presence * existing.materialPattern +
-         addedPresence * source.materialPattern) /
-        combinedPresence);
+    combined.coverage = combinedCoverage;
+    combined.presence = max(
+        existing.presence,
+        source.presence);
+    combined.remainingLife = max(
+        existing.remainingLife,
+        source.remainingLife);
+
+    // Repeated writes refresh Presence and Life without swimming the stable
+    // material identity. Pattern changes only where the source contributes
+    // genuinely new geometric Coverage.
+    combined.materialPattern = existing.materialPattern;
+    if (addedCoverage > FoamMaterialStateEpsilon)
+    {
+        combined.materialPattern = saturate(
+            (existing.coverage * existing.materialPattern +
+             addedCoverage * source.materialPattern) /
+            max(FoamMaterialStateEpsilon, combinedCoverage));
+    }
+
     return FoamEncodeMaterialState(combined);
 }
 
 float4 FoamClipPackedToValidFluid(float4 packed, float validFluid)
 {
     FoamMaterialState state = FoamDecodeMaterialState(packed);
-    state.presence = min(state.presence, saturate(validFluid));
+    state.coverage = min(state.coverage, saturate(validFluid));
     return FoamEncodeMaterialState(state);
 }
 
@@ -114,8 +177,9 @@ float4 FoamPreservePersistentMaterialState(
 
 // Conservative packed-state transport. Donor Cell is the exact accepted
 // first-order baseline; the optional TVD branch changes only interior face
-// reconstruction. Every flux carries Presence, Presence*RemainingLife, and
-// Presence*Pattern together so the normalized material properties remain attached.
+// reconstruction. Every flux carries material amount, its Remaining-Life and
+// Pattern moments, plus geometric Coverage, so decoded material properties remain
+// attached to one coherent transported state.
 
 bool FoamTransportInsideGrid(int2 coordinate)
 {
@@ -247,26 +311,9 @@ float FoamTransportSuperbeeSlopeComponent(
     return slope;
 }
 
-float4 FoamTransportSuperbeeSlope(
-    float4 previousPacked,
-    float4 centrePacked,
-    float4 nextPacked)
+float FoamTransportCoverage(float4 packed)
 {
-    float4 backwardDifference = centrePacked - previousPacked;
-    float4 forwardDifference = nextPacked - centrePacked;
-    return float4(
-        FoamTransportSuperbeeSlopeComponent(
-            backwardDifference.x,
-            forwardDifference.x),
-        FoamTransportSuperbeeSlopeComponent(
-            backwardDifference.y,
-            forwardDifference.y),
-        FoamTransportSuperbeeSlopeComponent(
-            backwardDifference.z,
-            forwardDifference.z),
-        FoamTransportSuperbeeSlopeComponent(
-            backwardDifference.w,
-            forwardDifference.w));
+    return FoamDecodeMaterialState(packed).coverage;
 }
 
 float4 FoamLoadTransportPackedOrFallback(
@@ -293,45 +340,67 @@ float4 FoamResolveInteriorFaceDonor(
     float4 negativePacked,
     float4 positivePacked)
 {
-    float4 donor = faceVelocity >= 0.0
+    float4 donorPacked = faceVelocity >= 0.0
         ? negativePacked
         : positivePacked;
     if (!FoamTransportUsesTvdSuperbee())
     {
-        return donor;
+        return donorPacked;
     }
 
+    FoamMaterialState negativeState = FoamDecodeMaterialState(
+        negativePacked);
+    FoamMaterialState positiveState = FoamDecodeMaterialState(
+        positivePacked);
+    FoamMaterialState donorState;
+    if (faceVelocity >= 0.0)
+    {
+        donorState.coverage = negativeState.coverage;
+        donorState.presence = negativeState.presence;
+        donorState.remainingLife = negativeState.remainingLife;
+        donorState.materialPattern = negativeState.materialPattern;
+    }
+    else
+    {
+        donorState.coverage = positiveState.coverage;
+        donorState.presence = positiveState.presence;
+        donorState.remainingLife = positiveState.remainingLife;
+        donorState.materialPattern = positiveState.materialPattern;
+    }
     float reconstructionScale = 0.5 * (1.0 - saturate(
         _FoamTransportReconstructionCourant));
 
-    float4 reconstructed = donor;
+    float reconstructedCoverage = donorState.coverage;
     if (faceVelocity >= 0.0)
     {
         float4 previousPacked = FoamLoadTransportPackedOrFallback(
             negativeCoordinate - axis,
             negativePacked);
-        float4 slope = FoamTransportSuperbeeSlope(
-            previousPacked,
-            negativePacked,
-            positivePacked);
-        reconstructed = negativePacked + slope * reconstructionScale;
+        float previousCoverage = FoamTransportCoverage(previousPacked);
+        float slope = FoamTransportSuperbeeSlopeComponent(
+            negativeState.coverage - previousCoverage,
+            positiveState.coverage - negativeState.coverage);
+        reconstructedCoverage =
+            negativeState.coverage + slope * reconstructionScale;
     }
     else
     {
         float4 nextPacked = FoamLoadTransportPackedOrFallback(
             positiveCoordinate + axis,
             positivePacked);
-        float4 slope = FoamTransportSuperbeeSlope(
-            negativePacked,
-            positivePacked,
-            nextPacked);
-        reconstructed = positivePacked - slope * reconstructionScale;
+        float nextCoverage = FoamTransportCoverage(nextPacked);
+        float slope = FoamTransportSuperbeeSlopeComponent(
+            positiveState.coverage - negativeState.coverage,
+            nextCoverage - positiveState.coverage);
+        reconstructedCoverage =
+            positiveState.coverage - slope * reconstructionScale;
     }
 
-    float4 faceMinimum = min(negativePacked, positivePacked);
-    float4 faceMaximum = max(negativePacked, positivePacked);
-    return FoamClampPackedMaterialState(
-        clamp(reconstructed, faceMinimum, faceMaximum));
+    donorState.coverage = clamp(
+        reconstructedCoverage,
+        min(negativeState.coverage, positiveState.coverage),
+        max(negativeState.coverage, positiveState.coverage));
+    return FoamEncodeMaterialState(donorState);
 }
 
 void FoamResolveLongitudinalFaceFlux(
@@ -574,52 +643,77 @@ void FoamAccumulateTransportTriplet(
 
 void FoamAccumulateTransportPresenceAttribution(
     int2 coordinate,
-    float rawTransportedPresence,
-    float finalStoredPresence,
+    float rawTransportedCoverage,
+    float rawTransportedMaterialAmount,
+    float finalStoredMaterialAmount,
     float validFluid,
     float cellArea,
-    float totalPresenceLossArea)
+    float totalMaterialAmountLossArea)
 {
     if (_FoamTransportMetricsEnabled == 0)
     {
         return;
     }
 
-    float positiveRawPresence = max(0.0, rawTransportedPresence);
-    float unitLimitedPresence = saturate(rawTransportedPresence);
+    float positiveRawCoverage = max(0.0, rawTransportedCoverage);
+    float positiveRawMaterialAmount = max(
+        0.0,
+        rawTransportedMaterialAmount);
+    if (positiveRawCoverage <= 0.00000001 &&
+        positiveRawMaterialAmount > 0.0)
+    {
+        positiveRawCoverage = positiveRawMaterialAmount;
+    }
+
+    float intrinsicPresence = positiveRawCoverage > 0.00000001
+        ? saturate(
+            min(positiveRawMaterialAmount, positiveRawCoverage) /
+            positiveRawCoverage)
+        : 0.0;
+    float unitLimitedCoverage = saturate(positiveRawCoverage);
     float boundaryCapacity = LoadBoundaryCoverage(coordinate);
-    float boundaryLimitedPresence = min(
-        unitLimitedPresence,
+    float boundaryLimitedCoverage = min(
+        unitLimitedCoverage,
         boundaryCapacity);
-    float obstacleLimitedPresence = min(
-        boundaryLimitedPresence,
+    float obstacleLimitedCoverage = min(
+        boundaryLimitedCoverage,
         saturate(validFluid));
+
+    float unitLimitedMaterialAmount =
+        unitLimitedCoverage * intrinsicPresence;
+    float boundaryLimitedMaterialAmount =
+        boundaryLimitedCoverage * intrinsicPresence;
+    float obstacleLimitedMaterialAmount =
+        obstacleLimitedCoverage * intrinsicPresence;
 
     float unitCapacityLoss = max(
         0.0,
-        positiveRawPresence - unitLimitedPresence);
+        positiveRawMaterialAmount - unitLimitedMaterialAmount);
     float boundaryCapacityLoss = max(
         0.0,
-        unitLimitedPresence - boundaryLimitedPresence);
+        unitLimitedMaterialAmount - boundaryLimitedMaterialAmount);
     float obstacleCapacityLoss = max(
         0.0,
-        boundaryLimitedPresence - obstacleLimitedPresence);
+        boundaryLimitedMaterialAmount - obstacleLimitedMaterialAmount);
 
     bool minimumCutoff =
-        obstacleLimitedPresence > 0.0 &&
-        obstacleLimitedPresence <= FoamMaterialStateEpsilon;
+        obstacleLimitedCoverage > 0.0 &&
+        obstacleLimitedCoverage <= FoamMaterialStateEpsilon;
     float minimumCutoffLoss = minimumCutoff
-        ? obstacleLimitedPresence
+        ? obstacleLimitedMaterialAmount
         : 0.0;
     float stateValidityLoss = max(
         0.0,
-        obstacleLimitedPresence -
-        saturate(finalStoredPresence) -
+        obstacleLimitedMaterialAmount -
+        max(0.0, finalStoredMaterialAmount) -
         minimumCutoffLoss);
 
-    bool unitCapacityHit = unitCapacityLoss > 0.0;
-    bool boundaryCapacityHit = boundaryCapacityLoss > 0.0;
-    bool obstacleCapacityHit = obstacleCapacityLoss > 0.0;
+    bool unitCapacityHit =
+        positiveRawCoverage > unitLimitedCoverage;
+    bool boundaryCapacityHit =
+        unitLimitedCoverage > boundaryLimitedCoverage;
+    bool obstacleCapacityHit =
+        boundaryLimitedCoverage > obstacleLimitedCoverage;
     bool anyCapacityHit =
         unitCapacityHit ||
         boundaryCapacityHit ||
@@ -627,7 +721,7 @@ void FoamAccumulateTransportPresenceAttribution(
 
     float maximumLocalCapacityExcess = max(
         0.0,
-        positiveRawPresence - saturate(validFluid));
+        positiveRawCoverage - saturate(validFluid));
 
     float attributedLoss =
         unitCapacityLoss +
@@ -638,10 +732,10 @@ void FoamAccumulateTransportPresenceAttribution(
     float attributedLossArea = attributedLoss * cellArea;
     float reconciliationTolerance = max(
         0.0000001,
-        totalPresenceLossArea * 0.00001);
+        totalMaterialAmountLossArea * 0.00001);
     bool floatAttributionReconciles =
         attributedLoss > 0.0 &&
-        abs(attributedLossArea - totalPresenceLossArea) <=
+        abs(attributedLossArea - totalMaterialAmountLossArea) <=
             reconciliationTolerance;
 
     uint unitCapacityLossFixed;
@@ -652,7 +746,7 @@ void FoamAccumulateTransportPresenceAttribution(
     if (floatAttributionReconciles)
     {
         uint totalLossFixed = FoamTransportFixedPoint(
-            totalPresenceLossArea);
+            totalMaterialAmountLossArea);
         float inverseAttributedLoss = 1.0 / attributedLoss;
         uint unitEnd = (uint)min(
             (float)totalLossFixed,
@@ -732,7 +826,7 @@ void FoamAccumulateTransportPresenceAttribution(
         originalValue);
     _FoamTransportMetrics.InterlockedMax(
         FoamTransportMaximumRawPresenceOffset,
-        FoamTransportFixedPoint(positiveRawPresence),
+        FoamTransportFixedPoint(positiveRawCoverage),
         originalValue);
     _FoamTransportMetrics.InterlockedMax(
         FoamTransportMaximumLocalCapacityExcessOffset,

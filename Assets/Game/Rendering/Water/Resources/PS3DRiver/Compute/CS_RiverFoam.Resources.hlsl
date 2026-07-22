@@ -1,11 +1,11 @@
-// Canonical persistent and per-step source state (4.11C.4+, preserved by 4.11C.5):
-// R = Presence
-// G = Presence * normalized Remaining Life
-// B = Presence * normalized Material Pattern
-// A = reserved and always zero
-// Premultiplying transported attributes by Presence preserves normalized Life
-// and Pattern across interpolation with empty water. Consumers decode G/R and
-// B/R only when Presence is non-zero.
+// Canonical P13A persistent material state:
+// R = Coverage * intrinsic Presence (transported material amount)
+// G = Coverage * Presence * normalized Remaining Life
+// B = Coverage * Presence * normalized Material Pattern
+// A = geometric Coverage
+// All four moments move through the same finite-volume flux. Consumers decode
+// Presence as R/A and Life/Pattern as G/R and B/R. Source shape and subcell
+// geometry change Coverage; authored Presence and Life remain intrinsic.
 RWTexture2D<float4> _FoamStateWrite;
 Texture2D<float4> _FoamStateRead;
 RWTexture2D<float> _FoamShapeMaskWrite;

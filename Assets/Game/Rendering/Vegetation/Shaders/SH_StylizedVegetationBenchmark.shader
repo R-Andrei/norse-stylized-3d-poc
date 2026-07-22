@@ -33,6 +33,15 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
         _InteractionHeightExponent("Interaction Height Exponent", Range(0.25, 4)) = 1.5
         _InteractionMaximumBend("Interaction Maximum Bend", Range(0, 3)) = 0.65
         _InteractionNormalResponse("Interaction Normal Response", Range(0, 4)) = 1
+        _WindInfluenceOnDisplacedGrass("Wind Influence On Displaced Grass", Range(0, 1)) = 1
+        _TrampleBendResponse("Trample Bend Response", Range(0, 2)) = 1
+        _TrampleFlattenResponse("Trample Flatten Response", Range(0, 2)) = 1
+        _TrampleHeightExponent("Trample Height Exponent", Range(0.25, 4)) = 1.25
+        _TrampleMaximumBend("Trample Maximum Bend", Range(0, 3)) = 0.8
+        _TrampleNormalResponse("Trample Normal Response", Range(0, 4)) = 1
+        _WindInfluenceOnTrampledGrass("Wind Influence On Trampled Grass", Range(0, 1)) = 0.25
+        [HideInInspector] _VegetationTramplePreviousField("Vegetation Trample Previous Field", 2D) = "black" {}
+        [HideInInspector] _VegetationTrampleCurrentField("Vegetation Trample Current Field", 2D) = "black" {}
     }
 
     SubShader
@@ -70,6 +79,7 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
             #include "../Includes/VegetationCommon.hlsl"
             #include "../Includes/VegetationWindResponse.hlsl"
             #include "../Includes/VegetationInteractionField.hlsl"
+            #include "../Includes/VegetationTrampleField.hlsl"
             #include "../Includes/VegetationLighting.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
@@ -104,6 +114,13 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                 float _InteractionHeightExponent;
                 float _InteractionMaximumBend;
                 float _InteractionNormalResponse;
+                float _WindInfluenceOnDisplacedGrass;
+                float _TrampleBendResponse;
+                float _TrampleFlattenResponse;
+                float _TrampleHeightExponent;
+                float _TrampleMaximumBend;
+                float _TrampleNormalResponse;
+                float _WindInfluenceOnTrampledGrass;
             CBUFFER_END
 
             struct Attributes
@@ -178,21 +195,54 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                 float3 interactionSamplePosition = mul(
                     _VegetationLocalToWorld,
                     float4(instanceLocalPosition, 1.0)).xyz;
+                VegetationInteractionSample interaction =
+                    SampleVegetationInteraction(interactionSamplePosition);
+                VegetationTrampleSample trample =
+                    SampleVegetationTrample(interactionSamplePosition);
+                float effectiveInteractionStrength =
+                    VegetationInteractionEffectiveStrength(
+                        interaction,
+                        _InteractionBendResponse,
+                        _InteractionFlattenResponse);
+                float effectiveTrampleStrength =
+                    VegetationTrampleEffectiveStrength(
+                        trample,
+                        _TrampleBendResponse,
+                        _TrampleFlattenResponse);
+                float immediateWindRetention = lerp(
+                    1.0,
+                    saturate(_WindInfluenceOnDisplacedGrass),
+                    effectiveInteractionStrength);
+                float trampleWindRetention = lerp(
+                    1.0,
+                    saturate(_WindInfluenceOnTrampledGrass),
+                    effectiveTrampleStrength);
+                float retainedWindInfluence =
+                    immediateWindRetention * trampleWindRetention;
+
+                float3 preWindWorldPosition = worldPosition;
                 float2 fullTipWindDisplacementXZ;
-                worldPosition = ApplyVegetationWindResponse(
-                    worldPosition,
-                    rootToTip,
-                    stiffness,
-                    phase,
-                    bladeVariation,
-                    fullTipWindDisplacementXZ);
+                float3 windDeformedWorldPosition =
+                    ApplyVegetationWindResponse(
+                        worldPosition,
+                        rootToTip,
+                        stiffness,
+                        phase,
+                        bladeVariation,
+                        fullTipWindDisplacementXZ);
+                worldPosition = lerp(
+                    preWindWorldPosition,
+                    windDeformedWorldPosition,
+                    retainedWindInfluence);
+                fullTipWindDisplacementXZ *= retainedWindInfluence;
+
                 float scaledVertexHeight =
                     input.positionOS.y * scale.y;
                 float2 fullTipInteractionDisplacementXZ;
                 float fullTipInteractionFlatten;
                 worldPosition = ApplyVegetationInteractionResponse(
                     worldPosition,
-                    interactionSamplePosition,
+                    interaction,
                     rootToTip,
                     scaledVertexHeight,
                     _InteractionBendResponse,
@@ -201,6 +251,19 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                     _InteractionMaximumBend,
                     fullTipInteractionDisplacementXZ,
                     fullTipInteractionFlatten);
+                float2 fullTipTrampleDisplacementXZ;
+                float fullTipTrampleFlatten;
+                worldPosition = ApplyVegetationTrampleResponse(
+                    worldPosition,
+                    trample,
+                    rootToTip,
+                    scaledVertexHeight,
+                    _TrampleBendResponse,
+                    _TrampleFlattenResponse,
+                    _TrampleHeightExponent,
+                    _TrampleMaximumBend,
+                    fullTipTrampleDisplacementXZ,
+                    fullTipTrampleFlatten);
 
                 float3 baseNormalWS =
                     TransformVegetationNormalToWorld(input.normalOS, yaw);
@@ -213,17 +276,22 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                     2.0 * rootToTip * inverseBladeHeight;
                 float interactionNormalAmount =
                     clamp(_InteractionNormalResponse, 0.0, 4.0);
+                float trampleNormalAmount =
+                    clamp(_TrampleNormalResponse, 0.0, 4.0);
                 float2 deformationSlopeXZ =
                     fullTipWindDisplacementXZ *
                         (commonSlopeScale *
                          clamp(_WindNormalResponse, 0.0, 4.0)) +
                     fullTipInteractionDisplacementXZ *
-                        (commonSlopeScale * interactionNormalAmount);
+                        (commonSlopeScale * interactionNormalAmount) +
+                    fullTipTrampleDisplacementXZ *
+                        (commonSlopeScale * trampleNormalAmount);
+                float combinedFlatten = saturate(
+                    fullTipInteractionFlatten * interactionNormalAmount +
+                    fullTipTrampleFlatten * trampleNormalAmount);
                 float interactionVerticalTangentScale = max(
                     0.05,
-                    1.0 - saturate(
-                        fullTipInteractionFlatten *
-                        interactionNormalAmount));
+                    1.0 - combinedFlatten);
                 float3 deformedCenterlineTangentWS = float3(
                     deformationSlopeXZ.x,
                     interactionVerticalTangentScale,
@@ -233,7 +301,8 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                     bladeLateralWS);
                 float2 combinedTipDisplacementXZ =
                     fullTipWindDisplacementXZ +
-                    fullTipInteractionDisplacementXZ;
+                    fullTipInteractionDisplacementXZ +
+                    fullTipTrampleDisplacementXZ;
                 float signedNormalBendRatio = dot(
                     baseNormalWS.xz,
                     combinedTipDisplacementXZ) * inverseBladeHeight;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using ProgrammaticStylized3D.Geometry;
 
@@ -37,6 +38,75 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 #else
             return false;
+#endif
+        }
+
+#if UNITY_EDITOR
+        private readonly struct CornerDamageSearchAttemptContext
+        {
+            public readonly bool Active;
+            public readonly int CandidateRank;
+            public readonly float CapRingUniformScale;
+
+            public CornerDamageSearchAttemptContext(
+                int candidateRank,
+                float capRingUniformScale)
+            {
+                Active = true;
+                CandidateRank = Mathf.Max(0, candidateRank);
+                CapRingUniformScale = Mathf.Clamp(
+                    capRingUniformScale,
+                    0.0001f,
+                    1f);
+            }
+        }
+
+        [ThreadStatic]
+        private static CornerDamageSearchAttemptContext
+            cornerDamageSearchAttemptContext;
+
+        private readonly struct CornerDamageSearchAttemptScope : IDisposable
+        {
+            private readonly CornerDamageSearchAttemptContext previous;
+
+            public CornerDamageSearchAttemptScope(
+                int candidateRank,
+                float capRingUniformScale)
+            {
+                previous = cornerDamageSearchAttemptContext;
+                cornerDamageSearchAttemptContext =
+                    new CornerDamageSearchAttemptContext(
+                        candidateRank,
+                        capRingUniformScale);
+            }
+
+            public void Dispose()
+            {
+                cornerDamageSearchAttemptContext = previous;
+            }
+        }
+
+#endif
+
+        private static int ResolveCornerDamageCandidateRankOverride()
+        {
+#if UNITY_EDITOR
+            return cornerDamageSearchAttemptContext.Active
+                ? cornerDamageSearchAttemptContext.CandidateRank
+                : 0;
+#else
+            return 0;
+#endif
+        }
+
+        private static float ResolveCornerDamageCapRingScaleOverride()
+        {
+#if UNITY_EDITOR
+            return cornerDamageSearchAttemptContext.Active
+                ? cornerDamageSearchAttemptContext.CapRingUniformScale
+                : 1f;
+#else
+            return 1f;
 #endif
         }
 
@@ -215,6 +285,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Diagnostic = diagnostic ?? string.Empty;
                 Edges = edges ?? Array.Empty<EdgeWearDebugEdgeRecord>();
             }
+        }
+
+        public enum CornerDamagePreviewKind
+        {
+            GeometryOnly,
+            WithEdgeWear
         }
 
 #if UNITY_EDITOR
@@ -492,14 +568,48 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         public sealed class CornerDamagePreviewStatus
         {
+            public CornerDamagePreviewKind PreviewKind;
             public bool PreviewApplied;
             public bool TransactionCertified;
+            public bool AuthoringEnabled;
             public int ShapeSeed;
+            public int CandidateCornerCount;
+            public int AttemptedCornerCount;
+            public int AttemptedConfigurationCount;
+            public int AcceptedCornerRank = -1;
+            public float CapRingCommittedScale;
+            public string SearchFailureStage = string.Empty;
+            public string SearchFailureReason = string.Empty;
+            public string SearchAttemptSummary = string.Empty;
             public int SelectedGraphVertexIndex = -1;
             public int AcceptedTrialIndex = -1;
+            public float RequestedDepthFraction;
+            public float DepthVariation;
+            public float DepthVariationIdentity;
+            public float ResolvedDepthFraction;
+            public float TopFacingPreference;
+            public float ShortestIncidentEdgeLength;
+            public float RequestedDepthAbsolute;
             public float AcceptedDepth;
+            public float AcceptedDepthFraction;
+            public float AcceptedRetryFactor;
+            public float AcceptedVsRequestedRatio;
+            public float OrdinaryRequestedWidth;
+            public float CapRingWidthScale;
+            public float CapRingOrdinaryLimit;
+            public float CapRingDepthLimit;
+            public float CapRingEdgeLimit;
+            public string CapRingWinningLimit = string.Empty;
+            public float CapRingWearStrength;
             public float CapRingRequestedWidth;
+            public Vector3 SelectedCornerLocalPosition;
+            public Vector3[] CapVerticesLocal = Array.Empty<Vector3>();
+            public float[] CapEdgeLengths = Array.Empty<float>();
             public int CapFaceCount;
+            public int SemanticCapFaceCount;
+            public int GeometryFaceCount;
+            public int ConstructionSourceFaceCountExpected;
+            public int ConstructionSourceFaceCountAttributed;
             public int ExpectedCapRingEdgeCount;
             public int MandatoryCandidateCount;
             public int MandatorySelectedCount;
@@ -571,23 +681,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
-#if UNITY_EDITOR
-        [ThreadStatic]
-        private static int cornerDamagePreviewRequestDepth;
-#endif
-
-        private static bool CornerDamagePreviewRequestActive
-        {
-            get
-            {
-#if UNITY_EDITOR
-                return cornerDamagePreviewRequestDepth > 0;
-#else
-                return false;
-#endif
-            }
-        }
-
         private enum EdgeWearEvaluationMode
         {
             None,
@@ -598,7 +691,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             UnifiedBatchAudit,
             UnifiedPreviewBatchAudit,
             SourceEdgeIndexDebug,
-            CornerDamageTransactionAudit
+            CornerDamageTransactionAudit,
+            CornerDamageGeometryPreview,
+            CornerDamageIntegrationPreview
         }
 
         private const float PlaneEpsilon = 0.0001f;
@@ -723,7 +818,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return CompleteCornerDamageTransactionAuditCapture(recipe);
         }
 
-        public static MeshData GenerateCornerDamagePreview(
+        private static readonly float[] CornerDamageCapRingSearchScales =
+        {
+            1f,
+            0.75f,
+            0.5625f,
+            0.421875f,
+            0.31640625f,
+            0.25f
+        };
+
+        public static MeshData GenerateCornerDamageGeometryPreview(
             MassRecipe recipe,
             MassSurfaceFeatureSettings surfaceFeatures,
             out CornerDamagePreviewStatus previewStatus)
@@ -732,7 +837,129 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 throw new ArgumentNullException(nameof(recipe));
             }
+            if (!surfaceFeatures.CornerChippingEnabled)
+            {
+                ResetCornerDamagePreviewCapture();
+                previewStatus = BuildDisabledCornerDamagePreviewStatus(
+                    recipe,
+                    surfaceFeatures,
+                    CornerDamagePreviewKind.GeometryOnly);
+                return Generate(recipe, surfaceFeatures);
+            }
 
+            GenerateCornerDamageFullCertificationSearch(
+                recipe,
+                surfaceFeatures,
+                out CornerDamagePreviewStatus certifiedStatus,
+                out _);
+            if (certifiedStatus == null ||
+                !certifiedStatus.PreviewApplied ||
+                certifiedStatus.AcceptedCornerRank < 0)
+            {
+                previewStatus = certifiedStatus;
+                return Generate(recipe, surfaceFeatures);
+            }
+
+            ResetCornerDamagePreviewCapture();
+            System.Diagnostics.Stopwatch geometryStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            MeshData geometryMeshData;
+            UnifiedEdgeWearPreviewStatus geometryStatus;
+            using (new CornerDamageSearchAttemptScope(
+                       certifiedStatus.AcceptedCornerRank,
+                       Mathf.Max(
+                           0.0001f,
+                           certifiedStatus.CapRingCommittedScale)))
+            {
+                geometryMeshData = GenerateInternal(
+                    recipe,
+                    surfaceFeatures,
+                    EdgeWearEvaluationMode.CornerDamageGeometryPreview,
+                    -1,
+                    out _,
+                    out _,
+                    out geometryStatus);
+            }
+            geometryStopwatch.Stop();
+
+            previewStatus = CompleteCornerDamagePreviewCapture(
+                recipe,
+                default,
+                geometryStatus,
+                0d,
+                geometryStopwatch.Elapsed.TotalMilliseconds);
+            ApplyCornerDamageSearchSummary(
+                previewStatus,
+                certifiedStatus.CandidateCornerCount,
+                certifiedStatus.AttemptedCornerCount,
+                certifiedStatus.AttemptedConfigurationCount,
+                certifiedStatus.AcceptedCornerRank,
+                certifiedStatus.CapRingCommittedScale,
+                previewStatus != null && previewStatus.PreviewApplied
+                    ? "none"
+                    : "geometry-emission",
+                previewStatus != null && previewStatus.PreviewApplied
+                    ? "none"
+                    : previewStatus == null
+                        ? "corner geometry preview status was unavailable"
+                        : previewStatus.Diagnostic,
+                certifiedStatus.SearchAttemptSummary);
+            if (previewStatus != null && previewStatus.PreviewApplied)
+            {
+                return geometryMeshData;
+            }
+
+            return Generate(recipe, surfaceFeatures);
+        }
+
+        public static MeshData GenerateCornerDamageIntegrationPreview(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            out CornerDamagePreviewStatus previewStatus)
+        {
+            return GenerateCornerDamageIntegrationPreview(
+                recipe,
+                surfaceFeatures,
+                out previewStatus,
+                out _);
+        }
+
+        private static MeshData GenerateCornerDamageIntegrationPreview(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            out CornerDamagePreviewStatus previewStatus,
+            out UnifiedEdgeWearPreviewStatus unifiedStatus)
+        {
+            if (recipe == null)
+            {
+                throw new ArgumentNullException(nameof(recipe));
+            }
+            if (!surfaceFeatures.CornerChippingEnabled)
+            {
+                ResetCornerDamagePreviewCapture();
+                previewStatus = BuildDisabledCornerDamagePreviewStatus(
+                    recipe,
+                    surfaceFeatures,
+                    CornerDamagePreviewKind.WithEdgeWear);
+                return GenerateUnifiedEdgeWearPreviewBaseline(
+                    recipe,
+                    surfaceFeatures,
+                    out unifiedStatus);
+            }
+
+            return GenerateCornerDamageFullCertificationSearch(
+                recipe,
+                surfaceFeatures,
+                out previewStatus,
+                out unifiedStatus);
+        }
+
+        private static MeshData GenerateCornerDamageFullCertificationSearch(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            out CornerDamagePreviewStatus previewStatus,
+            out UnifiedEdgeWearPreviewStatus unifiedStatus)
+        {
             System.Diagnostics.Stopwatch baselineStopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
             GenerateInternal(
@@ -745,41 +972,273 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 out UnifiedEdgeWearPreviewStatus baselineStatus);
             baselineStopwatch.Stop();
 
-            ResetCornerDamagePreviewCapture();
-            MeshData cornerMeshData;
-            UnifiedEdgeWearPreviewStatus cornerStatus;
-            System.Diagnostics.Stopwatch cornerStopwatch =
-                System.Diagnostics.Stopwatch.StartNew();
-            cornerDamagePreviewRequestDepth++;
-            try
+            int candidateCornerCount = -1;
+            int attemptedCornerCount = 0;
+            int attemptedConfigurationCount = 0;
+            int bestFailurePriority = int.MinValue;
+            CornerDamagePreviewStatus bestFailure = null;
+            UnifiedEdgeWearPreviewStatus bestFailureUnified = default;
+            string bestFailureStage = "candidate-availability";
+            string bestFailureReason =
+                "no eligible corner-damage candidate was available";
+            StringBuilder searchAttempts = new StringBuilder(512);
+
+            for (int candidateRank = 0;
+                 candidateCornerCount < 0 ||
+                 candidateRank < candidateCornerCount;
+                 candidateRank++)
             {
-                cornerMeshData = GenerateInternal(
-                    recipe,
-                    surfaceFeatures,
-                    EdgeWearEvaluationMode.UnifiedBoundedPreview,
-                    -1,
-                    out _,
-                    out _,
-                    out cornerStatus);
-            }
-            finally
-            {
-                cornerDamagePreviewRequestDepth--;
-                cornerStopwatch.Stop();
+                bool countedCorner = false;
+                for (int scaleIndex = 0;
+                     scaleIndex < CornerDamageCapRingSearchScales.Length;
+                     scaleIndex++)
+                {
+                    float capRingScale =
+                        CornerDamageCapRingSearchScales[scaleIndex];
+                    ResetCornerDamagePreviewCapture();
+                    System.Diagnostics.Stopwatch cornerStopwatch =
+                        System.Diagnostics.Stopwatch.StartNew();
+                    MeshData attemptMesh = null;
+                    UnifiedEdgeWearPreviewStatus attemptUnified = default;
+                    InvalidOperationException attemptException = null;
+                    try
+                    {
+                        using (new CornerDamageSearchAttemptScope(
+                                   candidateRank,
+                                   capRingScale))
+                        {
+                            attemptMesh = GenerateInternal(
+                                recipe,
+                                surfaceFeatures,
+                                EdgeWearEvaluationMode
+                                    .CornerDamageIntegrationPreview,
+                                -1,
+                                out _,
+                                out _,
+                                out attemptUnified);
+                        }
+                    }
+                    catch (InvalidOperationException exception)
+                    {
+                        attemptException = exception;
+                    }
+                    finally
+                    {
+                        cornerStopwatch.Stop();
+                    }
+                    CornerDamagePreviewStatus attemptStatus =
+                        CompleteCornerDamagePreviewCapture(
+                            recipe,
+                            baselineStatus,
+                            attemptUnified,
+                            baselineStopwatch.Elapsed.TotalMilliseconds,
+                            cornerStopwatch.Elapsed.TotalMilliseconds);
+                    if (attemptException != null && attemptStatus != null)
+                    {
+                        attemptStatus.PreviewApplied = false;
+                        attemptStatus.Diagnostic =
+                            "post-chip construction exception: " +
+                            attemptException.Message;
+                    }
+                    attemptedConfigurationCount++;
+                    if (candidateCornerCount < 0)
+                    {
+                        candidateCornerCount = attemptStatus == null
+                            ? 0
+                            : attemptStatus.CandidateCornerCount;
+                    }
+                    if (!countedCorner &&
+                        candidateRank < candidateCornerCount)
+                    {
+                        attemptedCornerCount++;
+                        countedCorner = true;
+                    }
+
+                    string failureStage = attemptException == null
+                        ? ResolveCornerDamageSearchFailureStage(
+                            attemptStatus)
+                        : "post-chip-construction";
+                    AppendCornerDamageSearchAttempt(
+                        searchAttempts,
+                        candidateRank,
+                        capRingScale,
+                        failureStage,
+                        attemptStatus);
+                    if (attemptStatus != null &&
+                        attemptStatus.PreviewApplied)
+                    {
+                        ApplyCornerDamageSearchSummary(
+                            attemptStatus,
+                            candidateCornerCount,
+                            attemptedCornerCount,
+                            attemptedConfigurationCount,
+                            candidateRank,
+                            capRingScale,
+                            "none",
+                            "none",
+                            searchAttempts.ToString());
+                        previewStatus = attemptStatus;
+                        unifiedStatus = attemptUnified;
+                        return attemptMesh;
+                    }
+
+                    int failurePriority =
+                        ResolveCornerDamageSearchFailurePriority(
+                            failureStage);
+                    if (bestFailure == null ||
+                        failurePriority > bestFailurePriority)
+                    {
+                        bestFailure = attemptStatus;
+                        bestFailureUnified = attemptUnified;
+                        bestFailurePriority = failurePriority;
+                        bestFailureStage = failureStage;
+                        bestFailureReason = attemptStatus == null
+                            ? "corner search attempt status was unavailable"
+                            : attemptStatus.Diagnostic;
+                    }
+
+                    if (attemptStatus == null ||
+                        !attemptStatus.TransactionCertified ||
+                        string.Equals(
+                            attemptStatus.Diagnostic,
+                            "cap-ring requested width is below the minimum stable style width",
+                            StringComparison.Ordinal))
+                    {
+                        break;
+                    }
+                }
+
+                if (candidateCornerCount <= 0)
+                {
+                    break;
+                }
             }
 
-            previewStatus = CompleteCornerDamagePreviewCapture(
-                recipe,
-                baselineStatus,
-                cornerStatus,
-                baselineStopwatch.Elapsed.TotalMilliseconds,
-                cornerStopwatch.Elapsed.TotalMilliseconds);
-            if (previewStatus != null && previewStatus.PreviewApplied)
-            {
-                return cornerMeshData;
-            }
-
+            previewStatus = bestFailure ??
+                new CornerDamagePreviewStatus
+                {
+                    PreviewKind = CornerDamagePreviewKind.WithEdgeWear,
+                    ShapeSeed = recipe.ShapeSeed,
+                    AuthoringEnabled = true,
+                    Diagnostic =
+                        "no eligible corner-damage candidate was available"
+                };
+            unifiedStatus = bestFailureUnified;
+            string finalFailureStage = bestFailure == null
+                ? ResolveCornerDamageSearchFailureStage(previewStatus)
+                : bestFailureStage;
+            string finalFailureReason = bestFailure == null
+                ? previewStatus.Diagnostic
+                : bestFailureReason;
+            ApplyCornerDamageSearchSummary(
+                previewStatus,
+                Mathf.Max(0, candidateCornerCount),
+                attemptedCornerCount,
+                attemptedConfigurationCount,
+                -1,
+                0f,
+                finalFailureStage,
+                finalFailureReason,
+                searchAttempts.ToString());
             return Generate(recipe, surfaceFeatures);
+        }
+
+        private static string ResolveCornerDamageSearchFailureStage(
+            CornerDamagePreviewStatus status)
+        {
+            if (status == null || status.CandidateCornerCount <= 0)
+            {
+                return "candidate-availability";
+            }
+            if (!status.TransactionCertified)
+            {
+                return "transaction-certification";
+            }
+            if (status.ExpectedCapRingEdgeCount <= 0 ||
+                status.MandatoryCandidateCount !=
+                    status.ExpectedCapRingEdgeCount ||
+                status.MandatorySelectedCount !=
+                    status.ExpectedCapRingEdgeCount ||
+                status.MandatoryBuiltCount !=
+                    status.ExpectedCapRingEdgeCount)
+            {
+                return "cap-ring-completion";
+            }
+            if (status.CollateralLostCount > 0)
+            {
+                return "unrelated-retention";
+            }
+            if (!status.PreviewApplied)
+            {
+                return "post-chip-construction";
+            }
+            return "none";
+        }
+
+        private static int ResolveCornerDamageSearchFailurePriority(
+            string failureStage)
+        {
+            return failureStage switch
+            {
+                "unrelated-retention" => 4,
+                "post-chip-construction" => 3,
+                "cap-ring-completion" => 2,
+                "transaction-certification" => 1,
+                _ => 0
+            };
+        }
+
+        private static void AppendCornerDamageSearchAttempt(
+            StringBuilder builder,
+            int candidateRank,
+            float capRingScale,
+            string failureStage,
+            CornerDamagePreviewStatus status)
+        {
+            if (builder.Length > 0)
+            {
+                builder.Append(';');
+            }
+            builder.Append('r');
+            builder.Append(candidateRank);
+            builder.Append('@');
+            builder.Append(capRingScale.ToString(
+                "G6",
+                System.Globalization.CultureInfo.InvariantCulture));
+            builder.Append(':');
+            builder.Append(failureStage);
+            builder.Append("[v=");
+            builder.Append(status == null
+                ? -1
+                : status.SelectedGraphVertexIndex);
+            builder.Append(",t=");
+            builder.Append(status == null
+                ? -1
+                : status.AcceptedTrialIndex);
+            builder.Append(",ring=");
+            builder.Append(status == null
+                ? 0
+                : status.MandatoryBuiltCount);
+            builder.Append('/');
+            builder.Append(status == null
+                ? 0
+                : status.ExpectedCapRingEdgeCount);
+            builder.Append(",lost=");
+            builder.Append(status == null
+                ? 0
+                : status.CollateralLostCount);
+            builder.Append(']');
+        }
+
+        public static MeshData GenerateCornerDamagePreview(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            out CornerDamagePreviewStatus previewStatus)
+        {
+            return GenerateCornerDamageIntegrationPreview(
+                recipe,
+                surfaceFeatures,
+                out previewStatus);
         }
 
         public static MeshData GeneratePlaneCutBevelPreview(
@@ -828,6 +1287,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
 
         public static MeshData GenerateUnifiedEdgeWearPreview(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures,
+            out UnifiedEdgeWearPreviewStatus previewStatus)
+        {
+            return GenerateUnifiedEdgeWearPreview(
+                recipe,
+                surfaceFeatures,
+                out previewStatus,
+                out _);
+        }
+
+        public static MeshData GenerateUnifiedEdgeWearPreview(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures,
+            out UnifiedEdgeWearPreviewStatus previewStatus,
+            out CornerDamagePreviewStatus cornerStatus)
+        {
+            if (surfaceFeatures.HasValue &&
+                surfaceFeatures.Value.CornerChippingEnabled)
+            {
+                return GenerateCornerDamageIntegrationPreview(
+                    recipe,
+                    surfaceFeatures.Value,
+                    out cornerStatus,
+                    out previewStatus);
+            }
+
+            cornerStatus = null;
+            return GenerateUnifiedEdgeWearPreviewBaseline(
+                recipe,
+                surfaceFeatures,
+                out previewStatus);
+        }
+
+        public static MeshData GenerateUnifiedEdgeWearPreviewBaseline(
             MassRecipe recipe,
             MassSurfaceFeatureSettings? surfaceFeatures,
             out UnifiedEdgeWearPreviewStatus previewStatus)
@@ -954,6 +1448,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<Vector3> edgeDebugPositions =
                 ExtractEdgeWearDebugPositions(
                     unifiedPreviewStatus.DebugEdges);
+            List<Vector3> cornerDamageMarkerPositions =
+                ExtractCornerDamagePreviewMarkerPositions();
 #endif
             ApplyDimensions(soup.Positions, dimensions);
             if (usesImmutableSourcePlacementFrame)
@@ -964,6 +1460,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 #if UNITY_EDITOR
             ApplyDimensions(edgeDebugPositions, dimensions);
+            ApplyDimensions(cornerDamageMarkerPositions, dimensions);
             bool previewApplied =
                 previewStatus.PreviewApplied ||
                 boundedPreviewStatus.PreviewApplied ||
@@ -1008,15 +1505,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ApplyMassPlacementFrame(
                 edgeDebugPositions,
                 placementFrame);
+            ApplyMassPlacementFrame(
+                cornerDamageMarkerPositions,
+                placementFrame);
             ApplyEdgeWearDebugPositions(
                 unifiedPreviewStatus.DebugEdges,
                 edgeDebugPositions);
+            ApplyCornerDamagePreviewMarkerPositions(
+                cornerDamageMarkerPositions);
             if (edgeWearEvaluationMode ==
                     EdgeWearEvaluationMode.UnifiedBoundedPreview ||
                 edgeWearEvaluationMode ==
                     EdgeWearEvaluationMode.UnifiedBatchAudit ||
                 edgeWearEvaluationMode ==
-                    EdgeWearEvaluationMode.UnifiedPreviewBatchAudit)
+                    EdgeWearEvaluationMode.UnifiedPreviewBatchAudit ||
+                edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.CornerDamageIntegrationPreview ||
+                edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.CornerDamageGeometryPreview)
             {
                 AppendMassPlacementFrameTelemetry(
                     placementFrame,

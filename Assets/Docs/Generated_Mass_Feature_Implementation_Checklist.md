@@ -22,10 +22,10 @@ Historical ledger rule: sections below preserve method history and old acceptanc
 ## Active feature
 
 ```text
-EW-C1A.2 — Visible corner-cut and mandatory cap-ring bevel preview
+EW-C1A.3 — Single-chip generalization and Inspector cleanup
 ```
 
-EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. `EW-C1A.1` has certified the deterministic pre-bevel corner transaction. The active patch commits that already-certified damaged polyhedron only in an explicit editor preview, transports stable untouched/descendant/cap-ring identities into candidate construction, forces every cap-ring edge through the existing bevel certification path without Macro or ordinary artistic filtering, and rejects the whole preview rather than exposing a raw or partially bevelled cap.
+EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. Seed `8889` has passed both raw corner geometry and post-chip edge-wear integration, including one semantic cap, dense construction provenance, mandatory cap ring `3/3/3/3`, unrelated bevel retention `28/28`, and no collateral loss. EW-C1A.3 removes the superseded duplicate corner-preview workflow, makes the existing edge-wear preview corner-aware, and adds the internal 33-case single-chip matrix to the existing one-click suite. Unity compilation and the complete matrix remain pending user validation.
 
 ## Visual-development sequence
 
@@ -36,8 +36,8 @@ EW-S1      object-space bevel breakup [rejected and removed]
 EW-C1A-RO2 pre-bevel ordering/ownership audit [complete]
 EW-C1A.1  transactional pre-bevel corner cut and provenance proof [implemented; transaction accepted]
 EW-C1A.1a one polygon, one render surface [accepted and frozen through EW-C1A.1a.8]
-EW-C1A.2  cap-ring bevel integration and visual preview
-EW-C1A.3  authoring controls, normals/material-role closure, and 33-case acceptance
+EW-C1A.2  cap-ring bevel integration and raw/integrated seed proof [complete]
+EW-C1A.3  unified authoring workflow and 33-case single-chip acceptance [implemented; Unity pending]
 EW-C2      sparse chips, notches, and break events
 EW-N1      final artistic normal shaping across all accepted worn geometry
 EW-F1      broad-face finish, cracks, and crevices
@@ -5922,42 +5922,390 @@ Each trial starts from a fresh deep clone. Failed trials never mutate the frozen
 - The changed-files ZIP overlay and unified patch each reproduced the complete final `331`-file `Assets` tree byte-for-byte from the untouched archive baseline.
 - A Unity compiler/runtime is unavailable in this environment. Unity compile, seed-8889 preview execution, visual review, and the existing complete one-click regression suite remain explicitly pending.
 
-#### EW-C1A.3 — Normal/material-role closure and complete acceptance
+#### EW-C1A.2a — Corner-damaged construction provenance bridge
 
-**Goal:** certify cap authored normal/group ownership, cap-ring authored bevel normals/groups, complete render channels, deterministic controls, and a one-click matrix.
+**Patch identifier:** `EW-C1A.2a`
 
-The complete matrix uses the accepted 11 seeds and three policies:
+**Status:** [implementation complete; static validation passed; Unity compile/runtime/visual validation pending]
+
+**Objective:** preserve the certified semantic corner transaction unchanged, create one exact construction clone whose complete face list is densely attributed as `SourceFace`, and feed only that construction clone into the existing bounded-bevel viability and shell pipeline. This repairs the observed `mandatoryCapRing=3/0/0/0` failure without changing clipping, candidate geometry rules, triangulation, final normals, shaders, controls, or production behavior.
+
+##### Unity failure evidence
+
+- Seed `8889` reported `transactionCertified=1`, `acceptedTrial=0`, `capFaces=1`, three generated cap-ring identities, and `mandatoryCapRing=3/0/0/0` with diagnostic `no geometrically viable edge-wear candidates`.
+- The same report showed `cornerConstruction=0/0/0/0/0/0`; therefore the failure occurred before topology/corner construction and not in the certified cut itself.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs::AuditBoundedSingleEdgeBevel` sets `expectedSourceFaceCount = sourceFaces.Count`, clones the complete input with `assignSourceFaceProvenance: true`, and requires all expected indices to appear exactly once.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs::ClonePolygonFacesForPlaneCutAudit` assigns `SourceFace` only when existing provenance is `None`; it intentionally preserves `CornerDamageCap` provenance.
+- The committed damaged polyhedron contains exactly one semantic `CornerDamageCap`, so its attributed raw baseline can contain at most `sourceFaces.Count - 1` `SourceFace` records. Every isolated viability audit therefore rejects before any candidate can survive.
+
+##### Read-only review and comparison evidence
+
+- The current authoritative tree contains `331` files and no `.git` directory. Branch, HEAD, status, and history comparisons are unavailable; `/mnt/data/c1a2_failure_audit/current` is the accepted EW-C1A.2 pre-edit baseline and remains untouched.
+- Complete current versions and symbol inventories were reviewed for all eight approved files. Direct producer/consumer review included `MassGenerator.EdgeWear.BoundedSingleEdge.cs::AuditBoundedSingleEdgeBevel`, `AuditBoundedSourceFaceProvenance`, `MassGenerator.EdgeWear.PlaneCutKernel.cs::ClonePolygonFacesForPlaneCutAudit`, `MassGenerator.cs::GenerateCornerDamagePreview`, `GeneratedMass.cs`, and `GeneratedMassEditor.cs`.
+- `CornerDamageTransactionAuditResult.AcceptedFaces` is the semantic transaction geometry and retains `CornerDamageCap` provenance. `ApplyGeneratedEdgeWearBevels` currently passes it directly to `BuildEdgeWearBevelCandidates`.
+- No evidence supports modifying the frozen bounded-bevel audit. Its complete dense source-face contract is correct for its construction input. The missing responsibility is an adapter owned by the committed corner transaction.
+
+##### Approved file scope
+
+**Modify:**
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+6. `Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+7. `Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs`
+8. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+
+**Create/delete/move/rename:** none.
+
+##### Frozen owners and non-goals
+
+- Do not modify `MassGenerator.Polyhedron.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.MeshOutput.cs`, `MassGenerator.cs`, `GeneratedMass.cs`, `GeneratedMassEditor.cs`, shaders, assets, scenes, prefabs, recipes, mesh channels, serialized controls, layers, tags, or metadata.
+- Do not alter cut geometry, cap semantic provenance, stable output-edge identities, cap-ring width, Macro bypass, mandatory selection, coverage, locality, isolated viability, corner/coexistence, recovery, topology, one-surface triangulation, final-normal selection, or the `0.5` render-normal guard.
+- Do not use the construction clone as transaction/report authority. `AcceptedFaces` and `AcceptedCapFace` remain the semantic evidence.
+
+##### Required construction attribution contract
+
+For every accepted semantic face `AcceptedFaces[i]`, create a new `PolygonFace` with:
 
 ```text
-corner damage disabled
-corner damage enabled at default depth
-corner damage enabled at maximum depth
+vertices = exact copied vertex list
+normal = semantic face normal
+feature = semantic face feature
+featureStrength = semantic face feature strength
+provenanceKind = SourceFace
+provenanceIndex = i
 ```
 
-Total cases: `33`.
+The clone must preserve face order and geometry exactly. It must contain `N` unique dense source indices for `N` construction faces. The original semantic list and its `CornerDamageCap` record remain unchanged.
 
-Required acceptance:
+##### File-by-file implementation sequence
+
+1. [x] Extend `CornerDamageTransactionAuditResult` with the accepted construction face list and dense construction-provenance counts.
+2. [x] In `TryCommitCornerDamageTransactionResult`, build and certify the exact construction clone after semantic geometry and identity certification. Reject the transaction if the clone is null, count-mismatched, non-dense, or geometrically different.
+3. [x] In `ApplyGeneratedEdgeWearBevels`, require the construction list and use it for bounds, candidate construction, and all subsequent corner-preview shell work. Preserve semantic `AcceptedFaces` for report/acceptance evidence.
+4. [x] Extend preview capture/report telemetry with `constructionSourceProvenance=attributed/expected` and `semanticCapFaces` without changing the existing report tuples.
+5. [x] Update framework, recovery architecture, and code inventory with the semantic-versus-construction ownership boundary.
+6. [x] Reread every modified file and affected producer/consumer, compare against the untouched EW-C1A.2 baseline, run exact-scope, delimiter, preprocessor, reference, line-ending, whitespace, frozen-owner, package-overlay, and patch-reproduction checks, and record Unity validation as pending.
+
+##### Acceptance criteria
+
+- [x] Exactly the eight approved files differ; no file is created, deleted, moved, or renamed.
+- [x] The semantic accepted face list remains separate, is never mutated by the adapter, and retains the previously certified one-cap seed-8889 transaction evidence.
+- [x] The construction helper enforces `constructionSourceProvenance=N/N`, dense unique indices `0..N-1`, copied vertex order/values, matching normal direction, feature, and feature strength.
+- [x] Candidate construction consumes only the construction list; transaction/report evidence continues to consume the semantic list.
+- [x] Frozen clipping, bounded-bevel provenance validation, triangulation, final normals, shaders, editor controls, and production generation remain byte-identical.
+- [x] Available source/static/package validation passes. Unity compile and runtime preview remain pending until the user applies the patch.
+- [ ] The next seed-8889 report advances past `mandatoryCapRing=3/0/0/0`; expected first evidence is `constructionSourceProvenance=N/N`, `semanticCapFaces=1`, and non-zero cap-ring candidate/construction counts. Any later genuine geometry blocker must be reported at its actual stage.
+
+##### Static completion and post-change compliance evidence
+
+- Exact actual scope: the approved `8` modified files; `0` created, deleted, moved, or renamed files; all `331` source files preserved.
+- Source validation passed `91/91` combined checks. All `195` C# files have balanced delimiters and preprocessor blocks; new definitions/callers resolve exactly once where required; existing C1A.1 identity and C1A.2 preview report tuples remain present; no serialized field, using directive, conflict marker, trailing whitespace, or line-ending regression was introduced.
+- The semantic list is assigned only from the certified trial. The construction adapter allocates a separate face list and separate vertex lists, overwrites provenance only on the clones, enforces dense `SourceFace` indices, and compares copied vertices, normal direction, feature, and feature strength before commit.
+- `ApplyGeneratedEdgeWearBevels` consumes `AcceptedConstructionFaces` only inside the scoped corner-preview branch and no longer assigns `AcceptedFaces` to the bevel pipeline. `CompleteCornerDamagePreviewCapture` requires complete construction attribution while preserving semantic cap evidence.
+- Frozen owner hashes remain byte-identical for `MassGenerator.Polyhedron.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.MeshOutput.cs`, `MassGenerator.cs`, `GeneratedMass.cs`, `GeneratedMassEditor.cs`, and `MassSurfaceFeatureGenerator.cs`.
+- The eight-entry changed-files ZIP overlaid the untouched baseline and reproduced all `331` final files byte-for-byte. The unified patch passed `git apply --check`, applied to the untouched baseline, and reproduced all `331` final files byte-for-byte. ZIP CRC validation passed.
+- Unity 6000.5.0f1 compilation, seed-8889 preview execution, visual review, and the complete one-click regression suite are unavailable here and remain pending.
+
+##### Performance contract
+
+- One additional `O(F + V)` face/vertex clone is created only during the explicit editor corner preview after a transaction is certified.
+- No active-gameplay, per-frame, shader, GPU, texture, buffer, persistent cache, or serialized-memory cost is added.
+- No performance exception is required.
+
+#### EW-C1A.2b — Corner-chip authoring and visual acceptance
+
+**Patch identifier:** `EW-C1A.2b`
+
+**Status:** [implemented; static validation passed; Unity validation pending]
+
+**Goal:** make the already-certified single-corner chip visibly authoritative and controllable while preserving the accepted pre-bevel construction order. Corner chipping remains editor-preview-only in this patch. The canonical base polyhedron is cut first; edge-wear candidate discovery and bevel construction then operate on the chipped topology, including the three new mandatory cap-ring edges.
+
+##### Read-only evidence reviewed before implementation
+
+- Repository state: the reconstructed accepted EW-C1A.2a tree contains `331` files and no `.git` directory. Branch, `HEAD`, status, remote, and history comparisons are unavailable. `/mnt/data/c1a2b_work/baseline` is the untouched pre-edit baseline; `/mnt/data/c1a2b_work/current` is the implementation tree.
+- Unity evidence supplied by the user reports `status=passed`, `transactionCertified=1`, `semanticCapFaces=1`, `constructionSourceProvenance=17/17`, `mandatoryCapRing=3/3/3/3`, `ordinaryRetention=31/28/28/0`, and no collateral loss for seed `8889`. The structural C1A.2/C1A.2a contracts are therefore working. The user screenshots show that the default cut is too subtle to identify reliably and that the cap ring appears disconnected from current edge-wear authoring.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs::EvaluateCornerDamageTransaction` currently resolves depth from a fixed deterministic `0.08..0.16` fraction and clamps every trial to `0.18` of the shortest incident edge. `BuildCornerDamageCandidate` uses fixed selection weights `0.55/0.25/0.15/0.05` for sharpness/size/upward/random.
+- `ResolveCornerDamageCapRingRequestedWidth` currently hard-codes `0.50 * ordinaryRequestedWidth`, `0.25 * acceptedDepth`, and `0.20 * shortestCapEdgeLength`. `BuildEdgeWearBevelCandidates` gives cap-ring candidates ordinary edge-wear amount but no authorable ring-strength multiplier.
+- `MassSurfaceFeatureSettings` carries the current edge-wear settings into all generator paths. `GeneratedMass.CreateSurfaceFeatureSettings` is the authoritative live-Inspector snapshot owner. Existing explicit preview rebuilds already mark stale on `OnValidate` and rebuild from the current snapshot.
+- `GeneratedMassEditor.DrawEdgeWearFeature` owns the visible edge-wear controls. `DrawEdgeWearBevelPreview` owns the corner preview action/report. `OnSceneGUI` currently draws render-audit and river-pressure overlays but no corner-chip marker.
+- `MassGenerator.GenerateInternal` already transforms edge-debug positions through dimensions and the immutable placement frame before exposing them. The corner marker requires the same transformation ownership; no `MassGenerator.MeshOutput.cs` change is justified.
+- Reviewed complete current owners and direct producers/consumers: `AGENTS.md`; all four canonical Generated Mass documents; `MassSurfaceFeatureGenerator.cs`; `GeneratedMass.cs`; `MassGenerator.cs`; `MassGenerator.EdgeWear.Types.cs`; `MassGenerator.EdgeWear.Orchestration.cs`; `MassGenerator.EdgeWear.SelectionAndCorners.cs`; `MassGenerator.EdgeWear.Diagnostics.Logging.cs`; `GeneratedMassEditor.cs`; and the unchanged clipping, bounded-bevel, plane-cut, triangulation, placement, mesh-output, recipe-baker, and shader consumers relevant to the new fields.
+
+##### Approved controls and defaults
+
+The serialized `Corner Chipping` group is preview-only in EW-C1A.2b:
 
 ```text
-zero parity exact
-selection determinism 33/33
-cut transaction topology 33/33
-one-or-zero cap per case
-one-or-zero selected corner per case
-cap-ring bevel render validity 33/33
-unrelated bevel retention 33/33
-normal/tangent channel validity 33/33
-no cancellation
-terminal reason none
+Enable Corner Chipping      bool          default Off
+Corner Chip Depth           0.04..0.35    default 0.18
+Corner Chip Depth Variation 0..0.50       default 0.15
+Top-Facing Preference       0..1          default 0.65
+Cap-Ring Width Scale        0.20..1.25    default 0.75
+Cap-Ring Wear Strength      0..1.50       default 1.00
 ```
+
+- `Corner Chip Depth` is the requested fraction of the selected corner's shortest incident edge.
+- `Corner Chip Depth Variation` applies deterministic symmetric multiplicative variation around the requested fraction. Zero resolves exactly to the requested value.
+- `Top-Facing Preference` controls the selection-score weight assigned to upward exposure. At `0.5`, the prior `0.55/0.25/0.15/0.05` score is reproduced exactly; remaining weight is redistributed in the established sharpness/size/random proportions.
+- `Cap-Ring Width Scale` multiplies the current ordinary generated edge-wear width before the existing depth and shortest-cap-edge safety ceilings.
+- `Cap-Ring Wear Strength` multiplies current edge-wear material strength only on the mandatory cap ring. It does not change ring geometry.
+
+##### Approved file scope
+
+**Modify:**
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassSurfaceFeatureGenerator.cs`
+6. `Game/Procedural/Masses/GeneratedMass.cs`
+7. `Game/Procedural/Masses/MassGenerator.cs`
+8. `Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+9. `Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs`
+10. `Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+11. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+12. `Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+**Create/delete/move/rename:** none.
+
+##### Frozen owners and non-goals
+
+- Do not change production `EdgeWearEvaluationMode.None`; enabled corner controls are consumed only by the explicit EW-C1A.2b preview in this patch.
+- Do not modify `MassGenerator.Polyhedron.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.MeshOutput.cs`, `MeshBuilder.cs`, shaders, materials, scenes, prefabs, recipe assets, mesh channels, layers, tags, or metadata.
+- Preserve the certified transaction, semantic/construction provenance split, stable descendant/cap-ring identities, mandatory all-or-nothing cap ring, ordinary coverage semantics, Macro bypass on cap-ring candidates, unrelated bevel retention, one-polygon/one-surface triangulation, shared-normal resolver, and exact `0.5` render-normal guard.
+- Do not add chip count, multiple chips, jagged cap geometry, cap displacement, arbitrary edge notches, secondary fractures, cap-ring Macro variation, or production promotion.
+- Do not add per-frame generation, shader work, buffers, textures, or persistent runtime caches.
+
+##### File-by-file implementation sequence
+
+1. [x] Complete and record the read-only source, caller/consumer, documentation, runtime-evidence, scope, and performance review.
+2. [x] Record this persistent plan as the first repository change.
+3. [x] Add the six clamped corner-authoring fields to `MassSurfaceFeatureSettings` while preserving old constructor callers through trailing optional parameters.
+4. [x] Add serialized fields, properties, feature-recipe/default ownership, recipe matching/reset behavior, and current snapshot transport in `GeneratedMass.cs`.
+5. [x] Parameterize corner selection, requested depth, deterministic depth variation, trial ceiling, cap-ring width scale, and cap-ring wear strength without changing eligibility, clipping, retry, or mandatory-ring rules.
+6. [x] Extend transaction/preview capture with requested/resolved authoring evidence, cap-ring limit evidence, selected corner, semantic cap vertices, and transformed local Scene-marker positions.
+7. [x] Transform marker positions through the same dimensions and immutable placement frame used by the generated preview mesh.
+8. [x] Expose the Corner Chipping controls in `GeneratedMassEditor`, disable the rebuild action when authoring is off, and draw the selected original corner, cap outline, ring edges, centre line, and `Corner Chip` label while the preview is current.
+9. [x] Advance report/Inspector contracts to EW-C1A.2b and print the exact consumed live settings, requested/resolved/accepted depth, all width limits, winning limit, ring strength, selected local position, and cap edge lengths.
+10. [x] Reconcile framework, recovery architecture, and code inventory with the accepted authoring and Scene-marker ownership.
+11. [x] Reread every modified file and affected unchanged producer/consumer; compare the final tree with the untouched EW-C1A.2a baseline; run exact-scope, C# delimiter/preprocessor/reference, constructor-call, serialized-property, frozen-owner, line-ending, whitespace, package-overlay, patch-application, and artifact-integrity checks.
+12. [ ] Unity compile and visual/runtime validation remain pending user execution.
+
+##### Acceptance criteria
+
+- Exactly the twelve approved files differ; no file is created, deleted, moved, or renamed.
+- Existing serialized masses retain corner chipping disabled by default. Existing `MassSurfaceFeatureSettings` callers compile unchanged through optional trailing defaults.
+- Pressing the corner-preview rebuild consumes the current live Inspector values. Any edit marks the existing preview stale.
+- Disabled corner chipping cannot silently generate a chip; the preview reports the disabled authoring state and returns production geometry.
+- With depth variation `0`, resolved depth fraction equals requested depth exactly before bounded trial fallback. The accepted depth and accepted trial remain explicitly reported.
+- The transaction still occurs before candidate discovery. Shortened original edges use normal edge-wear settings. New cap-ring edges use current ordinary width times `Cap-Ring Width Scale`, then the existing depth and cap-edge safety ceilings; all three remain mandatory and Macro-free.
+- Cap-ring wear strength uses current edge-wear amount times the authoring multiplier and remains clamped to the existing feature-strength contract.
+- Scene marker positions match the final preview mesh local space after dimensions, lean, grounding, and recenter placement.
+- Report telemetry identifies the exact selected corner and makes every clamp visible. No hidden cached settings survive a rebuild.
+- All accepted C1A.2a structural counters remain valid; no unrelated baseline bevel is lost.
+- Frozen clipping, bounded shell, triangulation, final-normal, shader, material, production, and `0.5` guard owners remain byte-identical.
+
+##### Static/package validation outcome
+
+- Exact scope: the approved twelve files differ from the untouched EW-C1A.2a baseline; no file was created, deleted, moved, or renamed.
+- All `195` C# files passed delimiter and preprocessor-balance scans. All five existing `MassSurfaceFeatureSettings` construction sites remain compatible: three retain the original twelve arguments and two explicitly pass all eighteen values.
+- Serialized-field/property/recipe/default/snapshot wiring, disabled-preview production fallback, transaction-before-candidate order, post-chip construction-face use, depth/selection/width/strength formulas, final-space marker transformation, report fields, and Scene overlay ownership passed targeted source checks.
+- Modified files preserve CRLF line endings, final newlines, and clean trailing-whitespace/conflict-marker checks. Frozen clipping, bounded-shell, plane-cut, mesh-output, mesh-builder, shader, material, scene, prefab, and asset owners remain byte-identical.
+- The twelve-entry changed-files ZIP passed CRC testing and overlaid onto the untouched baseline to reproduce all `331` final files byte-for-byte. The unified patch passed `git apply --check`, applied to the untouched baseline, and reproduced all `331` final files byte-for-byte.
+- Unity 6000.5.0f1 compilation, seed-8889 authoring/marker validation, visual before/after acceptance, control-response checks, and the complete one-click regression suite are unavailable here and remain pending.
+
+##### Performance contract
+
+- The six serialized scalars add negligible component storage. No new runtime buffer, texture, mesh channel, or shader input is added.
+- Selection/depth arithmetic is constant-time per eligible corner. Scene handles draw only for one selected current editor preview.
+- The existing explicit preview remains dirty/editor-time work: one baseline generation plus one corner generation. No active-gameplay or per-frame generation path is added.
+- No performance exception is required.
+
+#### EW-C1A.2c — Split chip-geometry and edge-wear integration previews
+
+**Patch identifier:** `EW-C1A.2c`
+
+**Status:** [implemented; static/compliance/package validation passed; Unity validation pending]
+
+**Goal:** stop the primary corner-chip authoring preview immediately after the certified corner cut so the removed material and silhouette can be judged without ordinary or cap-ring bevel geometry. Preserve the current combined corner-chip plus edge-wear path as a separately named integration/certification preview that rebuilds from the current live Inspector settings.
+
+##### Read-only evidence reviewed before implementation
+
+- Repository state: the accepted EW-C1A.2b source contains `331` files and no supplied Git metadata. `/mnt/data/c1a2c_work/baseline` is the untouched accepted baseline. `/mnt/data/c1a2c_work/current` is a local review/implementation copy with a synthetic baseline commit used only for exact diff and patch verification.
+- User Unity evidence for seed `8889` reports `status=passed`, one certified semantic cap, `constructionSourceProvenance=17/17`, mandatory cap ring `3/3/3/3`, ordinary retention `28/28`, and no collateral loss. It also reports `cornerChipDepthResolved=0.20`, `acceptedTrial=2`, and `acceptedDepth=0.0671515092`; the combined preview visibly presents bevel changes while the chip itself is not identifiable.
+- `MassGenerator.GenerateCornerDamagePreview` currently runs one ordinary unified-bevel baseline and one corner-damaged unified-bevel generation. It therefore always compares production geometry with a chipped mesh containing all selected ordinary bevels plus the mandatory cap ring.
+- `MassGenerator.ApplyGeneratedEdgeWearBevels` already commits the corner transaction before candidate discovery. `CornerDamageTransactionAuditResult.AcceptedFaces` is the exact semantic chipped polyhedron; `AcceptedConstructionFaces` is the dense `SourceFace` clone used only by bevel construction.
+- `TryTriangulateBoundedPreviewFaces` already accepts a list of convex polygon faces, preserves one polygon/one authored surface, emits no synthetic fan vertex, and does not require bevel faces. It can triangulate `AcceptedFaces` directly without modifying the frozen triangulator.
+- `GeneratedMass` currently owns one nonserialized corner-preview state and one `PreviewGenerationMode.CornerDamage`; `GeneratedMassEditor` exposes one ambiguous rebuild button and one report file. `OnSceneGUI` already draws the selected corner and cap from final transformed marker positions.
+- The current transaction report exposes requested/resolved fractions and accepted absolute depth but does not expose shortest incident edge length, requested absolute depth, accepted fraction, retry factor, or accepted/requested ratio.
+- Reviewed complete current owners and direct producers/consumers: `AGENTS.md`; all four canonical Generated Mass documents; `MassGenerator.cs`; `MassGenerator.PlaneCut.cs`; `MassGenerator.EdgeWear.Types.cs`; `MassGenerator.EdgeWear.Orchestration.cs`; `MassGenerator.EdgeWear.SelectionAndCorners.cs`; `MassGenerator.EdgeWear.Diagnostics.Logging.cs`; `GeneratedMass.cs`; `GeneratedMassEditor.cs`; and the unchanged clipping, construction-provenance, bounded triangulation, placement, mesh-output, settings transport, feature-atlas, material, and shader consumers.
+
+##### Approved file scope
+
+**Modify:**
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.cs`
+6. `Game/Procedural/Masses/MassGenerator.PlaneCut.cs`
+7. `Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+8. `Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs`
+9. `Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+10. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+11. `Game/Procedural/Masses/GeneratedMass.cs`
+12. `Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+**Create/delete/move/rename:** none.
+
+##### Frozen owners and non-goals
+
+- Do not modify corner clipping, retry factors, candidate eligibility/scoring, construction provenance, bevel candidate construction, bounded shell construction, one-surface triangulation, final normal resolution, the `0.5` guard, shaders, materials, settings defaults, scenes, prefabs, assets, mesh channels, layers, tags, or metadata.
+- Do not change production `EdgeWearEvaluationMode.None` or promote corner chipping into production generation.
+- Do not remove the accepted combined integration path or weaken its mandatory ring and unrelated-bevel retention gates.
+- Do not add chip count, jaggedness, multiple chips, edge notches, secondary fractures, per-frame work, buffers, textures, or runtime caches.
+
+##### File-by-file implementation sequence
+
+1. [x] Complete and record the read-only source, caller/consumer, runtime-evidence, scope, and performance review.
+2. [x] Record this persistent plan as the first repository change.
+3. [x] Add explicit generator evaluation modes/APIs for `Corner Chip Geometry Preview` and `Corner Chip + Edge Wear Integration Preview`; retain the old API as a compatibility alias to integration.
+4. [x] Route the geometry-only mode through the certified semantic `AcceptedFaces` and the existing one-surface triangulator, then stop before candidate discovery.
+5. [x] Preserve the integration mode's current baseline comparison, live settings, mandatory cap ring, construction provenance, and ordinary retention logic.
+6. [x] Extend transaction/status capture with shortest incident edge length, requested absolute depth, accepted depth fraction, accepted retry factor, and accepted/requested ratio.
+7. [x] Split `GeneratedMass` editor-only preview mode/state into mutually exclusive geometry and integration previews, with distinct mesh suffixes, stale flags, status/report accessors, and compatibility aliases.
+8. [x] Replace the ambiguous Inspector action with two explicit buttons, reports, summaries, and Scene labels: `Corner Chip — Geometry` and `Corner Chip — With Edge Wear`.
+9. [x] Reconcile framework, recovery architecture, and code inventory with the split preview ownership and unchanged production order.
+10. [x] Reread every modified file and affected unchanged producer/consumer; compare final behavior and exact scope with the untouched EW-C1A.2b baseline; run C# delimiter/preprocessor/reference checks, frozen-owner verification, whitespace/line-ending checks, package-overlay reproduction, patch application, and artifact integrity checks.
+11. [ ] Unity 6000.5.0f1 compile, seed-8889 geometry-only visual acceptance, integration regression, and complete one-click edge-wear suite remain pending user execution.
+
+##### Static/compliance completion evidence
+
+- Exact scope comparison passed: the same `331` source files remain present, exactly the twelve approved files differ, and no file was created, deleted, moved, or renamed.
+- Targeted source/contract validation passed `117/117`; all `195` C# files passed delimiter, preprocessor, and region-balance checks; `git diff --check` passed.
+- Every changed file retains CRLF line endings, a final newline, and no trailing whitespace.
+- Frozen clipping, construction, bounded-triangulation, mesh-output/final-normal, surface-settings transport, and mesh-builder owners remain byte-identical to EW-C1A.2b.
+- The changed-files overlay and unified patch each reproduce the complete final `331`-file tree byte-for-byte; archive integrity and path-safety checks pass.
+- Unity compilation and runtime/visual acceptance are unavailable in this environment and are not claimed.
+
+##### Acceptance criteria
+
+- The geometry-only preview contains the certified chipped polyhedron and no ordinary bevel faces, cap-ring bevel faces, edge-wear candidate selection, Macro variation, coverage selection, or ordinary-retention baseline generation.
+- The integration preview continues to build from the current live Inspector snapshot and retains the accepted `3/3/3/3` mandatory ring and unrelated-bevel retention contract.
+- Both preview modes are explicit, mutually exclusive, independently stale, independently reported, and return production geometry on failure.
+- The Scene marker remains final-placement accurate and labels the active preview mode.
+- Reports expose `shortestIncidentEdgeLength`, `requestedDepthAbsolute`, `acceptedDepthAbsolute`, `acceptedDepthFraction`, `acceptedRetryFactor`, and `acceptedVsRequestedRatio`. A visibly reduced accepted cut is no longer hidden by fraction/absolute-unit ambiguity.
+- The old `GenerateCornerDamagePreview` and `EvaluateCornerDamagePreview` entry points remain source-compatible aliases to the integration preview.
+- Exactly the twelve approved files differ; no file is created, deleted, moved, or renamed.
+- Frozen clipping, construction provenance, bevel construction, bounded triangulation, final normals, shaders, settings/defaults, production generation, and render guard owners remain byte-identical.
+
+##### Performance contract
+
+- Geometry-only preview performs one corner transaction and one polygon triangulation. It removes the current ordinary unified-bevel baseline and combined bevel construction from the primary authoring action.
+- Integration preview retains the existing explicit editor-only two-generation cost.
+- No active-gameplay, per-frame, shader, GPU, persistent-memory, texture, buffer, or cache cost is added. No performance exception is required.
+
+#### EW-C1A.3 — Single-chip generalization and Inspector cleanup
+
+**Patch identifier:** `EW-C1A.3`
+
+**Status:** [implemented; Unity validation pending]
+
+**Goal:** combine the minimal C1A.2d authoring cleanup with the 33-case single-chip acceptance gate. Corner Chipping is one normal authoring group. `Rebuild Corner Chip Preview` shows the raw certified cut using those controls. The existing `Rebuild Edge-Wear Bevel Preview` automatically applies corner chipping first whenever it is enabled, then runs the ordinary current-settings bevel pipeline. The separate corner-plus-edge-wear button, preview-specific Inspector explanations, duplicate report controls, and user-facing preview-only terminology are removed. The existing one-click edge-wear suite gains the C1A.3 matrix; no new validation button is added.
+
+##### Read-only evidence reviewed before implementation
+
+- The authoritative current tree was reconstructed from `Assets-Code-Archive(11).zip` plus the accepted EW-C1A.2, EW-C1A.2a, EW-C1A.2b, and EW-C1A.2c overlays in chronological order. It contains `331` files and no `.git` directory, so branch, `HEAD`, status, history, and repository-diff evidence are unavailable.
+- User Unity evidence passed both C1A.2c paths for seed `8889`: geometry-only `status=passed`, one cap, `ordinaryBevelCandidates=0`, `bevelFaces=0`; integration `status=passed`, mandatory ring `3/3/3/3`, unrelated retention `28/28`, and no collateral loss.
+- `GeneratedMassEditor.DrawEdgeWearFeature` exposes the six serialized controls under `Corner Chipping (Preview-Only)`. `DrawEdgeWearBevelPreview` adds two corner-specific buttons, two report-control groups, and separate geometry/integration status text. This is the confirmed Inspector clutter to remove.
+- `GeneratedMass.EvaluateUnifiedEdgeWearPreview` always selects `PreviewGenerationMode.UnifiedEdgeWear`, while the corner-integrated path is isolated behind `EvaluateCornerDamageIntegrationPreview`. Therefore the normal bevel preview does not yet consume enabled corner controls.
+- `MassGenerator.GenerateCornerDamageIntegrationPreview` already performs the required order: frozen unified baseline, certified pre-bevel corner cut, candidate discovery on damaged topology, mandatory cap ring, and unrelated-retention proof. `MassGenerator.GenerateUnifiedEdgeWearPreview` owns the ordinary preview entry point and can route to that integration path when Corner Chipping is enabled without changing production `EdgeWearEvaluationMode.None`.
+- `GeneratedMassEditor` already owns the accepted 11-seed array and the asynchronous one-click suite. The existing suite has current-preview, topology, and artistic-parity stages. C1A.3 can add one internal asynchronous 33-case stage without adding Inspector controls.
+- Complete current owners and direct callers/consumers were reviewed: `AGENTS.md`; the four canonical Generated Mass documents; `MassGenerator.cs`; `MassGenerator.EdgeWear.Diagnostics.Logging.cs`; `GeneratedMass.cs`; `GeneratedMassEditor.cs`; `MassSurfaceFeatureGenerator.cs`; `MassGenerator.EdgeWear.Types.cs`; `MassGenerator.EdgeWear.Orchestration.cs`; `MassGenerator.EdgeWear.SelectionAndCorners.cs`; `MassGenerator.PlaneCut.cs`; `MassGenerator.MeshOutput.cs`; `MeshData.cs`; and `MeshBuilder.cs`.
+
+##### Approved file scope
+
+**Modify:**
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.cs`
+6. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+7. `Game/Procedural/Masses/GeneratedMass.cs`
+8. `Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+No file may be created, deleted, moved, or renamed. `MassSurfaceFeatureGenerator.cs`, clipping, candidate construction, bounded shell construction, triangulation, final normals, shaders, materials, assets, mesh channels, and production generation remain unchanged.
+
+##### Inspector and preview contract
+
+1. [x] Rename the visible group to `Corner Chipping`; remove preview-only language from serialized tooltips and Inspector copy.
+2. [x] Keep exactly the existing six controls and defaults. Add no control, foldout, preview selector, or debug setting.
+3. [x] Keep one action named `Rebuild Corner Chip Preview`; it runs the raw geometry-only cut and automatically writes/copies its report without separate report buttons.
+4. [x] Remove the separate corner-plus-edge-wear integration button and duplicate corner report UI. Preserve internal compatibility APIs only where they prevent unrelated caller breakage.
+5. [x] Make `Rebuild Edge-Wear Bevel Preview` use the current Corner Chipping settings automatically: disabled uses the frozen ordinary unified path; enabled uses the certified corner-first integration path and stores the corner status for the existing Scene marker.
+6. [x] Use one Scene label, `Corner Chip`, for either the raw chip preview or the normal edge-wear preview with corner chipping enabled.
+7. [x] Remove the standalone EW-C1A.1 transaction-audit controls from the Inspector. The transaction remains covered by the corner preview and the one-click suite.
+
+##### C1A.3 one-click matrix
+
+The existing one-click suite gains one asynchronous internal stage over the accepted 11 seeds and three policies:
+
+```text
+Disabled         Corner Chipping off; exact parity against the frozen ordinary unified preview
+Default          enabled; depth 0.18, variation 0.15, current top/ring controls
+Maximum Depth    enabled; depth 0.35, variation 0, current top/ring controls
+```
+
+Total: `33` cases. No matrix button is added.
+
+For disabled cases, the corner-aware unified entry point must be byte-for-byte equivalent at `MeshData` channel level to the frozen ordinary unified entry point and must select no corner. For enabled cases, one geometry-only run and one integrated run must independently select the same corner/trial/depth/ring identities, certify one cap, preserve dense construction provenance, build the complete mandatory ring, retain every unrelated ordinary bevel, and produce valid final channels. Every final matrix mesh is applied to a temporary editor mesh to verify normal and recalculated tangent channel count, finiteness, and non-degenerate tangent direction.
+
+##### File-by-file implementation sequence
+
+1. [x] Record this persistent plan as the first write.
+2. [x] Add the corner-aware unified preview entry point and a frozen ordinary-baseline entry point in `MassGenerator.cs`; expose construction-provenance counts already held by the transaction status.
+3. [x] Route `GeneratedMass` unified preview through the corner-aware entry point, retain one raw corner preview, and collapse integration compatibility onto the normal unified preview.
+4. [x] Remove duplicate Inspector workflows and preview-only wording; retain one raw chip action and one normal edge-wear action.
+5. [x] Add the internal asynchronous 33-case C1A.3 suite stage, deterministic case/result aggregation, exact disabled parity checks, cap/ring/retention checks, and normal/tangent validation.
+6. [x] Extend the existing combined suite report and summary with C1A.3 status, `33/33` count, zero-parity, selection determinism, transaction, cap-ring, retention, channel, cancellation, and terminal evidence.
+7. [x] Update framework, recovery architecture, and code inventory to remove the superseded split-workflow authoring contract and record the accepted normal workflow.
+8. [x] Reread every modified file and all affected owners; verify exact scope, compatibility aliases, preprocessor boundaries, C# structure, frozen-owner hashes, report completeness, ZIP overlay reproduction, and patch reproduction. Mark Unity compilation/runtime validation pending.
+
+##### Acceptance criteria
+
+- [x] Exactly the eight approved files differ; `0` files are created, deleted, moved, or renamed.
+- [x] The Inspector shows `Corner Chipping`, the same six controls, one `Rebuild Corner Chip Preview` action, and no separate integration action or corner report controls.
+- [x] `Rebuild Edge-Wear Bevel Preview` consumes the current corner controls when enabled and remains exact ordinary behavior when disabled.
+- [x] The one-click report contains `cornerChippingStatus`, `cornerChippingCases=33/33`, exact disabled parity `11/11`, selection determinism `33/33`, transaction/cap/ring/retention/channel results, `cancelled=0`, and `terminalReason=none` when accepted.
+- [x] No clipping, bevel solver, triangulation, final-normal, shader, serialized default, mesh-channel, production, or per-frame behavior changes.
+- [x] Available static/package validation passes. Unity 6000.5.0f1 compilation and the one-click runtime matrix remain pending until the user applies the patch.
+
+##### Implementation result
+
+- Exact source scope: eight modified files; no create/delete/move/rename.
+- Inspector: one `Corner Chipping` group with the existing six controls, one raw chip action, one ordinary edge-wear action, and no separate integration/report/audit controls.
+- Routing: the ordinary unified preview is byte-identical to the frozen path when corner chipping is disabled and uses the certified pre-bevel integration path when enabled.
+- Suite: asynchronous 11-seed × 3-policy C1A.3 stage added to the existing one-click workflow; no new button.
+- Static source-contract checks: `53/53` passed.
+- C# delimiter and preprocessor checks: `195/195` files passed.
+- Changed-files ZIP overlay and unified patch each reproduced the complete `331/331`-file final tree byte-for-byte.
+- Unity 6000.5.0f1 compilation, Inspector rendering, and runtime `33/33` acceptance remain pending.
 
 ### Performance contract
 
-- Candidate adjacency and scoring are `O(V + E)` over the small normalized source graph.
-- At most one candidate runs at most four cloned half-space cut trials.
-- Cap-ring bevel work adds at most the cap polygon edge count to ordinary candidate construction.
-- Temporary memory is `O(F + V + E)` per dirty/editor evaluation.
-- Active gameplay, per-frame CPU, GPU shader work, textures, buffers, and persistent memory do not change in C1A.1.
+- The normal edge-wear preview keeps the existing explicit editor-only cost. When Corner Chipping is enabled it performs the already accepted retention baseline plus one post-chip unified construction; disabled behavior remains the single frozen unified construction.
+- The 33-case C1A.3 matrix is asynchronous editor validation. Disabled cases perform two parity generations; enabled cases perform one raw transaction generation plus the existing two-generation integrated proof. It adds no recurring update and no gameplay path.
+- Candidate adjacency and scoring remain `O(V + E)` over the small normalized source graph. At most one selected corner runs at most four cloned half-space cut trials. Cap-ring work adds only the cap polygon edge count to ordinary candidates.
+- Temporary construction memory remains bounded to dirty/editor evaluation. The matrix holds only case summaries and temporary per-case meshes; every temporary Unity mesh is destroyed before the next case.
+- Active gameplay, per-frame CPU, GPU shader work, textures, buffers, persistent caches, serialized defaults, and production generation do not change. No performance exception is required.
 
 ### Audit exit result
 
@@ -7284,3 +7632,112 @@ The former X/radial internal surface pattern must remain visually absent. If the
 - Available static validation passed `40/40`: all `185` C# files parse, preprocessor/region blocks balance, imports and critical unchanged bodies match, CRLF/BOM/trailing-whitespace and Markdown fences are clean, surface-group decoding matches all encoded classes/provenances, analytic one/two/three-support fixtures pass, and `30` deterministic random positive-cap cases match multi-start numerical optimization with maximum gap `2.22044604925E-16`.
 - Conservative dirty-time cost is `O(m^4)` per authored group and temporary group storage is `O(m)`; observed polygon groups are small and no per-frame path was added.
 - Unity compilation, the complete one-click suite, and visual confirmation remain pending. Package-overlay, strict-patch, ZIP-integrity, and final artifact-hash results are recorded in the accompanying static-validation report after packaging.
+
+#### EW-C1A.3a — Deterministic fully certified single-corner search
+
+**Patch identifier:** `EW-C1A.3a`
+
+**Status:** [implemented; static/compliance/package validation passed; Unity validation pending]
+
+**Goal:** replace unconditional commitment to the highest-scoring eligible corner with one deterministic score-ordered search that accepts the first corner capable of completing the entire single-chip feature. Each corner retains the existing four bounded depth trials. A transaction-certified corner then receives one shared cap-ring width schedule; every schedule step applies one uniform multiplier to all three cap-ring edges. The corner is accepted only when the transaction, complete mandatory cap ring, post-chip bevel construction, unrelated-bevel retention, final render mesh, and channel validation all pass. Failure of one corner continues to the next ranked eligible corner. No multiple-corner generation, new control, Inspector workflow, button, shader, normal rule, triangulation rule, or production path is added.
+
+##### Read-only evidence reviewed before implementation
+
+- The authoritative current tree was reconstructed from `Assets-Code-Archive(11).zip` plus the accepted EW-C1A.2, EW-C1A.2a, EW-C1A.2b, EW-C1A.2c, and EW-C1A.3 overlays in chronological order. It contains `331` files and no `.git` directory, so branch, `HEAD`, status, and history evidence are unavailable.
+- The user Unity `EW-C1A.3-suite` report completed without cancellation or terminal error. Frozen Macro, topology, ordinary preview, outlier, and negative-exclusion gates passed. The corner stage failed `14/33`; disabled parity passed `11/11`, while enabled cases passed only `3/22`.
+- The matrix root breakdown is: `10` selected-corner transaction failures, `6` transaction-certified but incomplete-ring failures, `3` complete-ring but unrelated-retention failures, and `3` enabled passes. This proves that fixed rank-0 selection and one cap-ring requested width are insufficient.
+- `EvaluateCornerDamageTransaction` currently gathers every eligible candidate but commits only the highest score, then runs four depth trials. It exposes no candidate rank and performs no fallback to the next eligible corner.
+- `ResolveCornerDamageCapRingRequestedWidth` currently produces one common requested width for all ring edges. `BuildEdgeWearBevelCandidates` already treats the three cap-ring edges as mandatory, Macro-free candidates at that common width. Therefore full uniform ring-width search can be added without changing candidate construction or the bevel solver.
+- `GenerateCornerDamageIntegrationPreview` currently evaluates one baseline and one fixed-corner integration attempt. This is the correct editor-only owner for score-ordered full certification search and can retain one baseline while trying deterministic candidate-rank/ring-scale attempts.
+- `GenerateCornerDamageGeometryPreview` currently evaluates the raw transaction independently. It must use the same full-certification search result, then render only the accepted raw cut, so the raw and integrated endpoints select the same fully viable corner.
+- `CompleteCornerDamagePreviewCapture` already proves transaction, mandatory ring, unrelated retention, and final preview acceptance. It is the authoritative per-attempt acceptance predicate and will gain search summary fields rather than duplicating geometry rules.
+- `GeneratedMassEditor.EvaluateCornerChippingMatrixCase` already runs raw and integrated endpoints independently and checks selection equality, transaction, complete ring, retention, and channels. It requires only truthful search-stage/result reporting; no new button or stage is required.
+- Complete affected owners and direct callers/consumers were reviewed: `AGENTS.md`; the four canonical Generated Mass documents; `MassGenerator.cs`; `MassGenerator.EdgeWear.Types.cs`; `MassGenerator.EdgeWear.SelectionAndCorners.cs`; `MassGenerator.EdgeWear.Orchestration.cs`; `MassGenerator.EdgeWear.Diagnostics.Logging.cs`; `GeneratedMass.cs`; `GeneratedMassEditor.cs`; `MassGenerator.PlaneCut.cs`; `MassGenerator.EdgeWear.BoundedSingleEdge.cs`; `MassGenerator.MeshOutput.cs`; `MeshData.cs`; and `MeshBuilder.cs`.
+
+##### Approved file scope
+
+**Modify:**
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.cs`
+6. `Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+7. `Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+8. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+9. `Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+No file may be created, deleted, moved, or renamed. `GeneratedMass.cs`, `MassSurfaceFeatureGenerator.cs`, `MassGenerator.EdgeWear.Orchestration.cs`, clipping, candidate construction, bounded shell construction, triangulation, final normals, shaders, materials, assets, mesh channels, serialized controls/defaults, Inspector controls/actions, and production `EdgeWearEvaluationMode.None` remain unchanged.
+
+##### Deterministic search contract
+
+1. [x] Rank every eligible corner by the existing score descending, then normalized graph vertex index ascending. Do not change eligibility or scoring.
+2. [x] For each ranked corner, run the existing depth factors `{1, 0.75, 0.5625, 0.421875}` in order. A corner with no certified transaction is rejected and search continues.
+3. [x] For each transaction-certified corner, run one shared cap-ring multiplier schedule `{1, 0.75, 0.5625, 0.421875, 0.31640625, 0.25}`. Every attempt applies the same multiplier to all three ring edges. Partial rings remain rejected.
+4. [x] Reuse one frozen ordinary baseline per integrated search. Accept a corner only when `CompleteCornerDamagePreviewCapture` proves one cap, dense construction provenance, mandatory ring expected/candidate/selected/built equality, successful post-chip preview, and zero unrelated bevel loss.
+5. [x] Continue after transaction, ring, construction, or retention failure. Fail only after every eligible corner has been rejected at every applicable ring scale.
+6. [x] The raw `Rebuild Corner Chip Preview` first performs the same full-certification search, then emits only the raw geometry for the accepted candidate rank. The integrated and raw endpoints must independently resolve the same accepted rank/vertex/trial/depth/ring identities.
+7. [x] Search state must be scoped with `try/finally`, editor-synchronous, and restored after every generation attempt. No state may leak into disabled, ordinary, audit, or production generation.
+
+##### Search diagnostics
+
+Every corner status/report gains:
+
+```text
+candidateCorners
+attemptedCorners
+attemptedConfigurations
+acceptedCornerRank
+capRingCommittedScale
+searchFailureStage
+searchFailureReason
+searchAttempts
+```
+
+The final failed result retains the deepest deterministic blocker in this order: unrelated retention, complete post-chip construction, cap-ring completion, transaction certification, candidate availability. The one-click CSV gains accepted rank, attempted corners/configurations, committed ring scale, and truthful failure stage. Existing aggregate fields remain for compatibility.
+
+##### File-by-file implementation sequence
+
+1. [x] Record this persistent plan as the first write.
+2. [x] Add candidate-rank, search summary, and per-attempt evidence fields in `MassGenerator.EdgeWear.Types.cs` and the public corner status.
+3. [x] Change `EvaluateCornerDamageTransaction` to select a requested eligible rank from the unchanged deterministic ordering and report that rank.
+4. [x] Apply the scoped uniform ring multiplier in `ResolveCornerDamageCapRingRequestedWidth` without changing the base width limits or candidate solver.
+5. [x] Add the full-certification search owner in `MassGenerator.cs`; reuse one integrated baseline, search all ranked corners and scales, select the first complete pass, and preserve the deepest failure when none pass.
+6. [x] Make geometry-only preview use the accepted full-search rank and render only that raw cut.
+7. [x] Extend `MassGenerator.EdgeWear.Diagnostics.Logging.cs` with search summaries and exact failure-stage evidence.
+8. [x] Extend the existing C1A.3 case/report rows in `GeneratedMassEditor.cs`; add no Inspector controls or buttons.
+9. [x] Update framework, recovery architecture, and code inventory.
+10. [x] Reread every modified file and affected owner; verify exact scope, disabled parity routing, state restoration, C# structure, frozen-owner hashes, package overlay reproduction, and unified patch reproduction. Mark Unity compilation/runtime validation pending.
+
+##### Acceptance criteria
+
+- [x] Exactly the nine approved files differ; `0` files are created, deleted, moved, or renamed.
+- [x] Existing controls, Inspector layout, buttons, settings defaults, and disabled routing are unchanged.
+- [ ] Every accepted enabled case reports `acceptedCornerRank >= 0`, `attemptedCorners >= 1`, `capRingCommittedScale > 0`, complete mandatory ring, and zero collateral loss.
+- [x] A rejected rank-0 corner can fall through to a later deterministic rank. A cap-ring failure can fall through the uniform scale schedule before rejecting that corner.
+- [ ] Raw and integrated endpoints independently select identical final rank, vertex, trial, depth, and cap-ring identities.
+- [ ] The existing one-click C1A.3 matrix reaches `33/33` without relaxing transaction, ring, retention, topology, normal, tangent, or disabled-parity rules.
+- [x] No active-gameplay, per-frame, shader, texture, buffer, cache, mesh-channel, or production-generation cost is added.
+- [x] Available static/package checks pass. Unity 6000.5.0f1 compilation and the complete runtime suite remain pending until user validation.
+
+##### Performance contract
+
+- The search is explicit editor-only work. One integrated baseline is reused across all candidate/ring attempts in one search.
+- Candidate gathering remains `O(V + E)` and frozen-tie-preserving deterministic ranking is `O(k²)` over the small eligible corner set `k`. Each ranked corner runs at most four existing transaction trials; only transaction-certified corners enter at most six uniform ring attempts.
+- The raw preview intentionally performs the same complete search before rendering the selected cut, so it cannot display a corner that the normal edge-wear preview would reject.
+- No recurring update, active-gameplay generation, shader work, persistent cache, texture, buffer, or mesh-channel change is permitted.
+- The one-click matrix may take materially longer because it now exhausts valid alternatives instead of stopping after rank `0`. The report must expose attempted-corner/configuration counts and elapsed time. No hard runtime budget is invented; cancellation must remain responsive between matrix cases.
+
+
+##### Implementation result
+
+- Candidate eligibility and score are unchanged. Every eligible corner is now sorted once and addressable by deterministic rank.
+- Full integration search reuses one ordinary baseline, exhausts the six common ring scales for each transaction-certified rank, and accepts only the first existing complete corner-preview certification. Candidate-local `InvalidOperationException` construction blockers advance deterministically as `post-chip-construction`; unexpected exception classes still propagate.
+- Raw corner preview resolves the same full-feature candidate and then renders only the semantic cut.
+- Reports and C1A.3a matrix rows expose eligible/attempted counts, accepted rank, committed ring scale, exact failure stage/reason, and the concise attempt trace.
+- No control, Inspector layout, button, serialized default, clipping rule, candidate rule, bevel solver, triangulation rule, final-normal rule, shader, mesh channel, production callback, or per-frame owner changed.
+- Static source/contract validation passed `43/43`; all `195` C# files passed delimiter and preprocessor/region checks.
+- Exact scope is nine modified files across the unchanged `331`-file tree; frozen clipping, orchestration, shell, triangulation, final-normal, settings, shader, mesh-channel, and production owners remain byte-identical.
+- The changed-files ZIP and unified patch each reproduced the complete final `331/331`-file tree byte-for-byte, and ZIP CRC validation passed.
+- Unity compilation and the `33/33` runtime matrix remain pending.

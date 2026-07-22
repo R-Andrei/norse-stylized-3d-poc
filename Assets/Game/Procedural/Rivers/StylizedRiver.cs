@@ -108,7 +108,7 @@ namespace ProgrammaticStylized3D.Rivers
 
     public enum StylizedRiverFoamPresenceFootprintMode
     {
-        [InspectorName("Current")]
+        [InspectorName("Coverage-Only")]
         Current = 0,
         [InspectorName("Presence-Amplitude")]
         PresenceAmplitude = 1
@@ -117,7 +117,7 @@ namespace ProgrammaticStylized3D.Rivers
 
     public enum StylizedRiverFoamTransportScheme
     {
-        [InspectorName("Donor Cell (Current)")]
+        [InspectorName("Donor Cell")]
         DonorCell = 0,
         [InspectorName("TVD Superbee")]
         TvdSuperbee = 1
@@ -967,7 +967,7 @@ namespace ProgrammaticStylized3D.Rivers
             foamFixedMetricCellSize =
                 StylizedRiverFoamFixedMetricCellSize.QualityDefault;
 
-        [Tooltip("Selects Layer C material transport. Donor Cell preserves the accepted first-order conservative baseline. TVD Superbee uses bounded monotonic face reconstruction to reduce numerical diffusion while retaining the same packed Presence/life/pattern conservation path. This changes no allocation or topology contract and may be switched during Play Mode.")]
+        [Tooltip("Selects how Layer C transports geometric Coverage. Donor Cell is the conservative first-order baseline and is more numerically diffuse. TVD Superbee reconstructs bounded Coverage at faces to retain sharper footprints while transporting one coherent material state. Neither scheme is permitted to alter decoded intrinsic Presence or Remaining Life merely because material moved. This changes no allocation or topology contract and may be switched during Play Mode.")]
         [SerializeField]
         private StylizedRiverFoamTransportScheme foamTransportScheme =
             StylizedRiverFoamTransportScheme.DonorCell;
@@ -1108,19 +1108,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 0.5f)]
         [SerializeField] private float foamShoreRibbonOffsetVariationCells = 0.25f;
 
-        [Tooltip("Minimum peak persistent Presence deposited by Shore Ribbon events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Shore Ribbon material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonInitialPresenceMin = 0.90f;
 
-        [Tooltip("Maximum peak persistent Presence deposited by Shore Ribbon events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Shore Ribbon material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonInitialPresenceMax = 1.00f;
 
-        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Shore Ribbon material. One means full authored Foam lifetime.")]
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Shore Ribbon material. One writes the full normalized life budget exactly; only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonInitialLifeMin = 0.80f;
 
-        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Shore Ribbon material. One means full authored Foam lifetime.")]
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Shore Ribbon material. One writes the full normalized life budget exactly; only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonInitialLifeMax = 1.00f;
 
@@ -1168,19 +1168,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamInwardWashOffsetMaxMetres = 0.040f;
 
-        [Tooltip("Minimum peak persistent Presence deposited by Inward Wash events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Inward Wash material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashInitialPresenceMin = 0.84f;
 
-        [Tooltip("Maximum peak persistent Presence deposited by Inward Wash events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Inward Wash material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashInitialPresenceMax = 0.98f;
 
-        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Inward Wash material. One means full authored Foam lifetime.")]
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Inward Wash material. One writes the full normalized life budget exactly; only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashInitialLifeMin = 0.60f;
 
-        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Inward Wash material. One means full authored Foam lifetime.")]
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Inward Wash material. One writes the full normalized life budget exactly; only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashInitialLifeMax = 1.00f;
 
@@ -1304,19 +1304,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamObjectContactArcOffsetMaxMetres = 0.120f;
 
-        [Tooltip("Minimum peak persistent Presence deposited by Object Contact Arc events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Object Contact Arc material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcInitialPresenceMin = 0.88f;
 
-        [Tooltip("Maximum peak persistent Presence deposited by Object Contact Arc events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Object Contact Arc material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcInitialPresenceMax = 1.00f;
 
-        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Object Contact Arc material.")]
+        [Tooltip("Minimum initial normalized Remaining Life written exactly to newly occupied Object Contact Arc material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcInitialLifeMin = 0.75f;
 
-        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Object Contact Arc material.")]
+        [Tooltip("Maximum initial normalized Remaining Life written exactly to newly occupied Object Contact Arc material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcInitialLifeMax = 1.00f;
 
@@ -1378,19 +1378,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamObjectContactSemiArcOffsetMaxMetres = 0.140f;
 
-        [Tooltip("Minimum peak persistent Presence deposited by Object Contact Semi-Arc events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Object Contact Semi-Arc material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcInitialPresenceMin = 0.84f;
 
-        [Tooltip("Maximum peak persistent Presence deposited by Object Contact Semi-Arc events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Object Contact Semi-Arc material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcInitialPresenceMax = 0.98f;
 
-        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Object Contact Semi-Arc material.")]
+        [Tooltip("Minimum initial normalized Remaining Life written exactly to newly occupied Object Contact Semi-Arc material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcInitialLifeMin = 0.65f;
 
-        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Object Contact Semi-Arc material.")]
+        [Tooltip("Maximum initial normalized Remaining Life written exactly to newly occupied Object Contact Semi-Arc material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcInitialLifeMax = 1.00f;
 
@@ -1442,19 +1442,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamObjectContactFleckOffsetMaxMetres = 0.160f;
 
-        [Tooltip("Minimum peak persistent Presence deposited by Object Contact Fleck events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Object Contact Fleck material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckInitialPresenceMin = 0.82f;
 
-        [Tooltip("Maximum peak persistent Presence deposited by Object Contact Fleck events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Object Contact Fleck material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckInitialPresenceMax = 0.97f;
 
-        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Object Contact Fleck material.")]
+        [Tooltip("Minimum initial normalized Remaining Life written exactly to newly occupied Object Contact Fleck material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckInitialLifeMin = 0.55f;
 
-        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Object Contact Fleck material.")]
+        [Tooltip("Maximum initial normalized Remaining Life written exactly to newly occupied Object Contact Fleck material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckInitialLifeMax = 0.90f;
 
@@ -1521,19 +1521,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.005f)]
         [SerializeField] private float foamFreeWaterLaceWidthMaxMetres = 0.115f;
 
-        [Tooltip("Minimum peak persistent Presence deposited by Free Water Lace Connector events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Free Water Lace Connector material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceInitialPresenceMin = 0.78f;
 
-        [Tooltip("Maximum peak persistent Presence deposited by Free Water Lace Connector events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Free Water Lace Connector material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceInitialPresenceMax = 0.96f;
 
-        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Free Water Lace Connector material.")]
+        [Tooltip("Minimum initial normalized Remaining Life written exactly to newly occupied Free Water Lace Connector material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceInitialLifeMin = 0.35f;
 
-        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Free Water Lace Connector material.")]
+        [Tooltip("Maximum initial normalized Remaining Life written exactly to newly occupied Free Water Lace Connector material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceInitialLifeMax = 0.80f;
 
@@ -1573,19 +1573,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.005f)]
         [SerializeField] private float foamFreeWaterCrossLaceWidthMaxMetres = 0.120f;
 
-        [Tooltip("Minimum peak persistent Presence deposited by Free Water Cross-Lace Connector events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Free Water Cross-Lace Connector material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterCrossLaceInitialPresenceMin = 0.78f;
 
-        [Tooltip("Maximum peak persistent Presence deposited by Free Water Cross-Lace Connector events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Free Water Cross-Lace Connector material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterCrossLaceInitialPresenceMax = 0.96f;
 
-        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Free Water Cross-Lace Connector material.")]
+        [Tooltip("Minimum initial normalized Remaining Life written exactly to newly occupied Free Water Cross-Lace Connector material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterCrossLaceInitialLifeMin = 0.45f;
 
-        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Free Water Cross-Lace Connector material.")]
+        [Tooltip("Maximum initial normalized Remaining Life written exactly to newly occupied Free Water Cross-Lace Connector material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterCrossLaceInitialLifeMax = 0.90f;
 
@@ -1617,19 +1617,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.005f)]
         [SerializeField] private float foamFreeWaterFragmentWidthMaxMetres = 0.280f;
 
-        [Tooltip("Minimum peak persistent Presence deposited by Free Water Torn Fragment events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Free Water Torn Fragment material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFragmentInitialPresenceMin = 0.76f;
 
-        [Tooltip("Maximum peak persistent Presence deposited by Free Water Torn Fragment events before profile, formation, and valid-fluid masks are applied. The default reproduces the former hidden source amount.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Free Water Torn Fragment material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFragmentInitialPresenceMax = 0.94f;
 
-        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Free Water Torn Fragment material.")]
+        [Tooltip("Minimum initial normalized Remaining Life written exactly to newly occupied Free Water Torn Fragment material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFragmentInitialLifeMin = 0.25f;
 
-        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Free Water Torn Fragment material.")]
+        [Tooltip("Maximum initial normalized Remaining Life written exactly to newly occupied Free Water Torn Fragment material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFragmentInitialLifeMax = 0.65f;
 
@@ -1664,12 +1664,12 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamFullSupportedAgingAt =
             DefaultFoamFullSupportedAgingAt;
 
-        [Tooltip("Selects how Final Foam converts living persistent material into visible coverage. Concentration + Lifetime preserves the current dense-core renderer, where local Presence concentration and Remaining Life both discard coverage. Lifecycle-Faithful uses Presence only to define a meaningful material footprint, then lets Remaining Life and the stable material pattern control deterioration. This is a render-only A/B control and does not change stored material or lifecycle.")]
+        [Tooltip("Selects how Final Foam converts transported Coverage and Remaining Life into a visible shape. Concentration + Lifetime deliberately lets diffuse Coverage and Remaining Life both reduce visibility. Lifecycle-Faithful uses meaningful Coverage as the footprint and leaves ordinary lifetime authority to explicit Layer C aging, so numerical dilution cannot counterfeit early death. This is render-only and does not change stored material or lifecycle.")]
         [SerializeField]
         private StylizedRiverFinalFoamVisibilityMode foamFinalVisibilityMode =
             StylizedRiverFinalFoamVisibilityMode.ConcentrationAndLifetime;
 
-        [Tooltip("Selects whether Layer E may amplify weak stored Presence into a full visual footprint. Current preserves the accepted renderer. Presence-Amplitude limits the resolved Foam base mask to the actual committed Presence amplitude, so weak transported tails shrink or disappear instead of receiving near-full coverage. This is render-only and may be switched during Play Mode.")]
+        [Tooltip("Selects whether decoded intrinsic Presence scales Final Foam. Coverage-Only resolves the shape from Coverage, Life, Pattern, Chipping, and Strands without using Presence as visual amplitude. Presence-Amplitude carries exact Presence through identical Presence-independent shape and surface-coupling weights, so uniform 0.75 produces 75% of the equivalent Presence 1.00 resolved mask before other explicit global rendering controls. This is render-only and may be switched during Play Mode.")]
         [SerializeField]
         private StylizedRiverFoamPresenceFootprintMode
             foamPresenceFootprintMode =
@@ -1829,7 +1829,7 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamChipEdgeWidthPixels =
             DefaultFoamChipEdgeWidthPixels;
 
-        [Tooltip("Soft-visibility value treated as the exterior start of the Presence-Amplitude Eligibility coordinate. The default 0.06 matches the accepted historical Current route. Higher values move the detected band inward; lower values include fainter fringe. This control affects Presence-Amplitude only.")]
+        [Tooltip("Soft-visibility value treated as the exterior start of the Presence-Amplitude Eligibility coordinate. The default 0.06 matches the accepted historical Coverage-Only route. Higher values move the detected band inward; lower values include fainter fringe. This control affects Presence-Amplitude only.")]
         [Range(
             MinimumFoamChipSoftEdgeStart,
             MaximumFoamChipSoftEdgeStart)]

@@ -2,10 +2,15 @@
 #pragma kernel RecenterField
 #pragma kernel SimulateField
 
+#define PS3D_INTERACTION_DIRECTION_RADIAL 0
+#define PS3D_INTERACTION_DIRECTION_WORLD_X_BIASED 1
+#define PS3D_INTERACTION_DIRECTION_HYBRID 2
+
 struct VegetationInteractorRecord
 {
     float4 startEnd;
     float4 parameters;
+    float4 directionParameters;
 };
 
 StructuredBuffer<VegetationInteractorRecord> _Interactors;
@@ -46,6 +51,81 @@ float2 ClampVectorMagnitude(float2 value, float maximum)
     return value * (maximum * rsqrt(magnitudeSquared));
 }
 
+uint HashWorldCell(int2 cell)
+{
+    uint hashValue =
+        (uint)cell.x * 0x8da6b343u ^
+        (uint)cell.y * 0xd8163841u;
+    hashValue ^= hashValue >> 13;
+    hashValue *= 0x85ebca6bu;
+    hashValue ^= hashValue >> 16;
+    return hashValue;
+}
+
+float StableWorldXSide(float2 worldXZ)
+{
+    float cellSize = max(0.01, _FieldOriginCellSize.z);
+    int2 lattice = (int2)floor(worldXZ / cellSize);
+    return (HashWorldCell(lattice) & 1u) == 0u ? -1.0 : 1.0;
+}
+
+float ResolveWorldXSide(
+    float radialX,
+    float2 worldXZ,
+    float radius)
+{
+    float centrelineHalfWidth = max(
+        _FieldOriginCellSize.z * 0.35,
+        radius * 0.04);
+    if (radialX < -centrelineHalfWidth)
+    {
+        return -1.0;
+    }
+    if (radialX > centrelineHalfWidth)
+    {
+        return 1.0;
+    }
+
+    return StableWorldXSide(worldXZ);
+}
+
+float2 ShapeDisplacementDirection(
+    float2 radialDirection,
+    float2 radialVector,
+    float2 movementDirection,
+    float movementBlend,
+    int directionMode,
+    float worldXBias,
+    float worldZStrength,
+    float2 worldXZ,
+    float radius)
+{
+    float2 radialMovementDirection = SafeNormalize(
+        lerp(radialDirection, movementDirection, movementBlend),
+        radialDirection);
+    if (directionMode == PS3D_INTERACTION_DIRECTION_RADIAL)
+    {
+        return radialMovementDirection;
+    }
+
+    float worldXSide = ResolveWorldXSide(
+        radialVector.x,
+        worldXZ,
+        radius);
+    float2 sourceDirection =
+        directionMode == PS3D_INTERACTION_DIRECTION_WORLD_X_BIASED
+            ? radialDirection
+            : radialMovementDirection;
+    float2 biasedDirection = lerp(
+        sourceDirection,
+        float2(worldXSide, 0.0),
+        worldXBias);
+    biasedDirection.y *= worldZStrength;
+    return SafeNormalize(
+        biasedDirection,
+        float2(worldXSide, 0.0));
+}
+
 int2 PhysicalCell(int2 logicalCell)
 {
     uint2 resolution = (uint2)_FieldResolution;
@@ -75,6 +155,12 @@ float4 EvaluateImmediateTarget(float2 worldXZ)
         float bendStrength = max(0.0, record.parameters.y);
         float flattenStrength = saturate(record.parameters.z);
         float movementBlend = saturate(record.parameters.w);
+        int directionMode = clamp(
+            (int)round(record.directionParameters.x),
+            PS3D_INTERACTION_DIRECTION_RADIAL,
+            PS3D_INTERACTION_DIRECTION_HYBRID);
+        float worldXBias = saturate(record.directionParameters.y);
+        float worldZStrength = saturate(record.directionParameters.z);
 
         float2 segment = endXZ - startXZ;
         float segmentLengthSquared = dot(segment, segment);
@@ -94,13 +180,26 @@ float4 EvaluateImmediateTarget(float2 worldXZ)
             ? float2(-movementDirection.y, movementDirection.x)
             : float2(1.0, 0.0);
         float2 radialDirection = SafeNormalize(radialVector, radialFallback);
-        float2 displacementDirection = SafeNormalize(
-            lerp(radialDirection, movementDirection, movementBlend),
-            radialDirection);
+        float2 displacementDirection = ShapeDisplacementDirection(
+            radialDirection,
+            radialVector,
+            movementDirection,
+            movementBlend,
+            directionMode,
+            worldXBias,
+            worldZStrength,
+            worldXZ,
+            radius);
 
         float normalizedDistance = saturate(distanceToSweep / radius);
         float influence = 1.0 - smoothstep(0.15, 1.0, normalizedDistance);
         influence *= influence;
+        if (segmentLengthSquared > 0.0000001)
+        {
+            float sweepT = segmentT * segmentT * (3.0 - 2.0 * segmentT);
+            float sweepTailRetention = saturate(_ResponseParameters.z);
+            influence *= lerp(sweepTailRetention, 1.0, sweepT);
+        }
         accumulatedBend +=
             displacementDirection * (bendStrength * influence);
         maximumFlatten = max(
@@ -186,7 +285,9 @@ void SimulateField(uint3 dispatchId : SV_DispatchThreadID)
     float4 nextState;
     nextState.xy = lerp(previousState.xy, targetState.xy, bendAlpha);
     nextState.z = lerp(previousState.z, targetState.z, flattenAlpha);
-    nextState.w = 0.0;
+    nextState.w = max(length(targetState.xy), targetState.z) > 0.0001
+        ? 1.0
+        : 0.0;
     nextState.xy = ClampVectorMagnitude(nextState.xy, 1.0);
     nextState.zw = saturate(nextState.zw);
     _StateWrite[physicalCell] = nextState;

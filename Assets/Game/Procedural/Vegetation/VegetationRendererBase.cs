@@ -78,6 +78,20 @@ namespace ProgrammaticStylized3D.Vegetation
             Shader.PropertyToID("_InteractionMaximumBend");
         protected static readonly int InteractionNormalResponseId =
             Shader.PropertyToID("_InteractionNormalResponse");
+        protected static readonly int WindInfluenceOnDisplacedGrassId =
+            Shader.PropertyToID("_WindInfluenceOnDisplacedGrass");
+        protected static readonly int TrampleBendResponseId =
+            Shader.PropertyToID("_TrampleBendResponse");
+        protected static readonly int TrampleFlattenResponseId =
+            Shader.PropertyToID("_TrampleFlattenResponse");
+        protected static readonly int TrampleHeightExponentId =
+            Shader.PropertyToID("_TrampleHeightExponent");
+        protected static readonly int TrampleMaximumBendId =
+            Shader.PropertyToID("_TrampleMaximumBend");
+        protected static readonly int TrampleNormalResponseId =
+            Shader.PropertyToID("_TrampleNormalResponse");
+        protected static readonly int WindInfluenceOnTrampledGrassId =
+            Shader.PropertyToID("_WindInfluenceOnTrampledGrass");
 
         [Header("Placement")]
         [SerializeField, Min(1)]
@@ -176,6 +190,35 @@ namespace ProgrammaticStylized3D.Vegetation
         [SerializeField, Range(0f, 4f)]
         [Tooltip("Controls how strongly immediate interaction rotates the lighting normal independently from Weather normal response.")]
         protected float interactionNormalResponse = 1f;
+
+        [SerializeField, Range(0f, 1f)]
+        [Tooltip("Weather influence retained while this recipe is displaced by immediate interaction. One preserves normal Weather behavior; zero suppresses Weather progressively as effective interaction bend or flattening approaches full strength.")]
+        protected float windInfluenceOnDisplacedGrass = 1f;
+
+        [Header("Historical Trample Response")]
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("Per-recipe multiplier for horizontal displacement from the Ground-owned historical trample field.")]
+        protected float trampleBendResponse = 1f;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("Per-recipe multiplier for stored flattening from the Ground-owned historical trample field.")]
+        protected float trampleFlattenResponse = 1f;
+
+        [SerializeField, Range(0.25f, 4f)]
+        [Tooltip("Shapes historical trample influence from planted roots to responsive tips.")]
+        protected float trampleHeightExponent = 1.25f;
+
+        [SerializeField, Range(0f, 3f)]
+        [Tooltip("Maximum world-space horizontal bend contributed by historical trample. This expands conservative render bounds and rebuilds the layer when changed.")]
+        protected float maximumTrampleBendMetres = 0.8f;
+
+        [SerializeField, Range(0f, 4f)]
+        [Tooltip("Controls how strongly historical trample rotates the lighting normal.")]
+        protected float trampleNormalResponse = 1f;
+
+        [SerializeField, Range(0f, 1f)]
+        [Tooltip("Weather influence retained while this recipe is historically trampled. One preserves normal Weather behavior; zero suppresses Weather as stored bend or flattening approaches full strength.")]
+        protected float windInfluenceOnTrampledGrass = 0.25f;
 
         [Header("Stylized Lighting")]
         [SerializeField]
@@ -322,6 +365,15 @@ namespace ProgrammaticStylized3D.Vegetation
         public float InteractionHeightExponent => interactionHeightExponent;
         public float MaximumInteractionBendMetres => maximumInteractionBendMetres;
         public float InteractionNormalResponse => interactionNormalResponse;
+        public float WindInfluenceOnDisplacedGrass =>
+            windInfluenceOnDisplacedGrass;
+        public float TrampleBendResponse => trampleBendResponse;
+        public float TrampleFlattenResponse => trampleFlattenResponse;
+        public float TrampleHeightExponent => trampleHeightExponent;
+        public float MaximumTrampleBendMetres => maximumTrampleBendMetres;
+        public float TrampleNormalResponse => trampleNormalResponse;
+        public float WindInfluenceOnTrampledGrass =>
+            windInfluenceOnTrampledGrass;
         public bool UsesAllCameras => targetCamera == null;
         public string PlacementDomainSummary =>
             coverageGround != null
@@ -453,6 +505,16 @@ namespace ProgrammaticStylized3D.Vegetation
                 maximumInteractionBendMetres, 0f, 3f);
             interactionNormalResponse = Mathf.Clamp(
                 interactionNormalResponse, 0f, 4f);
+            windInfluenceOnDisplacedGrass = Mathf.Clamp01(
+                windInfluenceOnDisplacedGrass);
+            trampleBendResponse = Mathf.Clamp(trampleBendResponse, 0f, 2f);
+            trampleFlattenResponse = Mathf.Clamp(trampleFlattenResponse, 0f, 2f);
+            trampleHeightExponent = Mathf.Clamp(trampleHeightExponent, 0.25f, 4f);
+            maximumTrampleBendMetres = Mathf.Clamp(
+                maximumTrampleBendMetres, 0f, 3f);
+            trampleNormalResponse = Mathf.Clamp(trampleNormalResponse, 0f, 4f);
+            windInfluenceOnTrampledGrass = Mathf.Clamp01(
+                windInfluenceOnTrampledGrass);
             ambientResponse = Mathf.Clamp(ambientResponse, 0f, 2f);
             sunResponse = Mathf.Clamp(sunResponse, 0f, 2f);
             localLightResponse = Mathf.Clamp(localLightResponse, 0f, 2f);
@@ -536,6 +598,7 @@ namespace ProgrammaticStylized3D.Vegetation
             }
 
             runtimeMaterial.SetMatrix(LocalToWorldId, transform.localToWorldMatrix);
+            VegetationTrampleDomain.BindToMaterial(runtimeMaterial, coverageGround);
             RenderParams renderParams = new RenderParams(runtimeMaterial)
             {
                 worldBounds = TransformBounds(localBounds, transform.localToWorldMatrix),
@@ -765,6 +828,9 @@ namespace ProgrammaticStylized3D.Vegetation
                 hash = CombineHash(
                     hash,
                     maximumInteractionBendMetres.GetHashCode());
+                hash = CombineHash(
+                    hash,
+                    maximumTrampleBendMetres.GetHashCode());
                 return hash;
             }
         }
@@ -791,6 +857,16 @@ namespace ProgrammaticStylized3D.Vegetation
                 hash = CombineHash(
                     hash,
                     interactionNormalResponse.GetHashCode());
+                hash = CombineHash(
+                    hash,
+                    windInfluenceOnDisplacedGrass.GetHashCode());
+                hash = CombineHash(hash, trampleBendResponse.GetHashCode());
+                hash = CombineHash(hash, trampleFlattenResponse.GetHashCode());
+                hash = CombineHash(hash, trampleHeightExponent.GetHashCode());
+                hash = CombineHash(hash, trampleNormalResponse.GetHashCode());
+                hash = CombineHash(
+                    hash,
+                    windInfluenceOnTrampledGrass.GetHashCode());
                 hash = CombineHash(hash, ambientResponse.GetHashCode());
                 hash = CombineHash(hash, sunResponse.GetHashCode());
                 hash = CombineHash(hash, localLightResponse.GetHashCode());
@@ -855,6 +931,25 @@ namespace ProgrammaticStylized3D.Vegetation
             runtimeMaterial.SetFloat(
                 InteractionNormalResponseId,
                 interactionNormalResponse);
+            runtimeMaterial.SetFloat(
+                WindInfluenceOnDisplacedGrassId,
+                windInfluenceOnDisplacedGrass);
+            runtimeMaterial.SetFloat(TrampleBendResponseId, trampleBendResponse);
+            runtimeMaterial.SetFloat(
+                TrampleFlattenResponseId,
+                trampleFlattenResponse);
+            runtimeMaterial.SetFloat(
+                TrampleHeightExponentId,
+                trampleHeightExponent);
+            runtimeMaterial.SetFloat(
+                TrampleMaximumBendId,
+                maximumTrampleBendMetres);
+            runtimeMaterial.SetFloat(
+                TrampleNormalResponseId,
+                trampleNormalResponse);
+            runtimeMaterial.SetFloat(
+                WindInfluenceOnTrampledGrassId,
+                windInfluenceOnTrampledGrass);
             runtimeMaterial.SetFloat(AmbientResponseId, ambientResponse);
             runtimeMaterial.SetFloat(SunResponseId, sunResponse);
             runtimeMaterial.SetFloat(
@@ -1005,6 +1100,7 @@ namespace ProgrammaticStylized3D.Vegetation
                 float maximumHeight = grassHeight * heightScaleRange.y;
                 float maximumHorizontalBend = maximumHeight * 1.1f +
                     maximumInteractionBendMetres +
+                    maximumTrampleBendMetres +
                     clusterDiameter * widthScaleRange.y *
                     widthStabilizationMaximumMultiplier;
                 localBounds = BuildLocalBounds(

@@ -101,11 +101,11 @@ The current wind generation is a baseline, not the final Weather authoring model
 
 ## 6. Stylized wind-line compatibility
 
-A future Weather presentation layer may render drawn wind lines that travel, curve, or swirl through the level.
+A Weather-owned stylized wind-trail V0 architecture is now approved and recorded in `Assets/Docs/Weather_Wind_Architecture.md` under `WEATHER-WIND-TRAILS-V0.0`; runtime implementation and Unity validation remain pending.
 
-These wind lines should consume the shared authoritative target wind rather than using an unrelated animation direction. Their paths may be advanced through repeated XZ wind samples so that visual wind direction agrees with grass and gameplay.
+The trails consume the shared authoritative target wind rather than an unrelated animation direction or the vegetation spring-response field. Candidate selection favours strong, separated locations, and centreline construction advances through repeated explicit-time XZ target-wind samples so trail direction agrees with Weather gameplay sampling and vegetation's target source.
 
-The exact wind-line rendering technique, spawning rules, lifetime, shape language, and performance budget have not been defined.
+V0 uses the Weather field-anchor Y plus a configurable altitude range, one fixed-capacity combined camera-facing ribbon mesh, and one hidden runtime material created from a serialized Shader reference. It does not depend on `GeneratedGround`, create a material asset, add a renderer feature, or create a second wind simulation.
 
 ---
 
@@ -184,10 +184,12 @@ Wind debugging is centralized in the Weather wind domain rather than duplicated 
 The current visualization is deliberately limited to three modes:
 
 - `Off`;
-- `Target Wind`;
-- `Response Wind`.
+- `Wind Field`;
+- `Response Error`.
 
-`Target Wind` shows the authoritative visual target field. `Response Wind` shows the spring-smoothed vegetation response field. Direction and magnitude are combined in the same arrow display to avoid debug-view bloat.
+`Wind Field` shows the authoritative Weather target vector used by CPU gameplay sampling and future wind-trail construction.
+
+`Response Error` shows `actual visual bend - expected equilibrium bend`. The expected bend uses the same target-wind-to-visual-bend conversion as the compute simulation. No arrow means the vegetation spring response has caught up; arrows expose lag, overshoot, and local settling. Response data uses the existing editor-only asynchronous GPU readback.
 
 ---
 
@@ -206,7 +208,7 @@ Current principles:
 
 - no per-grass CPU wind updates;
 - no gameplay dependence on GPU readback;
-- fixed-cadence low-resolution field updates are acceptable when bounded;
+- fixed-cadence low-resolution field updates are acceptable when bounded; the implemented Weather domain exposes `5–60 Hz`, with `10 Hz` as the baseline default and accepted demo-scene value;
 - visual consumers may use GPU field samples;
 - gameplay uses CPU-authoritative wind queries;
 - field density is measured in metres per cell, not tied to vegetation-patch dimensions;

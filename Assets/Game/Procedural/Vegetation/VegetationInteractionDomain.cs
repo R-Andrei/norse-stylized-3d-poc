@@ -14,7 +14,7 @@ namespace ProgrammaticStylized3D.Vegetation
         private const string ComputeResourcePath =
             "PS3DVegetation/Compute/CS_VegetationInteractionField";
         private const int ThreadGroupSize = 8;
-        private const int InteractorRecordStride = 32;
+        private const int InteractorRecordStride = 48;
 
         private static readonly int PreviousFieldId =
             Shader.PropertyToID("_VegetationInteractionPreviousField");
@@ -52,6 +52,10 @@ namespace ProgrammaticStylized3D.Vegetation
         [SerializeField, Range(0.1f, 2f)]
         private float cellSizeMetres = 0.25f;
 
+        [SerializeField, Range(0.25f, 8f)]
+        [Tooltip("Distance the anchor may move away from the current field centre before one accumulated toroidal recenter occurs.")]
+        private float recenterMarginMetres = 1.5f;
+
         [SerializeField, Range(5f, 60f)]
         [Tooltip("Fixed immediate-interaction update rate. The shader interpolates between field steps; 10 Hz is intentionally supported for testing.")]
         private float updateRateHz = 20f;
@@ -70,6 +74,10 @@ namespace ProgrammaticStylized3D.Vegetation
         [SerializeField, Range(0.01f, 2f)]
         [Tooltip("Time constant used when immediate displacement returns to zero. This is transient recovery, not trail lifetime.")]
         private float recoveryTimeSeconds = 0.18f;
+
+        [SerializeField, Range(0f, 1f)]
+        [Tooltip("Target strength retained at the previous endpoint of a moving swept capsule. Zero releases the tail completely; one preserves the former uniform sweep.")]
+        private float sweepTailRetention = 0.10f;
 
         [Header("Debug")]
         [SerializeField]
@@ -113,6 +121,7 @@ namespace ProgrammaticStylized3D.Vegetation
         {
             public Vector4 StartEnd;
             public Vector4 Parameters;
+            public Vector4 DirectionParameters;
         }
 
         private readonly struct InteractorCandidate
@@ -141,10 +150,12 @@ namespace ProgrammaticStylized3D.Vegetation
         public int FieldResolution => fieldResolution;
         public float CellSizeMetres => cellSizeMetres;
         public float FieldWorldSizeMetres => fieldResolution * cellSizeMetres;
+        public float RecenterMarginMetres => recenterMarginMetres;
         public float UpdateRateHz => updateRateHz;
         public int MaximumInteractors => maximumInteractors;
         public float ResponseTimeSeconds => responseTimeSeconds;
         public float RecoveryTimeSeconds => recoveryTimeSeconds;
+        public float SweepTailRetention => sweepTailRetention;
         public bool ResourcesReady => resourcesReady;
         public string LastError => lastError;
         public Vector2 FieldOriginXZ => new Vector2(
@@ -249,11 +260,16 @@ namespace ProgrammaticStylized3D.Vegetation
                 64,
                 512);
             cellSizeMetres = Mathf.Clamp(cellSizeMetres, 0.1f, 2f);
+            recenterMarginMetres = Mathf.Clamp(
+                recenterMarginMetres,
+                0.25f,
+                ComputeMaximumRecenterMarginMetres());
             updateRateHz = Mathf.Clamp(updateRateHz, 5f, 60f);
             maximumStepsPerFrame = Mathf.Clamp(maximumStepsPerFrame, 1, 8);
             maximumInteractors = Mathf.Clamp(maximumInteractors, 1, 96);
             responseTimeSeconds = Mathf.Clamp(responseTimeSeconds, 0.01f, 1f);
             recoveryTimeSeconds = Mathf.Clamp(recoveryTimeSeconds, 0.01f, 2f);
+            sweepTailRetention = Mathf.Clamp01(sweepTailRetention);
             resolvedCamera = targetCamera;
 
             int configurationHash = ComputeResourceConfigurationHash();
@@ -362,9 +378,13 @@ namespace ProgrammaticStylized3D.Vegetation
         public string BuildComprehensiveReport()
         {
             var builder = new StringBuilder(2048);
-            builder.AppendLine("[Vegetation INTERACT.1 Immediate Domain Report]");
-            builder.Append("Status: ")
-                .AppendLine(resourcesReady ? "READY" : "NOT READY");
+            builder.AppendLine("[Vegetation INTERACT.1B Immediate Domain Report]");
+            string status = !Application.isPlaying
+                ? "INACTIVE — PLAY MODE SIMULATION NOT RUNNING"
+                : resourcesReady
+                    ? "READY"
+                    : "NOT READY";
+            builder.Append("Status: ").AppendLine(status);
             builder.Append("Published domain: ")
                 .AppendLine(PublishedDomain == this ? "Yes" : "No");
             builder.Append("Active interaction domains: ")
@@ -390,6 +410,9 @@ namespace ProgrammaticStylized3D.Vegetation
                 .Append(" × ")
                 .Append(FieldWorldSizeMetres.ToString("0.###"))
                 .AppendLine(" m");
+            builder.Append("Recenter margin: ")
+                .Append(recenterMarginMetres.ToString("0.###"))
+                .AppendLine(" m");
             builder.Append("Update rate: ")
                 .Append(updateRateHz.ToString("0.###"))
                 .AppendLine(" Hz (allowed 5–60 Hz)");
@@ -398,6 +421,9 @@ namespace ProgrammaticStylized3D.Vegetation
                 .Append(" / ")
                 .Append(recoveryTimeSeconds.ToString("0.###"))
                 .AppendLine(" s");
+            builder.Append("Sweep tail retention: ")
+                .AppendLine(sweepTailRetention.ToString("0.###"));
+            builder.AppendLine("Render-time release compensation: Enabled");
             builder.Append("Field origin XZ: ")
                 .AppendLine(FieldOriginXZ.ToString("F3"));
             builder.Append("Toroidal offset: ")
@@ -407,7 +433,9 @@ namespace ProgrammaticStylized3D.Vegetation
                 .AppendLine(" bytes");
             builder.Append("Estimated actor-buffer memory: ")
                 .Append(EstimatedInteractorBufferBytes.ToString("N0"))
-                .AppendLine(" bytes");
+                .AppendLine(" bytes (48 bytes/interactor)");
+            builder.AppendLine(
+                "Direction shaping: Per interactor — Radial / World X Biased / Hybrid");
             builder.Append("Registered / candidate / uploaded / overflow: ")
                 .Append(lastRegisteredInteractorCount).Append(" / ")
                 .Append(lastCandidateInteractorCount).Append(" / ")
@@ -421,6 +449,13 @@ namespace ProgrammaticStylized3D.Vegetation
                 .AppendLine(totalSimulationDispatchCount.ToString("N0"));
             builder.Append("Total recenter dispatches: ")
                 .AppendLine(totalRecenterDispatchCount.ToString("N0"));
+            float recenterPercentage = totalSimulationDispatchCount > 0
+                ? totalRecenterDispatchCount * 100f /
+                    totalSimulationDispatchCount
+                : 0f;
+            builder.Append("Recenter dispatches / simulation steps: ")
+                .Append(recenterPercentage.ToString("0.0"))
+                .AppendLine("%");
             builder.AppendLine("Persistent trail state: Not present in INTERACT.1");
             if (!string.IsNullOrEmpty(lastError))
             {
@@ -645,7 +680,12 @@ namespace ProgrammaticStylized3D.Vegetation
                         sample.Radius,
                         sample.BendStrength,
                         sample.FlattenStrength,
-                        sample.MovementBlend)
+                        sample.MovementBlend),
+                    DirectionParameters = new Vector4(
+                        (float)sample.DirectionMode,
+                        sample.WorldXBias,
+                        sample.WorldZStrength,
+                        0f)
                 };
             }
 
@@ -747,7 +787,7 @@ namespace ProgrammaticStylized3D.Vegetation
                 new Vector4(
                     responseTimeSeconds,
                     recoveryTimeSeconds,
-                    0f,
+                    sweepTailRetention,
                     0f));
         }
 
@@ -798,7 +838,7 @@ namespace ProgrammaticStylized3D.Vegetation
                 new Vector4(
                     interpolation,
                     fixedStep,
-                    simulationTime,
+                    recoveryTimeSeconds,
                     1f));
         }
 
@@ -814,12 +854,40 @@ namespace ProgrammaticStylized3D.Vegetation
         private Vector2Int ComputeDesiredOriginCell()
         {
             Vector3 anchor = ResolveAnchorPosition();
-            int centreX = Mathf.FloorToInt(anchor.x / cellSizeMetres);
-            int centreZ = Mathf.FloorToInt(anchor.z / cellSizeMetres);
+            Vector2Int anchorCell = new Vector2Int(
+                Mathf.FloorToInt(anchor.x / cellSizeMetres),
+                Mathf.FloorToInt(anchor.z / cellSizeMetres));
             int halfResolution = fieldResolution / 2;
-            return new Vector2Int(
-                centreX - halfResolution,
-                centreZ - halfResolution);
+            Vector2Int centredOrigin = new Vector2Int(
+                anchorCell.x - halfResolution,
+                anchorCell.y - halfResolution);
+            if (!originInitialized)
+            {
+                return centredOrigin;
+            }
+
+            Vector2Int currentCentre = originCell + new Vector2Int(
+                halfResolution,
+                halfResolution);
+            Vector2Int centreDelta = anchorCell - currentCentre;
+            int marginCells = Mathf.Max(
+                1,
+                Mathf.CeilToInt(recenterMarginMetres / cellSizeMetres));
+            if (Mathf.Abs(centreDelta.x) <= marginCells &&
+                Mathf.Abs(centreDelta.y) <= marginCells)
+            {
+                return originCell;
+            }
+
+            return centredOrigin;
+        }
+
+        private float ComputeMaximumRecenterMarginMetres()
+        {
+            float halfExtent = fieldResolution * cellSizeMetres * 0.5f;
+            return Mathf.Max(
+                0.25f,
+                Mathf.Min(8f, halfExtent - cellSizeMetres * 2f));
         }
 
         private Vector3 ResolveAnchorPosition()
@@ -958,11 +1026,27 @@ namespace ProgrammaticStylized3D.Vegetation
 
             Vector3 anchor = ResolveAnchorPosition();
             float size = FieldWorldSizeMetres;
-            Vector3 centre = new Vector3(anchor.x, fieldPlaneY, anchor.z);
+            Vector2 fieldOrigin = originInitialized
+                ? FieldOriginXZ
+                : new Vector2(
+                    anchor.x - size * 0.5f,
+                    anchor.z - size * 0.5f);
+            Vector3 fieldCentre = new Vector3(
+                fieldOrigin.x + size * 0.5f,
+                fieldPlaneY,
+                fieldOrigin.y + size * 0.5f);
             Color previousColor = Gizmos.color;
             Gizmos.color = new Color(0.25f, 0.85f, 1f, 0.85f);
-            Gizmos.DrawWireCube(centre, new Vector3(size, 0.05f, size));
-            Gizmos.DrawSphere(centre, 0.12f);
+            Gizmos.DrawWireCube(
+                fieldCentre,
+                new Vector3(size, 0.05f, size));
+            Gizmos.DrawWireCube(
+                fieldCentre,
+                new Vector3(
+                    recenterMarginMetres * 2f,
+                    0.08f,
+                    recenterMarginMetres * 2f));
+            Gizmos.DrawSphere(anchor, 0.12f);
             Gizmos.color = previousColor;
         }
     }

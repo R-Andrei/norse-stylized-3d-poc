@@ -2207,10 +2207,18 @@ private readonly struct EdgeWearTopologyStats
             public int NormalizedEdgeCount;
             public int NormalizedFaceCount;
             public int EligibleCandidateCount;
+            public int SelectedCandidateRank = -1;
             public int SelectedGraphVertexIndex = -1;
             public Vector3 SelectedPosition;
             public Vector3 OutwardNormal;
+            public float RequestedDepthFraction;
+            public float DepthVariation;
+            public float DepthVariationIdentity;
+            public float ResolvedDepthFraction;
+            public float TopFacingPreference;
             public float BaseDepth;
+            public float ShortestIncidentEdgeLength;
+            public float AcceptedRetryFactor;
             public float MinimumStableEdgeLength;
             public float MinimumStableFaceArea;
             public float MaximumDimension;
@@ -2218,8 +2226,13 @@ private readonly struct EdgeWearTopologyStats
             public int AcceptedTrialIndex = -1;
             public float AcceptedDepth;
             public float ShortestCapEdgeLength;
+            public readonly List<float> CapEdgeLengths =
+                new List<float>();
             public List<PolygonFace> AcceptedFaces;
+            public List<PolygonFace> AcceptedConstructionFaces;
             public PolygonFace AcceptedCapFace;
+            public int ConstructionSourceFaceCountExpected;
+            public int ConstructionSourceFaceCountAttributed;
             public string Diagnostic = string.Empty;
             public readonly Dictionary<EdgeKey, int>
                 StableIdentityByOutputKey =
@@ -2238,8 +2251,22 @@ private readonly struct EdgeWearTopologyStats
 
         private sealed class CornerDamagePreviewConstructionRecord
         {
+            public CornerDamagePreviewKind PreviewKind;
             public CornerDamageTransactionAuditResult Transaction;
+            public bool AuthoringEnabled;
+            public float OrdinaryRequestedWidth;
+            public float CapRingWidthScale;
+            public float CapRingOrdinaryLimit;
+            public float CapRingDepthLimit;
+            public float CapRingEdgeLimit;
+            public string CapRingWinningLimit = string.Empty;
+            public float CapRingWearStrength;
             public float CapRingRequestedWidth;
+            public Vector3 SelectedCornerLocalPosition;
+            public readonly List<Vector3> CapVerticesLocal =
+                new List<Vector3>();
+            public readonly List<float> CapEdgeLengthsLocal =
+                new List<float>();
             public int ExpectedMandatoryCount;
             public int MandatoryCandidateCount;
             public int MandatorySelectedCount;

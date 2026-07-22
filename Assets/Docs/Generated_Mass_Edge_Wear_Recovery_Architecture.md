@@ -22,7 +22,7 @@ The architecture now establishes:
 - certified topology, convexity, containment, bounds, volume, face quality, triangulation, normals, tangents, and render channels;
 - stable seed-8889 positive/negative fixtures, including edges `13/23/39`, suppressed component `14/24/30`, and excluded edge `40`.
 
-The accepted R13A.9a uniform baseline and V1A.2b macro extension remain closed. V1A.2 completed owner/support construction-width backoff and retained the reported meaningful edge; V1A.2a closed stable-floor classification before corner solving; V1A.2b closed the corresponding editor-only fixture proof. The later EW-V2A multi-plane geometric Micro path is retired after runtime evidence showed high dirty-time cost and a repeated wide-end/narrow-middle result. EW-V1A.2c/d/e protected-Macro recovery experiments are likewise rejected and removed after failing functionally and producing an unresponsive 256-state editor case. EW-V1A.2f restores the complete V1A.2b recovery system and normalizes public Macro Strength to the certified effective amplitude. EW-S1 is rejected and removed. EW-V1A.3b is the accepted and frozen Macro-width/recovery boundary. `EW-C1A-RO2` completed the ownership/construction audit and approved one transactional corner cut after micro-topology normalization but before bevel-candidate construction. `EW-C1A.1` is implemented as a diagnostic-only transaction and its seed-8889 trial-0 report is accepted. EW-C1A.1a.8 passed the complete Unity gate and is frozen. EW-C1A.2 is implemented as a preview-only committed corner transaction with mandatory cap-ring bevels; Unity compile and visual acceptance remain pending.
+The accepted R13A.9a uniform baseline and V1A.2b macro extension remain closed. V1A.2 completed owner/support construction-width backoff and retained the reported meaningful edge; V1A.2a closed stable-floor classification before corner solving; V1A.2b closed the corresponding editor-only fixture proof. The later EW-V2A multi-plane geometric Micro path is retired after runtime evidence showed high dirty-time cost and a repeated wide-end/narrow-middle result. EW-V1A.2c/d/e protected-Macro recovery experiments are likewise rejected and removed after failing functionally and producing an unresponsive 256-state editor case. EW-V1A.2f restores the complete V1A.2b recovery system and normalizes public Macro Strength to the certified effective amplitude. EW-S1 is rejected and removed. EW-V1A.3b is the accepted and frozen Macro-width/recovery boundary. `EW-C1A-RO2` completed the ownership/construction audit and approved one transactional corner cut after micro-topology normalization but before bevel-candidate construction. `EW-C1A.1` is implemented as a diagnostic-only transaction and its seed-8889 trial-0 report is accepted. EW-C1A.1a.8 passed the complete Unity gate and is frozen. EW-C1A.2a repairs the semantic-versus-construction provenance boundary with a dense construction-only `SourceFace` clone; the user Unity report passed with `constructionSourceProvenance=17/17`, mandatory cap ring `3/3/3/3`, and no collateral loss. EW-C1A.2c proved both the raw certified cut and post-chip bevel integration. EW-C1A.3 removes the duplicate integration workflow from the Inspector, routes the existing edge-wear preview through corner chipping when enabled, and owns the internal disabled/default/maximum-depth 33-case stage. Its first Unity result passed every frozen baseline gate and disabled parity `11/11`, but enabled corner construction passed only `3/22`; EW-C1A.3a therefore adds deterministic full-feature corner fallback and a uniform cap-ring width schedule without weakening any acceptance gate.
 
 The legacy construction and repair paths and the earlier bounded/plane experiments remain documented as architecture history and diagnostic comparison evidence. Any pre-R13A section that speaks of a future geometry direction is historical unless repeated by the current contract near the end of this document.
 
@@ -2371,14 +2371,16 @@ Unity passed Macro preservation, topology and preview `33/33`, outliers `5/5`, n
 
 ## EW-C1A.2 committed-transaction and mandatory-ring recovery boundary
 
-The certified C1A.1 result is no longer reconstructed after audit. The accepted trial commits the exact damaged face list, cap face, accepted depth, stable identity for every damaged output edge, generated cap-ring key/identity set, and the three affected original parent identities. A generated cap-ring identity that aliases any original identity rejects the trial.
+The certified C1A.1 result is no longer reconstructed after audit. The accepted trial commits the exact semantic damaged face list, cap face, accepted depth, stable identity for every damaged output edge, generated cap-ring key/identity set, and the three affected original parent identities. A generated cap-ring identity that aliases any original identity rejects the trial.
 
-The explicit editor preview enters `UnifiedBoundedPreview` through a scoped thread-local request. Orchestration substitutes the committed damaged faces immediately after micro-topology normalization. `BuildEdgeWearBevelCandidates` resolves identity from the committed output-edge map before falling back to the frozen normalization map.
+The first EW-C1A.2 Unity report proved that the semantic cap provenance cannot be used directly as the bounded-bevel source baseline: the isolated audit expects one dense `SourceFace` index for every input polygon, while the semantic cap intentionally remains `CornerDamageCap`. EW-C1A.2a therefore derives an exact construction clone from the certified semantic list. The clone preserves face order and polygon geometry but assigns `SourceFace` indices `0..N-1` to all faces. The semantic list remains immutable transaction evidence.
+
+The explicit integration preview enters `CornerDamageIntegrationPreview`; orchestration substitutes the densely attributed construction faces immediately after micro-topology normalization. The geometry-only preview enters `CornerDamageGeometryPreview` and returns the triangulated semantic damaged faces before construction attribution or candidate discovery. `BuildEdgeWearBevelCandidates` resolves identity from the committed output-edge map before falling back to the frozen normalization map only in the integration path.
 
 Cap-ring candidates form a dedicated mandatory class:
 
 ```text
-requestedWidth = min(0.50 * ordinaryRequestedWidth,
+requestedWidth = min(CapRingWidthScale * ordinaryRequestedWidth,
                      0.25 * acceptedDepth,
                      0.20 * shortestCapEdgeLength)
 Macro participation = 0
@@ -2389,3 +2391,54 @@ coverage selection = mandatory before ordinary coverage
 This classification does not grant a topology or recovery exception. A mandatory ring edge can still fail structural convexity, footprint, locality, isolated viability, shared-corner solving, width floors, conflict reduction, plane construction, manifold, face-quality, one-surface, or final render-normal certification. Any such failure rejects the whole preview so a raw or partially softened cap never reaches the displayed mesh.
 
 The preview runs the frozen undamaged unified shell first. Built ordinary edges are compared by stable original identity. The three shortened parent identities are locally affected and exempt; every other baseline-certified identity must remain certified after the corner transaction. This two-generation proof is explicit editor/dirty-time work only and changes no active-gameplay owner.
+
+Construction attribution is certified before preview use: expected and attributed source-face counts must match, every provenance index must equal the face-list position, and copied vertex values/features must match the semantic face. Failure rejects the transaction/preview before candidate construction. Report fields `semanticCapFaces` and `constructionSourceProvenance` distinguish the two ownership domains without changing the accepted C1A.1 identity tuple.
+
+### EW-C1A.2b authoring boundary
+
+Corner authoring does not move damage after bevel construction. The order remains normalized canonical polyhedron, transactional corner cut, damaged topology/identity rebuild, ordinary and mandatory cap-ring candidate discovery, certified shell construction, triangulation, and final render output. The new controls only parameterize selection, cut depth, ring width request, and ring feature strength within that order.
+
+Depth is requested as `shortestIncidentEdgeLength * CornerChipDepth`. A stable signed seed sample applies multiplicative Depth Variation, clamped to the approved `0.04..0.35` fraction. The four accepted fallback factors remain unchanged; only the old hard `0.18` upper ceiling expands to the authoring maximum `0.35`. At Top-Facing Preference `0.5`, the prior selection score is reproduced exactly.
+
+Cap-ring width remains safety-bounded and all-or-nothing. Cap-Ring Width Scale changes only the ordinary-width ceiling; accepted-depth and shortest-cap-edge ceilings remain hard. Cap-Ring Wear Strength changes only the existing edge-wear feature strength and is clamped to the existing mask contract. Marker/report data is transformed after dimensions and placement but never enters mesh construction or runtime state.
+
+### EW-C1A.2c geometry-only versus integration ownership
+
+The corner transaction is shared, but the preview endpoints are intentionally different. `CornerDamageGeometryPreview` stops immediately after transaction certification and calls the accepted one-surface polygon triangulator on the semantic `AcceptedFaces`. It must report zero bevel candidates and zero bevel faces. It neither creates nor requires the construction-provenance clone because that clone exists specifically for bounded bevel ownership.
+
+`CornerDamageIntegrationPreview` continues through the dense construction clone, damaged-edge identity map, ordinary candidates, mandatory cap-ring candidates, coexistence/recovery, unified shell construction, and unrelated-baseline retention comparison. This remains the authoritative proof that edge wear applies after chipping and uses current live settings. The geometry preview is not a replacement for that proof; it is an unobstructed earlier-stage visual endpoint.
+
+The two modes retain one transformed marker contract but use distinct labels and reports. Depth telemetry is dimensionally explicit: requested absolute depth is the resolved requested fraction times the selected shortest incident edge; accepted fraction is accepted absolute depth divided by that same edge; accepted/requested ratio equals the certified retry factor when no additional clamp changes the request. No retry factor, clipping rule, triangulation rule, render-normal rule, or production owner changes in this split.
+
+### EW-C1A.3 unified authoring and suite ownership
+
+Corner Chipping is a normal authoring group, not a separate diagnostic subsystem. `Rebuild Corner Chip Preview` stops after the certified semantic cut. `Rebuild Edge-Wear Bevel Preview` is corner-aware: it follows the frozen ordinary path when disabled and the certified corner-first integration path when enabled. The separate integration button, duplicate corner report controls, standalone transaction-audit controls, preview selector, and user-facing preview-only terminology are removed.
+
+The one-click suite owns the only C1A.3 matrix entry point. Eleven accepted seeds are evaluated under Disabled, Default, and Maximum Depth policies. Disabled cases require exact parity with the frozen ordinary unified path and no corner status. Enabled cases run the semantic chip endpoint and the integrated endpoint independently and require identical selected vertex, accepted trial/depth, and cap-ring identities; one semantic cap; dense construction attribution; complete mandatory ring; zero unrelated bevel loss; and valid authored-normal plus recalculated-tangent channels.
+
+This matrix is asynchronous and immutable with respect to the selected `GeneratedMass`. It snapshots the recipe and current ordinary/top/ring settings, builds temporary `MeshData` and temporary Unity meshes, verifies the target mesh/preview/recipe state at completion, and contributes its aggregate directly to the existing suite status and combined clipboard report. No new Inspector button, production callback, runtime state, shader path, mesh channel, asset, cache, texture, or buffer is introduced.
+
+
+### EW-C1A.3a deterministic full-certification search
+
+The C1A.3 matrix proved three independent rejection classes above the frozen edge-wear baseline: selected-corner transaction failure, transaction-certified but incomplete cap ring, and complete ring with unrelated bevel loss. The repair does not relax any class. It changes the selection transaction from “highest score or fail” to “highest-ranked fully certified corner.”
+
+`EvaluateCornerDamageTransaction` retains the existing eligibility and score formula, repeatedly applies the frozen rank-0 comparison to form a deterministic fallback order, and consumes an editor-scoped requested rank. The repeated resolver avoids a non-transitive epsilon comparator inside `List.Sort`. Each rank still owns the existing four fresh-clone depth trials. `ResolveCornerDamageCapRingRequestedWidth` retains the ordinary-width, accepted-depth, and shortest-cap-edge limits, then applies one editor-scoped uniform ring multiplier. Candidate classification, mandatory ownership, Macro exclusion, coexistence, shell construction, and all geometry validators remain unchanged.
+
+`MassGenerator.GenerateCornerDamageFullCertificationSearch` owns the outer transaction:
+
+```text
+one frozen ordinary baseline
+for candidate rank in score order:
+    certify the existing corner transaction
+    for ring scale in 1/.75/.5625/.421875/.31640625/.25:
+        build the complete post-chip edge-wear preview
+        accept only CompleteCornerDamagePreviewCapture == passed
+return the first complete pass; otherwise retain the deepest blocker
+```
+
+Ring scales are common requests for all three generated ring edges. Individual ring omission remains fatal. Unrelated original identities outside the three shortened parent edges remain mandatory retention evidence. A later-ranked corner is therefore preferred over any earlier corner that cannot preserve the full feature.
+
+The raw geometry endpoint executes the same full search before regenerating only the accepted semantic cut. This prevents a raw preview from advertising a corner that the normal edge-wear preview cannot integrate. Thread-static search overrides are enclosed by disposable scopes and restored after every attempt; non-editor and production calls resolve rank `0` and scale `1` exactly as before. Candidate-local `InvalidOperationException` construction failures are recorded as `post-chip-construction` blockers so a malformed preferred corner cannot terminate the entire deterministic search; unexpected exception classes still propagate.
+
+Failure reporting is staged as candidate availability, transaction certification, cap-ring completion, post-chip construction, or unrelated retention. Search evidence includes eligible/attempted corner counts, attempted configurations, accepted rank, committed scale, and concise rank/scale outcomes. The one-click matrix consumes these fields but adds no Inspector action or user-facing workflow.

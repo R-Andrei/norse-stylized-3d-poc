@@ -1,3 +1,85 @@
+## 2026-07-22 — GSU-M2.7C.5E.2.2 feature-aware application-boundary contract
+
+This section extends the accepted E2.1 generic Bank and Riverbed application transition without changing corridor-channel meanings or hydrology.
+
+Each current secondary application uses the existing inward-distance field twice:
+
+1. Material Blend Distance/Softness controls the complete substrate transition into the resolved lower surface.
+2. Discrete Feature Edge Clearance/Return Fade controls whether a feature-aware payload retains its discrete feature contribution.
+
+Current boundaries remain:
+
+- Bank: inward distance from the corridor terrain handoff; lower surface is Primary Ground.
+- Riverbed: inward distance from exact Riverbed Support; lower surface is the already-resolved Bank/Primary-Ground composition.
+
+The transition vector contract is now:
+
+```text
+x = material blend distance
+y = material blend softness
+z = discrete-feature edge clearance
+w = discrete-feature return fade
+```
+
+Feature retention is gated by nonzero clearance, feature-aware payload mode, and nonzero feature coverage. Within the clearance band, a feature-aware layer resolves to its substrate-only Palette Form and roughness while its feature slope and cavity are neutralized. After the clearance band, the feature contribution returns over the configured fade. Clearance zero restores the E2.1 uniform payload behavior. Ordinary payload modes are unaffected.
+
+This operation occurs after the existing packed/detail-form samples and before sequential Ground → Bank → Riverbed composition. It adds no texture sample, mesh channel, draw call, renderer, runtime allocation, or CPU update. Shore wetness, Riverbed wetness, submerged-cover exclusion, exact support ownership, and the accepted `TEXCOORD3` meanings remain unchanged.
+
+The current payload assumes a neutral substrate slope and cavity beneath discrete rocks. Whole-rock atomic inclusion is not represented; the feature-free edge band prevents boundary-intersecting rocks from appearing partially dissolved, while the feature return farther inside remains a controlled pixel-level transition.
+
+Historical Riverbed-only and Boolean-bank-domain sections remain superseded by E2.1 and this extension.
+
+---
+
+## 2026-07-22 — GSU-M2.7C.5E.2.1 authoritative River-coupled application-blend contract
+
+The user explicitly reopened the previous A4B.3 `TEXCOORD3.z` Boolean Bank-domain contract after production evidence showed a hard **River Bank-to-Primary-Ground** material boundary. This section supersedes only that channel meaning and the later M2.7C.5E.2 Riverbed-only transition architecture. A4B.3 wetness placement, Shore highlight ownership, submerged finish behavior, exact Riverbed Support, geometry topology, and renderer ownership remain unchanged.
+
+### Packed corridor stream
+
+```text
+TEXCOORD3.x = exact Ground Riverbed Support
+TEXCOORD3.y = outward Bank distance in metres from Riverbed Support
+TEXCOORD3.z = inward Bank distance in metres from the terrain handoff
+TEXCOORD3.w = inward Riverbed distance in metres from Riverbed Support
+```
+
+The final terrain-handoff vertex publishes `z = 0`. Values increase inward through the visible Bank and remain available beneath Riverbed Support so the Bank can act as Riverbed's already-resolved lower layer. Hidden apron geometry beyond the handoff also publishes zero. Bank-domain authorization is derived in the shader from positive `.z`, River-coupled renderer authorization, and `(1 - Riverbed Support)`. Ordinary GeneratedGround remains unauthorized because it has no River-coupled stream and its renderer role remains Ordinary Ground.
+
+### Generic application transition
+
+Every secondary surface application uses the same resolver:
+
+```text
+application weight =
+    region/support weight
+    × inward-distance transition(distance, softness)
+    × authored material strength
+```
+
+`Distance = 0` returns the historical region/support weight. A positive distance yields zero material participation at that application's boundary and reaches full authored participation at the configured inward distance. `Softness = 0` is linear; `Softness = 1` is cubic smooth interpolation.
+
+Current slot ownership:
+
+- Bank application: boundary is the River corridor terrain handoff; lower layer is Primary Ground.
+- Riverbed application: boundary is exact Riverbed Support; lower layer is the already-resolved Bank/Primary-Ground composition.
+
+### Sequential complete-response composition
+
+```text
+resolved = Primary Ground
+resolved = Blend(resolved, Bank, Bank application weight)
+resolved = Blend(resolved, Riverbed, Riverbed application weight)
+```
+
+The imported texture-form binary `0.5` ownership cut is retired. Continuous application weights are authoritative for every surface payload type. The normalized weights apply consistently to palette/albedo, Palette Form, packed slope/normal, cavity, roughness/finish, smoothness, specular response, and texture-form lighting.
+
+Material transition is independent from hydrology. Shore wetness, Riverbed wetness, their distance/softness controls, and exact-support cover exclusion retain their accepted formulas and ownership. No River water shader, mesh topology, collider, profile schema, scene, prefab, texture asset, renderer, or draw-call change is introduced.
+
+Historical sections below retain design history. Any statement that `TEXCOORD3.z` is a Boolean Bank-domain authorization or that only Riverbed owns a dry application transition is superseded by this contract.
+
+---
+
 # Ground / River-Coupled Surface Response Architecture
 
 ## 2026-07-22 — GSU-M2.7C.5E.2 dry Riverbed material transition

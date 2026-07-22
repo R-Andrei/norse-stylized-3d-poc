@@ -295,11 +295,30 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 return;
             }
 
-            if (StylizedSurfaceDetailLibraryBuilder.NeedsRebuild(library))
-            {
-                StylizedSurfaceDetailLibraryBuilder.Rebuild(
+            if (StylizedSurfaceDetailLibraryBuilder.NeedsRebuild(library) &&
+                !StylizedSurfaceDetailLibraryBuilder.Rebuild(
                     library,
-                    false);
+                    out IReadOnlyList<string> rebuildFailures,
+                    false))
+            {
+                if (rebuildFailures != null &&
+                    rebuildFailures.Count > 0)
+                {
+                    for (int index = 0;
+                         index < rebuildFailures.Count;
+                         index++)
+                    {
+                        failures.Add(
+                            $"{label}: detail-library rebuild: " +
+                            rebuildFailures[index]);
+                    }
+                }
+                else
+                {
+                    failures.Add(
+                        $"{label}: detail-library rebuild failed without " +
+                        "a detailed builder message.");
+                }
             }
 
             builder.AppendLine($"Library: {AssetDatabase.GetAssetPath(library)}");
@@ -445,6 +464,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     resolved.SourceTexture,
                     false,
                     resolved.UsesPrepackedTextureForm);
+                if (resolved.UsesFeatureTextureForm &&
+                    !resolved.UsesPrepackedTextureForm)
+                {
+                    failures.Add(
+                        $"{library.name}/{resolved.StableId}: feature-aware " +
+                        "texture form is not recognized as a prepacked form.");
+                }
+
                 if (resolved.UsesPrepackedTextureForm)
                 {
                     AppendSourceTexture(
@@ -520,12 +547,24 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
                 builder.AppendLine(
                     $"Texture-form source: pre-normalized paired payload, algorithm {StylizedSurfaceDetailLibraryBuilder.PrepackedTextureFormAlgorithmVersion}");
-                AppendTextureFormBandCoverage(
-                    builder,
-                    failures,
-                    label,
-                    pairedSource.GetPixels(0),
-                    false);
+                if (entry.UsesFeatureTextureForm)
+                {
+                    AppendFeatureTextureFormPayloadReport(
+                        builder,
+                        failures,
+                        label,
+                        pairedSource.GetPixels32(0));
+                }
+                else
+                {
+                    AppendTextureFormBandCoverage(
+                        builder,
+                        failures,
+                        label,
+                        pairedSource.GetPixels(0),
+                        false);
+                }
+
                 return;
             }
 
@@ -626,6 +665,129 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             {
                 failures.Add(
                     $"{label}: could not write texture-form tiled diagnostics: {exception.Message}");
+            }
+        }
+
+        private static void AppendFeatureTextureFormPayloadReport(
+            StringBuilder builder,
+            ICollection<string> failures,
+            string label,
+            IReadOnlyList<Color32> pixels)
+        {
+            if (pixels == null || pixels.Count == 0)
+            {
+                failures.Add(
+                    $"{label}: feature-aware Palette Form has no pixels.");
+                return;
+            }
+
+            int dark = 0;
+            int baseline = 0;
+            int light = 0;
+            double featureSum = 0.0;
+            double substrateFormSum = 0.0;
+            double substrateRoughnessSum = 0.0;
+            float featureMaximum = 0f;
+            float combinedMinimum = 1f;
+            float combinedMaximum = 0f;
+            for (int index = 0; index < pixels.Count; index++)
+            {
+                Color32 pixel = pixels[index];
+                float combinedForm =
+                    StylizedSurfaceDetailLibraryBuilder.DecodeSrgbByte(
+                        pixel.r);
+                float substrateForm =
+                    StylizedSurfaceDetailLibraryBuilder.DecodeSrgbByte(
+                        pixel.g);
+                float substrateRoughness =
+                    StylizedSurfaceDetailLibraryBuilder.DecodeSrgbByte(
+                        pixel.b);
+                float feature = pixel.a / 255f;
+                combinedMinimum = Mathf.Min(
+                    combinedMinimum,
+                    combinedForm);
+                combinedMaximum = Mathf.Max(
+                    combinedMaximum,
+                    combinedForm);
+                substrateFormSum += substrateForm;
+                substrateRoughnessSum += substrateRoughness;
+                featureSum += feature;
+                featureMaximum = Mathf.Max(featureMaximum, feature);
+                if (combinedForm < 0.45f)
+                {
+                    dark++;
+                }
+                else if (combinedForm <= 0.55f)
+                {
+                    baseline++;
+                }
+                else
+                {
+                    light++;
+                }
+            }
+
+            float inverseCount = 1f / pixels.Count;
+            float featureMean = (float)(featureSum * inverseCount);
+            float substrateFormMean =
+                (float)(substrateFormSum * inverseCount);
+            float substrateRoughnessMean =
+                (float)(substrateRoughnessSum * inverseCount);
+            float count = pixels.Count;
+            builder.AppendLine(
+                $"Feature-aware combined form min/max: " +
+                $"{combinedMinimum:F5}/{combinedMaximum:F5}");
+            builder.AppendLine(
+                $"Feature-aware palette-band coverage: Dark=" +
+                $"{dark * 100f / count:F2}%, Base=" +
+                $"{baseline * 100f / count:F2}%, Light=" +
+                $"{light * 100f / count:F2}%");
+            builder.AppendLine(
+                $"Feature mask mean/max: " +
+                $"{featureMean:F5}/{featureMaximum:F5}");
+            builder.AppendLine(
+                $"Substrate-only form/roughness means (linear): " +
+                $"{substrateFormMean:F5}/{substrateRoughnessMean:F5}");
+
+            if (featureMaximum <
+                    StylizedSurfaceDetailLibraryBuilder
+                        .MinimumFeatureTextureFormMaximum ||
+                featureMean <
+                    StylizedSurfaceDetailLibraryBuilder
+                        .MinimumFeatureTextureFormMean ||
+                featureMean >
+                    StylizedSurfaceDetailLibraryBuilder
+                        .MaximumFeatureTextureFormMean)
+            {
+                failures.Add(
+                    $"{label}: feature mask mean/max is " +
+                    $"{featureMean:F5}/{featureMaximum:F5}; expected mean " +
+                    $"{StylizedSurfaceDetailLibraryBuilder.MinimumFeatureTextureFormMean:F5}–" +
+                    $"{StylizedSurfaceDetailLibraryBuilder.MaximumFeatureTextureFormMean:F5} and maximum at least " +
+                    $"{StylizedSurfaceDetailLibraryBuilder.MinimumFeatureTextureFormMaximum:F5}.");
+            }
+
+            if (substrateFormMean <
+                    StylizedSurfaceDetailLibraryBuilder
+                        .MinimumFeatureSubstrateFormMean ||
+                substrateFormMean >
+                    StylizedSurfaceDetailLibraryBuilder
+                        .MaximumFeatureSubstrateFormMean ||
+                substrateRoughnessMean <
+                    StylizedSurfaceDetailLibraryBuilder
+                        .MinimumFeatureSubstrateRoughnessMean ||
+                substrateRoughnessMean >
+                    StylizedSurfaceDetailLibraryBuilder
+                        .MaximumFeatureSubstrateRoughnessMean)
+            {
+                failures.Add(
+                    $"{label}: substrate-only form/roughness means are " +
+                    $"{substrateFormMean:F5}/{substrateRoughnessMean:F5}; " +
+                    $"expected form " +
+                    $"{StylizedSurfaceDetailLibraryBuilder.MinimumFeatureSubstrateFormMean:F2}–" +
+                    $"{StylizedSurfaceDetailLibraryBuilder.MaximumFeatureSubstrateFormMean:F2} and roughness " +
+                    $"{StylizedSurfaceDetailLibraryBuilder.MinimumFeatureSubstrateRoughnessMean:F2}–" +
+                    $"{StylizedSurfaceDetailLibraryBuilder.MaximumFeatureSubstrateRoughnessMean:F2}.");
             }
         }
 

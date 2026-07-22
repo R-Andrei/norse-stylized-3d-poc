@@ -383,17 +383,22 @@ Shader "PS3D/Stylized River Water"
                     _FoamInterpolation);
             }
 
-            float ResolveCommittedFoamPresenceVisibility(
-                float committedPresence)
+            float ResolveCommittedFoamCoverageVisibility(
+                float committedCoverage)
             {
-                // Comparative diagnostics share one meaningful-material gate.
-                // Raw Material Presence remains amplitude-faithful, while
-                // overlays and normalized moment views suppress tiny donor-cell
-                // tails that would otherwise look like full-strength coverage.
+                // Motion overlays use a soft geometric-occupancy visualization.
+                // Literal Presence/Life diagnostics use the binary authority gate
+                // below so their brightness is never rescaled by Coverage.
                 return smoothstep(
                     0.02,
                     0.16,
-                    saturate(committedPresence));
+                    saturate(committedCoverage));
+            }
+
+            float ResolveCommittedFoamMaterialAuthorityGate(
+                float committedCoverage)
+            {
+                return step(0.02, saturate(committedCoverage));
             }
 
 
@@ -1230,13 +1235,23 @@ Shader "PS3D/Stylized River Water"
                     // between two committed Layer C states used by Final Foam.
                     // Rejected velocity backtracing remains absent, so neither
                     // the white ownership overlay nor its grid crosses faces.
-                    float committedPresence = saturate(
-                        SampleCommittedFoamState(foam.fieldUV).r);
-                    float committedPresenceVisibility =
-                        ResolveCommittedFoamPresenceVisibility(
-                            committedPresence);
+                    float4 committedState =
+                        SampleCommittedFoamState(foam.fieldUV);
+                    float committedCoverage;
+                    float committedPresence;
+                    float committedLife;
+                    float committedPattern;
+                    RiverWaterFoamDecodeMaterialState(
+                        committedState,
+                        committedCoverage,
+                        committedPresence,
+                        committedLife,
+                        committedPattern);
+                    float committedCoverageVisibility =
+                        ResolveCommittedFoamCoverageVisibility(
+                            committedCoverage);
                     float foamOverlay = saturate(
-                        committedPresenceVisibility * 0.58);
+                        committedCoverageVisibility * 0.58);
                     fieldColour = lerp(
                         saturate(fieldColour),
                         float3(1.0, 1.0, 0.95),
@@ -1376,12 +1391,12 @@ Shader "PS3D/Stylized River Water"
 
                     if (foamDebug == 8)
                     {
-                        float materialPresence = saturate(
+                        float materialAmount = saturate(
                             SampleCommittedFoamState(foam.fieldUV).r);
                         float addedByShape = saturate(
-                            (evaluatedShape - materialPresence) * 4.0);
+                            (evaluatedShape - materialAmount) * 4.0);
                         float removedByShape = saturate(
-                            (materialPresence - evaluatedShape) * 4.0);
+                            (materialAmount - evaluatedShape) * 4.0);
                         float3 differenceColour = float3(
                             removedByShape + addedByShape * 0.10,
                             addedByShape,
@@ -1414,30 +1429,42 @@ Shader "PS3D/Stylized River Water"
                 {
                     float4 committedState =
                         SampleCommittedFoamState(foam.fieldUV);
-                    float committedPresence = saturate(committedState.x);
-                    float committedRemainingLife =
-                        committedPresence > 0.0001
-                            ? saturate(
-                                committedState.y /
-                                committedPresence)
-                            : 0.0;
-                    float committedPresenceVisibility =
-                        ResolveCommittedFoamPresenceVisibility(
-                            committedPresence);
-                    float lifeBrightness = lerp(
-                        0.12,
-                        1.0,
-                        saturate(committedRemainingLife));
-                    float life =
-                        lifeBrightness * committedPresenceVisibility;
-                    return half4(life.xxx, 1.0);
+                    float committedCoverage;
+                    float committedPresence;
+                    float committedRemainingLife;
+                    float committedPattern;
+                    RiverWaterFoamDecodeMaterialState(
+                        committedState,
+                        committedCoverage,
+                        committedPresence,
+                        committedRemainingLife,
+                        committedPattern);
+                    float materialAuthorityGate =
+                        ResolveCommittedFoamMaterialAuthorityGate(
+                            committedCoverage);
+                    float visibleLife = saturate(
+                        committedRemainingLife) * materialAuthorityGate;
+                    return half4(visibleLife.xxx, 1.0);
                 }
 
                 if (foamDebug == 3)
                 {
-                    float presence = saturate(
-                        SampleCommittedFoamState(foam.fieldUV).r);
-                    return half4(presence.xxx, 1.0);
+                    float4 committedState =
+                        SampleCommittedFoamState(foam.fieldUV);
+                    float committedCoverage;
+                    float committedPresence;
+                    float committedRemainingLife;
+                    float committedPattern;
+                    RiverWaterFoamDecodeMaterialState(
+                        committedState,
+                        committedCoverage,
+                        committedPresence,
+                        committedRemainingLife,
+                        committedPattern);
+                    float visiblePresence = saturate(committedPresence) *
+                        ResolveCommittedFoamMaterialAuthorityGate(
+                            committedCoverage);
+                    return half4(visiblePresence.xxx, 1.0);
                 }
 
                 if (foamDebug == 2)

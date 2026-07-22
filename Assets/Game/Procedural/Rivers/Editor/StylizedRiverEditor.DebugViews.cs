@@ -1409,7 +1409,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 case StylizedRiverFoamDebugView.Final:
                     return
-                        "The exact normal player-facing Foam result from ordinary temporal interpolation between the previous and current committed Layer C states after conservative transport, topology-adjusted Remaining Life, surface coupling, lighting, and final Presence coverage. Rejected velocity backtracing remains inactive.";
+                        "The exact normal player-facing Foam result from ordinary temporal interpolation between the previous and current committed Layer C states after Coverage transport, topology-adjusted Remaining Life, the selected Presence amplitude policy, surface coupling, Chipping, Strands, and lighting. Rejected velocity backtracing remains inactive.";
 
                 case StylizedRiverFoamDebugView.FoamAndAgingTopology:
                     return
@@ -1417,31 +1417,31 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.AutomaticBirthSources:
                     return
-                        "Exact automatic Layer C birth footprints from the latest material update before transport and aging. Yellow is Shore Ribbon and Inward Wash, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, white is same-update overlap between multiple source events or categories, and black means no source was written this update.";
+                        "Exact automatic Layer C geometric birth Coverage from the latest material update before transport and aging. Yellow is Shore Ribbon and Inward Wash, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, white is same-update overlap between multiple source events or categories, and black means no source Coverage was written this update. This view does not encode intrinsic Presence or Remaining Life.";
 
                 case StylizedRiverFoamDebugView.MaterialPresence:
                     return
-                        "Persistent material Presence sampled at the unshifted field coordinate through ordinary temporal interpolation between the previous and current committed Layer C states. Brightness remains literal packed Presence; no velocity backtrace, hidden transport, or morphology is applied.";
+                        "Decoded intrinsic material Presence sampled at the unshifted field coordinate through ordinary temporal interpolation between committed Layer C states. At Coverage 0.02 or greater, brightness is the literal decoded Presence with no Coverage ramp; source shape, subcell width, transport diffusion, and valid-fluid clipping do not attenuate it.";
 
                 case StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return
-                        "Normalized Remaining Life decoded from the temporally interpolated committed Layer C life moment, then multiplied by the shared meaningful-Presence visibility gate (0.02 to 0.16). Tiny low-density transport tails no longer appear as full white coverage.";
+                        "Exact normalized Remaining Life decoded from the temporally interpolated committed Layer C life moment. At Coverage 0.02 or greater, brightness is literal Remaining Life with no visibility floor or Coverage ramp; only explicit Layer C aging changes it.";
 
                 case StylizedRiverFoamDebugView.FoamMotionField:
                     return
-                        "Unified resolved Foam velocity contract. Bright neutral gray is straight full-speed downstream motion, red is rightward lateral velocity, blue is leftward lateral velocity, darker values are downstream slowdown/stagnation, and yellow marks obstacle-routing influence. Semi-transparent white uses the temporally interpolated committed material at the unshifted coordinate; it is an ownership overlay, not raw Presence amplitude.";
+                        "Unified resolved Foam velocity contract. Bright neutral gray is straight full-speed downstream motion, red is rightward lateral velocity, blue is leftward lateral velocity, darker values are downstream slowdown/stagnation, and yellow marks obstacle-routing influence. Semi-transparent white uses meaningful committed Coverage at the unshifted coordinate; it is an ownership overlay, not intrinsic Presence amplitude.";
 
                 case StylizedRiverFoamDebugView.FoamMotionFieldCellGrid:
                     return
-                        "Unified resolved Foam velocity contract plus the committed persistent simulation-cell grid. Brightness shows downstream speed factor, red/blue show signed lateral velocity, yellow shows obstacle routing, and white uses the shared meaningful-Presence visibility gate. Fine dark lines show individual Foam cells; pale lines show eight-cell blocks. Neither overlay nor grid follows render-only residual displacement.";
+                        "Unified resolved Foam velocity contract plus the committed persistent simulation-cell grid. Brightness shows downstream speed factor, red/blue show signed lateral velocity, yellow shows obstacle routing, and white uses the shared meaningful-Coverage gate. Fine dark lines show individual Foam cells; pale lines show eight-cell blocks. Neither overlay nor grid follows render-only residual displacement.";
 
                 case StylizedRiverFoamDebugView.FoamEvaluatedShape:
                     return
-                        "Layer D evaluated Foam Shape sampled from _FoamShapeMask. It intentionally combines full-resolution committed Presence with broader half-resolution temporal occupancy, so its footprint may exceed raw material. It is diagnostic-only, does not mutate FoamState, and is not yet consumed by Final Foam.";
+                        "Layer D evaluated Foam Shape sampled from _FoamShapeMask. It intentionally combines full-resolution committed material amount (Coverage × Presence) with broader half-resolution temporal occupancy, so its footprint may exceed raw material. It is diagnostic-only, does not mutate FoamState, and is not consumed by Final Foam.";
 
                 case StylizedRiverFoamDebugView.FoamShapeDifference:
                     return
-                        "Layer D difference diagnostic. Black means _FoamShapeMask matches raw persistent Material Presence, green means evaluated shape adds visual coverage, and magenta/red means evaluated shape removes visual coverage. This exists so Layer D changes are visible without guessing between two similar masks.";
+                        "Layer D difference diagnostic. Black means _FoamShapeMask matches raw persistent material amount (Coverage × Presence), green means evaluated shape adds visual coverage, and magenta/red means evaluated shape removes visual coverage. This exists so Layer D changes are visible without guessing between two similar masks.";
 
                 case StylizedRiverFoamDebugView.FoamChipAndStrandProbe:
                     return
@@ -1458,7 +1458,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.ChipEligibilityComposite:
                     return
-                        "Layer E Chip permission diagnostic, independent of current candidates and Activation. Dark gray is exact pre-Chip rendered Foam. Presence-Amplitude shows the continuous soft-visibility Edge Width band using Presence-Amplitude Edge Start and binary exact rendered support; Interior Access is disabled. Current shows its historical continuous soft band plus optional magenta Interior Access. Cyan is permission outside visible support and should be absent.";
+                        "Layer E Chip permission diagnostic, independent of current candidates and Activation. Dark gray is exact pre-Chip rendered Foam. Presence-Amplitude shows the continuous soft-visibility Edge Width band using Presence-Amplitude Edge Start and binary exact rendered support; Interior Access is disabled. Coverage-Only shows its historical continuous soft band plus optional magenta Interior Access. Cyan is permission outside visible support and should be absent.";
 
                 case StylizedRiverFoamDebugView.ProductionChipMask:
                     return
@@ -1478,7 +1478,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamTemporalOccupancy:
                     return
-                        "The advected half-resolution Layer D visual sheet. One occupancy texel covers four full-resolution material cells, so narrow edges may appear broader or coarser than Material Presence. It moves through the canonical local velocity and closed-face rules, builds/releases toward the instantaneous film target, and never changes Presence or Remaining Life.";
+                        "The advected half-resolution Layer D visual sheet. One occupancy texel covers four full-resolution material cells, so narrow edges may appear broader or coarser than committed material amount. It moves through the canonical local velocity and closed-face rules, builds/releases toward the instantaneous film target, and never changes Coverage, Presence, or Remaining Life.";
 
                 case StylizedRiverFoamDebugView.FoamTemporalDifference:
                     return
@@ -1486,7 +1486,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamEvaluatedFinalPreview:
                     return
-                        "Production-style Layer D preview. Renders the existing _FoamShapeMask with committed Presence, Remaining Life, and Material Pattern sampled at the same unshifted coordinate. It remains diagnostic-only while Final Foam uses committed Layer C state directly.";
+                        "Production-style Layer D preview. Renders the existing _FoamShapeMask with decoded committed Coverage, Presence, Remaining Life, and Material Pattern sampled at the same unshifted coordinate. It remains diagnostic-only while Final Foam uses committed Layer C state directly.";
 
                 default:
                     return

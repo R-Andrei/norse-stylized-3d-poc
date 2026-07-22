@@ -81,10 +81,28 @@ VegetationInteractionSample SampleVegetationInteraction(
         0.0);
     float interpolation = saturate(
         _VegetationInteractionFieldTiming.x);
-    float4 state = lerp(
-        previousState,
-        currentState,
-        interpolation) * inside;
+    float4 state;
+    if (currentState.w > 0.001)
+    {
+        state = lerp(
+            previousState,
+            currentState,
+            interpolation);
+    }
+    else
+    {
+        float fixedStep = max(
+            0.0,
+            _VegetationInteractionFieldTiming.y);
+        float recoveryTime = max(
+            0.001,
+            _VegetationInteractionFieldTiming.z);
+        float renderAge = interpolation * fixedStep;
+        float releaseDecay = exp(-renderAge / recoveryTime);
+        state = currentState;
+        state.xyz *= releaseDecay;
+    }
+    state *= inside;
 
     sample.bend = state.xy;
     sample.flatten = saturate(state.z);
@@ -92,9 +110,21 @@ VegetationInteractionSample SampleVegetationInteraction(
     return sample;
 }
 
+float VegetationInteractionEffectiveStrength(
+    VegetationInteractionSample interaction,
+    float bendResponse,
+    float flattenResponse)
+{
+    float bendStrength = saturate(
+        length(interaction.bend) * max(0.0, bendResponse));
+    float flattenStrength = saturate(
+        interaction.flatten * max(0.0, flattenResponse));
+    return max(bendStrength, flattenStrength);
+}
+
 float3 ApplyVegetationInteractionResponse(
     float3 worldPosition,
-    float3 interactionSamplePosition,
+    VegetationInteractionSample interaction,
     float rootToTipWeight,
     float vertexHeightMetres,
     float bendResponse,
@@ -106,8 +136,6 @@ float3 ApplyVegetationInteractionResponse(
 {
     fullTipDisplacementXZ = 0.0;
     fullTipFlatten = 0.0;
-    VegetationInteractionSample interaction =
-        SampleVegetationInteraction(interactionSamplePosition);
     if (interaction.active < 0.5)
     {
         return worldPosition;

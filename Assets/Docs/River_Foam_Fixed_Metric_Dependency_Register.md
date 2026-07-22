@@ -2258,3 +2258,53 @@ resolved duration = max(one material update step, raw duration)
 - The automatic-event GPU ABI, 32-slot pool, source dispatch ranges, transport, material state, cache, Film, Shape, and rendering dependencies are unchanged.
 - Runtime risk is bounded by the existing 32-event pool. Slow honest events can increase concurrent raster work and rejected starts; the P12u report exposes current occupancy and rejection evidence rather than modifying timing.
 - One editor-only report partial and Inspector action are added. They allocate no runtime GPU resource and use the existing diagnostic report/clipboard contract.
+
+
+## P13A dependency disposition — authoritative material and Coverage separation
+
+P12t soft-reconstruction Chipping and P12u unified Reveal Speed are frozen and closed. The user accepted P12t as the sufficient visual baseline and reported P12u working as expected. P13A does not reopen Candidate geometry, Chipping application, Reveal Speed, source scheduling, or negative topology.
+
+The persistent state reuses the existing ARGBHalf texture with no allocation change:
+
+```text
+R = Coverage × intrinsic Presence
+G = Coverage × intrinsic Presence × Remaining Life
+B = Coverage × intrinsic Presence × Material Pattern
+A = geometric Coverage
+```
+
+Dependency flow:
+
+```text
+source shape / taper / breakup / subcell footprint / valid fluid
+    -> geometric Coverage
+authored Initial Presence + Initial Life
+    -> intrinsic material properties
+Coverage + intrinsic material
+    -> coherent packed Layer C state
+    -> Donor Cell or Coverage-only TVD Superbee transport
+    -> explicit Layer C aging
+    -> Final Visibility policy
+    -> optional exact Presence-weighted resolved mask
+    -> accepted P12t Chipping / Strands / composition
+```
+
+- Automatic and manual sources no longer use Initial Presence as source-fill probability or geometric attenuation. Shape-family multipliers remain Coverage shaping only.
+- Birth overlap is an explicit single-cohort `Max + Refresh` approximation: maximum Coverage, maximum intrinsic Presence, maximum Remaining Life, with Pattern changed only by genuinely added Coverage.
+- Valid-fluid clipping changes Coverage and proportional packed moments while preserving decoded Presence, Life, and Pattern.
+- Convergent unit-capacity resolution also clips Coverage coherently and re-encodes the same intrinsic ratios instead of saturating packed channels independently.
+- Donor Cell transports one coherent packed state. TVD Superbee reconstructs one bounded Coverage scalar and re-encodes the donor's coherent intrinsic material rather than independently limiting four packed channels.
+- Concentration + Lifetime intentionally permits Coverage dilution and Remaining Life to reduce visibility. Lifecycle-Faithful uses meaningful Coverage for occupancy and leaves ordinary survival to explicit Layer C aging.
+- Coverage-Only is the Inspector-facing name for serialized enum value `Current`; it ignores intrinsic Presence as visual amplitude. Presence-Amplitude carries exact decoded Presence through identical Presence-independent shape/surface-coupling weights so uniform Presence remains exactly proportional in the completed resolved mask.
+- The three selectors move, without duplication, to `Foam > Transport & Visibility Contract`, followed by a permanently visible read-only explanation of each choice, the combined result, and persistent state meanings.
+- Raw R-channel transport metrics remain valid but are relabelled `Material Amount`; they are no longer described as intrinsic Presence.
+- The legacy transient fallback interprets positive RGB with zero alpha as old material amount, assigns Coverage equal to that amount and intrinsic Presence `1`, then rewrites the P13A contract on the next clamp/remap/update. Persistent caches are not changed.
+
+Impact classification:
+
+- textures, formats, samplers, buffers, kernels, dispatches, passes, draw calls, and persistent GPU memory: unchanged;
+- automatic-event GPU/CPU ABI and 32-slot pool: structurally unchanged;
+- P12t Candidate loop, Eligibility, soft reconstruction, and Strand order: unchanged;
+- per-face TVD arithmetic: one Coverage limiter plus coherent decode/encode instead of independent packed-channel limiting; measured GPU cost pending;
+- convergent capacity clipping: coherent Coverage re-encoding replaces independent packed-channel saturation; no new resource or dispatch;
+- source-visible quantity and Lifecycle-Faithful persistence may increase substantially by design because hidden suppression is removed.

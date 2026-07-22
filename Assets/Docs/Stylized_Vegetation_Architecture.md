@@ -3,7 +3,7 @@
 ## Status
 
 - **Domain:** exploratory procedural vegetation, vegetation response to external wind, interaction, and snow accumulation
-- **Current implementation:** historical exploratory document; V0 benchmark implementation is tracked elsewhere
+- **Current implementation:** historical exploratory document aligned to the accepted production ownership and interaction milestone through `VEG-V2-INTERACT.2B.2`; detailed implementation status is tracked elsewhere
 - **Purpose:** preserve early alternatives and long-term vegetation ideas
 - **Authority:** `Docs/Vegetation_Rendering_and_Interaction_Architecture.md` is the canonical vegetation architecture and implementation plan. Where this document conflicts with it, the canonical document governs.
 
@@ -267,9 +267,9 @@ These should remain optional. The baseline should still work in ordinary outdoor
 
 Vegetation interaction is split by whether the effect must retain history.
 
-**Immediate displacement** is owned by one scene-level `VegetationInteractionDomain`. It is a moving world-space XZ field centred on an explicit gameplay anchor or fallback camera-ground projection. Ordinary actors register through `VegetationInteractor`, bend and temporarily flatten grass while present or moving, and leave no stored trail state. The field update rate is an exposed `5–60 Hz` control; the initial default is `20 Hz`, and `10 Hz` is an intentional supported tuning target.
+**Immediate displacement** is owned by one scene-level `VegetationInteractionDomain`. It is a moving world-space XZ field centred on an explicit gameplay anchor or fallback camera-ground projection. Ordinary actors register through `VegetationInteractor`, bend and temporarily flatten grass while present or moving, and leave no stored trail state. The field update rate is an exposed `5–60 Hz` control; the initial default is `20 Hz`, and `10 Hz` is an intentional supported tuning target. A configurable central margin prevents quarter-metre anchor motion from recentering the complete field continuously. Low-cadence swept movement is front-loaded toward the current actor position, and cells that lose support decay analytically each rendered frame through the configured immediate recovery time rather than remaining blended with the older stronger field.
 
-**Historical trampling** is deferred to `VEG-V2-INTERACT.2`. It will be owned by the affected Ground vegetation infrastructure in fixed Ground-local space so short-lived trails, timed ability damage, and permanent stamps survive camera recentering. Its update rate will be independently exposed across the same `5–60 Hz` range. Ordinary player movement will not write this field by default.
+**Historical trampling** is owned by one optional `VegetationTrampleDomain` on the affected Ground vegetation infrastructure in fixed Ground-local space, so short-lived trails, timed ability damage, and session-persistent stamps survive camera recentering. Its update rate is independently exposed across the same `5–60 Hz` range. Ordinary player movement does not write this field by default. Opt-in moving writers and queued circle, cone-sector, and line ability requests share the same stored footprint and recovery state.
 
 ### 8.2 Immediate sources
 
@@ -280,7 +280,7 @@ Any moving or stationary object may receive `VegetationInteractor`; the system h
 - large actors with wider and stronger immediate displacement;
 - stationary bodies continuing to hold grass aside.
 
-Movement is stamped as a swept capsule between fixed interaction samples so reduced update rates do not create disconnected circles. Radial parting is blended with movement-directed push according to actor speed and recipe controls.
+Movement is stamped as a swept capsule between fixed interaction samples so reduced update rates do not create disconnected circles. `Sweep Tail Retention` controls how strongly the previous end of that capsule remains supported relative to the current actor end; this reduces the visual wake without changing cadence or writing history. Each interactor selects `Radial`, fixed-world-`X`-biased, or `Hybrid` direction shaping. World-X bias and world-Z strength are independent controls: X bias redirects toward pure world `±X`, while Z strength multiplies the final biased Z component. The basis is the fixed map axes (`X` left/right, `Z` map up/down), not actor facing or motion direction; only Radial and Hybrid may additionally use speed-derived movement influence. Near the exact actor X centreline, deterministic world-cell variation selects a stable left/right side.
 
 ### 8.3 Layer response
 
@@ -290,21 +290,24 @@ All vegetation layers sample the same immediate field but retain independent mat
 - temporary flatten response;
 - root-to-tip interaction exponent;
 - maximum world-space interaction bend;
-- interaction lighting-normal response.
+- interaction lighting-normal response;
+- Weather influence retained while the recipe is displaced.
 
-This lets tall soft grass react strongly while short stiff grass resists the same physical footprint. The root remains planted, Weather remains a separate deformation owner, and the shader combines Weather and interaction before lighting.
+This lets tall soft grass react strongly while short stiff grass resists the same physical footprint. The root remains planted and Weather remains a separate owner. The shader samples immediate interaction once, attenuates Weather according to the recipe and effective interaction strength, then applies interaction deformation before combined lighting-normal evaluation.
 
-### 8.4 Deferred trails and ability stamps
+### 8.4 Historical trails and gameplay ability stamps
 
-Historical interaction is opt-in rather than an automatic consequence of movement. `VEG-V2-INTERACT.2` may add:
+Historical interaction is opt-in rather than an automatic consequence of movement. Selected large movers may write swept trails. Gameplay abilities submit explicit one-shot requests to the Ground-owned trample domain without temporary actors or coverage edits.
 
-- short-lived trails for selected large movers;
-- irregular disc or ellipse stamps for slams and explosions;
-- capsule or line stamps for charges and directional attacks;
-- timed recovery from seconds to minutes;
-- deliberately permanent trampling where save/load ownership is justified.
+The supported gameplay shapes are:
 
-The shape footprint, displacement direction, flattening, recovery mode, and recovery time remain separate controls. A roughly circular ability may distort its edge with seeded world-space variation rather than producing a sterile perfect circle.
+- `Circle`: one radial footprint with 360-degree coverage;
+- `Cone`: the same radial-sector footprint with coverage below 360 degrees and an authored world-XZ facing direction;
+- `Line`: one width-controlled capsule between world-space start and end points.
+
+Shape footprint, displacement mode, bend, flattening, recovery mode, recovery delay, recovery duration, deterministic edge irregularity, scale, seed, and priority remain independent controls. Displacement may be radial outward, fixed world direction, away from the shape centreline, or flatten-only. Timed ability state uses the same delayed asymmetric slow–fast–slow recovery as moving trails; session-persistent state lasts until runtime reset.
+
+`VegetationTrampleStampTester` is an optional player-attached test harness with editable named configurations, previous/next/random selection, bounded randomized variants, Gizmo previews, and Inspector buttons. It invokes the exact public runtime API and is not part of gameplay ownership.
 
 ---
 
@@ -599,9 +602,11 @@ This is not a committed roadmap, only a likely sane order.
 
 ### V4 - opt-in trample history and snow integration
 
-- add fixed Ground-local trail/trample history only for explicitly configured movers and gameplay stamps;
+- **INTERACT.2A active implementation:** add one optional fixed Ground-local `VegetationTrampleDomain` per Ground vegetation root;
+- only explicitly configured moving interactors write history; ordinary player interaction remains immediate and history-free by default;
 - expose its update rate independently across `5–60 Hz`;
-- support short-lived, timed, and deliberate permanent recovery modes;
+- support timed recovery and session-persistent state without claiming save-file permanence;
+- **INTERACT.2B active implementation:** add queued gameplay-authored circle, cone-sector, and line stamps plus the optional player-attached test harness;
 - add shader-driven snow response and interaction-driven shedding after trample ownership is validated.
 
 ### V5 - world and ecosystem integration
@@ -652,7 +657,7 @@ Scene
 │       └── Vegetation Benchmark        [VegetationBenchmarkRunner]
 │
 └── GeneratedGround                     [GeneratedGround]
-    └── Vegetation                      [GroundVegetation]
+    └── Vegetation                      [GroundVegetation, optional VegetationTrampleDomain]
         ├── Grass_Default               [VegetationLayer]
         ├── Grass_Tall_Dark             [VegetationLayer]
         └── Grass_Short_Bright          [VegetationLayer]
@@ -662,7 +667,7 @@ Each named recipe is one GameObject with one `VegetationLayer` component directl
 
 A vegetation layer means one independently configured recipe plus one independently paintable coverage field. It does not require a unique biological family. All production layers use the fixed CrossedCards cluster and may differ in height, width, density, colour, stiffness, wind response, lighting, macro patches, or any later recipe setting. Masks may overlap.
 
-`GeneratedGround` owns terrain geometry, transform, domain, height sampling, and surface revision. A `VegetationLayer` consumes that surface and owns its recipe, mask, placement instances, GPU resources, and rendering. `GroundVegetation` is an editor/infrastructure coordinator only; it does not render or own a shared mask.
+`GeneratedGround` owns terrain geometry, transform, domain, height sampling, and surface revision. A `VegetationLayer` consumes that surface and owns its recipe, mask, placement instances, GPU resources, and rendering. `GroundVegetation` coordinates direct recipe children and is the ownership anchor for an optional `VegetationTrampleDomain`. It does not render or own recipe coverage; the trample component owns one shared fixed Ground-local historical field for all direct layers.
 
 A production layer never chooses a Ground through an editable object-reference field. It resolves the nearest `GeneratedGround` ancestor automatically, including through the `Vegetation` organizational child. Reparenting changes ownership and rebuilds the layer. A layer outside a Ground hierarchy is invalid and renders nothing.
 
@@ -681,7 +686,8 @@ The current production sequence is authoritative in `Vegetation_Rendering_and_In
 3. **Complete and validated** — the scene runner measures the exact authored stack, independently tests a selected layer at benchmark-owned `20/35/50` tiers, adds a non-duplicate exact authored density when required, and restores arbitrary density values exactly;
 4. **Complete and validated** — obsolete combined-renderer, wind-shim, migration, retirement, Ground-mask, and fallback code is deleted; only production layers, the scene runner, and scene Weather remain;
 5. **Complete at source level; Unity validation pending** — CrossedCards is the sole production cluster, controlled benchmarking varies density only, invalid-resolution runs cannot rank cases, and negative timing deltas are treated as baseline fluctuation;
-6. **VEG-V2-INTERACT.1 source implementation active; Unity validation pending** — one scene-owned immediate field accepts multiple transform-driven interactors, exposes a `5–60 Hz` update rate, bends and temporarily flattens every vegetation layer without rebuilding instances, and stores no trail history.
+6. **Complete and user-validated through VEG-V2-INTERACT.1B** — one scene-owned immediate field accepts multiple transform-driven interactors, exposes a `5–60 Hz` update rate, supports radial/fixed-world-X/hybrid direction shaping, suppresses world-Z independently, reduces Weather on displaced recipes, uses recenter hysteresis and low-cadence release compensation, and stores no trail history.
+7. **Complete and user-validated through VEG-V2-INTERACT.2B.2** — one optional fixed Ground-local trample domain accepts opt-in moving writers and queued circle, cone-sector, and line ability requests, exposes an independent `5–60 Hz` update rate, and shares one historical footprint across every recipe on that Ground. Timed state is fully held for an authored delay, then follows the accepted asymmetric slow–fast–slow return; session-persistent state remains until runtime reset. The optional player-attached tester invokes the exact public runtime request path. The proposed large interaction stress benchmark is not part of the accepted continuation because realistic simultaneous actor scale is approximately five to ten, and the user does not expect vegetation interaction to be the limiting system at that scale.
 
 ### Arbitrary recipe density and benchmark-owned tiers
 

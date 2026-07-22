@@ -91,6 +91,41 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
             }
 
             EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Historical Trample", EditorStyles.boldLabel);
+            VegetationTrampleDomain trampleDomain = root.TrampleDomain;
+            if (trampleDomain == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "No historical trample field is attached. Ordinary immediate interaction remains available and history-free.",
+                    MessageType.Info);
+                using (new EditorGUI.DisabledScope(root.SurfaceGround == null))
+                {
+                    if (GUILayout.Button("Add Historical Trample Domain"))
+                    {
+                        trampleDomain = Undo.AddComponent<VegetationTrampleDomain>(
+                            root.gameObject);
+                        EditorUtility.SetDirty(root.gameObject);
+                        Selection.activeObject = trampleDomain;
+                    }
+                }
+            }
+            else
+            {
+                using (new EditorGUI.DisabledScope(true))
+                {
+                    EditorGUILayout.ObjectField(
+                        "Trample Domain",
+                        trampleDomain,
+                        typeof(VegetationTrampleDomain),
+                        true);
+                }
+                if (GUILayout.Button("Select Historical Trample Domain"))
+                {
+                    Selection.activeObject = trampleDomain;
+                }
+            }
+
+            EditorGUILayout.Space();
             EditorGUILayout.LabelField("Diagnostics", EditorStyles.boldLabel);
             if (GUILayout.Button("Validate Layer Stack"))
             {

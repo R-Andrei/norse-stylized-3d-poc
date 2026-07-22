@@ -28,6 +28,35 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         Disabled = 2
     }
 
+    public readonly struct GroundSurfaceApplicationBlendSettings
+    {
+        public const float MaximumDistance = 2f;
+        public const float MaximumFeatureReturnFade = 1f;
+
+        public GroundSurfaceApplicationBlendSettings(
+            float distance,
+            float softness,
+            float featureEdgeClearance,
+            float featureReturnFade)
+        {
+            Distance = Mathf.Clamp(distance, 0f, MaximumDistance);
+            Softness = Mathf.Clamp01(softness);
+            FeatureEdgeClearance = Mathf.Clamp(
+                featureEdgeClearance,
+                0f,
+                MaximumDistance);
+            FeatureReturnFade = Mathf.Clamp(
+                featureReturnFade,
+                0f,
+                MaximumFeatureReturnFade);
+        }
+
+        public float Distance { get; }
+        public float Softness { get; }
+        public float FeatureEdgeClearance { get; }
+        public float FeatureReturnFade { get; }
+    }
+
 [Serializable]
 public sealed class GroundMaterialControls
 {
@@ -100,6 +129,31 @@ public sealed class GroundMaterialControls
     [Range(0f, 1f)]
     [SerializeField]
     private float bankMaterialStrength = 1f;
+
+    [InspectorName("Material Blend Distance")]
+    [Tooltip("Inward distance in metres from the Bank-to-Primary-Ground application boundary over which the complete Bank surface transitions into the already-resolved Primary Ground surface. Zero preserves the unmodified Bank region weight.")]
+    [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumDistance)]
+    [SerializeField]
+    private float bankMaterialBlendDistance = 0.35f;
+
+    [InspectorName("Material Blend Softness")]
+    [Tooltip("Shape of the Bank application-boundary transition. Zero is linear; one uses a smooth cubic interpolation.")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float bankMaterialBlendSoftness = 0.75f;
+
+
+    [InspectorName("Discrete Feature Edge Clearance")]
+    [Tooltip("Inward feature-free distance in metres from the Bank application boundary. Feature-aware payloads retain only their substrate response inside this band. Zero disables feature suppression.")]
+    [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumDistance)]
+    [SerializeField]
+    private float bankFeatureEdgeClearance = 0.50f;
+
+    [InspectorName("Discrete Feature Return Fade")]
+    [Tooltip("Distance in metres after the feature-free Bank edge band over which discrete features return. Zero performs a hard return after the clearance band.")]
+    [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumFeatureReturnFade)]
+    [SerializeField]
+    private float bankFeatureReturnFade = 0.15f;
 
     [InspectorName("Core Bank Reach")]
     [Tooltip("How much of the existing precise broad-bank field participates before any optional outward extension. This changes material composition only, not River or Ground geometry.")]
@@ -201,7 +255,7 @@ public sealed class GroundMaterialControls
 
     [InspectorName("Material Blend Distance")]
     [Tooltip("Inward distance in metres over which the dry Riverbed substrate transitions from the resolved Bank surface, or Primary Ground when no Bank layer is active, to the selected Riverbed Surface Layer. Zero preserves the exact-support hard boundary.")]
-    [Range(0f, 2f)]
+    [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumDistance)]
     [SerializeField]
     private float riverbedMaterialBlendDistance = 0.35f;
 
@@ -210,6 +264,19 @@ public sealed class GroundMaterialControls
     [Range(0f, 1f)]
     [SerializeField]
     private float riverbedMaterialBlendSoftness = 0.75f;
+
+
+    [InspectorName("Discrete Feature Edge Clearance")]
+    [Tooltip("Inward feature-free distance in metres from the Riverbed application boundary. Feature-aware payloads retain only their substrate response inside this band. Zero disables feature suppression.")]
+    [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumDistance)]
+    [SerializeField]
+    private float riverbedFeatureEdgeClearance = 0.50f;
+
+    [InspectorName("Discrete Feature Return Fade")]
+    [Tooltip("Distance in metres after the feature-free Riverbed edge band over which discrete features return. Zero performs a hard return after the clearance band.")]
+    [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumFeatureReturnFade)]
+    [SerializeField]
+    private float riverbedFeatureReturnFade = 0.15f;
 
     [Header("River-Coupled Riverbed Material Application")]
     [InspectorName("Detail Scale Multiplier")]
@@ -628,6 +695,20 @@ public sealed class GroundMaterialControls
             _ => null
         };
     public float BankMaterialStrength => Mathf.Clamp01(bankMaterialStrength);
+    public GroundSurfaceApplicationBlendSettings BankSurfaceApplicationBlend =>
+        new GroundSurfaceApplicationBlendSettings(
+            bankMaterialBlendDistance,
+            bankMaterialBlendSoftness,
+            bankFeatureEdgeClearance,
+            bankFeatureReturnFade);
+    public float BankMaterialBlendDistance =>
+        BankSurfaceApplicationBlend.Distance;
+    public float BankMaterialBlendSoftness =>
+        BankSurfaceApplicationBlend.Softness;
+    public float BankFeatureEdgeClearance =>
+        BankSurfaceApplicationBlend.FeatureEdgeClearance;
+    public float BankFeatureReturnFade =>
+        BankSurfaceApplicationBlend.FeatureReturnFade;
     public float BankMaterialReach => Mathf.Clamp01(bankMaterialReach);
     public float ImmediateBankExposure => Mathf.Clamp01(immediateBankExposure);
     public float WaterlineMaterialStrength => Mathf.Clamp01(waterlineMaterialStrength);
@@ -659,10 +740,21 @@ public sealed class GroundMaterialControls
         Mathf.Clamp(bankLegacyPixelCellInfluenceMultiplier, 0f, 2f);
     public float RiverbedMaterialStrength =>
         Mathf.Clamp01(riverbedMaterialStrength);
+    public GroundSurfaceApplicationBlendSettings
+        RiverbedSurfaceApplicationBlend =>
+            new GroundSurfaceApplicationBlendSettings(
+                riverbedMaterialBlendDistance,
+                riverbedMaterialBlendSoftness,
+                riverbedFeatureEdgeClearance,
+                riverbedFeatureReturnFade);
     public float RiverbedMaterialBlendDistance =>
-        Mathf.Clamp(riverbedMaterialBlendDistance, 0f, 2f);
+        RiverbedSurfaceApplicationBlend.Distance;
     public float RiverbedMaterialBlendSoftness =>
-        Mathf.Clamp01(riverbedMaterialBlendSoftness);
+        RiverbedSurfaceApplicationBlend.Softness;
+    public float RiverbedFeatureEdgeClearance =>
+        RiverbedSurfaceApplicationBlend.FeatureEdgeClearance;
+    public float RiverbedFeatureReturnFade =>
+        RiverbedSurfaceApplicationBlend.FeatureReturnFade;
     public float RiverbedDetailScaleMultiplier =>
         Mathf.Clamp(riverbedDetailScaleMultiplier, 0.25f, 4f);
     public float RiverbedTextureFormStrengthMultiplier =>
@@ -786,6 +878,10 @@ public sealed class GroundMaterialControls
                 GroundRiverbedHydrologySource.InheritShoreHydrologyModifier;
             riverbedHydrologyModifier = null;
             bankMaterialStrength = 1f;
+            bankMaterialBlendDistance = 0.35f;
+            bankMaterialBlendSoftness = 0.75f;
+            bankFeatureEdgeClearance = 0.50f;
+            bankFeatureReturnFade = 0.15f;
             bankMaterialReach = 0.65f;
             immediateBankExposure = 0.55f;
             waterlineMaterialStrength = 1f;
@@ -804,6 +900,8 @@ public sealed class GroundMaterialControls
             riverbedMaterialStrength = 1f;
             riverbedMaterialBlendDistance = 0.35f;
             riverbedMaterialBlendSoftness = 0.75f;
+            riverbedFeatureEdgeClearance = 0.50f;
+            riverbedFeatureReturnFade = 0.15f;
             riverbedDetailScaleMultiplier = 1f;
             riverbedAuthoredColorStrengthMultiplier = 1f;
             riverbedAuthoredColorLightingMultiplier = 1f;
@@ -852,6 +950,10 @@ public sealed class GroundMaterialControls
         riverbedHydrologySource = source.riverbedHydrologySource;
         riverbedHydrologyModifier = source.riverbedHydrologyModifier;
         bankMaterialStrength = source.bankMaterialStrength;
+        bankMaterialBlendDistance = source.bankMaterialBlendDistance;
+        bankMaterialBlendSoftness = source.bankMaterialBlendSoftness;
+        bankFeatureEdgeClearance = source.bankFeatureEdgeClearance;
+        bankFeatureReturnFade = source.bankFeatureReturnFade;
         bankMaterialReach = source.bankMaterialReach;
         immediateBankExposure = source.immediateBankExposure;
         waterlineMaterialStrength = source.waterlineMaterialStrength;
@@ -879,6 +981,10 @@ public sealed class GroundMaterialControls
             source.riverbedMaterialBlendDistance;
         riverbedMaterialBlendSoftness =
             source.riverbedMaterialBlendSoftness;
+        riverbedFeatureEdgeClearance =
+            source.riverbedFeatureEdgeClearance;
+        riverbedFeatureReturnFade =
+            source.riverbedFeatureReturnFade;
         riverbedDetailScaleMultiplier =
             source.riverbedDetailScaleMultiplier;
         riverbedAuthoredColorStrengthMultiplier =

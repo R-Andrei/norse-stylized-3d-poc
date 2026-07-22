@@ -94,6 +94,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal string FormSourcePath { get; }
         }
 
+        private sealed class LibraryAssetSnapshot
+        {
+            internal bool ExistedBeforeRun;
+            internal byte[] AssetBytes;
+            internal string Guid;
+        }
+
         [MenuItem(
             "Tools/PS3D/Install All Sparse Riverbed Surface Candidates")]
         private static void InstallAllCandidates()
@@ -136,29 +143,15 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     return;
                 }
 
-                ConfigureLibrary(
-                    library,
-                    libraryCreated,
-                    actions,
-                    failures);
-                if (failures.Count > 0)
-                {
-                    FinishReport(actions, warnings, failures);
-                    return;
-                }
-
-                if (!StylizedSurfaceDetailLibraryBuilder.Rebuild(
+                if (!TryConfigureAndRebuildLibrary(
                         library,
-                        false))
+                        libraryCreated,
+                        actions,
+                        failures))
                 {
-                    failures.Add(
-                        "The sparse-riverbed detail library rebuild failed.");
                     FinishReport(actions, warnings, failures);
                     return;
                 }
-
-                actions.Add(
-                    "Rebuilt the dedicated packed-detail and texture-form arrays.");
 
                 List<GroundSurfaceLayerProfile> layers =
                     new List<GroundSurfaceLayerProfile>(Candidates.Length);
@@ -216,6 +209,219 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             {
                 failures.Add(exception.ToString());
                 FinishReport(actions, warnings, failures);
+            }
+        }
+
+        private static bool TryConfigureAndRebuildLibrary(
+            StylizedSurfaceDetailLibrary library,
+            bool libraryCreated,
+            List<string> actions,
+            ICollection<string> failures)
+        {
+            LibraryAssetSnapshot snapshot = CaptureLibraryAssetSnapshot(
+                library,
+                libraryCreated,
+                failures);
+            if (snapshot == null)
+            {
+                return false;
+            }
+
+            int actionMarker = actions.Count;
+            try
+            {
+                ConfigureLibrary(
+                    library,
+                    libraryCreated,
+                    actions,
+                    failures);
+                if (failures.Count > 0)
+                {
+                    RollBackLibraryAsset(
+                        snapshot,
+                        actionMarker,
+                        actions,
+                        failures);
+                    return false;
+                }
+
+                if (!StylizedSurfaceDetailLibraryBuilder.Rebuild(
+                        library,
+                        out IReadOnlyList<string> rebuildFailures,
+                        false))
+                {
+                    if (rebuildFailures != null &&
+                        rebuildFailures.Count > 0)
+                    {
+                        for (int index = 0;
+                             index < rebuildFailures.Count;
+                             index++)
+                        {
+                            failures.Add(
+                                "Library rebuild: " +
+                                rebuildFailures[index]);
+                        }
+                    }
+                    else
+                    {
+                        failures.Add(
+                            "The sparse-riverbed detail library rebuild " +
+                            "failed without a detailed builder message.");
+                    }
+
+                    RollBackLibraryAsset(
+                        snapshot,
+                        actionMarker,
+                        actions,
+                        failures);
+                    return false;
+                }
+
+                actions.Add(
+                    "Rebuilt the dedicated packed-detail and texture-form " +
+                    "arrays.");
+                return true;
+            }
+            catch (Exception exception)
+            {
+                failures.Add(
+                    "The sparse-riverbed detail library refresh threw an " +
+                    "exception: " + exception);
+                RollBackLibraryAsset(
+                    snapshot,
+                    actionMarker,
+                    actions,
+                    failures);
+                return false;
+            }
+        }
+
+        private static LibraryAssetSnapshot CaptureLibraryAssetSnapshot(
+            StylizedSurfaceDetailLibrary library,
+            bool libraryCreated,
+            ICollection<string> failures)
+        {
+            LibraryAssetSnapshot snapshot = new LibraryAssetSnapshot
+            {
+                ExistedBeforeRun = !libraryCreated,
+                Guid = AssetDatabase.AssetPathToGUID(LibraryPath)
+            };
+            if (libraryCreated)
+            {
+                return snapshot;
+            }
+
+            try
+            {
+                AssetDatabase.SaveAssetIfDirty(library);
+                string absolutePath = AbsoluteProjectPath(LibraryPath);
+                if (!File.Exists(absolutePath))
+                {
+                    failures.Add(
+                        "The existing canonical detail-library asset file " +
+                        "could not be captured before refresh: " +
+                        LibraryPath + ".");
+                    return null;
+                }
+
+                snapshot.AssetBytes = File.ReadAllBytes(absolutePath);
+                return snapshot;
+            }
+            catch (Exception exception)
+            {
+                failures.Add(
+                    "Could not capture the canonical detail-library state " +
+                    "before refresh: " + exception.Message);
+                return null;
+            }
+        }
+
+        private static void RollBackLibraryAsset(
+            LibraryAssetSnapshot snapshot,
+            int actionMarker,
+            List<string> actions,
+            ICollection<string> failures)
+        {
+            while (actions.Count > actionMarker)
+            {
+                actions.RemoveAt(actions.Count - 1);
+            }
+
+            if (snapshot == null)
+            {
+                failures.Add(
+                    "The canonical detail library could not be rolled back " +
+                    "because no pre-refresh snapshot exists.");
+                return;
+            }
+
+            try
+            {
+                if (!snapshot.ExistedBeforeRun)
+                {
+                    if (!AssetDatabase.DeleteAsset(LibraryPath))
+                    {
+                        failures.Add(
+                            "Rollback could not delete the newly created " +
+                            "canonical detail library: " + LibraryPath + ".");
+                        return;
+                    }
+
+                    actions.Add(
+                        "Rolled back the failed refresh by deleting the " +
+                        "newly created canonical detail library.");
+                    return;
+                }
+
+                if (snapshot.AssetBytes == null ||
+                    snapshot.AssetBytes.Length == 0)
+                {
+                    failures.Add(
+                        "Rollback snapshot bytes are missing for the " +
+                        "existing canonical detail library.");
+                    return;
+                }
+
+                File.WriteAllBytes(
+                    AbsoluteProjectPath(LibraryPath),
+                    snapshot.AssetBytes);
+                AssetDatabase.ImportAsset(
+                    LibraryPath,
+                    ImportAssetOptions.ForceSynchronousImport |
+                    ImportAssetOptions.ForceUpdate);
+                StylizedSurfaceDetailLibrary restored =
+                    AssetDatabase.LoadAssetAtPath<
+                        StylizedSurfaceDetailLibrary>(LibraryPath);
+                if (restored == null)
+                {
+                    failures.Add(
+                        "Rollback restored the canonical asset bytes but " +
+                        "Unity did not reload a detail-library asset.");
+                    return;
+                }
+
+                string restoredGuid =
+                    AssetDatabase.AssetPathToGUID(LibraryPath);
+                if (!string.Equals(
+                        restoredGuid,
+                        snapshot.Guid,
+                        StringComparison.Ordinal))
+                {
+                    failures.Add(
+                        "Rollback changed the canonical detail-library GUID: " +
+                        snapshot.Guid + " -> " + restoredGuid + ".");
+                    return;
+                }
+
+                actions.Add(
+                    "Rolled back the failed refresh and restored the " +
+                    "pre-run canonical detail-library asset exactly.");
+            }
+            catch (Exception exception)
+            {
+                failures.Add(
+                    "Could not roll back the canonical detail-library " +
+                    "asset after refresh failure: " + exception.Message);
             }
         }
 
@@ -350,7 +556,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             if (!File.Exists(reportPath))
             {
                 failures.Add(
-                    "The M2.7C.5E.2 proof report is missing. Run Tools > " +
+                    "The M2.7C.5E.2.2 proof report is missing. Run Tools > " +
                     "PS3D > Run Generated Mass Sparse Riverbed Assembly " +
                     "Proof before installing the surfaces.");
                 return;
@@ -358,10 +564,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
             string report = File.ReadAllText(reportPath);
             if (report.IndexOf(
-                    "GSU-M2.7C.5E.2",
+                    "GSU-M2.7C.5E.2.2",
                     StringComparison.Ordinal) < 0 ||
                 report.IndexOf(
-                    "Assembler algorithm version: 6",
+                    "Assembler algorithm version: 7",
                     StringComparison.Ordinal) < 0 ||
                 report.IndexOf(
                     "VERDICT: PASS",
@@ -369,7 +575,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             {
                 failures.Add(
                     "The local sparse-riverbed proof is not a passing " +
-                    "M2.7C.5E.2 algorithm-6 run.");
+                    "M2.7C.5E.2.2 algorithm-7 run.");
                 return;
             }
 
@@ -601,7 +807,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     candidate.DisplayName;
                 entry.FindPropertyRelative("sourceMode").intValue =
                     (int)StylizedSurfaceDetailSourceMode
-                        .PrepackedDetailWithTextureForm;
+                        .PrepackedDetailWithFeatureTextureForm;
                 entry.FindPropertyRelative("sourceTexture")
                     .objectReferenceValue =
                     AssetDatabase.LoadAssetAtPath<Texture2D>(
@@ -649,7 +855,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         StringComparison.Ordinal) ||
                     entry.SourceMode !=
                         StylizedSurfaceDetailSourceMode
-                            .PrepackedDetailWithTextureForm ||
+                            .PrepackedDetailWithFeatureTextureForm ||
                     entry.SourceTexture !=
                         AssetDatabase.LoadAssetAtPath<Texture2D>(
                             candidate.PackedSourcePath) ||
@@ -852,6 +1058,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         candidate.StableId,
                         StringComparison.Ordinal) ||
                     !material.UsesTextureForm ||
+                    !material.UsesFeatureTextureForm ||
                     !material.TryResolveDetail(out _, out _) ||
                     !material.TryResolveTextureForm(out _, out _))
                 {
@@ -995,7 +1202,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             StringBuilder builder = new StringBuilder(16384);
             builder.AppendLine(
                 "GENERATED MASS SPARSE RIVERBED SURFACE REFRESH — " +
-                "GSU-M2.7C.5E.2");
+                "GSU-M2.7C.5E.2.2.1");
             builder.AppendLine(
                 "Generated UTC: " +
                 DateTime.UtcNow.ToString(
@@ -1075,14 +1282,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             if (failures.Count > 0)
             {
                 Debug.LogError(
-                    "[GSU-M2.7C.5E.2] Sparse riverbed surface refresh " +
+                    "[GSU-M2.7C.5E.2.2.1] Sparse riverbed surface refresh " +
                     "failed. Report written to " + InstallReportPath +
                     " and copied to the clipboard.");
             }
             else
             {
                 Debug.Log(
-                    "[GSU-M2.7C.5E.2] Refreshed all three sparse " +
+                    "[GSU-M2.7C.5E.2.2.1] Refreshed all three sparse " +
                     "riverbed surface candidates. Report written to " +
                     InstallReportPath +
                     " and copied to the clipboard.");

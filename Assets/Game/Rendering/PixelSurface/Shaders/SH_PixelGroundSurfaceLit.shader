@@ -95,6 +95,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundRiverbedWetSmoothnessResponse("Ground Riverbed Wet Smoothness Response", Range(0, 1)) = 0
         [HideInInspector] _GroundRiverbedWetSpecularResponse("Ground Riverbed Wet Specular Response", Range(0, 1)) = 0
         [HideInInspector] _GroundBankMaterialStrength("Ground Bank Material Strength", Range(0, 1)) = 1
+        [HideInInspector] _GroundBankMaterialTransition("Ground Bank Material Transition", Vector) = (0.35, 0.75, 0, 0)
         [HideInInspector] _GroundBankMaterialReach("Ground Bank Material Reach", Range(0, 1)) = 0.65
         [HideInInspector] _GroundImmediateBankExposure("Ground Immediate-Bank Exposure", Range(0, 1)) = 0.55
         [HideInInspector] _GroundWaterlineMaterialStrength("Ground Waterline Material Strength", Range(0, 1)) = 1
@@ -200,7 +201,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
-            #pragma multi_compile _ _FORWARD_PLUS
+            #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
 

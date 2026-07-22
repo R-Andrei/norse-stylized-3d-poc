@@ -70,6 +70,7 @@
                 float _GroundRiverbedWetSmoothnessResponse;
                 float _GroundRiverbedWetSpecularResponse;
                 float _GroundBankMaterialStrength;
+                float4 _GroundBankMaterialTransition;
                 float _GroundBankMaterialReach;
                 float _GroundImmediateBankExposure;
                 float _GroundWaterlineMaterialStrength;

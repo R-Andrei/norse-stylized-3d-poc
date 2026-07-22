@@ -1,3 +1,91 @@
+## 2026-07-22 — GSU-M2.7C.5E.2.2: Feature-aware surface-application transition architecture
+
+M2.7C.5E.2.2 preserves the accepted E2.1 sequential material composition:
+
+```text
+Primary Ground
+→ Bank application
+→ Riverbed application
+```
+
+The complete substrate response still uses each slot's ordinary material application weight. Discrete feature response is now independently retained only after an inward feature-clearance band. This prevents sparse rocks intersecting the Ground/Bank or Bank/Riverbed boundary from being dissolved by the ordinary material blend while retaining the imported substrate-only colour/form/finish in that transition region.
+
+The feature-aware payload is carried in the existing paired Palette Form texture. Its runtime channel contract is:
+
+```text
+R = complete substrate + feature Palette Form
+G = substrate-only Palette Form
+B = substrate-only roughness
+A = discrete-feature coverage
+```
+
+The existing packed-detail texture remains `RG = complete slope`, `B = complete cavity`, `A = complete roughness`. Feature suppression interpolates complete form and roughness toward the substrate-only values and attenuates slope/cavity toward their neutral substrate values. Current sparse-riverbed substrate slope and cavity are intentionally neutral. A future feature-aware payload requiring non-neutral substrate slope or cavity would need a separately approved channel contract; this patch does not add another texture.
+
+Feature handling belongs to the surface-application slot. Bank and Riverbed use one shared `GroundSurfaceApplicationBlendSettings` contract:
+
+```text
+Material Blend Distance
+Material Blend Softness
+Discrete Feature Edge Clearance
+Discrete Feature Return Fade
+```
+
+Clearance `0` disables feature suppression. Nonzero clearance creates a substrate-only band inward from that application's boundary; Return Fade controls the feature return farther inside. Ordinary texture-form, authored-material, and packed-only surfaces do not opt into the feature-aware payload mode and retain their previous response.
+
+Performance ownership remains unchanged: no texture sample, draw call, texture-array allocation, mesh stream, renderer, or runtime CPU process is added. The existing transition `float4` carries material distance/softness in `x/y` and feature clearance/return fade in `z/w`. Runtime cost is limited to one feature-mode/mask gate after the existing samples; retention arithmetic runs only on feature-aware feature texels while clearance is nonzero.
+
+The feature mask is pixel-level, not per-rock identity. The clearance band is sized to keep features away from the visible application boundary; the controlled return band farther inside is still a gradual feature transition. Whole-feature atomic placement would require feature-centre/identity data and is outside this patch.
+
+---
+
+## 2026-07-22 — GSU-M2.7C.5E.2.1: Generic surface-application blend architecture
+
+This section supersedes the Riverbed-only dry-material transition described by M2.7C.5E.2. The visible production defect was the **River Bank-to-Primary-Ground** handoff. The accepted architecture is therefore application-slot-owned rather than Riverbed-specific.
+
+Every secondary Ground surface application owns the same transition contract:
+
+```text
+Surface application
+├── Material Strength
+├── Material Blend Distance
+└── Material Blend Softness
+```
+
+The reusable material continues to own palette, form, packed detail, cavity, natural scale, and dry finish. The application slot owns where that material participates and how its complete response transitions into the already-resolved lower surface. Bank and Riverbed both use the same C# value contract and the same HLSL transition resolver. Future secondary slots must reuse this contract rather than add another semantic-specific fade implementation.
+
+Current sequential composition is:
+
+```text
+resolved = Primary Ground
+resolved = Blend(resolved, Bank, Bank application weight)
+resolved = Blend(resolved, Riverbed, Riverbed application weight)
+```
+
+Equivalent final weights are:
+
+```text
+Ground   = (1 - Bank) * (1 - Riverbed)
+Bank     = Bank * (1 - Riverbed)
+Riverbed = Riverbed
+```
+
+The Bank application weight combines the existing Bank semantic composition with a new terrain-handoff transition. The Riverbed application weight transitions inward from exact Riverbed Support over the already-resolved Bank/Primary-Ground result. One normalized weight set drives colour and Palette Form, packed slope/normal, cavity, roughness/finish, smoothness, specular response, and texture-form lighting. The imported texture-form `0.5` ownership cut is removed because it converted continuous application masks into hard binary edges.
+
+The River corridor packed stream is now:
+
+```text
+TEXCOORD3.x = exact Riverbed Support
+TEXCOORD3.y = outward Bank distance from Riverbed Support
+TEXCOORD3.z = inward Bank distance from the terrain handoff
+TEXCOORD3.w = inward Riverbed distance from Riverbed Support
+```
+
+Bank authorization is derived from positive Bank inward distance and exclusion of Riverbed Support. The terrain-handoff vertex stores zero, so Bank material begins at zero and reaches its authored strength over `Material Blend Distance`. No new stream, topology, renderer, draw call, or runtime process is introduced.
+
+Dry material transitions remain independent from Shore/Riverbed wetness transitions and from exact-support cover exclusion. M2.7C.5E.2 algorithm-6 rock-silhouette smoothing and installer update-in-place behavior are unchanged by this correction.
+
+---
+
 ## 2026-07-22 — GSU-M2.7C.5E.2: Controllable dry Riverbed blend and smooth runtime payload architecture
 
 M2.7C.5E.2 preserves the accepted homogeneous substrate, exact nested `6 / 9 / 12` sparse-rock placements, paired `PaletteForm + RuntimePackedDetail` runtime contract, editable palette profiles, and three-candidate comparison workflow. It corrects only the observed region integration, outer payload silhouette, and refresh behavior.

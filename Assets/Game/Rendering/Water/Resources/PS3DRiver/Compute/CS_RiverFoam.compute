@@ -124,7 +124,9 @@ float FoamEvaluateIntrinsicShapeMask(
     FoamMaterialState material,
     float validFluid)
 {
-    return saturate(material.presence * validFluid);
+    // Layer D remains diagnostic-only. Use transported material amount so the
+    // diagnostic reflects both geometric Coverage and intrinsic Presence.
+    return saturate(material.coverage * material.presence * validFluid);
 }
 
 
@@ -274,7 +276,8 @@ float FoamResolveVisualFilmSourceAtDomainUV(float2 domainUV)
     FoamVisualFilmInfluence influence =
         FoamResolveVisualFilmInfluenceAtDomainUV(domainUV);
 
-    float materialBody = smoothstep(0.035, 0.36, material.presence) *
+    float materialAmount = material.coverage * material.presence;
+    float materialBody = smoothstep(0.035, 0.36, materialAmount) *
         smoothstep(0.015, 0.070, material.remainingLife);
 
     // Layer D Film Source is material-derived. Layer B support/contact fields
@@ -1192,20 +1195,20 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
         sourceAmount = segmentSample.y;
     }
 
-    float sourceFill = EvaluateFoamSourceFillCoverage(
-        physicalPosition,
-        sourceAmount,
-        _FoamInjectionSourceFillSeed,
-        _FoamInjectionSourceFillFeatureSize,
-        physicalCellSpacing);
-    float injectedPresence = saturate(shape * sourceFill * validFluid);
-    if (injectedPresence <= FoamMaterialStateEpsilon)
+    // P13A separates geometric Coverage from intrinsic material properties.
+    // Shape and valid-fluid coverage decide where material is born; authored
+    // Amount is written exactly as intrinsic Presence and no longer doubles as
+    // a hidden source-fill threshold.
+    float injectedCoverage = saturate(shape * validFluid);
+    if (injectedCoverage <= FoamMaterialStateEpsilon ||
+        sourceAmount <= 0.0)
     {
         return;
     }
 
     FoamMaterialState sourceState;
-    sourceState.presence = injectedPresence;
+    sourceState.coverage = injectedCoverage;
+    sourceState.presence = sourceAmount;
     sourceState.remainingLife = saturate(_FoamInjectionRemainingLife);
     sourceState.materialPattern = EvaluateFoamMaterialPattern(
         physicalPosition,
@@ -1213,7 +1216,7 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
         _FoamInjectionSourceFillFeatureSize,
         physicalCellSpacing);
     float4 sourcePacked = FoamEncodeMaterialState(sourceState);
-    _FoamStateWrite[coordinate] = FoamMergeBornPresence(
+    _FoamStateWrite[coordinate] = FoamMergeBornMaterial(
         _FoamStateWrite[coordinate],
         sourcePacked);
 
@@ -1258,7 +1261,7 @@ float FoamEvaluateShoreRibbonSource(
     float lateralMetres,
     float shoreMetres,
     float2 physicalCellSpacing,
-    out float amountMultiplier)
+    out float coverageMultiplier)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float alongLength = max(
@@ -1318,7 +1321,7 @@ float FoamEvaluateShoreRibbonSource(
     float shape = saturate(max(core, softBand * irregularEdge) *
         endMask * revealMask);
 
-    amountMultiplier = 1.0;
+    coverageMultiplier = 1.0;
     return shape;
 }
 
@@ -1328,7 +1331,7 @@ float FoamEvaluateInwardWashSource(
     float lateralMetres,
     float shoreMetres,
     float2 physicalCellSpacing,
-    out float amountMultiplier)
+    out float coverageMultiplier)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float alongLength = max(
@@ -1414,7 +1417,7 @@ float FoamEvaluateInwardWashSource(
         lerp(1.0, breakup, 0.32) * lerp(1.0, 0.78, nearestS) *
         max(0.72, endTaper));
 
-    amountMultiplier = lerp(1.0, 0.92, nearestS);
+    coverageMultiplier = lerp(1.0, 0.92, nearestS);
     return shape;
 }
 
@@ -1787,7 +1790,7 @@ float FoamEvaluateObjectContactArcSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    out float amountMultiplier)
+    out float coverageMultiplier)
 {
     float2 localPosition = float2(
         globalDistance - sourceEvent.distance.z,
@@ -1897,7 +1900,7 @@ float FoamEvaluateObjectContactArcSource(
         max(
             negativeArmShape * negativePhase,
             positiveArmShape * positivePhase));
-    amountMultiplier = 1.0;
+    coverageMultiplier = 1.0;
     return saturate(shape);
 }
 
@@ -1906,7 +1909,7 @@ float FoamEvaluateObjectContactSemiArcSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    out float amountMultiplier)
+    out float coverageMultiplier)
 {
     float2 localPosition = float2(
         globalDistance - sourceEvent.distance.z,
@@ -2010,7 +2013,7 @@ float FoamEvaluateObjectContactSemiArcSource(
     float shape = max(
         armShape * armPhase,
         frontShape * frontPhase);
-    amountMultiplier = 1.0;
+    coverageMultiplier = 1.0;
     return saturate(shape);
 }
 
@@ -2020,7 +2023,7 @@ float FoamEvaluateObjectContactFleckSource(
     float lateralMetres,
     float2 physicalCellSpacing,
     int2 coordinate,
-    out float amountMultiplier)
+    out float coverageMultiplier)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float localAlong = (globalDistance - sourceEvent.distance.z) * flowDirection;
@@ -2037,7 +2040,7 @@ float FoamEvaluateObjectContactFleckSource(
     float contactConfidence = saturate(contact.r);
     if (contactConfidence <= 0.001)
     {
-        amountMultiplier = 0.0;
+        coverageMultiplier = 0.0;
         return 0.0;
     }
 
@@ -2090,7 +2093,7 @@ float FoamEvaluateObjectContactFleckSource(
         contact.a * coarseAlongGate * coarseAcrossGate *
         lerp(1.0, breakup, 0.46));
 
-    amountMultiplier = lerp(0.82, 1.0, saturate(contact.a));
+    coverageMultiplier = lerp(0.82, 1.0, saturate(contact.a));
     return shape;
 }
 
@@ -2100,7 +2103,7 @@ float FoamEvaluateFreeWaterLaceConnectorSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    out float amountMultiplier)
+    out float coverageMultiplier)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float progress = saturate(sourceEvent.header.z);
@@ -2165,7 +2168,7 @@ float FoamEvaluateFreeWaterLaceConnectorSource(
     float shape = saturate(
         stroke * max(0.25, endTaper) *
         lerp(1.0, breakup * gapMask, 0.55));
-    amountMultiplier = 0.92;
+    coverageMultiplier = 0.92;
     return shape;
 }
 
@@ -2174,7 +2177,7 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    out float amountMultiplier)
+    out float coverageMultiplier)
 {
     float progress = saturate(sourceEvent.header.z);
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
@@ -2256,7 +2259,7 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
     float shape = saturate(
         stroke * subCellCoverage * max(0.25, endTaper) *
         lerp(1.0, breakup * gapMask, 0.48));
-    amountMultiplier = 0.94;
+    coverageMultiplier = 0.94;
     return shape;
 }
 
@@ -2265,7 +2268,7 @@ float FoamEvaluateFreeWaterTornFragmentSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    out float amountMultiplier)
+    out float coverageMultiplier)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float progress = saturate(sourceEvent.header.z);
@@ -2338,14 +2341,14 @@ float FoamEvaluateFreeWaterTornFragmentSource(
         0.65);
 
     float shape = saturate(fragmentBase * reveal * breakup * biteMask);
-    amountMultiplier = 0.88;
+    coverageMultiplier = 0.88;
     return shape;
 }
 
 struct FoamAutomaticSourceRasterSample
 {
     float4 packedState;
-    float injectedPresence;
+    float injectedCoverage;
     float sourceType;
     float clearState;
 };
@@ -2355,7 +2358,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
 {
     FoamAutomaticSourceRasterSample result;
     result.packedState = 0.0.xxxx;
-    result.injectedPresence = 0.0;
+    result.injectedCoverage = 0.0;
     result.sourceType = 0.0;
     result.clearState = 0.0;
 
@@ -2408,7 +2411,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
         return result;
     }
 
-    float currentAmountMultiplier = 1.0;
+    float currentCoverageMultiplier = 1.0;
     float currentShape = 0.0;
     if (sourceType < 1.5)
     {
@@ -2418,7 +2421,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             lateralMetres,
             shoreMetres,
             physicalCellSpacing,
-            currentAmountMultiplier);
+            currentCoverageMultiplier);
     }
     else if (sourceType < 2.5)
     {
@@ -2428,7 +2431,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             lateralMetres,
             shoreMetres,
             physicalCellSpacing,
-            currentAmountMultiplier);
+            currentCoverageMultiplier);
     }
     else if (sourceType < 3.5)
     {
@@ -2437,7 +2440,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             globalDistance,
             lateralMetres,
             physicalCellSpacing,
-            currentAmountMultiplier);
+            currentCoverageMultiplier);
     }
     else if (sourceType < 4.5)
     {
@@ -2447,7 +2450,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             lateralMetres,
             physicalCellSpacing,
             coordinate,
-            currentAmountMultiplier);
+            currentCoverageMultiplier);
     }
     else if (sourceType < 5.5)
     {
@@ -2456,7 +2459,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             globalDistance,
             lateralMetres,
             physicalCellSpacing,
-            currentAmountMultiplier);
+            currentCoverageMultiplier);
     }
     else if (sourceType < 6.5)
     {
@@ -2465,7 +2468,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             globalDistance,
             lateralMetres,
             physicalCellSpacing,
-            currentAmountMultiplier);
+            currentCoverageMultiplier);
     }
     else if (sourceType < 7.5)
     {
@@ -2474,7 +2477,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             globalDistance,
             lateralMetres,
             physicalCellSpacing,
-            currentAmountMultiplier);
+            currentCoverageMultiplier);
     }
     else
     {
@@ -2483,11 +2486,11 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             globalDistance,
             lateralMetres,
             physicalCellSpacing,
-            currentAmountMultiplier);
+            currentCoverageMultiplier);
     }
 
     float currentContribution = saturate(currentShape) *
-        max(0.0, currentAmountMultiplier);
+        max(0.0, currentCoverageMultiplier);
     bool persistentObjectEmitter =
         (sourceType > 2.5 && sourceType < 3.5) ||
         (sourceType > 4.5 && sourceType < 5.5);
@@ -2499,7 +2502,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
         float previousContribution = 0.0;
         if (sourceEvent.deposit.z > 0.5)
         {
-            float previousAmountMultiplier = 1.0;
+            float previousCoverageMultiplier = 1.0;
             float previousShape = 0.0;
             if (sourceType < 1.5)
             {
@@ -2509,7 +2512,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     lateralMetres,
                     shoreMetres,
                     physicalCellSpacing,
-                    previousAmountMultiplier);
+                    previousCoverageMultiplier);
             }
             else if (sourceType < 2.5)
             {
@@ -2519,7 +2522,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     lateralMetres,
                     shoreMetres,
                     physicalCellSpacing,
-                    previousAmountMultiplier);
+                    previousCoverageMultiplier);
             }
             else if (sourceType < 4.5)
             {
@@ -2529,7 +2532,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     lateralMetres,
                     physicalCellSpacing,
                     coordinate,
-                    previousAmountMultiplier);
+                    previousCoverageMultiplier);
             }
             else if (sourceType < 6.5)
             {
@@ -2538,7 +2541,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     globalDistance,
                     lateralMetres,
                     physicalCellSpacing,
-                    previousAmountMultiplier);
+                    previousCoverageMultiplier);
             }
             else if (sourceType < 7.5)
             {
@@ -2547,7 +2550,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     globalDistance,
                     lateralMetres,
                     physicalCellSpacing,
-                    previousAmountMultiplier);
+                    previousCoverageMultiplier);
             }
             else
             {
@@ -2556,11 +2559,11 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     globalDistance,
                     lateralMetres,
                     physicalCellSpacing,
-                    previousAmountMultiplier);
+                    previousCoverageMultiplier);
             }
 
             previousContribution = saturate(previousShape) *
-                max(0.0, previousAmountMultiplier);
+                max(0.0, previousCoverageMultiplier);
         }
 
         float newlyRevealedContribution = sourceEvent.deposit.z > 0.5
@@ -2582,40 +2585,32 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     // authored contribution as the absolute birth target expected by the merge.
     float birthContribution = currentContribution;
 
-    bool objectRibbonSource =
-        (sourceType > 2.5 && sourceType < 3.5) ||
-        (sourceType > 4.5 && sourceType < 5.5);
-    float sourceFill = 1.0;
-    if (!objectRibbonSource)
-    {
-        float sourceFillBlend = saturate(sourceEvent.kinematics.w);
-        sourceFill = lerp(
-            1.0,
-            EvaluateFoamSourceFillCoverage(
-                physicalPosition,
-                sourceEvent.material.x,
-                sourceEvent.variation.x,
-                sourceEvent.material.w,
-                physicalCellSpacing),
-            sourceFillBlend);
-    }
-    float injectedPresence = saturate(
-        birthContribution * sourceFill * sourceEvent.material.x * validFluid);
-    if (injectedPresence <= FoamMaterialStateEpsilon)
+    // P13A makes Initial Presence and Initial Life authoritative material
+    // properties. Source shape, family/subcell shaping, reveal progression and
+    // valid-fluid clipping affect geometric Coverage only. The legacy source
+    // fill blend remains in the GPU record for binary compatibility but is no
+    // longer allowed to reinterpret Initial Presence as spatial probability.
+    float injectedCoverage = saturate(birthContribution * validFluid);
+    float authoredPresence = saturate(sourceEvent.material.x);
+    float authoredLife = saturate(sourceEvent.material.y);
+    if (injectedCoverage <= FoamMaterialStateEpsilon ||
+        authoredPresence <= 0.0 ||
+        authoredLife <= 0.0)
     {
         return result;
     }
 
     FoamMaterialState sourceState;
-    sourceState.presence = injectedPresence;
-    sourceState.remainingLife = saturate(sourceEvent.material.y);
+    sourceState.coverage = injectedCoverage;
+    sourceState.presence = authoredPresence;
+    sourceState.remainingLife = authoredLife;
     sourceState.materialPattern = EvaluateFoamMaterialPattern(
         physicalPosition,
         sourceEvent.material.z,
         sourceEvent.material.w,
         physicalCellSpacing);
     result.packedState = FoamEncodeMaterialState(sourceState);
-    result.injectedPresence = injectedPresence;
+    result.injectedCoverage = injectedCoverage;
     return result;
 }
 
@@ -2629,12 +2624,12 @@ void ApplyFoamAutomaticSourceRasterSample(
         return;
     }
 
-    if (sample.injectedPresence <= FoamMaterialStateEpsilon)
+    if (sample.injectedCoverage <= FoamMaterialStateEpsilon)
     {
         return;
     }
 
-    _FoamStateWrite[coordinate] = FoamMergeBornPresence(
+    _FoamStateWrite[coordinate] = FoamMergeBornMaterial(
         _FoamStateWrite[coordinate],
         sample.packedState);
 }
@@ -2643,7 +2638,7 @@ void WriteFoamAutomaticSourceDebug(
     int2 coordinate,
     FoamAutomaticSourceRasterSample sample)
 {
-    if (sample.injectedPresence <= FoamMaterialStateEpsilon)
+    if (sample.injectedCoverage <= FoamMaterialStateEpsilon)
     {
         return;
     }
@@ -2665,7 +2660,7 @@ void WriteFoamAutomaticSourceDebug(
 
     debugState.rgb = max(
         debugState.rgb,
-        categoryMask * sample.injectedPresence);
+        categoryMask * sample.injectedCoverage);
     debugState.a = max(
         debugState.a,
         alreadyOccupied ? 1.0 : 0.0);
@@ -2775,7 +2770,8 @@ void WriteIsolatedLifeProbe(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     FoamMaterialState sourceState;
-    sourceState.presence = saturate(validFluid);
+    sourceState.coverage = saturate(validFluid);
+    sourceState.presence = 1.0;
     sourceState.remainingLife = remainingLife;
     sourceState.materialPattern = 1.0;
     _FoamStateWrite[coordinate] = FoamEncodeMaterialState(sourceState);
@@ -3519,8 +3515,9 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
 
     FoamMaterialState visibleMaterial = FoamDecodeMaterialState(
         SampleStateAtUV(uv));
-    float presence = visibleMaterial.presence;
-    bool visible = presence >= _FoamPresenceMetricThreshold;
+    float materialAmount =
+        visibleMaterial.coverage * visibleMaterial.presence;
+    bool visible = materialAmount >= _FoamPresenceMetricThreshold;
     bool major = materialTopology.majorSupport >= 0.15;
     bool connector = materialTopology.connectorSupport >= 0.12;
     bool negativeAging =
@@ -3572,10 +3569,10 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
          max(1.0, (float)_FoamTopologyDimensions.y));
     float representedArea = fullCellArea * representedCellCount;
     uint integratedAreaFixed = (uint)round(
-        saturate(presence) * representedArea *
+        saturate(materialAmount) * representedArea *
         max(1.0, _FoamIntegratedAreaFixedPointScale));
     uint visibleCoreAreaFixed = (uint)round(
-        (presence >= 0.5 ? representedArea : 0.0) *
+        (materialAmount >= 0.5 ? representedArea : 0.0) *
         max(1.0, _FoamIntegratedAreaFixedPointScale));
     _FoamTopologyMetrics.InterlockedAdd(
         FoamMetricIntegratedPresenceAreaOffset,
@@ -3605,19 +3602,19 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     if (visible)
     {
         uint visiblePresenceAreaFixed = (uint)round(
-            saturate(presence) * representedArea *
+            saturate(materialAmount) * representedArea *
             max(1.0, _FoamIntegratedAreaFixedPointScale));
         uint visibleLifeAreaFixed = (uint)round(
-            saturate(presence) * saturate(visibleMaterial.remainingLife) *
+            saturate(materialAmount) * saturate(visibleMaterial.remainingLife) *
             representedArea * max(1.0, _FoamIntegratedAreaFixedPointScale));
         uint positiveAreaFixed = (uint)round(
-            saturate(presence) * saturate(positiveSupport) *
+            saturate(materialAmount) * saturate(positiveSupport) *
             representedArea * max(1.0, _FoamIntegratedAreaFixedPointScale));
         uint negativeAreaFixed = (uint)round(
-            saturate(presence) * saturate(materialTopology.negativeAgingPressure) *
+            saturate(materialAmount) * saturate(materialTopology.negativeAgingPressure) *
             representedArea * max(1.0, _FoamIntegratedAreaFixedPointScale));
         uint agingRateAreaFixed = (uint)round(
-            saturate(presence) * min(localAgeRate, 16.0) *
+            saturate(materialAmount) * min(localAgeRate, 16.0) *
             representedArea * max(1.0, _FoamIntegratedAreaFixedPointScale));
         uint maxPositiveFixed = (uint)round(
             saturate(positiveSupport) * 10000.0);
@@ -3803,6 +3800,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         clampLoss);
     FoamAccumulateTransportPresenceAttribution(
         coordinate,
+        rawTransported.w,
         rawTransported.x,
         transportedPacked.x,
         validFluid,
@@ -3833,7 +3831,8 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
             obstacleFootprint);
 
     FoamMaterialState material = FoamDecodeMaterialState(transportedPacked);
-    if (material.presence <= FoamMaterialStateEpsilon)
+    if (material.coverage <= FoamMaterialStateEpsilon ||
+        material.presence <= 0.0)
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
         return;

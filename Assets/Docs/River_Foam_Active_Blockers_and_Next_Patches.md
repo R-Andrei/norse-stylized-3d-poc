@@ -18,11 +18,15 @@
 
 `RG-METRIC-P12k — Exact pre-Chip rendered-mask ownership` remains retained. It correctly moved Presence-Amplitude eligibility to the exact no-Chip rendered mask passed to final composition: `preChipRenderedMask = foam.mask × strandKeep`.
 
-`RG-METRIC-P12l — Binary Candidate × Eligibility intersection` is mechanically valid but rejected by Unity visual evidence. Its `>= 0.5` tests select only the midpoint contour interiors of two antialiased fields, so positive Candidate or Eligibility support below `0.5` remains unselected and can preserve Foam. `RG-METRIC-P12m — Any-Support Binary Chip Selection and Full-Removal Proof` corrected that threshold defect. `RG-METRIC-P12n — Optional Candidate-Straddle Chip Admission A/B` and `RG-METRIC-P12o — Original Analytical Candidates with Boundary-Anchored Eligibility` are visually rejected and removed. `RG-METRIC-P12p — Retire Experimental Cache and Isolate the Rendered Exterior Fringe` is the active implementation: one original analytical Candidate Field multiplied by one rendered Eligibility band whose distance coordinate excludes the inner hard-body rise.
+`RG-METRIC-P12l — Binary Candidate × Eligibility intersection` is mechanically valid but rejected by Unity visual evidence. Its `>= 0.5` tests select only the midpoint contour interiors of two antialiased fields, so positive Candidate or Eligibility support below `0.5` remains unselected and can preserve Foam. `RG-METRIC-P12m — Any-Support Binary Chip Selection and Full-Removal Proof` corrected that threshold defect. `RG-METRIC-P12n — Optional Candidate-Straddle Chip Admission A/B` and `RG-METRIC-P12o — Original Analytical Candidates with Boundary-Anchored Eligibility` are visually rejected and removed. `RG-METRIC-P12p — Retire Experimental Cache and Isolate the Rendered Exterior Fringe` restored one original analytical Candidate Field multiplied by one rendered Eligibility band whose distance coordinate excludes the inner hard-body rise; later P12s/P12t work superseded only its application route.
 
 `RG-METRIC-P12q — Binary Morphology Eligibility` is Unity-rejected and fully removed by `RG-METRIC-P12r`. The source is restored to the P12p rendered-edge implementation with no topology route, resource, kernel, control, or fallback retained.
 
-`RG-METRIC-P12s — Optional Presence-Amplitude Soft-Mask Reconstruction A/B` is visually accepted as the production direction. `RG-METRIC-P12t — Soft Reconstruction Baseline and Layer D/E Inspector Reconciliation` promotes that route to the sole Chipping application, removes Exact Rendered Removal and its selector, moves Production Chipping into Layer E, and labels Layer D evaluated-shape controls as diagnostic-only. Unity compilation and final layout validation remain pending.
+`RG-METRIC-P12s — Optional Presence-Amplitude Soft-Mask Reconstruction A/B` is visually accepted as the production direction. `RG-METRIC-P12t — Soft Reconstruction Baseline and Layer D/E Inspector Reconciliation` promotes that route to the sole Chipping application, removes Exact Rendered Removal and its selector, moves Production Chipping into Layer E, and labels Layer D evaluated-shape controls as diagnostic-only. The user accepted the resulting Chipping appearance as imperfect but sufficient; P12t is frozen and closed.
+
+`RG-METRIC-P12u — Unified Automatic Birth Reveal-Speed Contract` is user-validated as working as expected and is frozen and closed. Its live report output and performance profile remain optional evidence work rather than open correctness blockers.
+
+`RG-METRIC-P13A — Authoritative Birth Material and Coverage-Separated Transport` is the active approved patch. It separates geometric Coverage from intrinsic Presence and Remaining Life, makes birth controls literal, preserves negative topology, and consolidates the three global transport/visibility selectors in one documented Inspector contract.
 
 ### P12g reviewed evidence
 
@@ -972,7 +976,7 @@ Create: none. Delete: none. Move/rename: none. Metadata, scene, prefab, material
 - GPU work per active event is unchanged. Honest slow reveals can keep more events active simultaneously, increasing existing source raster dispatches up to the unchanged 32-event bound.
 - Risk: high Activity plus very slow Reveal Speed can saturate the pool and reject starts. The report must expose pool occupancy and rejected starts; P12u must not silently accelerate events to avoid saturation.
 - Risk: restoring the complete Fleck/Free-Water Min/Max range changes the deterministic size distribution by design. Serialized Min/Max values remain unchanged.
-- **Status:** source implementation complete; Unity validation pending.
+- **Status:** source implementation complete; the user reports that P12u works as expected in Unity. Live report capture and performance profiling remain unmeasured; P12u is frozen and closed.
 
 ### P12u post-implementation reconciliation
 
@@ -986,3 +990,222 @@ Create: none. Delete: none. Move/rename: none. Metadata, scene, prefab, material
 - The Play Mode report covers all eight source types, active counts, current pool occupancy, last-update rejected starts, and latest requested/raw/resolved/actual timing; an adjacent Inspector action copies the report.
 - Static/model audit: exact scope, C#/HLSL delimiter and preprocessor balance, resolver ownership, obsolete-formula absence, call arity, full-range endpoint reachability, one-million-case timing model, serialized-field preservation, kernel/resource-count preservation, protected `Injection.cs` ownership, and package-reproduction gates pass.
 - Unity 6000.5 compilation, live report output, visual formation-speed comparison, and pool-saturation observation remain pending.
+
+## RG-METRIC-P13A — Authoritative Birth Material and Coverage-Separated Transport
+
+### Status
+
+- Authorization: approved by the user after read-only audit and contract review.
+- P12 closure: P12t soft-reconstruction Chipping and P12u unified Reveal Speed are frozen as accepted baselines. P13A does not reopen Candidate geometry, Chipping application, Reveal Speed, source Activity, or negative topology.
+- Read-only review: complete.
+- Canonical plan: recorded before implementation.
+- Implementation: source changes complete.
+- Offline validation: complete; 25/25 mathematical/static authority checks pass, exact scope reconciles, and package reproduction is recorded below.
+- Unity 6000.5 import, Play Mode visual validation, and measured performance: pending.
+
+### Reviewed evidence
+
+1. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl` currently packs `R = Presence`, `G = Presence × Remaining Life`, `B = Presence × Material Pattern`, leaves alpha zero, clips Presence directly to valid-fluid coverage, merges births only through newly added Presence, and reconstructs all packed TVD channels independently.
+2. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute` currently multiplies automatic Initial Presence by source shape, source-fill, family/subcell contribution, and valid-fluid coverage before encoding. It also passes Initial Presence into source-fill area selection. Manual injection uses the same mixed amount/coverage semantics.
+3. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Sampling.hlsl` explicitly clears sampled alpha, proving alpha is unused by the current persistent-state contract.
+4. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl` decodes the current three-channel contract, uses stored Presence as both geometric footprint and material amplitude, lets Lifecycle-Faithful still apply continuous life-driven patterned erosion, and applies Presence-Amplitude before nonlinear hardening rather than once to the resolved shape.
+5. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader` is the sole production consumer of `RiverWaterFoam.hlsl`. Its Layer C debug paths decode raw channels directly and must be synchronized with the new packed state.
+6. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs` places Material Transport under Runtime & Quality while Final Visibility and Presence Footprint are under Layer E. The user approved one shared `Transport & Visibility Contract` section with a live read-only explanation.
+7. `Game/Procedural/Rivers/StylizedRiver.cs` serializes the three selectors independently. Enum integer values and serialized field names can remain unchanged, so scenes and prefabs require no edit.
+8. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs` allocates the persistent state as existing ARGBHalf textures. P13A reuses alpha and adds no texture, buffer, kernel, dispatch, pass, or draw call.
+9. The supplied source archive contains no Git metadata and no Unity `.meta` files. The immutable pre-edit workspace at `/mnt/data/river_patch_base` is the comparison authority. Scene, prefab, material, cache, layer, tag, and metadata edits are prohibited.
+
+### Objective and authoritative contract
+
+1. Separate geometric Coverage from intrinsic material Presence without adding storage:
+   - `R = Coverage × Presence` (transported material amount),
+   - `G = Coverage × Presence × Remaining Life`,
+   - `B = Coverage × Presence × Material Pattern`,
+   - `A = Coverage`.
+2. Decode:
+   - `Coverage = A`,
+   - `Presence = R / A`,
+   - `Remaining Life = G / R`,
+   - `Material Pattern = B / R`.
+3. Preserve a legacy in-memory fallback for a positive RGB state with zero alpha so an active pre-P13 state is not interpreted as empty during transient editor/runtime replacement. New writes always use the P13A contract.
+4. Initial Presence and Initial Life are intrinsic birth properties. Source shape, taper, breakup, subcell width, and valid-fluid clipping may change Coverage only. They must not attenuate decoded Presence or Life.
+5. Birth overlap uses Max + Refresh:
+   - Coverage becomes the maximum of existing and incoming Coverage;
+   - Presence becomes the maximum intrinsic Presence;
+   - Remaining Life becomes the maximum intrinsic Remaining Life;
+   - Pattern remains stable unless genuinely new Coverage is added.
+6. Valid-fluid clipping reduces Coverage and all packed moments proportionally while preserving decoded Presence, Remaining Life, and Pattern.
+7. Donor Cell transports the coherent packed state unchanged.
+8. TVD Superbee reconstructs bounded Coverage only and re-encodes one coherent donor material state. It must not reconstruct four unrelated packed channels.
+9. `Concentration + Lifetime` uses local Coverage concentration and the existing continuous life-pattern erosion.
+10. `Lifecycle-Faithful` uses meaningful Coverage as the footprint and does not apply continuous hidden life erosion while Remaining Life is positive. Explicit lifecycle aging and negative topology still determine when the state reaches zero.
+11. `Coverage-Only` (serialized enum value remains `Current`) ignores intrinsic Presence as visual amplitude after shape resolution.
+12. `Presence-Amplitude` carries each resolved shape and its exact Presence-weighted counterpart through identical Presence-independent wake/warp/surface-coupling weights, then selects the Presence-weighted result. Uniform Presence `0.75` is therefore exactly proportional to the equivalent Presence `1.00` resolved mask. Presence does not feed source geometry, hardening thresholds, or coupling weights.
+13. P12t analytical Candidates, soft Eligibility, soft-mask Chipping reconstruction, and Strand order remain intact. Only their input mask amplitude/decoding changes under the new explicit contract.
+
+### Inspector requirement
+
+Create one section immediately after Runtime & Quality:
+
+`Foam > Transport & Visibility Contract`
+
+It owns, without duplication:
+
+1. `Material Transport Scheme`
+2. `Final Foam Visibility Mode`
+3. `Presence Footprint`
+
+Directly below, a permanently visible read-only panel must explain:
+
+- selected transport behaviour;
+- selected final-visibility behaviour;
+- selected Presence-footprint behaviour;
+- the combined result;
+- persistent meanings of Coverage, Presence, Remaining Life, and Material Pattern.
+
+Inspector-facing labels become `Donor Cell`, `TVD Superbee`, `Coverage-Only`, and `Presence-Amplitude`. Enum values and serialized field names remain unchanged.
+
+### Approved file scope
+
+Modify exactly:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Docs/River_Foam_Stage6_Architecture.md`
+5. `Docs/River_Rendering_Roadmap.md`
+6. `Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs`
+8. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+9. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+10. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.Diagnostics.cs`
+11. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+12. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.P8Diagnostics.cs`
+13. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl`
+14. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Sampling.hlsl`
+15. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+16. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl`
+17. `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl`
+18. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+19. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+Scope amendment before either added file was edited: the read-only consumer audit found that `CS_RiverFoam.Resources.hlsl` is the canonical inline declaration of the persistent packed-state channels and `CS_RiverFoam.Structs.hlsl` is the GPU-side declaration of the automatic source payload. Both require comment-only synchronization with the approved contract; their resource and struct declarations remain byte-for-byte structurally unchanged.
+A second scope amendment was recorded before the two added diagnostic files were edited: `StylizedRiverEditor.Diagnostics.cs` exposes the R-channel conservation metric to the user and `StylizedRiverFoamRuntime.P8Diagnostics.cs` prints the same historical metric in the P8 report. P13A keeps the metric and public property names for compatibility, but their visible labels must say transported Material Amount rather than intrinsic Presence.
+
+Create/delete/move/rename: none. Scene, prefab, material, cache, metadata, layer, tag, component, resource, kernel, dispatch, pass, and draw-call changes are prohibited.
+
+### Implementation sequence
+
+1. Record this plan before implementation.
+2. Introduce Coverage-aware packed-state encode/decode/clamp/clip/merge helpers and coherent Coverage-only TVD reconstruction.
+3. Separate automatic and manual birth Coverage from authored Presence/Life; remove Initial Presence from source-fill selection and material attenuation.
+4. Preserve alpha through all state sampling/remap/transport paths and update lifecycle/diagnostic calculations to use the correct decoded quantity.
+5. Update Layer E decoding and mode semantics. Carry unscaled and exact Presence-weighted resolved shapes through identical Presence-independent coupling; make Lifecycle-Faithful free of continuous hidden life erosion.
+6. Synchronize raw Layer C debug decoding and descriptions.
+7. Consolidate the three selectors in the new Inspector section and add the live read-only contract panel.
+8. Synchronize the remaining four canonical documents and record P12 closure plus P13A architecture.
+9. Run exact-scope diff, source invariant checks, mathematical model tests, delimiter/preprocessor checks, removed-misuse searches, shared-shader consumer audit, and package reproduction.
+
+### Invariants and non-goals
+
+- Preserve negative topology and all explicit lifecycle rates unchanged.
+- Preserve P12u Reveal Speed calculations and automatic event scheduling unchanged.
+- Preserve source dimensions, Activity, Coverage population controls, shape equations, taper, breakup, and event progression except that their output now owns Coverage rather than intrinsic Presence.
+- Preserve fixed spacing, quality modes, resources, texture formats, CFL/substep cadence, endpoint outflow, closed faces, and transport dispatch count.
+- Preserve Chipping Candidate identity/geometry/animation and the accepted soft-mask reconstruction order.
+- Do not add a new debug view, control, texture, field, pass, or runtime allocation.
+- Do not tune scene values or defaults.
+
+### Performance and risks
+
+- Persistent memory is unchanged: alpha of the existing ARGBHalf state is reused.
+- Dispatch, kernel, pass, draw-call, and texture-sample counts are unchanged.
+- TVD per-face arithmetic changes from four independent limiter channels to one Coverage limiter plus decode/encode arithmetic. Aggregate GPU cost is expected to be similar but is unmeasured; Unity profiling remains required before a performance claim.
+- Risk: Lifecycle-Faithful material now remains structurally present until explicit lifecycle death, so overall Foam quantity may rise substantially. This is intentional and must be tuned later through explicit birth/lifecycle controls, not hidden suppression.
+- Risk: a scalar Coverage field cannot reconstruct exact subcell ribbon geometry. It preserves subcell occupancy and intrinsic material values, but the selected Final Visibility policy still decides how that occupancy appears.
+- Risk: Max + Refresh is an explicit single-cohort overlap approximation. It prioritizes authored source authority over exact multi-population mixing and may refresh occupied cells more strongly than the former added-Presence merge.
+
+### Post-implementation reconciliation
+
+- Actual scope: exactly the nineteen declared files were modified. No file was created, deleted, moved, or renamed; no scene, prefab, material, cache, metadata, resource, kernel, dispatch, pass, draw call, layer, tag, or component changed.
+- Persistent packing is now `R = Coverage × Presence`, `G = R × Remaining Life`, `B = R × Material Pattern`, `A = Coverage`. Legacy positive RGB with effectively zero alpha migrates to explicit Coverage without clearing the visible material amount.
+- Birth shape, taper, breakup, reveal, family/subcell shaping, and valid-fluid clipping affect Coverage only. Initial Presence and Initial Life are encoded directly as intrinsic values. Max + Refresh prevents weak dying state from rejecting a fresh source.
+- Donor Cell remains first-order coherent packed transport. TVD reconstructs one bounded Coverage value and re-encodes one coherent donor material state. Unit-capacity and valid-fluid clipping now reduce Coverage coherently while preserving decoded Presence, Life, and Pattern.
+- Lifecycle-Faithful no longer performs continuous render-only life erosion while Layer C Remaining Life is positive. Negative topology and every explicit lifecycle rate are unchanged.
+- Presence-Amplitude now remains exactly proportional through the complete wake/warp/surface-coupling algebra because coupling weights are resolved from the unscaled Coverage/Life shape and applied identically to its Presence-weighted counterpart. The accepted P12t soft Chipping geometry remains unscaled and protected.
+- The P8 remap diagnostic now validates native P13A states and migration of legacy zero-alpha states. Historical R-channel transport reports remain structurally compatible but are labelled Material Amount rather than intrinsic Presence.
+- Material Presence and Remaining Life debug views now use a binary meaningful-Coverage gate and display literal decoded values without a soft Coverage brightness ramp or a minimum Life brightness floor.
+- Offline validation: 25/25 model/static checks pass, including one million float64 roundtrips, one million ARGBHalf precision cases, Initial Presence `0.75` authority across 100,000 Coverage values, overlap refresh, Donor mixing, coherent over-capacity clipping, 500,000 TVD face cases, one million full-coupling Presence-linearity cases, explicit neutral/negative aging clocks, P12u byte identity, and P12t Candidate/Eligibility arithmetic protection.
+- Static consistency: all changed C#/HLSL/Shader delimiters and preprocessor blocks balance; changed-function call arities match; compute kernels, resources, source-event layouts, shader properties, pass count, and target directives are unchanged.
+- Changed-file package reproduction: applying the exact nineteen-file patch set over the immutable supplied base reproduces every modified project byte with no additional, missing, or deleted path.
+- Unity 6000.5 compilation/import, live Play Mode visual/lifetime validation, and measured GPU/CPU performance remain pending and must not be inferred from offline validation.
+
+## RG-METRIC-P13A.1 — D3D11 Struct-Selection Compile Hotfix
+
+**Status:** Implementing after Unity D3D11 compile failure reported by the user.
+
+### Objective
+
+Restore `CS_RiverFoam` compilation on D3D11 without changing any P13A transport, material-state, lifecycle, birth, visibility, Inspector, resource, kernel, or dispatch behaviour.
+
+### Observed evidence
+
+Unity reports `type mismatch between conditional values` at:
+
+`Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl(355)`
+
+The error is repeated for every `CS_RiverFoam` kernel because all kernels compile the shared include. The failing expression selects between two `FoamMaterialState` struct values with the HLSL conditional operator:
+
+```hlsl
+FoamMaterialState donorState = faceVelocity >= 0.0
+    ? negativeState
+    : positiveState;
+```
+
+D3D11 rejects the struct-valued conditional even though the equivalent packed `float4` donor was already selected immediately above.
+
+### Approved file scope
+
+Modify exactly:
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl`
+
+Create/delete/move/rename: none inside the Unity project. Generate the hotfix ZIP, validation report, and checksum outside the project.
+
+### Implementation
+
+1. Record this hotfix before changing shader code.
+2. Replace the struct-valued conditional with an explicit D3D11-safe branch that copies the four scalar fields from the selected decoded endpoint.
+3. Preserve `negativeState` and `positiveState` for the existing TVD Coverage slope calculation; do not add another decode or alter any field calculation.
+4. Confirm there are no other `FoamMaterialState` conditional expressions in the River compute source.
+5. Run exact-scope diff, semantic-equivalence checks, delimiter/preprocessor checks, package reproduction, and archive safety checks.
+
+### Invariants and non-goals
+
+- No P13A equations or mode semantics change.
+- No transport branch, limiter, Coverage reconstruction, encode/decode, capacity clamp, lifecycle, birth merge, render, or diagnostic behaviour changes.
+- No kernel, resource, texture, buffer, dispatch, pass, property, serialized field, scene, prefab, material, metadata, layer, tag, or component changes.
+- P12t and P12u accepted baselines remain frozen.
+
+### Performance
+
+The replacement performs no new arithmetic. It selects the same already-decoded endpoint and copies its four scalar fields through an explicit branch. Donor Cell still returns before the TVD path. Expected runtime cost is equivalent to the rejected struct-valued conditional after compiler lowering; Unity profiling remains pending.
+
+### Validation status
+
+- Unity D3D11 compilation: pending user validation.
+- Offline semantic and structural validation: passed.
+
+### Post-implementation reconciliation
+
+- Actual project scope is exactly the two declared files. No project file was added, deleted, moved, or renamed.
+- The only shader-code difference from P13A is replacement of the struct-valued conditional with one explicit branch that copies `coverage`, `presence`, `remainingLife`, and `materialPattern` from the same selected endpoint.
+- The branch is mathematically identical to the rejected conditional for 500,000 randomized packed endpoint pairs; maximum decoded-field error was `0.000e+00`.
+- No other `FoamMaterialState`-valued conditional remains in the River compute source.
+- The complete P13A mathematical/semantic suite remains `25/25 PASS`.
+- Hotfix-specific scope, semantic, delimiter, preprocessor, and unrelated-source checks are `7/7 PASS`.
+- Applying the two-entry hotfix ZIP over the immutable P13A tree reproduces the completed P13A.1 tree byte-for-byte with zero unsafe, added, deleted, or differing paths.
+- Compute kernels, resources, dispatches, mode calculations, persistent packing, lifecycle, birth, render, diagnostics, and accepted P12t/P12u source remain unchanged.
+- Unity 6000.5 D3D11 compilation is pending and is the required next validation action.
+

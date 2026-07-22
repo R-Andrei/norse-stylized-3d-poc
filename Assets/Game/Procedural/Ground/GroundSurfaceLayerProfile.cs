@@ -129,6 +129,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public Color WetColor => wetColor;
         public bool UsesTextureForm =>
             surfaceMaterial != null && surfaceMaterial.UsesTextureForm;
+        public bool UsesFeatureTextureForm =>
+            surfaceMaterial != null &&
+            surfaceMaterial.UsesFeatureTextureForm;
         public float TextureFormStrength =>
             surfaceMaterial != null
                 ? surfaceMaterial.TextureFormStrength

@@ -4285,3 +4285,67 @@ Arc/Semi-Arc use Reveal Speed for Build only. Their accepted Build → Hold → 
 The previous Shore `14 s`, Object `4 s`, Lace `5 s`, Cross-Lace `3.5 s`, and Torn Fragment `1.35 s` ceilings are superseded. The material cadence is the only minimum-duration constraint. Extremely slow authored speeds can increase 32-slot pool occupancy and reject new starts; saturation is an explicit runtime condition and is reported rather than hidden by acceleration.
 
 Contact Fleck and Free-Water correlated size/life/presence sampling now reaches the full authored Min/Max intervals. Source grammar, geometry, deposition ownership, source strength, transport, Layer D, and Layer E are otherwise unchanged.
+
+
+## P13A authoritative Layer C material and visibility contract
+
+P12t Layer E Chipping and P12u automatic Reveal Speed are frozen baselines. P13A changes the semantic boundary between geometric occupancy, persistent material, transport, and Final visibility.
+
+### Packed state
+
+```text
+Coverage C          = A
+Intrinsic Presence P = R / A
+Remaining Life L     = G / R
+Material Pattern M   = B / R
+
+Packed = (C×P, C×P×L, C×P×M, C)
+```
+
+Coverage is geometric cell occupancy. Presence is intrinsic authored material strength. Life is intrinsic lifecycle state. Pattern is stable material identity. Shape/profile/subcell/valid-fluid operations may alter Coverage; only explicit material-authoring or overlap policy changes Presence; only Layer C lifecycle aging or overlap refresh changes Life.
+
+A positive old RGB state with zero alpha is decoded transiently as `Coverage = R`, `Presence = 1`, preserving the former visible material amount until normal state rewrite.
+
+### Birth
+
+For a source with `Initial Presence = 0.75` and `Initial Life = 1.00`, every newly occupied sample decodes to `P=0.75`, `L=1.00` regardless of whether Coverage is `1.0`, `0.25`, or another positive shape value. Cross-Lace subcell attenuation remains geometric Coverage and no longer weakens intrinsic material.
+
+Birth overlap is `Max + Refresh` because one cell stores one cohort:
+
+```text
+C = max(existing C, source C)
+P = max(existing P, source P)
+L = max(existing L, source L)
+M = existing M, unless source adds new C
+```
+
+This deliberately prevents weak dying material from suppressing a fresh event. It is not a multi-cohort physical mixture.
+
+### Transport
+
+Donor Cell transports the complete packed donor state. TVD Superbee limits/reconstructs Coverage alone and re-encodes the donor's coherent intrinsic state at the reconstructed Coverage. Conservative flux then moves Coverage and all material moments together. Uniform material retains its decoded Presence/Life through numerical diffusion; cells mixing different material decode explicit moment-weighted values.
+
+Unit capacity and the valid-fluid boundary own maximum Coverage. Convergent capacity resolution and valid-fluid clipping both reduce Coverage coherently and re-encode the same intrinsic Presence, Life, and Pattern; neither independently saturates packed moments or reinterprets a boundary fraction as intrinsic material.
+
+### Final visibility
+
+```text
+Transport Scheme
+    -> spatial distribution of Coverage
+Final Visibility Mode
+    -> Coverage + Life to resolved shape
+Presence Footprint
+    -> whether intrinsic Presence scales that shape
+P12t Chipping / Strands / final composition
+```
+
+- Concentration + Lifetime sharpens local Coverage and retains continuous patterned erosion from Life.
+- Lifecycle-Faithful uses a meaningful-Coverage footprint and passes full pattern survival while Layer C Life remains positive. State removal at Life zero remains owned by Layer C.
+- Coverage-Only ignores Presence amplitude after shape resolution.
+- Presence-Amplitude carries the resolved Coverage/Life shape and its exact Presence-weighted counterpart through identical Presence-independent wake/warp/surface-coupling weights. Uniform Presence remains exactly proportional in the completed resolved mask. Presence does not feed source coverage, hardening, pattern thresholds, Chipping eligibility geometry, transport selection, or coupling weights.
+
+The three policies are co-located under `Foam > Transport & Visibility Contract` with an always-visible resolved-contract explanation.
+
+### Preserved ownership
+
+Negative topology and all aging rates remain unchanged. The original analytical Candidate, soft Eligibility, accepted soft-mask Chipping reconstruction, and structural Strand order remain Layer E authorities. P13A adds no resource, cadence, pass, or draw-call dependency.

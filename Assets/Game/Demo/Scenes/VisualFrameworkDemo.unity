@@ -220,6 +220,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -535,6 +541,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -1167,6 +1179,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -1447,6 +1465,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -1727,6 +1751,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -1985,7 +2015,6 @@ MonoBehaviour:
   seed: 7319
   coverageGround: {fileID: 593135561}
   minimumCoverage: 0.03
-  geometry: 1
   clusterDiameter: 0.24
   grassHeight: 0.9
   masterBladeWidth: 0.025
@@ -2003,6 +2032,18 @@ MonoBehaviour:
   averageGrassPatchSeparation: 0.5
   darkPatchStrength: 0.35
   lightPatchStrength: 0.4
+  interactionBendResponse: 1
+  interactionFlattenResponse: 1
+  interactionHeightExponent: 1.5
+  maximumInteractionBendMetres: 0.65
+  interactionNormalResponse: 1
+  windInfluenceOnDisplacedGrass: 0.33
+  trampleBendResponse: 1
+  trampleFlattenResponse: 1
+  trampleHeightExponent: 1.25
+  maximumTrampleBendMetres: 0.8
+  trampleNormalResponse: 1
+  windInfluenceOnTrampledGrass: 0.25
   rootColor: {r: 0.12349624, g: 0.20754719, b: 0.09692062, a: 1}
   baseColor: {r: 0.2945757, g: 0.4433962, b: 0.26143643, a: 1}
   tipColor: {r: 0.45670167, g: 0.6415094, b: 0.3177287, a: 1}
@@ -2278,6 +2319,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -2883,6 +2930,7 @@ Transform:
   m_Children:
   - {fileID: 1864988713}
   - {fileID: 1355804988}
+  - {fileID: 1650107410}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &409265774
@@ -3337,6 +3385,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -3601,6 +3655,10 @@ MonoBehaviour:
     riverbedHydrologySource: 0
     riverbedHydrologyModifier: {fileID: 0}
     bankMaterialStrength: 1
+    bankMaterialBlendDistance: 0.35
+    bankMaterialBlendSoftness: 0.75
+    bankFeatureEdgeClearance: 0.5
+    bankFeatureReturnFade: 0.15
     bankMaterialReach: 0.65
     immediateBankExposure: 0.55
     waterlineMaterialStrength: 1
@@ -3617,6 +3675,10 @@ MonoBehaviour:
     bankDetailFinishVariationMultiplier: 1
     bankLegacyPixelCellInfluenceMultiplier: 1
     riverbedMaterialStrength: 1
+    riverbedMaterialBlendDistance: 0.35
+    riverbedMaterialBlendSoftness: 0.75
+    riverbedFeatureEdgeClearance: 0.5
+    riverbedFeatureReturnFade: 0.15
     riverbedDetailScaleMultiplier: 1
     riverbedAuthoredColorStrengthMultiplier: 1
     riverbedAuthoredColorLightingMultiplier: 1
@@ -3700,6 +3762,15 @@ MonoBehaviour:
   paintedAccentProductionCoverageOriginSize: {x: -20, y: -20, z: 40, w: 40}
   paintedAccentProductionCoveredTexelCount: 9113
   paintedAccentProductionCoveredTexelFraction: 0.0021727085
+  vegetationCoverageResolution: 128
+  vegetationCoveragePixels: 
+  vegetationCoverageRevision: 0
+  vegetationCoverageInitialized: 0
+  vegetationCoveragePaintMode: 0
+  vegetationCoverageBrushRadius: 3
+  vegetationCoverageBrushStrength: 0.5
+  vegetationCoverageEraseMode: 0
+  showVegetationCoverageOverlay: 1
   modifiers:
   - {fileID: 1356653796}
   rivers:
@@ -4185,7 +4256,7 @@ Transform:
   m_GameObject: {fileID: 618955576}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.51, z: 0}
+  m_LocalPosition: {x: 0, y: 0.71, z: 0}
   m_LocalScale: {x: 0.3, y: 0.3, z: 0.3}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4743,6 +4814,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -5038,6 +5115,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -5424,6 +5507,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1011255917}
   - component: {fileID: 1011255918}
+  - component: {fileID: 1011255919}
   m_Layer: 0
   m_Name: Vegetation
   m_TagString: Untagged
@@ -5460,6 +5544,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a22b661ea75ec7af05c6894cdd172d82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Vegetation.GroundVegetation
+--- !u!114 &1011255919
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1011255916}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 111c65db10e845618dcb49b2e4af1ff3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Vegetation.VegetationTrampleDomain
+  fieldResolution: 256
+  updateRateHz: 12
+  maximumStepsPerFrame: 4
+  maximumTrailWriters: 48
+  maximumAbilityStampsPerStep: 32
+  maximumQueuedAbilityStamps: 128
+  showFieldBounds: 1
 --- !u!1 &1013791388
 GameObject:
   m_ObjectHideFlags: 0
@@ -5819,6 +5922,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -6339,6 +6448,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -6843,6 +6958,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -7123,6 +7244,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -7326,8 +7453,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1231762111}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 10, y: 0, z: -3}
+  m_LocalRotation: {x: 0.012979677, y: 0.12930372, z: -0.0016926766, w: 0.9915187}
+  m_LocalPosition: {x: 10.54, y: -0.04, z: -2.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -7344,7 +7471,7 @@ Transform:
   - {fileID: 793915791}
   - {fileID: 430959283}
   m_Father: {fileID: 1493436010}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 1.5, y: 14.86, z: 0}
 --- !u!1 &1240706385
 GameObject:
   m_ObjectHideFlags: 0
@@ -7446,6 +7573,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -7999,6 +8132,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -8340,7 +8479,7 @@ MonoBehaviour:
   overallRockTintStrength: 0
   lightingTintInfluence: 0.8
   edgeWearAmount: 0.238
-  edgeWearWidth: 0.67
+  edgeWearWidth: 1.803
   edgeWearCoverage: 2
   edgeWearSoftness: 0.258
   edgeWearResponseStrength: 1
@@ -8349,6 +8488,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 1
+  cornerChippingEnabled: 1
+  cornerChipDepth: 0.2
+  cornerChipDepthVariation: 0
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -8426,7 +8571,7 @@ MonoBehaviour:
     Request: 0
     Resolution: 0
     EdgeWearAmount: 0.238
-    EdgeWearWidth: 0.67
+    EdgeWearWidth: 1.803
     EdgeWearCoverage: 2
     EdgeWearSoftness: 0.258
     CreaseAmount: 1
@@ -8537,7 +8682,7 @@ Transform:
   m_GameObject: {fileID: 1321270436}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -11.926, y: -0.183, z: 8.413}
+  m_LocalPosition: {x: -12.508, y: -0.014, z: 8.413}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8588,6 +8733,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1355804988}
   - component: {fileID: 1355804989}
+  - component: {fileID: 1355804990}
   m_Layer: 0
   m_Name: Weather
   m_TagString: Untagged
@@ -8649,6 +8795,60 @@ MonoBehaviour:
   debugSampleStepCells: 8
   debugHeightOffset: 0.15
   debugArrowScale: 1.15
+--- !u!114 &1355804990
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1355804987}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96a75e760d5c43e89970a86a91f70779, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Weather.WeatherWindTrailRenderer
+  trailShader: {fileID: 4800000, guid: 557be6b4f1f544e799a98d26a5ba02ec, type: 3}
+  trailColor: {r: 0.9578586, g: 0.98554486, b: 0.990566, a: 1}
+  uniformBodyOpacity: 1
+  edgeSoftness: 0.15
+  strengthOpacityInfluence: 0
+  variationOpacityInfluence: 0
+  maximumActiveTrails: 5
+  spawnAttemptsPerSecond: 2
+  candidateGridResolution: 8
+  strongestCandidateSubset: 6
+  candidateCellJitter: 0.7
+  trailSeed: 6247
+  minimumWindStrength: 0.18
+  strengthScoreExponent: 2
+  spacingScoreExponent: 1
+  minimumTrailSeparationMetres: 8
+  separationCooldownSeconds: 3
+  maximumCentrelinePoints: 80
+  integrationStepMetres: 0.5
+  minimumPathWindStrength: 0.12
+  minimumCompletedPathLengthMetres: 4
+  maximumTurnDegreesPerSegment: 55
+  selfApproachDistanceMetres: 0.3
+  minimumSegmentWindAlignment: 0.35
+  minimumAliveDurationSeconds: 7
+  maximumAliveDurationSeconds: 11
+  minimumWidthMetres: 0.05
+  maximumWidthMetres: 0.1
+  minimumPresentationSpeed: 1.1
+  maximumPresentationSpeed: 1.75
+  minimumVisibleBodyLengthMetres: 7
+  maximumVisibleBodyLengthMetres: 10
+  lifecycleTipSpeedAllowance: 0.75
+  pointedEndLengthMetres: 0.75
+  minimumAltitudeMetres: 1.5
+  maximumAltitudeMetres: 2.8
+  maximumVerticalDeviationMetres: 0.2
+  occasionalBroadWaveChance: 0.2
+  occasionalBroadWaveStrengthMetres: 0.3
+  trailOpacity: 0.96
+  serializedBaselineVersion: 2
+  candidateViewportMargin: 0.12
 --- !u!1 &1356653794
 GameObject:
   m_ObjectHideFlags: 0
@@ -8809,6 +9009,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -9186,6 +9392,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -9629,6 +9841,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -10386,6 +10604,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -10594,6 +10818,7 @@ GameObject:
   - component: {fileID: 1611485501}
   - component: {fileID: 2100000001}
   - component: {fileID: 2100000002}
+  - component: {fileID: 2100000003}
   m_Layer: 0
   m_Name: Player_Blockout
   m_TagString: Untagged
@@ -10698,50 +10923,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1611485499}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
---- !u!54 &2100000001
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1611485499}
-  serializedVersion: 5
-  m_Mass: 3
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 1
-  m_Constraints: 80
-  m_CollisionDetection: 0
---- !u!114 &2100000002
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1611485499}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 408d86999c874e558a40c8ea34ae9bf8, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Input.PlayerBlockoutMovement
-  inputActions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  viewCamera: {fileID: 330585545}
-  maximumSpeed: 5
-  deceleration: 40
-  rotationSpeed: 720
 --- !u!1 &1624202333
 GameObject:
   m_ObjectHideFlags: 0
@@ -10843,6 +11024,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -11636,8 +11823,8 @@ MonoBehaviour:
   foamNeutralLifetime: 10
   foamSupportedAgingRate: 0.07
   foamFullSupportedAgingAt: 0.9
-  foamFinalVisibilityMode: 1
-  foamPresenceFootprintMode: 1
+  foamFinalVisibilityMode: 0
+  foamPresenceFootprintMode: 0
   foamNegativeAgingRate: 7.5
   foamMaterialFlowSpeedMultiplier: 0.45
   foamSurfaceMorphStrength: 2.53
@@ -11886,6 +12073,63 @@ Transform:
   - {fileID: 1630774462}
   m_Father: {fileID: 1493436010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1650107409
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1650107410}
+  - component: {fileID: 1650107411}
+  m_Layer: 0
+  m_Name: Vegetation Interaction
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1650107410
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1650107409}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 380860347}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1650107411
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1650107409}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a65012f8bd378c115ad432609b1609fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Vegetation.VegetationInteractionDomain
+  fieldAnchor: {fileID: 1611485500}
+  targetCamera: {fileID: 330585545}
+  fieldPlaneY: 0
+  fieldResolution: 256
+  cellSizeMetres: 0.25
+  recenterMarginMetres: 1.5
+  updateRateHz: 15
+  maximumStepsPerFrame: 4
+  maximumInteractors: 50
+  responseTimeSeconds: 0.05
+  recoveryTimeSeconds: 0.05
+  sweepTailRetention: 0.1
+  showFieldBounds: 1
 --- !u!1 &1682837911
 GameObject:
   m_ObjectHideFlags: 0
@@ -12502,6 +12746,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -12782,6 +13032,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -13466,6 +13722,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -13778,6 +14040,12 @@ MonoBehaviour:
   edgeWearTintStrength: 0
   edgeWearMacroVariationCoverage: 1
   edgeWearMacroVariation: 0
+  cornerChippingEnabled: 0
+  cornerChipDepth: 0.18
+  cornerChipDepthVariation: 0.15
+  cornerChipTopFacingPreference: 0.65
+  cornerChipCapRingWidthScale: 0.75
+  cornerChipCapRingWearStrength: 1
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -14384,7 +14652,6 @@ MonoBehaviour:
   seed: 7319
   coverageGround: {fileID: 593135561}
   minimumCoverage: 0.03
-  geometry: 1
   clusterDiameter: 0.24
   grassHeight: 0.9
   masterBladeWidth: 0.025
@@ -14402,6 +14669,18 @@ MonoBehaviour:
   averageGrassPatchSeparation: 0.5
   darkPatchStrength: 0.35
   lightPatchStrength: 0.5
+  interactionBendResponse: 1.67
+  interactionFlattenResponse: 1
+  interactionHeightExponent: 1.25
+  maximumInteractionBendMetres: 0.65
+  interactionNormalResponse: 1
+  windInfluenceOnDisplacedGrass: 0.15
+  trampleBendResponse: 1
+  trampleFlattenResponse: 1
+  trampleHeightExponent: 1.25
+  maximumTrampleBendMetres: 0.8
+  trampleNormalResponse: 1
+  windInfluenceOnTrampledGrass: 0.25
   rootColor: {r: 0.12349624, g: 0.20754719, b: 0.09692062, a: 1}
   baseColor: {r: 0.2945757, g: 0.4433962, b: 0.26143643, a: 1}
   tipColor: {r: 0.45670167, g: 0.6415094, b: 0.3177287, a: 1}
@@ -14500,6 +14779,81 @@ MonoBehaviour:
     weight: 0
   updateDynamicEnvironment: 0
   environmentUpdateInterval: 1
+--- !u!54 &2100000001
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1611485499}
+  serializedVersion: 5
+  m_Mass: 3
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 1
+  m_Constraints: 80
+  m_CollisionDetection: 0
+--- !u!114 &2100000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1611485499}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 408d86999c874e558a40c8ea34ae9bf8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Input.PlayerBlockoutMovement
+  inputActions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  viewCamera: {fileID: 330585545}
+  maximumSpeed: 5
+  deceleration: 40
+  rotationSpeed: 720
+--- !u!114 &2100000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1611485499}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c6a86c1ebdfb01ef84d392c4780ce6c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Vegetation.VegetationInteractor
+  interactionRadius: 0.8
+  bendStrength: 0.67
+  flattenStrength: 0.67
+  directionMode: 1
+  worldXBias: 0.8
+  worldZStrength: 0.5
+  movementDirectionInfluence: 0.35
+  fullMovementResponseSpeed: 1
+  maximumSweepDistance: 5
+  priority: 0
+  trailMode: 1
+  trailRadius: 0.4
+  trailBendStrength: 0.8
+  trailFlattenStrength: 0.65
+  recoveryDelaySeconds: 3
+  recoveryDurationSeconds: 20
+  minimumTrailSpeed: 0.4
+  trailStampSpacing: 0.2
+  trailPriority: 0
 --- !u!1 &2101928828
 GameObject:
   m_ObjectHideFlags: 0

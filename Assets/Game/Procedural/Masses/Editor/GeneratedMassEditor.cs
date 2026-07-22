@@ -97,6 +97,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             CurrentPreview,
             TopologyViability,
             ArtisticPreviewParity,
+            CornerChipping,
             Complete
         }
 
@@ -104,6 +105,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             activeEdgeWearViabilityMatrixJob;
         private static EdgeWearValidationSuiteJob
             activeEdgeWearValidationSuiteJob;
+        private static CornerChippingMatrixJob
+            activeCornerChippingMatrixJob;
         private static string lastEdgeWearBatchSummary = string.Empty;
         private static string lastEdgeWearValidationSuiteSummary =
             string.Empty;
@@ -114,9 +117,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private static string lastCornerDamageTransactionAuditSummary =
             string.Empty;
         private const string CornerDamagePreviewReportFileName =
-            "GeneratedMassCornerDamagePreview.txt";
-        private static string lastCornerDamagePreviewSummary =
-            string.Empty;
+            "GeneratedMassCornerChipPreview.txt";
+        private static string lastCornerDamagePreviewSummary = string.Empty;
         private const string EdgeWearArtisticComprehensiveReportFileName =
             "GeneratedMassEdgeWearArtisticComprehensiveAudit.txt";
         private const string EdgeWearArtisticComprehensiveEdgesCsvFileName =
@@ -376,6 +378,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty edgeWearTintStrength;
         private SerializedProperty edgeWearMacroVariationCoverage;
         private SerializedProperty edgeWearMacroVariation;
+        private SerializedProperty cornerChippingEnabled;
+        private SerializedProperty cornerChipDepth;
+        private SerializedProperty cornerChipDepthVariation;
+        private SerializedProperty cornerChipTopFacingPreference;
+        private SerializedProperty cornerChipCapRingWidthScale;
+        private SerializedProperty cornerChipCapRingWearStrength;
         private SerializedProperty creaseAmount;
         private SerializedProperty creaseWidth;
         private SerializedProperty creaseLength;
@@ -427,6 +435,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             if (!sourceEdgeIndexOverlayEnabled || Application.isPlaying ||
                 activeEdgeWearViabilityMatrixJob != null ||
+                activeCornerChippingMatrixJob != null ||
                 activeEdgeWearValidationSuiteJob != null)
             {
                 return;
@@ -596,6 +605,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearMacroVariationCoverage");
             edgeWearMacroVariation = serializedObject.FindProperty(
                 "edgeWearMacroVariation");
+            cornerChippingEnabled = serializedObject.FindProperty(
+                "cornerChippingEnabled");
+            cornerChipDepth = serializedObject.FindProperty(
+                "cornerChipDepth");
+            cornerChipDepthVariation = serializedObject.FindProperty(
+                "cornerChipDepthVariation");
+            cornerChipTopFacingPreference = serializedObject.FindProperty(
+                "cornerChipTopFacingPreference");
+            cornerChipCapRingWidthScale = serializedObject.FindProperty(
+                "cornerChipCapRingWidthScale");
+            cornerChipCapRingWearStrength = serializedObject.FindProperty(
+                "cornerChipCapRingWearStrength");
             creaseAmount = serializedObject.FindProperty(
                 "creaseAmount");
             creaseWidth = serializedObject.FindProperty(
@@ -702,6 +723,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearTintStrength",
                 "edgeWearMacroVariationCoverage",
                 "edgeWearMacroVariation",
+                "cornerChippingEnabled",
+                "cornerChipDepth",
+                "cornerChipDepthVariation",
+                "cornerChipTopFacingPreference",
+                "cornerChipCapRingWidthScale",
+                "cornerChipCapRingWearStrength",
                 "creaseAmount",
                 "creaseWidth",
                 "creaseLength",
@@ -918,98 +945,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             EditorGUILayout.Space(4f);
             GeneratedMass selectedMass = target as GeneratedMass;
-            if (selectedMass != null &&
-                selectedMass.CornerDamagePreviewEnabled)
-            {
-                MassGenerator.CornerDamagePreviewStatus cornerStatus =
-                    selectedMass.CornerDamagePreviewStatus;
-                string cornerMessage;
-                MessageType cornerMessageType;
-                if (selectedMass.CornerDamagePreviewStale)
-                {
-                    cornerMessage =
-                        "The EW-C1A.2 corner-chip preview is stale. Rebuild it before judging the chip.";
-                    cornerMessageType = MessageType.Warning;
-                }
-                else if (cornerStatus != null &&
-                    cornerStatus.PreviewApplied)
-                {
-                    cornerMessage =
-                        "EW-C1A.2 corner-chip preview active: corner " +
-                        cornerStatus.SelectedGraphVertexIndex +
-                        ", trial " + cornerStatus.AcceptedTrialIndex +
-                        ", mandatory cap ring " +
-                        cornerStatus.MandatoryBuiltCount + "/" +
-                        cornerStatus.ExpectedCapRingEdgeCount +
-                        ", unrelated bevel retention " +
-                        cornerStatus.UnrelatedRetainedCount + "/" +
-                        cornerStatus.UnrelatedBaselineBuiltCount + ".";
-                    cornerMessageType = MessageType.Info;
-                }
-                else
-                {
-                    cornerMessage =
-                        "EW-C1A.2 corner-chip preview did not apply. " +
-                        selectedMass.CornerDamagePreviewDiagnostic;
-                    cornerMessageType = MessageType.Error;
-                }
-                EditorGUILayout.HelpBox(
-                    cornerMessage,
-                    cornerMessageType);
-            }
-            else
-            {
-                EditorGUILayout.HelpBox(
-                    "EW-C1A.2 commits one certified pre-bevel corner cut, requires every cap-ring bevel, and rejects the preview if any unrelated accepted bevel is lost.",
-                    MessageType.None);
-            }
-
             using (new EditorGUI.DisabledScope(
                 Application.isPlaying ||
                 serializedObject.isEditingMultipleObjects ||
+                selectedMass == null ||
+                !selectedMass.CornerChippingEnabled ||
                 activeEdgeWearViabilityMatrixJob != null ||
                 activeEdgeWearValidationSuiteJob != null))
             {
-                if (GUILayout.Button(
-                        "Rebuild EW-C1A.2 Corner-Chip Preview"))
+                if (GUILayout.Button("Rebuild Corner Chip Preview"))
                 {
-                    if (selectedMass != null)
-                    {
-                        RunCornerDamagePreview(selectedMass);
-                        serializedObject.Update();
-                        Repaint();
-                        SceneView.RepaintAll();
-                    }
+                    RunCornerDamagePreview(selectedMass);
+                    serializedObject.Update();
+                    Repaint();
+                    SceneView.RepaintAll();
                 }
             }
-
-            if (!string.IsNullOrEmpty(lastCornerDamagePreviewSummary))
-            {
-                EditorGUILayout.HelpBox(
-                    lastCornerDamagePreviewSummary,
-                    MessageType.None);
-                string cornerPreviewReportPath = GetEdgeWearLibraryPath(
-                    CornerDamagePreviewReportFileName);
-                using (new EditorGUI.DisabledScope(
-                    !File.Exists(cornerPreviewReportPath)))
-                {
-                    EditorGUILayout.BeginHorizontal();
-                    if (GUILayout.Button(
-                            "Copy EW-C1A.2 Preview Report"))
-                    {
-                        EditorGUIUtility.systemCopyBuffer =
-                            File.ReadAllText(cornerPreviewReportPath);
-                    }
-                    if (GUILayout.Button(
-                            "Reveal EW-C1A.2 Preview Report"))
-                    {
-                        EditorUtility.RevealInFinder(
-                            cornerPreviewReportPath);
-                    }
-                    EditorGUILayout.EndHorizontal();
-                }
-            }
-
             EditorGUILayout.Space(4f);
             DrawEdgeWearViabilityMatrixControls();
 
@@ -1032,54 +983,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             EditorGUILayout.HelpBox(
                 "One-click validation rebuilds the current preview, runs " +
-                "both canonical " + matrixCaseCount + "-case matrices, " +
-                "and writes one combined report. The focused matrix " +
-                "buttons remain available when only one audit is needed.",
+                "both canonical " + matrixCaseCount + "-case edge-wear matrices and the 33-case corner-chipping matrix, then writes one combined report. The focused edge-wear matrix buttons remain available when only one audit is needed.",
                 MessageType.None);
-
-            using (new EditorGUI.DisabledScope(
-                Application.isPlaying ||
-                serializedObject.isEditingMultipleObjects ||
-                matrixRunning ||
-                suiteRunning))
-            {
-                if (GUILayout.Button(
-                        "Run EW-C1A.1 Corner Transaction Audit"))
-                {
-                    GeneratedMass mass = target as GeneratedMass;
-                    if (mass != null)
-                    {
-                        RunCornerDamageTransactionAudit(mass);
-                    }
-                }
-            }
-
-            if (!string.IsNullOrEmpty(
-                    lastCornerDamageTransactionAuditSummary))
-            {
-                EditorGUILayout.HelpBox(
-                    lastCornerDamageTransactionAuditSummary,
-                    MessageType.None);
-                string cornerReportPath = GetEdgeWearLibraryPath(
-                    CornerDamageTransactionAuditReportFileName);
-                using (new EditorGUI.DisabledScope(
-                    !File.Exists(cornerReportPath)))
-                {
-                    EditorGUILayout.BeginHorizontal();
-                    if (GUILayout.Button(
-                            "Copy EW-C1A.1 Audit Report"))
-                    {
-                        EditorGUIUtility.systemCopyBuffer =
-                            File.ReadAllText(cornerReportPath);
-                    }
-                    if (GUILayout.Button(
-                            "Reveal EW-C1A.1 Audit Report"))
-                    {
-                        EditorUtility.RevealInFinder(cornerReportPath);
-                    }
-                    EditorGUILayout.EndHorizontal();
-                }
-            }
 
             using (new EditorGUI.DisabledScope(
                 Application.isPlaying ||
@@ -1130,6 +1035,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     activeEdgeWearValidationSuiteJob;
                 EdgeWearViabilityMatrixJob matrix =
                     activeEdgeWearViabilityMatrixJob;
+                CornerChippingMatrixJob cornerMatrix =
+                    activeCornerChippingMatrixJob;
                 string progress = suite.StageDisplayName;
                 if (matrix != null)
                 {
@@ -1137,10 +1044,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         (matrix.CompletedCaseCount + 1) + "/" +
                         matrix.TotalCaseCount;
                 }
+                else if (cornerMatrix != null)
+                {
+                    progress += ": case " +
+                        (cornerMatrix.CompletedCaseCount + 1) + "/" +
+                        cornerMatrix.TotalCaseCount;
+                }
                 EditorGUILayout.HelpBox(
                     "Running full edge-wear validation suite — " +
-                    progress + ". The current preview is rebuilt once; " +
-                    "matrix cases do not modify the selected mass.",
+                    progress + ". The current preview is rebuilt once; all matrix cases use immutable snapshots and do not modify the selected mass.",
                     MessageType.Info);
                 if (GUILayout.Button("Cancel Full Validation Suite"))
                 {
@@ -1148,6 +1060,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     if (matrix != null)
                     {
                         matrix.CancelRequested = true;
+                    }
+                    if (cornerMatrix != null)
+                    {
+                        cornerMatrix.CancelRequested = true;
                     }
                 }
             }
@@ -1212,13 +1128,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
         }
 
-        private static void RunCornerDamagePreview(
-            GeneratedMass mass)
+        private static void RunCornerDamagePreview(GeneratedMass mass)
         {
             if (mass == null || mass.Recipe == null)
             {
                 lastCornerDamagePreviewSummary =
-                    "EW-C1A.2 preview failed: selected mass has no recipe.";
+                    "Corner-chip preview failed: selected mass has no recipe.";
                 return;
             }
 
@@ -1226,13 +1141,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             try
             {
                 mass.EvaluateCornerDamagePreview();
-                report = mass.CornerDamagePreviewReport;
+                report = mass.CornerDamageGeometryPreviewReport;
                 if (string.IsNullOrEmpty(report))
                 {
                     report =
-                        "GeneratedMass EW-C1A.2 corner-chip preview" +
+                        "GeneratedMass EW-C1A.3a corner-chip preview" +
                         Environment.NewLine +
-                        "contract=EW-C1A.2-preview-only" +
+                        "contract=EW-C1A.3a-corner-chip-preview" +
                         Environment.NewLine +
                         "status=failed" + Environment.NewLine +
                         "diagnostic=preview report was unavailable";
@@ -1241,9 +1156,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             catch (Exception exception)
             {
                 report =
-                    "GeneratedMass EW-C1A.2 corner-chip preview" +
+                    "GeneratedMass EW-C1A.3a corner-chip preview" +
                     Environment.NewLine +
-                    "contract=EW-C1A.2-preview-only" +
+                    "contract=EW-C1A.3a-corner-chip-preview" +
                     Environment.NewLine +
                     "status=failed" + Environment.NewLine +
                     "diagnostic=exception: " + exception;
@@ -1256,8 +1171,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "status=passed",
                 StringComparison.Ordinal) >= 0;
             lastCornerDamagePreviewSummary =
-                "EW-C1A.2 corner-chip preview " +
-                (passed ? "passed" : "failed") +
+                "Corner-chip preview " + (passed ? "passed" : "failed") +
                 ". Report: " + reportPath;
             EditorGUIUtility.systemCopyBuffer = report;
             Debug.Log(
@@ -1294,7 +1208,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         mass.CreaseAmount,
                         mass.CreaseWidth,
                         mass.CreaseLength,
-                        mass.CreaseBranching);
+                        mass.CreaseBranching,
+                        mass.CornerChippingEnabled,
+                        mass.CornerChipDepth,
+                        mass.CornerChipDepthVariation,
+                        mass.CornerChipTopFacingPreference,
+                        mass.CornerChipCapRingWidthScale,
+                        mass.CornerChipCapRingWearStrength);
                 report =
                     MassGenerator.GenerateCornerDamageTransactionAudit(
                         recipe,
@@ -1649,10 +1569,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     return;
                 }
 
-                FinishEdgeWearValidationSuite(
-                    suite,
-                    false,
-                    string.Empty);
+                suite.Stage = EdgeWearValidationSuiteStage.CornerChipping;
+                StartCornerChippingMatrix(suite);
                 return;
             }
 
@@ -1718,6 +1636,755 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 message);
         }
 
+        private static void StartCornerChippingMatrix(
+            EdgeWearValidationSuiteJob suite)
+        {
+            if (suite == null || suite.Target == null ||
+                activeCornerChippingMatrixJob != null)
+            {
+                FinishEdgeWearValidationSuite(
+                    suite,
+                    false,
+                    "corner chipping matrix could not start");
+                return;
+            }
+
+            activeCornerChippingMatrixJob =
+                new CornerChippingMatrixJob(suite.Target);
+            EditorApplication.update -= AdvanceCornerChippingMatrix;
+            EditorApplication.update += AdvanceCornerChippingMatrix;
+        }
+
+        private static void AdvanceCornerChippingMatrix()
+        {
+            CornerChippingMatrixJob job = activeCornerChippingMatrixJob;
+            EdgeWearValidationSuiteJob suite =
+                activeEdgeWearValidationSuiteJob;
+            if (job == null || suite == null)
+            {
+                EditorApplication.update -= AdvanceCornerChippingMatrix;
+                EditorUtility.ClearProgressBar();
+                activeCornerChippingMatrixJob = null;
+                if (suite != null)
+                {
+                    FinishEdgeWearValidationSuite(
+                        suite,
+                        false,
+                        "corner chipping matrix state was lost");
+                }
+                return;
+            }
+
+            if (job.CancelRequested || suite.CancelRequested ||
+                job.Target == null)
+            {
+                FinishCornerChippingMatrix(
+                    job,
+                    true,
+                    job.Target == null
+                        ? "target mass was destroyed"
+                        : "cancelled by user");
+                return;
+            }
+
+            int caseIndex = job.CompletedCaseCount;
+            if (caseIndex >= job.TotalCaseCount)
+            {
+                FinishCornerChippingMatrix(job, false, string.Empty);
+                return;
+            }
+
+            int seedIndex = caseIndex / 3;
+            int policyIndex = caseIndex % 3;
+            int shapeSeed = EdgeWearBatchShapeSeeds[seedIndex];
+            CornerChippingMatrixPolicy policy =
+                (CornerChippingMatrixPolicy)policyIndex;
+            float progress = (float)caseIndex / job.TotalCaseCount;
+            if (EditorUtility.DisplayCancelableProgressBar(
+                    "Generated Mass Corner Chipping Matrix",
+                    "Seed " + shapeSeed + ", " +
+                    CornerChippingPolicyName(policy) +
+                    " (case " + (caseIndex + 1) + "/" +
+                    job.TotalCaseCount + ")",
+                    progress))
+            {
+                FinishCornerChippingMatrix(
+                    job,
+                    true,
+                    "cancelled by user");
+                return;
+            }
+
+            CornerChippingMatrixCase matrixCase;
+            try
+            {
+                matrixCase = EvaluateCornerChippingMatrixCase(
+                    job,
+                    shapeSeed,
+                    policy);
+            }
+            catch (Exception exception)
+            {
+                matrixCase = new CornerChippingMatrixCase
+                {
+                    ShapeSeed = shapeSeed,
+                    Policy = policy,
+                    Diagnostic = exception.GetType().Name + ":" +
+                        exception.Message
+                };
+            }
+            job.Cases.Add(matrixCase);
+            job.CompletedCaseCount++;
+
+            if (job.CompletedCaseCount >= job.TotalCaseCount)
+            {
+                FinishCornerChippingMatrix(job, false, string.Empty);
+            }
+        }
+
+        private static CornerChippingMatrixCase
+            EvaluateCornerChippingMatrixCase(
+                CornerChippingMatrixJob job,
+                int shapeSeed,
+                CornerChippingMatrixPolicy policy)
+        {
+            CornerChippingMatrixCase result =
+                new CornerChippingMatrixCase
+                {
+                    ShapeSeed = shapeSeed,
+                    Policy = policy
+                };
+            MassRecipe recipe = JsonUtility.FromJson<MassRecipe>(
+                job.RecipeJson);
+            if (recipe == null)
+            {
+                result.Diagnostic = "failed to clone the immutable recipe";
+                return result;
+            }
+            recipe.SetShapeSeed(shapeSeed);
+
+            bool enabled = policy != CornerChippingMatrixPolicy.Disabled;
+            float depth = policy ==
+                    CornerChippingMatrixPolicy.MaximumDepth
+                ? 0.35f
+                : 0.18f;
+            float variation = policy ==
+                    CornerChippingMatrixPolicy.MaximumDepth
+                ? 0f
+                : 0.15f;
+            MassSurfaceFeatureSettings settings =
+                new MassSurfaceFeatureSettings(
+                    recipe.Archetype,
+                    recipe.SurfaceSeed,
+                    job.EdgeWearAmount,
+                    job.EdgeWearWidth,
+                    job.EdgeWearCoverage,
+                    job.EdgeWearMacroVariationCoverage,
+                    job.EdgeWearMacroVariation,
+                    job.EdgeWearSoftness,
+                    job.CreaseAmount,
+                    job.CreaseWidth,
+                    job.CreaseLength,
+                    job.CreaseBranching,
+                    enabled,
+                    depth,
+                    variation,
+                    job.CornerChipTopFacingPreference,
+                    job.CornerChipCapRingWidthScale,
+                    job.CornerChipCapRingWearStrength);
+
+            System.Diagnostics.Stopwatch stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            MeshData finalMesh;
+            if (!enabled)
+            {
+                MeshData baselineMesh =
+                    MassGenerator.GenerateUnifiedEdgeWearPreviewBaseline(
+                        recipe,
+                        settings,
+                        out MassGenerator.UnifiedEdgeWearPreviewStatus
+                            baselineStatus);
+                finalMesh = MassGenerator.GenerateUnifiedEdgeWearPreview(
+                    recipe,
+                    settings,
+                    out MassGenerator.UnifiedEdgeWearPreviewStatus
+                        routedStatus,
+                    out MassGenerator.CornerDamagePreviewStatus
+                        cornerStatus);
+                result.ZeroParityValid = cornerStatus == null &&
+                    MeshDataExactlyEqual(baselineMesh, finalMesh) &&
+                    UnifiedPreviewStatusExactlyEqual(
+                        baselineStatus,
+                        routedStatus);
+                result.SelectionDeterministic = cornerStatus == null;
+                result.TransactionValid = cornerStatus == null;
+                result.CapRingValid = cornerStatus == null;
+                result.RetentionValid = cornerStatus == null;
+            }
+            else
+            {
+                MassGenerator.GenerateCornerDamageGeometryPreview(
+                    recipe,
+                    settings,
+                    out MassGenerator.CornerDamagePreviewStatus
+                        geometryStatus);
+                finalMesh = MassGenerator.GenerateUnifiedEdgeWearPreview(
+                    recipe,
+                    settings,
+                    out MassGenerator.UnifiedEdgeWearPreviewStatus
+                        unifiedStatus,
+                    out MassGenerator.CornerDamagePreviewStatus
+                        integratedStatus);
+
+                result.ZeroParityValid = true;
+                result.SelectionDeterministic =
+                    CornerSelectionsExactlyEqual(
+                        geometryStatus,
+                        integratedStatus);
+                result.TransactionValid =
+                    geometryStatus != null &&
+                    integratedStatus != null &&
+                    geometryStatus.TransactionCertified &&
+                    integratedStatus.TransactionCertified &&
+                    geometryStatus.AcceptedCornerRank >= 0 &&
+                    integratedStatus.AcceptedCornerRank >= 0 &&
+                    geometryStatus.SelectedGraphVertexIndex >= 0 &&
+                    integratedStatus.SelectedGraphVertexIndex >= 0 &&
+                    geometryStatus.CapFaceCount == 1 &&
+                    integratedStatus.CapFaceCount == 1 &&
+                    geometryStatus.SemanticCapFaceCount == 1 &&
+                    integratedStatus.SemanticCapFaceCount == 1 &&
+                    integratedStatus.ConstructionSourceFaceCountExpected > 0 &&
+                    integratedStatus.ConstructionSourceFaceCountAttributed ==
+                        integratedStatus.ConstructionSourceFaceCountExpected;
+                result.CapRingValid =
+                    integratedStatus != null &&
+                    integratedStatus.PreviewApplied &&
+                    unifiedStatus.PreviewApplied &&
+                    integratedStatus.ExpectedCapRingEdgeCount > 0 &&
+                    integratedStatus.CapRingCommittedScale > 0f &&
+                    integratedStatus.MandatoryCandidateCount ==
+                        integratedStatus.ExpectedCapRingEdgeCount &&
+                    integratedStatus.MandatorySelectedCount ==
+                        integratedStatus.ExpectedCapRingEdgeCount &&
+                    integratedStatus.MandatoryBuiltCount ==
+                        integratedStatus.ExpectedCapRingEdgeCount;
+                result.RetentionValid =
+                    integratedStatus != null &&
+                    integratedStatus.CollateralLostCount == 0 &&
+                    integratedStatus.UnrelatedRetainedCount ==
+                        integratedStatus.UnrelatedBaselineBuiltCount;
+                result.SelectedGraphVertexIndex =
+                    integratedStatus == null
+                        ? -1
+                        : integratedStatus.SelectedGraphVertexIndex;
+                result.AcceptedCornerRank = integratedStatus == null
+                    ? -1
+                    : integratedStatus.AcceptedCornerRank;
+                result.CandidateCornerCount = integratedStatus == null
+                    ? 0
+                    : integratedStatus.CandidateCornerCount;
+                result.AttemptedCornerCount = integratedStatus == null
+                    ? 0
+                    : integratedStatus.AttemptedCornerCount;
+                result.AttemptedConfigurationCount = integratedStatus == null
+                    ? 0
+                    : integratedStatus.AttemptedConfigurationCount;
+                result.CapRingCommittedScale = integratedStatus == null
+                    ? 0f
+                    : integratedStatus.CapRingCommittedScale;
+                result.SearchFailureStage = integratedStatus == null
+                    ? string.Empty
+                    : integratedStatus.SearchFailureStage;
+                result.SearchFailureReason = integratedStatus == null
+                    ? string.Empty
+                    : integratedStatus.SearchFailureReason;
+                result.AcceptedTrialIndex = integratedStatus == null
+                    ? -1
+                    : integratedStatus.AcceptedTrialIndex;
+                result.AcceptedDepthFraction = integratedStatus == null
+                    ? 0f
+                    : integratedStatus.AcceptedDepthFraction;
+                result.MandatoryBuiltCount = integratedStatus == null
+                    ? 0
+                    : integratedStatus.MandatoryBuiltCount;
+                result.UnrelatedRetainedCount = integratedStatus == null
+                    ? 0
+                    : integratedStatus.UnrelatedRetainedCount;
+                result.UnrelatedBaselineCount = integratedStatus == null
+                    ? 0
+                    : integratedStatus.UnrelatedBaselineBuiltCount;
+            }
+            stopwatch.Stop();
+            result.ElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+            result.ChannelValid = ValidateCornerMatrixMeshChannels(
+                finalMesh,
+                out string channelDiagnostic);
+            if (!result.Passed)
+            {
+                result.Diagnostic = BuildCornerMatrixCaseDiagnostic(
+                    result,
+                    channelDiagnostic);
+            }
+            return result;
+        }
+
+        private static bool CornerSelectionsExactlyEqual(
+            MassGenerator.CornerDamagePreviewStatus left,
+            MassGenerator.CornerDamagePreviewStatus right)
+        {
+            if (left == null || right == null)
+            {
+                return false;
+            }
+            return left.AcceptedCornerRank ==
+                       right.AcceptedCornerRank &&
+                   left.SelectedGraphVertexIndex ==
+                       right.SelectedGraphVertexIndex &&
+                   left.AcceptedTrialIndex == right.AcceptedTrialIndex &&
+                   left.AcceptedDepth.Equals(right.AcceptedDepth) &&
+                   left.CapRingCommittedScale.Equals(
+                       right.CapRingCommittedScale) &&
+                   IntArraysExactlyEqual(
+                       left.MandatoryCapRingIdentities,
+                       right.MandatoryCapRingIdentities);
+        }
+
+        private static bool IntArraysExactlyEqual(int[] left, int[] right)
+        {
+            left ??= Array.Empty<int>();
+            right ??= Array.Empty<int>();
+            if (left.Length != right.Length)
+            {
+                return false;
+            }
+            for (int index = 0; index < left.Length; index++)
+            {
+                if (left[index] != right[index])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool UnifiedPreviewStatusExactlyEqual(
+            MassGenerator.UnifiedEdgeWearPreviewStatus left,
+            MassGenerator.UnifiedEdgeWearPreviewStatus right)
+        {
+            return left.PreviewApplied == right.PreviewApplied &&
+                   left.CandidateCount == right.CandidateCount &&
+                   left.RailSolvedEdgeCount == right.RailSolvedEdgeCount &&
+                   left.ActiveEdgeCount == right.ActiveEdgeCount &&
+                   left.DeferredEdgeCount == right.DeferredEdgeCount &&
+                   left.RejectedEdgeCount == right.RejectedEdgeCount &&
+                   left.BevelFaceCount == right.BevelFaceCount &&
+                   left.VertexJunctionFaceCount ==
+                       right.VertexJunctionFaceCount &&
+                   left.TriangleCount == right.TriangleCount &&
+                   string.Equals(
+                       left.Diagnostic,
+                       right.Diagnostic,
+                       StringComparison.Ordinal) &&
+                   EdgeDebugArraysExactlyEqual(
+                       left.DebugEdges,
+                       right.DebugEdges);
+        }
+
+        private static bool EdgeDebugArraysExactlyEqual(
+            MassGenerator.EdgeWearDebugEdgeRecord[] left,
+            MassGenerator.EdgeWearDebugEdgeRecord[] right)
+        {
+            left ??= Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+            right ??= Array.Empty<MassGenerator.EdgeWearDebugEdgeRecord>();
+            if (left.Length != right.Length)
+            {
+                return false;
+            }
+            for (int index = 0; index < left.Length; index++)
+            {
+                if (!left[index].Equals(right[index]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool MeshDataExactlyEqual(
+            MeshData left,
+            MeshData right)
+        {
+            if (left == null || right == null ||
+                left.Vertices.Count != right.Vertices.Count ||
+                left.Triangles.Count != right.Triangles.Count ||
+                left.UV0.Count != right.UV0.Count ||
+                left.UV2.Count != right.UV2.Count ||
+                left.Colors.Count != right.Colors.Count ||
+                left.Normals.Count != right.Normals.Count)
+            {
+                return false;
+            }
+            for (int index = 0; index < left.Vertices.Count; index++)
+            {
+                if (left.Vertices[index] != right.Vertices[index] ||
+                    left.UV0[index] != right.UV0[index] ||
+                    left.Colors[index] != right.Colors[index] ||
+                    (left.UV2.Count > 0 &&
+                     left.UV2[index] != right.UV2[index]) ||
+                    (left.Normals.Count > 0 &&
+                     left.Normals[index] != right.Normals[index]))
+                {
+                    return false;
+                }
+            }
+            for (int index = 0; index < left.Triangles.Count; index++)
+            {
+                if (left.Triangles[index] != right.Triangles[index])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool ValidateCornerMatrixMeshChannels(
+            MeshData data,
+            out string diagnostic)
+        {
+            diagnostic = string.Empty;
+            if (data == null || data.VertexCount == 0 ||
+                data.TriangleCount == 0 || !data.HasNormals)
+            {
+                diagnostic = "mesh data or authored normal channel was unavailable";
+                return false;
+            }
+            try
+            {
+                data.Validate();
+            }
+            catch (Exception exception)
+            {
+                diagnostic = "MeshData validation failed: " +
+                    exception.Message;
+                return false;
+            }
+            for (int index = 0; index < data.Normals.Count; index++)
+            {
+                Vector3 normal = data.Normals[index];
+                if (!IsFiniteVector3(normal) ||
+                    normal.sqrMagnitude <= 0.000001f)
+                {
+                    diagnostic = "invalid authored normal at vertex " + index;
+                    return false;
+                }
+            }
+
+            Mesh temporaryMesh = new Mesh();
+            try
+            {
+                MeshBuilder.ApplyToMesh(
+                    data,
+                    temporaryMesh,
+                    "GeneratedMass_CornerMatrixValidation");
+                Vector4[] tangents = temporaryMesh.tangents;
+                if (tangents == null ||
+                    tangents.Length != data.VertexCount)
+                {
+                    diagnostic = "recalculated tangent count did not match vertices";
+                    return false;
+                }
+                for (int index = 0; index < tangents.Length; index++)
+                {
+                    Vector4 tangent = tangents[index];
+                    Vector3 direction = new Vector3(
+                        tangent.x,
+                        tangent.y,
+                        tangent.z);
+                    if (!IsFiniteFloat(tangent.x) ||
+                        !IsFiniteFloat(tangent.y) ||
+                        !IsFiniteFloat(tangent.z) ||
+                        !IsFiniteFloat(tangent.w) ||
+                        direction.sqrMagnitude <= 0.000001f)
+                    {
+                        diagnostic = "invalid tangent at vertex " + index;
+                        return false;
+                    }
+                }
+                return true;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(temporaryMesh);
+            }
+        }
+
+        private static bool IsFiniteVector3(Vector3 value)
+        {
+            return IsFiniteFloat(value.x) &&
+                   IsFiniteFloat(value.y) &&
+                   IsFiniteFloat(value.z);
+        }
+
+        private static bool IsFiniteFloat(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private static string BuildCornerMatrixCaseDiagnostic(
+            CornerChippingMatrixCase result,
+            string channelDiagnostic)
+        {
+            List<string> failures = new List<string>();
+            if (!result.ZeroParityValid)
+            {
+                failures.Add("zero parity");
+            }
+            if (!result.SelectionDeterministic)
+            {
+                failures.Add("selection determinism");
+            }
+            if (!result.TransactionValid)
+            {
+                failures.Add("transaction topology");
+            }
+            if (!result.CapRingValid)
+            {
+                failures.Add("cap-ring render");
+            }
+            if (!result.RetentionValid)
+            {
+                failures.Add("unrelated bevel retention");
+            }
+            if (!result.ChannelValid)
+            {
+                failures.Add(string.IsNullOrEmpty(channelDiagnostic)
+                    ? "normal/tangent channels"
+                    : channelDiagnostic);
+            }
+            if (!string.IsNullOrEmpty(result.SearchFailureStage) &&
+                !string.Equals(
+                    result.SearchFailureStage,
+                    "none",
+                    StringComparison.Ordinal))
+            {
+                failures.Add(
+                    "search=" + result.SearchFailureStage +
+                    (string.IsNullOrEmpty(result.SearchFailureReason) ||
+                     string.Equals(
+                         result.SearchFailureReason,
+                         "none",
+                         StringComparison.Ordinal)
+                        ? string.Empty
+                        : ":" + result.SearchFailureReason));
+            }
+            return string.Join("; ", failures);
+        }
+
+        private static string CornerChippingPolicyName(
+            CornerChippingMatrixPolicy policy)
+        {
+            return policy switch
+            {
+                CornerChippingMatrixPolicy.Disabled => "disabled",
+                CornerChippingMatrixPolicy.Default => "default",
+                _ => "maximum-depth"
+            };
+        }
+
+        private static void FinishCornerChippingMatrix(
+            CornerChippingMatrixJob job,
+            bool cancelled,
+            string terminalReason)
+        {
+            EditorApplication.update -= AdvanceCornerChippingMatrix;
+            EditorUtility.ClearProgressBar();
+            activeCornerChippingMatrixJob = null;
+            EdgeWearValidationSuiteJob suite =
+                activeEdgeWearValidationSuiteJob;
+            if (suite == null)
+            {
+                return;
+            }
+
+            bool statePreserved = job.ValidateTargetStatePreserved(
+                out string stateDiagnostic);
+            if (!statePreserved)
+            {
+                terminalReason = string.IsNullOrEmpty(terminalReason)
+                    ? stateDiagnostic
+                    : terminalReason + "; " + stateDiagnostic;
+            }
+            CornerChippingMatrixAggregate aggregate =
+                BuildCornerChippingMatrixAggregate(
+                    job,
+                    cancelled,
+                    statePreserved,
+                    terminalReason);
+            suite.RecordCornerChippingMatrix(
+                aggregate,
+                BuildCornerChippingMatrixReport(job, aggregate));
+            FinishEdgeWearValidationSuite(
+                suite,
+                cancelled,
+                terminalReason);
+        }
+
+        private static CornerChippingMatrixAggregate
+            BuildCornerChippingMatrixAggregate(
+                CornerChippingMatrixJob job,
+                bool cancelled,
+                bool statePreserved,
+                string terminalReason)
+        {
+            CornerChippingMatrixAggregate aggregate =
+                new CornerChippingMatrixAggregate
+                {
+                    CasesRun = job.Cases.Count,
+                    Cancelled = cancelled,
+                    StatePreserved = statePreserved,
+                    TerminalReason = terminalReason ?? string.Empty
+                };
+            for (int index = 0; index < job.Cases.Count; index++)
+            {
+                CornerChippingMatrixCase item = job.Cases[index];
+                if (item.Passed)
+                {
+                    aggregate.CasesPassed++;
+                }
+                if (item.Policy == CornerChippingMatrixPolicy.Disabled)
+                {
+                    aggregate.ZeroParityRun++;
+                    if (item.ZeroParityValid)
+                    {
+                        aggregate.ZeroParityPassed++;
+                    }
+                }
+                aggregate.SelectionRun++;
+                aggregate.TransactionRun++;
+                aggregate.CapRingRun++;
+                aggregate.RetentionRun++;
+                aggregate.ChannelsRun++;
+                if (item.SelectionDeterministic)
+                {
+                    aggregate.SelectionPassed++;
+                }
+                if (item.TransactionValid)
+                {
+                    aggregate.TransactionPassed++;
+                }
+                if (item.CapRingValid)
+                {
+                    aggregate.CapRingPassed++;
+                }
+                if (item.RetentionValid)
+                {
+                    aggregate.RetentionPassed++;
+                }
+                if (item.ChannelValid)
+                {
+                    aggregate.ChannelsPassed++;
+                }
+            }
+            return aggregate;
+        }
+
+        private static string BuildCornerChippingMatrixReport(
+            CornerChippingMatrixJob job,
+            CornerChippingMatrixAggregate aggregate)
+        {
+            StringBuilder builder = new StringBuilder(32768);
+            builder.AppendLine("GeneratedMass EW-C1A.3a corner chipping matrix");
+            builder.AppendLine("contract=EW-C1A.3a-33-case");
+            builder.Append("status=");
+            builder.AppendLine(aggregate.Status);
+            builder.Append("seeds=");
+            builder.AppendLine(string.Join("/", EdgeWearBatchShapeSeeds));
+            builder.AppendLine("policies=disabled/default/maximum-depth");
+            builder.Append("cases=");
+            builder.Append(aggregate.CasesPassed);
+            builder.Append('/');
+            builder.AppendLine(aggregate.CasesRun.ToString());
+            builder.Append("zeroParity=");
+            builder.Append(aggregate.ZeroParityPassed);
+            builder.Append('/');
+            builder.AppendLine(aggregate.ZeroParityRun.ToString());
+            builder.Append("selectionDeterminism=");
+            builder.Append(aggregate.SelectionPassed);
+            builder.Append('/');
+            builder.AppendLine(aggregate.SelectionRun.ToString());
+            builder.Append("transactionTopology=");
+            builder.Append(aggregate.TransactionPassed);
+            builder.Append('/');
+            builder.AppendLine(aggregate.TransactionRun.ToString());
+            builder.Append("capRingRenderValidity=");
+            builder.Append(aggregate.CapRingPassed);
+            builder.Append('/');
+            builder.AppendLine(aggregate.CapRingRun.ToString());
+            builder.Append("unrelatedBevelRetention=");
+            builder.Append(aggregate.RetentionPassed);
+            builder.Append('/');
+            builder.AppendLine(aggregate.RetentionRun.ToString());
+            builder.Append("normalTangentChannels=");
+            builder.Append(aggregate.ChannelsPassed);
+            builder.Append('/');
+            builder.AppendLine(aggregate.ChannelsRun.ToString());
+            builder.Append("cancelled=");
+            builder.AppendLine(aggregate.Cancelled ? "1" : "0");
+            builder.Append("statePreserved=");
+            builder.AppendLine(aggregate.StatePreserved ? "1" : "0");
+            builder.Append("terminalReason=");
+            builder.AppendLine(string.IsNullOrEmpty(aggregate.TerminalReason)
+                ? "none"
+                : aggregate.TerminalReason);
+            builder.AppendLine();
+            builder.AppendLine(
+                "seed,policy,status,acceptedRank,selectedCorner,acceptedTrial,acceptedDepthFraction,candidateCorners,attemptedCorners,attemptedConfigurations,ringScale,mandatoryBuilt,retained,baseline,failureStage,elapsedMs,diagnostic");
+            for (int index = 0; index < job.Cases.Count; index++)
+            {
+                CornerChippingMatrixCase item = job.Cases[index];
+                builder.Append(item.ShapeSeed);
+                builder.Append(',');
+                builder.Append(CornerChippingPolicyName(item.Policy));
+                builder.Append(',');
+                builder.Append(item.Passed ? "passed" : "failed");
+                builder.Append(',');
+                builder.Append(item.AcceptedCornerRank);
+                builder.Append(',');
+                builder.Append(item.SelectedGraphVertexIndex);
+                builder.Append(',');
+                builder.Append(item.AcceptedTrialIndex);
+                builder.Append(',');
+                builder.Append(item.AcceptedDepthFraction.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.Append(item.CandidateCornerCount);
+                builder.Append(',');
+                builder.Append(item.AttemptedCornerCount);
+                builder.Append(',');
+                builder.Append(item.AttemptedConfigurationCount);
+                builder.Append(',');
+                builder.Append(item.CapRingCommittedScale.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.Append(item.MandatoryBuiltCount);
+                builder.Append(',');
+                builder.Append(item.UnrelatedRetainedCount);
+                builder.Append(',');
+                builder.Append(item.UnrelatedBaselineCount);
+                builder.Append(',');
+                builder.Append((item.SearchFailureStage ?? string.Empty).
+                    Replace(',', ';'));
+                builder.Append(',');
+                builder.Append(item.ElapsedMilliseconds.ToString(
+                    "G9", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.AppendLine((item.Diagnostic ?? string.Empty).
+                    Replace('\r', ' ').Replace('\n', ' ').Replace(',', ';'));
+            }
+            return builder.ToString();
+        }
+
         private static void FinishEdgeWearValidationSuite(
             EdgeWearValidationSuiteJob suite,
             bool cancelled,
@@ -1730,7 +2397,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             activeEdgeWearValidationSuiteJob = null;
             activeEdgeWearViabilityMatrixJob = null;
+            activeCornerChippingMatrixJob = null;
             EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
+            EditorApplication.update -= AdvanceCornerChippingMatrix;
             EditorUtility.ClearProgressBar();
             suite.Stage = EdgeWearValidationSuiteStage.Complete;
             suite.Cancelled = cancelled;
@@ -1801,7 +2470,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 ", topology=" + suite.TopologyCasesPassed + "/" +
                 suite.TopologyCasesRun + ", artistic preview=" +
                 suite.PreviewCasesPassed + "/" +
-                suite.PreviewCasesRun + ". Combined report: Library/" +
+                suite.PreviewCasesRun + ", corner chipping=" +
+                suite.CornerChippingCasesPassed + "/" +
+                suite.CornerChippingCasesRun + ". Combined report: Library/" +
                 EdgeWearValidationSuiteReportFileName;
 
             string message =
@@ -1815,6 +2486,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     suite.TopologyCasesRun +
                 ",preview:" + suite.PreviewCasesPassed + "/" +
                     suite.PreviewCasesRun +
+                ",cornerChipping:" + suite.CornerChippingCasesPassed + "/" +
+                    suite.CornerChippingCasesRun +
                 ",outlierResolution:" +
                     suite.OutlierRecoveryChecksPassed + "/" +
                     suite.OutlierRecoveryChecksRun +
@@ -1843,7 +2516,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-V1A.3b-suite");
+            builder.AppendLine("contract=EW-C1A.3a-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -1915,6 +2588,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append(suite.PreviewCasesPassed);
             builder.Append('/');
             builder.AppendLine(suite.PreviewCasesRun.ToString());
+            builder.Append("cornerChippingStatus=");
+            builder.AppendLine(suite.CornerChippingStatus);
+            builder.Append("cornerChippingCases=");
+            builder.Append(suite.CornerChippingCasesPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.CornerChippingCasesRun.ToString());
+            builder.Append("cornerDisabledZeroParity=");
+            builder.Append(suite.CornerDisabledZeroParityPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.CornerDisabledZeroParityRun.ToString());
+            builder.Append("cornerSelectionDeterminism=");
+            builder.Append(suite.CornerSelectionDeterminismPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.CornerSelectionDeterminismRun.ToString());
+            builder.Append("cornerTransactionTopology=");
+            builder.Append(suite.CornerTransactionPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.CornerTransactionRun.ToString());
+            builder.Append("cornerCapRingRenderValidity=");
+            builder.Append(suite.CornerCapRingPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.CornerCapRingRun.ToString());
+            builder.Append("cornerUnrelatedBevelRetention=");
+            builder.Append(suite.CornerRetentionPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.CornerRetentionRun.ToString());
+            builder.Append("cornerNormalTangentChannels=");
+            builder.Append(suite.CornerChannelsPassed);
+            builder.Append('/');
+            builder.AppendLine(suite.CornerChannelsRun.ToString());
             builder.Append("outlierResolutionStatus=");
             builder.AppendLine(suite.OutlierRecoveryStatus);
             builder.Append("outlierResolutionChecks=");
@@ -1978,6 +2681,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine(string.IsNullOrEmpty(suite.PreviewReportText)
                 ? "not run"
                 : suite.PreviewReportText);
+            builder.AppendLine();
+            builder.AppendLine("[Corner Chipping Matrix]");
+            builder.AppendLine(string.IsNullOrEmpty(suite.CornerChippingReportText)
+                ? "not run"
+                : suite.CornerChippingReportText);
             builder.AppendLine();
             builder.AppendLine(
                 "[Outlier Resolution and Negative Exclusion Contract]");
@@ -5070,8 +5778,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             CancelEdgeWearViabilityMatrixForDomainReload()
         {
             EditorApplication.update -= AdvanceEdgeWearViabilityMatrix;
+            EditorApplication.update -= AdvanceCornerChippingMatrix;
             EditorUtility.ClearProgressBar();
             activeEdgeWearViabilityMatrixJob = null;
+            activeCornerChippingMatrixJob = null;
             activeEdgeWearValidationSuiteJob = null;
         }
 
@@ -5988,6 +6698,168 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
         }
 
+        private enum CornerChippingMatrixPolicy
+        {
+            Disabled,
+            Default,
+            MaximumDepth
+        }
+
+        private sealed class CornerChippingMatrixCase
+        {
+            public int ShapeSeed;
+            public CornerChippingMatrixPolicy Policy;
+            public bool ZeroParityValid;
+            public bool SelectionDeterministic;
+            public bool TransactionValid;
+            public bool CapRingValid;
+            public bool RetentionValid;
+            public bool ChannelValid;
+            public int AcceptedCornerRank = -1;
+            public int SelectedGraphVertexIndex = -1;
+            public int AcceptedTrialIndex = -1;
+            public int CandidateCornerCount;
+            public int AttemptedCornerCount;
+            public int AttemptedConfigurationCount;
+            public float CapRingCommittedScale;
+            public string SearchFailureStage = string.Empty;
+            public string SearchFailureReason = string.Empty;
+            public float AcceptedDepthFraction;
+            public int MandatoryBuiltCount;
+            public int UnrelatedRetainedCount;
+            public int UnrelatedBaselineCount;
+            public double ElapsedMilliseconds;
+            public string Diagnostic = string.Empty;
+
+            public bool Passed =>
+                ZeroParityValid &&
+                SelectionDeterministic &&
+                TransactionValid &&
+                CapRingValid &&
+                RetentionValid &&
+                ChannelValid &&
+                string.IsNullOrEmpty(Diagnostic);
+        }
+
+        private sealed class CornerChippingMatrixAggregate
+        {
+            public int CasesRun;
+            public int CasesPassed;
+            public int ZeroParityRun;
+            public int ZeroParityPassed;
+            public int SelectionRun;
+            public int SelectionPassed;
+            public int TransactionRun;
+            public int TransactionPassed;
+            public int CapRingRun;
+            public int CapRingPassed;
+            public int RetentionRun;
+            public int RetentionPassed;
+            public int ChannelsRun;
+            public int ChannelsPassed;
+            public bool Cancelled;
+            public bool StatePreserved;
+            public string TerminalReason = string.Empty;
+
+            public string Status =>
+                !Cancelled &&
+                StatePreserved &&
+                CasesRun == EdgeWearBatchShapeSeeds.Length * 3 &&
+                CasesPassed == CasesRun &&
+                ZeroParityRun == EdgeWearBatchShapeSeeds.Length &&
+                ZeroParityPassed == ZeroParityRun &&
+                SelectionPassed == SelectionRun &&
+                TransactionPassed == TransactionRun &&
+                CapRingPassed == CapRingRun &&
+                RetentionPassed == RetentionRun &&
+                ChannelsPassed == ChannelsRun &&
+                string.IsNullOrEmpty(TerminalReason)
+                    ? "passed"
+                    : Cancelled ? "cancelled" : "failed";
+        }
+
+        private sealed class CornerChippingMatrixJob
+        {
+            public readonly GeneratedMass Target;
+            public readonly string RecipeJson;
+            public readonly Mesh TargetMesh;
+            public readonly bool UnifiedPreviewEnabled;
+            public readonly bool UnifiedPreviewStale;
+            public readonly bool GeometryPreviewEnabled;
+            public readonly float EdgeWearAmount;
+            public readonly float EdgeWearWidth;
+            public readonly float EdgeWearCoverage;
+            public readonly float EdgeWearMacroVariationCoverage;
+            public readonly float EdgeWearMacroVariation;
+            public readonly float EdgeWearSoftness;
+            public readonly float CreaseAmount;
+            public readonly float CreaseWidth;
+            public readonly float CreaseLength;
+            public readonly float CreaseBranching;
+            public readonly float CornerChipTopFacingPreference;
+            public readonly float CornerChipCapRingWidthScale;
+            public readonly float CornerChipCapRingWearStrength;
+            public readonly List<CornerChippingMatrixCase> Cases =
+                new List<CornerChippingMatrixCase>();
+            public bool CancelRequested;
+            public int CompletedCaseCount;
+            public int TotalCaseCount => EdgeWearBatchShapeSeeds.Length * 3;
+
+            public CornerChippingMatrixJob(GeneratedMass target)
+            {
+                Target = target;
+                RecipeJson = JsonUtility.ToJson(target.Recipe);
+                TargetMesh = target.GeometryMeshFilter.sharedMesh;
+                UnifiedPreviewEnabled = target.UnifiedEdgeWearPreviewEnabled;
+                UnifiedPreviewStale = target.UnifiedEdgeWearPreviewStale;
+                GeometryPreviewEnabled =
+                    target.CornerDamageGeometryPreviewEnabled;
+                EdgeWearAmount = target.EdgeWearAmount;
+                EdgeWearWidth = target.EdgeWearWidth;
+                EdgeWearCoverage = target.EdgeWearCoverage;
+                EdgeWearMacroVariationCoverage =
+                    target.EdgeWearMacroVariationCoverage;
+                EdgeWearMacroVariation = target.EdgeWearMacroVariation;
+                EdgeWearSoftness = target.EdgeWearSoftness;
+                CreaseAmount = target.CreaseAmount;
+                CreaseWidth = target.CreaseWidth;
+                CreaseLength = target.CreaseLength;
+                CreaseBranching = target.CreaseBranching;
+                CornerChipTopFacingPreference =
+                    target.CornerChipTopFacingPreference;
+                CornerChipCapRingWidthScale =
+                    target.CornerChipCapRingWidthScale;
+                CornerChipCapRingWearStrength =
+                    target.CornerChipCapRingWearStrength;
+            }
+
+            public bool ValidateTargetStatePreserved(out string diagnostic)
+            {
+                diagnostic = string.Empty;
+                if (Target == null)
+                {
+                    diagnostic = "target mass was destroyed";
+                    return false;
+                }
+                if (Target.GeometryMeshFilter.sharedMesh != TargetMesh ||
+                    Target.UnifiedEdgeWearPreviewEnabled !=
+                        UnifiedPreviewEnabled ||
+                    Target.UnifiedEdgeWearPreviewStale !=
+                        UnifiedPreviewStale ||
+                    Target.CornerDamageGeometryPreviewEnabled !=
+                        GeometryPreviewEnabled ||
+                    !string.Equals(
+                        JsonUtility.ToJson(Target.Recipe),
+                        RecipeJson,
+                        StringComparison.Ordinal))
+                {
+                    diagnostic = "selected mass state changed during corner matrix";
+                    return false;
+                }
+                return true;
+            }
+        }
+
         private sealed class EdgeWearValidationSuiteJob
         {
             public readonly GeneratedMass Target;
@@ -6018,6 +6890,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public EdgeWearViabilityMatrixAggregate PreviewAggregate;
             public string TopologyReportText = string.Empty;
             public string PreviewReportText = string.Empty;
+            public CornerChippingMatrixAggregate CornerChippingAggregate;
+            public string CornerChippingReportText = string.Empty;
             public bool ComprehensiveArtisticAvailable;
             public string ComprehensiveArtisticReport = string.Empty;
             public string ComprehensiveArtisticDiagnostic = string.Empty;
@@ -6057,6 +6931,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         EdgeWearValidationSuiteStage
                             .ArtisticPreviewParity =>
                             "artistic preview parity matrix",
+                        EdgeWearValidationSuiteStage.CornerChipping =>
+                            "corner chipping matrix",
                         _ => "complete"
                     };
                 }
@@ -6069,6 +6945,81 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public string PreviewStatus => PreviewAggregate == null
                 ? "not-run"
                 : PreviewAggregate.Status;
+
+            public string CornerChippingStatus =>
+                CornerChippingAggregate == null
+                    ? "not-run"
+                    : CornerChippingAggregate.Status;
+
+            public int CornerChippingCasesRun =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.CasesRun;
+
+            public int CornerChippingCasesPassed =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.CasesPassed;
+
+            public int CornerDisabledZeroParityRun =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.ZeroParityRun;
+
+            public int CornerDisabledZeroParityPassed =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.ZeroParityPassed;
+
+            public int CornerSelectionDeterminismRun =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.SelectionRun;
+
+            public int CornerSelectionDeterminismPassed =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.SelectionPassed;
+
+            public int CornerTransactionRun =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.TransactionRun;
+
+            public int CornerTransactionPassed =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.TransactionPassed;
+
+            public int CornerCapRingRun =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.CapRingRun;
+
+            public int CornerCapRingPassed =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.CapRingPassed;
+
+            public int CornerRetentionRun =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.RetentionRun;
+
+            public int CornerRetentionPassed =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.RetentionPassed;
+
+            public int CornerChannelsRun =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.ChannelsRun;
+
+            public int CornerChannelsPassed =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.ChannelsPassed;
 
             public string OutlierRecoveryStatus =>
                 OutlierRecoveryChecksRun == 0
@@ -6128,8 +7079,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         !MacroVariationContractPassed ||
                         TopologyAggregate == null ||
                         PreviewAggregate == null ||
+                        CornerChippingAggregate == null ||
                         TopologyAggregate.Status != "passed" ||
                         PreviewAggregate.Status != "passed" ||
+                        CornerChippingAggregate.Status != "passed" ||
                         OutlierRecoveryChecksRun == 0 ||
                         OutlierRecoveryChecksPassed !=
                             OutlierRecoveryChecksRun ||
@@ -6144,6 +7097,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     }
                     return "passed";
                 }
+            }
+
+            public void RecordCornerChippingMatrix(
+                CornerChippingMatrixAggregate aggregate,
+                string reportText)
+            {
+                CornerChippingAggregate = aggregate;
+                CornerChippingReportText = reportText ?? string.Empty;
             }
 
             public void PrepareCurrentPreviewCapture()
@@ -8201,6 +9162,47 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     new GUIContent(
                         "Macro Variation Strength",
                         "How strongly participating edges narrow from the uniform bevel width. Zero is uniform; one applies the certified downward-only amplitude, with sharper convex edges retaining more width than shallow convex edges."));
+
+                EditorGUILayout.Space(3f);
+                EditorGUILayout.LabelField(
+                    "Corner Chipping",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.PropertyField(
+                    cornerChippingEnabled,
+                    new GUIContent(
+                        "Enable Corner Chipping",
+                        "Enables one deterministic corner chip. The corner-chip preview shows the raw cut; the normal edge-wear preview applies the cut before bevel construction."));
+                using (new EditorGUI.DisabledScope(
+                    cornerChippingEnabled == null ||
+                    !cornerChippingEnabled.boolValue))
+                {
+                    EditorGUILayout.PropertyField(
+                        cornerChipDepth,
+                        new GUIContent(
+                            "Corner Chip Depth",
+                            "Requested removed depth as a fraction of the selected corner's shortest incident edge."));
+                    EditorGUILayout.PropertyField(
+                        cornerChipDepthVariation,
+                        new GUIContent(
+                            "Corner Chip Depth Variation",
+                            "Deterministic symmetric variation around the requested depth. Zero uses the requested fraction exactly before bounded fallback trials."));
+                    EditorGUILayout.PropertyField(
+                        cornerChipTopFacingPreference,
+                        new GUIContent(
+                            "Top-Facing Preference",
+                            "How strongly selection favours upward-exposed corners. 0.5 reproduces the original C1A.1 score balance."));
+                    EditorGUILayout.PropertyField(
+                        cornerChipCapRingWidthScale,
+                        new GUIContent(
+                            "Cap-Ring Width Scale",
+                            "Multiplies the current ordinary Edge Wear Width before depth and cap-edge safety ceilings."));
+                    EditorGUILayout.PropertyField(
+                        cornerChipCapRingWearStrength,
+                        new GUIContent(
+                            "Cap-Ring Wear Strength",
+                            "Multiplies the current edge-wear material strength on the three mandatory cap-ring bevels."));
+                }
+
                 EditorGUILayout.PropertyField(
                     edgeWearSoftness,
                     new GUIContent(
@@ -10758,6 +11760,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     lastRenderMeshAudit);
             }
 
+            if (mass.CornerDamageGeometryPreviewEnabled &&
+                !mass.CornerDamageGeometryPreviewStale &&
+                mass.CornerDamageGeometryPreviewApplied)
+            {
+                DrawCornerDamagePreviewSceneOverlay(
+                    mass,
+                    mass.CornerDamageGeometryPreviewStatus,
+                    "Corner Chip");
+            }
+            else if (mass.UnifiedEdgeWearPreviewEnabled &&
+                !mass.UnifiedEdgeWearPreviewStale &&
+                mass.CornerDamageIntegrationPreviewApplied)
+            {
+                DrawCornerDamagePreviewSceneOverlay(
+                    mass,
+                    mass.CornerDamageIntegrationPreviewStatus,
+                    "Corner Chip");
+            }
+
             if (showPressureProfile && Application.isPlaying &&
                 StylizedRiverDisturbanceRuntime.
                     TryGetGeneratedSourcePressureProfileDebugData(
@@ -10768,6 +11789,70 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
         }
 
+
+        private static void DrawCornerDamagePreviewSceneOverlay(
+            GeneratedMass mass,
+            MassGenerator.CornerDamagePreviewStatus status,
+            string label)
+        {
+            if (mass == null || status == null ||
+                status.CapVerticesLocal == null ||
+                status.CapVerticesLocal.Length < 3)
+            {
+                return;
+            }
+
+            Transform transform = mass.transform;
+            Vector3 selectedWorld = transform.TransformPoint(
+                status.SelectedCornerLocalPosition);
+            Vector3[] worldCap = new Vector3[
+                status.CapVerticesLocal.Length];
+            Vector3 capCentre = Vector3.zero;
+            for (int vertexIndex = 0;
+                 vertexIndex < status.CapVerticesLocal.Length;
+                 vertexIndex++)
+            {
+                worldCap[vertexIndex] = transform.TransformPoint(
+                    status.CapVerticesLocal[vertexIndex]);
+                capCentre += worldCap[vertexIndex];
+            }
+            capCentre /= worldCap.Length;
+
+            Color previousColor = Handles.color;
+            UnityEngine.Rendering.CompareFunction previousZTest =
+                Handles.zTest;
+            Handles.zTest =
+                UnityEngine.Rendering.CompareFunction.LessEqual;
+
+            Handles.color = new Color(0f, 0.85f, 1f, 0.18f);
+            Handles.DrawAAConvexPolygon(worldCap);
+
+            Vector3[] closedRing = new Vector3[worldCap.Length + 1];
+            Array.Copy(worldCap, closedRing, worldCap.Length);
+            closedRing[closedRing.Length - 1] = worldCap[0];
+            Handles.color = new Color(0f, 0.9f, 1f, 1f);
+            Handles.DrawAAPolyLine(4f, closedRing);
+
+            Handles.color = new Color(1f, 0.78f, 0.10f, 1f);
+            float markerSize = HandleUtility.GetHandleSize(
+                selectedWorld) * 0.055f;
+            Handles.SphereHandleCap(
+                0,
+                selectedWorld,
+                Quaternion.identity,
+                markerSize,
+                EventType.Repaint);
+            Handles.DrawAAPolyLine(
+                3f,
+                selectedWorld,
+                capCentre);
+            Handles.Label(
+                capCentre + Vector3.up * markerSize,
+                label ?? "Corner Chip");
+
+            Handles.color = previousColor;
+            Handles.zTest = previousZTest;
+        }
 
         private static int CountCurrentSearchFocusEdges(
             GeneratedMass mass)

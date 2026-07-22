@@ -86,7 +86,7 @@ geometryCommit=disabled
 
 remains active. V1A acceptance therefore freezes deterministic edge-to-edge average-width irregularity on the editor visual/geometry foundation; it is not production promotion and it is not completion of the full edge-wear visual feature.
 
-The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b is frozen. The EW-C1A ordering audit is complete and approves a pre-bevel corner cut after micro-topology normalization. EW-C1A.1 is implemented and certified diagnostically. EW-C1A.1a.8 is accepted and frozen: every accepted polygon owns one render surface after final placement deformation. EW-C1A.2 now commits the certified corner transaction only in an explicit editor preview and requires a complete cap-ring bevel before the damaged mesh can be shown.
+The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b is frozen. The EW-C1A ordering audit is complete and approves a pre-bevel corner cut after micro-topology normalization. EW-C1A.1 is implemented and certified diagnostically. EW-C1A.1a.8 is accepted and frozen: every accepted polygon owns one render surface after final placement deformation. EW-C1A.2a passed its seed-8889 Unity gate with one semantic cap, complete `17/17` construction provenance, mandatory cap ring `3/3/3/3`, and unrelated bevel retention `28/28`. EW-C1A.3 owns the compact authoring workflow: one normal `Corner Chipping` control group, one raw corner-chip preview, and the existing edge-wear preview automatically applying the certified corner cut before bevel discovery when enabled. Its first Unity matrix preserved every frozen baseline gate but passed only `14/33` corner cases: disabled parity `11/11` and enabled construction `3/22`. EW-C1A.3a therefore replaces fixed rank-0 commitment with deterministic score-ordered full-feature search and shared cap-ring width backoff. Production generation remains unchanged until a separate promotion patch.
 
 ## Post-baseline edge-wear visual contract
 
@@ -99,8 +99,11 @@ EW-S1      object-space normal/material breakup [rejected and removed]
 EW-C1A-RO2 pre-bevel order and ownership audit [complete]
 EW-C1A.1  transactional pre-bevel cut and provenance proof [implemented; transaction accepted]
 EW-C1A.1a one polygon, one render surface [accepted and frozen]
-EW-C1A.2  committed corner cut and mandatory cap-ring preview [implemented; Unity validation pending]
-EW-C1A.3  controls, normal/material-role closure, and 33-case acceptance
+EW-C1A.2a committed corner cut, provenance bridge, and mandatory cap-ring preview [Unity seed-8889 accepted]
+EW-C1A.2b corner controls, live settings, and Scene marker [seed-8889 proof complete]
+EW-C1A.2c chip-only geometry endpoint and post-chip integration proof [seed-8889 proof complete]
+EW-C1A.3  unified authoring workflow and first 33-case gate [implemented; Unity result 14/33]
+EW-C1A.3a deterministic fully certified single-corner search [implemented; Unity validation pending]
 EW-C2      sparse edge chips and notches [later]
 EW-N1      final artistic normal shaping [after geometry]
 EW-F1      face finish, cracks, and crevices [later]
@@ -473,7 +476,7 @@ The first three corner-damage stages are:
 
 1. `EW-C1A.1`: deterministic candidate selection, cloned four-depth cut transaction, one cap, topology/volume certification, and identity proof; accepted preview remains unchanged. The implemented owner is `EdgeWearEvaluationMode.CornerDamageTransactionAudit`, exposed through `MassGenerator.GenerateCornerDamageTransactionAudit` and `GeneratedMassEditor` as `Run EW-C1A.1 Corner Transaction Audit`. The report is saved to `Library/GeneratedMassCornerDamageTransactionAudit.txt`, copied to the clipboard, and can be revealed from the same Inspector section.
 2. `EW-C1A.2`: retain the certified damaged polyhedron and stable output-edge identities, feed that exact result into ordinary bevel construction, force every dedicated non-Macro cap-ring candidate before ordinary coverage selection, compare unrelated built bevel identities against the frozen unified baseline, and expose the first editor-only visual preview. Any partial cap ring or collateral bevel loss falls back to production geometry.
-3. `EW-C1A.3`: add approved authoring controls, cap/cap-ring authored normal and surface-group closure, complete 33-case acceptance, and freeze.
+3. `EW-C1A.3`: expose one normal Corner Chipping authoring group, route the existing edge-wear preview through the certified pre-bevel chip when enabled, remove duplicate corner-preview Inspector workflows, and certify disabled/default/maximum-depth behavior across the 33-case matrix.
 
 The initial cap-ring width is bounded by:
 
@@ -585,11 +588,28 @@ The resolver performs `O(m^4)` dirty-time work and `O(m)` temporary group storag
 This final bounded C1A.1a infrastructure gate passed and is frozen. EW-C1A.2 consumes the existing polygon render ownership unchanged. A future proven below-threshold group would require a separately approved placement-deformation plan; it would not authorize another triangulation or normal-threshold workaround.
 
 
-## EW-C1A.2 preview-only committed corner chip
+## EW-C1A.2 / EW-C1A.3 corner-chip authoring and preview ownership
 
-`MassGenerator.GenerateCornerDamagePreview` is an editor-only synchronous entry point. It first builds the frozen unified preview as a retention baseline, then enters a scoped thread-local corner request and invokes the existing unified preview return path. The request is always restored in `finally`; ordinary unified preview and production `EdgeWearEvaluationMode.None` remain unchanged.
+The corner feature has one authoring group and two existing authoring actions with distinct purposes:
 
-The successful C1A.1 trial now retains its exact prepared `PolygonFace` list, cap face, accepted depth, stable identity by damaged output `EdgeKey`, generated cap-ring identities, and the original identities of the three shortened parent edges. Candidate construction reads that committed identity map before Macro sampling. Cap-ring candidates are marked mandatory, use the fixed C1A.2 width formula, report zero Macro participation, and bypass ordinary artistic filtering and coverage. They still pass the existing convexity, footprint, locality, isolated-width, corner/coexistence, recovery, topology, face-quality, one-surface, and final render-normal gates.
+```text
+Rebuild Corner Chip Preview
+    -> certified cut only
+    -> semantic damaged polygons triangulated directly
+    -> no ordinary bevel candidates or cap-ring bevel
+
+Rebuild Edge-Wear Bevel Preview
+    -> corner disabled: frozen ordinary unified preview
+    -> corner enabled: certified corner cut first
+       -> damaged topology and stable identities
+       -> ordinary candidates from current edge-wear settings
+       -> mandatory complete cap-ring candidates
+       -> unified shell and unrelated-bevel retention proof
+```
+
+There is no separate corner-plus-edge-wear Inspector action, preview selector, report-control group, or corner-specific debug foldout. `GeneratedMassEditor` writes and copies the raw corner report automatically. The ordinary edge-wear preview is the integration preview whenever Corner Chipping is enabled. Internal compatibility APIs may remain, but they do not create another user workflow.
+
+The successful transaction retains its exact semantic prepared `PolygonFace` list, `CornerDamageCap`, accepted depth, stable identity by damaged output `EdgeKey`, generated cap-ring identities, and the original identities of the three shortened parent edges. The construction path uses one geometry-identical dense `SourceFace` clone. Candidate construction reads the committed identity map before Macro sampling. Cap-ring candidates are mandatory, Macro-free, and bypass ordinary artistic filtering and coverage while still passing every geometry, coexistence, topology, face-quality, one-surface, and final render-normal gate.
 
 Selection is:
 
@@ -598,4 +618,45 @@ all mandatory cap-ring candidates ordered by generated identity
 + ceil(ordinary candidate count * existing ordinary coverage)
 ```
 
-The complete preview is rejected unless exactly one certified cap exists, every generated cap-ring identity becomes a mandatory candidate, every mandatory candidate is selected and built, the unified corner shell certifies, and every baseline-built original edge outside the three affected parent identities remains certified. Rejection returns production geometry and preserves the complete report. No serialized control, shader, mesh channel, asset, or active-gameplay path is added in C1A.2.
+The complete edge-wear preview is rejected unless exactly one certified cap exists, every generated cap-ring identity becomes a mandatory candidate, every mandatory candidate is selected and built, the unified corner shell certifies, and every baseline-built original edge outside the three affected parent identities remains certified. Rejection preserves the complete report and does not expose a raw or partially softened cap.
+
+### Semantic/construction provenance boundary
+
+The semantic accepted list retains `PolygonFaceProvenanceKind.CornerDamageCap` and remains the transaction/report authority. `TryCommitCornerDamageTransactionResult` builds and certifies a construction-only face list by copying every semantic polygon and assigning `SourceFace` provenance index equal to its face-list position. Face count, vertex order, vertex values, feature, and feature strength remain unchanged. The bounded-bevel pipeline consumes only that construction list. Telemetry reports both `semanticCapFaces` and `constructionSourceProvenance=attributed/expected`.
+
+### Corner Chipping controls
+
+`MassSurfaceFeatureSettings` and `GeneratedMass` transport six clamped values: enable, requested depth fraction, deterministic depth variation, top-facing selection preference, cap-ring width scale, and cap-ring wear-strength scale. Existing constructor callers remain source-compatible through trailing optional defaults, and existing masses remain disabled by default. Production `EdgeWearEvaluationMode.None` does not consume the enable flag.
+
+The transaction precedes candidate discovery. Requested depth is resolved from the selected corner's shortest incident edge; variation zero reproduces the requested fraction exactly before bounded fallback factors. Shortened original edges retain ordinary width, Macro, coverage, and response. New cap-ring edges remain mandatory and Macro-free; their requested width is current ordinary Edge Wear Width times Cap-Ring Width Scale, bounded by accepted-depth and shortest-cap-edge limits. Their material strength is ordinary edge-wear amount times Cap-Ring Wear Strength.
+
+The Scene overlay uses one `Corner Chip` label for the raw preview or the ordinary edge-wear preview after chipping. The report records requested/resolved/accepted depth, retry ratio, selected corner, semantic cap, construction attribution, ring identities, ring width limits, and retention evidence where applicable.
+
+### EW-C1A.3 single-chip matrix
+
+The existing one-click edge-wear validation suite owns an additional asynchronous 33-case stage over the accepted 11 seeds:
+
+```text
+Disabled       corner off; exact MeshData and unified-status parity
+Default        depth 0.18, variation 0.15
+Maximum Depth  depth 0.35, variation 0
+```
+
+Disabled cases compare the corner-aware unified entry point against the frozen ordinary unified entry point at exact vertex, index, UV, colour, normal, debug-edge, and status level. Enabled cases compare the raw and integrated transaction selection, require one semantic cap, dense construction provenance, a complete mandatory cap ring, zero unrelated bevel loss, and valid final normal/tangent channels. The matrix uses temporary editor meshes only to validate Unity tangent recalculation. It adds no button, serialized setting, production path, per-frame work, shader work, persistent cache, texture, buffer, or mesh channel.
+
+
+### EW-C1A.3a deterministic full-feature selection
+
+Corner selection is preference ordering, not unconditional commitment. Every eligible normalized source corner is ranked by repeated application of the unchanged C1A score and epsilon tie contract, with normalized graph vertex index as the stable tie-break. This preserves the previous rank-0 choice exactly while producing a deterministic fallback order. Editor preview then evaluates candidates in that order until one complete feature passes.
+
+For each ranked corner, the existing four bounded cut-depth trials remain authoritative. A transaction-certified corner is tested with one uniform cap-ring schedule:
+
+```text
+1.0 -> 0.75 -> 0.5625 -> 0.421875 -> 0.31640625 -> 0.25
+```
+
+The multiplier applies to the common ring request before the unchanged candidate and shell solvers. It never permits a partial ring. One ordinary unified baseline is reused for the search. A corner is accepted only when the existing corner preview capture proves one semantic cap, dense construction provenance, all mandatory ring identities candidate/selected/built, a certified post-chip shell, zero unrelated baseline-bevel loss, and valid final render channels. Transaction, ring, construction, or retention failure advances deterministically to the next applicable scale or corner.
+
+The raw chip preview first resolves this same fully certified corner, then emits only that accepted semantic cut. Raw and integrated endpoints therefore remain visually distinct but must independently resolve the same candidate rank, graph vertex, depth trial, accepted depth, and generated ring identities. Search state is editor-only and scoped; disabled authoring, ordinary audits, and production `EdgeWearEvaluationMode.None` retain their prior behavior.
+
+Search telemetry records candidate and attempt counts, accepted rank, committed ring scale, the deepest deterministic failure stage, and a concise attempt trace. The search adds explicit dirty-time work only. For each eligible corner it performs at most the existing four transaction trials and, after transaction certification, at most six integrated ring attempts. It adds no per-frame, shader, texture, buffer, mesh-channel, serialized-control, or production-generation cost.

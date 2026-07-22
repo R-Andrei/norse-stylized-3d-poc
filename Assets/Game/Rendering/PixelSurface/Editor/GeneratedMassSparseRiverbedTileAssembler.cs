@@ -16,7 +16,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
     /// </summary>
     internal static class GeneratedMassSparseRiverbedTileAssembler
     {
-        internal const int AlgorithmVersion = 6;
+        internal const int AlgorithmVersion = 7;
         internal const int FinalResolution = 1024;
         internal const int WorkResolution = 2048;
         internal const int CandidateCount = 3;
@@ -287,6 +287,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal float NeutralToAlternateMeanDifference;
             internal float FractionalSilhouetteCoverageFraction;
             internal float MaximumAdjacentPaletteFormDifference;
+            internal float FeatureMaskMean;
+            internal float FeatureMaskMaximum;
+            internal float SubstrateOnlyFormMean;
+            internal float SubstrateOnlyRoughnessMean;
             internal string PalettePayloadFingerprint;
             internal string PalettePreviewNeutralFingerprint;
             internal string PalettePreviewHigherContrastFingerprint;
@@ -2456,7 +2460,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         placements[final.Owner[index]].SourceIndex)
                     : substrate.Color[index];
                 result.Moderate[index] = (Color32)moderateColor;
-                result.PaletteForm[index] = EncodePaletteForm(paletteForm);
+                float substrateRoughness = ResolveSubstrateRoughness(
+                    substrate.Variation[index]);
+                result.PaletteForm[index] = EncodePalettePayload(
+                    paletteForm,
+                    substrateForm,
+                    substrateRoughness,
+                    rockCoverage);
                 result.RuntimePackedDetail[index] =
                     BuildRuntimePackedDetailPixel(
                         final,
@@ -2599,17 +2609,39 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 lightT);
         }
 
-        private static Color32 EncodePaletteForm(float linearForm)
+        private static Color32 EncodePalettePayload(
+            float combinedForm,
+            float substrateForm,
+            float substrateRoughness,
+            float featureCoverage)
         {
-            byte encoded = ToByte(
-                Mathf.LinearToGammaSpace(Mathf.Clamp01(linearForm)));
-            return Grayscale(encoded);
+            return new Color32(
+                EncodeLinearSrgbByte(combinedForm),
+                EncodeLinearSrgbByte(substrateForm),
+                EncodeLinearSrgbByte(substrateRoughness),
+                ToByte(featureCoverage));
+        }
+
+        private static byte EncodeLinearSrgbByte(float value)
+        {
+            return ToByte(
+                Mathf.LinearToGammaSpace(Mathf.Clamp01(value)));
         }
 
         private static float DecodePaletteForm(Color32 encodedForm)
         {
             return Mathf.Clamp01(
                 Mathf.GammaToLinearSpace(encodedForm.r / 255f));
+        }
+
+        private static float ResolveSubstrateRoughness(
+            float substrateVariation)
+        {
+            return Mathf.Clamp(
+                0.68f +
+                (0.5f - substrateVariation) * 0.10f,
+                0.55f,
+                0.80f);
         }
 
         private static Color32 BuildRuntimePackedDetailPixel(
@@ -2635,11 +2667,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 ? Mathf.Clamp01(
                     final.RootDarkening[index] * 1.05f * coverage)
                 : 0f;
-            float substrateRoughness = Mathf.Clamp(
-                0.68f +
-                (0.5f - substrate.Variation[index]) * 0.10f,
-                0.55f,
-                0.80f);
+            float substrateRoughness = ResolveSubstrateRoughness(
+                substrate.Variation[index]);
             float rockRoughness = hasRockData
                 ? Mathf.Clamp(
                     0.64f +
@@ -2733,8 +2762,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 0,
                 0,
                 panelSize);
+            Color32[] paletteFormPreview = new Color32[paletteForm.Length];
+            for (int index = 0; index < paletteForm.Length; index++)
+            {
+                paletteFormPreview[index] = Grayscale(paletteForm[index].r);
+            }
             BlitScaled(
-                paletteForm,
+                paletteFormPreview,
                 FinalResolution,
                 output,
                 FinalResolution,
@@ -2757,12 +2791,28 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             int substrateCount = 0;
             int rockCount = 0;
             int fractionalCoverageCount = 0;
+            double featureMask = 0.0;
+            double substrateOnlyForm = 0.0;
+            double substrateOnlyRoughness = 0.0;
+            float maximumFeatureMask = 0f;
             float minimumForm = 1f;
             float maximumForm = 0f;
             float maximumRockCavity = 0f;
             for (int index = 0; index < result.PaletteForm.Length; index++)
             {
-                float form = DecodePaletteForm(result.PaletteForm[index]);
+                Color32 palettePayload = result.PaletteForm[index];
+                float form = DecodePaletteForm(palettePayload);
+                float substrateFormValue = Mathf.Clamp01(
+                    Mathf.GammaToLinearSpace(palettePayload.g / 255f));
+                float substrateRoughnessValue = Mathf.Clamp01(
+                    Mathf.GammaToLinearSpace(palettePayload.b / 255f));
+                float featureMaskValue = palettePayload.a / 255f;
+                substrateOnlyForm += substrateFormValue;
+                substrateOnlyRoughness += substrateRoughnessValue;
+                featureMask += featureMaskValue;
+                maximumFeatureMask = Mathf.Max(
+                    maximumFeatureMask,
+                    featureMaskValue);
                 float maskCoverage = Mathf.Clamp01(final.Mask[index]);
                 if (maskCoverage > 0.0001f && maskCoverage < 0.9999f)
                 {
@@ -2830,6 +2880,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             result.MaximumAdjacentPaletteFormDifference =
                 MeasureMaximumAdjacentPaletteFormDifference(
                     result.PaletteForm);
+            float payloadCount = Mathf.Max(1, result.PaletteForm.Length);
+            result.FeatureMaskMean = (float)(featureMask / payloadCount);
+            result.FeatureMaskMaximum = maximumFeatureMask;
+            result.SubstrateOnlyFormMean =
+                (float)(substrateOnlyForm / payloadCount);
+            result.SubstrateOnlyRoughnessMean =
+                (float)(substrateOnlyRoughness / payloadCount);
         }
 
         private static float MeasureMaximumAdjacentPaletteFormDifference(
@@ -3255,7 +3312,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             ref double packed,
             ref double preview)
         {
-            form += ColorDifference(paletteForm[a], paletteForm[b]);
+            form += PackedColorDifference(paletteForm[a], paletteForm[b]);
             packed += PackedColorDifference(
                 packedDetail[a],
                 packedDetail[b]);

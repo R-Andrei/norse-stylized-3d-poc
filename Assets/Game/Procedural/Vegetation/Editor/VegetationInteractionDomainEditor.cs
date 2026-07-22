@@ -34,8 +34,12 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
                 "Active Domains",
                 VegetationInteractionDomain.ActiveDomainCount.ToString());
             EditorGUILayout.LabelField(
-                "Resources Ready",
-                domain.ResourcesReady ? "Yes" : "No");
+                "Simulation State",
+                !Application.isPlaying
+                    ? "Inactive — Play Mode simulation not running"
+                    : domain.ResourcesReady
+                        ? "Ready"
+                        : "Not ready");
             EditorGUILayout.LabelField(
                 "Field Coverage",
                 $"{domain.FieldWorldSizeMetres:0.###} × " +
@@ -80,7 +84,7 @@ namespace ProgrammaticStylized3D.Vegetation.Editor
                 EditorGUIUtility.systemCopyBuffer =
                     domain.BuildComprehensiveReport();
                 Debug.Log(
-                    "[Vegetation INTERACT.1] Immediate interaction report " +
+                    "[Vegetation INTERACT.1B] Immediate interaction report " +
                     "copied to clipboard.",
                     domain);
             }

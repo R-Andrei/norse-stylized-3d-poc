@@ -85,7 +85,7 @@ RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
     [branch]
     if (presenceFootprintMode <= 0.5)
     {
-        // Protected compatibility path: exact accepted Current arithmetic.
+        // Protected compatibility path: exact accepted Coverage-Only arithmetic.
         if (widthPixels <= 0.0001 || result.visibleSupport <= 0.0001)
         {
             return result;
@@ -872,7 +872,7 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
         }
         else
         {
-            // Protected compatibility path: exact accepted Current arithmetic.
+            // Protected compatibility path: exact accepted Coverage-Only arithmetic.
             float edgeSelection = saturate(
                 result.chipCandidateField * chipEligibility.edgeBand);
             float interiorSelection = saturate(
@@ -910,13 +910,13 @@ float RiverWaterFoamSharpenCoverage(
     return saturate(hard);
 }
 
-float RiverWaterFoamResolveMeaningfulPresenceFootprint(
-    float presence)
+float RiverWaterFoamResolveMeaningfulCoverageFootprint(
+    float coverage)
 {
-    // Match the accepted material diagnostic footprint. Lifecycle-Faithful
-    // rendering still requires meaningful material, but it does not require a
-    // dense local concentration before Remaining Life can remain visible.
-    return smoothstep(0.02, 0.10, saturate(presence));
+    // Lifecycle-Faithful requires meaningful geometric Coverage, but it does
+    // not require dense local concentration before living material remains
+    // visible. Intrinsic Presence is applied later as a single amplitude.
+    return smoothstep(0.02, 0.10, saturate(coverage));
 }
 
 struct RiverWaterFoamPatternFields
@@ -983,7 +983,7 @@ RiverWaterFoamPatternFields RiverWaterFoamStablePatternFields(
 
 float RiverWaterFoamPatternedMask(
     float baseMask,
-    float presence,
+    float coverage,
     float remainingLife,
     float materialPattern,
     float storedGlobalDistance,
@@ -1069,10 +1069,10 @@ float RiverWaterFoamPatternedMask(
     float slowB = sin(_Time.y * 0.57 + seed * 0.79 + p.x * 0.37 - p.y * 0.91) * 0.5 + 0.5;
     float morph = slowA * 0.55 + slowB * 0.45;
 
-    float edgeExposure = 1.0 - smoothstep(0.38, 0.76, presence);
-    float weakInterior = 1.0 - smoothstep(0.54, 0.88, presence);
+    float edgeExposure = 1.0 - smoothstep(0.38, 0.76, coverage);
+    float weakInterior = 1.0 - smoothstep(0.54, 0.88, coverage);
 
-    // Remaining Life is not opacity. It raises the erosion threshold so older
+    // In Concentration + Lifetime, Remaining Life raises the erosion threshold so older
     // material loses weak edge/fringe pieces first. The fragments that survive
     // still render as opaque foam rather than fading into blue/teal water.
     float erosionDrive = pattern + (morph - 0.5) * 0.16;
@@ -1141,7 +1141,7 @@ float RiverWaterFoamPatternedMask(
             smoothstep(
                 presenceGuardLow,
                 presenceGuardHigh,
-                presence));
+                coverage));
         strandLineifiedKeep = lerp(
             coherentKeep,
             rawStrandLineifiedKeep,
@@ -1159,14 +1159,14 @@ float RiverWaterFoamPatternedMask(
     // Preserve only compact, pattern-supported cores. All transient signals
     // share the same core and lifecycle authority; they differ only in their
     // explicit render-only deterioration vocabulary.
-    float compactCore = smoothstep(0.66, 0.91, presence) *
+    float compactCore = smoothstep(0.66, 0.91, coverage) *
         smoothstep(0.22 + damage * 0.16, 0.58 + damage * 0.12, pattern + morph * 0.10);
     float protectedCore = compactCore * lerp(0.72, 0.92, s);
     coherentVisible = max(coherentVisible, protectedCore);
     strandVisible = max(strandVisible, protectedCore);
 
-    // Near-zero Remaining Life may disappear, but ordinary aging does not
-    // globally fade the whole patch. It erodes through the thresholds above.
+    // The caller selects actual life or a lifecycle-faithful full-life value for
+    // these thresholds. Near-zero explicit life remains gated.
     float lifeGate = smoothstep(0.015, 0.070, life);
     coherentVisible *= lifeGate;
     strandVisible *= lifeGate;
@@ -1295,7 +1295,7 @@ float RiverWaterFoamApplyChipAndStrands(
     productionChipRemovedMask = 0.0;
 
     // Accepted soft-mask reconstruction is the sole Chipping application.
-    // Current and Presence-Amplitude both modify the pre-hardened soft signal,
+    // Coverage-Only and Presence-Amplitude both modify the pre-hardened soft signal,
     // reharden the result, and apply structural Strands afterward.
     float strandSoftShape = saturate(strandSoftVisibility);
     float strand = saturate(strandStrength);
@@ -1622,16 +1622,29 @@ float4 RiverWaterFoamSampleInterpolatedState(
 
 void RiverWaterFoamDecodeMaterialState(
     float4 state,
+    out float coverage,
     out float presence,
     out float remainingLife,
     out float materialPattern)
 {
-    presence = saturate(state.x);
-    remainingLife = presence > 0.0001
-        ? saturate(state.y / presence)
+    float materialAmount = saturate(state.x);
+    float storedCoverage = saturate(state.w);
+    bool legacyPackedState =
+        storedCoverage <= 0.00000001 &&
+        materialAmount > 0.0;
+    coverage = legacyPackedState
+        ? materialAmount
+        : storedCoverage;
+    presence = coverage > 0.0001 && materialAmount > 0.0
+        ? (legacyPackedState
+            ? 1.0
+            : saturate(materialAmount / max(coverage, 0.00000001)))
         : 0.0;
-    materialPattern = presence > 0.0001
-        ? saturate(state.z / presence)
+    remainingLife = materialAmount > 0.0
+        ? saturate(state.y / max(materialAmount, 0.00000001))
+        : 0.0;
+    materialPattern = materialAmount > 0.0
+        ? saturate(state.z / max(materialAmount, 0.00000001))
         : 0.0;
 }
 
@@ -1641,7 +1654,6 @@ float RiverWaterFoamResolveStateMask(
     float lateralMetres,
     float sharpness,
     float finalVisibilityMode,
-    float presenceFootprintMode,
     float strandStrength,
     float strandScale,
     float strandReach,
@@ -1649,6 +1661,7 @@ float RiverWaterFoamResolveStateMask(
     float projectedPatternSeedFootprint,
     out float coherentSoftVisibility,
     out float strandSoftVisibility,
+    out float coverage,
     out float presence,
     out float remainingLife,
     out float materialPattern,
@@ -1657,47 +1670,43 @@ float RiverWaterFoamResolveStateMask(
 {
     RiverWaterFoamDecodeMaterialState(
         state,
+        coverage,
         presence,
         remainingLife,
         materialPattern);
+
     float baseMask;
-    float patternedPresence;
+    float patternedCoverage;
+    float lifecyclePatternLife = remainingLife;
     [branch]
     if (finalVisibilityMode > 0.5)
     {
-        // Presence defines only the meaningful material footprint in this mode.
-        // Once inside that footprint, Remaining Life and the stable material
-        // pattern own deterioration instead of a second high-concentration gate.
+        // Lifecycle-Faithful uses Coverage only to establish a meaningful
+        // material footprint. Ordinary patterned erosion cannot counterfeit
+        // early death; explicit Layer C aging remains the lifetime authority.
         float lifecycleFootprint =
-            RiverWaterFoamResolveMeaningfulPresenceFootprint(presence);
+            RiverWaterFoamResolveMeaningfulCoverageFootprint(coverage);
         baseMask = lifecycleFootprint;
-        patternedPresence = lifecycleFootprint;
+        patternedCoverage = lifecycleFootprint;
+        lifecyclePatternLife = remainingLife > 0.0 ? 1.0 : 0.0;
     }
     else
     {
-        // Preserve the accepted legacy result exactly for the default A/B side.
-        baseMask = RiverWaterFoamSharpenCoverage(
-            presence,
-            sharpness);
-        patternedPresence = presence;
+        // Concentration + Lifetime intentionally lets diffuse local Coverage
+        // and Remaining Life both reduce the visible result.
+        baseMask = RiverWaterFoamSharpenCoverage(coverage, sharpness);
+        patternedCoverage = coverage;
     }
 
-    [branch]
-    if (presenceFootprintMode > 0.5)
-    {
-        // Presence-Amplitude is a render-only A/B option. It never grants more
-        // base footprint authority than the committed Layer C amount. The
-        // existing patterned/lifecycle hardening still owns the surviving
-        // opaque stylized body; weak donor-cell tails are no longer promoted
-        // into near-full coverage by the meaningful-footprint branch.
-        baseMask = min(baseMask, presence);
-        patternedPresence = presence;
-    }
-
-    return RiverWaterFoamPatternedMask(
+    // Resolve Coverage, lifecycle, Pattern, and the structural soft signals
+    // without applying intrinsic Presence here. RiverWaterEvaluateFoam carries
+    // this Coverage/Life shape and its exact Presence-weighted counterpart
+    // through the same wake/warp coupling, then selects the requested footprint
+    // once after the complete shape has been resolved.
+    float resolvedShape = RiverWaterFoamPatternedMask(
         baseMask,
-        patternedPresence,
-        remainingLife,
+        patternedCoverage,
+        lifecyclePatternLife,
         materialPattern,
         storedGlobalDistance,
         lateralMetres,
@@ -1711,10 +1720,13 @@ float RiverWaterFoamResolveStateMask(
         strandSoftVisibility,
         strandPattern,
         strandResolution);
+
+    return saturate(resolvedShape);
 }
 
 struct RiverWaterFoamResult
 {
+    float coverage;
     float presence;
     float remainingLife;
     float materialPattern;
@@ -1754,6 +1766,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     RiverWaterFoamSurfaceInfluence surfaceInfluence)
 {
     RiverWaterFoamResult result;
+    result.coverage = 0.0;
     result.presence = 0.0;
     result.remainingLife = 0.0;
     result.materialPattern = 0.0;
@@ -1833,21 +1846,24 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     // Measure its screen-space variation once outside wake/lee branches so the
     // resolution policy does not incorrectly classify rapidly changing seed
     // phase as resolved merely because river coordinates are smooth.
+    float previewCoverage;
     float previewPresence;
     float previewRemainingLife;
     float previewMaterialPattern;
     RiverWaterFoamDecodeMaterialState(
         storedState,
+        previewCoverage,
         previewPresence,
         previewRemainingLife,
         previewMaterialPattern);
     float projectedPatternSeedFootprint =
         fwidth(previewMaterialPattern) * 43.731 *
-        smoothstep(0.02, 0.16, previewPresence) *
+        smoothstep(0.02, 0.16, previewCoverage) *
         lerp(1.0, 1.35, surfaceEnergy);
 
     float storedSoftVisibility;
     float storedStrandSoftVisibility;
+    float storedCoverage;
     float storedPresence;
     float storedRemainingLife;
     float storedMaterialPattern;
@@ -1859,7 +1875,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         storedLateralMetres,
         sharpness,
         finalVisibilityMode,
-        presenceFootprintMode,
         strandStrength,
         strandScale,
         strandReach,
@@ -1867,6 +1882,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         projectedPatternSeedFootprint,
         storedSoftVisibility,
         storedStrandSoftVisibility,
+        storedCoverage,
         storedPresence,
         storedRemainingLife,
         storedMaterialPattern,
@@ -1875,6 +1891,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
 
     // Normal rendering and raw Layer C diagnostics now share the committed
     // field coordinate. Surface warp below remains visual-only and bounded.
+    result.coverage = storedCoverage;
     result.presence = storedPresence;
     result.remainingLife = storedRemainingLife;
     result.materialPattern = storedMaterialPattern;
@@ -1916,6 +1933,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
 
     float visualSoftVisibility;
     float visualStrandSoftVisibility;
+    float visualCoverage;
     float visualPresence;
     float visualRemainingLife;
     float visualMaterialPattern;
@@ -1927,7 +1945,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         storedLateralMetres - warpMetres.y,
         sharpness,
         finalVisibilityMode,
-        presenceFootprintMode,
         strandStrength,
         strandScale,
         strandReach,
@@ -1935,6 +1952,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         projectedPatternSeedFootprint,
         visualSoftVisibility,
         visualStrandSoftVisibility,
+        visualCoverage,
         visualPresence,
         visualRemainingLife,
         visualMaterialPattern,
@@ -1945,6 +1963,10 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float coupledMask = lerp(
         storedMask,
         visualMask,
+        surfaceCoupling);
+    float coupledPresenceMask = lerp(
+        storedMask * storedPresence,
+        visualMask * visualPresence,
         surfaceCoupling);
     float coupledSoftVisibility = lerp(
         storedSoftVisibility,
@@ -2029,6 +2051,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
 
         float leadSoftVisibility;
         float leadStrandSoftVisibility;
+        float leadCoverage;
         float leadPresence;
         float leadLife;
         float leadPattern;
@@ -2040,7 +2063,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             storedLateralMetres - warpMetres.y - stretchDirection.y * stretchMetres,
             sharpness,
             finalVisibilityMode,
-            presenceFootprintMode,
             strandStrength,
             strandScale,
             strandReach,
@@ -2048,6 +2070,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             projectedPatternSeedFootprint,
             leadSoftVisibility,
             leadStrandSoftVisibility,
+            leadCoverage,
             leadPresence,
             leadLife,
             leadPattern,
@@ -2055,6 +2078,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             leadStrandResolution);
         float trailSoftVisibility;
         float trailStrandSoftVisibility;
+        float trailCoverage;
         float trailPresence;
         float trailLife;
         float trailPattern;
@@ -2066,7 +2090,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             storedLateralMetres - warpMetres.y + stretchDirection.y * stretchMetres,
             sharpness,
             finalVisibilityMode,
-            presenceFootprintMode,
             strandStrength,
             strandScale,
             strandReach,
@@ -2074,6 +2097,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             projectedPatternSeedFootprint,
             trailSoftVisibility,
             trailStrandSoftVisibility,
+            trailCoverage,
             trailPresence,
             trailLife,
             trailPattern,
@@ -2089,6 +2113,11 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float stretchedMask = max(
             coupledMask,
             max(leadMask, trailMask) * stretchScale);
+        float stretchedPresenceMask = max(
+            coupledPresenceMask,
+            max(
+                leadMask * leadPresence,
+                trailMask * trailPresence) * stretchScale);
         float stretchedSoftVisibility = max(
             coupledSoftVisibility,
             max(leadSoftVisibility, trailSoftVisibility) * stretchScale);
@@ -2128,6 +2157,10 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             coupledMask,
             stretchedMask,
             stretchWeight);
+        coupledPresenceMask = lerp(
+            coupledPresenceMask,
+            stretchedPresenceMask,
+            stretchWeight);
         coupledSoftVisibility = lerp(
             coupledSoftVisibility,
             stretchedSoftVisibility,
@@ -2146,7 +2179,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             stretchWeight);
     }
 
-    float edgeExposure = 1.0 - smoothstep(0.36, 0.82, max(storedPresence, visualPresence));
+    float edgeExposure = 1.0 - smoothstep(0.36, 0.82, max(storedCoverage, visualCoverage));
     float contactWave = sin(
         _Time.y * (1.10 + surfaceEnergy * 0.75) +
         globalDistance * 2.15 +
@@ -2163,6 +2196,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         surfaceBreak,
         surfaceBreakWeight);
     coupledMask *= surfaceBreakMultiplier;
+    coupledPresenceMask *= surfaceBreakMultiplier;
     coupledSoftVisibility *= surfaceBreakMultiplier;
     coupledStrandSoftVisibility *= surfaceBreakMultiplier;
 
@@ -2175,6 +2209,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     coupledMask = max(
         coupledMask,
         storedMask * storedRetention);
+    coupledPresenceMask = max(
+        coupledPresenceMask,
+        storedMask * storedPresence * storedRetention);
     float retainedStoredSoft =
         storedSoftVisibility * storedRetention;
     coupledSoftVisibility = max(
@@ -2197,10 +2234,19 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         storedStrandResolution,
         storedOwnsRetainedStrand);
     coupledMask *= liquidFactor;
+    coupledPresenceMask *= liquidFactor;
     coupledSoftVisibility *= liquidFactor;
     coupledStrandSoftVisibility *= liquidFactor;
 
-    result.mask = saturate(coupledMask);
+    // Coverage-Only uses the complete resolved Coverage/Life shape. In
+    // Presence-Amplitude, every contributing state carries its exact decoded
+    // intrinsic Presence through identical, Presence-independent coupling
+    // weights. Uniform Presence therefore remains exactly proportional through
+    // the full resolved mask while the accepted soft Chipping geometry stays
+    // unscaled.
+    result.mask = saturate(presenceFootprintMode > 0.5
+        ? coupledPresenceMask
+        : coupledMask);
     result.softVisibility = saturate(coupledSoftVisibility);
     result.strandSoftVisibility = saturate(
         coupledStrandSoftVisibility);

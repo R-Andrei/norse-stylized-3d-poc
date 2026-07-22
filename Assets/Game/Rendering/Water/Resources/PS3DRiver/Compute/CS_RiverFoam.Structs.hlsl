@@ -11,16 +11,17 @@ struct FoamSourceEventData
     // except Shore Ribbon thickness cells and Object Arc/Semi-Arc wake-arm length;
     // z = inward reach or Arc/Semi-Arc normalized material-step duration; w = feather or point 2.x.
     float4 shore;
-    // x = source amount, y = remaining life, z = material pattern seed,
-    // w = source fill feature size.
+    // x = authored intrinsic Presence, y = authored normalized Remaining Life,
+    // z = material pattern seed, w = pattern feature size.
     float4 material;
     // x = source fill seed except Object Arc/Semi-Arc negative-half
     // first-segment split; y/z = breakup scale/strength except Object
     // Arc/Semi-Arc point 2.y / point 3.x; w = curvature or selected Semi-Arc side.
     float4 variation;
     // x/y = formation speed / moving-head trail except Object Arc/Semi-Arc
-    // point 3.y / point 4.x; z = source path length metres; w = source fill blend
-    // except Object Arc/Semi-Arc positive-half first-segment split.
+    // point 3.y / point 4.x; z = source path length metres; w = reserved legacy
+    // source-fill blend except Object Arc/Semi-Arc positive-half first-segment
+    // split. P13A does not use it to reinterpret Initial Presence as Coverage.
     float4 kinematics;
     // x = object centre lateral metres; y/z = object half extents except
     // Object Arc/Semi-Arc point 4.y / front split; w = Fleck contact offset or

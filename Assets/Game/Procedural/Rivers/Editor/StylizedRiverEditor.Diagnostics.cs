@@ -815,7 +815,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 runtime.TransportMetricsAvailable;
 
             DrawReadOnlyRow(
-                new GUIContent("Presence Accounting"),
+                new GUIContent("Material Amount Accounting"),
                 available
                     ? $"{runtime.TransportPresenceBefore:0.0000} → " +
                       $"{runtime.TransportPresenceAfter:0.0000} / out " +
@@ -838,17 +838,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawReadOnlyRow(
                 new GUIContent("Unaccounted Error"),
                 available
-                    ? $"P {runtime.TransportPresenceUnaccountedErrorRatio * 100f:0.000}% / " +
+                    ? $"Amount {runtime.TransportPresenceUnaccountedErrorRatio * 100f:0.000}% / " +
                       $"Life {runtime.TransportLifeUnaccountedErrorRatio * 100f:0.000}% / " +
                       $"Pattern {runtime.TransportPatternUnaccountedErrorRatio * 100f:0.000}%"
                     : "—");
             DrawReadOnlyRow(
                 new GUIContent("Capacity / Clamp Loss"),
                 available
-                    ? $"P {runtime.TransportPresenceClampLoss:0.000000} / " +
+                    ? $"Amount {runtime.TransportPresenceClampLoss:0.000000} / " +
                       $"Life {runtime.TransportLifeClampLoss:0.000000} / " +
                       $"Pattern {runtime.TransportPatternClampLoss:0.000000} " +
-                      $"({runtime.TransportPresenceClampLossRatio * 100f:0.000}% P)"
+                      $"({runtime.TransportPresenceClampLossRatio * 100f:0.000}% amount)"
                     : "—");
             string capacityAttribution = available
                 ? "unit " + FormatTransportLoss(
@@ -876,22 +876,24 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawReadOnlyRow(
                 new GUIContent(
                     "Capacity Attribution",
-                    "Area-weighted Presence loss from unit storage, " +
+                    "Area-weighted transported Material Amount loss from unit storage, " +
                     "fractional shoreline coverage, and obstacle exclusion."),
                 capacityAttribution);
             DrawReadOnlyRow(
                 new GUIContent(
-                    "Other Presence Loss",
+                    "Other Material Amount Loss",
                     "Area-weighted state-validity rejection, minimum-state " +
                     "cutoff, and the signed residual against total clamp loss."),
                 otherPresenceLoss);
             DrawReadOnlyRow(
                 new GUIContent(
                     "Capacity Peaks",
-                    "Maximum raw transported Presence and maximum excess " +
-                    "above the cell's boundary-and-obstacle fluid capacity."),
+                    "Maximum raw transported geometric Coverage and maximum " +
+                    "Coverage excess above the cell's boundary-and-obstacle " +
+                    "fluid capacity. Material Amount loss attribution below is " +
+                    "derived from that Coverage overflow and intrinsic Presence."),
                 available
-                    ? $"raw {runtime.TransportMaximumRawPresence:0.0000} / " +
+                    ? $"raw Coverage {runtime.TransportMaximumRawPresence:0.0000} / " +
                       $"local excess " +
                       $"{runtime.TransportMaximumLocalCapacityExcess:0.0000}"
                     : "—");

@@ -1,3 +1,69 @@
+## 2026-07-22 — GSU-M2.7C.5E.2.2 Inspector contract: generic discrete-feature edge handling
+
+Both current secondary surface-application slots expose the same controls under their existing application transition:
+
+```text
+Hierarchy > Ground > Inspector > Material
+> River-Coupled Ground Response — River Bank
+> Material Coverage > Application Transition
+> Discrete Feature Edge Clearance
+> Discrete Feature Return Fade
+```
+
+```text
+Hierarchy > Ground > Inspector > Material
+> River-Coupled Ground Response — Riverbed
+> Material Coverage > Application Transition
+> Discrete Feature Edge Clearance
+> Discrete Feature Return Fade
+```
+
+These values belong to the application slot, not to the reusable material asset. They affect only materials whose detail-library entry uses the feature-aware paired Palette Form source mode. Clearance `0` disables the visual suppression path while retaining the same samples and draw calls, providing a direct in-scene visual/GPU comparison. The default for both current slots is `0.50 m` clearance and `0.15 m` return fade.
+
+The existing Material Blend Distance/Softness controls continue blending the complete substrate into the resolved lower surface. The new controls remove discrete feature form/slope/cavity/finish before the application boundary; they do not change wetness, River geometry, support masks, or material selection.
+
+The proof and refresh actions remain:
+
+```text
+Tools > PS3D > Run Generated Mass Sparse Riverbed Assembly Proof
+Tools > PS3D > Install All Sparse Riverbed Surface Candidates
+```
+
+Installation requires a passing `GSU-M2.7C.5E.2.2`, algorithm-version-7 proof. It updates the canonical library, source PNGs, material profiles, and layer profiles in place, preserves GUIDs and user-authored profile/layer tuning, and creates no numbered copies during normal operation.
+
+No new debug view or Scene overlay is introduced.
+
+---
+
+## 2026-07-22 — GSU-M2.7C.5E.2.1 Inspector contract: application-owned Bank and Riverbed blending
+
+The authoritative editor baseline remains the user-provided `GeneratedGroundEditor(6).cs`. M2.7C.5E.2.1 replaces the rejected Riverbed-only control model with one shared application-transition drawer used by both current secondary surface slots.
+
+Bank controls are available at:
+
+```text
+Hierarchy > Ground > Inspector > Material > River-Coupled Ground Response — River Bank > Material Coverage > Application Transition
+```
+
+Riverbed controls are available at:
+
+```text
+Hierarchy > Ground > Inspector > Material > River-Coupled Ground Response — Riverbed > Material Coverage > Application Transition
+```
+
+Both expose:
+
+- `Material Blend Distance`: inward transition width in metres, `0–2`; zero preserves the unmodified application-region weight;
+- `Material Blend Softness`: linear-to-cubic transition shape, `0–1`.
+
+The shared help text states that the same application weight controls palette/form, normal, cavity, roughness/finish, smoothness, specular, and texture-form lighting. Bank blends from Primary Ground at the terrain handoff. Riverbed blends from the already-resolved Bank/Primary-Ground surface at exact Riverbed Support.
+
+These controls are available for both local `GeneratedGround` material overrides and shared style-variant material controls. They are disabled when the corresponding secondary surface layer is not selected. Existing Bank semantic controls and independent Shore/Riverbed wetness controls remain in their current sections and retain separate ownership.
+
+No new debug view, Scene overlay, installer action, proof action, or candidate asset is added. The algorithm-6 proof payload and idempotent installer from M2.7C.5E.2 remain unchanged.
+
+---
+
 ## 2026-07-22 — GSU-M2.7C.5E.2 Inspector and refresh contract
 
 The authoritative Ground editor baseline for this patch is the user-provided `GeneratedGroundEditor(6).cs`. Under the existing path:
