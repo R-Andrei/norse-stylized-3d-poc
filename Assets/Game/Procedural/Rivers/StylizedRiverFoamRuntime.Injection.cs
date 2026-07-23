@@ -324,23 +324,78 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            float contactStrokeDuration = Mathf.Max(
+                0.0001f,
+                sourceEvent.ObjectContactStrokeDuration > 0f
+                    ? sourceEvent.ObjectContactStrokeDuration
+                    : sourceEvent.ObjectBuildDuration);
+            if (sourceEvent.ObjectContactReinforcementOnly)
+            {
+                phaseOrSide = 1f;
+                progress = Mathf.Clamp01(elapsed / contactStrokeDuration);
+                return;
+            }
+
             int strokeCount = Mathf.Clamp(
                 sourceEvent.ObjectContactStrokeCount,
                 1,
                 3);
-            float strokeDuration = Mathf.Max(
+            float initialStrokeDuration = Mathf.Max(
                 0.0001f,
                 sourceEvent.ObjectBuildDuration);
-            float clampedElapsed = Mathf.Clamp(
-                elapsed,
-                0f,
-                strokeDuration * strokeCount);
-            int strokeIndex = Mathf.Min(
-                strokeCount - 1,
-                Mathf.FloorToInt(clampedElapsed / strokeDuration));
-            float strokeElapsed = clampedElapsed - strokeIndex * strokeDuration;
-            phaseOrSide = strokeIndex;
-            progress = Mathf.Clamp01(strokeElapsed / strokeDuration);
+            float totalDuration = initialStrokeDuration +
+                Mathf.Max(0, strokeCount - 1) * contactStrokeDuration;
+            float clampedElapsed = Mathf.Clamp(elapsed, 0f, totalDuration);
+            if (strokeCount <= 1 || clampedElapsed < initialStrokeDuration)
+            {
+                phaseOrSide = 0f;
+                progress = Mathf.Clamp01(
+                    clampedElapsed / initialStrokeDuration);
+                return;
+            }
+
+            float reinforcementElapsed = clampedElapsed - initialStrokeDuration;
+            int reinforcementIndex = Mathf.Min(
+                strokeCount - 2,
+                Mathf.FloorToInt(reinforcementElapsed / contactStrokeDuration));
+            float strokeElapsed = reinforcementElapsed -
+                reinforcementIndex * contactStrokeDuration;
+            phaseOrSide = reinforcementIndex + 1;
+            progress = Mathf.Clamp01(strokeElapsed / contactStrokeDuration);
+        }
+
+        private static float ResolveAutomaticObjectContactPhaseDuration(
+            AutomaticFoamSourceEvent sourceEvent,
+            float phaseCode)
+        {
+            if (!IsAutomaticObjectContactCycle(sourceEvent.Type) ||
+                phaseCode < 0.5f)
+            {
+                return Mathf.Max(0.0001f, sourceEvent.ObjectBuildDuration);
+            }
+
+            return Mathf.Max(
+                0.0001f,
+                sourceEvent.ObjectContactStrokeDuration > 0f
+                    ? sourceEvent.ObjectContactStrokeDuration
+                    : sourceEvent.ObjectBuildDuration);
+        }
+
+        private static float ResolveAutomaticObjectContactPhasePathLength(
+            AutomaticFoamSourceEvent sourceEvent,
+            float phaseCode)
+        {
+            if (!IsAutomaticObjectContactCycle(sourceEvent.Type) ||
+                phaseCode < 0.5f)
+            {
+                return Mathf.Max(0.001f, sourceEvent.RevealPathDistanceMetres);
+            }
+
+            return Mathf.Max(
+                0.001f,
+                sourceEvent.ObjectContactStrokePathLengthMetres > 0f
+                    ? sourceEvent.ObjectContactStrokePathLengthMetres
+                    : sourceEvent.RevealPathDistanceMetres);
         }
 
         private FoamSourceEventGpuData BuildAutomaticFoamSourceGpuData(
@@ -372,7 +427,9 @@ namespace ProgrammaticStylized3D.Rivers
                 out float previousPhaseCode,
                 out float previousProgress);
             float depositionPhaseDuration = objectContactCycle
-                ? sourceEvent.ObjectBuildDuration
+                ? ResolveAutomaticObjectContactPhaseDuration(
+                    sourceEvent,
+                    phaseCode)
                 : sourceEvent.Duration;
             float materialStepProgress = Mathf.Clamp01(
                 (1f / Mathf.Max(1f, ResolveUpdateRate())) /
@@ -470,7 +527,9 @@ namespace ProgrammaticStylized3D.Rivers
                     previousPhaseCode,
                     previousProgress,
                     previousElapsed > 0.000001f ? 1f : 0f,
-                    0f)
+                    objectContactCycle
+                        ? sourceEvent.ObjectContactStrokePathLengthMetres
+                        : 0f)
             };
         }
 

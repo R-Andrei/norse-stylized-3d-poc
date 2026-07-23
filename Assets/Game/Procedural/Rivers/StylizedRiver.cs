@@ -373,6 +373,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const int MinimumObjectContactStrokeCount = 1;
         private const int MaximumObjectContactStrokeCount = 3;
         private const int DefaultObjectContactStrokeCount = 2;
+        private const float MinimumObjectContactReinforcementIntervalSeconds = 1f;
+        private const float MaximumObjectContactReinforcementIntervalSeconds = 30f;
+        private const float DefaultObjectContactReinforcementIntervalSeconds = 6f;
         private const float DefaultFreeWaterFoamPacketGapMetres = 1.00f;
         private const float MinimumFoamMaximumLateralSpeedRatio = 0f;
         private const float MaximumFoamMaximumLateralSpeedRatio = 1f;
@@ -1209,12 +1212,22 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectFoamActivity = 0.35f;
 
-        [Tooltip("Minimum downstream clearance in metres required after any Object Arc, Semi-Arc, or Fleck finishes before the same object may emit another packet. Rearm also includes conservative clearance through the authored object-contact slowdown halo.")]
+        [Tooltip("Minimum downstream gap in metres between released Object packets from the same anchor. Full Arc/Semi-Arc rearm uses the previous wake-arm length plus this gap at normal Foam downstream speed. Contact-only reinforcement has its own interval and does not reset this packet clock.")]
         [Range(MinimumFoamPacketGapMetres, MaximumFoamPacketGapMetres)]
         [SerializeField] private float foamObjectContactMinimumPacketGapMetres =
             DefaultObjectContactPacketGapMetres;
 
-        [Tooltip("Finite number of strokes in each Object Arc or Semi-Arc burst. Stroke one emits the complete contact packet and finite wake arm or arms. Later strokes reinforce only the immediate object-contact profile. The emitter ends after the final stroke and cannot bypass the shared packet-clearance gate.")]
+        [Tooltip("Enables finite contact-only maintenance strokes after an Object Arc or Semi-Arc packet has completed. Reinforcement reuses the last successful contact geometry, emits no wake arms, and never changes full-packet eligibility.")]
+        [SerializeField] private bool foamObjectContactReinforcementEnabled = true;
+
+        [Tooltip("Seconds between finite contact-only maintenance strokes while the next full Object packet is still waiting for released-wake clearance. Each maintenance event is exactly one progressive contact-profile stroke and then ends.")]
+        [Range(
+            MinimumObjectContactReinforcementIntervalSeconds,
+            MaximumObjectContactReinforcementIntervalSeconds)]
+        [SerializeField] private float foamObjectContactReinforcementIntervalSeconds =
+            DefaultObjectContactReinforcementIntervalSeconds;
+
+        [Tooltip("Finite number of strokes in each initial Object Arc or Semi-Arc burst. Stroke one emits the complete contact packet and finite wake arm or arms. Later strokes reinforce only the immediate object-contact profile. Independent later maintenance uses one contact-only stroke per authored interval.")]
         [Range(MinimumObjectContactStrokeCount, MaximumObjectContactStrokeCount)]
         [SerializeField] private int foamObjectContactStrokeCount =
             DefaultObjectContactStrokeCount;
@@ -2540,6 +2553,13 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactMinimumPacketGapMetres,
                 MinimumFoamPacketGapMetres,
                 MaximumFoamPacketGapMetres);
+        public bool FoamObjectContactReinforcementEnabled =>
+            foamObjectContactReinforcementEnabled;
+        public float FoamObjectContactReinforcementIntervalSeconds =>
+            Mathf.Clamp(
+                foamObjectContactReinforcementIntervalSeconds,
+                MinimumObjectContactReinforcementIntervalSeconds,
+                MaximumObjectContactReinforcementIntervalSeconds);
         public int FoamObjectContactStrokeCount =>
             Mathf.Clamp(
                 foamObjectContactStrokeCount,
@@ -3255,6 +3275,10 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactStrokeCount,
                 MinimumObjectContactStrokeCount,
                 MaximumObjectContactStrokeCount);
+            foamObjectContactReinforcementIntervalSeconds = Mathf.Clamp(
+                foamObjectContactReinforcementIntervalSeconds,
+                MinimumObjectContactReinforcementIntervalSeconds,
+                MaximumObjectContactReinforcementIntervalSeconds);
             foamObjectFoamFormationSpeedMetresPerSecond = Mathf.Clamp(
                 foamObjectFoamFormationSpeedMetresPerSecond,
                 MinimumShoreFoamFormationSpeedMetresPerSecond,

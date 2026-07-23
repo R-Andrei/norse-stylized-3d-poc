@@ -155,7 +155,8 @@
 
             PS3D_StylizedSurfaceDetail ResolveGroundBankLayerDetail(
                 Varyings input,
-                float substrateWeight)
+                float substrateWeight,
+                float sameDrySurface)
             {
                 PS3D_StylizedSurfaceDetail result =
                     PS3D_ZeroStylizedSurfaceDetail();
@@ -198,22 +199,51 @@
                 // This branch depends only on material uniforms. The sampled B/A
                 // payload identifies the common centre; the returned value is an
                 // absolute final-composition weight, not a per-fragment detail lerp.
+                float bankWholeFeatureSettings =
+                    _GroundBankMaterialTransition.x +
+                    _GroundBankMaterialTransition.z +
+                    _GroundBankMaterialTransition.w;
+                float riverbedWholeFeatureSettings =
+                    _GroundRiverbedMaterialTransition.x +
+                    _GroundRiverbedMaterialTransition.z +
+                    _GroundRiverbedMaterialTransition.w;
+                float activeWholeFeatureSettings =
+                    bankWholeFeatureSettings +
+                    saturate(sameDrySurface) *
+                        riverbedWholeFeatureSettings;
                 [branch]
-                if ((_GroundBankMaterialTransition.x +
-                        _GroundBankMaterialTransition.z +
-                        _GroundBankMaterialTransition.w) > 0.0001 &&
+                if (activeWholeFeatureSettings > 0.0001 &&
                     _GroundBankLayerDetailC.z > 1.5)
                 {
-                    result.featureApplicationWeight =
-                        ResolveGroundWholeFeatureApplicationWeight(
-                            ResolveGroundRiverBankInwardDistance(input),
-                            substrateWeight,
-                            input.positionWS,
-                            result.featureCenterOffsetNormalized,
-                            result.featureMaximumSupportRadiusUv,
-                            _GroundBankLayerDetailA.z,
-                            _GroundBankMaterialTransition) *
-                        featureMask;
+                    [branch]
+                    if (sameDrySurface > 0.5)
+                    {
+                        result.featureApplicationWeight =
+                            ResolveGroundSharedBankRiverbedWholeFeatureApplicationWeight(
+                                ResolveGroundRiverBankInwardDistance(input),
+                                ResolveGroundRiverbedInwardDistance(input),
+                                substrateWeight,
+                                input.positionWS,
+                                result.featureCenterOffsetNormalized,
+                                result.featureMaximumSupportRadiusUv,
+                                _GroundBankLayerDetailA.z,
+                                _GroundBankMaterialTransition,
+                                _GroundRiverbedMaterialTransition) *
+                            featureMask;
+                    }
+                    else
+                    {
+                        result.featureApplicationWeight =
+                            ResolveGroundWholeFeatureApplicationWeight(
+                                ResolveGroundRiverBankInwardDistance(input),
+                                substrateWeight,
+                                input.positionWS,
+                                result.featureCenterOffsetNormalized,
+                                result.featureMaximumSupportRadiusUv,
+                                _GroundBankLayerDetailA.z,
+                                _GroundBankMaterialTransition) *
+                            featureMask;
+                    }
                 }
 
                 return result;
@@ -1110,7 +1140,8 @@
                 PS3D_StylizedSurfaceDetail bankLayerDetail =
                     ResolveGroundBankLayerDetail(
                         input,
-                        substrateWeights.y);
+                        substrateWeights.y,
+                        sameDrySurface);
                 PS3D_StylizedSurfaceDetail riverbedLayerDetail =
                     ResolveGroundRiverbedLayerDetail(
                         input,

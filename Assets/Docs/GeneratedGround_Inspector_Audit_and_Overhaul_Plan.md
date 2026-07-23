@@ -1,3 +1,30 @@
+## 2026-07-23 — Whole-feature Inspector state freeze
+
+The current Bank and Riverbed application controls remain in their existing compact `Application Transition > Whole Feature Handling` groups:
+
+```text
+Feature Safety Margin
+Whole Feature Return Fade
+```
+
+Their serialized fields, ranges, defaults, and ownership remain unchanged by this documentation freeze.
+
+Accepted Inspector/runtime relationship:
+
+- Bank controls affect Bank-owned rocks only;
+- Riverbed controls affect Riverbed-owned rocks only;
+- same-surface Bank/Riverbed detail reuse does not merge their feature-policy ownership.
+
+Known unresolved behavior:
+
+- Bank Feature Safety Margin = `0` and Bank Whole Feature Return Fade = `0` still produce no visible sparse Bank stones in the validated scene.
+
+Do not change labels, defaults, ranges, serialized names, or help text to rationalize this result. Zero remains authored as no additional safety margin and a hard return fade setting; the live Bank result requires a runtime audit.
+
+The separate cloud-shading workstream must not add duplicate whole-feature controls or repurpose these values for cloud response. No new Ground Inspector section or debug view is authorized by this freeze. When sparse-rock work resumes, use the existing controls while auditing the live Bank centre/application path.
+
+---
+
 ## 2026-07-22 — Whole-feature transition control semantics
 
 The existing serialized Bank and Riverbed feature-transition fields are retained for migration, but their Inspector presentation is corrected:

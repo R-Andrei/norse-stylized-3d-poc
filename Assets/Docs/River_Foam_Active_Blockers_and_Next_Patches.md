@@ -28,7 +28,9 @@
 
 `RG-METRIC-P13A — Authoritative Birth Material and Coverage-Separated Transport` and `RG-METRIC-P13A.1 — D3D11 Struct-Selection Compile Hotfix` are implemented and Unity-imported. P13A remains the current Coverage/Presence/Life baseline; P13A.1 removed the D3D11 struct-valued conditional without changing its calculations.
 
-`RG-METRIC-P13B — Packet-Rearmed Birth and Object Contact Retention` is implemented in source and awaiting Unity validation. It stops repeated automatic-source accumulation, restricts Object Arc/Semi-Arc refresh to the immediate contact profile, adds distance-derived per-slot rearming, reuses the existing obstacle-routing texture for a narrow contact slowdown halo, and removes automatic-source Breakup Strength authoring and hidden breakup/gap masks.
+`RG-METRIC-P13B` through `RG-METRIC-P13F` establish packet-rearmed automatic birth, one-shot Object packets, complete-vector contact retention, finite initial reinforcement, independent contact-maintenance cadence, a complete initial obstacle-contact ring, and recipe-complete later Arc/Semi-Arc contact strokes. The user reports that the final P13F result works as expected and is materially better than the former persistent-emitter implementation. Automatic spawning and Object spawning are accepted and frozen for the current milestone. Remaining River issues exist but are outside the active spawning scope.
+
+River Foam work is paused while a separate thread performs small shared River shader updates for Weather cloud shading. Those external edits are expected not to alter Foam behavior, but that expectation is unverified until the receiving River thread compares the post-Weather source against this frozen P13F/P13G baseline. Do not resume implementation from this plan until the external shader work is complete and current source is re-inventoried.
 
 ### P12g reviewed evidence
 
@@ -1628,3 +1630,337 @@ Execution remains bounded by the existing 32-event pool and source raster kernel
 ### Offline validation evidence
 
 `36/36 PASS`, including exact 13-file reconciliation; no added/deleted project paths; serialized-property and Inspector uniqueness; event-state/duration/phase ownership; exactly two contact-only reinforcement branches; persistent-emitter absence; 500,000 stroke phase/progress cases; 500,000 duration cases; 500,000 phase-boundary dispatch cases; 500,000 one-shot phase-reset cases; 500,000 per-stroke reveal-speed cases; C#/HLSL/preprocessor/Markdown structure; unchanged 23-kernel manifest; unchanged eight-`float4` source GPU ABI; byte-identical P13C velocity and P13A/P12t protected files; and byte-identical P12u reveal-speed resolver. Package reproduction is recorded in the external validation report after final archive generation.
+
+## RG-METRIC-P13E — Independent Object Contact Reinforcement Cadence
+
+**Status:** implementation complete; `48/48` offline source/package gates pass; Unity compilation, Play Mode cadence/shape acceptance, and profiling remain pending.
+
+### Objective
+
+Allow supported Object Arc/Semi-Arc contact material to be refreshed at an authored finite cadence without regenerating downstream wake arms or coupling full-packet frequency to the intentionally strong object-contact slowdown. Preserve P13D finite initial bursts, P13C full-vector slowdown, P13A material authority, P12u reveal speed, and P12t Layer E rendering.
+
+### Read-only reviewed evidence
+
+- `StylizedRiverFoamRuntime.BirthEvents.cs::AdvanceAutomaticObjectBirthSources` starts full Arc/Semi-Arc packets whenever the shared per-object `NextStartTime` expires and schedules Flecks from a separate activity accumulator. There is no independent contact-only maintenance scheduler.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::ResolveAutomaticObjectPacketClearanceSeconds` includes slowdown-halo clearance at `Object Contact Minimum Speed Factor`. With `0.02`, a `0.50 m` halo and `0.45 m/s` base Foam speed contribute approximately `55.6 s` before the authored packet gap, so stronger retention nearly disables all later object contact birth.
+- `CS_RiverFoam.compute::FoamEvaluateObjectContactArcSource` and `FoamEvaluateObjectContactSemiArcSource` already interpret `Header.y >= 0.5` as progressive contact-profile-only deposition. P13D already proves phase-boundary current-minus-previous ownership; no compute-shader edit is required.
+- `StylizedRiverFoamRuntime.Injection.cs::ResolveAutomaticSourceDepositionState` can emit a reinforcement-only event by fixing the existing phase lane to contact-only phase `1` while advancing one ordinary normalized stroke.
+- `AutomaticObjectSourceState` currently has one `NextStartTime` and remembers only the last event type. Independent maintenance requires separate full-packet and reinforcement clocks plus the last successful Arc/Semi-Arc recipe/seed so reinforcement exactly reuses the established contact geometry.
+- Full packet rearm should follow released wake clearance at normal Foam downstream speed, not clearance of contact material that is intentionally retained in the slowdown halo. The appropriate conservative distance is the completed packet's wake-arm length plus `Object Contact Minimum Packet Gap`.
+- The source set contains no `.git` metadata. `/mnt/data/p13e_base` is the immutable post-P13D comparison authority.
+
+### Approved project file scope
+
+**Modify exactly:**
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Assets/Docs/River_Foam_Stage6_Architecture.md`
+5. `Assets/Docs/River_Rendering_Roadmap.md`
+6. `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+9. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+10. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+11. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+12. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`
+13. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+14. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+15. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs`
+
+**Create/Delete/Move/Rename/Metadata:** none inside the Unity project. Patch archive, validation report, and checksum are generated outside the project.
+
+If evidence requires another project path, implementation stops and this scope is amended before that path is edited.
+
+### Authoritative contract
+
+1. Add `Object Contact Reinforcement Enabled`, default `true`.
+2. Add `Object Contact Reinforcement Interval (s)`, range `1–30 s`, default `6 s`.
+3. P13D full Arc/Semi-Arc packets remain finite: stroke zero emits complete contact plus wake geometry and optional later strokes reinforce contact only.
+4. After a full Arc/Semi-Arc burst completes, the object records both a full-packet next-eligible time and a reinforcement next-eligible time.
+5. A reinforcement event is exactly one progressive contact-only stroke. It reuses the most recent successful Arc/Semi-Arc recipe, side selection, deterministic seed, contact profile, Initial Presence, Initial Life, and Reveal Speed inputs. It emits zero wake-arm Coverage.
+6. Reinforcement never changes or resets the full-packet clock. A reinforcement is allowed only while the full packet remains in clearance; once the full-packet clock becomes eligible, reinforcement is blocked. Existing P13C Fleck fairness remains: a pending supplemental Fleck may take an eligible full-packet opportunity, but reinforcement cannot take it.
+7. Flecks remain behind the full-packet shared gate and cannot run concurrently with a full packet or reinforcement from the same object. Flecks do not reset reinforcement cadence, and a completed Fleck still yields the next eligible opportunity back to Arc/Semi-Arc when contact cycles are enabled.
+8. Full Arc/Semi-Arc rearm is calculated from `(wake-arm length + Object Contact Minimum Packet Gap) / normal Foam downstream speed`. It no longer includes slowdown halo reach or minimum contact speed.
+9. Reinforcement completion schedules the next reinforcement at `completion + authored interval`. Disabling reinforcement sets the reinforcement clock to infinity without altering full-packet cadence.
+10. No persistent emitter is restored. Each reinforcement is one finite event and dispatches only while its reveal progress advances.
+11. Existing `Object Contact Stroke Count` continues to control only the initial full burst. Reinforcement amount is intentionally fixed to one contact-only stroke per interval.
+12. No compute shader, GPU event record, texture, buffer, kernel, pass, draw call, shader sample, scene, prefab, material, layer, tag, or component changes.
+
+### Implementation sequence
+
+1. Add serialized reinforcement Enabled/Interval authoring, sanitized public properties, Inspector controls, tooltips, and read-only ownership text.
+2. Split per-object state into `NextPacketStartTime` and `NextReinforcementTime`; store last successful contact event type and deterministic seed.
+3. Add a CPU-only event flag identifying contact-only maintenance. Create reinforcement events through the existing Arc/Semi-Arc geometry builder with contact-path reveal distance, one stroke, and fixed contact-only phase.
+4. Attempt full contact cycles first, due reinforcements second, and Flecks third within the unchanged two-start-per-update budget. Preserve the existing pending-Fleck fairness inside full-cycle selection; packet eligibility still blocks reinforcement even when that eligible opportunity is yielded to a Fleck.
+5. On full packet completion, schedule released-wake clearance and the first reinforcement interval separately. On reinforcement completion, update only its next interval. On Fleck completion, update only full-packet clearance.
+6. Remove slowdown-halo/minimum-factor coupling from full-packet clearance authority and add a separate reinforcement-authority signature so changing cadence cannot trigger an unrelated full packet.
+7. Reconcile runtime counts, public status, Object packet Inspector status, P7 contract evidence, Reveal-Speed report wording, and all five canonical documents.
+8. Run exact-scope, serialized-property, scheduler-priority, event-phase, duration/reveal, rearm-independence, protected-file, resource/kernel/ABI, structure, stale-reference, and package-reproduction checks.
+
+### Invariants and non-goals
+
+- Preserve P13D initial finite stroke count and full first-stroke geometry.
+- Preserve P13C complete-vector slowdown and authored contact-halo dimensions byte-for-byte.
+- Preserve P13A Coverage/Presence/Life/Pattern packing, birth merge, Donor/TVD transport, and visibility contracts.
+- Preserve P12u reveal resolver arithmetic; reinforcement uses the same recipe inputs but resolves duration from contact-profile path length.
+- Preserve P12t Chipping, Strands, colour, opacity, and all Layer D/E code byte-for-byte.
+- Do not add Arc/Semi-Arc Activity. Full packet frequency remains distance-controlled; the new interval controls contact-only maintenance.
+- Do not allow reinforcement before an object has successfully emitted a full Arc/Semi-Arc packet.
+- Do not allow reinforcement to emit wake arms, overlap an active object event, or postpone/accelerate full packet eligibility.
+
+### Performance and risks
+
+- No full-field work or resource is added. Each enabled participating object may issue one finite contact-only source sweep per authored interval while its full packet remains in clearance.
+- Default cadence `6 s` is approximately `0.167` reinforcement starts per second per participating object before event-pool and per-update budgets. This is far below the removed persistent emitter's material-cadence writes.
+- Full packet rearm becomes more frequent than P13D under extreme slowdown because retained contact material no longer blocks released-wake cadence. Wake length plus packet gap remains the conservative released-packet spacing authority.
+- Reinforcement uses the existing 32-event pool and unchanged maximum two object starts per update. Busy scenes may defer, not multiply, due events.
+- **PERFORMANCE EXCEPTION — approved:** bounded contact-only maintenance is accepted because P13D's finite initial burst does not reliably maintain supported Layer C contact material. The lower-cost alternative is disabling reinforcement.
+
+### Acceptance criteria
+
+1. Reinforcement controls appear once under Object Foam with defaults `Enabled=true`, `Interval=6 s`.
+2. A full Arc/Semi-Arc burst remains byte-equivalent to P13D and ends completely.
+3. A due reinforcement starts only after a previous full contact packet, uses phase `1`, has one stroke, and emits contact profile only.
+4. Reinforcement emits no wake Coverage and never resets full-packet next eligibility.
+5. Full-packet eligibility blocks reinforcement; existing pending-Fleck fairness may consume that eligible opportunity. While the packet remains in clearance, reinforcement is attempted before Flecks. No same-object concurrency occurs.
+6. Full packet clearance uses normal downstream speed and wake length plus packet gap, with no dependency on slowdown falloff, halo reach, or minimum speed factor.
+7. Changing reinforcement controls does not reset the full-packet clock. Disabling reinforcement prevents new maintenance events.
+8. Runtime/Inspector diagnostics distinguish full Arc/Semi-Arc bursts from contact-only reinforcement.
+9. No compute/shader/resource/ABI change exists and protected P13C/P13A/P12 files remain byte-identical.
+10. Exact 15-file reconciliation and package reproduction pass; Unity compilation, Play Mode cadence review, and profiling remain explicitly pending.
+
+### Implementation record
+
+- Added serialized `Contact Reinforcement Enabled` and `Contact Reinforcement Interval (s)` controls under Object Foam, with defaults `true` and `6 s` and an explicit Inspector explanation that reinforcement occurs only while the next full packet remains in clearance.
+- Split per-object state into independent full-packet and reinforcement clocks and remembered the last successful Arc/Semi-Arc recipe/seed.
+- Added one CPU-only event classification flag. Reinforcement reuses the existing Arc/Semi-Arc event type, existing P13D contact-only phase, existing current-minus-previous deposition, and unchanged eight-`float4` GPU event ABI.
+- Full packet scheduling remains first, reinforcement second while packet clearance remains active, and Flecks third within the unchanged two-start-per-update budget. Same-object concurrency remains prohibited.
+- Full Arc/Semi-Arc packet clearance now uses released wake-arm length plus packet gap at normal downstream speed. Contact slowdown no longer suppresses future full-packet availability.
+- Reinforcement completion updates only the reinforcement clock. Full-packet eligibility remains byte-for-byte unaffected by maintenance completion.
+- Runtime status, Object packet Inspector status, P7 evidence, and Reveal-Speed reporting distinguish full bursts from contact-only reinforcement.
+- Exact project delta: `15` modified files, `0` added, `0` deleted. Protected compute, velocity, material simulation, and Layer E rendering files are byte-identical to post-P13D.
+- Offline validation: `48/48 PASS`, including `500,000` independent-clock cases, `500,000` P13D full-burst equivalence cases, `500,000` reinforcement clock-isolation cases, `200,000` clearance/slowdown-independence cases, `200,000` reinforcement phase/duration cases, exact scope/resource/ABI checks, and clean package reproduction over the immutable post-P13D baseline.
+
+
+
+## RG-METRIC-P13F — Full Initial Contact Ring and Recipe-Complete Reinforcement
+
+### Status
+
+**Source implementation complete / offline validation complete / Unity validation pending.** P13E is the immutable comparison baseline. Unity evidence shows the bounded scheduler and full-vector slowdown materially improve object Foam, but the first finite packet does not reliably establish contact around the complete obstacle and later front-only reinforcement cannot rebuild the desired Arc/Semi-Arc contact extent.
+
+### Read-only evidence
+
+- `CS_RiverFoam.compute::FoamEvaluateObjectContactArcSource` currently emits `frontShape + two wake arms` for phase `0`, then only `frontShape` for every phase `>= 1`.
+- `CS_RiverFoam.compute::FoamEvaluateObjectContactSemiArcSource` currently emits one selected front half plus one wake arm for phase `0`, then only that selected front half for every phase `>= 1`.
+- `_FoamObstacleExclusionRead` is already bound to the source-raster kernel. The existing separate object-contact-field build runs only for Flecks; invoking it throughout Arc/Semi-Arc Build would add repeated full-field dispatches. P13F therefore derives one-cell contact confidence and outward normal from the eight neighboring obstacle-exclusion samples inside the existing bounded source dispatch.
+- `StylizedRiverFoamRuntime.Injection.cs::ResolveAutomaticSourceDepositionState` and `CS_RiverFoam.compute::RasterizeFoamSourceEvent` already provide phase-aware current-minus-previous one-shot deposition. Phase changes reset one-shot permission; no persistent emitter is required.
+- P13D/P13E currently reuse one `ObjectBuildDuration` for the initial full packet and every shorter contact-only stroke. That does not preserve authored metres-per-second Reveal Speed once P13F makes the initial ring path and later Arc/Semi-Arc contact paths materially different.
+- The eight-`float4` GPU source-event record has one unused lane: `Deposit.w`. P13F may carry the later contact-stroke path length in that lane while preserving record size and every existing buffer/resource binding.
+- `StylizedRiverFoamRuntime.P7Diagnostics.cs` and `StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs` explicitly assume one per-stroke duration and front-only reinforcement; both are direct consumers and must be updated.
+- The supplied source contains no `.git` metadata. `/mnt/data/p13f_work` reconstructed from `Assets-Code-Archive(10).zip` plus P13A through P13E is the post-P13E comparison authority.
+
+### Objective
+
+Establish complete supported contact material around an obstacle with the first finite stroke, then reinforce the complete authored recipe contact geometry without regenerating wake arms:
+
+- Arc and Semi-Arc first stroke: full obstacle-contact ring, followed by the recipe's existing one-time wake arm geometry.
+- Arc later initial strokes and independent maintenance strokes: complete Arc contact profile, no wake arms.
+- Semi-Arc later initial strokes and independent maintenance strokes: selected Semi-Arc half-profile, no wake arm.
+
+### Approved project scope
+
+**Modify:**
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Assets/Docs/River_Foam_Stage6_Architecture.md`
+5. `Assets/Docs/River_Rendering_Roadmap.md`
+6. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+7. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+8. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+9. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+10. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+11. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs`
+12. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+13. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl`
+
+**Create/Delete/Move/Rename/Metadata:** none inside the Unity project. Patch archive, validation report, and checksum are generated outside the project.
+
+If evidence requires another project path, implementation stops and this scope is amended before that path is edited.
+
+### Authoritative geometry contract
+
+1. Phase/stroke `0` for both Arc and Semi-Arc derives a one-cell all-side contact ring directly from the existing obstacle-exclusion texture inside the event's bounded source dispatch.
+2. The initial ring is progressively revealed from the upstream face toward the rear on both sides using the locally resolved outward normal. It is not a global amplitude fade and each contact cell receives one one-shot birth opportunity.
+3. After the ring completes, the existing recipe wake geometry is emitted once: two existing finite arms for Arc, one selected finite arm for Semi-Arc. Wake geometry is never emitted by phase/stroke `>= 1` or by independent reinforcement events.
+4. Arc phase/stroke `>= 1` uses the complete existing five-point Arc contact profile (`point0 -> point4`).
+5. Semi-Arc phase/stroke `>= 1` uses only its deterministic selected half-profile (`point0 -> point2` or `point2 -> point4`).
+6. The full ring uses contact-field confidence only; front-side relevance must not suppress side or rear cells. A conservative event-local bounds gate prevents contact cells belonging to a nearby obstacle from being admitted.
+7. No Layer E shape, Chipping, Strand, colour, opacity, visibility, or Presence Footprint code changes.
+
+### Reveal-speed and event contract
+
+1. One authored Base Reveal Speed and recipe multiplier remain authoritative.
+2. A full packet resolves an initial-stroke duration from `full-ring proxy length + one-time wake traversal length`.
+3. Later Arc/Semi-Arc contact strokes resolve a separate duration from their actual contact-profile path length at the same requested speed and deterministic jitter.
+4. Full event duration is `initial duration + (Stroke Count - 1) × contact-stroke duration`.
+5. Independent P13E maintenance events contain exactly one contact stroke and use only the contact-stroke duration.
+6. `ObjectBuildDuration` remains the initial-stroke duration; add CPU-only contact-stroke duration/path evidence. Pack the contact-stroke path length into the previously reserved `Deposit.w` lane and update the shared struct contract comment; do not change the eight-`float4` GPU ABI.
+7. Material-step reveal feather uses the active phase duration, not always the initial duration.
+
+### Implementation sequence
+
+1. Add explicit initial/contact path lengths and separate durations to CPU event creation and state.
+2. Update phase/progress resolution and active-phase material-step progress while preserving current-minus-previous phase reset.
+3. Pack contact-stroke path length into `Deposit.w` without changing GPU record size.
+4. Add bounded local obstacle-neighbour ring evaluation and event-local ownership gating to Arc/Semi-Arc phase `0`; sequence the one-time wake after the ring.
+5. Keep Arc later phases on the complete front profile and Semi-Arc later phases on the selected half-profile.
+6. Update Inspector ownership text and Reveal-Speed/P7 diagnostics for distinct initial/contact durations and the new geometry contract.
+7. Update all five canonical documents.
+8. Run exact-scope, C#/HLSL structure, signature/caller, GPU ABI, phase/duration, ring bounds, wake-one-shot, Arc/Semi-Arc distinction, protected-file, kernel/resource, stale-text, and package-reproduction checks.
+
+### Invariants and non-goals
+
+- Preserve P13E scheduler priority, independent reinforcement interval, full-packet clearance, same-object concurrency prevention, and CPU-only reinforcement flag.
+- Preserve P13C full-vector slowdown and obstacle-field generation byte-for-byte.
+- Preserve P13A packed material, merge, Donor/TVD transport, and visibility implementation.
+- Preserve P12u requested-speed resolver arithmetic; only path selection and phase duration ownership change.
+- Preserve P12t/P13A Layer E implementation byte-for-byte.
+- Do not add new authoring controls. Existing Stroke Count and Reinforcement Interval remain the amount/cadence authorities.
+- Do not broaden the contact ring beyond the existing one-cell obstacle-contact field.
+- Do not restore Hold, Release, Rest, material-cadence refresh, or repeated wake emission.
+
+### Performance and risks
+
+- No new resource, kernel, dispatch, render-shader sample, pass, or draw call. Arc/Semi-Arc phase `0` performs eight obstacle-neighbour reads only inside the existing bounded source-raster dispatch; no full-field contact build is added.
+- Phase `0` may evaluate more contact cells than the former front profile, but only during one finite initial stroke. Later strokes remain bounded contact profiles.
+- The ring progress coordinate uses dot products and saturate arithmetic; no trigonometric function is added.
+- Event-local bounds must include the obstacle rear while excluding nearby contact rings. Incorrect bounds are the highest visual risk.
+- **PERFORMANCE EXCEPTION — approved:** one finite full-ring source sweep per complete object packet is accepted to establish supported contact material. The lower-cost fallback is the P13E front-only first stroke.
+
+### Acceptance criteria
+
+1. In `Automatic Birth Sources`, the first Arc and Semi-Arc stroke visibly traverses a complete narrow ring around the obstacle before/with its one-time wake arm geometry.
+2. Arc stroke `2/3` and periodic reinforcement traverse the complete Arc contact profile and emit no wake arms.
+3. Semi-Arc stroke `2/3` and periodic reinforcement traverse only the selected Semi-Arc half-profile and emit no wake arm.
+4. No source geometry remains after each finite stroke/event completes.
+5. Requested Reveal Speed is preserved independently for the longer initial stroke and shorter contact strokes, except explicit material-cadence limitation.
+6. No nearby obstacle contact ring is admitted by another object's event.
+7. P13E scheduling and P13C slowdown remain unchanged.
+8. No new runtime resource/ABI size, kernel, pass, draw call, scene edit, or Layer E change.
+9. Exact 13-file reconciliation and package reproduction pass; Unity compilation and Play Mode acceptance remain explicitly pending.
+
+### P13F implementation record
+
+- Exact project delta: `13` modified files, `0` added, `0` deleted.
+- Phase zero derives a one-cell all-side ring from eight local obstacle-exclusion neighbour reads inside the existing bounded source dispatch, then emits the existing finite recipe wake geometry once.
+- Later Arc strokes and periodic Arc reinforcement use the complete five-point contact profile. Later Semi-Arc strokes and periodic Semi-Arc reinforcement use the deterministic selected half-profile. Neither later route emits a wake arm.
+- Initial and later strokes resolve separate durations from separate path lengths at one requested Reveal Speed and deterministic jitter. Full burst duration is `initialDuration + (strokeCount - 1) × contactDuration`.
+- The existing eight-`float4` GPU source-event ABI remains unchanged; `Deposit.w` now carries contact-stroke path length.
+- P13E scheduling, P13C slowdown, P13A material/transport/visibility, P12u resolver arithmetic, and Layer E rendering remain protected.
+- Offline source validation: `63/63 PASS`, including `500,000` reveal-speed cases, `500,000` unequal-phase cases, `500,000` ring-coordinate cases, exact scope/ABI/kernel/resource checks, and protected-file byte comparisons.
+- Unity compilation, D3D11 shader import, complete-ring visual acceptance, nearby-obstacle isolation, and profiler evidence remain pending.
+
+## RG-METRIC-P13G — Object Spawning Acceptance Freeze and External Shader-Integration Pause
+
+**Status: documentation-only implementation complete / user acceptance recorded / runtime source frozen / external shader integration pending.**
+
+### Objective
+
+Record the user's Unity acceptance of the complete P13B–P13F automatic-spawning and Object-spawning result, close the spawning work for the current milestone, and define the safe pause/resume boundary while another thread performs Weather cloud-shading integration in shared River shader files.
+
+### Expected affected files
+
+Modify:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md
+Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Docs/River_Rendering_Roadmap.md
+```
+
+Create/Delete/Move/Metadata: none.
+
+### Reviewed evidence
+
+- User Unity result after P13F: the implementation "works as expected" and gives a "MUCH better result than before."
+- User scope decision: spawning generally, and Object spawning specifically, may be marked done for now.
+- P13F final contract: every full Arc/Semi-Arc packet starts with a complete narrow obstacle-contact ring; Arc later strokes reinforce the complete Arc contact profile; Semi-Arc later strokes reinforce the selected half-profile; wake geometry remains first-stroke-only.
+- P13E scheduler contract: independent finite contact-only reinforcement cadence is separate from complete-packet spacing and never emits wake arms.
+- P13C retention contract: object-contact slowdown scales the complete routed velocity vector and uses the existing obstacle-routing resource.
+- P13A material contract, P12u reveal-speed resolver, and P12t Layer E Chipping remain protected.
+- P13F offline report: `63/63 PASS`, three `500,000`-case numerical suites, exact 13-file package reproduction, unchanged compute-kernel/resource manifests, and no new runtime resource or rendering pass.
+
+### Accepted frozen spawning contract
+
+1. Shore and Free-Water automatic sources are finite packet emitters with stable slot participation and distance-derived rearm spacing; they do not continuously repaint completed paths.
+2. Object Arc, Semi-Arc, and Fleck sources share bounded per-object ownership. No Hold/Release/Rest material-cadence emitter exists.
+3. A complete Arc/Semi-Arc packet is finite. Its first stroke establishes a complete narrow ring around the actual obstacle boundary and emits its recipe wake once.
+4. Later strokes and independent maintenance events are contact-only. Arc uses the complete Arc contact profile; Semi-Arc uses the deterministic selected half-profile. No later stroke regenerates a wake arm.
+5. Contact maintenance is an authored finite interval, not an every-material-update persistent emitter.
+6. Object-contact slowdown applies to the complete routed velocity vector. Topology support and lifecycle remain the material-persistence authorities.
+7. Initial Presence, Initial Life, Coverage, Donor/TVD transport, visibility policy, Reveal Speed, Chipping, and Strands retain their current accepted ownership. This freeze does not claim that all remaining River Foam visibility or lifetime issues are solved.
+
+### Pause and external-edit boundary
+
+A separate thread is authorized to make small Weather cloud-shading changes in shared River shader files. Those changes are outside P13G and outside the frozen spawning implementation. The River Foam thread must assume source drift after that work.
+
+Before resuming River Foam work:
+
+1. Obtain the newest user-supplied archive or exact changed files after Weather integration. Supplied files remain authoritative; do not clone or replace them from Git.
+2. Read `Assets/AGENTS.md` and re-inventory the five canonical River Foam documents plus every externally changed River shader/include.
+3. Diff the new source against the post-P13F/P13G baseline and classify each external change as cloud-shading-only or Foam-affecting.
+4. Verify that source-event scheduling, Layer C packing/transport/lifecycle, obstacle velocity, and Layer E Foam functions are unchanged unless the user explicitly approved otherwise.
+5. Run Unity compilation and a focused spawning regression before selecting the next River issue.
+
+### Non-goals
+
+- No implementation, shader, scene, prefab, material, tuning, serialization, resource, kernel, pass, or draw-call change.
+- No performance tuning or profiler closure.
+- No reopening of P12 Chipping, P12u Reveal Speed, P13A material authority, or P13B–P13F spawning architecture.
+- No assertion that unrelated pending River issues are solved.
+
+### Performance
+
+P13G is documentation-only. Active-gameplay runtime compute, dirty-triggered runtime work, CPU/GPU memory, and build/runtime storage are unchanged. The only storage delta is the small Markdown increase in the five canonical documents. No `PERFORMANCE EXCEPTION` applies.
+
+### Acceptance and validation
+
+- User acceptance of P13F spawning behavior: recorded.
+- P13B–P13F spawning scope: frozen for the current milestone.
+- Exact documentation scope: five modified Markdown files; no project implementation files.
+- Documentation validation: `19/19 PASS`, covering exact scope, zero added/deleted files, unchanged 323-file inventory, P13G presence in all five documents, Markdown fence balance, acceptance/freeze/pause wording, and no runtime-file delta.
+- Unity validation is not required for the P13G document patch because it changes no runtime or serialized project data. Unity compilation and runtime spawning regression are required only after the external Weather shader integration is complete.
+
+### P13G implementation record
+
+Actually affected files:
+
+Modify:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md
+Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Docs/River_Rendering_Roadmap.md
+```
+
+Create/Delete/Move/Metadata: none.
+
+Expected-versus-actual discrepancy: none.
+
+Post-change consistency result:
+
+- Exact project delta: five modified Markdown files, zero added, deleted, moved, renamed, metadata, serialized, shader, or runtime files.
+- All five canonical documents record the same acceptance, freeze, and external Weather-shader pause boundary.
+- Markdown fence balance passes in every modified document.
+- The 323-file Unity project inventory is unchanged.
+- Runtime and performance validation are not applicable to P13G because it contains no implementation or serialized-data changes.
+

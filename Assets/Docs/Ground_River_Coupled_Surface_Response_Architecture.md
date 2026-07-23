@@ -1,3 +1,92 @@
+## 2026-07-23 — Frozen river-surface whole-rock baseline before cloud shading
+
+This section freezes the accepted `GSU-M2.7C.5E.2.4A.2` through `GSU-M2.7C.5E.2.4B.4.1` river-surface contracts before a separate Ground/cloud-shading workstream changes shared shader code.
+
+### Accepted baseline
+
+- Bank and Riverbed transition directly through the normalized `2.4A.2` handoff. Primary Ground must not appear as an intermediate strip.
+- Sparse-rock ownership uses the algorithm-10 non-ID centre-anchor payload.
+- Emitted rock evidence is reconstructed from slope, cavity, combined/substrate form difference, and roughness difference.
+- Final dry response is decomposed into fragment-local substrate response plus a centre-evaluated whole-rock response delta.
+- Equivalent Bank/Riverbed materials may share detail sampling, but the reconstructed rock centre selects independent Bank or Riverbed feature policy.
+- The passing proof reports zero hard partial rocks, zero removed residual, zero fade-inconsistent rocks, zero anchor failures, zero ungated emitted response, zero owner inconsistency, and zero policy leakage in either direction.
+- User scene validation confirms Bank controls no longer affect Riverbed-owned rocks.
+
+### Frozen known limitation
+
+Bank-owned sparse rocks are absent in the live scene even when Bank Feature Safety Margin and Bank Whole Feature Return Fade are both `0`. This is not accepted as intended behavior. The cause is unresolved and no architecture statement in this document should infer one.
+
+Future diagnosis must trace the live centre-evaluated Bank path from decoded anchor through Bank inward distance, Bank application weight, required clearance, support-radius subtraction, owner-selected settings, and final response-delta weight. Proof success does not establish that the live Bank corridor fields produce a nonzero feature weight.
+
+### Cloud-shading compatibility boundary
+
+Cloud-related Ground shading may modulate resolved lighting, shadowing, or illumination response. It must not silently modify:
+
+```text
+Primary/Bank/Riverbed substrate weights
+algorithm-10 anchor decoding
+feature evidence
+support-radius transport
+centre ownership
+owner-selected transition settings
+whole-rock final-response weight
+Bank/Riverbed policy isolation
+```
+
+Cloud shading must not be used as a surface-application mask and must not reintroduce Primary Ground between Bank and Riverbed. Any change to shared Ground shader/includes requires a cross-subsystem audit against this frozen baseline.
+
+Before whole-rock work resumes, compare the current post-cloud-shading shader/includes with the `2.4B.4.1` baseline and record every relevant difference. Preserve the current payload and proof contracts unless a new patch explicitly supersedes them.
+
+---
+
+## 2026-07-23 — Independent Bank/Riverbed whole-feature ownership
+
+Equivalent Bank and Riverbed dry surfaces continue to share one detail sample and one final dry response. Sampling reuse does not transfer feature-policy ownership.
+
+### Centre ownership
+
+The B/A anchor reconstructs the common rock centre. The Riverbed inward-distance field is extrapolated to that centre through the existing guarded world-XZ gradient solver.
+
+```text
+Riverbed owner = Riverbed material enabled
+                 and centre Riverbed inward distance
+                     >= max(0.0001 m, support radius × 0.02)
+Bank owner     = otherwise
+```
+
+The classifier remains centre-based. The two-percent support inset is a numerical guard larger than the accepted algorithm-10 centre-reconstruction error ratio; it prevents mixed ownership from quantized centre offsets while shifting the semantic boundary by only a small fraction of one rock radius. Interior Riverbed rocks use only Riverbed feature settings.
+
+### Independent policy selection
+
+For an equivalent shared dry surface, the feature response still uses the centre-evaluated shared dry application weight. Only the owner supplies the transition policy:
+
+```text
+Bank-owned rock:
+    required clearance = Bank Material Blend Distance
+                         + Bank Feature Safety Margin
+    fade = Bank Whole Feature Return Fade
+
+Riverbed-owned rock:
+    required clearance = Riverbed Material Blend Distance
+                         + Riverbed Feature Safety Margin
+    fade = Riverbed Whole Feature Return Fade
+```
+
+Changing the non-owner settings must produce exactly zero change in the rock weight. The selected policy controls the existing full-minus-substrate discrete-rock delta once; substrate composition and the normalized 2.4A.2 Bank/Riverbed handoff are unchanged.
+
+Distinct Bank and Riverbed materials retain their existing separate samplers and policy evaluators. The ownership selector is used only by the equivalent shared-surface Bank/shared slot.
+
+### Proof and cost
+
+Algorithm 10 retains all centre-anchor and final-response boundary-sweep gates and adds two hard isolation counters:
+
+- Bank settings affecting Riverbed-owned rocks;
+- Riverbed settings affecting Bank-owned rocks.
+
+Owner classification must also remain consistent across every emitted pixel of each tested rock. All three counters must be zero for every candidate. No payload byte, texture sample, draw call, mesh stream, CBUFFER property, serialized control, installer path, or corridor channel changes. The shared-surface path adds one Riverbed inward-distance centre reconstruction and scalar owner-policy selection inside the existing whole-feature evaluation.
+
+---
+
 ## 2026-07-23 — Whole-rock final-response composition
 
 The algorithm-10 centre anchor remains the ownership contract. Whole-rock handling now occurs at final dry-response composition rather than by mutating sampled detail before ordinary layer blending.

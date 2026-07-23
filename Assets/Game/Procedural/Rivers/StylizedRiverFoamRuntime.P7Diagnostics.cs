@@ -421,6 +421,17 @@ namespace ProgrammaticStylized3D.Rivers
                 BuildAutomaticFoamSourceGpuData(arc, 0.80f, descriptor);
             FoamSourceEventGpuData arcRepeatedReinforcement =
                 BuildAutomaticFoamSourceGpuData(arc, 0.90f, descriptor);
+            AutomaticFoamSourceEvent contactMaintenance = arc;
+            contactMaintenance.ObjectContactReinforcementOnly = true;
+            contactMaintenance.ObjectContactStrokeCount = 1;
+            contactMaintenance.Duration =
+                contactMaintenance.ObjectContactStrokeDuration;
+            contactMaintenance.Elapsed = 0.20f;
+            FoamSourceEventGpuData contactMaintenanceBuild =
+                BuildAutomaticFoamSourceGpuData(
+                    contactMaintenance,
+                    0.10f,
+                    descriptor);
 
             bool shoreBuildAdvances =
                 shoreBuild.Header.z > shoreBuild.Deposit.y;
@@ -445,8 +456,19 @@ namespace ProgrammaticStylized3D.Rivers
                 arcRepeatedReinforcement.Deposit.y);
             bool finiteBurstDuration = Mathf.Approximately(
                 arc.Duration,
-                arc.ObjectBuildDuration * arc.ObjectContactStrokeCount) &&
+                arc.ObjectBuildDuration +
+                (arc.ObjectContactStrokeCount - 1) *
+                arc.ObjectContactStrokeDuration) &&
                 arc.ObjectContactStrokeCount == 2;
+            bool contactMaintenancePhase =
+                contactMaintenanceBuild.Header.y == 1f &&
+                contactMaintenanceBuild.Deposit.x == 1f &&
+                contactMaintenanceBuild.Header.z >
+                    contactMaintenanceBuild.Deposit.y &&
+                Mathf.Approximately(
+                    contactMaintenance.Duration,
+                    contactMaintenance.ObjectContactStrokeDuration) &&
+                contactMaintenanceBuild.Deposit.w > 0f;
 
             string projectRoot = Path.GetFullPath(
                 Path.Combine(Application.dataPath, ".."));
@@ -485,12 +507,18 @@ namespace ProgrammaticStylized3D.Rivers
                 injectionSource.IndexOf(
                     "bool depositionPhaseChanged",
                     StringComparison.Ordinal) >= 0;
-            bool contactOnlyReinforcement =
+            bool recipeCompleteReinforcement =
                 CountP7TextOccurrences(
                     computeSource,
                     "return saturate(frontShape * reinforcementPhase);") == 2 &&
                 computeSource.IndexOf(
-                    "if (sourceEvent.header.y >= 0.5)",
+                    "FoamResolveFullObjectContactRing(",
+                    StringComparison.Ordinal) >= 0 &&
+                computeSource.IndexOf(
+                    "ringShape * ringPhase",
+                    StringComparison.Ordinal) >= 0 &&
+                computeSource.IndexOf(
+                    "sourceEvent.deposit.w",
                     StringComparison.Ordinal) >= 0;
             bool persistentBypassRemoved =
                 computeSource.IndexOf(
@@ -510,10 +538,19 @@ namespace ProgrammaticStylized3D.Rivers
                     "sourceEvent.ObjectContactStrokeCount",
                     StringComparison.Ordinal) >= 0 &&
                 injectionSource.IndexOf(
-                    "strokeElapsed / strokeDuration",
+                    "sourceEvent.ObjectContactReinforcementOnly",
                     StringComparison.Ordinal) >= 0 &&
                 injectionSource.IndexOf(
-                    "depositionPhaseDuration = objectContactCycle",
+                    "sourceEvent.ObjectContactStrokeDuration",
+                    StringComparison.Ordinal) >= 0 &&
+                injectionSource.IndexOf(
+                    "reinforcementElapsed / contactStrokeDuration",
+                    StringComparison.Ordinal) >= 0 &&
+                injectionSource.IndexOf(
+                    "ResolveAutomaticObjectContactPhaseDuration",
+                    StringComparison.Ordinal) >= 0 &&
+                injectionSource.IndexOf(
+                    "ObjectContactStrokePathLengthMetres",
                     StringComparison.Ordinal) >= 0;
             bool absoluteTargetPreserved =
                 computeSource.IndexOf(
@@ -533,8 +570,9 @@ namespace ProgrammaticStylized3D.Rivers
                 repeatedNonpersistentInteriorZero && firstStrokeAdvances &&
                 phaseBoundaryResets && reinforcementAdvances &&
                 repeatedReinforcementInteriorZero && finiteBurstDuration &&
+                contactMaintenancePhase &&
                 universalDifferenceGate && phaseResetContract &&
-                contactOnlyReinforcement && persistentBypassRemoved &&
+                recipeCompleteReinforcement && persistentBypassRemoved &&
                 finiteStrokeResolver && absoluteTargetPreserved &&
                 finiteOneShotContract;
             report.AppendLine(
@@ -550,8 +588,8 @@ namespace ProgrammaticStylized3D.Rivers
                 $"{finiteBurstDuration}");
             report.AppendLine(
                 $"Universal difference gate: {universalDifferenceGate}; phase " +
-                $"reset contract: {phaseResetContract}; contact-only " +
-                $"reinforcement: {contactOnlyReinforcement}");
+                $"reset contract: {phaseResetContract}; recipe-complete " +
+                $"reinforcement: {recipeCompleteReinforcement}");
             report.AppendLine(
                 $"Persistent bypass removed: {persistentBypassRemoved}; finite " +
                 $"stroke resolver: {finiteStrokeResolver}; absolute target: " +
@@ -744,15 +782,20 @@ namespace ProgrammaticStylized3D.Rivers
                 ObjectCentreGlobalDistance = centreGlobal,
                 Duration = type == AutomaticFoamSourceEventType.ObjectContactArc ||
                     type == AutomaticFoamSourceEventType.ObjectContactSemiArc
-                        ? 1.4f
+                        ? 1.1f
                         : 0.7f,
                 Elapsed = 0.65f,
                 ObjectBuildDuration = 0.7f,
+                ObjectContactStrokeDuration = 0.4f,
+                ObjectContactStrokePathLengthMetres = 1.2f,
+                ObjectContactStrokeRawRevealDurationSeconds = 0.35f,
+                ObjectContactStrokeRevealCadenceLimited = false,
                 ObjectContactStrokeCount =
                     type == AutomaticFoamSourceEventType.ObjectContactArc ||
                     type == AutomaticFoamSourceEventType.ObjectContactSemiArc
                         ? 2
                         : 1,
+                ObjectContactReinforcementOnly = false,
                 FormationSpeedMetresPerSecond = 0.55f,
                 HeadTrailMetres = 0.45f,
                 ShoreInsetMetres = 0.05f,

@@ -488,10 +488,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawReadOnlyRow(
                 new GUIContent(
                     "Object Source Packets",
-                    "Per-object one-shot source ownership. Arc/Semi-Arc exist only while Build advances, Flecks are finite packets, and all recipes wait behind one shared packet-clearance gate after completion."),
-                $"{runtime.AutomaticObjectContactBuildCount} Arc/Semi-Arc building | " +
-                $"{runtime.AutomaticObjectContactFleckCount} Fleck building | " +
-                $"{runtime.AutomaticObjectWaitingClearanceCount} waiting for clearance");
+                    "Per-object finite source ownership. Full Arc/Semi-Arc bursts are released-packet spaced, contact-only reinforcement uses its independent interval, Flecks remain finite, and no two source events can own the same object concurrently."),
+                $"{runtime.AutomaticObjectContactBuildCount} full Arc/Semi-Arc | " +
+                $"{runtime.AutomaticObjectContactReinforcementCount} reinforcement | " +
+                $"{runtime.AutomaticObjectContactFleckCount} Fleck | " +
+                $"{runtime.AutomaticObjectWaitingClearanceCount} waiting for packet clearance");
         }
 
         private int DrawDebugViewSelector(

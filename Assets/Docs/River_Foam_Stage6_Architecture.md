@@ -4461,3 +4461,105 @@ Layer boundaries remain:
 - Layers D/E do not create the observed contact holes and are unchanged by P13D.
 
 P13D adds no texture, buffer, event GPU lane, kernel, pass, draw call, or shader sample. Its bounded extra source-raster work is limited to at most two contact-only sweeps per Arc/Semi-Arc event. `36/36` offline validation passes; Unity compilation, Play Mode acceptance, and profiling remain pending.
+
+## RG-METRIC-P13E architecture addendum — released-packet cadence versus contact maintenance
+
+Object-contact Foam now owns two independent clocks because released wake spacing and retention of supported contact material are different responsibilities.
+
+```text
+registered object anchor
+    -> one shared same-object active owner
+
+full Arc/Semi-Arc packet
+    -> P13D finite initial burst
+    -> remembers successful recipe + deterministic seed
+    -> schedules released-packet clearance at normal downstream speed
+
+contact-only reinforcement
+    -> one finite progressive stroke
+    -> reuses remembered contact geometry
+    -> writes no wake arms
+    -> schedules only its own next interval
+```
+
+The scheduler attempts full packets first, then due reinforcement while the full packet still waits for clearance, then Flecks. A due full packet blocks reinforcement; P13C Fleck fairness remains within that full-packet opportunity. No two event types may own the same object concurrently.
+
+Full packet clearance is intentionally independent of the contact slowdown halo. The halo is designed to retain contact material, so waiting for that material to leave would couple stronger retention to lower source availability. Released wake-arm length plus the authored packet gap remains the spacing authority for complete packets.
+
+Reinforcement is not a persistent emitter. Each event enters the unchanged 32-slot pool, progresses through one contact-profile reveal, writes only current-minus-previous deposition, completes, and releases its slot. P13A Max + Refresh birth merging may restore lost contact Coverage/Life up to authored values but cannot add beyond those values. P13C complete-vector slowdown and topology support then own persistence.
+
+The CPU event receives one private classification bit; the eight-`float4` GPU ABI remains unchanged. Existing Arc/Semi-Arc phase `1` already means contact-profile-only deposition, so no compute-shader or resource change is required.
+
+## RG-METRIC-P13F architecture addendum — complete contact establishment
+
+P13F keeps Object Foam in Layer C but separates the geometry and duration of the initial packet stroke from later contact maintenance.
+
+```text
+Layer C full object packet
+    phase 0:
+        actual obstacle-boundary ring
+        + one-time recipe wake
+
+Layer C later finite strokes
+    Arc:
+        complete authored Arc contact profile
+    Semi-Arc:
+        selected authored half-profile
+
+Layer A:
+    support/lifecycle only
+Layer B:
+    complete-vector retention only
+Layer E:
+    unchanged
+```
+
+The obstacle ring is not reconstructed from Layer E and does not use final visibility, Chipping, or Strands. It is born directly into Layer C Coverage from cells immediately adjacent to the existing obstacle-exclusion mask. Locally derived outward normals order the progressive ring reveal from the upstream contact face toward the rear on both sides.
+
+The first stroke and later contact strokes carry independent path lengths and cadence-bounded durations while sharing one requested Reveal Speed. This preserves the P12u metres-per-second contract across geometrically unequal phases. Phase transitions reset only one-shot deposition ownership; they do not create a persistent emitter.
+
+The P13E independent reinforcement scheduler is unchanged. A periodic reinforcement event is still one finite event, but its geometry is now recipe-complete: full Arc profile or selected Semi-Arc half-profile, with no wake arm.
+
+No new persistent field, GPU record growth, kernel, pass, draw call, or final-render sample is introduced.
+
+## RG-METRIC-P13G architecture freeze — accepted source ownership and pause boundary
+
+The post-P13F automatic-source and Object-source architecture is accepted and frozen for the current milestone.
+
+### Frozen Layer C birth ownership
+
+- Automatic sources emit finite packets; completed source paths are not continuously repainted.
+- Object Arc, Semi-Arc, and Fleck use one bounded per-object owner.
+- Complete Object packets and finite contact-maintenance events are separately scheduled.
+- A complete Arc/Semi-Arc packet begins with a narrow ring around the complete actual obstacle boundary and emits its recipe wake once.
+- Later Arc contact strokes cover the complete Arc profile. Later Semi-Arc contact strokes cover the deterministic selected half-profile.
+- Independent contact maintenance uses the same recipe-complete contact geometry and never emits a wake.
+- No Hold, Release, Rest, or material-cadence persistent Object emitter exists.
+
+### Frozen Layer B retention ownership
+
+The existing obstacle field retains its accepted split meaning:
+
+```text
+R = signed lateral-routing influence
+G = independent object-contact slowdown influence
+```
+
+Object-contact slowdown scales the complete routed velocity vector. It does not create material. Layer C topology support and lifecycle remain responsible for how long born material survives.
+
+### Frozen downstream contracts
+
+P13G does not reopen:
+
+- P13A Coverage/Presence/Remaining-Life/Pattern packing and birth merge;
+- Donor Cell and TVD Superbee transport;
+- Final Visibility or Presence Footprint behavior;
+- P12u Reveal Speed;
+- P12t Candidate, Eligibility, soft-mask Chipping reconstruction, or Strands.
+
+### External Weather shader integration
+
+A separate thread will make small Weather cloud-shading updates in shared River shader files. Cloud shading is outside River Foam source ownership, but shared shader edits can accidentally change include order, uniforms, lighting composition, opacity, or Foam calls. The resumed River thread must compare the exact post-Weather source against this frozen baseline and run a focused regression before treating the architecture as unchanged.
+
+P13G is documentation-only and has no runtime performance effect. No `PERFORMANCE EXCEPTION` applies.
+

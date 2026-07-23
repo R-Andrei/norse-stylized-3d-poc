@@ -22,10 +22,10 @@ Historical ledger rule: sections below preserve method history and old acceptanc
 ## Active feature
 
 ```text
-EW-C1A.3d — Validation-suite de-duplication and research scheduling
+EW-C1A.3f — Authoritative solve/materialization split and exact topology-baseline reuse
 ```
 
-EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. Seed `8889` has passed both raw corner geometry and post-chip edge-wear integration, including one semantic cap, dense construction provenance, mandatory cap ring `3/3/3/3`, unrelated bevel retention `28/28`, and no collateral loss. EW-C1A.3 established the compact normal Corner Chipping workflow and internal 33-case matrix. EW-C1A.3c now owns the one-final-build corner search, but its first Unity suite never reached the corner stage: the already-passing current-preview, Macro, topology, and duplicate 33-case artistic-materialization work consumed `59,008.2899 ms` and exhausted the former `58 s` global boundary with `cornerChippingCases=0/0`. EW-C1A.3d de-duplicates validation scheduling without changing generation: topology remains exhaustive `33/33`, artistic ranking is fingerprinted over all 33 captured topology cases, the corner matrix runs next, and only 12 difficult artistic sentinels are deeply materialized afterward. The research-only whole-suite boundary is `90 s`; enabled corner generation remains hard-bounded at `4 s` per rock and the corner matrix at `35 s`. Unity compilation and runtime validation remain pending.
+EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. Seed `8889` has passed both raw corner geometry and post-chip edge-wear integration, including one semantic cap, dense construction provenance, mandatory cap ring `3/3/3/3`, unrelated bevel retention `28/28`, and no collateral loss. EW-C1A.3 established the compact normal Corner Chipping workflow and internal 33-case matrix. EW-C1A.3d repaired validator scheduling. EW-C1A.3e then removed predictive/final identity divergence: its Unity run reported `cornerIntegrationPlanMismatches=0`, but reached only `3/9` corner cases in `41.07 s` because each candidate plan still constructed the complete polygon shell and preview soup; final emission itself measured `0 ms`. Cross-stage baseline reuse also failed (`cornerBaselineBuilds=3`) because topology's case width `1f` was used instead of the authored edge-wear width. EW-C1A.3f splits candidate plane-and-rail solving from one accepted-plan shell materialization, adds bounded editor-only deadline probes, and materializes topology-owned ordinary baselines with the exact authored settings fingerprint. The production target remains `<= 4 s`, the hard per-rock maximum remains `5 s`, the corner matrix remains `35 s`, and the research suite remains `90 s`. Production generation remains unchanged. Unity compilation and runtime validation of C1A.3f remain pending.
 
 ## Visual-development sequence
 
@@ -37,10 +37,13 @@ EW-C1A-RO2 pre-bevel ordering/ownership audit [complete]
 EW-C1A.1  transactional pre-bevel corner cut and provenance proof [implemented; transaction accepted]
 EW-C1A.1a one polygon, one render surface [accepted and frozen through EW-C1A.1a.8]
 EW-C1A.2  cap-ring bevel integration and raw/integrated seed proof [complete]
-EW-C1A.3  unified authoring workflow and 33-case single-chip acceptance [superseded by C1A.3b performance repair]
+EW-C1A.3  unified authoring workflow and first 33-case gate [implemented; Unity result 14/33]
+EW-C1A.3a deterministic fully certified single-corner search [superseded by C1A.3b]
 EW-C1A.3b bounded staged single-corner certification [superseded by C1A.3c]
-EW-C1A.3c complete integration preflight and one-final-build search [implemented; runtime not yet exercised]
-EW-C1A.3d validation-suite de-duplication and research scheduling [implemented; Unity validation pending]
+EW-C1A.3c predictive complete preflight and one-final-build search [superseded by C1A.3e]
+EW-C1A.3d validation-suite de-duplication and research scheduling [implemented; Unity scheduling accepted]
+EW-C1A.3e authoritative integration plan and topology-baseline reuse [implemented; Unity result: identity parity fixed, performance failed]
+EW-C1A.3f authoritative solve/materialization split and exact topology-baseline reuse [implemented; Unity validation pending]
 EW-C2      sparse chips, notches, and break events
 EW-N1      final artistic normal shaping across all accepted worn geometry
 EW-F1      broad-face finish, cracks, and crevices
@@ -6097,7 +6100,7 @@ Cap-Ring Wear Strength      0..1.50       default 1.00
 9. [x] Advance report/Inspector contracts to EW-C1A.2b and print the exact consumed live settings, requested/resolved/accepted depth, all width limits, winning limit, ring strength, selected local position, and cap edge lengths.
 10. [x] Reconcile framework, recovery architecture, and code inventory with the accepted authoring and Scene-marker ownership.
 11. [x] Reread every modified file and affected unchanged producer/consumer; compare the final tree with the untouched EW-C1A.2a baseline; run exact-scope, C# delimiter/preprocessor/reference, constructor-call, serialized-property, frozen-owner, line-ending, whitespace, package-overlay, patch-application, and artifact-integrity checks.
-12. [ ] Unity compile and visual/runtime validation remain pending user execution.
+12. [x] Unity compile and visual/runtime validation remain pending user execution.
 
 ##### Acceptance criteria
 
@@ -6186,7 +6189,7 @@ Cap-Ring Wear Strength      0..1.50       default 1.00
 8. [x] Replace the ambiguous Inspector action with two explicit buttons, reports, summaries, and Scene labels: `Corner Chip — Geometry` and `Corner Chip — With Edge Wear`.
 9. [x] Reconcile framework, recovery architecture, and code inventory with the split preview ownership and unchanged production order.
 10. [x] Reread every modified file and affected unchanged producer/consumer; compare final behavior and exact scope with the untouched EW-C1A.2b baseline; run C# delimiter/preprocessor/reference checks, frozen-owner verification, whitespace/line-ending checks, package-overlay reproduction, patch application, and artifact integrity checks.
-11. [ ] Unity 6000.5.0f1 compile, seed-8889 geometry-only visual acceptance, integration regression, and complete one-click edge-wear suite remain pending user execution.
+11. [x] Unity 6000.5.0f1 compile, seed-8889 geometry-only visual acceptance, integration regression, and complete one-click edge-wear suite remain pending user execution.
 
 ##### Static/compliance completion evidence
 
@@ -7746,6 +7749,133 @@ The final failed result retains the deepest deterministic blocker in this order:
 - Unity compilation and the `33/33` runtime matrix remain pending.
 
 
+#### EW-C1A.3e.1 — Missing topology-job coverage snapshot compile correction
+
+**Patch identifier:** `EW-C1A.3e.1`
+
+**Status:** [implemented; static/compliance validation passed; Unity compile pending].
+
+**Objective:** restore Unity compilation after EW-C1A.3e introduced ordinary-baseline materialization inside the topology matrix. `EvaluateEdgeWearViabilityMatrixCase` consumes `job.EdgeWearCoverage`, but `EdgeWearViabilityMatrixJob` does not currently declare or initialize that immutable snapshot. Add the missing field without changing matrix semantics, settings, budgets, geometry, or runtime behavior.
+
+**Approved files:**
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+**Reviewed evidence:**
+
+- Unity compiler error: `GeneratedMassEditor.cs(1507,25): CS1061`, reporting that `EdgeWearViabilityMatrixJob` has no `EdgeWearCoverage` definition.
+- `GeneratedMassEditor.cs::EvaluateEdgeWearViabilityMatrixCase` uses `job.EdgeWearCoverage` only for the new ordinary baseline settings; the topology audit settings intentionally retain exhaustive coverage `2f`.
+- `GeneratedMassEditor.cs::EdgeWearViabilityMatrixJob` snapshots `EdgeWearAmount`, Macro settings, softness, and crease settings from `GeneratedMass`, but omits `EdgeWearCoverage`.
+- `CornerChippingMatrixJob` already snapshots `target.EdgeWearCoverage`, confirming the authoritative source and immutable-job pattern.
+- The accepted EW-C1A.3d baseline and final EW-C1A.3e diff were reviewed; this unresolved member was introduced only by EW-C1A.3e topology-baseline reuse.
+
+**Invariants and non-goals:**
+
+- No change to corner search, authoritative plans, topology audit coverage, artistic selection, baseline fingerprints, budgets, reports, Inspector controls, serialized settings, geometry, shaders, runtime, or production generation.
+- The field is immutable and captured once from `GeneratedMass.EdgeWearCoverage`, matching the existing job-snapshot contract.
+- No unrelated cleanup or refactor.
+
+**Implementation sequence:**
+
+1. [x] Add `EdgeWearCoverage` to `EdgeWearViabilityMatrixJob` beside the other immutable edge-wear settings.
+2. [x] Initialize it from `target.EdgeWearCoverage` in the job constructor.
+3. [x] Verify every `job.EdgeWearCoverage` reference resolves to that field and no other job/settings member is missing.
+4. [x] Reread the complete modified class and direct topology/corner baseline consumers; run structural, reference, whitespace, diff, clean-apply, and package-replay checks.
+5. [x] Unity compilation remains the external acceptance gate.
+
+**Acceptance criteria:**
+
+- Unity no longer reports CS1061 for `EdgeWearViabilityMatrixJob.EdgeWearCoverage`.
+- `EvaluateEdgeWearViabilityMatrixCase` still uses `2f` for exhaustive topology audit coverage and the captured authored coverage only for ordinary baseline generation.
+- Exactly the two approved files change; no runtime or generation behavior changes.
+
+##### Implementation result
+
+- `EdgeWearViabilityMatrixJob` now declares immutable `EdgeWearCoverage` beside `EdgeWearAmount` and initializes it from `target.EdgeWearCoverage`.
+- `EvaluateEdgeWearViabilityMatrixCase` remains semantically split: the topology audit still uses exhaustive coverage `2f`, while only the retained ordinary baseline uses the captured authored coverage.
+- Every `job.*` member referenced by `EvaluateEdgeWearViabilityMatrixCase` resolves against the complete `EdgeWearViabilityMatrixJob` contract; no second missing member was found.
+- Exact scope is two modified files in the unchanged `331`-file C1A.3e tree. All other files are byte-identical.
+- All `195/195` C# files pass lexical delimiter, preprocessor, and region checks. Modified files retain CRLF, one final newline, and no trailing whitespace.
+- Clean overlay and unified-patch replay reproduce the final `331/331`-file tree byte-for-byte.
+- Unity compilation remains pending; the concrete next action is to apply this correction and allow Unity to resume compilation.
+
+#### EW-C1A.3e — Authoritative corner-integration plan and topology-baseline reuse
+
+**Patch identifier:** `EW-C1A.3e`
+
+**Status:** [implemented; static/compliance validation passed; Unity validation pending].
+
+**Objective:** eliminate the EW-C1A.3d preflight/final-build divergence by making one committed corner-integration plan own the exact damaged topology, selected ordinary and mandatory identities, resolved widths, shell result, and emitted preview. Reuse matching default topology outputs as corner baselines so the corner matrix performs no duplicate ordinary baseline generation. Preserve the per-rock target of `<= 4 s`, hard maximum of `5 s`, corner-matrix `35 s`, and development-only complete-suite `90 s` boundary.
+
+**Approved files:**
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+**Reviewed evidence:**
+
+- Unity report `Pasted text(142).txt` reports `totalElapsedMs=73901.5597`, `totalBudgetExceeded=0`, topology `33/33`, artistic fingerprints `33/33`, and a real corner stage that reached `22` cases before the `35 s` corner boundary.
+- The same report records `cornerBaselineBuilds=8` and `cornerBaselineCacheUses=22`, proving the corner stage rebuilt one ordinary baseline for every reached seed instead of consuming the matching default topology result.
+- Seven enabled cases report `integration-preflight-mismatch`; exact counts can agree while the final ordinary identity set differs, and other cases regress from preflight mandatory `3/3` to final `1/3` or `0/3`.
+- `MassGenerator.GenerateCornerDamageFullCertificationSearch` currently retains a predictive `CornerDamageIntegrationPreflightRecord`, then calls `RunCornerDamageIntegrationAttempt`, which invokes `GenerateInternal` and independently repeats candidate discovery, width solving, coexistence, and shell construction.
+- `BuildCornerDamageIntegrationPreflightRecord` currently stores only scalar predictions and identity arrays; it discards the prepared damaged faces, topology context, coverage lifecycle, and width solution that produced those predictions.
+- `GeneratedMassEditor.GetOrBuildCornerChippingBaseline` keys only by shape seed and always calls `GenerateUnifiedEdgeWearPreviewBaseline` on the first policy for each seed. Topology audit generation already materializes a mesh and unified status but discards them.
+- The supplied reconstructed archive has no Git metadata. The byte-identical EW-C1A.3d tree is the implementation baseline; EW-C1A.3c and EW-C1A.3d package diffs were reviewed to distinguish generator changes from validator-only scheduling changes.
+
+**Invariants and non-goals:**
+
+- No new Inspector controls, actions, serialized defaults, assets, shaders, mesh channels, production generation, runtime update work, or corner-count controls.
+- No topology, retention, complete-ring, clipping, triangulation, final-normal, or deterministic ranking gate is weakened.
+- The production `EdgeWearEvaluationMode.None` path remains unchanged.
+- A planned shell may be emitted only when it contains all mandatory ring identities and zero unrelated baseline loss.
+- Final emission must consume the committed plan; it must not rediscover candidates or rerun the corner-width/coexistence solver.
+- Exact baseline reuse requires a seed/settings/mode fingerprint match; mismatch falls back to a local baseline build rather than stale reuse.
+
+**Implementation sequence:**
+
+1. [x] Extend the preflight record into an internal immutable `CornerDamageIntegrationPlan` carrying prepared damaged faces, topology context, coverage lifecycle, solved widths, exact planned identities, shell soup, and deterministic plan hash.
+2. [x] Materialize candidate plans from the retained prepared state; validate exact mandatory and unrelated identity sets; continue deterministic corner ranking only when plan construction fails.
+3. [x] Add a scoped editor-only plan override so final preview generation consumes the accepted shell soup/status without repeating candidate discovery, viability, width solving, coexistence, or shell construction.
+4. [x] Replace generic mismatch telemetry with exact missing/unexpected ordinary and mandatory identities plus `integrationPlanHash` and `emittedPlanHash`.
+5. [x] Preserve one final emitted mesh build, zero fallback builds, and per-rock `<= 4 s` target / `5 s` hard maximum reporting.
+6. [x] Materialize one exact ordinary unified baseline alongside each topology default case, retain that mesh/status, and seed the corner cache by exact settings fingerprint; target `cornerBaselineBuilds=0` and `cornerBaselineCacheUses=33`.
+7. [x] Update framework, recovery architecture, code inventory, report contracts, and acceptance gates.
+8. [x] Complete exact-scope diff, full modified-file reread, caller/consumer consistency audit, structural checks, package replay, and Unity-pending declaration.
+
+**Acceptance criteria:**
+
+- `cornerChippingCases=33/33` and `cornerChippingMatrixBudgetExceeded=0`.
+- `fullIntegrationBuilds <= 1`, `fullFallbackBuilds=0`, and final emission performs no solver rediscovery.
+- `integrationPlanMismatches=0`; missing/unexpected planned ordinary and mandatory identity sets are empty for every accepted case.
+- `integrationPlanHash` equals `emittedPlanHash` for every accepted case.
+- `cornerBaselineBuilds=0` and `cornerBaselineCacheUses=33` when topology settings fingerprints match.
+- Every enabled case remains below the `5 s` hard maximum; cases above `4 s` report over-target without being misclassified as hard-budget failures.
+- Topology, Macro, artistic fingerprint, disabled parity, cap-ring, retention, normal, tangent, state-restoration, and production invariants remain unchanged.
+
+##### Implementation result
+
+- `CornerDamageIntegrationPreflightRecord` now retains the exact damaged faces, topology context, coverage lifecycle, corner-width solution, stable limits, and cap-ring width evidence that produced the candidate decision.
+- The ranked search converts that retained state into one `CornerDamageIntegrationPlan` by running the complete shell kernel once. The plan owns the exact preview soup, unified status, ordinary and mandatory identity sets, unrelated-retention result, and deterministic plan hash.
+- Accepted final preview emission consumes the committed plan through an editor-only scoped override. It clones the already-certified soup and status and does not rediscover candidates or repeat viability, width, coexistence, or shell solving.
+- Emission validation reports exact missing and unexpected ordinary/mandatory identities together with `integrationPlanHash` and `emittedPlanHash`; any disagreement is an explicit `integration-plan-mismatch` failure.
+- Each topology default case now additionally materializes and retains one ordinary unified baseline using the exact current edge-wear coverage/settings required by the corner matrix. The all-geometric topology audit mesh is never relabeled as ordinary. The corner matrix seeds an exact recipe/settings/mode fingerprint cache from the retained ordinary result and rebuilds only on a true fingerprint miss.
+- Matrix telemetry distinguishes the `4 s` target from the `5 s` hard maximum and exposes plan attempts, plan mismatches, baseline builds/cache uses, timing partitions, and exact identity differences.
+- The six normal Corner Chipping controls, existing preview actions, clipping, topology, complete-ring, retention, triangulation, final-normal, shader, serialized asset, runtime, and production-generation contracts remain unchanged.
+- Exact scope is ten modified files in the unchanged `331`-file tree, with no create/delete/move/rename; frozen clipping, bounded-shell, triangulation, final-normal, settings, and production owners remain byte-identical.
+- Targeted source/contract validation passed `97/97`; all `195/195` C# files passed delimiter, lexical-state, preprocessor, and region checks; modified files retain CRLF, one final newline, and no trailing whitespace.
+- `git diff --check` passed with CR-at-EOL handling. The changed-files ZIP and unified patch each reproduced the complete final `331/331`-file tree byte-for-byte, and ZIP CRC validation passed.
+- Unity compilation, `33/33` corner acceptance, zero plan mismatches, zero baseline rebuilds, and the per-rock runtime gate remain pending.
+
+
 #### EW-C1A.3d — Validation-suite de-duplication and research scheduling
 
 **Patch identifier:** `EW-C1A.3d`
@@ -7965,3 +8095,114 @@ No file may be created, deleted, moved, or renamed. `GeneratedMass.cs`, `MassSur
 - [x] All changed files preserve CRLF, terminal newlines, BOM state, Markdown-fence balance, and contain no actual trailing spaces or tabs.
 - [x] `GeneratedMass.cs`, settings transport, clipping, plane-cut shell, bounded triangulation, final mesh normals, shaders, serialized controls/defaults, Inspector layout/actions, mesh channels, and production generation remain byte-identical to EW-C1A.3a.
 - [ ] Unity 6000.5.0f1 compilation, actual per-case/matrix timings, cancellation responsiveness, and complete `33/33` runtime acceptance remain pending; no runtime speedup is claimed from static evidence.
+
+## EW-C1A.3f.1 compile correction — value-type audit guard
+
+### Objective and acceptance criteria
+
+- [x] Restore Unity compilation after C1A.3f compared the value-type `PlaneCutBevelAuditResult` snapshot to `null` inside `MaterializePlaneCutBevelSolvedPlan`.
+- [x] Remove only the invalid value-type null comparison. Preserve the existing reference guards and `SolveValid` success contract.
+- [x] Do not change plane solving, shell materialization, deadlines, identities, telemetry, budgets, Inspector behavior, serialized data, or production generation.
+
+### Approved files
+
+- [x] `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md` — canonical plan and final validation evidence.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutKernel.cs` — remove the invalid `solvedPlan.Audit == null` guard.
+
+### Read-only evidence reviewed before implementation
+
+- [x] Unity compiler error: `MassGenerator.EdgeWear.PlaneCutKernel.cs(1201,39): CS0019`, operator `==` cannot compare `PlaneCutBevelAuditResult` with `null`.
+- [x] `PlaneCutBevelAuditResult` is declared as a private `struct` in `MassGenerator.EdgeWear.PlaneCutKernel.cs`; it is therefore non-nullable in this contract.
+- [x] `PlaneCutBevelSolvedPlan.Audit` is a value-type field initialized from `result` when the solved plan is created.
+- [x] `MaterializePlaneCutBevelSolvedPlan` already guards the plan reference, source faces, retained candidates, active identities, and `SolveValid`; no replacement null sentinel is required.
+- [x] Direct callers in `MassGenerator.cs` and the combined `AuditPlaneCutBevelKernel` wrapper consume the returned value-type audit and do not require nullable behavior.
+- [x] Synthetic C1A.3e.1 baseline commit `38fe7bf`, complete C1A.3f diff, `Assets/AGENTS.md`, canonical C1A.3f plan, and affected type/caller contracts were reviewed.
+
+### Implementation sequence and invariants
+
+1. [x] Delete only `solvedPlan.Audit == null ||` from the materialization guard.
+2. [x] Confirm no other `PlaneCutBevelAuditResult` null comparisons exist.
+3. [x] Run exact two-file scope, structural C# and preprocessor checks, diff hygiene, and ZIP/patch replay.
+4. [x] Record Unity compilation as pending user validation.
+
+### Risks and controls
+
+- [x] Risk: removing the guard could admit an uninitialized audit. Control: a non-null `PlaneCutBevelSolvedPlan` is created only after `result` initialization and assigns `Audit = result`; `SolveValid` remains the explicit semantic gate.
+- [x] Risk: scope drift into C1A.3f behavior. Control: exact two-file patch; only one executable expression changes.
+
+### Validation status
+
+- [x] Final diff is restricted to the two approved files; the executable diff removes one invalid value-type null comparison and changes no other code.
+- [x] All `195/195` C# files pass delimiter, comment/string, preprocessor, and region-balance checks.
+- [x] No `solvedPlan.Audit == null` or other `PlaneCutBevelAuditResult` null comparison remains.
+- [x] Both modified files preserve CRLF, terminal newline, BOM state, and whitespace hygiene.
+- [x] Changed-files ZIP and unified patch replay reproduce the final tree byte-for-byte from the untouched C1A.3f delivery baseline.
+- [ ] Unity 6000.5.0f1 compilation pending user execution.
+
+## EW-C1A.3f implementation plan — authoritative solve/materialization split
+
+### Objective and acceptance criteria
+
+- [x] Preserve the C1A.3e correctness result: authoritative planned and emitted ordinary/mandatory identity sets remain exact and `integrationPlanMismatches=0`.
+- [x] Remove complete polygon-shell and triangle-soup construction from rejected candidate plans. Candidate search performs deterministic plane-and-rail solving only; only the accepted candidate may construct the shell and triangulate/materialize preview soup.
+- [x] Split the existing plane-cut kernel into an authoritative plane-and-rail solved plan and a separate one-time shell/materialization step without changing candidate ordering, width schedules, coexistence, topology, face-quality, triangulation, or final mesh-channel rules.
+- [x] Add cooperative case-deadline checks at bounded candidate, conflict-pass, and materialization boundaries so one synchronous attempt cannot silently run beyond the `5 s` hard maximum.
+- [x] Materialize the topology-stage ordinary baseline with the authored `EdgeWearWidth`, not the topology audit case width `1f`, so exact cross-stage fingerprints can match.
+- [ ] Expected Unity evidence: `cornerBaselineBuilds=0`, `cornerBaselineCacheUses=33`, `authoritativeSolveAttempts>=1` for enabled cases, `planMaterializationBuilds<=1`, `planMaterializationMismatches=0`, every enabled case `<5000 ms`, and corner matrix `33/33` within `35 s`.
+
+### Approved files
+
+- [x] `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md` — canonical plan, evidence, status, and final audit.
+- [x] `Assets/Docs/Generated_Mass_Framework.md` — stable solve/materialization ownership and performance boundary.
+- [x] `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md` — authoritative solved-plan contract and one-time materialization.
+- [x] `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md` — exact code ownership.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.cs` — ranked search, solved-plan ownership, one-time materialization, deadline scope, telemetry.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs` — solved-plan/materialization records and telemetry.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutKernel.cs` — split deterministic plane-and-rail solve from one accepted polygon-shell/triangle-soup materialization; preserve existing rules.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs` — consume only materialized accepted plans during final preview emission.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs` — copy/report solve, materialization, deadline, and mismatch evidence.
+- [x] `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs` — authored-width topology baseline snapshot, aggregate telemetry, matrix acceptance checks.
+
+### Read-only evidence reviewed before implementation
+
+- [x] Repository state: synthetic accepted C1A.3e.1 baseline commit `38fe7bf`; clean working tree before this plan edit.
+- [x] Unity report `Pasted text(143).txt`: total `88,444.4819 ms`; topology `33/33`; corner matrix `3/9`; `cornerIntegrationPlanAttempts=19`; `cornerIntegrationPlanMismatches=0`; enabled plan time `647–8,600 ms`; final emission time `0 ms`; cross-stage baseline reuse failed (`cornerBaselineBuilds=3`).
+- [x] `MassGenerator.cs` — `GenerateCornerDamageFullCertificationSearch`, `TryBuildCornerDamageIntegrationPlan`, `RunCornerDamageIntegrationPlanEmission`, identity/hash validation.
+- [x] `MassGenerator.EdgeWear.Orchestration.cs` — prepared preflight capture and committed-plan early-return consumer.
+- [x] `MassGenerator.EdgeWear.Types.cs` — preflight, integration-plan, and search telemetry contracts.
+- [x] `MassGenerator.EdgeWear.PlaneCutKernel.cs` — `AuditPlaneCutBevelKernel` currently performs candidate solve, clean polygon-shell construction, topology/quality certification, triangulation, soup audit, and coverage finalization in one call.
+- [x] `GeneratedMassEditor.cs` — topology baseline currently uses the matrix case `width`; the default topology case is named `default` but has value `1f`, while the corner matrix fingerprints authored `target.EdgeWearWidth`.
+- [x] Direct callers/consumers: unified preview path, batch topology audit, corner integration preflight, committed-plan preview routing, matrix baseline seeding and exact fingerprint lookup.
+- [x] Canonical framework, recovery architecture, code inventory, C1A.3e plan, AGENTS.md, and C1A.3d→C1A.3e diff.
+
+### Invariants and non-goals
+
+- [x] Production `EdgeWearEvaluationMode.None`, runtime callbacks, serialized settings/defaults, Inspector layout, controls, shaders, materials, assets, clipping/cap creation, source identity mapping, width schedules, coexistence rules, triangulation policy, authored normals/tangents, and mesh channels remain unchanged.
+- [x] No new layers, tags, components, assets, folders, dependencies, per-frame work, or persistent cache.
+- [x] The `4 s` target, `5 s` hard maximum, `35 s` corner matrix, and `90 s` research suite boundaries remain unchanged.
+- [x] Failure is not hidden by relaxing retention, mandatory ring, topology, or identity parity rules.
+
+### File-by-file sequence
+
+1. [x] Introduce deadline scope/probe and solved-plan/materialization telemetry/types.
+2. [x] Refactor the plane-cut kernel into deterministic polygon-shell solve and separate triangle-soup materialization while retaining the existing combined wrapper for unrelated callers.
+3. [x] Change corner plan search to run solve-only for candidates and materialize exactly once after acceptance; validate exact identity/hash parity after emission.
+4. [x] Correct topology-stage ordinary baseline settings to use the authored edge-wear width and record cross-stage cache hits.
+5. [x] Update diagnostics and canonical architecture/inventory documents.
+6. [x] Run scope, diff, structural C# and preprocessor checks, static contract checks, patch/ZIP replay, and record Unity validation as pending.
+
+### Risks and controls
+
+- [x] Risk: solve-only and materialization paths diverge. Control: materialization consumes the exact solved planes/rails/candidates/coverage; no rediscovery or identity selection; exact planned/emitted identity/hash comparison remains mandatory.
+- [x] Risk: skipping triangulation during rejected solves could defer a render-contract failure to the accepted candidate. Control: accepted materialization remains a hard certification step; a failure reports `plan-materialization`, does not search another complete materialization, and preserves production fallback.
+- [x] Risk: deadline probes alter unrelated audits. Control: probes are editor-only, active only inside corner search, and return false elsewhere.
+- [x] Risk: stale topology baseline reuse. Control: exact recipe/settings fingerprint remains required; mismatch locally rebuilds.
+
+### Validation and audit status
+
+- [x] Final diff is restricted to the ten approved files.
+- [x] Complete final modified files and affected callers/consumers reread.
+- [x] C# delimiter/comment/string/preprocessor checks pass for all `195/195` source files.
+- [x] Static contracts `103/103` prove one materialization path, authored-width baseline capture, deadline probes, exact C1A.3f telemetry/contracts, and unchanged frozen owners.
+- [x] Changed-files ZIP and unified patch reproduce the final `331/331`-file tree byte-for-byte from commit `38fe7bf`; ZIP CRC passes with exactly ten entries.
+- [ ] Unity compile and `EW-C1A.3f-suite` runtime validation pending user execution.

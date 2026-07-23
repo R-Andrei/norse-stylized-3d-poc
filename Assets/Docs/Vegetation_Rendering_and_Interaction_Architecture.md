@@ -6,6 +6,17 @@
 
 This document defines the production architecture, measurable performance targets, visual contract, implementation history, and validation gates for dense interactive vegetation in the Norse Stylized 3D PoC.
 
+
+## Weather cloud-shadow receiver contract — planned
+
+Vegetation is a mandatory receiver of the Weather-owned cloud-shadow illumination field. Grass, future shrubs, and trees must share the same world-space cloud boundary as Ground, Generated Mass, River, actors, and buildings. Vegetation owns only its material and lighting response; it does not own cloud pattern, phase, direction, speed, coverage, or sun gating.
+
+Cloud integration must attenuate the environmental-sun term without changing ambient minimum visibility, local-light response, punctual-light edge accents, wind deformation, immediate interaction, persistent trample, coverage authoring, instance placement, geometry selection, or recovery simulation. Weather wind remains authoritative for motion; cloud movement may consume the same wind direction but must not use the Vegetation spring-response field.
+
+V0 uses the authoritative sun's URP directional-light cookie. Vegetation must compile and consume the cookie-aware main-light path exactly once; it must not evaluate a separate procedural cloud field per vertex or update cloud values per instance. Dense transparent Vegetation remains the primary performance benchmark because fragment overdraw can amplify the cookie sample cost. The highest accepted density, normal gameplay camera, target resolution, and realistic visible-patch load must be profiled after complete implementation. No per-instance CPU update, field rebuild, or recurring allocation is allowed. A receiver-compliance audit must identify any Vegetation shader that lacks cookie support.
+
+Exact representation and files remain governed by `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`. A per-instance or vertex-optimized hybrid path is fallback only if measured cookie cost is materially unacceptable.
+
 The production ownership and interaction stack is implemented through `VEG-V2-INTERACT.2B.2`. The user has directly accepted the immediate response, Ground-owned historical trails, delayed asymmetric recovery, and circle/cone/line ability stamps in Unity. Historical patch sections retain their original source-validation limitations and failed intermediate approaches as evidence; `VEG-V2-CLOSE.1` is the authoritative closure status.
 
 ```text

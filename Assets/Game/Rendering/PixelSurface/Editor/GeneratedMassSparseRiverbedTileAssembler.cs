@@ -326,6 +326,9 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal int FeatureBoundaryHardPartialRockCount;
             internal float FeatureBoundaryRemovedMaximumResidual;
             internal int FeatureBoundaryFadeInconsistentRockCount;
+            internal int FeatureOwnershipInconsistentRockCount;
+            internal int FeatureOwnershipBankSettingsAffectRiverbedRockCount;
+            internal int FeatureOwnershipRiverbedSettingsAffectBankRockCount;
             internal string PalettePayloadFingerprint;
             internal string PalettePreviewNeutralFingerprint;
             internal string PalettePreviewHigherContrastFingerprint;
@@ -2558,6 +2561,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 placements,
                 decodedFeatureAnchorX,
                 decodedFeatureAnchorY);
+            MeasureIndependentFeaturePolicyOwnership(
+                result,
+                final,
+                placements,
+                decodedFeatureAnchorX,
+                decodedFeatureAnchorY);
             result.PalettePayloadFingerprint =
                 CalculatePairedPayloadFingerprint(result);
             result.PalettePreviewNeutralFingerprint =
@@ -3589,6 +3598,264 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     supportRadius);
         }
 
+        private struct ProofFeaturePolicy
+        {
+            internal float TransitionDistance;
+            internal float SafetyMargin;
+            internal float FadeDistance;
+        }
+
+        private static void MeasureIndependentFeaturePolicyOwnership(
+            CandidateResult result,
+            FinalBuffers final,
+            IReadOnlyList<PlacementEvidence> placements,
+            IReadOnlyList<float> centerOffsetX,
+            IReadOnlyList<float> centerOffsetY)
+        {
+            float supportRadius = Mathf.Max(
+                0.0001f,
+                result.FeatureMaximumSupportRadiusUv);
+            ProofFeaturePolicy bankPolicy = new ProofFeaturePolicy
+            {
+                TransitionDistance = supportRadius * 0.70f,
+                SafetyMargin = supportRadius * 0.45f,
+                FadeDistance = supportRadius * 0.60f
+            };
+            ProofFeaturePolicy riverbedPolicy = new ProofFeaturePolicy
+            {
+                TransitionDistance = supportRadius * 0.20f,
+                SafetyMargin = supportRadius * 0.10f,
+                FadeDistance = supportRadius * 0.25f
+            };
+            ProofFeaturePolicy extremePolicy = new ProofFeaturePolicy
+            {
+                TransitionDistance = supportRadius * 3.00f,
+                SafetyMargin = supportRadius * 2.00f,
+                FadeDistance = supportRadius * 1.50f
+            };
+
+            int ownerInconsistentRockCount =
+                MeasureFeatureOwnerConsistency(
+                    result,
+                    final,
+                    placements,
+                    centerOffsetX,
+                    centerOffsetY,
+                    supportRadius);
+            int bankSettingsAffectRiverbed = 0;
+            int riverbedSettingsAffectBank = 0;
+            float[] applicationWeights = { 0.25f, 0.60f, 1.00f };
+            for (int applicationIndex = 0;
+                 applicationIndex < applicationWeights.Length;
+                 applicationIndex++)
+            {
+                float applicationWeight =
+                    applicationWeights[applicationIndex];
+                for (int distanceIndex = 0;
+                     distanceIndex <= 24;
+                     distanceIndex++)
+                {
+                    float edgeDistance =
+                        supportRadius * distanceIndex * 0.20f;
+                    float riverbedOwnedBaseline =
+                        ResolveProofIndependentOwnerFeatureWeight(
+                            true,
+                            applicationWeight,
+                            edgeDistance,
+                            bankPolicy,
+                            riverbedPolicy);
+                    float riverbedOwnedWithChangedBank =
+                        ResolveProofIndependentOwnerFeatureWeight(
+                            true,
+                            applicationWeight,
+                            edgeDistance,
+                            extremePolicy,
+                            riverbedPolicy);
+                    if (Mathf.Abs(
+                            riverbedOwnedBaseline -
+                            riverbedOwnedWithChangedBank) > 0.000001f)
+                    {
+                        bankSettingsAffectRiverbed++;
+                    }
+
+                    float bankOwnedBaseline =
+                        ResolveProofIndependentOwnerFeatureWeight(
+                            false,
+                            applicationWeight,
+                            edgeDistance,
+                            bankPolicy,
+                            riverbedPolicy);
+                    float bankOwnedWithChangedRiverbed =
+                        ResolveProofIndependentOwnerFeatureWeight(
+                            false,
+                            applicationWeight,
+                            edgeDistance,
+                            bankPolicy,
+                            extremePolicy);
+                    if (Mathf.Abs(
+                            bankOwnedBaseline -
+                            bankOwnedWithChangedRiverbed) > 0.000001f)
+                    {
+                        riverbedSettingsAffectBank++;
+                    }
+                }
+            }
+
+            result.FeatureOwnershipInconsistentRockCount =
+                ownerInconsistentRockCount;
+            result.FeatureOwnershipBankSettingsAffectRiverbedRockCount =
+                bankSettingsAffectRiverbed;
+            result.FeatureOwnershipRiverbedSettingsAffectBankRockCount =
+                riverbedSettingsAffectBank;
+        }
+
+        private static int MeasureFeatureOwnerConsistency(
+            CandidateResult result,
+            FinalBuffers final,
+            IReadOnlyList<PlacementEvidence> placements,
+            IReadOnlyList<float> centerOffsetX,
+            IReadOnlyList<float> centerOffsetY,
+            float supportRadius)
+        {
+            List<int>[] featurePixels = new List<int>[placements.Count];
+            for (int index = 0; index < featurePixels.Length; index++)
+            {
+                featurePixels[index] = new List<int>();
+            }
+
+            for (int index = 0; index < result.PaletteForm.Length; index++)
+            {
+                int owner = final.Owner[index];
+                if (owner < 0 || owner >= placements.Count ||
+                    !HasEncodedFeatureResponse(result, index))
+                {
+                    continue;
+                }
+
+                featurePixels[owner].Add(index);
+            }
+
+            float guardDistance = Mathf.Max(
+                2f / FinalResolution,
+                result.FeatureAnchorMaximumCenterErrorUv * 3f);
+            float ownershipInset = Mathf.Max(
+                0.0001f,
+                supportRadius * 0.02f);
+            int inconsistentRocks = 0;
+            for (int orientation = 0;
+                 orientation < FeatureBoundaryProofOrientationCount;
+                 orientation++)
+            {
+                float angle =
+                    orientation /
+                    (float)FeatureBoundaryProofOrientationCount *
+                    Mathf.PI * 2f;
+                Vector2 normal = new Vector2(
+                    Mathf.Cos(angle),
+                    Mathf.Sin(angle));
+
+                for (int owner = 0; owner < placements.Count; owner++)
+                {
+                    IReadOnlyList<int> pixels = featurePixels[owner];
+                    if (pixels.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    bool bankStateConsistent =
+                        IsFeatureOwnerStateConsistent(
+                            pixels,
+                            placements[owner],
+                            centerOffsetX,
+                            centerOffsetY,
+                            supportRadius,
+                            normal,
+                            Mathf.Max(0f, ownershipInset - guardDistance),
+                            ownershipInset,
+                            false);
+                    bool riverbedStateConsistent =
+                        IsFeatureOwnerStateConsistent(
+                            pixels,
+                            placements[owner],
+                            centerOffsetX,
+                            centerOffsetY,
+                            supportRadius,
+                            normal,
+                            ownershipInset + guardDistance,
+                            ownershipInset,
+                            true);
+                    if (!bankStateConsistent || !riverbedStateConsistent)
+                    {
+                        inconsistentRocks++;
+                    }
+                }
+            }
+
+            return inconsistentRocks;
+        }
+
+        private static bool IsFeatureOwnerStateConsistent(
+            IReadOnlyList<int> pixels,
+            PlacementEvidence placement,
+            IReadOnlyList<float> centerOffsetX,
+            IReadOnlyList<float> centerOffsetY,
+            float supportRadius,
+            Vector2 boundaryNormal,
+            float intendedCenterRiverbedInwardDistance,
+            float ownershipInset,
+            bool expectedRiverbedOwner)
+        {
+            for (int index = 0; index < pixels.Count; index++)
+            {
+                int pixelIndex = pixels[index];
+                int x = pixelIndex % FinalResolution;
+                int y = pixelIndex / FinalResolution;
+                float pointX = (x + 0.5f) / FinalResolution;
+                float pointY = (y + 0.5f) / FinalResolution;
+                float centerX = placement.CenterX / WorkResolution;
+                float centerY = placement.CenterY / WorkResolution;
+                Vector2 actualOffset = new Vector2(
+                    ToroidalDeltaUv(pointX, centerX),
+                    ToroidalDeltaUv(pointY, centerY));
+                Vector2 decodedOffset = new Vector2(
+                    centerOffsetX[pixelIndex],
+                    centerOffsetY[pixelIndex]) * supportRadius;
+                float reconstructedCenterRiverbedInwardDistance =
+                    intendedCenterRiverbedInwardDistance +
+                    Vector2.Dot(
+                        actualOffset - decodedOffset,
+                        boundaryNormal);
+                bool riverbedOwner =
+                    reconstructedCenterRiverbedInwardDistance >= ownershipInset;
+                if (riverbedOwner != expectedRiverbedOwner)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static float ResolveProofIndependentOwnerFeatureWeight(
+            bool riverbedOwner,
+            float centerApplicationWeight,
+            float featureEdgeDistance,
+            ProofFeaturePolicy bankPolicy,
+            ProofFeaturePolicy riverbedPolicy)
+        {
+            ProofFeaturePolicy ownerPolicy =
+                riverbedOwner ? riverbedPolicy : bankPolicy;
+            float requiredClearance =
+                ownerPolicy.TransitionDistance + ownerPolicy.SafetyMargin;
+            float retention = ownerPolicy.FadeDistance <= 0.0001f
+                ? (featureEdgeDistance >= requiredClearance ? 1f : 0f)
+                : SmoothStep(
+                    requiredClearance,
+                    requiredClearance + ownerPolicy.FadeDistance,
+                    featureEdgeDistance);
+            return Mathf.Clamp01(centerApplicationWeight) * retention;
+        }
+
         private struct WeightRange
         {
             internal float Minimum;
@@ -4410,6 +4677,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 writer.Write(result.FeatureBoundaryHardPartialRockCount);
                 writer.Write(result.FeatureBoundaryRemovedMaximumResidual);
                 writer.Write(result.FeatureBoundaryFadeInconsistentRockCount);
+                writer.Write(result.FeatureOwnershipInconsistentRockCount);
+                writer.Write(
+                    result.FeatureOwnershipBankSettingsAffectRiverbedRockCount);
+                writer.Write(
+                    result.FeatureOwnershipRiverbedSettingsAffectBankRockCount);
                 WritePixels(writer, result.Moderate);
                 WritePixels(writer, result.PlacementDebug);
                 WritePixels(writer, result.StableIdDebug);

@@ -1703,11 +1703,127 @@ float FoamResolveObjectRibbonBuildMask(
         phaseFeather01);
 }
 
+float FoamLoadObjectRingObstacle(int2 coordinate)
+{
+    int2 clamped = clamp(
+        coordinate,
+        int2(0, 0),
+        max(int2(0, 0), _FoamDimensions - int2(1, 1)));
+    return saturate(_FoamObstacleExclusionRead.Load(int3(clamped, 0)));
+}
+
+float FoamResolveFullObjectContactRing(
+    int2 coordinate,
+    float2 localPosition,
+    float2 point0,
+    float2 point1,
+    float2 point2,
+    float2 point3,
+    float2 point4,
+    float2 physicalCellSpacing,
+    out float ringPathT,
+    out float ringPathLength)
+{
+    if (FoamLoadObjectRingObstacle(coordinate) > 0.5)
+    {
+        ringPathT = 0.0;
+        ringPathLength = 0.001;
+        return 0.0;
+    }
+
+    float2 gradientToObstacle = float2(0.0, 0.0);
+    float contactAccumulation = 0.0;
+    [unroll]
+    for (int oy = -1; oy <= 1; oy++)
+    {
+        [unroll]
+        for (int ox = -1; ox <= 1; ox++)
+        {
+            if (ox == 0 && oy == 0)
+            {
+                continue;
+            }
+
+            float solid = FoamLoadObjectRingObstacle(
+                coordinate + int2(ox, oy));
+            if (solid <= 0.001)
+            {
+                continue;
+            }
+
+            float2 offset = float2(
+                (float)ox * physicalCellSpacing.x,
+                (float)oy * physicalCellSpacing.y);
+            float offsetLength = max(0.001, length(offset));
+            gradientToObstacle += (offset / offsetLength) * solid;
+            contactAccumulation += solid;
+        }
+    }
+
+    float confidence = saturate(contactAccumulation);
+    float normalLength = length(gradientToObstacle);
+    if (confidence <= 0.001 || normalLength <= 0.001)
+    {
+        ringPathT = 0.0;
+        ringPathLength = 0.001;
+        return 0.0;
+    }
+    float2 outwardNormal = -gradientToObstacle / normalLength;
+
+    float minimumX = min(
+        point0.x,
+        min(point1.x, min(point2.x, min(point3.x, point4.x))));
+    float maximumX = max(
+        point0.x,
+        max(point1.x, max(point2.x, max(point3.x, point4.x))));
+    float maximumAbsoluteY = max(
+        abs(point0.y),
+        max(abs(point1.y), max(abs(point2.y), max(abs(point3.y), abs(point4.y)))));
+    float alongExtent = max(abs(minimumX), abs(maximumX));
+    float cellReach = max(physicalCellSpacing.x, physicalCellSpacing.y);
+    float alongGate = 1.0 - smoothstep(
+        alongExtent + cellReach * 0.75,
+        alongExtent + cellReach * 1.75,
+        abs(localPosition.x));
+    float acrossGate = 1.0 - smoothstep(
+        maximumAbsoluteY + cellReach * 0.75,
+        maximumAbsoluteY + cellReach * 1.75,
+        abs(localPosition.y));
+
+    float localLength = length(localPosition);
+    float ownershipGate = 1.0;
+    if (localLength > 0.001)
+    {
+        float2 radialDirection = localPosition / localLength;
+        ownershipGate = smoothstep(
+            -0.30,
+            0.10,
+            dot(outwardNormal, radialDirection));
+    }
+
+    float2 shoulderCentre = (point0 + point4) * 0.5;
+    float2 frontDirection = point2 - shoulderCentre;
+    float frontDirectionLength = length(frontDirection);
+    frontDirection = frontDirectionLength > 0.001
+        ? frontDirection / frontDirectionLength
+        : float2(-1.0, 0.0);
+    ringPathT = saturate(
+        (1.0 - dot(outwardNormal, frontDirection)) * 0.5);
+    float fullFrontLength =
+        length(point1 - point0) +
+        length(point2 - point1) +
+        length(point3 - point2) +
+        length(point4 - point3);
+    ringPathLength = max(0.001, fullFrontLength * 2.0);
+    return saturate(confidence * alongGate * acrossGate * ownershipGate);
+}
+
 float FoamEvaluateObjectContactArcSource(
     FoamSourceEventData sourceEvent,
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
+    int2 coordinate,
     out float coverageMultiplier)
 {
     float2 localPosition = float2(
@@ -1733,10 +1849,8 @@ float FoamEvaluateObjectContactArcSource(
         positiveFirstSegmentSplit);
 
     float wakeArmLength = max(0.05, sourceEvent.shore.y);
-    float totalPathLength = max(0.001, sourceEvent.kinematics.z);
-    float frontProfileLength = max(
-        0.001,
-        totalPathLength - wakeArmLength - wakeArmLength);
+    float initialPathLength = max(0.001, sourceEvent.kinematics.z);
+    float contactStrokePathLength = max(0.001, sourceEvent.deposit.w);
     float frontT;
     float frontShape = FoamResolveObjectFrontProfileShape(
         localPosition,
@@ -1751,6 +1865,35 @@ float FoamEvaluateObjectContactArcSource(
         physicalCellSpacing,
         frontT);
 
+    bool reverseSweep = FoamHash11(sourceEvent.header.w + 73.17) < 0.5;
+    float contactFrontPathT = reverseSweep ? 1.0 - frontT : frontT;
+    float progress = saturate(sourceEvent.header.z);
+    float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
+    if (sourceEvent.header.y >= 0.5)
+    {
+        float reinforcementPhase = FoamResolveObjectRibbonBuildMask(
+            contactFrontPathT,
+            progress,
+            materialStepProgress,
+            contactStrokePathLength,
+            physicalCellSpacing);
+        coverageMultiplier = 1.0;
+        return saturate(frontShape * reinforcementPhase);
+    }
+
+    float ringPathT;
+    float ringPathLength;
+    float ringShape = FoamResolveFullObjectContactRing(
+        coordinate,
+        localPosition,
+        point0,
+        point1,
+        point2,
+        point3,
+        point4,
+        physicalCellSpacing,
+        ringPathT,
+        ringPathLength);
     float negativeArmT;
     float positiveArmT;
     float negativeArmShape = FoamResolveObjectWakeArmShape(
@@ -1766,61 +1909,36 @@ float FoamEvaluateObjectContactArcSource(
         physicalCellSpacing,
         positiveArmT);
 
-    float negativePathT = saturate(
-        wakeArmLength * (1.0 - negativeArmT) /
-        totalPathLength);
-    float frontPathT = saturate(
-        (wakeArmLength + frontT * frontProfileLength) /
-        totalPathLength);
-    float positivePathT = saturate(
-        (wakeArmLength + frontProfileLength +
+    float ringGlobalPathT = saturate(
+        ringPathT * ringPathLength / initialPathLength);
+    float negativeArmPathT = saturate(
+        (ringPathLength + negativeArmT * wakeArmLength) /
+        initialPathLength);
+    float positiveArmPathT = saturate(
+        (ringPathLength + wakeArmLength +
          positiveArmT * wakeArmLength) /
-        totalPathLength);
-
-    float contactFrontPathT = frontT;
-    bool reverseSweep = FoamHash11(sourceEvent.header.w + 73.17) < 0.5;
-    if (reverseSweep)
-    {
-        negativePathT = 1.0 - negativePathT;
-        frontPathT = 1.0 - frontPathT;
-        positivePathT = 1.0 - positivePathT;
-        contactFrontPathT = 1.0 - contactFrontPathT;
-    }
-
-    float progress = saturate(sourceEvent.header.z);
-    float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
-    if (sourceEvent.header.y >= 0.5)
-    {
-        float reinforcementPhase = FoamResolveObjectRibbonBuildMask(
-            contactFrontPathT,
-            progress,
-            materialStepProgress,
-            frontProfileLength,
-            physicalCellSpacing);
-        coverageMultiplier = 1.0;
-        return saturate(frontShape * reinforcementPhase);
-    }
-    float negativePhase = FoamResolveObjectRibbonBuildMask(
-        negativePathT,
+        initialPathLength);
+    float ringPhase = FoamResolveObjectRibbonBuildMask(
+        ringGlobalPathT,
         progress,
         materialStepProgress,
-        totalPathLength,
+        initialPathLength,
         physicalCellSpacing);
-    float frontPhase = FoamResolveObjectRibbonBuildMask(
-        frontPathT,
+    float negativePhase = FoamResolveObjectRibbonBuildMask(
+        negativeArmPathT,
         progress,
         materialStepProgress,
-        totalPathLength,
+        initialPathLength,
         physicalCellSpacing);
     float positivePhase = FoamResolveObjectRibbonBuildMask(
-        positivePathT,
+        positiveArmPathT,
         progress,
         materialStepProgress,
-        totalPathLength,
+        initialPathLength,
         physicalCellSpacing);
 
     float shape = max(
-        frontShape * frontPhase,
+        ringShape * ringPhase,
         max(
             negativeArmShape * negativePhase,
             positiveArmShape * positivePhase));
@@ -1833,6 +1951,7 @@ float FoamEvaluateObjectContactSemiArcSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
+    int2 coordinate,
     out float coverageMultiplier)
 {
     float2 localPosition = float2(
@@ -1858,10 +1977,8 @@ float FoamEvaluateObjectContactSemiArcSource(
         positiveFirstSegmentSplit);
 
     float armLength = max(0.05, sourceEvent.shore.y);
-    float totalPathLength = max(0.001, sourceEvent.kinematics.z);
-    float selectedFrontLength = max(
-        0.001,
-        totalPathLength - armLength);
+    float initialPathLength = max(0.001, sourceEvent.kinematics.z);
+    float contactStrokePathLength = max(0.001, sourceEvent.deposit.w);
     bool selectedPositive = sourceEvent.variation.w >= 0.0;
     float armT;
     float armShape;
@@ -1904,16 +2021,7 @@ float FoamEvaluateObjectContactSemiArcSource(
             frontHalfT);
     }
 
-    // Build begins at the front point and advances through the selected face
-    // half toward the shoulder and finite downstream arm tip. Every location is
-    // born once and becomes ordinary transported Layer C material afterward.
     float contactFrontPathT = saturate(1.0 - frontHalfT);
-    float frontPathT = saturate(
-        contactFrontPathT * selectedFrontLength /
-        totalPathLength);
-    float armPathT = saturate(
-        (selectedFrontLength + armT * armLength) /
-        totalPathLength);
     float progress = saturate(sourceEvent.header.z);
     float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
     if (sourceEvent.header.y >= 0.5)
@@ -1922,28 +2030,46 @@ float FoamEvaluateObjectContactSemiArcSource(
             contactFrontPathT,
             progress,
             materialStepProgress,
-            selectedFrontLength,
+            contactStrokePathLength,
             physicalCellSpacing);
         coverageMultiplier = 1.0;
         return saturate(frontShape * reinforcementPhase);
     }
 
+    float ringPathT;
+    float ringPathLength;
+    float ringShape = FoamResolveFullObjectContactRing(
+        coordinate,
+        localPosition,
+        point0,
+        point1,
+        point2,
+        point3,
+        point4,
+        physicalCellSpacing,
+        ringPathT,
+        ringPathLength);
+    float ringGlobalPathT = saturate(
+        ringPathT * ringPathLength / initialPathLength);
+    float armPathT = saturate(
+        (ringPathLength + armT * armLength) /
+        initialPathLength);
+    float ringPhase = FoamResolveObjectRibbonBuildMask(
+        ringGlobalPathT,
+        progress,
+        materialStepProgress,
+        initialPathLength,
+        physicalCellSpacing);
     float armPhase = FoamResolveObjectRibbonBuildMask(
         armPathT,
         progress,
         materialStepProgress,
-        totalPathLength,
-        physicalCellSpacing);
-    float frontPhase = FoamResolveObjectRibbonBuildMask(
-        frontPathT,
-        progress,
-        materialStepProgress,
-        totalPathLength,
+        initialPathLength,
         physicalCellSpacing);
 
     float shape = max(
-        armShape * armPhase,
-        frontShape * frontPhase);
+        ringShape * ringPhase,
+        armShape * armPhase);
     coverageMultiplier = 1.0;
     return saturate(shape);
 }
@@ -2341,6 +2467,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             globalDistance,
             lateralMetres,
             physicalCellSpacing,
+            coordinate,
             currentCoverageMultiplier);
     }
     else if (sourceType < 4.5)
@@ -2360,6 +2487,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
             globalDistance,
             lateralMetres,
             physicalCellSpacing,
+            coordinate,
             currentCoverageMultiplier);
     }
     else if (sourceType < 6.5)
@@ -2431,6 +2559,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     globalDistance,
                     lateralMetres,
                     physicalCellSpacing,
+                    coordinate,
                     previousCoverageMultiplier);
             }
             else if (sourceType < 4.5)
@@ -2450,6 +2579,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     globalDistance,
                     lateralMetres,
                     physicalCellSpacing,
+                    coordinate,
                     previousCoverageMultiplier);
             }
             else if (sourceType < 6.5)
@@ -2500,9 +2630,10 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     }
 
     // Every automatic source deposits only the newly revealed interval. Object
-    // Arc/Semi-Arc stroke zero emits the complete contact-and-wake packet. Finite
-    // later stroke phases reset one-shot permission and reinforce only the
-    // immediate contact profile; wake arms are never emitted by reinforcement.
+    // Arc/Semi-Arc stroke zero establishes the complete obstacle-contact ring and
+    // then emits its finite wake arm geometry once. Later Arc strokes use the
+    // complete Arc contact profile; later Semi-Arc strokes use the selected half.
+    // Phase changes reset one-shot permission and no later stroke emits a wake arm.
 
     // P13A makes Initial Presence and Initial Life authoritative material
     // properties. Source shape, family/subcell shaping, reveal progression and

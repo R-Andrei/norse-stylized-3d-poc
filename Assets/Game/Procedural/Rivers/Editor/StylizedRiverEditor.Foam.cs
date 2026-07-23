@@ -1363,12 +1363,26 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamObjectContactMinimumPacketGapMetres"),
                     new GUIContent(
                         "Object Contact Minimum Packet Gap (m)",
-                        "Minimum downstream clearance after any Object Arc, Semi-Arc, or Fleck finishes before the same object may emit another packet. Rearm also includes conservative clearance through the object-contact slowdown halo."));
+                        "Minimum downstream gap between released Object packets from the same anchor. Full Arc/Semi-Arc rearm uses the previous wake-arm length plus this gap at normal Foam downstream speed. Contact-only reinforcement has an independent interval and does not reset this packet clock."));
                 EditorGUILayout.PropertyField(
                     Find("foamObjectContactStrokeCount"),
                     new GUIContent(
                         "Object Contact Stroke Count",
-                        "Finite Arc/Semi-Arc burst size. Stroke one emits the complete contact packet and finite wake arm or arms. Additional strokes progressively reinforce only the immediate object-contact profile. Range 1–3; default 2."));
+                        "Finite initial Arc/Semi-Arc burst size. Stroke one progressively establishes a complete narrow ring around the obstacle and then emits the recipe's finite wake arm or arms once. Later Arc strokes reinforce the complete Arc contact profile; later Semi-Arc strokes reinforce only the selected Semi-Arc half-profile. Range 1–3; default 2."));
+                EditorGUILayout.PropertyField(
+                    Find("foamObjectContactReinforcementEnabled"),
+                    new GUIContent(
+                        "Contact Reinforcement Enabled",
+                        "Enables independent finite contact maintenance after a full Arc/Semi-Arc packet. Arc maintenance emits one complete Arc contact-profile stroke; Semi-Arc maintenance emits one selected half-profile stroke. Neither emits wake arms, and each event ends after one stroke."));
+                using (new EditorGUI.DisabledScope(
+                    !Find("foamObjectContactReinforcementEnabled").boolValue))
+                {
+                    EditorGUILayout.PropertyField(
+                        Find("foamObjectContactReinforcementIntervalSeconds"),
+                        new GUIContent(
+                            "Contact Reinforcement Interval (s)",
+                            "Seconds between finite contact-only maintenance strokes while the next full Object packet is still waiting for released-wake clearance. Full packets keep priority and reinforcement never changes their eligibility."));
+                }
                 EditorGUILayout.PropertyField(
                     Find("foamObjectFoamFormationSpeedMetresPerSecond"),
                     new GUIContent(
@@ -1377,7 +1391,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 EditorGUILayout.Space(4f);
                 EditorGUILayout.LabelField(
-                    "One-Shot Contact Packets",
+                    "Contact Packets & Reinforcement",
                     EditorStyles.boldLabel);
                 EditorGUILayout.PropertyField(
                     Find("foamObjectContactCycleCoverage"),
@@ -1385,7 +1399,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Anchor Coverage",
                         "Stable share of registered object anchors that can emit finite Arc/Semi-Arc reinforcement bursts. One includes every eligible object."));
                 EditorGUILayout.HelpBox(
-                    "Arc and Semi-Arc use a finite reinforcement burst: stroke one deposits the complete packet, while later strokes reinforce only the immediate contact profile. No Hold, Release, or persistent emitter exists after the final stroke. Flecks remain finite one-shot packets. All recipes share one per-object clearance gate. If contact slowdown is enabled with Minimum Speed Factor zero, automatic object rearm remains disabled because the previous packet is authored as stationary.",
+                    "Full Arc/Semi-Arc packets remain finite and distance-spaced. Their first stroke establishes one complete obstacle-contact ring and emits the recipe wake geometry once. Optional later initial strokes and independent maintenance use recipe contact geometry only: complete Arc or selected Semi-Arc half-profile, with no wake arms. Maintenance never changes full-packet eligibility and runs only while the next full packet remains in clearance. Full packets have priority over reinforcement; reinforcement has priority over Flecks. No persistent material-cadence emitter exists.",
                     MessageType.None);
 
                 EditorGUILayout.PropertyField(
@@ -1394,7 +1408,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Debug Pattern Mode",
                         "Mixed uses Arc and Semi-Arc weights for per-object contact cycles and enables supplemental Flecks through their independent Coverage and Activity controls. Pure modes force one pattern for validation."));
                 EditorGUILayout.HelpBox(
-                    "Contact Arcs and Semi-Arcs use a one-cell upstream contact bridge plus thin straight downstream wake arms from the two side shoulders. They never follow the obstacle behind the shoulders, use no breakup or source-fill holes, and expose only real path controls. Fleck geometry remains independent, and Static Pressure Front Reach cannot widen any object source.",
+                    "The first Arc or Semi-Arc stroke derives a one-cell contact ring locally from the existing obstacle-exclusion field around the actual rock boundary, then emits only the recipe's finite straight downstream wake arm geometry. Later Arc strokes use the complete five-point contact profile; later Semi-Arc strokes use the deterministic selected half-profile. No later stroke emits a wake arm. Fleck geometry remains independent, and Static Pressure Front Reach cannot widen any object source.",
                     MessageType.None);
 
                 EditorGUILayout.Space(4f);
@@ -1414,7 +1428,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Contact Semi-Arcs",
                         "Relative share of Mixed per-object contact cycles assigned to single-arm Contact Semi-Arcs. Flecks are independent and are not part of this normalized cycle mix."));
                 EditorGUILayout.HelpBox(
-                    "Contact Flecks are an independent packet population. Their Coverage and Activity control eligibility behind the shared Object Contact Minimum Packet Gap; Arc/Semi-Arc weights do not scale Fleck rate.",
+                    "Contact Flecks are an independent packet population. Their Coverage and Activity control eligibility behind the full-packet clearance clock; Arc/Semi-Arc weights do not scale Fleck rate. Contact-only reinforcement uses its own interval and does not consume Fleck Activity.",
                     MessageType.None);
 
                 EditorGUILayout.Space(4f);

@@ -1141,6 +1141,7 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectContactCycleTime += Mathf.Max(0f, deltaTime);
             RefreshAutomaticObjectPatternAuthority();
             RefreshAutomaticObjectClearanceAuthority();
+            RefreshAutomaticObjectReinforcementAuthority();
 
             if (!ResolveAutomaticObjectSourceProfile(
                     out AutomaticObjectSourceProfile objectProfile,
@@ -1190,6 +1191,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             int cycleStarts = 0;
+            int reinforcementStarts = 0;
             int fleckStarts = 0;
             int skippedThisUpdate = 0;
             if (river.FoamObjectContactCyclesEnabled)
@@ -1204,10 +1206,24 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
+            if (river.FoamObjectContactReinforcementEnabled &&
+                river.FoamObjectContactCyclesEnabled)
+            {
+                while (cycleStarts + reinforcementStarts <
+                           AutomaticObjectSourceMaximumStartsPerUpdate &&
+                       TryStartAutomaticObjectContactReinforcement(
+                           objectProfile,
+                           out int skippedObjects))
+                {
+                    reinforcementStarts++;
+                    skippedThisUpdate += skippedObjects;
+                }
+            }
+
             if (fleckEventsPerSecond > 0.0001f)
             {
                 while (automaticObjectBirthAccumulator >= 1f &&
-                       cycleStarts + fleckStarts <
+                       cycleStarts + reinforcementStarts + fleckStarts <
                            AutomaticObjectSourceMaximumStartsPerUpdate)
                 {
                     if (TryStartAutomaticObjectFleckEvent(
@@ -1228,16 +1244,17 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
-            int startsThisUpdate = cycleStarts + fleckStarts;
+            int startsThisUpdate = cycleStarts + reinforcementStarts + fleckStarts;
             automaticObjectBirthSubmittedLastUpdate = startsThisUpdate;
             automaticObjectBirthRejectedLastUpdate = skippedThisUpdate;
             automaticObjectBirthSubmittedTotal += startsThisUpdate;
             RefreshAutomaticObjectSourcePacketDiagnostics();
             automaticObjectBirthStatus =
-                $"Object packets {automaticObjectContactBuildCount} building / " +
-                $"{automaticObjectWaitingClearanceCount} waiting for clearance; " +
-                $"started {cycleStarts} Arc/Semi-Arc + {fleckStarts} Fleck, " +
-                $"skipped {skippedThisUpdate}";
+                $"Object packets {automaticObjectContactBuildCount} full / " +
+                $"{automaticObjectContactReinforcementCount} reinforcement / " +
+                $"{automaticObjectWaitingClearanceCount} waiting for packet clearance; " +
+                $"started {cycleStarts} full + {reinforcementStarts} reinforcement + " +
+                $"{fleckStarts} Fleck, skipped {skippedThisUpdate}";
             return startsThisUpdate > 0;
         }
 
@@ -1302,8 +1319,11 @@ namespace ProgrammaticStylized3D.Rivers
                 EntityId sourceId = automaticObjectContactStaleSourceIds[index];
                 AutomaticObjectSourceState state =
                     automaticObjectSourceStates[sourceId];
-                state.NextStartTime = automaticObjectContactCycleTime;
+                state.NextPacketStartTime = automaticObjectContactCycleTime;
+                state.NextReinforcementTime = float.PositiveInfinity;
                 state.LastEventType = AutomaticFoamSourceEventType.None;
+                state.LastContactEventType = AutomaticFoamSourceEventType.None;
+                state.LastContactSeed = 0f;
                 automaticObjectSourceStates[sourceId] = state;
             }
             automaticObjectContactStaleSourceIds.Clear();
@@ -1322,12 +1342,6 @@ namespace ProgrammaticStylized3D.Rivers
                 signature = 29;
                 signature = signature * 31 + Mathf.RoundToInt(
                     river.FoamObjectContactMinimumPacketGapMetres * 1000f);
-                signature = signature * 31 + Mathf.RoundToInt(
-                    river.FoamObstacleSlowdownStrength * 10000f);
-                signature = signature * 31 + Mathf.RoundToInt(
-                    river.FoamObstacleMinimumDownstreamFactor * 10000f);
-                signature = signature * 31 + Mathf.RoundToInt(
-                    river.FoamObjectContactSlowdownOuterReachMetres * 1000f);
                 signature = signature * 31 + Mathf.RoundToInt(
                     ResolveBaseFoamDownstreamSpeedMetresPerSecond() * 1000f);
             }
@@ -1360,7 +1374,63 @@ namespace ProgrammaticStylized3D.Rivers
                 EntityId sourceId = automaticObjectContactStaleSourceIds[index];
                 AutomaticObjectSourceState state =
                     automaticObjectSourceStates[sourceId];
-                state.NextStartTime = automaticObjectContactCycleTime;
+                state.NextPacketStartTime = automaticObjectContactCycleTime;
+                automaticObjectSourceStates[sourceId] = state;
+            }
+            automaticObjectContactStaleSourceIds.Clear();
+        }
+
+        private void RefreshAutomaticObjectReinforcementAuthority()
+        {
+            if (river == null)
+            {
+                return;
+            }
+
+            int signature;
+            unchecked
+            {
+                signature = 41;
+                signature = signature * 31 +
+                    (river.FoamObjectContactReinforcementEnabled ? 1 : 0);
+                signature = signature * 31 + Mathf.RoundToInt(
+                    river.FoamObjectContactReinforcementIntervalSeconds * 1000f);
+            }
+
+            if (automaticObjectReinforcementAuthoritySignature == int.MinValue)
+            {
+                automaticObjectReinforcementAuthoritySignature = signature;
+                return;
+            }
+
+            if (automaticObjectReinforcementAuthoritySignature == signature)
+            {
+                return;
+            }
+
+            automaticObjectReinforcementAuthoritySignature = signature;
+            automaticObjectContactStaleSourceIds.Clear();
+            foreach (EntityId sourceId in automaticObjectSourceStates.Keys)
+            {
+                if (!HasActiveAutomaticObjectSource(sourceId))
+                {
+                    automaticObjectContactStaleSourceIds.Add(sourceId);
+                }
+            }
+
+            for (int index = 0;
+                 index < automaticObjectContactStaleSourceIds.Count;
+                 index++)
+            {
+                EntityId sourceId = automaticObjectContactStaleSourceIds[index];
+                AutomaticObjectSourceState state =
+                    automaticObjectSourceStates[sourceId];
+                state.NextReinforcementTime =
+                    river.FoamObjectContactReinforcementEnabled &&
+                    IsAutomaticObjectContactCycle(state.LastContactEventType)
+                        ? automaticObjectContactCycleTime +
+                            river.FoamObjectContactReinforcementIntervalSeconds
+                        : float.PositiveInfinity;
                 automaticObjectSourceStates[sourceId] = state;
             }
             automaticObjectContactStaleSourceIds.Clear();
@@ -1473,7 +1543,7 @@ namespace ProgrammaticStylized3D.Rivers
 
                 if (HasActiveAutomaticObjectSource(source.SourceId) ||
                     automaticObjectContactCycleTime + 0.0001f <
-                        state.NextStartTime)
+                        state.NextPacketStartTime)
                 {
                     skippedObjects++;
                     continue;
@@ -1502,10 +1572,99 @@ namespace ProgrammaticStylized3D.Rivers
                         profile,
                         recipe,
                         source,
-                        cycleSeed))
+                        cycleSeed,
+                        false))
                 {
                     state.CycleIndex++;
-                    state.NextStartTime = float.PositiveInfinity;
+                    state.NextPacketStartTime = float.PositiveInfinity;
+                    state.NextReinforcementTime = float.PositiveInfinity;
+                    state.LastContactEventType =
+                        recipe == AutomaticObjectSourceRecipe.ContactSemiArc
+                            ? AutomaticFoamSourceEventType.ObjectContactSemiArc
+                            : AutomaticFoamSourceEventType.ObjectContactArc;
+                    state.LastContactSeed = cycleSeed;
+                    automaticObjectSourceStates[source.SourceId] = state;
+                    idleSince = 0.0;
+                    return true;
+                }
+
+                skippedObjects++;
+            }
+
+            return false;
+        }
+
+        private bool TryStartAutomaticObjectContactReinforcement(
+            AutomaticObjectSourceProfile profile,
+            out int skippedObjects)
+        {
+            skippedObjects = 0;
+            int sourceCount = automaticObjectFoamSources.Count;
+            if (river == null || !river.Domain.IsValid || sourceCount <= 0 ||
+                !river.FoamObjectContactReinforcementEnabled)
+            {
+                return false;
+            }
+
+            int scanBudget = Mathf.Min(
+                Mathf.Max(1, sourceCount),
+                AutomaticObjectSourceMaximumScansPerUpdate);
+            for (int scan = 0; scan < scanBudget; scan++)
+            {
+                int cursor = automaticObjectBirthCursor++;
+                int cyclePermutation = cursor / Mathf.Max(1, sourceCount);
+                int scanIndex = PositiveModulo(cursor, sourceCount);
+                int sourceIndex = ResolvePermutedAutomaticObjectSourceIndex(
+                    scanIndex,
+                    sourceCount,
+                    cyclePermutation);
+                RiverFoamStaticObjectSource source =
+                    automaticObjectFoamSources[sourceIndex];
+                float identitySeed = ResolveAutomaticObjectIdentitySeed(source);
+                if (Hash01(identitySeed + 1.7f) >
+                    river.FoamObjectContactCycleCoverage)
+                {
+                    skippedObjects++;
+                    continue;
+                }
+
+                if (!automaticObjectSourceStates.TryGetValue(
+                        source.SourceId,
+                        out AutomaticObjectSourceState state))
+                {
+                    state = CreateInitialAutomaticObjectSourceState();
+                    automaticObjectSourceStates[source.SourceId] = state;
+                }
+
+                bool hasContactRecipe =
+                    IsAutomaticObjectContactCycle(state.LastContactEventType);
+                bool fullPacketStillWaiting =
+                    automaticObjectContactCycleTime + 0.0001f <
+                        state.NextPacketStartTime;
+                bool reinforcementDue =
+                    automaticObjectContactCycleTime + 0.0001f >=
+                        state.NextReinforcementTime;
+                if (!hasContactRecipe || !fullPacketStillWaiting ||
+                    !reinforcementDue ||
+                    HasActiveAutomaticObjectSource(source.SourceId))
+                {
+                    skippedObjects++;
+                    continue;
+                }
+
+                AutomaticObjectSourceRecipe recipe =
+                    state.LastContactEventType ==
+                        AutomaticFoamSourceEventType.ObjectContactSemiArc
+                            ? AutomaticObjectSourceRecipe.ContactSemiArc
+                            : AutomaticObjectSourceRecipe.ContactArc;
+                if (TryBeginAutomaticObjectSourceEvent(
+                        profile,
+                        recipe,
+                        source,
+                        state.LastContactSeed,
+                        true))
+                {
+                    state.NextReinforcementTime = float.PositiveInfinity;
                     automaticObjectSourceStates[source.SourceId] = state;
                     idleSince = 0.0;
                     return true;
@@ -1563,7 +1722,7 @@ namespace ProgrammaticStylized3D.Rivers
                         river.FoamObjectContactCycleCoverage;
                 if (HasActiveAutomaticObjectSource(source.SourceId) ||
                     automaticObjectContactCycleTime + 0.0001f <
-                        state.NextStartTime ||
+                        state.NextPacketStartTime ||
                     (contactCycleEligible &&
                      state.LastEventType ==
                         AutomaticFoamSourceEventType.ObjectContactFleck))
@@ -1577,10 +1736,11 @@ namespace ProgrammaticStylized3D.Rivers
                         profile,
                         AutomaticObjectSourceRecipe.ContactFleck,
                         source,
-                        sourceSeed))
+                        sourceSeed,
+                        false))
                 {
                     state.CycleIndex++;
-                    state.NextStartTime = float.PositiveInfinity;
+                    state.NextPacketStartTime = float.PositiveInfinity;
                     automaticObjectSourceStates[source.SourceId] = state;
                     idleSince = 0.0;
                     return true;
@@ -1645,8 +1805,11 @@ namespace ProgrammaticStylized3D.Rivers
             return new AutomaticObjectSourceState
             {
                 CycleIndex = 0,
-                NextStartTime = automaticObjectContactCycleTime,
-                LastEventType = AutomaticFoamSourceEventType.None
+                NextPacketStartTime = automaticObjectContactCycleTime,
+                NextReinforcementTime = float.PositiveInfinity,
+                LastEventType = AutomaticFoamSourceEventType.None,
+                LastContactEventType = AutomaticFoamSourceEventType.None,
+                LastContactSeed = 0f
             };
         }
 
@@ -1686,11 +1849,31 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectSourceStates.TryGetValue(
                 sourceEvent.ObjectSourceId,
                 out AutomaticObjectSourceState state);
+            if (sourceEvent.ObjectContactReinforcementOnly)
+            {
+                state.NextReinforcementTime =
+                    river != null && river.FoamObjectContactReinforcementEnabled
+                        ? automaticObjectContactCycleTime +
+                            river.FoamObjectContactReinforcementIntervalSeconds
+                        : float.PositiveInfinity;
+                automaticObjectSourceStates[sourceEvent.ObjectSourceId] = state;
+                return;
+            }
+
             state.LastEventType = sourceEvent.Type;
-            float clearanceSeconds = ResolveAutomaticObjectPacketClearanceSeconds();
-            state.NextStartTime = float.IsPositiveInfinity(clearanceSeconds)
+            float clearanceSeconds =
+                ResolveAutomaticObjectPacketClearanceSeconds(sourceEvent);
+            state.NextPacketStartTime = float.IsPositiveInfinity(clearanceSeconds)
                 ? float.PositiveInfinity
                 : automaticObjectContactCycleTime + clearanceSeconds;
+            if (IsAutomaticObjectContactCycle(sourceEvent.Type))
+            {
+                state.NextReinforcementTime =
+                    river != null && river.FoamObjectContactReinforcementEnabled
+                        ? automaticObjectContactCycleTime +
+                            river.FoamObjectContactReinforcementIntervalSeconds
+                        : float.PositiveInfinity;
+            }
             automaticObjectSourceStates[sourceEvent.ObjectSourceId] = state;
         }
 
@@ -1744,6 +1927,7 @@ namespace ProgrammaticStylized3D.Rivers
         private void RefreshAutomaticObjectSourcePacketDiagnostics()
         {
             automaticObjectContactBuildCount = 0;
+            automaticObjectContactReinforcementCount = 0;
             automaticObjectContactFleckCount = 0;
             for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
             {
@@ -1759,7 +1943,14 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceEvent.Type ==
                         AutomaticFoamSourceEventType.ObjectContactSemiArc)
                 {
-                    automaticObjectContactBuildCount++;
+                    if (sourceEvent.ObjectContactReinforcementOnly)
+                    {
+                        automaticObjectContactReinforcementCount++;
+                    }
+                    else
+                    {
+                        automaticObjectContactBuildCount++;
+                    }
                 }
                 else if (sourceEvent.Type ==
                     AutomaticFoamSourceEventType.ObjectContactFleck)
@@ -1773,7 +1964,7 @@ namespace ProgrammaticStylized3D.Rivers
                      in automaticObjectSourceStates)
             {
                 if (!HasActiveAutomaticObjectSource(pair.Key) &&
-                    pair.Value.NextStartTime > automaticObjectContactCycleTime)
+                    pair.Value.NextPacketStartTime > automaticObjectContactCycleTime)
                 {
                     automaticObjectWaitingClearanceCount++;
                 }
@@ -1875,7 +2066,8 @@ namespace ProgrammaticStylized3D.Rivers
             AutomaticObjectSourceProfile profile,
             AutomaticObjectSourceRecipe recipe,
             RiverFoamStaticObjectSource source,
-            float seed)
+            float seed,
+            bool contactOnlyReinforcement)
         {
             float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
             float sourceKey = river.VisualSeed * 0.417f +
@@ -1900,6 +2092,8 @@ namespace ProgrammaticStylized3D.Rivers
             float objectAlongHalfLengthMetres = 0f;
             float objectAcrossHalfWidthMetres = 0f;
             float sourcePathDistance;
+            float objectContactPathLengthMetres = 0f;
+            float objectContactStrokePathLengthMetres = 0f;
             ResolvedAutomaticObjectContactProfile resolvedContactProfile = default;
             float startGlobalDistance;
             float endGlobalDistance;
@@ -2046,11 +2240,26 @@ namespace ProgrammaticStylized3D.Rivers
                         ? resolvedContactProfile.NegativeHalfLength
                         : resolvedContactProfile.PositiveHalfLength)
                     : resolvedContactProfile.FrontPathLength;
-                sourcePathDistance = Mathf.Max(
+                objectContactStrokePathLengthMetres = Mathf.Max(
                     0.001f,
+                    selectedFrontLength);
+                float fullContactRingPathLengthMetres = Mathf.Max(
+                    0.001f,
+                    resolvedContactProfile.FrontPathLength * 2f);
+                objectContactPathLengthMetres = Mathf.Max(
+                    0.001f,
+                    fullContactRingPathLengthMetres +
                     negativeArmLength +
-                    selectedFrontLength +
                     positiveArmLength);
+                sourcePathDistance = contactOnlyReinforcement
+                    ? objectContactStrokePathLengthMetres
+                    : objectContactPathLengthMetres;
+                float dispatchNegativeArmLength = contactOnlyReinforcement
+                    ? 0f
+                    : negativeArmLength;
+                float dispatchPositiveArmLength = contactOnlyReinforcement
+                    ? 0f
+                    : positiveArmLength;
 
                 float minimumLocalX;
                 float maximumLocalX;
@@ -2058,7 +2267,7 @@ namespace ProgrammaticStylized3D.Rivers
                 if (semiArc && lopsidedness < 0f)
                 {
                     Vector2 armTip = resolvedContactProfile.Point0 +
-                        new Vector2(negativeArmLength, 0f);
+                        new Vector2(dispatchNegativeArmLength, 0f);
                     minimumLocalX = Mathf.Min(
                         resolvedContactProfile.Point0.x,
                         Mathf.Min(
@@ -2080,7 +2289,7 @@ namespace ProgrammaticStylized3D.Rivers
                 else if (semiArc)
                 {
                     Vector2 armTip = resolvedContactProfile.Point4 +
-                        new Vector2(positiveArmLength, 0f);
+                        new Vector2(dispatchPositiveArmLength, 0f);
                     minimumLocalX = Mathf.Min(
                         resolvedContactProfile.Point2.x,
                         Mathf.Min(
@@ -2102,15 +2311,28 @@ namespace ProgrammaticStylized3D.Rivers
                 else
                 {
                     Vector2 negativeArmTip = resolvedContactProfile.Point0 +
-                        new Vector2(negativeArmLength, 0f);
+                        new Vector2(dispatchNegativeArmLength, 0f);
                     Vector2 positiveArmTip = resolvedContactProfile.Point4 +
-                        new Vector2(positiveArmLength, 0f);
+                        new Vector2(dispatchPositiveArmLength, 0f);
                     minimumLocalX = resolvedContactProfile.MinimumX;
                     maximumLocalX = Mathf.Max(
                         resolvedContactProfile.MaximumX,
                         Mathf.Max(negativeArmTip.x, positiveArmTip.x));
                     maximumAbsoluteY =
                         resolvedContactProfile.MaximumAbsoluteY;
+                }
+
+                if (!contactOnlyReinforcement)
+                {
+                    minimumLocalX = Mathf.Min(
+                        minimumLocalX,
+                        -objectAlongHalfLengthMetres);
+                    maximumLocalX = Mathf.Max(
+                        maximumLocalX,
+                        objectAlongHalfLengthMetres);
+                    maximumAbsoluteY = Mathf.Max(
+                        maximumAbsoluteY,
+                        objectAcrossHalfWidthMetres);
                 }
 
                 startGlobalDistance = Mathf.Clamp(
@@ -2128,18 +2350,33 @@ namespace ProgrammaticStylized3D.Rivers
                     maximumAbsoluteY);
             }
 
-            if (sourcePathDistance <= 0.05f)
+            float minimumAcceptedPathDistance = contactOnlyReinforcement
+                ? 0.001f
+                : 0.05f;
+            if (sourcePathDistance <= minimumAcceptedPathDistance)
             {
                 foamCompositionRejectedCount++;
                 return false;
             }
 
+            float revealSpeedJitter = Mathf.Lerp(
+                0.90f,
+                1.10f,
+                Hash01(seed + 12.5f));
             ResolvedAutomaticRevealTiming revealTiming =
                 ResolveAutomaticRevealTiming(
                     sourcePathDistance,
                     profile.FormationSpeedMetresPerSecond,
                     patternFormationSpeedMultiplier,
-                    Mathf.Lerp(0.90f, 1.10f, Hash01(seed + 12.5f)));
+                    revealSpeedJitter);
+            ResolvedAutomaticRevealTiming contactStrokeRevealTiming =
+                recipe == AutomaticObjectSourceRecipe.ContactFleck
+                    ? revealTiming
+                    : ResolveAutomaticRevealTiming(
+                        objectContactStrokePathLengthMetres,
+                        profile.FormationSpeedMetresPerSecond,
+                        patternFormationSpeedMultiplier,
+                        revealSpeedJitter);
             float formationSpeed =
                 revealTiming.RequestedSpeedMetresPerSecond;
             bool contactCycle = recipe != AutomaticObjectSourceRecipe.ContactFleck;
@@ -2166,6 +2403,7 @@ namespace ProgrammaticStylized3D.Rivers
                 endGlobalDistance,
                 source.GlobalDistance,
                 revealTiming,
+                contactStrokeRevealTiming,
                 headTrailMetres,
                 offset,
                 width,
@@ -2180,8 +2418,10 @@ namespace ProgrammaticStylized3D.Rivers
                 objectAcrossHalfWidthMetres,
                 objectSourceLateralCellSpacingMetres,
                 objectWakeArmLengthMetres,
-                sourcePathDistance,
-                resolvedContactProfile);
+                objectContactPathLengthMetres,
+                objectContactStrokePathLengthMetres,
+                resolvedContactProfile,
+                contactOnlyReinforcement);
         }
 
         private bool BeginAutomaticObjectFoamSourceEvent(
@@ -2191,6 +2431,7 @@ namespace ProgrammaticStylized3D.Rivers
             float endGlobalDistance,
             float objectCentreGlobalDistance,
             ResolvedAutomaticRevealTiming revealTiming,
+            ResolvedAutomaticRevealTiming contactStrokeRevealTiming,
             float headTrailMetres,
             float contactOffsetMetres,
             float widthMetres,
@@ -2206,7 +2447,9 @@ namespace ProgrammaticStylized3D.Rivers
             float objectSourceLateralCellSpacingMetres,
             float objectWakeArmLengthMetres,
             float objectContactPathLengthMetres,
-            ResolvedAutomaticObjectContactProfile contactProfile)
+            float objectContactStrokePathLengthMetres,
+            ResolvedAutomaticObjectContactProfile contactProfile,
+            bool contactOnlyReinforcement)
         {
             if (river == null || !river.FoamEnabled ||
                 river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
@@ -2242,11 +2485,19 @@ namespace ProgrammaticStylized3D.Rivers
                 sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
             float resolvedBuildDuration =
                 revealTiming.ResolvedDurationSeconds;
-            int objectContactStrokeCount = contactCycle && river != null
-                ? river.FoamObjectContactStrokeCount
-                : 1;
-            float resolvedEventDuration = resolvedBuildDuration *
-                Mathf.Max(1, objectContactStrokeCount);
+            float resolvedContactStrokeDuration = contactCycle
+                ? contactStrokeRevealTiming.ResolvedDurationSeconds
+                : resolvedBuildDuration;
+            int objectContactStrokeCount = contactCycle && river != null &&
+                !contactOnlyReinforcement
+                    ? river.FoamObjectContactStrokeCount
+                    : 1;
+            float resolvedEventDuration = contactCycle &&
+                !contactOnlyReinforcement
+                    ? resolvedBuildDuration +
+                        Mathf.Max(0, objectContactStrokeCount - 1) *
+                        resolvedContactStrokeDuration
+                    : resolvedBuildDuration;
 
             automaticFoamSourceEvents[slotIndex] = new AutomaticFoamSourceEvent
             {
@@ -2261,7 +2512,17 @@ namespace ProgrammaticStylized3D.Rivers
                 Duration = resolvedEventDuration,
                 Elapsed = 0f,
                 ObjectBuildDuration = resolvedBuildDuration,
+                ObjectContactStrokeDuration = resolvedContactStrokeDuration,
+                ObjectContactStrokePathLengthMetres = contactCycle
+                    ? Mathf.Max(0.001f, objectContactStrokePathLengthMetres)
+                    : 0f,
+                ObjectContactStrokeRawRevealDurationSeconds = contactCycle
+                    ? contactStrokeRevealTiming.RawDurationSeconds
+                    : 0f,
+                ObjectContactStrokeRevealCadenceLimited = contactCycle &&
+                    contactStrokeRevealTiming.CadenceLimited,
                 ObjectContactStrokeCount = objectContactStrokeCount,
+                ObjectContactReinforcementOnly = contactOnlyReinforcement,
                 FormationSpeedMetresPerSecond =
                     revealTiming.RequestedSpeedMetresPerSecond,
                 RevealPathDistanceMetres = revealTiming.PathDistanceMetres,
@@ -2403,7 +2664,8 @@ namespace ProgrammaticStylized3D.Rivers
             return 0f;
         }
 
-        private float ResolveAutomaticObjectPacketClearanceSeconds()
+        private float ResolveAutomaticObjectPacketClearanceSeconds(
+            AutomaticFoamSourceEvent sourceEvent)
         {
             if (river == null)
             {
@@ -2416,20 +2678,14 @@ namespace ProgrammaticStylized3D.Rivers
                 return float.PositiveInfinity;
             }
 
-            float contactSpeedFactor = ResolveObjectContactPacketSpeedFactor();
-            if (contactSpeedFactor <= 0.0001f)
-            {
-                return float.PositiveInfinity;
-            }
-
-            float haloClearanceSeconds =
-                river.FoamObjectContactSlowdownOuterReachMetres /
-                Mathf.Max(0.0001f, baseSpeed * contactSpeedFactor);
-            float gapClearanceSeconds =
-                river.FoamObjectContactMinimumPacketGapMetres /
+            float releasedPacketLength = IsAutomaticObjectContactCycle(
+                    sourceEvent.Type)
+                ? Mathf.Max(0f, sourceEvent.ObjectWakeArmLengthMetres)
+                : 0f;
+            float clearanceDistance = releasedPacketLength +
+                river.FoamObjectContactMinimumPacketGapMetres;
+            return Mathf.Max(0f, clearanceDistance) /
                 Mathf.Max(0.0001f, baseSpeed);
-            return Mathf.Max(0f, haloClearanceSeconds) +
-                Mathf.Max(0f, gapClearanceSeconds);
         }
 
         private float ResolveAutomaticPacketClearanceSeconds(
@@ -2446,18 +2702,6 @@ namespace ProgrammaticStylized3D.Rivers
                     AutomaticPacketClearanceMinimumSpeedMetresPerSecond,
                     downstreamSpeed);
         }
-
-        private float ResolveObjectContactPacketSpeedFactor()
-        {
-            if (river == null || river.FoamObstacleSlowdownStrength <= 0.0001f)
-            {
-                return 1f;
-            }
-
-            return Mathf.Clamp01(river.FoamObstacleMinimumDownstreamFactor);
-        }
-
-
 
         private int ResolvePermutedAutomaticObjectSourceIndex(
             int scanIndex,
@@ -3657,7 +3901,9 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectContactCycleTime = 0f;
             automaticObjectPatternAuthoritySignature = int.MinValue;
             automaticObjectClearanceAuthoritySignature = int.MinValue;
+            automaticObjectReinforcementAuthoritySignature = int.MinValue;
             automaticObjectContactBuildCount = 0;
+            automaticObjectContactReinforcementCount = 0;
             automaticObjectContactFleckCount = 0;
             automaticObjectWaitingClearanceCount = 0;
         }

@@ -44,10 +44,10 @@ namespace ProgrammaticStylized3D.Rivers
                 "multiplier × deterministic jitter; resolved duration = " +
                 "max(material step, path distance / requested speed).");
             report.AppendLine(
-                "Arc/Semi-Arc requested and resolved timing describes one stroke. " +
-                "Stroke one emits the complete packet; finite later strokes " +
-                "reinforce only the contact profile. Total burst duration equals " +
-                "per-stroke duration multiplied by Stroke Count.");
+                "Arc/Semi-Arc full packets resolve separate finite timing for the " +
+                "initial full-ring-plus-wake stroke and later recipe contact strokes. " +
+                "Independent maintenance uses one recipe contact stroke, emits no " +
+                "wake arms, and does not change full-packet eligibility.");
             report.AppendLine();
 
             float updateRate = ResolveUpdateRate();
@@ -56,6 +56,10 @@ namespace ProgrammaticStylized3D.Rivers
             report.AppendLine($"Material update rate: {updateRate:0.###} Hz");
             report.AppendLine(
                 $"Material step duration: {materialStepDuration:0.######} s");
+            report.AppendLine(
+                $"Object contact reinforcement: " +
+                $"{(river.FoamObjectContactReinforcementEnabled ? "enabled" : "disabled")}; " +
+                $"interval={river.FoamObjectContactReinforcementIntervalSeconds:0.###} s");
             report.AppendLine(
                 $"Automatic event pool: {activeAutomaticFoamSourceEventCount}/" +
                 $"{automaticFoamSourceEvents.Length} active");
@@ -121,36 +125,71 @@ namespace ProgrammaticStylized3D.Rivers
                 anyActive = true;
                 bool objectContactCycle =
                     IsAutomaticObjectContactCycle(sourceEvent.Type);
+                float strokePhase = sourceEvent.SideSign;
+                float strokeProgress = Mathf.Clamp01(
+                    sourceEvent.Elapsed /
+                    Mathf.Max(0.0001f, sourceEvent.Duration));
+                if (objectContactCycle)
+                {
+                    ResolveAutomaticSourceDepositionState(
+                        sourceEvent,
+                        sourceEvent.Elapsed,
+                        out strokePhase,
+                        out strokeProgress);
+                }
                 float revealDuration = objectContactCycle
-                    ? sourceEvent.ObjectBuildDuration
+                    ? ResolveAutomaticObjectContactPhaseDuration(
+                        sourceEvent,
+                        strokePhase)
                     : sourceEvent.Duration;
-                float actualSpeed = sourceEvent.RevealPathDistanceMetres /
+                float revealPath = objectContactCycle
+                    ? ResolveAutomaticObjectContactPhasePathLength(
+                        sourceEvent,
+                        strokePhase)
+                    : sourceEvent.RevealPathDistanceMetres;
+                float actualSpeed = revealPath /
                     Mathf.Max(0.0001f, revealDuration);
                 report.AppendLine(
                     $"Slot {index:00} / Event {sourceEvent.EventId} / " +
                     $"{AutomaticRevealSourceName(sourceEvent.Type)}");
                 report.AppendLine(
                     $"  elapsed={sourceEvent.Elapsed:0.###} s; " +
-                    $"perStrokeRevealDuration={revealDuration:0.###} s; " +
-                    $"path={sourceEvent.RevealPathDistanceMetres:0.###} m");
+                    $"activeStrokeDuration={revealDuration:0.###} s; " +
+                    $"activePath={revealPath:0.###} m");
                 if (objectContactCycle)
                 {
-                    ResolveAutomaticSourceDepositionState(
-                        sourceEvent,
-                        sourceEvent.Elapsed,
-                        out float strokePhase,
-                        out float strokeProgress);
-                    report.AppendLine(
-                        $"  stroke={(int)strokePhase + 1}/" +
-                        $"{Mathf.Clamp(sourceEvent.ObjectContactStrokeCount, 1, 3)}; " +
-                        $"strokeProgress={strokeProgress:0.###}; " +
-                        $"totalBurstDuration={sourceEvent.Duration:0.###} s");
+                    if (sourceEvent.ObjectContactReinforcementOnly)
+                    {
+                        report.AppendLine(
+                            $"  mode=recipe contact reinforcement; " +
+                            $"strokeProgress={strokeProgress:0.###}; " +
+                            $"eventDuration={sourceEvent.Duration:0.###} s");
+                    }
+                    else
+                    {
+                        report.AppendLine(
+                            $"  mode=full packet burst; " +
+                            $"stroke={(int)strokePhase + 1}/" +
+                            $"{Mathf.Clamp(sourceEvent.ObjectContactStrokeCount, 1, 3)}; " +
+                            $"strokeProgress={strokeProgress:0.###}; " +
+                            $"initialDuration={sourceEvent.ObjectBuildDuration:0.###} s; " +
+                            $"contactDuration={sourceEvent.ObjectContactStrokeDuration:0.###} s; " +
+                            $"totalBurstDuration={sourceEvent.Duration:0.###} s");
+                    }
                 }
+                float activeRawDuration = objectContactCycle &&
+                    strokePhase >= 0.5f
+                        ? sourceEvent.ObjectContactStrokeRawRevealDurationSeconds
+                        : sourceEvent.RawRevealDurationSeconds;
+                bool activeCadenceLimited = objectContactCycle &&
+                    strokePhase >= 0.5f
+                        ? sourceEvent.ObjectContactStrokeRevealCadenceLimited
+                        : sourceEvent.RevealCadenceLimited;
                 report.AppendLine(
                     $"  requested={sourceEvent.FormationSpeedMetresPerSecond:0.###} m/s; " +
-                    $"raw={sourceEvent.RawRevealDurationSeconds:0.###} s; " +
-                    $"actual={actualSpeed:0.###} m/s; " +
-                    $"cadenceLimited={sourceEvent.RevealCadenceLimited}");
+                    $"rawActive={activeRawDuration:0.###} s; " +
+                    $"actualActive={actualSpeed:0.###} m/s; " +
+                    $"cadenceLimited={activeCadenceLimited}");
             }
 
             if (!anyActive)

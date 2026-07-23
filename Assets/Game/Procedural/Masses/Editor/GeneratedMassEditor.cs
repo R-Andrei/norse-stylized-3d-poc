@@ -1159,9 +1159,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 if (string.IsNullOrEmpty(report))
                 {
                     report =
-                        "GeneratedMass EW-C1A.3c corner-chip preview" +
+                        "GeneratedMass EW-C1A.3f corner-chip preview" +
                         Environment.NewLine +
-                        "contract=EW-C1A.3c-corner-chip-preview" +
+                        "contract=EW-C1A.3f-corner-chip-preview" +
                         Environment.NewLine +
                         "status=failed" + Environment.NewLine +
                         "diagnostic=preview report was unavailable";
@@ -1170,9 +1170,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             catch (Exception exception)
             {
                 report =
-                    "GeneratedMass EW-C1A.3c corner-chip preview" +
+                    "GeneratedMass EW-C1A.3f corner-chip preview" +
                     Environment.NewLine +
-                    "contract=EW-C1A.3c-corner-chip-preview" +
+                    "contract=EW-C1A.3f-corner-chip-preview" +
                     Environment.NewLine +
                     "status=failed" + Environment.NewLine +
                     "diagnostic=exception: " + exception;
@@ -1498,6 +1498,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     job.CreaseWidth,
                     job.CreaseLength,
                     job.CreaseBranching);
+            MassSurfaceFeatureSettings ordinaryBaselineSettings =
+                new MassSurfaceFeatureSettings(
+                    caseRecipe.Archetype,
+                    caseRecipe.SurfaceSeed,
+                    job.EdgeWearAmount,
+                    job.EdgeWearWidth,
+                    job.EdgeWearCoverage,
+                    job.AuthoredEdgeWearMacroVariationCoverage,
+                    job.AuthoredEdgeWearMacroVariation,
+                    job.EdgeWearSoftness,
+                    job.CreaseAmount,
+                    job.CreaseWidth,
+                    job.CreaseLength,
+                    job.CreaseBranching);
             MassGenerator.EdgeWearBatchAuditCaseResult result;
             MassGenerator.SetEditorEdgeWearAuditCancellationProbe(() =>
             {
@@ -1525,7 +1539,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 result = job.RequireAllGeometricCandidates
                     ? MassGenerator.GenerateUnifiedEdgeWearBatchAuditCase(
                         caseRecipe,
-                        settings)
+                        settings,
+                        job.SuiteOwned && string.Equals(
+                            widthName,
+                            "default",
+                            StringComparison.Ordinal)
+                                ? ordinaryBaselineSettings
+                                : (MassSurfaceFeatureSettings?)null)
                     : MassGenerator
                         .GenerateUnifiedEdgeWearPreviewParityAuditCase(
                             caseRecipe,
@@ -1534,6 +1554,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             finally
             {
                 MassGenerator.SetEditorEdgeWearAuditCancellationProbe(null);
+            }
+            if (result != null &&
+                result.GeneratedOrdinaryBaselineMesh != null)
+            {
+                result.GeneratedOrdinaryBaselineFingerprint =
+                    BuildCornerChippingBaselineFingerprint(
+                        caseRecipe,
+                        ordinaryBaselineSettings);
             }
             return new EdgeWearViabilityMatrixCase(
                 shapeSeed,
@@ -1719,7 +1747,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 message);
         }
 
-        private const double CornerChippingCaseHardBudgetMilliseconds = 4000d;
+        private const double CornerChippingCaseTargetBudgetMilliseconds = 4000d;
+        private const double CornerChippingCaseHardBudgetMilliseconds = 5000d;
         private const double CornerChippingMatrixHardBudgetMilliseconds =
             35000d;
         private const double EdgeWearValidationSuiteHardBudgetMilliseconds =
@@ -1739,7 +1768,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
 
             activeCornerChippingMatrixJob =
-                new CornerChippingMatrixJob(suite.Target);
+                new CornerChippingMatrixJob(
+                    suite.Target,
+                    suite.TopologyCases);
             EditorApplication.update -= AdvanceCornerChippingMatrix;
             EditorApplication.update += AdvanceCornerChippingMatrix;
         }
@@ -1921,7 +1952,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     job,
                     recipe,
                     settings,
-                    out bool baselineBuiltNow);
+                    out bool baselineBuiltNow,
+                    out bool baselineCrossStageCacheHit);
+            result.BaselineCrossStageCacheHitCount =
+                baselineCrossStageCacheHit ? 1 : 0;
             if (baseline == null || baseline.Mesh == null)
             {
                 stopwatch.Stop();
@@ -2062,6 +2096,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         integratedStatus.GeometrySearchReuseCount;
                     result.IntegrationPreflightMismatchCount =
                         integratedStatus.IntegrationPreflightMismatchCount;
+                    result.IntegrationPlanAttemptCount =
+                        integratedStatus.IntegrationPlanAttemptCount;
+                    result.IntegrationPlanMismatchCount =
+                        integratedStatus.IntegrationPlanMismatchCount;
+                    result.AuthoritativeSolveAttemptCount =
+                        integratedStatus.AuthoritativeSolveAttemptCount;
+                    result.AuthoritativeSolveRejectCount =
+                        integratedStatus.AuthoritativeSolveRejectCount;
+                    result.PlanMaterializationBuildCount =
+                        integratedStatus.PlanMaterializationBuildCount;
+                    result.PlanMaterializationMismatchCount =
+                        integratedStatus.PlanMaterializationMismatchCount;
+                    result.DeadlineAbortCount =
+                        integratedStatus.DeadlineAbortCount;
+                    result.IntegrationPlanHash =
+                        integratedStatus.IntegrationPlanHash;
+                    result.EmittedPlanHash =
+                        integratedStatus.EmittedPlanHash;
+                    result.MissingPlannedOrdinary =
+                        integratedStatus.MissingPlannedOrdinary;
+                    result.UnexpectedFinalOrdinary =
+                        integratedStatus.UnexpectedFinalOrdinary;
+                    result.MissingPlannedMandatory =
+                        integratedStatus.MissingPlannedMandatory;
+                    result.UnexpectedFinalMandatory =
+                        integratedStatus.UnexpectedFinalMandatory;
                     result.PreflightCandidateCount =
                         integratedStatus.PreflightCandidateCount;
                     result.PreflightSelectedCount =
@@ -2076,6 +2136,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         integratedStatus.TransactionMilliseconds;
                     result.IntegrationPreflightMilliseconds =
                         integratedStatus.IntegrationPreflightMilliseconds;
+                    result.IntegrationPlanMilliseconds =
+                        integratedStatus.IntegrationPlanMilliseconds;
+                    result.AuthoritativeSolveMilliseconds =
+                        integratedStatus.AuthoritativeSolveMilliseconds;
+                    result.PlanMaterializationMilliseconds =
+                        integratedStatus.PlanMaterializationMilliseconds;
                     result.IntegrationMilliseconds =
                         integratedStatus.IntegrationMilliseconds;
                     result.CaseBudgetExceeded =
@@ -2085,24 +2151,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                             baseline.MaximumObservedIntegrationMilliseconds,
                             integratedStatus.IntegrationMilliseconds);
                     if (integratedStatus.FullIntegrationBuildCount > 1 ||
-                        integratedStatus.FullFallbackBuildCount != 0)
+                        integratedStatus.FullFallbackBuildCount != 0 ||
+                        integratedStatus.IntegrationPlanMismatchCount != 0 ||
+                        integratedStatus.PlanMaterializationBuildCount > 1 ||
+                        integratedStatus.PlanMaterializationMismatchCount != 0)
                     {
                         result.SearchFailureStage =
                             "integration-build-count";
                         result.SearchFailureReason =
-                            "enabled case performed more than one final build or any fallback build";
+                            "enabled case violated the authoritative plan/build-count contract";
                     }
                 }
             }
             stopwatch.Stop();
             result.ElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
             if (enabled && result.ElapsedMilliseconds >
+                CornerChippingCaseTargetBudgetMilliseconds)
+            {
+                result.CaseTargetExceeded = true;
+            }
+            if (enabled && result.ElapsedMilliseconds >
                 CornerChippingCaseHardBudgetMilliseconds)
             {
                 result.CaseBudgetExceeded = true;
                 result.SearchFailureStage = "performance-budget";
                 result.SearchFailureReason =
-                    "corner matrix case exceeded the 4 s hard stop";
+                    "corner matrix case exceeded the 5 s hard maximum";
             }
             result.ChannelValid = ValidateCornerMatrixMeshChannels(
                 finalMesh,
@@ -2121,17 +2195,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 CornerChippingMatrixJob job,
                 MassRecipe recipe,
                 MassSurfaceFeatureSettings settings,
-                out bool builtNow)
+                out bool builtNow,
+                out bool crossStageCacheHit)
         {
             builtNow = false;
+            crossStageCacheHit = false;
             if (job == null || recipe == null)
             {
                 return null;
             }
-            if (job.BaselineBySeed.TryGetValue(
-                    recipe.ShapeSeed,
+            string fingerprint = BuildCornerChippingBaselineFingerprint(
+                recipe,
+                settings);
+            if (job.BaselineByFingerprint.TryGetValue(
+                    fingerprint,
                     out CornerChippingMatrixJob.BaselineCacheEntry cached))
             {
+                crossStageCacheHit = cached.FromTopologyStage;
                 return cached;
             }
 
@@ -2147,11 +2227,57 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 {
                     Mesh = mesh,
                     Status = status,
-                    BuildMilliseconds = stopwatch.Elapsed.TotalMilliseconds
+                    BuildMilliseconds = stopwatch.Elapsed.TotalMilliseconds,
+                    Fingerprint = fingerprint,
+                    FromTopologyStage = false
                 };
-            job.BaselineBySeed[recipe.ShapeSeed] = created;
+            job.BaselineByFingerprint[fingerprint] = created;
             builtNow = true;
             return created;
+        }
+
+        private static string BuildCornerChippingBaselineFingerprint(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings settings)
+        {
+            if (recipe == null)
+            {
+                return string.Empty;
+            }
+            StringBuilder builder = new StringBuilder(256);
+            builder.Append(JsonUtility.ToJson(recipe));
+            builder.Append('|');
+            builder.Append(settings.EdgeWearAmount.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(settings.EdgeWearWidth.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(settings.EdgeWearCoverage.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(settings.EdgeWearMacroVariationCoverage.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(settings.EdgeWearMacroVariation.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(settings.EdgeWearSoftness.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(settings.CreaseAmount.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(settings.CreaseWidth.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(settings.CreaseLength.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(settings.CreaseBranching.ToString(
+                "R", CultureInfo.InvariantCulture));
+            builder.Append("|UnifiedBoundedPreview");
+            return builder.ToString();
         }
 
         private static bool CornerSelectionFingerprintMatches(
@@ -2719,10 +2845,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 {
                     aggregate.ChannelsPassed++;
                 }
+                aggregate.IntegrationPlanAttemptCount +=
+                    item.IntegrationPlanAttemptCount;
+                aggregate.IntegrationPlanMismatchCount +=
+                    item.IntegrationPlanMismatchCount;
+                aggregate.AuthoritativeSolveAttemptCount +=
+                    item.AuthoritativeSolveAttemptCount;
+                aggregate.AuthoritativeSolveRejectCount +=
+                    item.AuthoritativeSolveRejectCount;
+                aggregate.PlanMaterializationBuildCount +=
+                    item.PlanMaterializationBuildCount;
+                aggregate.PlanMaterializationMismatchCount +=
+                    item.PlanMaterializationMismatchCount;
+                aggregate.DeadlineAbortCount +=
+                    item.DeadlineAbortCount;
                 aggregate.BaselineBuildCount +=
                     item.BaselineBuildCount;
                 aggregate.BaselineCacheUseCount +=
                     item.BaselineCacheUseCount;
+                aggregate.BaselineCrossStageCacheHitCount +=
+                    item.BaselineCrossStageCacheHitCount;
+                if (item.CaseTargetExceeded)
+                {
+                    aggregate.CaseTargetExceededCount++;
+                }
                 if (item.CaseBudgetExceeded)
                 {
                     aggregate.CaseBudgetExceededCount++;
@@ -2736,14 +2882,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             CornerChippingMatrixAggregate aggregate)
         {
             StringBuilder builder = new StringBuilder(32768);
-            builder.AppendLine("GeneratedMass EW-C1A.3d corner chipping matrix");
-            builder.AppendLine("contract=EW-C1A.3d-33-case");
+            builder.AppendLine("GeneratedMass EW-C1A.3f corner chipping matrix");
+            builder.AppendLine("contract=EW-C1A.3f-33-case");
             builder.Append("status=");
             builder.AppendLine(aggregate.Status);
             builder.Append("seeds=");
             builder.AppendLine(string.Join("/", EdgeWearBatchShapeSeeds));
             builder.AppendLine("policies=disabled/default/maximum-depth");
-            builder.AppendLine("caseBudgetMilliseconds=4000");
+            builder.AppendLine("caseTargetMilliseconds=4000");
+            builder.AppendLine("caseHardMaximumMilliseconds=5000");
             builder.AppendLine("matrixBudgetMilliseconds=35000");
             builder.Append("cases=");
             builder.Append(aggregate.CasesPassed);
@@ -2777,8 +2924,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine(aggregate.Cancelled ? "1" : "0");
             builder.Append("statePreserved=");
             builder.AppendLine(aggregate.StatePreserved ? "1" : "0");
-            builder.Append("caseBudgetExceeded=");
+            builder.Append("caseTargetExceeded=");
+            builder.AppendLine(aggregate.CaseTargetExceededCount.ToString());
+            builder.Append("caseHardMaximumExceeded=");
             builder.AppendLine(aggregate.CaseBudgetExceededCount.ToString());
+            builder.Append("integrationPlanAttempts=");
+            builder.AppendLine(aggregate.IntegrationPlanAttemptCount.ToString());
+            builder.Append("integrationPlanMismatches=");
+            builder.AppendLine(aggregate.IntegrationPlanMismatchCount.ToString());
+            builder.Append("authoritativeSolveAttempts=");
+            builder.AppendLine(aggregate.AuthoritativeSolveAttemptCount.ToString());
+            builder.Append("authoritativeSolveRejects=");
+            builder.AppendLine(aggregate.AuthoritativeSolveRejectCount.ToString());
+            builder.Append("planMaterializationBuilds=");
+            builder.AppendLine(aggregate.PlanMaterializationBuildCount.ToString());
+            builder.Append("planMaterializationMismatches=");
+            builder.AppendLine(aggregate.PlanMaterializationMismatchCount.ToString());
+            builder.Append("deadlineAborts=");
+            builder.AppendLine(aggregate.DeadlineAbortCount.ToString());
+            builder.Append("baselineCrossStageCacheHits=");
+            builder.AppendLine(aggregate.BaselineCrossStageCacheHitCount.ToString());
             builder.Append("matrixBudgetExceeded=");
             builder.AppendLine(aggregate.MatrixBudgetExceeded ? "1" : "0");
             builder.Append("elapsedMilliseconds=");
@@ -2790,7 +2955,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 : aggregate.TerminalReason);
             builder.AppendLine();
             builder.AppendLine(
-                "seed,policy,status,acceptedRank,selectedCorner,acceptedTrial,acceptedDepthFraction,candidateCorners,attemptedCorners,attemptedConfigurations,ringScale,mandatoryBuilt,retained,baseline,baselineBuilds,baselineCacheUses,transactionAttempts,integrationPreflightAttempts,fullIntegrationBuilds,fullFallbackBuilds,geometrySearchReuses,integrationPreflightMismatches,preflightCandidates,preflightSelected,preflightMandatorySolved,preflightCollateralLost,candidateRankingMs,transactionMs,integrationPreflightMs,integrationMs,caseBudgetExceeded,failureStage,elapsedMs,diagnostic");
+                "seed,policy,status,acceptedRank,selectedCorner,acceptedTrial,acceptedDepthFraction,candidateCorners,attemptedCorners,attemptedConfigurations,ringScale,mandatoryBuilt,retained,baseline,baselineBuilds,baselineCacheUses,baselineCrossStageCacheHits,transactionAttempts,integrationPreflightAttempts,integrationPlanAttempts,authoritativeSolveAttempts,authoritativeSolveRejects,planMaterializationBuilds,planMaterializationMismatches,deadlineAborts,fullIntegrationBuilds,fullFallbackBuilds,geometrySearchReuses,integrationPreflightMismatches,integrationPlanMismatches,integrationPlanHash,emittedPlanHash,missingPlannedOrdinary,unexpectedFinalOrdinary,missingPlannedMandatory,unexpectedFinalMandatory,preflightCandidates,preflightSelected,preflightMandatorySolved,preflightCollateralLost,candidateRankingMs,transactionMs,integrationPreflightMs,integrationPlanMs,authoritativeSolveMs,planMaterializationMs,integrationMs,caseTargetExceeded,caseHardMaximumExceeded,failureStage,elapsedMs,diagnostic");
             for (int index = 0; index < job.Cases.Count; index++)
             {
                 CornerChippingMatrixCase item = job.Cases[index];
@@ -2828,9 +2993,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append(',');
                 builder.Append(item.BaselineCacheUseCount);
                 builder.Append(',');
+                builder.Append(item.BaselineCrossStageCacheHitCount);
+                builder.Append(',');
                 builder.Append(item.TransactionAttemptCount);
                 builder.Append(',');
                 builder.Append(item.IntegrationPreflightAttemptCount);
+                builder.Append(',');
+                builder.Append(item.IntegrationPlanAttemptCount);
+                builder.Append(',');
+                builder.Append(item.AuthoritativeSolveAttemptCount);
+                builder.Append(',');
+                builder.Append(item.AuthoritativeSolveRejectCount);
+                builder.Append(',');
+                builder.Append(item.PlanMaterializationBuildCount);
+                builder.Append(',');
+                builder.Append(item.PlanMaterializationMismatchCount);
+                builder.Append(',');
+                builder.Append(item.DeadlineAbortCount);
                 builder.Append(',');
                 builder.Append(item.FullIntegrationBuildCount);
                 builder.Append(',');
@@ -2839,6 +3018,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append(item.GeometrySearchReuseCount);
                 builder.Append(',');
                 builder.Append(item.IntegrationPreflightMismatchCount);
+                builder.Append(',');
+                builder.Append(item.IntegrationPlanMismatchCount);
+                builder.Append(',');
+                builder.Append(item.IntegrationPlanHash ?? string.Empty);
+                builder.Append(',');
+                builder.Append(item.EmittedPlanHash ?? string.Empty);
+                builder.Append(',');
+                builder.Append(string.Join("/", item.MissingPlannedOrdinary ??
+                    Array.Empty<int>()));
+                builder.Append(',');
+                builder.Append(string.Join("/", item.UnexpectedFinalOrdinary ??
+                    Array.Empty<int>()));
+                builder.Append(',');
+                builder.Append(string.Join("/", item.MissingPlannedMandatory ??
+                    Array.Empty<int>()));
+                builder.Append(',');
+                builder.Append(string.Join("/", item.UnexpectedFinalMandatory ??
+                    Array.Empty<int>()));
                 builder.Append(',');
                 builder.Append(item.PreflightCandidateCount);
                 builder.Append(',');
@@ -2857,8 +3054,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append(item.IntegrationPreflightMilliseconds.ToString(
                     "F3", CultureInfo.InvariantCulture));
                 builder.Append(',');
+                builder.Append(item.IntegrationPlanMilliseconds.ToString(
+                    "F3", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.Append(item.AuthoritativeSolveMilliseconds.ToString(
+                    "F3", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.Append(item.PlanMaterializationMilliseconds.ToString(
+                    "F3", CultureInfo.InvariantCulture));
+                builder.Append(',');
                 builder.Append(item.IntegrationMilliseconds.ToString(
                     "F3", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.Append(item.CaseTargetExceeded ? "1" : "0");
                 builder.Append(',');
                 builder.Append(item.CaseBudgetExceeded ? "1" : "0");
                 builder.Append(',');
@@ -3033,7 +3241,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-C1A.3d-suite");
+            builder.AppendLine("contract=EW-C1A.3f-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -3193,9 +3401,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append(suite.CornerChippingCasesPassed);
             builder.Append('/');
             builder.AppendLine(suite.CornerChippingCasesRun.ToString());
+            builder.Append("cornerChippingCaseTargetExceeded=");
+            builder.AppendLine(
+                suite.CornerCaseTargetExceededCount.ToString());
             builder.Append("cornerChippingCaseBudgetExceeded=");
             builder.AppendLine(
                 suite.CornerCaseBudgetExceededCount.ToString());
+            builder.Append("cornerIntegrationPlanAttempts=");
+            builder.AppendLine(
+                suite.CornerIntegrationPlanAttemptCount.ToString());
+            builder.Append("cornerIntegrationPlanMismatches=");
+            builder.AppendLine(
+                suite.CornerIntegrationPlanMismatchCount.ToString());
+            builder.Append("cornerAuthoritativeSolveAttempts=");
+            builder.AppendLine(
+                suite.CornerAuthoritativeSolveAttemptCount.ToString());
+            builder.Append("cornerAuthoritativeSolveRejects=");
+            builder.AppendLine(
+                suite.CornerAuthoritativeSolveRejectCount.ToString());
+            builder.Append("cornerPlanMaterializationBuilds=");
+            builder.AppendLine(
+                suite.CornerPlanMaterializationBuildCount.ToString());
+            builder.Append("cornerPlanMaterializationMismatches=");
+            builder.AppendLine(
+                suite.CornerPlanMaterializationMismatchCount.ToString());
+            builder.Append("cornerDeadlineAborts=");
+            builder.AppendLine(
+                suite.CornerDeadlineAbortCount.ToString());
             builder.Append("cornerChippingMatrixBudgetExceeded=");
             builder.AppendLine(
                 suite.CornerMatrixBudgetExceeded ? "1" : "0");
@@ -3215,6 +3447,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append("cornerBaselineCacheUses=");
             builder.AppendLine(
                 suite.CornerBaselineCacheUseCount.ToString());
+            builder.Append("cornerBaselineCrossStageCacheHits=");
+            builder.AppendLine(
+                suite.CornerBaselineCrossStageCacheHitCount.ToString());
             builder.Append("cornerDisabledZeroParity=");
             builder.Append(suite.CornerDisabledZeroParityPassed);
             builder.Append('/');
@@ -3593,7 +3828,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             reportBuilder.AppendLine(
                 "GeneratedMass comprehensive artistic selection evidence");
             reportBuilder.AppendLine(
-                "contract=EW-C1A.3d-comprehensive-selection-projection");
+                "contract=EW-C1A.3f-comprehensive-selection-projection");
             reportBuilder.Append("cases=");
             reportBuilder.AppendLine(expectedCaseCount.ToString());
             reportBuilder.Append("scenariosPerCase=");
@@ -7372,12 +7607,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public int UnrelatedBaselineCount;
             public int BaselineBuildCount;
             public int BaselineCacheUseCount;
+            public int BaselineCrossStageCacheHitCount;
             public int TransactionAttemptCount;
             public int IntegrationPreflightAttemptCount;
             public int FullIntegrationBuildCount;
             public int FullFallbackBuildCount;
             public int GeometrySearchReuseCount;
             public int IntegrationPreflightMismatchCount;
+            public int IntegrationPlanAttemptCount;
+            public int IntegrationPlanMismatchCount;
+            public int AuthoritativeSolveAttemptCount;
+            public int AuthoritativeSolveRejectCount;
+            public int PlanMaterializationBuildCount;
+            public int PlanMaterializationMismatchCount;
+            public int DeadlineAbortCount;
             public int PreflightCandidateCount;
             public int PreflightSelectedCount;
             public int PreflightMandatorySolvedCount;
@@ -7385,8 +7628,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public double CandidateRankingMilliseconds;
             public double TransactionMilliseconds;
             public double IntegrationPreflightMilliseconds;
+            public double IntegrationPlanMilliseconds;
+            public double AuthoritativeSolveMilliseconds;
+            public double PlanMaterializationMilliseconds;
             public double IntegrationMilliseconds;
+            public bool CaseTargetExceeded;
             public bool CaseBudgetExceeded;
+            public string IntegrationPlanHash = string.Empty;
+            public string EmittedPlanHash = string.Empty;
+            public int[] MissingPlannedOrdinary = Array.Empty<int>();
+            public int[] UnexpectedFinalOrdinary = Array.Empty<int>();
+            public int[] MissingPlannedMandatory = Array.Empty<int>();
+            public int[] UnexpectedFinalMandatory = Array.Empty<int>();
             public double ElapsedMilliseconds;
             public string Diagnostic = string.Empty;
 
@@ -7400,6 +7653,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 FullIntegrationBuildCount <= 1 &&
                 FullFallbackBuildCount == 0 &&
                 IntegrationPreflightMismatchCount == 0 &&
+                IntegrationPlanMismatchCount == 0 &&
+                PlanMaterializationBuildCount <= 1 &&
+                PlanMaterializationMismatchCount == 0 &&
                 !CaseBudgetExceeded &&
                 string.IsNullOrEmpty(Diagnostic);
         }
@@ -7420,9 +7676,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public int RetentionPassed;
             public int ChannelsRun;
             public int ChannelsPassed;
+            public int CaseTargetExceededCount;
             public int CaseBudgetExceededCount;
+            public int IntegrationPlanAttemptCount;
+            public int IntegrationPlanMismatchCount;
+            public int AuthoritativeSolveAttemptCount;
+            public int AuthoritativeSolveRejectCount;
+            public int PlanMaterializationBuildCount;
+            public int PlanMaterializationMismatchCount;
+            public int DeadlineAbortCount;
             public int BaselineBuildCount;
             public int BaselineCacheUseCount;
+            public int BaselineCrossStageCacheHitCount;
             public bool MatrixBudgetExceeded;
             public double ElapsedMilliseconds;
             public bool Cancelled;
@@ -7442,6 +7707,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 RetentionPassed == RetentionRun &&
                 ChannelsPassed == ChannelsRun &&
                 CaseBudgetExceededCount == 0 &&
+                IntegrationPlanMismatchCount == 0 &&
+                PlanMaterializationMismatchCount == 0 &&
+                BaselineBuildCount == 0 &&
+                BaselineCacheUseCount == CasesRun &&
+                BaselineCrossStageCacheHitCount == CasesRun &&
                 !MatrixBudgetExceeded &&
                 string.IsNullOrEmpty(TerminalReason)
                     ? "passed"
@@ -7456,6 +7726,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 public MassGenerator.UnifiedEdgeWearPreviewStatus Status;
                 public double BuildMilliseconds;
                 public double MaximumObservedIntegrationMilliseconds;
+                public string Fingerprint = string.Empty;
+                public bool FromTopologyStage;
             }
 
             public readonly GeneratedMass Target;
@@ -7479,16 +7751,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public readonly float CornerChipCapRingWearStrength;
             public readonly List<CornerChippingMatrixCase> Cases =
                 new List<CornerChippingMatrixCase>();
-            public readonly Dictionary<int, BaselineCacheEntry>
-                BaselineBySeed =
-                    new Dictionary<int, BaselineCacheEntry>();
+            public readonly Dictionary<string, BaselineCacheEntry>
+                BaselineByFingerprint =
+                    new Dictionary<string, BaselineCacheEntry>();
             public readonly System.Diagnostics.Stopwatch Stopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
             public bool CancelRequested;
             public int CompletedCaseCount;
             public int TotalCaseCount => EdgeWearBatchShapeSeeds.Length * 3;
 
-            public CornerChippingMatrixJob(GeneratedMass target)
+            public CornerChippingMatrixJob(
+                GeneratedMass target,
+                IReadOnlyList<EdgeWearViabilityMatrixCase> topologyCases)
             {
                 Target = target;
                 RecipeJson = JsonUtility.ToJson(target.Recipe);
@@ -7514,6 +7788,51 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     target.CornerChipCapRingWidthScale;
                 CornerChipCapRingWearStrength =
                     target.CornerChipCapRingWearStrength;
+                SeedTopologyBaselines(topologyCases);
+            }
+
+            private void SeedTopologyBaselines(
+                IReadOnlyList<EdgeWearViabilityMatrixCase> topologyCases)
+            {
+                if (topologyCases == null)
+                {
+                    return;
+                }
+                for (int index = 0; index < topologyCases.Count; index++)
+                {
+                    EdgeWearViabilityMatrixCase topologyCase =
+                        topologyCases[index];
+                    if (!string.Equals(
+                            topologyCase.WidthName,
+                            "default",
+                            StringComparison.Ordinal) ||
+                        topologyCase.Result == null ||
+                        topologyCase.Result.
+                            GeneratedOrdinaryBaselineMesh == null ||
+                        !topologyCase.Result.
+                            GeneratedOrdinaryBaselineStatus.PreviewApplied ||
+                        string.IsNullOrEmpty(
+                            topologyCase.Result.
+                                GeneratedOrdinaryBaselineFingerprint))
+                    {
+                        continue;
+                    }
+
+                    string fingerprint = topologyCase.Result.
+                        GeneratedOrdinaryBaselineFingerprint;
+                    BaselineByFingerprint[fingerprint] =
+                        new BaselineCacheEntry
+                        {
+                            Mesh = topologyCase.Result.
+                                GeneratedOrdinaryBaselineMesh,
+                            Status = topologyCase.Result.
+                                GeneratedOrdinaryBaselineStatus,
+                            BuildMilliseconds = topologyCase.Result.
+                                GeneratedOrdinaryBaselineMilliseconds,
+                            Fingerprint = fingerprint,
+                            FromTopologyStage = true
+                        };
+                }
             }
 
             public bool ValidateTargetStatePreserved(out string diagnostic)
@@ -7686,10 +8005,55 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     ? 0
                     : CornerChippingAggregate.BaselineCacheUseCount;
 
+            public int CornerCaseTargetExceededCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.CaseTargetExceededCount;
+
             public int CornerCaseBudgetExceededCount =>
                 CornerChippingAggregate == null
                     ? 0
                     : CornerChippingAggregate.CaseBudgetExceededCount;
+
+            public int CornerIntegrationPlanAttemptCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.IntegrationPlanAttemptCount;
+
+            public int CornerIntegrationPlanMismatchCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.IntegrationPlanMismatchCount;
+
+            public int CornerAuthoritativeSolveAttemptCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.AuthoritativeSolveAttemptCount;
+
+            public int CornerAuthoritativeSolveRejectCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.AuthoritativeSolveRejectCount;
+
+            public int CornerPlanMaterializationBuildCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.PlanMaterializationBuildCount;
+
+            public int CornerPlanMaterializationMismatchCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.PlanMaterializationMismatchCount;
+
+            public int CornerDeadlineAbortCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.DeadlineAbortCount;
+
+            public int CornerBaselineCrossStageCacheHitCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.BaselineCrossStageCacheHitCount;
 
             public bool CornerMatrixBudgetExceeded =>
                 CornerChippingAggregate != null &&
@@ -9023,8 +9387,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public readonly string TargetEntityId;
             public readonly string RecipeJson;
             public readonly float EdgeWearAmount;
+            public readonly float EdgeWearWidth;
+            public readonly float EdgeWearCoverage;
             public readonly float EdgeWearMacroVariationCoverage;
             public readonly float EdgeWearMacroVariation;
+            public readonly float AuthoredEdgeWearMacroVariationCoverage;
+            public readonly float AuthoredEdgeWearMacroVariation;
             public readonly float EdgeWearSoftness;
             public readonly float CreaseAmount;
             public readonly float CreaseWidth;
@@ -9061,12 +9429,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 TargetEntityId = target.GetEntityId().ToString();
                 RecipeJson = JsonUtility.ToJson(target.Recipe);
                 EdgeWearAmount = target.EdgeWearAmount;
+                EdgeWearWidth = target.EdgeWearWidth;
+                EdgeWearCoverage = target.EdgeWearCoverage;
                 EdgeWearMacroVariationCoverage = suiteOwned
                     ? 1f
                     : target.EdgeWearMacroVariationCoverage;
                 EdgeWearMacroVariation = suiteOwned
                     ? 1f
                     : target.EdgeWearMacroVariation;
+                AuthoredEdgeWearMacroVariationCoverage =
+                    target.EdgeWearMacroVariationCoverage;
+                AuthoredEdgeWearMacroVariation =
+                    target.EdgeWearMacroVariation;
                 EdgeWearSoftness = target.EdgeWearSoftness;
                 CreaseAmount = target.CreaseAmount;
                 CreaseWidth = target.CreaseWidth;
@@ -9167,7 +9541,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public string Contract => RequireAllGeometricCandidates
                 ? "EW-V1A.3b-topology"
                 : SuiteArtisticSentinelOnly
-                    ? "EW-C1A.3d-preview-sentinel"
+                    ? "EW-C1A.3f-preview-sentinel"
                     : "EW-V1A.3b-preview";
 
             public int TotalCaseCount => CaseCoordinates.Count;

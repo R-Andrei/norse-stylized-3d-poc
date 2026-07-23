@@ -5639,6 +5639,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 new CornerDamageIntegrationPreflightRecord
                 {
                     Transaction = transaction,
+                    PreparedContext = context,
+                    PreparedSolution = solution,
+                    PreparedCoverage = coverageAudit,
                     Completed = true,
                     RequestedRingWidth = requestedRingWidth,
                     MinimumStyleWidth = minimumStyleWidth,
@@ -5784,7 +5787,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 result.FailureStage = "none";
                 result.Diagnostic =
-                    "complete non-emitting integration preflight passed";
+                    "prepared integration preflight passed; authoritative plan construction required";
             }
             return result;
         }

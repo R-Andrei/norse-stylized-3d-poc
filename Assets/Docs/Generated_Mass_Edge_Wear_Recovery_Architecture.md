@@ -2486,3 +2486,26 @@ The resolved common scale is the largest member of `{1, 0.75, 0.5625, 0.421875, 
 The matrix owns one ordinary baseline cache entry per seed. Disabled policy returns the cached mesh and status directly. Enabled policies each run one integrated staged search and use a lightweight transaction fingerprint to repeat only rank/vertex/trial/depth/identity selection evidence; the raw geometry endpoint is not regenerated for every matrix case. The interactive raw action performs one staged search and then one raw geometry emission for the accepted rank.
 
 Performance is now an acceptance invariant. A single case has a `5 s` hard budget and the full corner matrix a `55 s` hard stop, with `2 s` and `40 s` targets. An over-budget result is marked `performance-budget` even when its geometry would otherwise pass. Cancellation and target-state restoration remain mandatory. Telemetry separates cached/built baselines, transaction attempts, mandatory preflights, complete/fallback builds, geometry reuse, stage timings, and budget flags. No runtime, shader, persistent-memory, mesh-channel, or production-generation owner changes.
+
+## EW-C1A.3e authoritative plan boundary
+
+Corner chipping no longer treats non-emitting preflight and final integrated construction as independent solvers. The prepared preflight state retains the exact post-cut faces, topology context, lifecycle coverage, solved corner widths, and stability limits. One complete shell audit converts that state into an authoritative `CornerDamageIntegrationPlan` containing the certified shell soup/status and exact stable identities.
+
+The accepted plan is immutable for emission. Final preview generation consumes its soup and status directly and does not repeat discovery, viability, coexistence, width recovery, or cap-ring selection. Exact planned-versus-emitted ordinary and mandatory identity sets, together with deterministic plan hashes, are the certification boundary. Any missing or unexpected identity is a hard `integration-plan-mismatch`; no count-equivalent substitution is accepted.
+
+Each topology default case may additionally materialize one ordinary unified baseline using the exact corner-matrix settings. The all-geometric topology audit mesh is not reused as ordinary. The retained ordinary result may be reused by the corner matrix only under an exact recipe/settings/evaluation-mode fingerprint. This is editor-suite-local reuse and does not alter production generation, recovery ordering, runtime memory, or persistent caches. The enabled-rock performance contract is a `4 s` target and `5 s` hard maximum during development validation.
+
+## EW-C1A.3f authoritative solve and one-time materialization
+
+C1A.3e established one authoritative identity plan, but its plan builder still crossed the complete shell/triangulation boundary for every viable corner candidate. C1A.3f moves that boundary:
+
+1. `SolvePlaneCutBevelKernel` performs candidate preparation only. It freezes the post-cut source faces, topology context, coverage lifecycle, active graph-edge set, retained candidates, and each candidate's already-resolved plane/rail data. It does not call clean-shell construction, polygon certification, triangulation, or soup audit.
+2. The ranked corner search may reject any number of these solve-only plans using exact mandatory-ring identity and unrelated-baseline retention gates.
+3. The first accepted solve is materialized once by `MaterializePlaneCutBevelSolvedPlan`. That method consumes the retained candidate objects and their solved planes/rails, runs the existing clean-shell width-reduction/certification path, triangulates once, and finalizes coverage.
+4. Final preview routing consumes only a successfully materialized plan and compares exact planned/emitted ordinary and mandatory identity sets plus deterministic plan hashes.
+
+Corner solve-only plans use the existing maximum-coverage reduction strategy even when ordinary authored coverage is below the audit maximum. This does not increase ordinary selection: the selected candidate set was already frozen by preflight. It only prevents materialization from using the deferral branch to silently substitute a different identity set. Coexistence exclusion search remains disabled for the authoritative corner plan; inability to preserve the frozen set is a hard candidate/materialization failure.
+
+The `CornerDamageSearchDeadlineScope` is editor-only and thread-scoped. Bounded probes exist before solve/materialization and inside candidate preparation, width reduction, deferral/conflict loops, shell preparation, and triangulation. They improve return latency at the `5 s` hard validation boundary without changing any non-corner or production call.
+
+Topology audit widths remain unchanged. Cross-stage baseline reuse is corrected by materializing a separate ordinary baseline at authored settings during each seed's default topology case, hashing the exact recipe/settings/mode, and accepting only an exact fingerprint match in the corner matrix.

@@ -885,6 +885,55 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool allowCoexistenceSearch,
             out TriangleSoup previewSoup)
         {
+            return AuditPlaneCutBevelKernelCore(
+                sourceFaces,
+                context,
+                solution,
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                coverageAudit,
+                allowCoexistenceSearch,
+                true,
+                out _,
+                out previewSoup);
+        }
+
+        private static PlaneCutBevelAuditResult SolvePlaneCutBevelKernel(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            ChamferCornerSolution solution,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            EdgeWearCoverageAudit coverageAudit,
+            bool allowCoexistenceSearch,
+            out PlaneCutBevelSolvedPlan solvedPlan)
+        {
+            return AuditPlaneCutBevelKernelCore(
+                sourceFaces,
+                context,
+                solution,
+                minimumStableEdgeLength,
+                minimumStableFaceArea,
+                coverageAudit,
+                allowCoexistenceSearch,
+                false,
+                out solvedPlan,
+                out _);
+        }
+
+        private static PlaneCutBevelAuditResult AuditPlaneCutBevelKernelCore(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            ChamferCornerSolution solution,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            EdgeWearCoverageAudit coverageAudit,
+            bool allowCoexistenceSearch,
+            bool materializePreview,
+            out PlaneCutBevelSolvedPlan solvedPlan,
+            out TriangleSoup previewSoup)
+        {
+            solvedPlan = null;
             previewSoup = null;
             PlaneCutBevelAuditResult result =
                 new PlaneCutBevelAuditResult
@@ -945,6 +994,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         new PlaneCutNumericalRepairTelemetry()
                 };
 
+            if (IsCornerDamageSearchDeadlineExceeded())
+            {
+                result.Diagnostic = "corner search deadline exceeded before plane solve";
+                return result;
+            }
+
             List<EdgeWearSelectedGraphEdge> orderedSelected =
                 new List<EdgeWearSelectedGraphEdge>(context.SelectedEdges);
             orderedSelected.Sort((left, right) =>
@@ -959,6 +1014,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                  selectedIndex < orderedSelected.Count;
                  selectedIndex++)
             {
+                if (IsCornerDamageSearchDeadlineExceeded())
+                {
+                    result.Diagnostic = "corner search deadline exceeded during plane candidate preparation";
+                    return result;
+                }
                 EdgeWearSelectedGraphEdge selected =
                     orderedSelected[selectedIndex];
                 TryGetEdgeWearCoverageRecord(
@@ -1086,6 +1146,91 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return result;
             }
 
+            bool solveValid = result.PlanesRejected == 0 &&
+                planeCandidates.Count > 0;
+            solvedPlan = new PlaneCutBevelSolvedPlan
+            {
+                SourceFaces = materializePreview
+                    ? sourceFaces
+                    : ClonePolygonFacesForPlaneCutAudit(sourceFaces),
+                PreparedFaces = null,
+                RetainedCandidates = planeCandidates,
+                ActiveEdgeIndices = new List<int>(activeEdgeIndices),
+                Context = context,
+                CoverageAudit = coverageAudit,
+                Audit = result,
+                MinimumStableEdgeLength = minimumStableEdgeLength,
+                MinimumStableFaceArea = minimumStableFaceArea,
+                LocalityDeferredCount = localityDeferredCount,
+                MaximumCoverageMode = !materializePreview ||
+                    (coverageAudit != null &&
+                     coverageAudit.MaximumCoverageMode),
+                AllowCoexistenceSearch = allowCoexistenceSearch,
+                SolveValid = solveValid,
+                PolygonGeometryValid = false,
+                Diagnostic = result.Diagnostic
+            };
+            if (!solveValid)
+            {
+                SetPlaneCutBevelDiagnostic(
+                    ref result.Diagnostic,
+                    "the authoritative plane-and-rail solve did not retain a valid candidate set");
+                solvedPlan.Diagnostic = result.Diagnostic;
+                return result;
+            }
+            if (!materializePreview)
+            {
+                result.GeometryValid = 0;
+                solvedPlan.Diagnostic = string.IsNullOrEmpty(result.Diagnostic)
+                    ? "authoritative plane-and-rail solve prepared"
+                    : result.Diagnostic;
+                return result;
+            }
+            return MaterializePlaneCutBevelSolvedPlan(
+                solvedPlan,
+                out previewSoup);
+        }
+
+
+        private static PlaneCutBevelAuditResult
+            MaterializePlaneCutBevelSolvedPlan(
+                PlaneCutBevelSolvedPlan solvedPlan,
+                out TriangleSoup previewSoup)
+        {
+            previewSoup = null;
+            if (solvedPlan == null ||
+                solvedPlan.SourceFaces == null ||
+                solvedPlan.RetainedCandidates == null ||
+                solvedPlan.ActiveEdgeIndices == null ||
+                !solvedPlan.SolveValid)
+            {
+                return solvedPlan == null
+                    ? new PlaneCutBevelAuditResult
+                    {
+                        Diagnostic = "solved bevel plan was unavailable"
+                    }
+                    : solvedPlan.Audit;
+            }
+            PlaneCutBevelAuditResult result = solvedPlan.Audit;
+            List<PolygonFace> sourceFaces = solvedPlan.SourceFaces;
+            ChamferTopologyContext context = solvedPlan.Context;
+            List<PlaneCutBevelCandidate> planeCandidates =
+                solvedPlan.RetainedCandidates;
+            List<int> activeEdgeIndices = solvedPlan.ActiveEdgeIndices;
+            EdgeWearCoverageAudit coverageAudit = solvedPlan.CoverageAudit;
+            float minimumStableEdgeLength =
+                solvedPlan.MinimumStableEdgeLength;
+            float minimumStableFaceArea =
+                solvedPlan.MinimumStableFaceArea;
+            int localityDeferredCount = solvedPlan.LocalityDeferredCount;
+            bool allowCoexistenceSearch =
+                solvedPlan.AllowCoexistenceSearch;
+            if (IsCornerDamageSearchDeadlineExceeded())
+            {
+                result.Diagnostic = "corner search deadline exceeded before plan materialization";
+                solvedPlan.Diagnostic = result.Diagnostic;
+                return result;
+            }
             Bounds sourceBounds = CalculateFaceBounds(sourceFaces);
             double sourceVolume = CalculatePlaneCutPolyhedronVolume(sourceFaces);
             List<PlaneCutVertexJunctionCandidate> noJunctions =
@@ -1099,8 +1244,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     localityDeferredCount,
-                    coverageAudit != null &&
-                        coverageAudit.MaximumCoverageMode,
+                    solvedPlan.MaximumCoverageMode,
                     allowCoexistenceSearch,
                     ref result,
                     out List<PlaneCutBevelCandidate> retainedCandidates,
@@ -1301,6 +1445,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 boundsValid &&
                 edgeOnlyFaces.Count >= 4;
 
+            solvedPlan.PreparedFaces = edgeOnlyFaces;
+            solvedPlan.RetainedCandidates = planeCandidates;
+            solvedPlan.PolygonGeometryValid = polygonGeometryValid;
+            solvedPlan.Audit = result;
+            if (IsCornerDamageSearchDeadlineExceeded())
+            {
+                result.Diagnostic = "corner search deadline exceeded before triangulation";
+                solvedPlan.Diagnostic = result.Diagnostic;
+                return result;
+            }
             TriangleSoup auditedSoup = null;
             bool surfaceTriangulationValid = false;
             if (polygonGeometryValid)
@@ -1381,6 +1535,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             : surfaceBlocker);
                 }
             }
+            if (IsCornerDamageSearchDeadlineExceeded())
+            {
+                result.Diagnostic = "corner search deadline exceeded after triangulation";
+                solvedPlan.Diagnostic = result.Diagnostic;
+                return result;
+            }
             if (auditedSoup != null)
             {
                 AuditPlaneCutPreviewTriangleSoup(
@@ -1444,6 +1604,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             PrepareEdgeWearStableEvaluationFingerprints(
                 edgeOnlyFaces,
                 ref result);
+            solvedPlan.Audit = result;
+            solvedPlan.Materialized = previewContractValid;
+            solvedPlan.Diagnostic = result.Diagnostic;
             return result;
         }
 
@@ -1927,6 +2090,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                  passIndex < maximumConflictPasses;
                  passIndex++)
             {
+                if (IsCornerDamageSearchDeadlineExceeded())
+                {
+                    blocker = "corner search deadline exceeded during conflict width reduction";
+                    result.EdgeConflictBudgetExhausted = 1;
+                    result.EdgeConflictUnresolvedCount++;
+                    return false;
+                }
                 retainedCandidates = BuildScaledPlaneCutCandidates(
                     allCandidates,
                     context,
@@ -1990,6 +2160,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     blocker = string.IsNullOrEmpty(buildCoexistenceBlocker)
                         ? blocker
                         : buildCoexistenceBlocker;
+                    return false;
+                }
+
+                if (IsCornerDamageSearchDeadlineExceeded())
+                {
+                    blocker = "corner search deadline exceeded after plane construction";
+                    result.EdgeConflictBudgetExhausted = 1;
+                    result.EdgeConflictUnresolvedCount++;
                     return false;
                 }
 
@@ -2071,6 +2249,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     blocker = string.IsNullOrEmpty(preparationCoexistenceBlocker)
                         ? blocker
                         : preparationCoexistenceBlocker;
+                    return false;
+                }
+
+                if (IsCornerDamageSearchDeadlineExceeded())
+                {
+                    blocker = "corner search deadline exceeded after shell preparation";
+                    result.EdgeConflictBudgetExhausted = 1;
+                    result.EdgeConflictUnresolvedCount++;
                     return false;
                 }
 
@@ -7031,6 +7217,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                  retainedCandidates.Count > 0;
                  passIndex++)
             {
+                if (IsCornerDamageSearchDeadlineExceeded())
+                {
+                    blocker = "corner search deadline exceeded during conflict deferral";
+                    result.EdgeConflictBudgetExhausted = 1;
+                    return false;
+                }
                 ResetPlaneCutStageTelemetry(ref result);
                 PlaneCutNumericalRepairTelemetry numericalRepairs =
                     new PlaneCutNumericalRepairTelemetry();
@@ -7048,6 +7240,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     blocker = string.IsNullOrEmpty(buildBlocker)
                         ? "the deterministic edge-only shell could not be built"
                         : buildBlocker;
+                    return false;
+                }
+
+                if (IsCornerDamageSearchDeadlineExceeded())
+                {
+                    blocker = "corner search deadline exceeded after plane construction";
+                    result.EdgeConflictBudgetExhausted = 1;
                     return false;
                 }
 
@@ -7076,6 +7275,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     blocker = string.IsNullOrEmpty(preparationBlocker)
                         ? "the edge-only shell failed preview preparation"
                         : preparationBlocker;
+                    return false;
+                }
+
+                if (IsCornerDamageSearchDeadlineExceeded())
+                {
+                    blocker = "corner search deadline exceeded after shell preparation";
+                    result.EdgeConflictBudgetExhausted = 1;
                     return false;
                 }
 

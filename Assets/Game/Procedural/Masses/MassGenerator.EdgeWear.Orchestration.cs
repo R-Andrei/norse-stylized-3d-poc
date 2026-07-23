@@ -100,6 +100,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStyleWidth = ResolveGeneratedEdgeWearWidth(
                 maximumDimension,
                 EdgeWearMinimumStyleWidthSetting);
+#if UNITY_EDITOR
+            CornerDamageIntegrationPlan committedPlan =
+                runCornerDamageIntegrationPreview
+                    ? ResolveCornerDamageIntegrationPlanOverride()
+                    : null;
+            if (committedPlan != null && committedPlan.Valid &&
+                committedPlan.SolvedPlan != null &&
+                committedPlan.SolvedPlan.Materialized &&
+                committedPlan.PreviewSoup != null &&
+                committedPlan.Transaction != null)
+            {
+                BeginCornerDamagePreviewCapture(
+                    CornerDamagePreviewKind.WithEdgeWear,
+                    committedPlan.Transaction,
+                    settings,
+                    committedPlan.OrdinaryRequestedWidth,
+                    committedPlan.CapRingOrdinaryLimit,
+                    committedPlan.CapRingDepthLimit,
+                    committedPlan.CapRingEdgeLimit,
+                    committedPlan.CapRingWinningLimit,
+                    committedPlan.CapRingRequestedWidth);
+                CaptureCornerDamagePreviewCandidateSelection(
+                    committedPlan.PlannedMandatoryIdentities.Length,
+                    committedPlan.PlannedMandatoryIdentities.Length,
+                    committedPlan.PlannedMandatoryIdentities.Length);
+                unifiedPreviewStatus = committedPlan.UnifiedStatus;
+                CaptureCornerDamagePreviewOutcome(
+                    unifiedPreviewStatus,
+                    committedPlan.Diagnostic);
+                return CloneCornerDamageIntegrationPlanSoup(
+                    committedPlan.PreviewSoup);
+            }
+#endif
             EdgeWearMicroTopologyNormalizationResult
                 microTopologyNormalization =
                     NormalizeEdgeWearMicroTopology(
@@ -593,7 +626,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             context,
                             preflightSolution);
                     }
-                    CaptureCornerDamageIntegrationPreflight(
+                    CornerDamageIntegrationPreflightRecord preflightRecord =
                         BuildCornerDamageIntegrationPreflightRecord(
                             cornerDamageTransaction,
                             coverageAudit,
@@ -606,7 +639,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             true,
                             widthSolutionReady,
                             integrationPreflightScale,
-                            preflightBlocker));
+                            preflightBlocker);
+                    if (widthSolutionReady && preflightSolution != null)
+                    {
+                        preflightRecord.PreparedFaces = edgeWearFaces;
+                        preflightRecord.PreparedContext = context;
+                        preflightRecord.PreparedSolution = preflightSolution;
+                        preflightRecord.PreparedCoverage = coverageAudit;
+                        preflightRecord.RequestedOrdinaryWidth = requestedWidth;
+                        preflightRecord.MinimumStableEdgeLength =
+                            minimumStableEdgeLength;
+                        preflightRecord.MinimumStableFaceArea =
+                            minimumStableFaceArea;
+                        preflightRecord.CapRingOrdinaryLimit =
+                            capRingOrdinaryLimit;
+                        preflightRecord.CapRingDepthLimit =
+                            capRingDepthLimit;
+                        preflightRecord.CapRingEdgeLimit = capRingEdgeLimit;
+                        preflightRecord.CapRingWinningLimit =
+                            capRingWinningLimit;
+                        preflightRecord.CapRingWearStrength =
+                            settings.CornerChipCapRingWearStrength;
+                    }
+                    CaptureCornerDamageIntegrationPreflight(
+                        preflightRecord);
                     return null;
                 }
 

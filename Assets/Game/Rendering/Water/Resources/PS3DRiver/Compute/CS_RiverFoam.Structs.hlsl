@@ -28,10 +28,11 @@ struct FoamSourceEventData
     // Arc/Semi-Arc source-local lateral cell spacing metres.
     float4 objectData;
     // x = previous deposition side/phase, y = previous deposition progress,
-    // z = previous deposition state valid (0 on the first source tick), w reserved.
+    // z = previous deposition state valid (0 on the first source tick),
+    // w = Object Arc/Semi-Arc contact-stroke path length in metres (0 otherwise).
     // Current deposition side/phase and progress remain header.y/z. Positive
-    // newly revealed coverage gates nonpersistent families; Object Arc/Semi-Arc
-    // use their current phase-shaped persistent emitter directly.
+    // newly revealed coverage gates every finite source. Object Arc/Semi-Arc
+    // phase changes reset that one-shot gate for the next bounded stroke.
     float4 deposit;
 };
 

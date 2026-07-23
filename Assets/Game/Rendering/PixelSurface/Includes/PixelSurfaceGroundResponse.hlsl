@@ -323,6 +323,130 @@
                     wholeFeatureEnabled);
             }
 
+            float ResolveGroundSharedBankRiverbedWholeFeatureApplicationWeight(
+                float bankInwardDistance,
+                float riverbedInwardDistance,
+                float localApplicationWeight,
+                float3 positionWS,
+                float2 featureCenterOffsetNormalized,
+                float maximumSupportRadiusUv,
+                float detailUvScale,
+                float4 bankTransitionSettings,
+                float4 riverbedTransitionSettings)
+            {
+                float safeUvScale = max(0.0001, detailUvScale);
+                float conservativeSupportRadius =
+                    max(0.0, maximumSupportRadiusUv) / safeUvScale;
+                float metadataEnabled = step(
+                    1e-5,
+                    conservativeSupportRadius);
+                float2 centreOffset =
+                    featureCenterOffsetNormalized *
+                    conservativeSupportRadius;
+
+                float bankInwardGradientValid;
+                float2 bankInwardGradient =
+                    ResolveGroundWorldXZScalarGradient(
+                        bankInwardDistance,
+                        positionWS,
+                        bankInwardGradientValid);
+                float centreBankInwardDistance = max(
+                    0.0,
+                    bankInwardDistance -
+                        dot(bankInwardGradient, centreOffset));
+
+                float riverbedInwardGradientValid;
+                float2 riverbedInwardGradient =
+                    ResolveGroundWorldXZScalarGradient(
+                        riverbedInwardDistance,
+                        positionWS,
+                        riverbedInwardGradientValid);
+                float centreRiverbedInwardDistance = max(
+                    0.0,
+                    riverbedInwardDistance -
+                        dot(riverbedInwardGradient, centreOffset));
+
+                float applicationGradientValid;
+                float2 applicationGradient =
+                    ResolveGroundWorldXZScalarGradient(
+                        localApplicationWeight,
+                        positionWS,
+                        applicationGradientValid);
+                float centreApplicationWeight = saturate(
+                    localApplicationWeight -
+                    dot(applicationGradient, centreOffset));
+
+                float riverbedMaterialEnabled =
+                    step(0.5, _GroundRiverbedLayerEnabled) *
+                    step(0.0001, _GroundRiverbedMaterialStrength);
+                float riverbedOwnershipInset = max(
+                    0.0001,
+                    conservativeSupportRadius * 0.02);
+                float riverbedOwner =
+                    riverbedMaterialEnabled *
+                    step(
+                        riverbedOwnershipInset,
+                        centreRiverbedInwardDistance);
+                float centreOwnerInwardDistance = lerp(
+                    centreBankInwardDistance,
+                    centreRiverbedInwardDistance,
+                    riverbedOwner);
+                float4 ownerTransitionSettings = lerp(
+                    bankTransitionSettings,
+                    riverbedTransitionSettings,
+                    riverbedOwner);
+
+                float transitionDistance = max(
+                    0.0,
+                    ownerTransitionSettings.x);
+                float safetyMargin = max(
+                    0.0,
+                    ownerTransitionSettings.z);
+                float fadeDistance = max(
+                    0.0,
+                    ownerTransitionSettings.w);
+                float wholeFeatureEnabled =
+                    step(
+                        0.0001,
+                        transitionDistance + safetyMargin + fadeDistance) *
+                    metadataEnabled;
+                float anchorDistanceSquared = dot(
+                    featureCenterOffsetNormalized,
+                    featureCenterOffsetNormalized);
+                float payloadValid =
+                    bankInwardGradientValid *
+                    riverbedInwardGradientValid *
+                    applicationGradientValid *
+                    metadataEnabled *
+                    step(anchorDistanceSquared, 1.0001);
+
+                float reconstructedEdgeDistance =
+                    centreOwnerInwardDistance - conservativeSupportRadius;
+                float requiredClearance =
+                    transitionDistance + safetyMargin;
+                float featureEdgeDistance = lerp(
+                    -1000000.0,
+                    reconstructedEdgeDistance,
+                    payloadValid);
+                float hardRetention = step(
+                    requiredClearance,
+                    featureEdgeDistance);
+                float softRetention = smoothstep(
+                    requiredClearance,
+                    requiredClearance + max(0.0001, fadeDistance),
+                    featureEdgeDistance);
+                float retention = lerp(
+                    hardRetention,
+                    softRetention,
+                    step(0.0001, fadeDistance));
+                float wholeFeatureWeight =
+                    centreApplicationWeight * retention;
+                return lerp(
+                    saturate(localApplicationWeight),
+                    wholeFeatureWeight,
+                    wholeFeatureEnabled);
+            }
+
             float ResolveGroundComposedShoreWetness(
                 float domainWeight,
                 float distance,

@@ -22,6 +22,7 @@ Render pipeline: URP
 Gameplay camera: constrained top-down isometric
 Primary wind spatial domain: world-space XZ
 Current implemented Weather features: shared wind domain, vegetation response field, and stylized wind trails
+Current planned Weather feature: universal gameplay-world cloud-shadow illumination; receiver-audit source implemented, live audit and runtime shading pending
 ```
 
 The current game does not require a general-purpose three-dimensional atmospheric simulation. The first Weather implementation is deliberately built around the XZ gameplay plane used by the top-down isometric game.
@@ -40,6 +41,21 @@ The same ownership rule applies to current and future consumers:
 - future gameplay movement effects in severe wind;
 
 A consumer may apply its own response model, but it must not invent a separate authoritative wind state when the shared Weather wind is applicable.
+
+
+### 2.1 Cloud-shadow ownership and universal receiver contract — planned
+
+Weather owns the authoritative moving cloud-shadow field, including its world-space phase, deterministic pattern controls, coverage, transition softness, retained sunlight, movement speed, wind-direction response, and sun-availability gate. Receiver systems consume that field; they do not author independent cloud masks or movement.
+
+The cloud-shadow requirement is universal across gameplay-world receivers. Ground, Generated Mass, Vegetation, River, actors, buildings, future houses, terrain-like materials, props, snow, ice, and other sun-responsive world surfaces must show one coherent cloud boundary at the same world position. UI, sky, diagnostics, and intentionally unlit or emissive effects may be explicitly exempted.
+
+The canonical design, candidate comparison, receiver-audit requirement, exact continuation procedure, and acceptance gates are defined in:
+
+- `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`
+
+The earlier Ground-only and unresolved-candidate scopes are superseded. The selected V0 architecture is one URP main directional-light cookie assigned to the authoritative sun and consumed through every supported receiver's cookie-aware main-light path. It is implemented completely before performance judgment. A hybrid shared-mask receiver system is deferred and may be reopened only if matched profiling proves the cookie cost materially unacceptable. Receivers must never apply both paths.
+
+Cloud transmission modifies environmental sunlight only unless a separately approved global overcast response also changes ambient/sky lighting. Weather cloud shading must not mutate receiver geometry, collision, hydrology, River simulation, Vegetation interaction, Generated Mass generation, actor gameplay, or material ownership.
 
 ---
 
@@ -185,6 +201,23 @@ Expected to own:
 
 Expected to consume CPU-authoritative wind and apply explicit gameplay rules. They must not depend on the vegetation response texture.
 
+
+### Cloud-shadow receiver audit — source implemented, live execution pending
+
+`Assets/Game/Procedural/Weather/Editor/WeatherCloudShadowReceiverAudit.cs` owns the editor-triggered compliance scan. It must run only on request, inspect loaded-scene renderers through shared materials, classify every shader as cookie-supported, explicitly exempt, or unsupported, inspect all discovered URP assets for light-cookie support, and copy the complete report to the clipboard. It must not mutate materials, shaders, renderers, scenes, pipeline assets, or the authoritative sun.
+
+### Cloud-shadow receivers — planned
+
+Expected to:
+
+- consume one Weather-owned world-space transmission field;
+- attenuate the selected environmental-sun contribution without inventing subsystem-local cloud state;
+- preserve ambient, local lights, emission, fog, simulation, geometry, and material ownership unless an explicit receiver rule says otherwise;
+- declare support or an intentional exemption through the project receiver-compliance audit;
+- reject unsupported future gameplay-world shaders rather than silently rendering them fully sunlit.
+
+The audit is editor-triggered and diagnostic only. It must not scan renderers or materials every frame.
+
 ---
 
 ## 10. Diagnostics policy
@@ -231,7 +264,7 @@ Current principles:
 The following have not been designed and must not be inferred from this document:
 
 - precipitation architecture;
-- cloud systems;
+- visible-cloud geometry, sky-cloud rendering, and volumetric clouds;
 - temperature;
 - seasons;
 - day/night ownership;
@@ -242,7 +275,7 @@ The following have not been designed and must not be inferred from this document
 - save/load representation;
 - complete Weather authoring tools.
 
-They may eventually belong to Weather, another subsystem, or a shared environment layer. No ownership decision has been made here.
+The moving ground/world cloud-shadow illumination contract is now defined by `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`; only visible-cloud rendering and the other items above remain ownership-undefined. They may eventually belong to Weather, another subsystem, or a shared environment layer.
 
 ---
 
@@ -275,7 +308,7 @@ Scene
     └── Weather                         [WeatherWindDomain]
 ```
 
-`WeatherWindDomain` is attached directly to the `Weather` object in this initial version. Future Weather features may become child modules only after a dedicated Weather architecture review; WEATHER-V0A does not create speculative precipitation, cloud, temperature, event, or regional modules.
+`WeatherWindDomain` is attached directly to the `Weather` object in this initial version. Future Weather features may become child modules only after a dedicated Weather architecture review. The planned cloud-shadow controller has now received that architecture review, but its exact scene attachment and runtime implementation remain pending explicit approval. WEATHER-V0A itself still contains only the implemented wind domain.
 
 The one-time vegetation-owned compatibility publisher and migration utility were removed by `VEG-V2-INFRA.3` after scene-owned Weather was accepted. New and retained scenes use the exact `WeatherWindDomain` directly; there is no production migration or fallback ownership path.
 

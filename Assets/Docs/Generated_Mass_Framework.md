@@ -2,6 +2,15 @@
 
 This document defines the stable Generated Mass feature contract. It is not a progress log.
 
+
+## Weather cloud-shadow receiver contract — planned
+
+Generated Mass is a required receiver of the Weather-owned cloud-shadow illumination field. Rocks and future Pixel Surface props must shade coherently with adjacent Ground, Vegetation, River, actors, and buildings at the same world position. Generated Mass does not own cloud seed, coverage, phase, direction, speed, or transmission.
+
+Cloud integration is renderer-only. It may attenuate the approved environmental-sun contribution in the Pixel Surface forward-lighting path, but it must not change deterministic generation, convex topology, edge-wear selection, corner damage, chipping, feature-atlas data, UV channels, normals, collision, placement, material identity, wetness ownership, or geometry budgets. Open-sun rendering must remain equivalent to the accepted no-cloud baseline.
+
+The production shader family must declare directional-cookie receiver support for the editor compliance audit. V0 uses the authoritative sun's URP main-light cookie exactly once; Generated Mass must not add a separate vertex cloud field or final-colour cloud multiplier. Future Generated Mass material or Shader Graph adapters are not production-compatible until they receive the same cookie or are explicitly exempted. Exact runtime files remain governed by `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`; hybrid optimization is deferred until measured cookie cost justifies it.
+
 The sole canonical progress ledger is:
 
 ```text
@@ -86,7 +95,7 @@ geometryCommit=disabled
 
 remains active. V1A acceptance therefore freezes deterministic edge-to-edge average-width irregularity on the editor visual/geometry foundation; it is not production promotion and it is not completion of the full edge-wear visual feature.
 
-The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b is frozen. The EW-C1A ordering audit is complete and approves a pre-bevel corner cut after micro-topology normalization. EW-C1A.1 is implemented and certified diagnostically. EW-C1A.1a.8 is accepted and frozen: every accepted polygon owns one render surface after final placement deformation. EW-C1A.2a passed its seed-8889 Unity gate with one semantic cap, complete `17/17` construction provenance, mandatory cap ring `3/3/3/3`, and unrelated bevel retention `28/28`. EW-C1A.3 owns the compact authoring workflow: one normal `Corner Chipping` control group, one raw corner-chip preview, and the existing edge-wear preview automatically applying the certified corner cut before bevel discovery when enabled. Its first Unity matrix preserved every frozen baseline gate but passed only `14/33` corner cases: disabled parity `11/11` and enabled construction `3/22`. EW-C1A.3a replaced fixed rank-0 commitment with deterministic score-ordered full-feature search, but its first matrix attempt was cancelled after `2:38` at case `3/33`; enabled seed-1 cases each required roughly `80–84 s` because both preview endpoints repeated complete candidate-by-scale mesh construction. EW-C1A.3b proved the staged direction but still spent `55.99 s` on only `20/33` cases because ring-only preflight admitted multiple expensive complete builds. EW-C1A.3c replaces that filter with a complete non-emitting integration preflight, scans all ranked corners without mesh emission, and permits exactly one final integration build with no fallback. Its first one-click Unity run never reached corner evaluation because current-preview, Macro, exhaustive topology, and a duplicate exhaustive artistic-materialization stage consumed the former `58 s` total boundary. EW-C1A.3d changes validation scheduling only: topology remains exhaustive `33/33`; all 33 artistic rankings are derived as non-emitting fingerprints from captured topology records; the corner matrix runs before artistic materialization; and only 12 difficult artistic sentinels are deeply rebuilt in the one-click suite. The standalone artistic matrix remains exhaustive. The research suite may use `90 s`, while enabled corner generation remains hard-bounded at `4 s` per rock and the corner matrix at `35 s`. Production generation remains unchanged until a separate promotion patch.
+The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b and EW-C1A.1a.8 remain accepted and frozen. EW-C1A.2a passed its seed-8889 integration gate. EW-C1A.3 owns the compact Corner Chipping authoring workflow and 33-case validation stage. EW-C1A.3e fixed authoritative plan/emission identity parity, but its Unity run proved that candidate plan creation still performed complete shell construction and consumed `41.07 s` for only `9` cases; topology-to-corner baseline reuse also missed because the topology default audit width was `1f`, not the authored edge-wear width. EW-C1A.3f separates deterministic candidate plane-and-rail solving from exactly one accepted-plan polygon-shell/triangle-soup materialization, preserves exact identity/hash validation, adds editor-only cooperative deadline probes, and snapshots the topology ordinary baseline with the exact authored width/Macro fingerprint. Production `EdgeWearEvaluationMode.None` remains unchanged. The development contracts remain `<= 4 s` target, `5 s` hard maximum per enabled rock, `35 s` corner matrix, and `90 s` research suite.
 
 ## Post-baseline edge-wear visual contract
 
@@ -103,10 +112,12 @@ EW-C1A.2a committed corner cut, provenance bridge, and mandatory cap-ring previe
 EW-C1A.2b corner controls, live settings, and Scene marker [seed-8889 proof complete]
 EW-C1A.2c chip-only geometry endpoint and post-chip integration proof [seed-8889 proof complete]
 EW-C1A.3  unified authoring workflow and first 33-case gate [implemented; Unity result 14/33]
-EW-C1A.3a deterministic fully certified single-corner search [superseded by C1A.3b performance repair]
-EW-C1A.3d validation-suite de-duplication and research scheduling [implemented; Unity validation pending]
-EW-C1A.3c complete integration preflight and one-final-build search [implemented; runtime not yet exercised]
-EW-C1A.3b bounded staged single-corner certification [implemented; Unity validation pending]
+EW-C1A.3a deterministic fully certified single-corner search [superseded by C1A.3b]
+EW-C1A.3b bounded staged certification [superseded by C1A.3c]
+EW-C1A.3c predictive complete preflight and one-final-build search [superseded by C1A.3e]
+EW-C1A.3d validator de-duplication and research scheduling [implemented; Unity scheduling accepted]
+EW-C1A.3e authoritative integration plan and topology-baseline reuse [implemented; identity parity accepted, performance failed]
+EW-C1A.3f authoritative solve/materialization split and exact topology-baseline reuse [implemented; Unity validation pending]
 EW-C2      sparse edge chips and notches [later]
 EW-N1      final artistic normal shaping [after geometry]
 EW-F1      face finish, cracks, and crevices [later]
@@ -697,3 +708,34 @@ per-seed ordinary baseline cache
 The 33-case matrix caches one ordinary baseline mesh/status per seed. Disabled policy returns that exact cached pair. Default and maximum-depth each execute one staged integrated search; they do not call the raw geometry endpoint. Determinism is verified by a lightweight repeated transaction fingerprint for the accepted rank. The interactive raw preview reuses one staged certification result and performs only one additional geometry emission for that accepted rank.
 
 The editor contract enforces a `5 s` hard budget per corner case and `55 s` hard stop for the complete corner matrix, with `2 s` and `40 s` targets respectively. A budget breach reports `performance-budget`, returns control, and prevents an over-budget valid mesh from being accepted. Telemetry distinguishes baseline builds/cache uses, transaction and ring-preflight attempts, complete/fallback builds, geometry reuse, stage timings, and case/matrix budget flags. These are editor-only safety limits; no production or per-frame owner exists.
+
+## EW-C1A.3e authoritative corner-integration plan
+
+Editor preview certification has one owner. A ranked candidate first produces a prepared preflight state containing the committed corner transaction, damaged polygon faces, topology context, coverage lifecycle, solved widths, and stability limits. The complete shell kernel consumes that state once and returns an immutable integration plan containing the certified triangle soup, unified preview status, exact ordinary and mandatory stable identities, unrelated-retention evidence, and deterministic plan hash.
+
+Final integrated preview generation may only consume that accepted plan. It clones the committed soup/status into the ordinary mesh-emission pipeline and must not rerun candidate discovery, isolated viability, width solving, coexistence, cap-ring scale selection, or shell construction. Emission validates the exact planned identity sets and hash. Missing or unexpected ordinary/mandatory identities are hard failures; counts alone never establish parity.
+
+The editor validation matrix reuses the ordinary unified baseline explicitly materialized alongside each topology default case. The all-geometric topology audit mesh is not relabeled as an ordinary baseline. Reuse is allowed only when the full recipe, edge-wear, Macro, crease, and evaluation-mode fingerprint matches. A mismatch performs a local baseline build rather than accepting stale data. This cache is suite-local and has no production/runtime ownership.
+
+## EW-C1A.3f authoritative solve/materialization boundary
+
+Corner candidate certification now has two explicit editor-only phases:
+
+```text
+ranked corner transaction and complete preflight
+    -> authoritative plane-and-rail solve
+       -> exact retained ordinary/mandatory candidate identities
+       -> prepared candidate widths, planes, rails, context, and coverage
+       -> no polygon-shell construction and no triangulation
+    -> first solved candidate satisfying mandatory-ring and unrelated-retention gates
+       -> exactly one polygon-shell construction
+       -> topology/face-quality/volume/bounds certification
+       -> exactly one triangulation and preview-soup materialization
+       -> exact plan/emission identity and hash comparison
+```
+
+Rejected candidates never construct the clean bevel shell or triangle soup. The accepted materialization consumes the solved candidate set directly. Corner solve-only plans force the existing maximum-coverage width-reduction route and disable coexistence exclusion search, so materialization may reduce widths but may not replace or defer planned identities. A materialization failure is explicit and returns the unchanged production fallback; it does not launch a second expensive candidate materialization.
+
+Editor-only deadline ownership is scoped to the corner search and is probed before candidate preparation, during bounded width/conflict passes, before shell construction, after plane construction, and before/after triangulation. Outside that scope the probe is inert, so ordinary audits and production generation retain their prior semantics.
+
+The topology matrix keeps its exhaustive audit widths `0.05 / 1.0 / 2.0`, but each seed's default topology case additionally materializes one semantically separate ordinary unified baseline using the authored Edge Wear Width, Coverage, Macro Coverage, Macro Strength, Softness, and crease settings. The corner stage consumes it only under an exact recipe/settings/evaluation-mode fingerprint. This is suite-local dirty-time reuse; it adds no persistent or runtime cache.

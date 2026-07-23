@@ -2254,6 +2254,18 @@ private readonly struct EdgeWearTopologyStats
         private sealed class CornerDamageIntegrationPreflightRecord
         {
             public CornerDamageTransactionAuditResult Transaction;
+            public List<PolygonFace> PreparedFaces;
+            public ChamferTopologyContext PreparedContext;
+            public ChamferCornerSolution PreparedSolution;
+            public EdgeWearCoverageAudit PreparedCoverage;
+            public float RequestedOrdinaryWidth;
+            public float MinimumStableEdgeLength;
+            public float MinimumStableFaceArea;
+            public float CapRingOrdinaryLimit;
+            public float CapRingDepthLimit;
+            public float CapRingEdgeLimit;
+            public string CapRingWinningLimit = string.Empty;
+            public float CapRingWearStrength;
             public bool Completed;
             public float RequestedRingWidth;
             public float MinimumStyleWidth;
@@ -2282,6 +2294,57 @@ private readonly struct EdgeWearTopologyStats
             public string Diagnostic = string.Empty;
         }
 
+        private sealed class PlaneCutBevelSolvedPlan
+        {
+            public List<PolygonFace> SourceFaces;
+            public List<PolygonFace> PreparedFaces;
+            public List<PlaneCutBevelCandidate> RetainedCandidates;
+            public List<int> ActiveEdgeIndices;
+            public ChamferTopologyContext Context;
+            public EdgeWearCoverageAudit CoverageAudit;
+            public PlaneCutBevelAuditResult Audit;
+            public float MinimumStableEdgeLength;
+            public float MinimumStableFaceArea;
+            public int LocalityDeferredCount;
+            public bool MaximumCoverageMode;
+            public bool AllowCoexistenceSearch;
+            public bool SolveValid;
+            public bool PolygonGeometryValid;
+            public bool Materialized;
+            public string Diagnostic = string.Empty;
+        }
+
+        private sealed class CornerDamageIntegrationPlan
+        {
+            public CornerDamageTransactionAuditResult Transaction;
+            public PlaneCutBevelSolvedPlan SolvedPlan;
+            public TriangleSoup PreviewSoup;
+            public UnifiedEdgeWearPreviewStatus UnifiedStatus;
+            public PlaneCutBevelAuditResult PlaneAudit;
+            public float ResolvedUniformScale;
+            public float OrdinaryRequestedWidth;
+            public float CapRingOrdinaryLimit;
+            public float CapRingDepthLimit;
+            public float CapRingEdgeLimit;
+            public string CapRingWinningLimit = string.Empty;
+            public float CapRingWearStrength;
+            public float CapRingRequestedWidth;
+            public int[] PlannedOrdinaryIdentities = Array.Empty<int>();
+            public int[] PlannedMandatoryIdentities = Array.Empty<int>();
+            public int[] MissingPlannedOrdinary = Array.Empty<int>();
+            public int[] UnexpectedFinalOrdinary = Array.Empty<int>();
+            public int[] MissingPlannedMandatory = Array.Empty<int>();
+            public int[] UnexpectedFinalMandatory = Array.Empty<int>();
+            public string IntegrationPlanHash = string.Empty;
+            public string EmittedPlanHash = string.Empty;
+            public int UnrelatedBaselineCount;
+            public int UnrelatedRetainedCount;
+            public int CollateralLostCount;
+            public int[] CollateralLostIdentities = Array.Empty<int>();
+            public bool Valid;
+            public string Diagnostic = string.Empty;
+        }
+
         private sealed class CornerDamageSearchTelemetry
         {
             public int BaselineBuildCount;
@@ -2292,9 +2355,19 @@ private readonly struct EdgeWearTopologyStats
             public int FullFallbackBuildCount;
             public int GeometrySearchReuseCount;
             public int IntegrationPreflightMismatchCount;
+            public int IntegrationPlanAttemptCount;
+            public int IntegrationPlanMismatchCount;
+            public int AuthoritativeSolveAttemptCount;
+            public int AuthoritativeSolveRejectCount;
+            public int PlanMaterializationBuildCount;
+            public int PlanMaterializationMismatchCount;
+            public int DeadlineAbortCount;
             public double CandidateRankingMilliseconds;
             public double TransactionMilliseconds;
             public double IntegrationPreflightMilliseconds;
+            public double IntegrationPlanMilliseconds;
+            public double AuthoritativeSolveMilliseconds;
+            public double PlanMaterializationMilliseconds;
             public double IntegrationMilliseconds;
             public bool CaseBudgetExceeded;
             public bool MatrixBudgetExceeded;

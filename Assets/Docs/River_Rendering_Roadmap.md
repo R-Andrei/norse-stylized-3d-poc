@@ -1,5 +1,16 @@
 # Current River Rendering Roadmap
 
+
+## Weather cloud-shadow receiver contract — planned
+
+River is a mandatory receiver of the Weather-owned cloud-shadow illumination field. Liquid water, frozen water, foam, shore-facing sun response, and other visible River lighting must remain spatially coherent with adjacent Ground, Vegetation, Generated Mass, actors, and buildings.
+
+V0 uses the authoritative sun's URP directional-light cookie. River water, ice, foam, and shore lighting must consume the cookie through their cookie-aware main-light path exactly once; no River-specific vertex field, custom cloud texture sample, or simulation input is permitted. Cloud integration belongs only to the final visible lighting path. It must not change River geometry, corridor ownership, hydrology, motion, disturbance, refraction, reflection inputs, depth, foam spawning, transport, lifecycle, topology, chipping, cache data, compute kernels, runtime allocations, or simulation cadence. Cloud transmission must remain separate from ordinary URP geometric shadow attenuation so existing liquid/ice shadow-response controls preserve their meaning. Ambient and local-light response must not be indiscriminately darkened.
+
+Current River Foam work remains paused while shared Weather shading integration is performed. After integration, the newest River source must be diffed against the frozen P13G state, compiled, and visually checked with matched cloud state before River development resumes. Exact representation and files are governed by `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`.
+
+---
+
 ## Fixed-metric River Foam coordinate status — P12
 
 P2–P10 are Unity-validated and closed; P11 found no mechanical or consistency defect. P12 now activates the authored grid selection at the real runtime allocation gate. Fixed metric is the source default, with quality-derived spacing and explicit `0.25`, `0.20`, `0.15`, and `0.10 m` candidates; legacy normalized-across remains directly selectable for comparison and rollback.
@@ -1443,3 +1454,47 @@ All strokes retain the same Reveal Speed and per-stroke Build duration. P13C ful
 No Layer E visibility, Chipping, Strand, colour, or opacity system is changed or implicated. No runtime resource, kernel, pass, sample, or draw call is added. The bounded extra cost is one contact-only sweep at the default stroke count and at most two at the maximum.
 
 Status: source implementation complete; `36/36` offline validation passes. Final package reproduction is recorded in the external validation report. Unity import, Play Mode proof of reliable supported contact material, and profiler evidence remain pending.
+
+## RG-METRIC-P13E — Independent Object Contact Reinforcement Cadence
+
+P13E separates complete Object packet frequency from maintenance of Foam intentionally retained around obstacles. Full Arc/Semi-Arc packets remain finite P13D bursts and are spaced by released wake length plus Object Contact Minimum Packet Gap at normal downstream Foam speed. An independent optional interval emits one finite contact-only reinforcement stroke using the last successful Arc/Semi-Arc recipe and seed.
+
+Reinforcement never emits wake arms, never changes full-packet eligibility, and never overlaps another source from the same object. It is attempted only while the next full packet is still in clearance. Existing Flecks remain finite and retain P13C fairness at full-packet eligibility.
+
+This patch adds no GPU resource, compute kernel, texture, buffer, shader sample, rendering pass, or draw call. P13C object velocity retention, P13A material/transport/visibility, P12u reveal timing, and P12t Layer E Chipping remain unchanged. Runtime cost is bounded to one existing contact-profile raster event per participating object per authored interval and may be disabled completely.
+
+Status: source implementation and offline package validation complete; Unity compilation, Play Mode cadence/shape acceptance, and profiling remain pending.
+
+## RG-METRIC-P13F — Full Initial Contact Ring and Recipe-Complete Reinforcement
+
+P13F refines the accepted P13E Object Foam scheduler without reopening transport, retention, or rendering:
+
+- every full Arc/Semi-Arc packet begins by progressively establishing a complete narrow ring around the actual obstacle boundary;
+- its existing finite wake geometry is emitted once after the ring;
+- later Arc strokes and independent reinforcement use the complete Arc contact profile;
+- later Semi-Arc strokes and independent reinforcement use only the deterministic selected half-profile;
+- no later stroke regenerates a wake arm and no persistent emitter returns.
+
+Initial and later strokes resolve separate durations from their own path lengths at the same requested Reveal Speed. The existing event ABI is unchanged; one reserved lane now carries contact-stroke path length. The ring uses eight neighbour reads from the existing obstacle-exclusion texture only inside the bounded source dispatch. No new full-field dispatch, resource, kernel, final-render sample, pass, or draw call is added.
+
+Status: source implementation complete; offline validation and exact package reproduction recorded in the P13F delivery report. Unity compilation, Play Mode proof of complete-ring ownership, Arc/Semi-Arc reinforcement distinction, nearby-obstacle isolation, and profiler evidence remain pending.
+
+## RG-METRIC-P13G — Object Spawning Acceptance Freeze and Weather Integration Pause
+
+The user has accepted the post-P13F automatic-spawning and Object-spawning result for the current milestone. P13F works as expected and is materially better than the former continuous object-emitter implementation. Spawning generally, and Object spawning specifically, are marked done for now.
+
+Frozen result:
+
+- finite packet spawning and authored rearm spacing;
+- no persistent Object material-cadence emitter;
+- one complete initial obstacle-contact ring per full Arc/Semi-Arc packet;
+- first-stroke-only Arc/Semi-Arc wake geometry;
+- complete Arc and selected-half Semi-Arc contact reinforcement;
+- optional finite independent contact-maintenance cadence;
+- full-vector object-contact slowdown;
+- unchanged P13A material/transport/visibility, P12u Reveal Speed and P12t Layer E Chipping.
+
+There are additional River issues, but none is selected or authorized as the next River patch. River Foam work is paused while a different thread performs small Weather cloud-shading changes in shared River shader files. After that integration, the newest supplied source must be diffed against the post-P13F/P13G baseline and compiled before River work resumes.
+
+P13G changes documentation only. It adds no runtime work, resource, allocation, dispatch, shader sample, pass or draw call. Unity validation is not required for the freeze patch itself; post-Weather compilation and spawning regression are mandatory.
+

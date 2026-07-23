@@ -1,3 +1,24 @@
+## 2026-07-23 — Sparse-riverbed visual state freeze
+
+The current river-surface visual baseline is frozen for a temporary workstream switch.
+
+Accepted visual behavior:
+
+- the green Primary Ground line between Bank and Riverbed is removed;
+- Riverbed-owned stones are no longer controlled by Bank Feature Safety Margin or Bank Whole Feature Return Fade;
+- hard whole-rock removal does not leave crescents or partial stone silhouettes in the algorithm-10 boundary-sweep proof;
+- positive whole-rock fade uses one shared stone response rather than a fragment-local spatial cut.
+
+Known unresolved visual defect:
+
+- no sparse stones remain visible on the Bank even when both Bank whole-feature controls are `0`.
+
+This Bank result is not an accepted visual target. It is frozen only as the current implementation state so another Ground-shader task can proceed. Future work must diagnose the live Bank response before changing visual tuning, support radius, candidate density, or defaults.
+
+Cloud-related shading is now governed by the universal Weather receiver contract in `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`. V0 uses the authoritative sun's URP directional-light cookie; Ground must consume that cookie through its normal main-light path and must not add a Ground-specific vertex field or custom cloud multiplier. Ground, Bank, Riverbed, imported material detail, and riverbed stones must receive the same world-space cloud transmission as adjacent Vegetation, Generated Mass, River, actors, and buildings. The cloud signal is an external illumination input only: it must not change surface ownership, application masks, hydrology, material blending, feature suppression, geometry, collision, or generation. It must not reintroduce the green handoff line or use cloud coverage to suppress sparse-rock response. Open-sun rendering must preserve this frozen Ground baseline; clouded comparisons must account only for the approved environmental-light difference. When stone work resumes, visual comparison must use the same cloud state or disable the cloud effect for matched evidence.
+
+---
+
 ## 2026-07-22 — Sparse-rock boundary silhouette rule
 
 A discrete riverbed rock is a recognizable object, not opacity noise. Application transitions may blend the noisy substrate spatially, but they must never cut through a rock silhouette. Each rock therefore remains, disappears, or fades uniformly according to whether one candidate-wide conservative support circle around its reconstructed centre has cleared the Bank or Riverbed boundary and configured safety margin.

@@ -1,3 +1,228 @@
+## 2026-07-23 — GSU-M2.7C.5E.2.4B.5: Current whole-rock state documentation freeze
+
+**Status:** Documentation-only freeze complete. Sparse-riverbed whole-rock work is paused for a separate Ground/cloud-shading workstream. The current implementation is the authoritative continuation baseline, but it is **not** feature-complete because Bank-owned sparse rocks remain absent even when Bank Feature Safety Margin and Whole Feature Return Fade are both `0`.
+
+### Purpose
+
+Freeze the exact accepted and unresolved state before another thread makes minor Ground-shader changes for cloud-related shading. This update changes documentation only. It does not attempt to diagnose or correct the remaining Bank-rock defect.
+
+### Accepted current behavior
+
+- `GSU-M2.7C.5E.2.4A.2` removed the Primary-Ground-coloured line at the Bank/Riverbed dry-surface handoff. User scene validation confirmed the line is gone.
+- Algorithm-10 non-ID centre anchors reconstruct whole-rock ownership without feature IDs, centre/radius arrays, metadata textures, or fragment searches.
+- `GSU-M2.7C.5E.2.4B.3` moved sparse-rock handling into final dry-response composition. The algorithm-10 boundary-sweep proof reports, for Ultra Sparse, Very Sparse, and Sparse candidates:
+  - hard partial rocks: `0`;
+  - removed-state residual: `0.00000`;
+  - fade-inconsistent rocks: `0`;
+  - anchor owner mismatches / invalid samples / inconsistent rocks / ungated emitted-response pixels: `0 / 0 / 0 / 0`.
+- `GSU-M2.7C.5E.2.4B.4` separated feature-policy ownership from same-surface detail-sampling reuse. The passing proof reports feature ownership inconsistent / Bank-to-Riverbed / Riverbed-to-Bank policy leaks as `0 / 0 / 0` for all three candidates.
+- User scene validation confirmed Bank feature settings no longer affect Riverbed-owned rocks; only Bank-owned response changes.
+- The proof verdict is `PASS WITH SOURCE GEOMETRY DRIFT WARNING`. The eleven raw-source geometry fingerprint warnings predate this ownership freeze and are not accepted as proof failures.
+
+### Known unresolved Bank defect
+
+Observed user scene behavior:
+
+- Bank Feature Safety Margin = `0`;
+- Bank Whole Feature Return Fade = `0`;
+- no sparse stones remain visible on the Bank.
+
+This is a confirmed unresolved defect. Its cause has not been established. Do not document the absence of Bank rocks as intended conservative culling, and do not tune defaults or change the candidate-wide support radius until a facts-based runtime audit identifies the exact failing equation, field, or ownership input.
+
+The first future stone-work task is therefore:
+
+```text
+Audit why Bank-owned whole-rock application weight is zero at zero Bank safety/fade controls.
+```
+
+The audit must trace the live Bank centre ownership, Bank inward distance, centre-evaluated application weight, required clearance, support-radius subtraction, and final rock-delta weight. It must distinguish proof behavior from live corridor/Ground interpolation and must not begin from a presumed cause.
+
+### Frozen runtime and payload contracts
+
+Until the Bank defect is deliberately resumed, preserve:
+
+1. the `2.4A.2` normalized direct Bank/Riverbed handoff that prevents Primary Ground from reappearing between the two secondary surfaces;
+2. algorithm version `10` and the Palette Form non-ID centre-anchor contract;
+3. complete feature-response evidence from slope, cavity, form, and roughness;
+4. final-response decomposition into fragment-local substrate response plus a centre-evaluated whole-rock response delta;
+5. independent Bank/Riverbed feature-policy ownership selected from the reconstructed rock centre;
+6. zero Bank-to-Riverbed and Riverbed-to-Bank policy leakage;
+7. existing fixed candidate assets, installer paths, GUID preservation, and no-numbered-copy behavior;
+8. the current no-ID, no-search-array, no-metadata-texture, no-extra-texture-sample architecture.
+
+### Separate cloud-shading workstream boundary
+
+A later thread is authorized to make minor Ground-shader changes for cloud-related shading. That work is separate from sparse-rock ownership and may change illumination response, but it must not silently alter the frozen contracts above.
+
+Before modifying any shared Ground shader/include, the cloud-shading patch must audit and preserve, or explicitly declare and justify a change to:
+
+- Bank/Riverbed substrate-composition weights;
+- `2.4A.2` direct handoff behavior;
+- algorithm-10 anchor decoding and support-radius transport;
+- whole-rock owner selection;
+- whole-rock final-response delta weighting;
+- Bank/Riverbed feature-policy isolation;
+- feature evidence and payload sampling count.
+
+Cloud shading must remain lighting/shadow modulation. It must not become a new surface-identity mask, reintroduce Primary Ground in the Bank/Riverbed handoff, or multiply Bank/Riverbed rock weights by an unrelated cloud field.
+
+When sparse-rock work resumes, compare the then-current Ground shader/includes against the `2.4B.4.1` baseline and reconcile every cloud-shading difference before diagnosing the Bank defect.
+
+### Approved documentation-only scope
+
+Modify only:
+
+1. `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+2. `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+3. `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
+4. `Assets/Docs/GeneratedGround_Inspector_Audit_and_Overhaul_Plan.md`
+
+Create/delete/move/rename: none.
+
+### Validation and compliance result
+
+- No runtime or Editor source is modified.
+- No Unity compilation, proof rerun, installation, regeneration, or scene validation is required for this documentation-only freeze.
+- The four documents record the same accepted behaviors, known limitation, future resumption gate, and cloud-shading compatibility boundary.
+- The live project remains the source of truth for exact code after subsequent cloud-shading work; this freeze is the authoritative record of the river-surface contracts that such work must preserve.
+
+---
+
+## 2026-07-23 — GSU-M2.7C.5E.2.4B.4.1: Ownership proof compile correction
+
+**Status:** Source correction and static consistency audit complete in the declared two-file scope. Unity C# compilation and the algorithm-10 proof remain pending.
+
+### Trigger and proven cause
+
+Unity reported `CS0103` at `GeneratedMassSparseRiverbedTileAssembler.cs:3819`: `supportRadius` did not exist in the context of `IsFeatureOwnerStateConsistent`. The direct caller `MeasureFeatureOwnerConsistency` already receives the candidate support radius and uses it to compute the ownership inset, but the nested helper multiplied decoded centre offsets by `supportRadius` without accepting that value as a parameter.
+
+### Objective and acceptance
+
+Pass the existing candidate support radius into both `IsFeatureOwnerStateConsistent` calls and add it to the helper signature. Preserve all 2.4B.4 ownership semantics, thresholds, counters, payload bytes, runtime shader behavior, and proof outputs.
+
+### Approved scope
+
+Modify only:
+
+1. `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+2. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssembler.cs`
+
+Create/delete/move/rename: none.
+
+### Implementation and static audit
+
+- Added `supportRadius` to both calls to `IsFeatureOwnerStateConsistent`.
+- Added `float supportRadius` to the helper signature.
+- The helper continues to decode centre offsets as `encodedOffset * supportRadius`; no equation or threshold changed.
+- Exact changed-file scope: two files.
+- Caller/signature parity: two calls, each passing the existing candidate support radius.
+- Undefined `supportRadius` references inside the helper: zero.
+- C# delimiter balance: passed.
+- Assembler algorithm remains `10`.
+- No runtime shader, validation gate, payload, profile, control, installer, geometry, or generated asset changed.
+
+### Pending validation
+
+- Unity C# compilation must pass.
+- Run the algorithm-10 proof and require all existing 2.4B.4 ownership and whole-rock gates to pass.
+
+---
+
+## 2026-07-23 — GSU-M2.7C.5E.2.4B.4: Independent Bank/Riverbed feature ownership
+
+**Status:** Source implementation and post-change static consistency/compliance audit complete in the declared six-file scope. Unity C#/ForwardLit compilation, corrected algorithm-10 proof, scene acceptance, and GPU measurement remain pending.
+
+### Trigger and proven defect
+
+User scene evidence after the passing 2.4B.3 proof shows that whole-rock culling works but Bank Feature Safety Margin removes rocks visibly located in the Riverbed. Current source proves the ownership leak: `Frag` collapses equivalent Bank/Riverbed dry response into `sharedSubstrateWeights = (Ground, shared, 0)`, then calls `ResolveGroundBankLayerDetail` with the complete shared Bank+Riverbed weight while `ResolveGroundRiverbedLayerDetail` receives zero. `ResolveGroundBankLayerDetail` consequently applies `_GroundBankMaterialTransition` to every shared-surface rock, including rocks whose centres are inside the Riverbed.
+
+The accepted 2.4A.2 same-surface sampling optimization is not itself rejected. The defect is that sampling ownership and feature-policy ownership were coupled. A shared dry surface may be sampled once, but its rock must select Bank or Riverbed feature policy from the reconstructed rock centre.
+
+### Objective and acceptance
+
+Preserve one shared dry-detail evaluation for equivalent Bank/Riverbed surfaces while making feature-policy ownership spatially independent:
+
+- a rock whose reconstructed centre is inside the Riverbed inward-distance domain uses only Riverbed Material Blend Distance, Feature Safety Margin, and Whole Feature Return Fade;
+- a rock whose reconstructed centre is outside that domain uses only the Bank settings;
+- changing Bank feature settings causes zero change to Riverbed-owned rock weights;
+- changing Riverbed feature settings causes zero change to Bank-owned rock weights;
+- the shared dry response, normalized 2.4A.2 handoff, whole-rock final-response decomposition, hard/fade semantics, payload bytes, support radius, and texture-sample count remain unchanged;
+- distinct Bank and Riverbed dry surfaces retain their existing independent detail paths.
+
+The centre ownership classifier uses reconstructed Riverbed inward distance. An enabled Riverbed application owns the rock when its centre is inside the Riverbed domain beyond a numerical inset of `max(0.0001 m, conservativeSupportRadius × 0.02)`; otherwise Bank owns it. The two-percent support inset is only a centre-reconstruction stability guard, not a whole-support ownership rule. The shared feature response continues to use the centre-evaluated shared dry application weight, while only the selected owner supplies the clearance and fade policy.
+
+### Approved scope
+
+Modify only:
+
+1. `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+2. `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+3. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssembler.cs`
+4. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssemblyValidation.cs`
+5. `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl`
+6. `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl`
+
+Create/delete/move/rename: none. No installer or generated asset is changed.
+
+### Reviewed evidence, producers, consumers, and invariants
+
+- Current source was reconstructed from `Assets-Code-Archive(13).zip` plus accepted 2.4A, 2.4A.1, 2.4A.2, 2.4B, 2.4B.2, and 2.4B.3 packages. The archive contains no `.git`, so branch, HEAD, status, history, and unrelated live changes cannot be verified.
+- `PixelSurfaceGroundForwardPass.hlsl` was reviewed through Bank/Riverbed detail sampling, shared-surface weight collapse, whole-rock delta composition, normal, albedo, smoothness, specular, and `Frag` call order. The exact leak is `sharedSubstrateWeights.z = 0` followed by Bank-only feature-policy evaluation.
+- `PixelSurfaceGroundResponse.hlsl` was reviewed through application transitions, world-XZ centre reconstruction, whole-feature application weight, Bank/Riverbed inward-distance producers, and normalized substrate composition.
+- `GroundMaterialControls.cs` and `GeneratedGround.cs` were reviewed as direct producers. Bank and Riverbed transition vectors are already uploaded independently; no C# property or serialized-control change is required.
+- `PixelSurfaceMaterialDetail.hlsl` was reviewed completely. Its anchor, support-radius, substrate-detail, and final-response fields remain unchanged.
+- The algorithm-10 assembler and validator were reviewed through anchor proof, final-response boundary sweep, report fields, failure gates, output fingerprints, and serialization. The new proof adds policy-isolation counters only; payload generation remains unchanged.
+- Shared-shader impact: only Ground calls the changed whole-feature ownership helper. Generated Mass includes the Ground response file but does not enable or call this Ground material-property path.
+
+### Implementation sequence
+
+1. Add a same-surface ownership-aware whole-feature weight helper that reconstructs shared application weight, Bank inward distance, and Riverbed inward distance at the common rock centre.
+2. Select Bank or Riverbed transition settings from centre Riverbed ownership and calculate one shared whole-rock weight. Keep invalid reconstruction conservative: suppress the discrete-rock delta while retaining substrate response.
+3. Pass `sameDrySurface` into Bank detail resolution. Use the ownership-aware helper only for the equivalent shared-surface path; preserve the existing Bank helper for distinct surfaces and the existing Riverbed helper for the Riverbed path.
+4. Add algorithm-10 ownership proof counters: reconstructed owner classification must be consistent across every emitted pixel of a rock, and Bank-setting changes affecting Riverbed-owned rocks plus Riverbed-setting changes affecting Bank-owned rocks must all be zero.
+5. Update report and failure gates, then complete exact-scope, complete-file reread, producer/consumer, delimiter, preprocessor, sample-site, branch, payload, and algorithm audits.
+
+### Performance and risk
+
+No texture sample, draw call, mesh stream, payload channel, CBUFFER property, runtime allocation, per-frame CPU work, ID, array, metadata texture, or search is added. Equivalent shared-surface feature evaluation adds one Riverbed inward-distance centre reconstruction and owner-policy selection. Distinct-surface paths remain unchanged. `PERFORMANCE EXCEPTION`: none; GPU measurement remains pending.
+
+Primary risks are derivative cost and FXC sensitivity. The implementation must not branch around texture sampling or duplicate the shared detail sample. The additional ownership work remains within the existing uniform whole-feature branch, and compile-before-proof/install remains mandatory.
+
+### Validation gates
+
+- C# and ForwardLit compile before proof or installation.
+- Algorithm-10 proof reports zero owner-inconsistent rocks, zero Bank-to-Riverbed policy leaks, and zero Riverbed-to-Bank policy leaks for every candidate.
+- Existing anchor, emitted-response, hard/fade boundary-sweep, and residual gates remain passing.
+- In scene, changing Bank Feature Safety Margin or Return Fade does not alter Riverbed-owned rocks; changing Riverbed settings does not alter Bank-owned rocks.
+- Hard and positive-fade whole-rock behavior remains complete and uniform for both owners.
+- GPU timing is compared with 2.4B.3 under the same camera and material settings.
+
+### Implementation result and post-change audit
+
+The implementation changed exactly the six declared files and no others. Equivalent Bank/Riverbed surfaces still sample the shared detail once through the Bank/shared slot. The shared whole-feature evaluator now reconstructs Bank inward distance, Riverbed inward distance, and shared application weight at the rock centre. Riverbed owns the feature when its reconstructed centre clears `max(0.0001 m, conservative support radius × 0.02)` inside the Riverbed domain; otherwise Bank owns it. Only the selected owner transition vector supplies Material Blend Distance, Feature Safety Margin, and Whole Feature Return Fade. Distinct-surface Bank and Riverbed evaluators are unchanged.
+
+The algorithm-10 proof now reports owner-inconsistent rocks, Bank-setting effects on Riverbed-owned rocks, and Riverbed-setting effects on Bank-owned rocks. All three are hard zero gates and participate in the deterministic candidate fingerprint. Payload production, candidate placement, installed assets, installer identity, and algorithm version remain unchanged.
+
+Post-change static evidence:
+
+- exact expected-versus-actual scope: passed, six files;
+- complete changed-file reread and direct producer/consumer reconciliation: passed;
+- C# and HLSL brace, parenthesis, and bracket balance: passed;
+- HLSL preprocessor balance: passed;
+- detail sampler call-site parity: one Bank definition/caller and one Riverbed definition/caller;
+- Ground ForwardPass texture sampling remains four array samples plus one ordinary 2D sample;
+- `[branch]` annotations increase from six to seven; the added branch is material-uniform and surrounds scalar ownership evaluation only, not texture sampling;
+- `ddx`/`ddy` source sites remain unchanged; the shared path invokes the existing scalar-gradient helper once more for Riverbed centre ownership;
+- accepted proof centre-error ratio is `0.00033 / 0.02924 = 1.13%`; the two-percent support ownership inset exceeds that measured ratio;
+- 400,000 randomized owner-threshold trials using the accepted error bound produced zero owner inconsistencies;
+- exhaustive proof-policy samples produced zero Bank-to-Riverbed and zero Riverbed-to-Bank setting leaks;
+- no ID, search array, metadata texture, ShaderLab property, CBUFFER member, payload channel, profile, control, installer, corridor, wetness, cover, or 2.4A.2 composition edit was introduced;
+- assembler algorithm remains `10`.
+
+Unity compilation and execution are unavailable in the reconstruction environment. Compile and proof remain mandatory before scene acceptance. Reinstallation is not required because the payload and installed candidate assets are unchanged.
+
+---
+
 ## 2026-07-23 — GSU-M2.7C.5E.2.4B.3: Whole-rock final-response composition
 
 **Status:** Source implementation and post-change static consistency/compliance audit complete in the declared seven-file scope. Unity C#/ForwardLit compilation, corrected algorithm-10 boundary-sweep proof, installation, scene acceptance, and GPU measurement remain pending.

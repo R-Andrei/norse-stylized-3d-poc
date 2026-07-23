@@ -954,6 +954,8 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectBirthAnchorCountLastUpdate;
         public int AutomaticObjectContactBuildCount =>
             automaticObjectContactBuildCount;
+        public int AutomaticObjectContactReinforcementCount =>
+            automaticObjectContactReinforcementCount;
         public int AutomaticObjectContactFleckCount =>
             automaticObjectContactFleckCount;
         public int AutomaticObjectWaitingClearanceCount =>

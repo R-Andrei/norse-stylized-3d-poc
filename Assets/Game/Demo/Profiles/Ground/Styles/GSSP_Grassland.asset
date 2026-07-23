@@ -35,8 +35,8 @@ MonoBehaviour:
       bankMaterialStrength: 1
       bankMaterialBlendDistance: 1.409
       bankMaterialBlendSoftness: 0.75
-      bankFeatureEdgeClearance: 0.817
-      bankFeatureReturnFade: 0.127
+      bankFeatureEdgeClearance: 0
+      bankFeatureReturnFade: 1
       bankMaterialReach: 1
       immediateBankExposure: 0.398
       waterlineMaterialStrength: 0.307

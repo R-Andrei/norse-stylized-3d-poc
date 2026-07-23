@@ -117,12 +117,14 @@ namespace ProgrammaticStylized3D.Rivers
         private float automaticObjectContactCycleTime;
         private int automaticObjectPatternAuthoritySignature = int.MinValue;
         private int automaticObjectClearanceAuthoritySignature = int.MinValue;
+        private int automaticObjectReinforcementAuthoritySignature = int.MinValue;
         private int automaticObjectBirthCursor;
         private int automaticObjectBirthSubmittedLastUpdate;
         private int automaticObjectBirthRejectedLastUpdate;
         private int automaticObjectBirthSubmittedTotal;
         private int automaticObjectBirthAnchorCountLastUpdate;
         private int automaticObjectContactBuildCount;
+        private int automaticObjectContactReinforcementCount;
         private int automaticObjectContactFleckCount;
         private int automaticObjectWaitingClearanceCount;
         private float automaticFreeWaterBirthAccumulator;

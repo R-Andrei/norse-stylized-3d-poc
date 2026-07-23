@@ -1051,6 +1051,23 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     candidate.FeatureBoundaryFadeInconsistentRockCount + ".");
             }
 
+            if (candidate.FeatureOwnershipInconsistentRockCount != 0 ||
+                candidate.FeatureOwnershipBankSettingsAffectRiverbedRockCount != 0 ||
+                candidate.FeatureOwnershipRiverbedSettingsAffectBankRockCount != 0)
+            {
+                failures.Add(
+                    candidate.Definition.StableId +
+                    ": independent Bank/Riverbed feature-policy proof failed. " +
+                    "owner-inconsistent rocks / Bank settings affecting " +
+                    "Riverbed-owned rocks / Riverbed settings affecting " +
+                    "Bank-owned rocks = " +
+                    candidate.FeatureOwnershipInconsistentRockCount + " / " +
+                    candidate.FeatureOwnershipBankSettingsAffectRiverbedRockCount +
+                    " / " +
+                    candidate.FeatureOwnershipRiverbedSettingsAffectBankRockCount +
+                    ".");
+            }
+
             if (string.IsNullOrEmpty(candidate.PalettePayloadFingerprint) ||
                 string.IsNullOrEmpty(
                     candidate.PalettePreviewNeutralFingerprint) ||
@@ -1554,6 +1571,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 FormatFloat(
                     candidate.FeatureBoundaryRemovedMaximumResidual) + " / " +
                 candidate.FeatureBoundaryFadeInconsistentRockCount);
+            builder.AppendLine(
+                "    feature ownership inconsistent / Bank-to-Riverbed / Riverbed-to-Bank policy leaks: " +
+                candidate.FeatureOwnershipInconsistentRockCount + " / " +
+                candidate.FeatureOwnershipBankSettingsAffectRiverbedRockCount +
+                " / " +
+                candidate.FeatureOwnershipRiverbedSettingsAffectBankRockCount);
             builder.AppendLine(
                 "    retired roughness-field maximum scalar deviation: " +
                 FormatFloat(

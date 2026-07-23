@@ -129,8 +129,11 @@ namespace ProgrammaticStylized3D.Rivers
         private struct AutomaticObjectSourceState
         {
             public int CycleIndex;
-            public float NextStartTime;
+            public float NextPacketStartTime;
+            public float NextReinforcementTime;
             public AutomaticFoamSourceEventType LastEventType;
+            public AutomaticFoamSourceEventType LastContactEventType;
+            public float LastContactSeed;
         }
 
         private struct AutomaticRevealTimingTelemetry
@@ -159,7 +162,12 @@ namespace ProgrammaticStylized3D.Rivers
             public float Duration;
             public float Elapsed;
             public float ObjectBuildDuration;
+            public float ObjectContactStrokeDuration;
+            public float ObjectContactStrokePathLengthMetres;
+            public float ObjectContactStrokeRawRevealDurationSeconds;
+            public bool ObjectContactStrokeRevealCadenceLimited;
             public int ObjectContactStrokeCount;
+            public bool ObjectContactReinforcementOnly;
             public float FormationSpeedMetresPerSecond;
             public float RevealPathDistanceMetres;
             public float RawRevealDurationSeconds;

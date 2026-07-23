@@ -2346,3 +2346,47 @@ Performance boundary:
 - Preflight candidate enumeration is restricted to the three mandatory ring edges. It uses existing isolated certification and adds no second solver.
 - One enabled matrix case owns at most one complete integration build plus one lower fallback per attempted corner; the old six-build outer scale sweep and duplicate raw endpoint search are removed.
 - The matrix cache is editor-job-local and stores eleven baseline mesh/status pairs at most; it is discarded with the suite job and is not a production or persistent cache.
+
+## EW-C1A.3e code ownership
+
+- `MassGenerator.cs`
+  - owns ranked authoritative-plan construction, exact plan/emission identity comparison, deterministic plan hashing, one scoped final plan emission, and the `4 s` target / `5 s` hard-limit telemetry surfaced to validation;
+  - lets topology default cases retain an additional ordinary unified baseline generated with the exact corner-matrix settings; the all-geometric topology audit mesh remains semantically separate.
+- `MassGenerator.EdgeWear.Types.cs`
+  - owns `CornerDamageIntegrationPreflightRecord` prepared-state references, `CornerDamageIntegrationPlan`, and plan-attempt/mismatch timing telemetry.
+- `MassGenerator.EdgeWear.Orchestration.cs`
+  - captures prepared post-cut faces/context/coverage/width solution during preflight;
+  - consumes a committed plan during integrated preview and returns its exact certified soup/status without solver rediscovery.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+  - owns the predictive gates and marks successful prepared preflight as requiring authoritative plan construction.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+  - copies and reports plan attempts, hashes, exact missing/unexpected identity sets, and plan timing through the existing corner report.
+- `Editor/GeneratedMassEditor.cs`
+  - seeds the corner baseline cache from the exact ordinary unified baseline materialized alongside matching topology default cases, using an exact recipe/settings/mode fingerprint;
+  - distinguishes the `4 s` target from the `5 s` hard maximum and reports aggregate plan mismatches and baseline reuse.
+
+Unchanged owners: `GeneratedMass.cs`, Inspector layout, settings transport, clipping/cap creation, bounded plane-shell geometry, coexistence/recovery rules, triangulation, final shared normals/tangents, shaders, serialized assets, runtime callbacks, and production `EdgeWearEvaluationMode.None`.
+
+## EW-C1A.3f code ownership
+
+- `MassGenerator.cs`
+  - owns `CornerDamageSearchDeadlineScope`, ranked solve-only candidate search, mandatory/retention acceptance, exactly one accepted-plan materialization, and solve/materialization/deadline telemetry;
+  - retains exact planned/emitted identity differences and hashes; final committed-plan emission remains a cheap consumer.
+- `MassGenerator.EdgeWear.Types.cs`
+  - owns `PlaneCutBevelSolvedPlan`, which freezes source faces, retained candidate objects, active graph edges, topology context, coverage audit, stability thresholds, and materialization state;
+  - extends corner search telemetry with authoritative solve attempts/rejects, one-time materialization builds/mismatches, deadline aborts, and timing partitions.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs`
+  - retains `AuditPlaneCutBevelKernel` as the combined wrapper for existing callers;
+  - adds `SolvePlaneCutBevelKernel` for candidate plane/rail preparation without shell or soup generation;
+  - adds `MaterializePlaneCutBevelSolvedPlan` for one accepted clean-shell build, certification, triangulation, coverage finalization, and preview-soup creation;
+  - contains inert-outside-scope deadline probes at bounded expensive stages.
+- `MassGenerator.EdgeWear.Orchestration.cs`
+  - accepts a committed corner plan only after its solved plan is marked materialized, then returns the exact committed soup/status without rediscovery.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+  - copies and reports authoritative solve, materialization, deadline, identity, and hash evidence through the existing corner report.
+- `Editor/GeneratedMassEditor.cs`
+  - snapshots authored Edge Wear Width and Macro values separately from topology audit settings;
+  - asks each topology default case to materialize a separate ordinary authored-settings baseline;
+  - tracks exact cross-stage baseline cache hits and enforces zero local baseline builds, one materialization maximum, zero materialization mismatches, `5 s` hard cases, `35 s` corner matrix, and `90 s` research suite.
+
+Reviewed unchanged owners: `GeneratedMass.cs`, settings transport, Inspector layout/actions, clipping and cap creation, corner ranking/scoring, bounded triangulation algorithms, final shared normals/tangents, shaders, assets, serialized defaults, runtime callbacks, and production `EdgeWearEvaluationMode.None`.

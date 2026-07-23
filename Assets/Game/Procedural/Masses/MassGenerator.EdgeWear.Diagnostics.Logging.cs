@@ -576,12 +576,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     telemetry.GeometrySearchReuseCount;
                 status.IntegrationPreflightMismatchCount =
                     telemetry.IntegrationPreflightMismatchCount;
+                status.IntegrationPlanAttemptCount =
+                    telemetry.IntegrationPlanAttemptCount;
+                status.IntegrationPlanMismatchCount =
+                    telemetry.IntegrationPlanMismatchCount;
+                status.AuthoritativeSolveAttemptCount =
+                    telemetry.AuthoritativeSolveAttemptCount;
+                status.AuthoritativeSolveRejectCount =
+                    telemetry.AuthoritativeSolveRejectCount;
+                status.PlanMaterializationBuildCount =
+                    telemetry.PlanMaterializationBuildCount;
+                status.PlanMaterializationMismatchCount =
+                    telemetry.PlanMaterializationMismatchCount;
+                status.DeadlineAbortCount =
+                    telemetry.DeadlineAbortCount;
                 status.CandidateRankingMilliseconds =
                     telemetry.CandidateRankingMilliseconds;
                 status.TransactionMilliseconds =
                     telemetry.TransactionMilliseconds;
                 status.IntegrationPreflightMilliseconds =
                     telemetry.IntegrationPreflightMilliseconds;
+                status.IntegrationPlanMilliseconds =
+                    telemetry.IntegrationPlanMilliseconds;
+                status.AuthoritativeSolveMilliseconds =
+                    telemetry.AuthoritativeSolveMilliseconds;
+                status.PlanMaterializationMilliseconds =
+                    telemetry.PlanMaterializationMilliseconds;
                 status.IntegrationMilliseconds =
                     telemetry.IntegrationMilliseconds;
                 status.CaseBudgetExceeded =
@@ -643,6 +663,59 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.Append("integrationPreflightMismatches=");
             builder.AppendLine(status.IntegrationPreflightMismatchCount.ToString(
                 CultureInfo.InvariantCulture));
+            builder.Append("integrationPlanAttempts=");
+            builder.AppendLine(status.IntegrationPlanAttemptCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("integrationPlanMismatches=");
+            builder.AppendLine(status.IntegrationPlanMismatchCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("authoritativeSolveAttempts=");
+            builder.AppendLine(status.AuthoritativeSolveAttemptCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("authoritativeSolveRejects=");
+            builder.AppendLine(status.AuthoritativeSolveRejectCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("planMaterializationBuilds=");
+            builder.AppendLine(status.PlanMaterializationBuildCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("planMaterializationMismatches=");
+            builder.AppendLine(status.PlanMaterializationMismatchCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("deadlineAborts=");
+            builder.AppendLine(status.DeadlineAbortCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("integrationPlanHash=");
+            builder.AppendLine(string.IsNullOrEmpty(status.IntegrationPlanHash)
+                ? "none"
+                : status.IntegrationPlanHash);
+            builder.Append("emittedPlanHash=");
+            builder.AppendLine(string.IsNullOrEmpty(status.EmittedPlanHash)
+                ? "none"
+                : status.EmittedPlanHash);
+            builder.Append("plannedOrdinaryIdentities={");
+            builder.Append(FormatCornerDamageIdentitySet(
+                status.PlannedOrdinaryIdentities));
+            builder.AppendLine("}");
+            builder.Append("plannedMandatoryIdentities={");
+            builder.Append(FormatCornerDamageIdentitySet(
+                status.PlannedMandatoryIdentities));
+            builder.AppendLine("}");
+            builder.Append("missingPlannedOrdinary={");
+            builder.Append(FormatCornerDamageIdentitySet(
+                status.MissingPlannedOrdinary));
+            builder.AppendLine("}");
+            builder.Append("unexpectedFinalOrdinary={");
+            builder.Append(FormatCornerDamageIdentitySet(
+                status.UnexpectedFinalOrdinary));
+            builder.AppendLine("}");
+            builder.Append("missingPlannedMandatory={");
+            builder.Append(FormatCornerDamageIdentitySet(
+                status.MissingPlannedMandatory));
+            builder.AppendLine("}");
+            builder.Append("unexpectedFinalMandatory={");
+            builder.Append(FormatCornerDamageIdentitySet(
+                status.UnexpectedFinalMandatory));
+            builder.AppendLine("}");
             builder.Append("preflightCandidates=");
             builder.AppendLine(status.PreflightCandidateCount.ToString(
                 CultureInfo.InvariantCulture));
@@ -684,6 +757,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.Append("integrationPreflightMilliseconds=");
             builder.AppendLine(status.IntegrationPreflightMilliseconds.ToString(
                 "F3", CultureInfo.InvariantCulture));
+            builder.Append("integrationPlanMilliseconds=");
+            builder.AppendLine(status.IntegrationPlanMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append("authoritativeSolveMilliseconds=");
+            builder.AppendLine(status.AuthoritativeSolveMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append("planMaterializationMilliseconds=");
+            builder.AppendLine(status.PlanMaterializationMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
             builder.Append("integrationMilliseconds=");
             builder.AppendLine(status.IntegrationMilliseconds.ToString(
                 "F3", CultureInfo.InvariantCulture));
@@ -692,6 +774,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.Append("matrixBudgetExceeded=");
             builder.AppendLine(status.MatrixBudgetExceeded ? "1" : "0");
             status.Report = builder.ToString();
+        }
+
+        private static string FormatCornerDamageIdentitySet(
+            int[] identities)
+        {
+            identities ??= Array.Empty<int>();
+            return identities.Length == 0
+                ? "none"
+                : string.Join("/", identities);
         }
 
         private static HashSet<int>
@@ -832,11 +923,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 CornerDamagePreviewKind.GeometryOnly;
             StringBuilder builder = new StringBuilder(8192);
             builder.AppendLine(geometryOnly
-                ? "GeneratedMass EW-C1A.3b corner-chip preview"
-                : "GeneratedMass EW-C1A.3b corner-chip and edge-wear preview");
+                ? "GeneratedMass EW-C1A.3f corner-chip preview"
+                : "GeneratedMass EW-C1A.3f corner-chip and edge-wear preview");
             builder.AppendLine(geometryOnly
-                ? "contract=EW-C1A.3b-corner-chip-preview"
-                : "contract=EW-C1A.3b-corner-chip-edge-wear");
+                ? "contract=EW-C1A.3f-corner-chip-preview"
+                : "contract=EW-C1A.3f-corner-chip-edge-wear");
             builder.Append("previewMode=");
             builder.AppendLine(geometryOnly
                 ? "geometry-only"
