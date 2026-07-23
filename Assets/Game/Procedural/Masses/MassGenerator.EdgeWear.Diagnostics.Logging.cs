@@ -669,21 +669,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.Append("integrationPlanMismatches=");
             builder.AppendLine(status.IntegrationPlanMismatchCount.ToString(
                 CultureInfo.InvariantCulture));
-            builder.Append("authoritativeSolveAttempts=");
+            builder.Append("candidatePreparationAttempts=");
             builder.AppendLine(status.AuthoritativeSolveAttemptCount.ToString(
                 CultureInfo.InvariantCulture));
-            builder.Append("authoritativeSolveRejects=");
+            builder.Append("candidatePreparationRejects=");
             builder.AppendLine(status.AuthoritativeSolveRejectCount.ToString(
                 CultureInfo.InvariantCulture));
-            builder.Append("planMaterializationBuilds=");
+            builder.Append("completeAuthoritativeBuilds=");
             builder.AppendLine(status.PlanMaterializationBuildCount.ToString(
                 CultureInfo.InvariantCulture));
-            builder.Append("planMaterializationMismatches=");
+            builder.Append("completeAuthoritativeBuildMismatches=");
             builder.AppendLine(status.PlanMaterializationMismatchCount.ToString(
                 CultureInfo.InvariantCulture));
             builder.Append("deadlineAborts=");
             builder.AppendLine(status.DeadlineAbortCount.ToString(
                 CultureInfo.InvariantCulture));
+            builder.Append("preparedPlanHash=");
+            builder.AppendLine(string.IsNullOrEmpty(status.PreparedPlanHash)
+                ? "none"
+                : status.PreparedPlanHash);
             builder.Append("integrationPlanHash=");
             builder.AppendLine(string.IsNullOrEmpty(status.IntegrationPlanHash)
                 ? "none"
@@ -692,6 +696,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.AppendLine(string.IsNullOrEmpty(status.EmittedPlanHash)
                 ? "none"
                 : status.EmittedPlanHash);
+            builder.Append("preparedOrdinaryIdentities={");
+            builder.Append(FormatCornerDamageIdentitySet(
+                status.PreparedOrdinaryIdentities));
+            builder.AppendLine("}");
+            builder.Append("preparedMandatoryIdentities={");
+            builder.Append(FormatCornerDamageIdentitySet(
+                status.PreparedMandatoryIdentities));
+            builder.AppendLine("}");
             builder.Append("plannedOrdinaryIdentities={");
             builder.Append(FormatCornerDamageIdentitySet(
                 status.PlannedOrdinaryIdentities));
@@ -760,10 +772,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.Append("integrationPlanMilliseconds=");
             builder.AppendLine(status.IntegrationPlanMilliseconds.ToString(
                 "F3", CultureInfo.InvariantCulture));
-            builder.Append("authoritativeSolveMilliseconds=");
+            builder.Append("candidatePreparationMilliseconds=");
             builder.AppendLine(status.AuthoritativeSolveMilliseconds.ToString(
                 "F3", CultureInfo.InvariantCulture));
-            builder.Append("planMaterializationMilliseconds=");
+            builder.Append("completeAuthoritativeBuildMilliseconds=");
             builder.AppendLine(status.PlanMaterializationMilliseconds.ToString(
                 "F3", CultureInfo.InvariantCulture));
             builder.Append("integrationMilliseconds=");
@@ -923,11 +935,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 CornerDamagePreviewKind.GeometryOnly;
             StringBuilder builder = new StringBuilder(8192);
             builder.AppendLine(geometryOnly
-                ? "GeneratedMass EW-C1A.3f corner-chip preview"
-                : "GeneratedMass EW-C1A.3f corner-chip and edge-wear preview");
+                ? "GeneratedMass EW-C1A.3g corner-chip preview"
+                : "GeneratedMass EW-C1A.3g corner-chip and edge-wear preview");
             builder.AppendLine(geometryOnly
-                ? "contract=EW-C1A.3f-corner-chip-preview"
-                : "contract=EW-C1A.3f-corner-chip-edge-wear");
+                ? "contract=EW-C1A.3g-corner-chip-preview"
+                : "contract=EW-C1A.3g-corner-chip-edge-wear");
             builder.Append("previewMode=");
             builder.AppendLine(geometryOnly
                 ? "geometry-only"

@@ -2704,7 +2704,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609313, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: -0.15, y: 21.88, z: -31.119999}
+  m_LocalPosition: {x: 0.1, y: 21.88, z: -30.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3158,8 +3158,8 @@ MonoBehaviour:
   m_UsePipelineSettings: 1
   m_AdditionalLightsShadowResolutionTier: 2
   m_CustomShadowLayers: 0
-  m_LightCookieSize: {x: 1, y: 1}
-  m_LightCookieOffset: {x: 0, y: 0}
+  m_LightCookieSize: {x: 128, y: 128}
+  m_LightCookieOffset: {x: -155.08264, y: -57.91613}
   m_SoftShadowQuality: 1
   m_RenderingLayersMask:
     serializedVersion: 0
@@ -8734,6 +8734,7 @@ GameObject:
   - component: {fileID: 1355804988}
   - component: {fileID: 1355804989}
   - component: {fileID: 1355804990}
+  - component: {fileID: 1355804991}
   m_Layer: 0
   m_Name: Weather
   m_TagString: Untagged
@@ -8750,7 +8751,7 @@ Transform:
   m_GameObject: {fileID: 1355804987}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -0.1, y: 0, z: -2.7}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8858,6 +8859,53 @@ MonoBehaviour:
   cameraEntryPreference: 0.9
   preferredVisibleRunwayMetres: 12
   minimumAcceptedVisibleRunwayMetres: 7
+--- !u!114 &1355804991
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1355804987}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3db9029873907b1acce7ba6708bda10, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Weather.WeatherCloudShadowController
+  cloudShadowsEnabled: 1
+  previewInEditMode: 1
+  sunOverride: {fileID: 0}
+  seed: 7331
+  cookieResolution: 256
+  cookieWorldSizeMetres: 128
+  cloudCoverage: 0.6
+  primaryFeatureScaleMetres: 6
+  secondaryFeatureScaleMetres: 3
+  secondaryShapeWeight: 0.67
+  transitionSoftnessMetres: 1.2
+  minimumOpeningDiameterMetres: 3
+  shadedTransmission: 0.05
+  cookieEvolutionEnabled: 1
+  minimumEvolutionIntervalSeconds: 120
+  maximumEvolutionIntervalSeconds: 360
+  evolutionDurationSeconds: 12
+  evolutionUpdateRateHz: 5
+  movementSpeedMetresPerSecond: 0.7
+  windAngleOffsetDegrees: 3
+  windSampleRateHz: 8
+  fallbackDirection: {x: 1, y: 0.25}
+  debugFocusOverride: {fileID: 1611485500}
+  debugFallbackCamera: {fileID: 330585545}
+  minimumSunIntensity: 0.01
+  minimumSunElevation: 0.01
+  debugVisualization: 0
+  debugFollowResolvedFocus: 1
+  debugMatchCookieWorldSize: 1
+  debugOverlayAnchor: {fileID: 0}
+  debugOverlaySizeMetres: 64
+  debugSampleHeightMetres: 0
+  debugOverlayOpacity: 0.55
+  debugCloudColor: {r: 1, g: 0, b: 0.75, a: 1}
+  debugOpeningColor: {r: 0, g: 0.85, b: 1, a: 1}
 --- !u!1 &1356653794
 GameObject:
   m_ObjectHideFlags: 0
@@ -10154,7 +10202,7 @@ Transform:
   m_GameObject: {fileID: 1533091818}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609314, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: -0.15, y: 21.88, z: -31.119999}
+  m_LocalPosition: {x: 0.1, y: 21.88, z: -30.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -10844,7 +10892,7 @@ Transform:
   m_GameObject: {fileID: 1611485499}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.15, y: 0.63, z: -11.12}
+  m_LocalPosition: {x: 0.1, y: 0.63, z: -10.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:

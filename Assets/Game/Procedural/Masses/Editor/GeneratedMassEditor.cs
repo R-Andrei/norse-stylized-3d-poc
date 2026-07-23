@@ -1159,9 +1159,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 if (string.IsNullOrEmpty(report))
                 {
                     report =
-                        "GeneratedMass EW-C1A.3f corner-chip preview" +
+                        "GeneratedMass EW-C1A.3g corner-chip preview" +
                         Environment.NewLine +
-                        "contract=EW-C1A.3f-corner-chip-preview" +
+                        "contract=EW-C1A.3g-corner-chip-preview" +
                         Environment.NewLine +
                         "status=failed" + Environment.NewLine +
                         "diagnostic=preview report was unavailable";
@@ -1170,9 +1170,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             catch (Exception exception)
             {
                 report =
-                    "GeneratedMass EW-C1A.3f corner-chip preview" +
+                    "GeneratedMass EW-C1A.3g corner-chip preview" +
                     Environment.NewLine +
-                    "contract=EW-C1A.3f-corner-chip-preview" +
+                    "contract=EW-C1A.3g-corner-chip-preview" +
                     Environment.NewLine +
                     "status=failed" + Environment.NewLine +
                     "diagnostic=exception: " + exception;
@@ -2882,8 +2882,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             CornerChippingMatrixAggregate aggregate)
         {
             StringBuilder builder = new StringBuilder(32768);
-            builder.AppendLine("GeneratedMass EW-C1A.3f corner chipping matrix");
-            builder.AppendLine("contract=EW-C1A.3f-33-case");
+            builder.AppendLine("GeneratedMass EW-C1A.3g corner chipping matrix");
+            builder.AppendLine("contract=EW-C1A.3g-33-case");
             builder.Append("status=");
             builder.AppendLine(aggregate.Status);
             builder.Append("seeds=");
@@ -3241,7 +3241,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-C1A.3f-suite");
+            builder.AppendLine("contract=EW-C1A.3g-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -3285,6 +3285,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append("currentPreviewTelemetryAvailable=");
             builder.AppendLine(
                 suite.CurrentPreviewTelemetryAvailable ? "1" : "0");
+            builder.Append("currentCornerStatusAvailable=");
+            builder.AppendLine(
+                suite.CurrentCornerStatusAvailable ? "1" : "0");
             builder.Append("currentPreviewElapsedMs=");
             builder.AppendLine(
                 suite.CurrentPreviewMilliseconds.ToString(
@@ -3413,16 +3416,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append("cornerIntegrationPlanMismatches=");
             builder.AppendLine(
                 suite.CornerIntegrationPlanMismatchCount.ToString());
-            builder.Append("cornerAuthoritativeSolveAttempts=");
+            builder.Append("cornerCandidatePreparationAttempts=");
             builder.AppendLine(
                 suite.CornerAuthoritativeSolveAttemptCount.ToString());
-            builder.Append("cornerAuthoritativeSolveRejects=");
+            builder.Append("cornerCandidatePreparationRejects=");
             builder.AppendLine(
                 suite.CornerAuthoritativeSolveRejectCount.ToString());
-            builder.Append("cornerPlanMaterializationBuilds=");
+            builder.Append("cornerCompleteAuthoritativeBuilds=");
             builder.AppendLine(
                 suite.CornerPlanMaterializationBuildCount.ToString());
-            builder.Append("cornerPlanMaterializationMismatches=");
+            builder.Append("cornerCompleteAuthoritativeBuildMismatches=");
             builder.AppendLine(
                 suite.CornerPlanMaterializationMismatchCount.ToString());
             builder.Append("cornerDeadlineAborts=");
@@ -3526,6 +3529,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine();
             builder.AppendLine("[Current Preview Summary]");
             builder.AppendLine(suite.CurrentPreviewSummary);
+            builder.AppendLine();
+            builder.AppendLine("[Current Corner Status]");
+            builder.AppendLine(suite.CurrentCornerStatusAvailable
+                ? suite.CurrentCornerStatusReport
+                : "unavailable: " + suite.CurrentCornerStatusDiagnostic);
             builder.AppendLine();
             builder.AppendLine("[Current Preview Telemetry]");
             builder.AppendLine(suite.CurrentPreviewTelemetryAvailable
@@ -3828,7 +3836,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             reportBuilder.AppendLine(
                 "GeneratedMass comprehensive artistic selection evidence");
             reportBuilder.AppendLine(
-                "contract=EW-C1A.3f-comprehensive-selection-projection");
+                "contract=EW-C1A.3g-comprehensive-selection-projection");
             reportBuilder.Append("cases=");
             reportBuilder.AppendLine(expectedCaseCount.ToString());
             reportBuilder.Append("scenariosPerCase=");
@@ -7881,6 +7889,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public double MacroVariationContractMilliseconds;
             public bool CurrentPreviewPassed;
             public bool CurrentPreviewTelemetryAvailable;
+            public bool CurrentCornerStatusAvailable;
             public bool MacroVariationContractPassed;
             public bool MacroZeroParityPassed;
             public bool MacroAngleMappingPassed;
@@ -7892,6 +7901,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public string CurrentPreviewTelemetry = string.Empty;
             public string CurrentPreviewTelemetryDiagnostic =
                 string.Empty;
+            public string CurrentCornerStatusReport = string.Empty;
+            public string CurrentCornerStatusDiagnostic = string.Empty;
             public EdgeWearViabilityMatrixAggregate TopologyAggregate;
             public EdgeWearViabilityMatrixAggregate PreviewAggregate;
             public string TopologyReportText = string.Empty;
@@ -8267,6 +8278,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                             Target.UnifiedEdgeWearPreviewDiagnostic)
                             ? "none"
                             : Target.UnifiedEdgeWearPreviewDiagnostic);
+
+                MassGenerator.CornerDamagePreviewStatus currentCornerStatus =
+                    Target.CornerDamageIntegrationPreviewStatus;
+                CurrentCornerStatusAvailable = currentCornerStatus != null;
+                if (CurrentCornerStatusAvailable)
+                {
+                    CurrentCornerStatusReport = string.IsNullOrEmpty(
+                            currentCornerStatus.Report)
+                        ? "status=" +
+                            (currentCornerStatus.PreviewApplied
+                                ? "passed"
+                                : "failed") +
+                            Environment.NewLine +
+                            "searchFailureStage=" +
+                            (string.IsNullOrEmpty(
+                                currentCornerStatus.SearchFailureStage)
+                                ? "none"
+                                : currentCornerStatus.SearchFailureStage) +
+                            Environment.NewLine +
+                            "diagnostic=" +
+                            (string.IsNullOrEmpty(
+                                currentCornerStatus.Diagnostic)
+                                ? "none"
+                                : currentCornerStatus.Diagnostic)
+                        : currentCornerStatus.Report;
+                    CurrentCornerStatusDiagnostic = string.Empty;
+                }
+                else
+                {
+                    CurrentCornerStatusReport = string.Empty;
+                    CurrentCornerStatusDiagnostic =
+                        "corner integration status was not captured for the current preview";
+                }
 
                 string telemetryPath = GetEdgeWearLibraryPath(
                     "GeneratedMassEdgeWearTelemetry.txt");
@@ -9541,7 +9585,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public string Contract => RequireAllGeometricCandidates
                 ? "EW-V1A.3b-topology"
                 : SuiteArtisticSentinelOnly
-                    ? "EW-C1A.3f-preview-sentinel"
+                    ? "EW-C1A.3g-preview-sentinel"
                     : "EW-V1A.3b-preview";
 
             public int TotalCaseCount => CaseCoordinates.Count;

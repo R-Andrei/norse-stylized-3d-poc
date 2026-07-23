@@ -3,13 +3,13 @@
 This document defines the stable Generated Mass feature contract. It is not a progress log.
 
 
-## Weather cloud-shadow receiver contract — planned
+## Weather cloud-shadow receiver contract — source integrated; Unity visual validation pending
 
 Generated Mass is a required receiver of the Weather-owned cloud-shadow illumination field. Rocks and future Pixel Surface props must shade coherently with adjacent Ground, Vegetation, River, actors, and buildings at the same world position. Generated Mass does not own cloud seed, coverage, phase, direction, speed, or transmission.
 
 Cloud integration is renderer-only. It may attenuate the approved environmental-sun contribution in the Pixel Surface forward-lighting path, but it must not change deterministic generation, convex topology, edge-wear selection, corner damage, chipping, feature-atlas data, UV channels, normals, collision, placement, material identity, wetness ownership, or geometry budgets. Open-sun rendering must remain equivalent to the accepted no-cloud baseline.
 
-The production shader family must declare directional-cookie receiver support for the editor compliance audit. V0 uses the authoritative sun's URP main-light cookie exactly once; Generated Mass must not add a separate vertex cloud field or final-colour cloud multiplier. Future Generated Mass material or Shader Graph adapters are not production-compatible until they receive the same cookie or are explicitly exempted. Exact runtime files remain governed by `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`; hybrid optimization is deferred until measured cookie cost justifies it.
+The live receiver audit reported that `PS3D/Pixel Surface Lit` declared `_LIGHT_COOKIES`, but source review found that the custom ForwardLit pass inherited the keyword in `Shader.keywordSpace` through its URP Lit fallback and did not contain its own cookie variant pragma. V0.2 therefore adds only `#pragma multi_compile_fragment _ _LIGHT_COOKIES` to `SH_PixelSurfaceLit.shader`; its existing `UniversalFragmentPBR` path performs the actual cookie-aware main-light evaluation. Generated Mass geometry, generation, editor, feature-atlas, forward-lighting includes, and material contracts remain unchanged. The production shader family must continue to declare directional-cookie receiver support for the editor compliance audit. V0 uses the authoritative sun's URP main-light cookie exactly once; Generated Mass must not add a separate vertex cloud field or final-colour cloud multiplier. Future Generated Mass material or Shader Graph adapters are not production-compatible until they receive the same cookie or are explicitly exempted. Exact runtime files remain governed by `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`; hybrid optimization is deferred until measured cookie cost justifies it.
 
 The sole canonical progress ledger is:
 
@@ -95,7 +95,7 @@ geometryCommit=disabled
 
 remains active. V1A acceptance therefore freezes deterministic edge-to-edge average-width irregularity on the editor visual/geometry foundation; it is not production promotion and it is not completion of the full edge-wear visual feature.
 
-The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b and EW-C1A.1a.8 remain accepted and frozen. EW-C1A.2a passed its seed-8889 integration gate. EW-C1A.3 owns the compact Corner Chipping authoring workflow and 33-case validation stage. EW-C1A.3e fixed authoritative plan/emission identity parity, but its Unity run proved that candidate plan creation still performed complete shell construction and consumed `41.07 s` for only `9` cases; topology-to-corner baseline reuse also missed because the topology default audit width was `1f`, not the authored edge-wear width. EW-C1A.3f separates deterministic candidate plane-and-rail solving from exactly one accepted-plan polygon-shell/triangle-soup materialization, preserves exact identity/hash validation, adds editor-only cooperative deadline probes, and snapshots the topology ordinary baseline with the exact authored width/Macro fingerprint. Production `EdgeWearEvaluationMode.None` remains unchanged. The development contracts remain `<= 4 s` target, `5 s` hard maximum per enabled rock, `35 s` corner matrix, and `90 s` research suite.
+The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b and EW-C1A.1a.8 remain accepted and frozen. EW-C1A.2a passed its seed-8889 integration gate. EW-C1A.3 owns the compact Corner Chipping authoring workflow and 33-case validation stage. EW-C1A.3e fixed plan/emission identity parity but remained too slow. EW-C1A.3f split solve-only candidate preparation from one shell materialization, but its Unity run proved that the public wrapper could discard a valid ordinary baseline mesh/status and return production geometry with default unified status after corner failure. EW-C1A.3g retains the ordinary baseline as one mesh/status/timing bundle, treats solve-only output as non-authoritative preparation, permits exactly one complete shell build, derives final identities and retention from the completed coverage, emits only the stored certified soup/status, and returns the exact ordinary baseline on every corner failure. Production `EdgeWearEvaluationMode.None` remains unchanged. The development contracts remain `<= 4 s` target, `5 s` hard maximum per enabled rock, `35 s` corner matrix, and `90 s` research suite.
 
 ## Post-baseline edge-wear visual contract
 
@@ -117,7 +117,8 @@ EW-C1A.3b bounded staged certification [superseded by C1A.3c]
 EW-C1A.3c predictive complete preflight and one-final-build search [superseded by C1A.3e]
 EW-C1A.3d validator de-duplication and research scheduling [implemented; Unity scheduling accepted]
 EW-C1A.3e authoritative integration plan and topology-baseline reuse [implemented; identity parity accepted, performance failed]
-EW-C1A.3f authoritative solve/materialization split and exact topology-baseline reuse [implemented; Unity validation pending]
+EW-C1A.3f solve/materialization split [runtime rejected: ordinary preview status/mesh ownership failed]
+EW-C1A.3g complete authoritative build and truthful baseline fallback [implemented; Unity validation pending]
 EW-C2      sparse edge chips and notches [later]
 EW-N1      final artistic normal shaping [after geometry]
 EW-F1      face finish, cracks, and crevices [later]
@@ -717,25 +718,28 @@ Final integrated preview generation may only consume that accepted plan. It clon
 
 The editor validation matrix reuses the ordinary unified baseline explicitly materialized alongside each topology default case. The all-geometric topology audit mesh is not relabeled as an ordinary baseline. Reuse is allowed only when the full recipe, edge-wear, Macro, crease, and evaluation-mode fingerprint matches. A mismatch performs a local baseline build rather than accepting stale data. This cache is suite-local and has no production/runtime ownership.
 
-## EW-C1A.3f authoritative solve/materialization boundary
+## EW-C1A.3g complete authoritative build and truthful baseline fallback
 
-Corner candidate certification now has two explicit editor-only phases:
+Corner candidate certification has three explicit editor-only ownership phases:
 
 ```text
 ranked corner transaction and complete preflight
-    -> authoritative plane-and-rail solve
-       -> exact retained ordinary/mandatory candidate identities
-       -> prepared candidate widths, planes, rails, context, and coverage
-       -> no polygon-shell construction and no triangulation
-    -> first solved candidate satisfying mandatory-ring and unrelated-retention gates
-       -> exactly one polygon-shell construction
+    -> solve-only candidate preparation
+       -> prepared candidate widths, planes, rails, context, coverage, and estimated identities
+       -> no clean-shell authority and no triangulation authority
+    -> first prepared candidate satisfying predictive mandatory/retention gates
+       -> exactly one complete clean-shell construction
+       -> final conflict reduction and retained-candidate ownership
        -> topology/face-quality/volume/bounds certification
-       -> exactly one triangulation and preview-soup materialization
-       -> exact plan/emission identity and hash comparison
+       -> exactly one triangulation and preview-soup creation
+       -> final ordinary/mandatory identities, unrelated retention, and authoritative hash
+    -> emission consumes the stored certified soup/status only
 ```
 
-Rejected candidates never construct the clean bevel shell or triangle soup. The accepted materialization consumes the solved candidate set directly. Corner solve-only plans force the existing maximum-coverage width-reduction route and disable coexistence exclusion search, so materialization may reduce widths but may not replace or defer planned identities. A materialization failure is explicit and returns the unchanged production fallback; it does not launch a second expensive candidate materialization.
+Prepared identities are ranking and diagnostic evidence only. `MaterializePlaneCutBevelSolvedPlan` is the first boundary that can own final retained identities because conflict reduction, clean-shell construction, certification, triangulation, and coverage finalization still occur there. The completed shell therefore replaces the prepared identity estimate as the authoritative `CornerDamageIntegrationPlan`. Final emission compares the stored final identity sets and hash against the status produced from the same stored soup; it does not rerun discovery, solving, conflict reduction, or shell construction.
 
-Editor-only deadline ownership is scoped to the corner search and is probed before candidate preparation, during bounded width/conflict passes, before shell construction, after plane construction, and before/after triangulation. Outside that scope the probe is inert, so ordinary audits and production generation retain their prior semantics.
+The ordinary baseline is one inseparable editor-only bundle containing `MeshData`, `UnifiedEdgeWearPreviewStatus`, and build duration. Cached reuse requires both a non-null mesh and an applied status. Every unsuccessful corner-enabled exit returns that exact baseline mesh and status while retaining a failed `CornerDamagePreviewStatus` with its actual stage, diagnostic, attempts, and telemetry. No failure path substitutes production geometry or clears the valid ordinary unified status.
 
-The topology matrix keeps its exhaustive audit widths `0.05 / 1.0 / 2.0`, but each seed's default topology case additionally materializes one semantically separate ordinary unified baseline using the authored Edge Wear Width, Coverage, Macro Coverage, Macro Strength, Softness, and crease settings. The corner stage consumes it only under an exact recipe/settings/evaluation-mode fingerprint. This is suite-local dirty-time reuse; it adds no persistent or runtime cache.
+Only one complete authoritative build is permitted per enabled rock. If that build fails mandatory-ring completion, unrelated retention, render certification, deadline, or emission validation, the search returns the ordinary baseline and does not try a second complete candidate. Solve-only preparation may continue across ranked candidates before the one complete-build commitment.
+
+Editor-only deadline probes remain inert outside corner search. The topology matrix keeps its exhaustive audit widths, while the suite-local corner cache continues to store the semantically separate ordinary unified baseline at exact authored settings. This adds no persistent cache, player callback, per-frame work, shader work, or production behavior.

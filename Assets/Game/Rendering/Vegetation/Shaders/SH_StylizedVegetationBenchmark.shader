@@ -70,6 +70,7 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
             #pragma multi_compile_fog
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"

@@ -2329,6 +2329,9 @@ private readonly struct EdgeWearTopologyStats
             public string CapRingWinningLimit = string.Empty;
             public float CapRingWearStrength;
             public float CapRingRequestedWidth;
+            public int[] PreparedOrdinaryIdentities = Array.Empty<int>();
+            public int[] PreparedMandatoryIdentities = Array.Empty<int>();
+            public string PreparedPlanHash = string.Empty;
             public int[] PlannedOrdinaryIdentities = Array.Empty<int>();
             public int[] PlannedMandatoryIdentities = Array.Empty<int>();
             public int[] MissingPlannedOrdinary = Array.Empty<int>();

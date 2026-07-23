@@ -22,10 +22,10 @@ Historical ledger rule: sections below preserve method history and old acceptanc
 ## Active feature
 
 ```text
-EW-C1A.3f — Authoritative solve/materialization split and exact topology-baseline reuse
+EW-C1A.3g — Complete authoritative build with truthful ordinary-baseline fallback
 ```
 
-EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. Seed `8889` has passed both raw corner geometry and post-chip edge-wear integration, including one semantic cap, dense construction provenance, mandatory cap ring `3/3/3/3`, unrelated bevel retention `28/28`, and no collateral loss. EW-C1A.3 established the compact normal Corner Chipping workflow and internal 33-case matrix. EW-C1A.3d repaired validator scheduling. EW-C1A.3e then removed predictive/final identity divergence: its Unity run reported `cornerIntegrationPlanMismatches=0`, but reached only `3/9` corner cases in `41.07 s` because each candidate plan still constructed the complete polygon shell and preview soup; final emission itself measured `0 ms`. Cross-stage baseline reuse also failed (`cornerBaselineBuilds=3`) because topology's case width `1f` was used instead of the authored edge-wear width. EW-C1A.3f splits candidate plane-and-rail solving from one accepted-plan shell materialization, adds bounded editor-only deadline probes, and materializes topology-owned ordinary baselines with the exact authored settings fingerprint. The production target remains `<= 4 s`, the hard per-rock maximum remains `5 s`, the corner matrix remains `35 s`, and the research suite remains `90 s`. Production generation remains unchanged. Unity compilation and runtime validation of C1A.3f remain pending.
+EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. Seed `8889` has passed both raw corner geometry and post-chip edge-wear integration, including one semantic cap, dense construction provenance, mandatory cap ring `3/3/3/3`, unrelated bevel retention `28/28`, and no collateral loss. EW-C1A.3 established the compact normal Corner Chipping workflow and internal 33-case matrix. EW-C1A.3d repaired validator scheduling. EW-C1A.3e removed predictive/final identity divergence but remained too slow. EW-C1A.3f split candidate preparation from one shell materialization, but Unity report `Pasted text(148).txt` runtime-rejected that boundary: the ordinary all-edge preview certified `30/30/30` with render-valid polygon, plane, and mesh evidence while the public current-preview status returned all-zero/default state and failed fast before topology or corner matrices. Source inspection confirms the cached ordinary mesh was discarded, corner failure exits returned production geometry with default or mismatched unified status, and solve-only identities were incorrectly treated as authoritative before conflict reduction, clean-shell construction, triangulation, and coverage finalization. EW-C1A.3g preserves the ordinary mesh/status/timing as one baseline bundle, treats solve-only work as candidate preparation, permits exactly one complete authoritative shell build, and routes every failed corner attempt to the exact ordinary baseline while preserving the real corner failure. The production target remains `<= 4 s`, the hard per-rock maximum remains `5 s`, the corner matrix remains `35 s`, and the research suite remains `90 s`. Production generation remains unchanged.
 
 ## Visual-development sequence
 
@@ -43,7 +43,8 @@ EW-C1A.3b bounded staged single-corner certification [superseded by C1A.3c]
 EW-C1A.3c predictive complete preflight and one-final-build search [superseded by C1A.3e]
 EW-C1A.3d validation-suite de-duplication and research scheduling [implemented; Unity scheduling accepted]
 EW-C1A.3e authoritative integration plan and topology-baseline reuse [implemented; Unity result: identity parity fixed, performance failed]
-EW-C1A.3f authoritative solve/materialization split and exact topology-baseline reuse [implemented; Unity validation pending]
+EW-C1A.3f solve/materialization split [runtime rejected: valid ordinary preview status lost on corner failure]
+EW-C1A.3g complete authoritative build and truthful ordinary-baseline fallback [active implementation]
 EW-C2      sparse chips, notches, and break events
 EW-N1      final artistic normal shaping across all accepted worn geometry
 EW-F1      broad-face finish, cracks, and crevices
@@ -8206,3 +8207,81 @@ No file may be created, deleted, moved, or renamed. `GeneratedMass.cs`, `MassSur
 - [x] Static contracts `103/103` prove one materialization path, authored-width baseline capture, deadline probes, exact C1A.3f telemetry/contracts, and unchanged frozen owners.
 - [x] Changed-files ZIP and unified patch reproduce the final `331/331`-file tree byte-for-byte from commit `38fe7bf`; ZIP CRC passes with exactly ten entries.
 - [ ] Unity compile and `EW-C1A.3f-suite` runtime validation pending user execution.
+
+## EW-C1A.3g implementation plan — complete authoritative build and truthful ordinary-baseline fallback
+
+### Objective and acceptance criteria
+
+- [x] Record C1A.3f as runtime-rejected from `Pasted text(148).txt`: `currentPreviewPassed=0` and an all-zero public summary coexist with `planeBevel=30/30/30`, `polygonSurface.renderValid=1`, `planeSurface.renderValid=1`, and `planeMesh.renderValid=1`.
+- [x] Preserve each ordinary baseline as one mesh/status/timing bundle. A supplied cached baseline is reusable only when both mesh and applied status are present; otherwise build one local ordinary unified baseline and retain its exact mesh and status.
+- [x] Treat solve-only plane/rail output as candidate preparation, not final authority. Prepared identities may reject an obviously invalid candidate, but only the completed clean shell may own final ordinary/mandatory identities, retention counts, hashes, render validity, and preview soup.
+- [x] Perform at most one complete authoritative shell construction per enabled rock. Final emission must consume the completed soup/status without rediscovery or a second solve.
+- [x] Route every unsuccessful corner-enabled exit through one fallback helper that returns the exact ordinary baseline mesh and unified status while retaining a failed `CornerDamagePreviewStatus` with the real stage, diagnostic, search summary, and telemetry.
+- [x] Add current corner-status evidence to the one-click suite so an ordinary-preview pass cannot hide the actual corner failure stage.
+- [x] Preserve the frozen production path, controls, serialized data, shaders, assets, triangulation policy, normal/tangent ownership, width schedules, candidate ranking, and mandatory/unrelated-retention gates.
+
+### Approved files
+
+- [x] `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md` — first persistent write, evidence, concrete plan, implementation status, and final compliance audit.
+- [x] `Assets/Docs/Generated_Mass_Framework.md` — replace the false solve-only authority boundary with complete-build authority and truthful fallback ownership.
+- [x] `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md` — define candidate preparation, one complete build, exact soup emission, and baseline fallback.
+- [x] `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md` — update exact C1A.3g code ownership.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.cs` — baseline bundle, corrected candidate-preparation/complete-build boundary, post-build retention validation, centralized fallback, and updated failure priorities.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs` — separate prepared identity evidence from final authoritative identity evidence without adding serialized state.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs` — advance report contracts and label candidate preparation versus complete authoritative construction truthfully.
+- [x] `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs` — pass the cached baseline mesh through the corner path, advance suite contracts, and include current corner-status evidence.
+
+No file may be created, deleted, moved, renamed, generated, or modified outside this eight-file scope. `MassGenerator.EdgeWear.Orchestration.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `GeneratedMass.cs`, `MeshData.cs`, `MassGenerator.MeshOutput.cs`, all shaders/includes, materials, scenes, prefabs, assets, and metadata are reviewed unchanged owners.
+
+### Read-only evidence reviewed before implementation
+
+- [x] Source authority: `/mnt/data/Assets-Code-Archive(18).zip`, SHA-256 `862adafc137d885207ffb0debdeaaba0b6fb18dc96744830af24831a4e19088a`, containing `353` project files under `Assets`; no `.git` directory is present, so real branch, `HEAD`, status, diff, and history are unavailable. The archive includes the post-pause weather/cloud work and is authoritative over the handoff reconstruction.
+- [x] Handoff: `GeneratedMass_EW-C1A.3g_Continuation_Handoff_2026-07-23(1).md`, SHA-256 `82f332e815c1a977b99f0a40d7ee824faf4f742c39b12597207b8a9dd7755a36`, records the same corrected boundary and forbids shader/cloud edits.
+- [x] Runtime report `Pasted text(148).txt`: suite `EW-C1A.3f-suite`, total `8391.0696 ms`, current preview `1616.5212 ms`, fail-fast before topology/corner matrices, public status all zero/default, ordinary telemetry `30/30/30` and render-valid.
+- [x] `MassGenerator.cs:1225-1736` — `GenerateCornerDamageFullCertificationSearch` builds or receives only baseline status, retains default unified failure state, returns production `Generate(...)` on no-plan, budget, materialization, and final-emission failures, and can pair non-preview geometry with preview status.
+- [x] `MassGenerator.cs:2862-2905` — `GenerateUnifiedEdgeWearPreviewWithBaseline` receives cached `baselineMesh` but discards it before calling the corner path.
+- [x] `MassGenerator.cs:1809-2132` — solve-only output is used to define planned identities before materialization; `MaterializePlaneCutBevelSolvedPlan` later performs the clean-shell build and can change final retained identities.
+- [x] `MassGenerator.EdgeWear.PlaneCutKernel.cs:901-1609` — complete authority is reached only after conflict reduction, retained-candidate finalization, clean-shell construction, topology/face/coverage certification, triangulation, and final `TriangleSoup` creation.
+- [x] `MassGenerator.EdgeWear.Orchestration.cs:103-134` — an already materialized committed plan is consumed without rediscovery by cloning its exact soup and status; this owner requires no edit.
+- [x] `GeneratedMass.cs:2268-2308` — public Inspector/current-preview fields copy the returned unified status directly, explaining the observed all-zero summary when the corner wrapper returns default status.
+- [x] `Editor/GeneratedMassEditor.cs:1948-1979` already caches mesh/status/timing together, but the generator API drops the mesh; `CaptureCurrentPreview` records only ordinary status and telemetry, not the current corner status.
+- [x] `MeshData.cs` is a mutable managed data container with no disposal or native ownership. Returning the exact cached/local baseline object matches the existing corner-disabled baseline path and requires no clone/disposal protocol.
+- [x] Canonical checklist, framework, recovery architecture, code inventory, `Assets/AGENTS.md`, direct callers, status producers/consumers, complete-build consumer, and validation suite contracts were reviewed before this first write.
+
+### Invariants and non-goals
+
+- [x] Production `EdgeWearEvaluationMode.None` remains byte-identical and no player/runtime callback changes.
+- [x] No new Inspector controls, foldouts, debug views, serialized fields, defaults, assets, dependencies, layers, tags, components, folders, shaders, includes, or per-frame work.
+- [x] Candidate ranking, corner depth/scoring, cap-ring tuning, width schedules, conflict rules, triangulation, mesh channels, authored normals/tangents, and render response remain unchanged.
+- [x] Mandatory cap-ring completion, unrelated ordinary-retention, exact identity, mesh validity, `<=4 s` target, `<5 s` hard case, `35 s` matrix, and `90 s` suite gates are not relaxed.
+- [x] One failed complete build returns the ordinary baseline; it does not authorize a second complete candidate build.
+
+### File-by-file implementation sequence
+
+1. [x] Add a non-serialized baseline bundle in `MassGenerator.cs`; thread cached/local baseline mesh, status, and timing through all corner search entry points.
+2. [x] Rename solve-only search semantics to candidate preparation and store its identity evidence separately from final authoritative identities.
+3. [x] Materialize exactly one selected candidate; derive final ordinary/mandatory identities and unrelated-retention from the completed coverage, then establish final hashes and soup/status as the authoritative plan.
+4. [x] Add one centralized baseline-return helper and use it for no candidate, deadline, preparation failure exhaustion, complete-build failure, identity/retention failure, and emission failure/budget exits.
+5. [x] Update failure priority so candidate-preparation, complete-build, complete-build-retention, and emission failures preserve the deepest diagnostic.
+6. [x] Add current corner-status report capture/output and advance C1A.3g report/suite contract labels without changing the one-click workflow.
+7. [x] Update the framework, recovery architecture, and code inventory to the implemented ownership model.
+8. [x] Run exact-scope diff review, changed-caller/consumer reread, C# lexical/preprocessor/region checks, contract assertions, whitespace/line-ending checks, archive replay, and record Unity compile/runtime as pending.
+
+### Risks and controls
+
+- [x] Risk: returning the supplied baseline object allows mutation by the caller. Control: this matches the existing corner-disabled `GenerateUnifiedEdgeWearPreviewWithBaseline` contract; `MeshData` is returned as completed generator output and no generator path mutates it after return.
+- [x] Risk: a prepared candidate passes but its one complete build fails. Control: report the exact complete-build stage, return the ordinary baseline, and do not try another complete build.
+- [x] Risk: final identities differ from prepared estimates. Control: prepared identities are diagnostic/ranking evidence only; final authority is recomputed from completed coverage and compared only against the emitted status from the same stored soup.
+- [x] Risk: cached mesh/status mismatch. Control: cached reuse requires a non-null mesh and applied status; otherwise build one local baseline pair.
+- [x] Risk: scope drift into plane kernel or cloud shaders. Control: both are reviewed unchanged owners and excluded from the approved file list.
+
+### Validation and compliance status
+
+- [x] Final diff restricted to the eight approved files; no create/delete/move/rename and no shader/cloud change.
+- [x] All failure exits return baseline mesh plus baseline unified status and retain a non-null failed corner status.
+- [x] One enabled search contains at most one call to `MaterializePlaneCutBevelSolvedPlan`; emission consumes stored soup/status.
+- [x] Final authoritative identities/hashes are derived after materialization; prepared identities are not used as final authority.
+- [x] Current one-click suite includes a `[Current Corner Status]` section and C1A.3g contracts.
+- [x] All C# files pass delimiter, comment/string, preprocessor, and region-balance checks; changed files preserve their original line-ending convention, terminal newline, BOM state, and whitespace hygiene.
+- [x] Changed-files ZIP and unified patch replay reproduce the final tree byte-for-byte from the untouched archive extraction.
+- [ ] Unity 6000.5.0f1 compilation and `EW-C1A.3g-suite` runtime validation pending user execution; no runtime success or performance improvement may be claimed from static checks.

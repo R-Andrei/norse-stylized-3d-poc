@@ -156,6 +156,7 @@ Shader "PS3D/Pixel Surface Lit"
             #pragma multi_compile _ _FORWARD_PLUS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
             #define _SPECULAR_SETUP 1
 

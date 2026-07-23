@@ -20,15 +20,23 @@ namespace ProgrammaticStylized3D.Weather.Editor
             "#include(?:_with_pragmas)?\\s+\"([^\"]+)\"",
             RegexOptions.Compiled);
 
-        private static readonly Regex CookieAwareMainLightRegex = new Regex(
-            @"GetMainLight\s*\(\s*[^,()]+,\s*[^,()]+,\s*[^)]+\)",
-            RegexOptions.Compiled | RegexOptions.Singleline);
+        private static readonly Regex CookieVariantPragmaRegex = new Regex(
+            @"#pragma\s+(?:multi_compile(?:_fragment|_vertex)?|shader_feature(?:_local)?(?:_fragment|_vertex)?)\b[^\r\n]*\b_LIGHT_COOKIES\b",
+            RegexOptions.Compiled);
 
         private static readonly HashSet<string> ExplicitlyExemptShaderNames =
             new HashSet<string>(StringComparer.Ordinal)
             {
                 "PS3D/Weather/Weather Wind Trails"
             };
+
+        private static readonly string[] MandatoryReceiverShaderNames =
+        {
+            "PS3D/Pixel Ground Surface Lit",
+            "PS3D/Pixel Surface Lit",
+            "PS3D/Vegetation/Stylized Vegetation Benchmark",
+            "PS3D/Stylized River Water"
+        };
 
         private enum ReceiverStatus
         {
@@ -74,17 +82,27 @@ namespace ProgrammaticStylized3D.Weather.Editor
             AppendHeader(builder);
             bool pipelineReady = AppendPipelineAssets(builder);
             bool sunReady = AppendSunState(builder);
+            bool controllerReady = AppendControllerState(builder);
             CollectReceiverRecords(records, assessmentCache);
+            bool mandatoryReceiversReady =
+                AppendMandatoryReceiverAssessments(
+                    builder,
+                    assessmentCache);
             bool receiversReady = AppendReceiverSummary(
                 builder,
                 records,
                 assessmentCache,
-                pipelineReady && sunReady);
+                pipelineReady &&
+                sunReady &&
+                controllerReady &&
+                mandatoryReceiversReady);
             AppendReceiverDetails(builder, records);
             AppendRequiredNextAction(
                 builder,
                 pipelineReady,
                 sunReady,
+                controllerReady,
+                mandatoryReceiversReady,
                 receiversReady);
 
             return builder.ToString();
@@ -100,7 +118,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
                 .AppendLine(UnityEngine.SceneManagement.SceneManager
                     .GetActiveScene().path);
             builder.AppendLine(
-                "Scope: active loaded-scene Renderer components and all discovered URP assets");
+                "Scope: active loaded-scene Renderer components, mandatory authored receivers, the active cloud controller, and all discovered URP assets");
             builder.AppendLine(
                 "Mutation: none; shared materials and shader source are read only");
             builder.AppendLine();
@@ -205,6 +223,119 @@ namespace ProgrammaticStylized3D.Weather.Editor
 
             builder.AppendLine();
             return isDirectional;
+        }
+
+        private static bool AppendControllerState(StringBuilder builder)
+        {
+            builder.AppendLine("[Weather Cloud-Shadow Controller]");
+            WeatherCloudShadowController[] controllers =
+                UnityEngine.Object.FindObjectsByType<
+                    WeatherCloudShadowController>(
+                        FindObjectsInactive.Include);
+            int activeCount = 0;
+            foreach (WeatherCloudShadowController controller in controllers)
+            {
+                if (controller != null && controller.isActiveAndEnabled)
+                {
+                    activeCount++;
+                }
+            }
+
+            WeatherCloudShadowController published =
+                WeatherCloudShadowController.PublishedController;
+            builder.Append("Discovered / active controllers: ")
+                .Append(controllers.Length)
+                .Append(" / ")
+                .AppendLine(activeCount.ToString());
+            builder.Append("Published controller: ")
+                .AppendLine(published != null ?
+                    GetHierarchyPath(published.transform) :
+                    "None");
+
+            if (published == null || !published.isActiveAndEnabled)
+            {
+                builder.AppendLine(
+                    "UNSUPPORTED: no active published Weather cloud-shadow controller exists.");
+                builder.AppendLine();
+                return false;
+            }
+
+            Light resolvedSun = published.ResolvedSun;
+            bool cookieReady = published.CookieReady;
+            bool assignmentExpected = published.SunGateActive;
+            bool assignmentReady =
+                !assignmentExpected ||
+                (resolvedSun != null &&
+                 resolvedSun.cookie == published.GeneratedCookie);
+
+            builder.Append("Cloud shadows enabled: ")
+                .AppendLine(published.CloudShadowsEnabled ? "Yes" : "No");
+            builder.Append("Cookie ready: ")
+                .AppendLine(cookieReady ? "Yes" : "No");
+            builder.Append("Sun gate active: ")
+                .AppendLine(assignmentExpected ? "Yes" : "No");
+            builder.Append("Cookie assignment: ")
+                .AppendLine(assignmentReady ?
+                    (assignmentExpected ? "Assigned" : "Not required while gated") :
+                    "Missing");
+            builder.Append("Controller error: ")
+                .AppendLine(string.IsNullOrEmpty(published.LastError) ?
+                    "None" :
+                    published.LastError);
+
+            bool ready =
+                activeCount == 1 &&
+                published.CloudShadowsEnabled &&
+                cookieReady &&
+                resolvedSun != null &&
+                resolvedSun.type == LightType.Directional &&
+                assignmentReady &&
+                string.IsNullOrEmpty(published.LastError);
+            builder.Append("Controller gate: ")
+                .AppendLine(ready ? "PASS" : "BLOCKED");
+            builder.AppendLine();
+            return ready;
+        }
+
+        private static bool AppendMandatoryReceiverAssessments(
+            StringBuilder builder,
+            Dictionary<Shader, ShaderAssessment> assessmentCache)
+        {
+            builder.AppendLine("[Mandatory Authored Receiver Shaders]");
+            bool allSupported = true;
+            foreach (string shaderName in MandatoryReceiverShaderNames)
+            {
+                Shader shader = Shader.Find(shaderName);
+                if (shader == null)
+                {
+                    allSupported = false;
+                    builder.Append("UNSUPPORTED | ")
+                        .Append(shaderName)
+                        .AppendLine(" | Shader.Find returned null.");
+                    continue;
+                }
+
+                if (!assessmentCache.TryGetValue(
+                        shader,
+                        out ShaderAssessment assessment))
+                {
+                    assessment = AssessShader(shader);
+                    assessmentCache.Add(shader, assessment);
+                }
+
+                allSupported &=
+                    assessment.Status == ReceiverStatus.Supported;
+                builder.Append(assessment.Status
+                        .ToString()
+                        .ToUpperInvariant())
+                    .Append(" | ")
+                    .Append(shaderName)
+                    .Append(" | ")
+                    .AppendLine(assessment.Reason);
+            }
+
+            builder.AppendLine();
+            return allSupported;
         }
 
         private static void CollectReceiverRecords(
@@ -324,7 +455,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
         {
             string shaderName = shader.name ?? string.Empty;
             string assetPath = AssetDatabase.GetAssetPath(shader) ?? string.Empty;
-            bool hasCookieKeyword = HasCookieKeyword(shader);
+            bool keywordSpaceContainsCookie = HasCookieKeyword(shader);
 
             if (ExplicitlyExemptShaderNames.Contains(shaderName) ||
                 shaderName.StartsWith("UI/", StringComparison.Ordinal))
@@ -334,7 +465,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     Status = ReceiverStatus.ExplicitlyExempt,
                     ShaderName = shaderName,
                     AssetPath = assetPath,
-                    DeclaresCookieKeyword = hasCookieKeyword,
+                    DeclaresCookieKeyword = keywordSpaceContainsCookie,
                     Reason = "Shader matches an explicit UI or Weather-trail exemption."
                 };
             }
@@ -345,16 +476,37 @@ namespace ProgrammaticStylized3D.Weather.Editor
             {
                 return new ShaderAssessment
                 {
-                    Status = hasCookieKeyword
+                    Status = keywordSpaceContainsCookie
                         ? ReceiverStatus.Supported
                         : ReceiverStatus.Unsupported,
                     ShaderName = shaderName,
                     AssetPath = assetPath,
-                    DeclaresCookieKeyword = hasCookieKeyword,
-                    UsesCookieAwareLighting = hasCookieKeyword,
-                    Reason = hasCookieKeyword
+                    DeclaresCookieKeyword = keywordSpaceContainsCookie,
+                    UsesCookieAwareLighting = keywordSpaceContainsCookie,
+                    Reason = keywordSpaceContainsCookie
                         ? "Compiled Shader Graph declares the URP cookie keyword; visual verification remains required."
                         : "Compiled Shader Graph does not declare the URP cookie keyword."
+                };
+            }
+
+            bool isUrpShader = shaderName.StartsWith(
+                "Universal Render Pipeline/",
+                StringComparison.Ordinal);
+            bool isPackageShader = assetPath.StartsWith(
+                "Packages/",
+                StringComparison.Ordinal);
+            if (isUrpShader && isPackageShader && keywordSpaceContainsCookie)
+            {
+                return new ShaderAssessment
+                {
+                    Status = ReceiverStatus.Supported,
+                    ShaderName = shaderName,
+                    AssetPath = assetPath,
+                    DeclaresCookieKeyword = true,
+                    UsesCookieAwareLighting = true,
+                    Reason =
+                        "Package-owned URP shader declares _LIGHT_COOKIES; " +
+                        "its package lighting implementation is authoritative."
                 };
             }
 
@@ -363,6 +515,8 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     StringComparison.OrdinalIgnoreCase))
             {
                 string source = LoadShaderSourceClosure(assetPath);
+                bool declaresCookieVariant =
+                    CookieVariantPragmaRegex.IsMatch(source);
                 bool usesPbr = source.Contains(
                     "UniversalFragmentPBR",
                     StringComparison.Ordinal);
@@ -370,31 +524,31 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "SampleMainLightCookie",
                     StringComparison.Ordinal);
                 bool usesCookieAwareMainLight =
-                    CookieAwareMainLightRegex.IsMatch(source);
+                    ContainsFunctionCallWithArgumentCount(
+                        source,
+                        "GetMainLight",
+                        3);
                 bool usesCookieAwareLighting =
                     usesPbr || samplesCookie || usesCookieAwareMainLight;
 
                 return new ShaderAssessment
                 {
-                    Status = hasCookieKeyword && usesCookieAwareLighting
+                    Status = declaresCookieVariant && usesCookieAwareLighting
                         ? ReceiverStatus.Supported
                         : ReceiverStatus.Unsupported,
                     ShaderName = shaderName,
                     AssetPath = assetPath,
-                    DeclaresCookieKeyword = hasCookieKeyword,
+                    DeclaresCookieKeyword = declaresCookieVariant,
                     UsesCookieAwareLighting = usesCookieAwareLighting,
                     Reason = BuildShaderReason(
-                        hasCookieKeyword,
+                        declaresCookieVariant,
                         usesPbr,
                         samplesCookie,
                         usesCookieAwareMainLight)
                 };
             }
 
-            bool isUrpShader = shaderName.StartsWith(
-                "Universal Render Pipeline/",
-                StringComparison.Ordinal);
-            if (isUrpShader && hasCookieKeyword)
+            if (isUrpShader && keywordSpaceContainsCookie)
             {
                 return new ShaderAssessment
                 {
@@ -412,8 +566,8 @@ namespace ProgrammaticStylized3D.Weather.Editor
                 Status = ReceiverStatus.Unsupported,
                 ShaderName = shaderName,
                 AssetPath = assetPath,
-                DeclaresCookieKeyword = hasCookieKeyword,
-                Reason = hasCookieKeyword
+                DeclaresCookieKeyword = keywordSpaceContainsCookie,
+                Reason = keywordSpaceContainsCookie
                     ? "Shader declares the cookie keyword, but its cookie-aware lighting path could not be proven from source."
                     : "Shader does not declare the URP main-light cookie keyword."
             };
@@ -424,6 +578,136 @@ namespace ProgrammaticStylized3D.Weather.Editor
             LocalKeyword keyword = shader.keywordSpace.FindKeyword(
                 CookieKeywordName);
             return keyword.isValid;
+        }
+
+        private static bool ContainsFunctionCallWithArgumentCount(
+            string source,
+            string functionName,
+            int expectedArgumentCount)
+        {
+            int searchIndex = 0;
+            while (searchIndex < source.Length)
+            {
+                int functionIndex = source.IndexOf(
+                    functionName,
+                    searchIndex,
+                    StringComparison.Ordinal);
+                if (functionIndex < 0)
+                {
+                    return false;
+                }
+
+                int functionEnd = functionIndex + functionName.Length;
+                bool hasIdentifierBefore =
+                    functionIndex > 0 &&
+                    IsIdentifierCharacter(source[functionIndex - 1]);
+                bool hasIdentifierAfter =
+                    functionEnd < source.Length &&
+                    IsIdentifierCharacter(source[functionEnd]);
+                if (hasIdentifierBefore || hasIdentifierAfter)
+                {
+                    searchIndex = functionEnd;
+                    continue;
+                }
+
+                int openParenthesisIndex = functionEnd;
+                while (
+                    openParenthesisIndex < source.Length &&
+                    char.IsWhiteSpace(source[openParenthesisIndex]))
+                {
+                    openParenthesisIndex++;
+                }
+
+                if (
+                    openParenthesisIndex >= source.Length ||
+                    source[openParenthesisIndex] != '(')
+                {
+                    searchIndex = functionEnd;
+                    continue;
+                }
+
+                if (
+                    TryCountCallArguments(
+                        source,
+                        openParenthesisIndex,
+                        out int argumentCount) &&
+                    argumentCount == expectedArgumentCount)
+                {
+                    return true;
+                }
+
+                searchIndex = openParenthesisIndex + 1;
+            }
+
+            return false;
+        }
+
+        private static bool TryCountCallArguments(
+            string source,
+            int openParenthesisIndex,
+            out int argumentCount)
+        {
+            argumentCount = 0;
+            int parenthesisDepth = 0;
+            int topLevelCommaCount = 0;
+            bool hasTopLevelContent = false;
+
+            for (int index = openParenthesisIndex; index < source.Length; index++)
+            {
+                char character = source[index];
+                if (character == '(')
+                {
+                    parenthesisDepth++;
+                    if (parenthesisDepth > 1)
+                    {
+                        hasTopLevelContent = true;
+                    }
+
+                    continue;
+                }
+
+                if (character == ')')
+                {
+                    parenthesisDepth--;
+                    if (parenthesisDepth < 0)
+                    {
+                        return false;
+                    }
+
+                    if (parenthesisDepth == 0)
+                    {
+                        argumentCount = hasTopLevelContent
+                            ? topLevelCommaCount + 1
+                            : 0;
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                if (parenthesisDepth != 1)
+                {
+                    continue;
+                }
+
+                if (character == ',')
+                {
+                    topLevelCommaCount++;
+                    continue;
+                }
+
+                if (!char.IsWhiteSpace(character))
+                {
+                    hasTopLevelContent = true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsIdentifierCharacter(char character)
+        {
+            return char.IsLetterOrDigit(character) || character == '_';
         }
 
         private static string BuildShaderReason(
@@ -668,18 +952,24 @@ namespace ProgrammaticStylized3D.Weather.Editor
             StringBuilder builder,
             bool pipelineReady,
             bool sunReady,
+            bool controllerReady,
+            bool mandatoryReceiversReady,
             bool receiversReady)
         {
             builder.AppendLine("[Required Next Action]");
-            if (!pipelineReady || !sunReady || !receiversReady)
+            if (!pipelineReady ||
+                !sunReady ||
+                !controllerReady ||
+                !mandatoryReceiversReady ||
+                !receiversReady)
             {
                 builder.AppendLine(
-                    "Copy this complete report into the cloud-shadow implementation thread. V0.2 must correct the reported URP, sun, and receiver blockers, and must edit only the controller/scene/cookie representation and shader families proven necessary by this audit.");
+                    "Resolve every BLOCKED section before cloud-shadow visual acceptance. Do not exempt an ordinary sun-responsive world shader merely because it is absent from the current scene.");
                 return;
             }
 
             builder.AppendLine(
-                "All loaded-scene receiver records are supported or explicitly exempt, all discovered URP assets support cookies, and the authoritative sun is directional. Proceed to the complete directional-cookie implementation and visual validation.");
+                "All loaded-scene and mandatory authored receivers are supported or explicitly exempt, all discovered URP assets support cookies, the directional sun is valid, and the active Weather controller owns a generated cookie. Proceed to visual continuity and performance validation.");
         }
 
         private static string GetHierarchyPath(Transform transform)

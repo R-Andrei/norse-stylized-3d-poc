@@ -682,8 +682,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int PreflightUnrelatedRetainedCount;
             public int PreflightCollateralLostCount;
             public string IntegrationPreflightDiagnostic = string.Empty;
+            public string PreparedPlanHash = string.Empty;
             public string IntegrationPlanHash = string.Empty;
             public string EmittedPlanHash = string.Empty;
+            public int[] PreparedOrdinaryIdentities = Array.Empty<int>();
+            public int[] PreparedMandatoryIdentities = Array.Empty<int>();
             public int[] PlannedOrdinaryIdentities = Array.Empty<int>();
             public int[] PlannedMandatoryIdentities = Array.Empty<int>();
             public int[] MissingPlannedOrdinary = Array.Empty<int>();
@@ -984,6 +987,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private const double CornerDamageSearchHardBudgetMilliseconds = 5000d;
 
+        private sealed class CornerDamageBaselineBundle
+        {
+            public readonly MeshData Mesh;
+            public readonly UnifiedEdgeWearPreviewStatus Status;
+            public readonly double BuildMilliseconds;
+
+            public CornerDamageBaselineBundle(
+                MeshData mesh,
+                UnifiedEdgeWearPreviewStatus status,
+                double buildMilliseconds)
+            {
+                Mesh = mesh;
+                Status = status;
+                BuildMilliseconds = Math.Max(0d, buildMilliseconds);
+            }
+        }
+
         public static MeshData GenerateCornerDamageGeometryPreview(
             MassRecipe recipe,
             MassSurfaceFeatureSettings surfaceFeatures,
@@ -1007,6 +1027,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 recipe,
                 surfaceFeatures,
                 false,
+                null,
                 default,
                 0d,
                 0d,
@@ -1100,6 +1121,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return GenerateCornerDamageIntegrationPreviewWithBaseline(
                 recipe,
                 surfaceFeatures,
+                null,
                 baselineStatus,
                 0d,
                 0d,
@@ -1111,6 +1133,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             GenerateCornerDamageIntegrationPreviewWithBaseline(
                 MassRecipe recipe,
                 MassSurfaceFeatureSettings surfaceFeatures,
+                MeshData baselineMesh,
                 UnifiedEdgeWearPreviewStatus baselineStatus,
                 double baselineBuildMilliseconds,
                 double estimatedIntegrationMilliseconds,
@@ -1128,14 +1151,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     recipe,
                     surfaceFeatures,
                     CornerDamagePreviewKind.WithEdgeWear);
-                unifiedStatus = baselineStatus;
-                return Generate(recipe, surfaceFeatures);
+                if (baselineMesh != null && baselineStatus.PreviewApplied)
+                {
+                    unifiedStatus = baselineStatus;
+                    return baselineMesh;
+                }
+
+                return GenerateUnifiedEdgeWearPreviewBaseline(
+                    recipe,
+                    surfaceFeatures,
+                    out unifiedStatus);
             }
 
             return GenerateCornerDamageFullCertificationSearch(
                 recipe,
                 surfaceFeatures,
-                true,
+                baselineMesh != null && baselineStatus.PreviewApplied,
+                baselineMesh,
                 baselineStatus,
                 baselineBuildMilliseconds,
                 estimatedIntegrationMilliseconds,
@@ -1171,6 +1203,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 recipe,
                 surfaceFeatures,
                 false,
+                null,
                 default,
                 0d,
                 0d,
@@ -1226,6 +1259,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MassRecipe recipe,
             MassSurfaceFeatureSettings surfaceFeatures,
             bool useProvidedBaseline,
+            MeshData providedBaselineMesh,
             UnifiedEdgeWearPreviewStatus providedBaselineStatus,
             double providedBaselineMilliseconds,
             double estimatedIntegrationMilliseconds,
@@ -1239,40 +1273,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 new CornerDamageSearchDeadlineScope(hardBudgetMilliseconds);
             System.Diagnostics.Stopwatch searchStopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
-            UnifiedEdgeWearPreviewStatus baselineStatus;
-            double baselineMilliseconds = 0d;
-            if (useProvidedBaseline)
-            {
-                baselineStatus = providedBaselineStatus;
-                baselineMilliseconds = Mathf.Max(
-                    0f,
-                    (float)providedBaselineMilliseconds);
-                telemetry.BaselineCacheUseCount = 1;
-            }
-            else
-            {
-                System.Diagnostics.Stopwatch baselineStopwatch =
-                    System.Diagnostics.Stopwatch.StartNew();
-                GenerateInternal(
+            CornerDamageBaselineBundle baseline =
+                BuildCornerDamageBaselineBundle(
                     recipe,
                     surfaceFeatures,
-                    EdgeWearEvaluationMode.UnifiedBoundedPreview,
-                    -1,
-                    out _,
-                    out _,
-                    out baselineStatus);
-                baselineStopwatch.Stop();
-                baselineMilliseconds =
-                    baselineStopwatch.Elapsed.TotalMilliseconds;
-                telemetry.BaselineBuildCount = 1;
-            }
+                    useProvidedBaseline,
+                    providedBaselineMesh,
+                    providedBaselineStatus,
+                    providedBaselineMilliseconds,
+                    telemetry);
+            UnifiedEdgeWearPreviewStatus baselineStatus = baseline.Status;
+            double baselineMilliseconds = baseline.BuildMilliseconds;
 
             int candidateCornerCount = -1;
             int attemptedCornerCount = 0;
             int attemptedConfigurationCount = 0;
             int bestFailurePriority = int.MinValue;
             CornerDamagePreviewStatus bestFailure = null;
-            UnifiedEdgeWearPreviewStatus bestFailureUnified = default;
             string bestFailureStage = "candidate-availability";
             string bestFailureReason =
                 "no eligible corner-damage candidate was available";
@@ -1410,18 +1427,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     {
                         telemetry.IntegrationPlanAttemptCount++;
                         telemetry.AuthoritativeSolveAttemptCount++;
-                        bool solveBuilt =
-                            TrySolveCornerDamageIntegrationPlan(
+                        bool preparationBuilt =
+                            TryPrepareCornerDamageIntegrationPlan(
                                 recipe,
                                 preflight,
                                 baselineStatus,
                                 out CornerDamageIntegrationPlan candidatePlan,
-                                out double solveMilliseconds);
+                                out double preparationMilliseconds);
                         telemetry.IntegrationPlanMilliseconds +=
-                            solveMilliseconds;
+                            preparationMilliseconds;
                         telemetry.AuthoritativeSolveMilliseconds +=
-                            solveMilliseconds;
-                        if (solveBuilt && candidatePlan != null &&
+                            preparationMilliseconds;
+                        if (preparationBuilt && candidatePlan != null &&
                             candidatePlan.Valid)
                         {
                             acceptedPreflight = preflight;
@@ -1434,7 +1451,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 searchAttempts,
                                 candidateRank,
                                 preflight.ResolvedUniformScale,
-                                "authoritative-solve-certified",
+                                "candidate-preparation-certified",
                                 preflightStatus);
                             break;
                         }
@@ -1444,11 +1461,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         {
                             telemetry.DeadlineAbortCount++;
                         }
-                        string solveDiagnostic = candidatePlan == null
-                            ? "authoritative solved plan was unavailable"
+                        string preparationDiagnostic = candidatePlan == null
+                            ? "candidate preparation result was unavailable"
                             : candidatePlan.Diagnostic;
                         preflightStatus.PreviewApplied = false;
-                        preflightStatus.Diagnostic = solveDiagnostic;
+                        preflightStatus.Diagnostic = preparationDiagnostic;
                         ApplyCornerDamageIntegrationPlanEvidence(
                             preflightStatus,
                             candidatePlan);
@@ -1456,14 +1473,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             searchAttempts,
                             candidateRank,
                             preflight.ResolvedUniformScale,
-                            "authoritative-solve",
+                            "candidate-preparation",
                             preflightStatus);
                         RetainCornerDamageSearchFailure(
                             preflightStatus,
-                            default,
-                            "authoritative-solve",
+                            "candidate-preparation",
                             ref bestFailure,
-                            ref bestFailureUnified,
                             ref bestFailurePriority,
                             ref bestFailureStage,
                             ref bestFailureReason);
@@ -1481,10 +1496,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     preflightStatus);
                 RetainCornerDamageSearchFailure(
                     preflightStatus,
-                    default,
                     preflightStage,
                     ref bestFailure,
-                    ref bestFailureUnified,
                     ref bestFailurePriority,
                     ref bestFailureStage,
                     ref bestFailureReason);
@@ -1493,7 +1506,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (acceptedPreflight == null || acceptedPlan == null)
             {
                 searchStopwatch.Stop();
-                previewStatus = bestFailure ??
+                CornerDamagePreviewStatus failureStatus = bestFailure ??
                     new CornerDamagePreviewStatus
                     {
                         PreviewKind = CornerDamagePreviewKind.WithEdgeWear,
@@ -1501,9 +1514,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         AuthoringEnabled = true,
                         Diagnostic = bestFailureReason
                     };
-                unifiedStatus = bestFailureUnified;
                 ApplyCornerDamageSearchSummary(
-                    previewStatus,
+                    failureStatus,
                     Mathf.Max(0, candidateCornerCount),
                     attemptedCornerCount,
                     attemptedConfigurationCount,
@@ -1513,14 +1525,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     bestFailureReason,
                     searchAttempts.ToString(),
                     telemetry);
-                return Generate(recipe, surfaceFeatures);
+                return ReturnCornerDamageBaselineFallback(
+                    baseline,
+                    failureStatus,
+                    out previewStatus,
+                    out unifiedStatus);
             }
 
             double remainingBudget = hardBudgetMilliseconds -
                 searchStopwatch.Elapsed.TotalMilliseconds;
-            const double MinimumPlanMaterializationBudgetMilliseconds = 250d;
+            const double MinimumCompleteBuildBudgetMilliseconds = 250d;
             if (remainingBudget + 0.001d <
-                MinimumPlanMaterializationBudgetMilliseconds)
+                MinimumCompleteBuildBudgetMilliseconds)
             {
                 telemetry.CaseBudgetExceeded = true;
                 telemetry.DeadlineAbortCount++;
@@ -1529,7 +1545,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         recipe,
                         surfaceFeatures,
                         acceptedPreflight,
-                        "insufficient case budget remains to materialize the authoritative solved plan");
+                        "insufficient case budget remains for the one complete authoritative build");
                 ApplyCornerDamageIntegrationPlanEvidence(
                     budgetStatus,
                     acceptedPlan);
@@ -1544,29 +1560,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     budgetStatus.Diagnostic,
                     searchAttempts.ToString(),
                     telemetry);
-                previewStatus = budgetStatus;
-                unifiedStatus = default;
-                return Generate(recipe, surfaceFeatures);
+                return ReturnCornerDamageBaselineFallback(
+                    baseline,
+                    budgetStatus,
+                    out previewStatus,
+                    out unifiedStatus);
             }
 
             telemetry.PlanMaterializationBuildCount = 1;
+            telemetry.FullIntegrationBuildCount = 1;
             attemptedConfigurationCount = 1;
-            bool materialized = TryMaterializeCornerDamageIntegrationPlan(
+            bool completed = TryCompleteCornerDamageIntegrationPlan(
                 acceptedPlan,
                 acceptedPreflight.ExpectedMandatoryCount,
-                out double materializationMilliseconds,
-                out bool materializationIdentityMismatch);
+                baselineStatus,
+                out double completeBuildMilliseconds,
+                out string completeBuildFailureStage);
             telemetry.PlanMaterializationMilliseconds +=
-                materializationMilliseconds;
+                completeBuildMilliseconds;
             telemetry.IntegrationMilliseconds =
-                materializationMilliseconds;
-            if (!materialized)
+                completeBuildMilliseconds;
+            if (!completed)
             {
-                if (materializationIdentityMismatch)
-                {
-                    telemetry.PlanMaterializationMismatchCount++;
-                    telemetry.IntegrationPlanMismatchCount++;
-                }
                 bool deadlineExceeded =
                     IsCornerDamageSearchDeadlineExceeded() ||
                     searchStopwatch.Elapsed.TotalMilliseconds >=
@@ -1576,43 +1591,44 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     telemetry.CaseBudgetExceeded = true;
                     telemetry.DeadlineAbortCount++;
                 }
-                CornerDamagePreviewStatus materializationStatus =
+                CornerDamagePreviewStatus completionStatus =
                     BuildCornerDamagePreflightStatus(
                         recipe,
                         surfaceFeatures,
                         acceptedPreflight,
                         acceptedPlan.Diagnostic);
                 ApplyCornerDamageIntegrationPlanEvidence(
-                    materializationStatus,
+                    completionStatus,
                     acceptedPlan);
-                string materializationStage = deadlineExceeded
+                string completionStage = deadlineExceeded
                     ? "performance-budget"
-                    : materializationIdentityMismatch
-                        ? "plan-materialization-mismatch"
-                        : "plan-materialization";
+                    : string.IsNullOrEmpty(completeBuildFailureStage)
+                        ? "complete-authoritative-build"
+                        : completeBuildFailureStage;
                 AppendCornerDamageSearchAttempt(
                     searchAttempts,
                     acceptedCandidateRank,
                     acceptedPreflight.ResolvedUniformScale,
-                    materializationStage,
-                    materializationStatus);
+                    completionStage,
+                    completionStatus);
                 ApplyCornerDamageSearchSummary(
-                    materializationStatus,
+                    completionStatus,
                     candidateCornerCount,
                     attemptedCornerCount,
                     attemptedConfigurationCount,
                     -1,
                     0f,
-                    materializationStage,
-                    materializationStatus.Diagnostic,
+                    completionStage,
+                    completionStatus.Diagnostic,
                     searchAttempts.ToString(),
                     telemetry);
-                previewStatus = materializationStatus;
-                unifiedStatus = default;
-                return Generate(recipe, surfaceFeatures);
+                return ReturnCornerDamageBaselineFallback(
+                    baseline,
+                    completionStatus,
+                    out previewStatus,
+                    out unifiedStatus);
             }
 
-            telemetry.FullIntegrationBuildCount = 1;
             telemetry.GeometrySearchReuseCount++;
             MeshData finalMesh = RunCornerDamageIntegrationPlanEmission(
                 recipe,
@@ -1663,7 +1679,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 finalStatus.PreviewApplied = false;
                 finalStatus.Diagnostic = string.IsNullOrEmpty(mismatchReason)
-                    ? "emitted shell disagreed with the committed integration plan"
+                    ? "emitted shell disagreed with the completed authoritative build"
                     : mismatchReason;
                 ApplyCornerDamageIntegrationPlanEvidence(
                     finalStatus,
@@ -1677,7 +1693,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     finalStatus.PreviewApplied = false;
                     finalStatus.Diagnostic =
-                        "authoritative solve, plan materialization, and emission exceeded the case hard budget";
+                        "candidate preparation, complete authoritative build, and emission exceeded the case hard budget";
                 }
             }
 
@@ -1731,9 +1747,70 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 finalStatus.Diagnostic,
                 searchAttempts.ToString(),
                 telemetry);
-            previewStatus = finalStatus;
-            unifiedStatus = finalUnified;
-            return Generate(recipe, surfaceFeatures);
+            return ReturnCornerDamageBaselineFallback(
+                baseline,
+                finalStatus,
+                out previewStatus,
+                out unifiedStatus);
+        }
+
+        private static CornerDamageBaselineBundle
+            BuildCornerDamageBaselineBundle(
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings surfaceFeatures,
+                bool useProvidedBaseline,
+                MeshData providedBaselineMesh,
+                UnifiedEdgeWearPreviewStatus providedBaselineStatus,
+                double providedBaselineMilliseconds,
+                CornerDamageSearchTelemetry telemetry)
+        {
+            if (useProvidedBaseline && providedBaselineMesh != null &&
+                providedBaselineStatus.PreviewApplied)
+            {
+                telemetry.BaselineCacheUseCount = 1;
+                return new CornerDamageBaselineBundle(
+                    providedBaselineMesh,
+                    providedBaselineStatus,
+                    providedBaselineMilliseconds);
+            }
+
+            System.Diagnostics.Stopwatch baselineStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            MeshData baselineMesh = GenerateInternal(
+                recipe,
+                surfaceFeatures,
+                EdgeWearEvaluationMode.UnifiedBoundedPreview,
+                -1,
+                out _,
+                out _,
+                out UnifiedEdgeWearPreviewStatus baselineStatus);
+            baselineStopwatch.Stop();
+            telemetry.BaselineBuildCount = 1;
+            return new CornerDamageBaselineBundle(
+                baselineMesh,
+                baselineStatus,
+                baselineStopwatch.Elapsed.TotalMilliseconds);
+        }
+
+        private static MeshData ReturnCornerDamageBaselineFallback(
+            CornerDamageBaselineBundle baseline,
+            CornerDamagePreviewStatus failureStatus,
+            out CornerDamagePreviewStatus previewStatus,
+            out UnifiedEdgeWearPreviewStatus unifiedStatus)
+        {
+            if (baseline == null || baseline.Mesh == null)
+            {
+                throw new InvalidOperationException(
+                    "ordinary corner-fallback baseline mesh was unavailable");
+            }
+
+            if (failureStatus != null)
+            {
+                failureStatus.PreviewApplied = false;
+            }
+            previewStatus = failureStatus;
+            unifiedStatus = baseline.Status;
+            return baseline.Mesh;
         }
 
         private static void ApplyCornerDamageIntegrationPreflightEvidence(
@@ -1806,7 +1883,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             preflight.PredictedCollateralLostCount = lost.Count;
         }
 
-        private static bool TrySolveCornerDamageIntegrationPlan(
+        private static bool TryPrepareCornerDamageIntegrationPlan(
             MassRecipe recipe,
             CornerDamageIntegrationPreflightRecord preflight,
             UnifiedEdgeWearPreviewStatus baselineStatus,
@@ -1863,7 +1940,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (IsCornerDamageSearchDeadlineExceeded())
                 {
                     plan.Diagnostic =
-                        "corner search deadline exceeded before authoritative solve";
+                        "corner search deadline exceeded before candidate preparation";
                     return false;
                 }
 
@@ -1882,11 +1959,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     solvedPlan == null
                         ? audit.CoverageAudit ?? coverage
                         : solvedPlan.CoverageAudit ?? coverage;
-                int[] ordinary = CollectCornerDamageSolvedPlanIdentities(
+                int[] ordinary = CollectCornerDamagePreparedPlanIdentities(
                     solvedPlan,
                     effectiveCoverage,
                     false);
-                int[] mandatory = CollectCornerDamageSolvedPlanIdentities(
+                int[] mandatory = CollectCornerDamagePreparedPlanIdentities(
                     solvedPlan,
                     effectiveCoverage,
                     true);
@@ -1919,46 +1996,51 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 plan.SolvedPlan = solvedPlan;
                 plan.PlaneAudit = audit;
-                plan.PlannedOrdinaryIdentities = ordinary;
-                plan.PlannedMandatoryIdentities = mandatory;
+                plan.PreparedOrdinaryIdentities = ordinary;
+                plan.PreparedMandatoryIdentities = mandatory;
                 plan.UnrelatedBaselineCount = unrelatedBaselineCount;
                 plan.UnrelatedRetainedCount = unrelatedRetainedCount;
                 plan.CollateralLostCount = lost.Count;
                 plan.CollateralLostIdentities = lost.ToArray();
-                plan.IntegrationPlanHash =
-                    BuildCornerDamageIntegrationPlanHash(plan);
+                plan.PreparedPlanHash =
+                    BuildCornerDamageIntegrationPlanHash(
+                        plan.Transaction,
+                        plan.ResolvedUniformScale,
+                        ordinary,
+                        mandatory);
+                plan.IntegrationPlanHash = string.Empty;
                 plan.EmittedPlanHash = string.Empty;
 
                 if (solvedPlan == null ||
                     !solvedPlan.SolveValid)
                 {
                     plan.Diagnostic = string.IsNullOrEmpty(audit.Diagnostic)
-                        ? "authoritative bevel solve did not certify"
+                        ? "candidate plane-and-rail preparation did not certify"
                         : audit.Diagnostic;
                     return false;
                 }
                 if (mandatory.Length != preflight.ExpectedMandatoryCount)
                 {
                     plan.Diagnostic =
-                        "authoritative solve has an incomplete mandatory cap ring";
+                        "candidate preparation has an incomplete mandatory cap ring";
                     return false;
                 }
                 if (lost.Count > 0)
                 {
                     plan.Diagnostic =
-                        "authoritative solve loses unrelated baseline bevel identities";
+                        "candidate preparation predicts unrelated baseline bevel loss";
                     return false;
                 }
 
                 plan.Valid = true;
                 plan.Diagnostic =
-                    "authoritative corner-integration solve certified";
+                    "corner-integration candidate preparation certified";
                 return true;
             }
             catch (InvalidOperationException exception)
             {
                 plan.Diagnostic =
-                    "authoritative solve exception: " +
+                    "candidate preparation exception: " +
                     exception.Message;
                 return false;
             }
@@ -1970,7 +2052,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
-        private static int[] CollectCornerDamageSolvedPlanIdentities(
+        private static int[] CollectCornerDamagePreparedPlanIdentities(
             PlaneCutBevelSolvedPlan solvedPlan,
             EdgeWearCoverageAudit coverage,
             bool mandatory)
@@ -2006,14 +2088,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return result;
         }
 
-        private static bool TryMaterializeCornerDamageIntegrationPlan(
+        private static bool TryCompleteCornerDamageIntegrationPlan(
             CornerDamageIntegrationPlan plan,
             int expectedMandatoryCount,
+            UnifiedEdgeWearPreviewStatus baselineStatus,
             out double elapsedMilliseconds,
-            out bool identityMismatch)
+            out string failureStage)
         {
             elapsedMilliseconds = 0d;
-            identityMismatch = false;
+            failureStage = string.Empty;
             System.Diagnostics.Stopwatch stopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
             try
@@ -2023,16 +2106,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     if (plan != null)
                     {
                         plan.Diagnostic =
-                            "authoritative solved plan was unavailable";
+                            "candidate preparation result was unavailable";
                         plan.Valid = false;
                     }
+                    failureStage = "candidate-preparation";
                     return false;
                 }
                 if (IsCornerDamageSearchDeadlineExceeded())
                 {
                     plan.Diagnostic =
-                        "corner search deadline exceeded before plan materialization";
+                        "corner search deadline exceeded before the complete authoritative build";
                     plan.Valid = false;
+                    failureStage = "performance-budget";
                     return false;
                 }
 
@@ -2069,66 +2154,84 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 int[] finalMandatory = CollectCornerDamagePlanIdentities(
                     effectiveCoverage,
                     true);
-                plan.MissingPlannedOrdinary =
-                    ResolveCornerDamageIdentityDifference(
-                        plan.PlannedOrdinaryIdentities,
-                        finalOrdinary);
-                plan.UnexpectedFinalOrdinary =
-                    ResolveCornerDamageIdentityDifference(
-                        finalOrdinary,
-                        plan.PlannedOrdinaryIdentities);
-                plan.MissingPlannedMandatory =
-                    ResolveCornerDamageIdentityDifference(
-                        plan.PlannedMandatoryIdentities,
-                        finalMandatory);
-                plan.UnexpectedFinalMandatory =
-                    ResolveCornerDamageIdentityDifference(
-                        finalMandatory,
-                        plan.PlannedMandatoryIdentities);
-                plan.EmittedPlanHash = BuildCornerDamageIntegrationPlanHash(
-                    plan.Transaction,
-                    plan.ResolvedUniformScale,
-                    finalOrdinary,
-                    finalMandatory);
-                identityMismatch =
-                    plan.MissingPlannedOrdinary.Length != 0 ||
-                    plan.UnexpectedFinalOrdinary.Length != 0 ||
-                    plan.MissingPlannedMandatory.Length != 0 ||
-                    plan.UnexpectedFinalMandatory.Length != 0 ||
-                    !string.Equals(
-                        plan.IntegrationPlanHash,
-                        plan.EmittedPlanHash,
-                        StringComparison.Ordinal);
+                HashSet<int> baseline =
+                    CollectCertifiedOrdinaryEdgeIdentities(
+                        baselineStatus.DebugEdges);
+                HashSet<int> affected = new HashSet<int>(
+                    plan.Transaction.AffectedOriginalEdgeIndices);
+                HashSet<int> finalOrdinarySet =
+                    new HashSet<int>(finalOrdinary);
+                List<int> lost = new List<int>();
+                int unrelatedBaselineCount = 0;
+                int unrelatedRetainedCount = 0;
+                foreach (int identity in baseline)
+                {
+                    if (affected.Contains(identity))
+                    {
+                        continue;
+                    }
+                    unrelatedBaselineCount++;
+                    if (finalOrdinarySet.Contains(identity))
+                    {
+                        unrelatedRetainedCount++;
+                    }
+                    else
+                    {
+                        lost.Add(identity);
+                    }
+                }
+                lost.Sort();
 
                 plan.PreviewSoup = previewSoup;
                 plan.UnifiedStatus = unifiedStatus;
                 plan.PlaneAudit = audit;
+                plan.PlannedOrdinaryIdentities = finalOrdinary;
+                plan.PlannedMandatoryIdentities = finalMandatory;
+                plan.IntegrationPlanHash =
+                    BuildCornerDamageIntegrationPlanHash(
+                        plan.Transaction,
+                        plan.ResolvedUniformScale,
+                        finalOrdinary,
+                        finalMandatory);
+                plan.EmittedPlanHash = string.Empty;
+                plan.MissingPlannedOrdinary = Array.Empty<int>();
+                plan.UnexpectedFinalOrdinary = Array.Empty<int>();
+                plan.MissingPlannedMandatory = Array.Empty<int>();
+                plan.UnexpectedFinalMandatory = Array.Empty<int>();
+                plan.UnrelatedBaselineCount = unrelatedBaselineCount;
+                plan.UnrelatedRetainedCount = unrelatedRetainedCount;
+                plan.CollateralLostCount = lost.Count;
+                plan.CollateralLostIdentities = lost.ToArray();
+
                 if (!previewApplied)
                 {
                     plan.Diagnostic = string.IsNullOrEmpty(audit.Diagnostic)
-                        ? "authoritative plan materialization failed"
+                        ? "complete authoritative shell build failed"
                         : audit.Diagnostic;
                     plan.Valid = false;
+                    failureStage = "complete-authoritative-build";
                     return false;
                 }
                 if (finalMandatory.Length != expectedMandatoryCount)
                 {
                     plan.Diagnostic =
-                        "materialized mandatory cap ring is incomplete";
+                        "completed authoritative shell has an incomplete mandatory cap ring";
                     plan.Valid = false;
+                    failureStage = "complete-build-mandatory";
                     return false;
                 }
-                if (identityMismatch)
+                if (lost.Count > 0)
                 {
                     plan.Diagnostic =
-                        "materialized shell differs from the authoritative solved plan";
+                        "completed authoritative shell loses unrelated baseline bevel identities";
                     plan.Valid = false;
+                    failureStage = "complete-build-retention";
                     return false;
                 }
 
                 plan.Valid = true;
                 plan.Diagnostic =
-                    "authoritative corner-integration plan materialized";
+                    "complete authoritative corner-integration shell certified";
                 return true;
             }
             catch (InvalidOperationException exception)
@@ -2137,9 +2240,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     plan.Valid = false;
                     plan.Diagnostic =
-                        "plan materialization exception: " +
+                        "complete authoritative build exception: " +
                         exception.Message;
                 }
+                failureStage = "complete-authoritative-build";
                 return false;
             }
             finally
@@ -2288,8 +2392,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 return;
             }
+            status.PreparedPlanHash = plan.PreparedPlanHash;
             status.IntegrationPlanHash = plan.IntegrationPlanHash;
             status.EmittedPlanHash = plan.EmittedPlanHash;
+            status.PreparedOrdinaryIdentities =
+                plan.PreparedOrdinaryIdentities ?? Array.Empty<int>();
+            status.PreparedMandatoryIdentities =
+                plan.PreparedMandatoryIdentities ?? Array.Empty<int>();
             status.PlannedOrdinaryIdentities =
                 plan.PlannedOrdinaryIdentities ?? Array.Empty<int>();
             status.PlannedMandatoryIdentities =
@@ -2563,10 +2672,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private static void RetainCornerDamageSearchFailure(
             CornerDamagePreviewStatus attemptStatus,
-            UnifiedEdgeWearPreviewStatus attemptUnified,
             string failureStage,
             ref CornerDamagePreviewStatus bestFailure,
-            ref UnifiedEdgeWearPreviewStatus bestFailureUnified,
             ref int bestFailurePriority,
             ref string bestFailureStage,
             ref string bestFailureReason)
@@ -2578,7 +2685,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return;
             }
             bestFailure = attemptStatus;
-            bestFailureUnified = attemptUnified;
             bestFailurePriority = priority;
             bestFailureStage = failureStage;
             bestFailureReason = attemptStatus == null
@@ -2709,11 +2815,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             return failureStage switch
             {
-                "performance-budget" => 9,
-                "integration-plan-mismatch" => 9,
-                "integration-plan" => 8,
-                "integration-preflight-mismatch" => 8,
-                "unrelated-retention" => 7,
+                "performance-budget" => 10,
+                "integration-plan-mismatch" => 10,
+                "plan-emission" => 9,
+                "complete-build-retention" => 9,
+                "complete-build-mandatory" => 9,
+                "complete-authoritative-build" => 8,
+                "candidate-preparation" => 7,
+                "integration-plan" => 7,
+                "integration-preflight-mismatch" => 7,
+                "unrelated-retention" => 6,
                 "post-chip-construction" => 6,
                 "width-solution" => 5,
                 "candidate-conservation" => 4,
@@ -2893,6 +3004,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return GenerateCornerDamageIntegrationPreviewWithBaseline(
                     recipe,
                     surfaceFeatures,
+                    baselineMesh,
                     baselineStatus,
                     baselineBuildMilliseconds,
                     estimatedIntegrationMilliseconds,

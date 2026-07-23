@@ -1,11 +1,11 @@
 # Current River Rendering Roadmap
 
 
-## Weather cloud-shadow receiver contract — planned
+## Weather cloud-shadow receiver contract — source implemented; Unity validation pending
 
 River is a mandatory receiver of the Weather-owned cloud-shadow illumination field. Liquid water, frozen water, foam, shore-facing sun response, and other visible River lighting must remain spatially coherent with adjacent Ground, Vegetation, Generated Mass, actors, and buildings.
 
-V0 uses the authoritative sun's URP directional-light cookie. River water, ice, foam, and shore lighting must consume the cookie through their cookie-aware main-light path exactly once; no River-specific vertex field, custom cloud texture sample, or simulation input is permitted. Cloud integration belongs only to the final visible lighting path. It must not change River geometry, corridor ownership, hydrology, motion, disturbance, refraction, reflection inputs, depth, foam spawning, transport, lifecycle, topology, chipping, cache data, compute kernels, runtime allocations, or simulation cadence. Cloud transmission must remain separate from ordinary URP geometric shadow attenuation so existing liquid/ice shadow-response controls preserve their meaning. Ambient and local-light response must not be indiscriminately darkened.
+V0 uses the authoritative sun's URP directional-light cookie. `SH_CleanStylizedRiver.shader` now compiles `_LIGHT_COOKIES`; its existing three-argument `GetMainLight` path in `RiverWaterLighting.hlsl` already applies the cookie to River water, ice, foam, and shore-lighting sun response. Unity import and visual validation remain pending. River must consume the cookie through that path exactly once; no River-specific vertex field, custom cloud texture sample, or simulation input is permitted. Cloud integration belongs only to the final visible lighting path. It must not change River geometry, corridor ownership, hydrology, motion, disturbance, refraction, reflection inputs, depth, foam spawning, transport, lifecycle, topology, chipping, cache data, compute kernels, runtime allocations, or simulation cadence. Cloud transmission must remain separate from ordinary URP geometric shadow attenuation so existing liquid/ice shadow-response controls preserve their meaning. Ambient and local-light response must not be indiscriminately darkened.
 
 Current River Foam work remains paused while shared Weather shading integration is performed. After integration, the newest River source must be diffed against the frozen P13G state, compiled, and visually checked with matched cloud state before River development resumes. Exact representation and files are governed by `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`.
 

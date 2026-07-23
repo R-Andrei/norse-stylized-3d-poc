@@ -282,7 +282,10 @@ VegetationLightingResult VegetationEvaluateLighting(
             lightColourInfluence) *
         max(0.0, ambientResponse);
 
-    Light mainLight = GetMainLight();
+    Light mainLight = GetMainLight(
+        float4(0.0, 0.0, 0.0, 0.0),
+        inputData.positionWS,
+        half4(1.0, 1.0, 1.0, 1.0));
     VegetationDirectLightingResult mainResult =
         VegetationEvaluateDirectLight(
             resolvedNormalWS,

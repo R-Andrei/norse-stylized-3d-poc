@@ -21,8 +21,8 @@ Engine: Unity 6000.5.0f1
 Render pipeline: URP
 Gameplay camera: constrained top-down isometric
 Primary wind spatial domain: world-space XZ
-Current implemented Weather features: shared wind domain, vegetation response field, and stylized wind trails
-Current planned Weather feature: universal gameplay-world cloud-shadow illumination; receiver-audit source implemented, live audit and runtime shading pending
+Current implemented Weather features: shared wind domain, vegetation response field, stylized wind trails, and a frozen V0 native directional-cookie cloud-shadow system with universal receiver integration, diagnostics, low-frequency seed evolution, and automated benchmarking
+Current pending Weather validation: standalone Player, low-end-PC, release-stripping, and broad lifecycle confirmation during the future project-wide Weather testing sprint; none blocks the accepted cloud-shadow V0.4 freeze
 ```
 
 The current game does not require a general-purpose three-dimensional atmospheric simulation. The first Weather implementation is deliberately built around the XZ gameplay plane used by the top-down isometric game.
@@ -43,7 +43,7 @@ The same ownership rule applies to current and future consumers:
 A consumer may apply its own response model, but it must not invent a separate authoritative wind state when the shared Weather wind is applicable.
 
 
-### 2.1 Cloud-shadow ownership and universal receiver contract — planned
+### 2.1 Cloud-shadow ownership and universal receiver contract — V0.4 frozen
 
 Weather owns the authoritative moving cloud-shadow field, including its world-space phase, deterministic pattern controls, coverage, transition softness, retained sunlight, movement speed, wind-direction response, and sun-availability gate. Receiver systems consume that field; they do not author independent cloud masks or movement.
 
@@ -53,7 +53,7 @@ The canonical design, candidate comparison, receiver-audit requirement, exact co
 
 - `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`
 
-The earlier Ground-only and unresolved-candidate scopes are superseded. The selected V0 architecture is one URP main directional-light cookie assigned to the authoritative sun and consumed through every supported receiver's cookie-aware main-light path. It is implemented completely before performance judgment. A hybrid shared-mask receiver system is deferred and may be reopened only if matched profiling proves the cookie cost materially unacceptable. Receivers must never apply both paths.
+The earlier Ground-only and unresolved-candidate scopes are superseded. The frozen V0 architecture is one URP main directional-light cookie assigned to the authoritative sun and consumed through every supported receiver's cookie-aware main-light path. `WeatherCloudShadowController` and its dirty-triggered cookie generator implement that contract. The controller is attached to the existing Weather object, and the user-supplied post-fix audit reports both controller and receiver gates at `PASS`, with 64/64 loaded-scene records and every mandatory authored receiver supported. The user also validated the projected debug field, global tiled coverage, debug-focus workflow, low-frequency cookie evolution, and the complete V0.3E2 benchmark suite. The hybrid shared-mask receiver system is deferred and may be reopened only if later Player-build or low-end-hardware evidence proves the native cookie cost materially unacceptable. Receivers must never apply both paths.
 
 Cloud transmission modifies environmental sunlight only unless a separately approved global overcast response also changes ambient/sky lighting. Weather cloud shading must not mutate receiver geometry, collision, hydrology, River simulation, Vegetation interaction, Generated Mass generation, actor gameplay, or material ownership.
 
@@ -202,21 +202,78 @@ Expected to own:
 Expected to consume CPU-authoritative wind and apply explicit gameplay rules. They must not depend on the vegetation response texture.
 
 
-### Cloud-shadow receiver audit — source implemented, live execution pending
+### Cloud-shadow receiver audit — live V0.1 complete; V0.2 source hardened
 
-`Assets/Game/Procedural/Weather/Editor/WeatherCloudShadowReceiverAudit.cs` owns the editor-triggered compliance scan. It must run only on request, inspect loaded-scene renderers through shared materials, classify every shader as cookie-supported, explicitly exempt, or unsupported, inspect all discovered URP assets for light-cookie support, and copy the complete report to the clipboard. It must not mutate materials, shaders, renderers, scenes, pipeline assets, or the authoritative sun.
+`Assets/Game/Procedural/Weather/Editor/WeatherCloudShadowReceiverAudit.cs` owns the editor-triggered compliance scan. The user ran V0.1 in `VisualFrameworkDemo` and supplied the complete report: both URP assets supported cookies, the authoritative directional sun was valid, and 64 active renderer/material records across five shaders were inventoried. V0.2 adds active-controller and assigned-cookie checks, mandatory authored-receiver checks even when a shader is absent from the loaded scene, package-owned URP Lit recognition, and direct authored-pragma verification so a fallback keyword-space entry cannot falsely prove a custom ForwardLit variant. The audit remains read-only, on-demand, and clipboard-copyable; it must not scan renderers or materials every frame.
 
-### Cloud-shadow receivers — planned
+### Cloud-shadow runtime and receivers — V0.4 frozen
 
-Expected to:
+`WeatherCloudShadowController` owns one generated directional cookie on the authoritative sun. `WeatherCloudShadowCookieGenerator` builds a deterministic seamless linear `R8` texture only when pattern settings are dirty. The texture uses repeat wrapping, so one configured world-space period tiles across all world positions; `Cookie World Size Metres` is a repeat period, not a finite coverage extent. Steady movement consumes bounded-cadence Weather wind direction, integrates one world-space phase, and updates the URP directional-cookie offset without traversing renderers or rebuilding the texture. The controller preserves and restores the previous sun cookie, size, and offset and disables cloud shade when the sun has no useful contribution. Map dimensions, player position, camera position, and loaded chunk count do not require additional cloud textures or simulation state.
 
-- consume one Weather-owned world-space transmission field;
-- attenuate the selected environmental-sun contribution without inventing subsystem-local cloud state;
-- preserve ambient, local lights, emission, fog, simulation, geometry, and material ownership unless an explicit receiver rule says otherwise;
-- declare support or an intentional exemption through the project receiver-compliance audit;
-- reject unsupported future gameplay-world shaders rather than silently rendering them fully sunlit.
+Receivers consume the authoritative main-light cookie exactly once. Ground and Generated Mass Pixel Surface continue through `UniversalFragmentPBR`; River continues through its existing world-position-aware main-light call; Vegetation now uses the world-position-aware main-light overload while preserving ambient, local lights, edge accents, and its no-geometric-main-shadow policy. Standard URP Lit and compatible Lit Shader Graphs use their native package path. No receiver owns subsystem-local cloud state, and no simulation, geometry, material identity, fog, emission, or local-light contract is redefined by this integration.
 
-The audit is editor-triggered and diagnostic only. It must not scan renderers or materials every frame.
+### Cloud-shadow cookie evolution — V0.3D complete
+
+`WeatherCloudShadowController` may periodically evolve the globally tiled cookie without changing the receiver contract. Automatic evolution runs only in Play Mode. The default schedule selects a deterministic next seed after a randomized `90–180 s` interval, generates that next pattern once, and crossfades the existing single readable `R8` cookie over `10 s` at `6 Hz`. Manual `Evolve Cloud Cookie Now` and `Complete Evolution Immediately` actions remain available for edit-preview and validation.
+
+The controller owns three reusable CPU byte buffers—current, next, and blended—and one GPU cookie texture. `WeatherCloudShadowCookieGenerator` reuses a retained workspace for lattices, field values, opening cleanup, and queue storage, so repeated automatic seed changes do not allocate new managed arrays after the configured resolution/cell capacities have warmed. During an active blend, the controller applies a smoothstep interpolation to the byte buffers and calls `SetPixelData`/`Apply` only at the bounded evolution cadence. The world movement phase and cookie offset continue uninterrupted; receivers still perform exactly one native directional-cookie sample.
+
+Idle evolution cost is one timer/state comparison. Preparation is one dirty `O(R²)` next-seed generation. Transition cost is one `O(R²)` byte blend and one `R²` upload per configured update. At the approved default 256²/6 Hz/10 s settings, the transition performs 60 uploads and moves approximately 3,932,160 raw texel bytes before engine/driver overhead. No extra draw, render pass, compute dispatch, material mutation, renderer traversal, per-chunk state, or receiver-shader change is introduced.
+
+Any authored pattern edit cancels the pending transition, restores/rebuilds the authored seed safely, and reschedules. A failed next-seed generation leaves the current cookie active and reports the complete evolution error. Disabling automatic evolution prevents future schedules but does not create a half-frozen receiver path; manual actions remain explicit diagnostics.
+
+### Cloud-shadow automated benchmark — V0.3E2 complete and retained
+
+The Weather cloud Inspector owns one benchmark entry point backed by a transient runtime runner. The runner creates no persistent scene object and changes no scene content. It captures the active controller state, forces the debug overlay and automatic evolution off during controlled persistent windows, runs adjacent cloud-cookie-disabled/static-cookie and cloud-cookie-disabled/moving-cookie comparisons in alternating order, runs one complete forced evolution transition, runs a post-evolution moving-cookie control, and restores the captured controller state on every exit path.
+
+The source-implemented suite uses `FrameTimingManager` for whole-frame CPU total, active main-thread, active render-thread, and GPU data where supported. Optional `ProfilerRecorder` counters capture managed allocations and rendering counters where available. Measurement arrays are allocated before timed windows. `WeatherCloudShadowCookieGenerator` exposes profiler markers around dirty generation and texture upload, while the controller records preparation and blend/upload CPU timings. The suite reports unavailable counters explicitly and does not interpret missing data as zero.
+
+The benchmark measures the complete native directional-cookie path by controlled A/B comparison. It does not claim direct isolation of one shader sample. It does not modify receiver shaders, cookie representation, quality settings, VSync, target frame rate, time scale, camera, Vegetation density, River state, rocks, or other gameplay content. Reports are retained in memory, written automatically to `Library/WeatherCloudShadowBenchmarkDiagnostics` in the Editor or `Application.persistentDataPath` in a Player, and copied through one Inspector action. The runner has no idle presence: it is created with `HideAndDontSave` only when the suite starts and destroys itself after completion or cancellation.
+
+The final corrected V0.3E2 stress-view run completed at 2560 × 1440, Direct3D12, `PC_RPAsset`, with explicit actual execution order and restoration `PASS`. Mean paired GPU median deltas were `+0.016 ms` for the static cookie and `+0.011 ms` for the normal moving cookie. CPU deltas reversed sign across cases and remain inconclusive within Editor noise. SetPass calls did not materially change. Evolution preparation measured `14.586 ms` once; the ten-second transition performed 60 low-cadence blend/uploads totalling `73.323 ms`, with a `1.466 ms` maximum update and no post-transition GPU residue (`0.631 ms` evolution median versus `0.633 ms` post-evolution median). This evidence accepts the native cookie architecture for V0.4. Standalone Player and low-end-PC confirmation move to the future testing sprint.
+
+### Cloud-shadow world coverage and debug focus — V0.3B/V0.3C
+
+The production directional cookie is a globally tiled world-space lighting mask. It is not a finite player-centred or camera-centred simulation region, and it does not require recentering, regeneration after travel, per-chunk storage, or whole-map allocation. Remote cutscenes receive the same cloud field automatically because every visible receiver samples the authoritative directional light at its own world position.
+
+`WeatherCloudShadowController` exposes a generic debug-focus contract only for the finite diagnostic overlay and future view-local tooling. Resolution order is runtime override, Inspector override, assigned fallback camera, `Camera.main`, then controller transform. Public set/clear methods may redirect the diagnostic overlay without moving the player. The overlay follows the resolved focus by default and may match one complete cookie repeat period.
+
+V0.3C removes the misleading coverage terminology from serialized field labels, public API, Inspector actions, and reports. Existing serialized references are preserved through `FormerlySerializedAs`. The custom Inspector displays the live resolved debug focus and source even when the serialized fields remain `None`, identifies automatic `Camera.main` resolution explicitly, and warns when a higher-priority override masks the fallback camera. These controls do not affect production cloud coverage. Source implementation is complete and user-validated; these controls remain diagnostic only.
+
+### Cloud-shadow debug visualization — V0.3A
+
+Before cloud placement or generation behavior is revised, `WeatherCloudShadowController` provides a dedicated diagnostic overlay. The overlay is submitted programmatically without a scene object and samples the exact active URP directional cookie on a configurable horizontal world plane. `CloudAreas` marks only clouded regions; `CloudAndOpenings` shows the complete field classification. The generated cookie is also visible as a compact Inspector preview.
+
+This visualization is observational only. It does not create visible-cloud geometry, change the cookie generator, alter coverage or movement, traverse receivers, modify materials, or participate in lighting. It casts and receives no shadows and is exempt from the universal receiver contract as an intentionally unlit diagnostic overlay. V0.3B gives it a generic debug focus resolved from a runtime override, Inspector override, assigned camera, `Camera.main`, or controller fallback. V0.3C makes that diagnostic-only ownership explicit in the Inspector and public API. The finite overlay follows that focus for gameplay, cutscene, spectator, and editor inspection, while the production cookie remains globally tiled and independent of any focus.
+
+### Cloud-shadow accepted freeze — V0.4
+
+The accepted cloud-shadow baseline is:
+
+- one Weather-owned native URP main directional-light cookie;
+- globally tiled world coverage independent of player, camera, chunk count, and map size;
+- one cookie-aware main-light sample per supported receiver;
+- `256²` linear `R8` cookie with a `128 m` world-space repeat period;
+- Weather-wind-driven movement;
+- broad clouded regions with authored clearances normally around `5–7 m` or larger and approximately `1.5 m` transition softness;
+- randomized seed evolution every `90–180 s` using a `10 s`, `6 Hz` smooth crossfade into the same GPU cookie;
+- retained receiver audit, debug overlay, copied diagnostics, and automated benchmark suite;
+- no finite coverage window, per-chunk cloud state, visible cloud geometry, fullscreen cloud-shadow pass, or hybrid receiver field.
+
+No additional cloud-shadow implementation is currently planned. The system may reopen only for a concrete defect or materially adverse Player/low-end benchmark evidence.
+
+### Godrays adjacency boundary — undefined future system
+
+The next Weather-adjacent discussion concerns godrays: visible sunshine passing through clearances in the cloud field. That feature is not yet architected. No rendering representation, camera-space model, volumetric method, ray-march, mesh, renderer feature, quality tier, occlusion rule, or budget is approved.
+
+The exploration should begin from these ownership boundaries:
+
+- `TimeOfDayController` remains authoritative for sun direction, colour, intensity, and day/night state;
+- Weather remains authoritative for the cloud cookie, clearances, seed, phase, and wind-driven movement;
+- godrays should prefer consuming the existing cloud/opening state rather than inventing a second drifting cloud simulation;
+- godrays must not change the frozen receiver-cookie contract, Ground/Generated Mass/Vegetation/River simulation, or material ownership without a separately approved plan;
+- the constrained top-down isometric camera and 1440p low-end-PC 60 FPS target are primary design inputs;
+- architecture and visual-target discussion must precede implementation.
 
 ---
 
@@ -308,7 +365,7 @@ Scene
     └── Weather                         [WeatherWindDomain]
 ```
 
-`WeatherWindDomain` is attached directly to the `Weather` object in this initial version. Future Weather features may become child modules only after a dedicated Weather architecture review. The planned cloud-shadow controller has now received that architecture review, but its exact scene attachment and runtime implementation remain pending explicit approval. WEATHER-V0A itself still contains only the implemented wind domain.
+`WeatherWindDomain` is attached directly to the `Weather` object in this initial version. Future Weather features may become child modules only after a dedicated Weather architecture review. The cloud-shadow controller completed its architecture review, source implementation, Unity attachment, receiver audit, visual validation, seed-evolution validation, and V0.3E2 benchmark. It remains attached directly to the existing Weather object; no child module or duplicate Weather owner is introduced. WEATHER-V0A wind ownership remains unchanged.
 
 The one-time vegetation-owned compatibility publisher and migration utility were removed by `VEG-V2-INFRA.3` after scene-owned Weather was accepted. New and retained scenes use the exact `WeatherWindDomain` directly; there is no production migration or fallback ownership path.
 

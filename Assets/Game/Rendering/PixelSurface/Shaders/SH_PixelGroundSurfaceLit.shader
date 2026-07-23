@@ -205,6 +205,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
             #define _SPECULAR_SETUP 1
 
