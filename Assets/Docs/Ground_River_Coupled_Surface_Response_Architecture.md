@@ -1,3 +1,62 @@
+## 2026-07-23 — Whole-rock final-response composition
+
+The algorithm-10 centre anchor remains the ownership contract. Whole-rock handling now occurs at final dry-response composition rather than by mutating sampled detail before ordinary layer blending.
+
+### Response decomposition
+
+For a feature-aware texture-form layer, one texture sample pair resolves both:
+
+```text
+complete detail = substrate + discrete-rock response
+substrate detail = substrate-only form and roughness, neutral feature slope/cavity
+rock response delta = complete response - substrate response
+```
+
+The ordinary Ground/Bank/Riverbed composition applies the substrate-only response with fragment-local normalized application weights. The discrete-rock delta uses an absolute whole-feature application weight reconstructed at the common rock centre. This rule applies consistently to:
+
+- palette albedo, combined/substrate form, and cavity;
+- world-XZ normal slope;
+- roughness-derived dry smoothness;
+- cavity/finish-derived dry specular response.
+
+Ordinary and non-feature payloads are unchanged: their substrate resolver returns the original detail, so the feature delta is zero.
+
+### Whole-feature application weight
+
+The sampled B/A anchor reconstructs the centre offset using the existing conservative support radius. The corridor inward-distance field and the final normalized Bank or Riverbed application-weight field are differentiated through the guarded world-XZ 2×2 solve and extrapolated to that centre.
+
+```text
+feature edge distance = centre inward distance - conservative support radius
+required clearance = Material Blend Distance + Feature Safety Margin
+whole feature weight = centre application weight × whole feature retention
+```
+
+Whole Feature Return Fade `0` uses a hard step at the required clearance. A positive fade uses one centre-evaluated smoothstep scalar. Invalid centre, inward-gradient, or application-gradient reconstruction yields zero discrete-rock response while leaving substrate composition intact.
+
+The whole-feature path is enabled when any of Material Blend Distance, Feature Safety Margin, or Whole Feature Return Fade is nonzero. Safety Margin `0` therefore still protects the complete ordinary Material Blend Distance.
+
+### Equivalent Bank/Riverbed surface
+
+The accepted 2.4A.2 normalized direct handoff remains authoritative. When Bank and Riverbed resolve the same dry surface, the shared normalized application weight is assigned to Bank before detail resolution and Riverbed receives zero final dry weight. The shared substrate and discrete-rock delta are therefore evaluated once; there is no internal Bank/Riverbed rock suppression.
+
+### Proof contract
+
+The algorithm-10 proof retains centre-owner, centre-error, payload, mip, and emitted-response gates. It additionally sweeps hard and faded affine application boundaries over every emitted rock response and records:
+
+- maximum hard-mode whole-rock weight spread;
+- maximum fade-mode whole-rock weight spread;
+- hard-mode partial-rock count;
+- maximum residual rock response in the removed state;
+- fade-mode inconsistent-rock count.
+
+A `WholeFeatureBoundarySweep` contact sheet shows hard removed, hard retained, and two uniform fade states. These are proof outputs under `Library`; no installed asset or payload byte changes.
+
+### Cost and unchanged contracts
+
+No texture sample, draw call, mesh stream, payload channel, shader property, CBUFFER member, ID, array, metadata texture, search loop, runtime allocation, or per-frame CPU update is added. Runtime cost is substrate-detail derivation, one additional guarded scalar-gradient solve when whole-feature handling is active, and full-minus-substrate scalar/vector delta composition. Corridor UV3, algorithm version 10, support-radius metadata, installer identity, wetness, cover, Shore highlight, and 2.4A.2 composition remain unchanged.
+
+---
+
 ## 2026-07-23 — Complete feature-response gating for algorithm-10 centre anchors
 
 The algorithm-10 centre-anchor contract remains unchanged. The correction is limited to reconstructing whether the emitted paired payload contains any discrete-rock response that must receive whole-feature retention.

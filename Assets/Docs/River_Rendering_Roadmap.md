@@ -1428,3 +1428,18 @@ Expected runtime source cost is lower because Arc/Semi-Arc leave the event pool 
 
 Status: source implementation complete; `35/35` offline validation passes; package reproduction complete. Unity import, Play Mode proof that cyan Object source geometry disappears after Build, contact-retention review, and profiler evidence remain pending.
 
+
+## RG-METRIC-P13D — Finite Object Contact Reinforcement Burst
+
+P13D addresses unreliable Layer C object-contact establishment after P13C removed persistent emitters. Arc/Semi-Arc packets now support an authored finite `1–3` stroke burst, default `2`:
+
+- the first stroke emits the complete one-shot object packet;
+- later strokes reinforce only the immediate contact front;
+- downstream arms are never regenerated;
+- the event ends after the final stroke and enters the existing shared object-clearance gate.
+
+All strokes retain the same Reveal Speed and per-stroke Build duration. P13C full-vector slowdown and object-contact reach controls are unchanged; a Unity test value of `Object Contact Minimum Speed Factor = 0.02` corresponds to 98% slowdown of complete routed velocity at full influence.
+
+No Layer E visibility, Chipping, Strand, colour, or opacity system is changed or implicated. No runtime resource, kernel, pass, sample, or draw call is added. The bounded extra cost is one contact-only sweep at the default stroke count and at most two at the maximum.
+
+Status: source implementation complete; `36/36` offline validation passes. Final package reproduction is recorded in the external validation report. Unity import, Play Mode proof of reliable supported contact material, and profiler evidence remain pending.

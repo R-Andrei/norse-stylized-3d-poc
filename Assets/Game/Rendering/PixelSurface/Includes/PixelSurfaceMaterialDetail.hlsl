@@ -17,6 +17,7 @@ struct PS3D_StylizedSurfaceDetail
     float substrateFormSigned;
     float substrateRoughness;
     float featureMask;
+    float featureApplicationWeight;
     float2 featureCenterOffsetNormalized;
     float featureMaximumSupportRadiusUv;
 };
@@ -38,6 +39,7 @@ PS3D_StylizedSurfaceDetail PS3D_ZeroStylizedSurfaceDetail()
     result.substrateFormSigned = 0.0;
     result.substrateRoughness = 0.5;
     result.featureMask = 0.0;
+    result.featureApplicationWeight = 0.0;
     result.featureCenterOffsetNormalized = float2(1.0, 1.0);
     result.featureMaximumSupportRadiusUv = 0.0;
     return result;
@@ -143,6 +145,26 @@ PS3D_StylizedSurfaceDetail PS3D_ApplyStylizedSurfaceFeatureRetention(
         detail.substrateRoughness,
         detail.roughness,
         retention);
+    return detail;
+}
+
+PS3D_StylizedSurfaceDetail PS3D_ResolveStylizedSurfaceSubstrateDetail(
+    PS3D_StylizedSurfaceDetail detail)
+{
+    float featurePayload = saturate(detail.featureTextureFormPayload);
+    detail.formSigned = lerp(
+        detail.formSigned,
+        detail.substrateFormSigned,
+        featurePayload);
+    detail.slope *= 1.0 - featurePayload;
+    detail.cavity *= 1.0 - featurePayload;
+    detail.cavityCore *= 1.0 - featurePayload;
+    detail.roughness = lerp(
+        detail.roughness,
+        detail.substrateRoughness,
+        featurePayload);
+    detail.featureMask *= 1.0 - featurePayload;
+    detail.featureApplicationWeight = 0.0;
     return detail;
 }
 

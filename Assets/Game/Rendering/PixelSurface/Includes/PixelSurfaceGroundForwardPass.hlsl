@@ -191,28 +191,29 @@
                     }
                 }
 
-                // The material-uniform branch keeps the inward-distance
-                // derivative coherent. The sampled B/A payload directly carries
-                // the centre offset; feature-mask gating occurs afterwards.
+                float featureMask = step(0.001, result.featureMask);
+                result.featureApplicationWeight =
+                    saturate(substrateWeight) * featureMask;
+
+                // This branch depends only on material uniforms. The sampled B/A
+                // payload identifies the common centre; the returned value is an
+                // absolute final-composition weight, not a per-fragment detail lerp.
                 [branch]
-                if (_GroundBankMaterialTransition.z > 0.0001 &&
+                if ((_GroundBankMaterialTransition.x +
+                        _GroundBankMaterialTransition.z +
+                        _GroundBankMaterialTransition.w) > 0.0001 &&
                     _GroundBankLayerDetailC.z > 1.5)
                 {
-                    float wholeFeatureRetention =
-                        ResolveGroundWholeFeatureRetention(
-                            ResolveGroundRiverBankDomain(input),
+                    result.featureApplicationWeight =
+                        ResolveGroundWholeFeatureApplicationWeight(
                             ResolveGroundRiverBankInwardDistance(input),
+                            substrateWeight,
                             input.positionWS,
                             result.featureCenterOffsetNormalized,
                             result.featureMaximumSupportRadiusUv,
                             _GroundBankLayerDetailA.z,
-                            _GroundBankMaterialTransition);
-                    result = PS3D_ApplyStylizedSurfaceFeatureRetention(
-                        result,
-                        lerp(
-                            1.0,
-                            wholeFeatureRetention,
-                            step(0.001, result.featureMask)));
+                            _GroundBankMaterialTransition) *
+                        featureMask;
                 }
 
                 return result;
@@ -256,27 +257,26 @@
                     }
                 }
 
-                // See the Bank path: the only derivative is taken from the
-                // coherent corridor distance field, not from sampled feature data.
+                float featureMask = step(0.001, result.featureMask);
+                result.featureApplicationWeight =
+                    saturate(substrateWeight) * featureMask;
+
                 [branch]
-                if (_GroundRiverbedMaterialTransition.z > 0.0001 &&
+                if ((_GroundRiverbedMaterialTransition.x +
+                        _GroundRiverbedMaterialTransition.z +
+                        _GroundRiverbedMaterialTransition.w) > 0.0001 &&
                     _GroundRiverbedLayerDetailC.z > 1.5)
                 {
-                    float wholeFeatureRetention =
-                        ResolveGroundWholeFeatureRetention(
-                            ResolveGroundRiverbedSupportMask(input),
+                    result.featureApplicationWeight =
+                        ResolveGroundWholeFeatureApplicationWeight(
                             ResolveGroundRiverbedInwardDistance(input),
+                            substrateWeight,
                             input.positionWS,
                             result.featureCenterOffsetNormalized,
                             result.featureMaximumSupportRadiusUv,
                             _GroundRiverbedLayerDetailA.z,
-                            _GroundRiverbedMaterialTransition);
-                    result = PS3D_ApplyStylizedSurfaceFeatureRetention(
-                        result,
-                        lerp(
-                            1.0,
-                            wholeFeatureRetention,
-                            step(0.001, result.featureMask)));
+                            _GroundRiverbedMaterialTransition) *
+                        featureMask;
                 }
 
                 return result;
@@ -451,7 +451,19 @@
                         0.08,
                     -1.0,
                     1.0);
-                half3 bankLayerPalette =
+                PS3D_StylizedSurfaceDetail bankSubstrateDetail =
+                    PS3D_ResolveStylizedSurfaceSubstrateDetail(
+                        bankLayerDetail);
+                half3 bankSubstratePalette =
+                    PS3D_ResolveStylizedSurfacePalette(
+                        _GroundBankLayerBaseColor.rgb,
+                        _GroundBankLayerDarkColor.rgb,
+                        _GroundBankLayerLightColor.rgb,
+                        _GroundBankLayerCavityColor.rgb,
+                        bankLayerSignedVariation,
+                        _GroundBankLayerDetailB.w,
+                        bankSubstrateDetail);
+                half3 bankCompletePalette =
                     PS3D_ResolveStylizedSurfacePalette(
                         _GroundBankLayerBaseColor.rgb,
                         _GroundBankLayerDarkColor.rgb,
@@ -460,8 +472,11 @@
                         bankLayerSignedVariation,
                         _GroundBankLayerDetailB.w,
                         bankLayerDetail);
-                half3 bankLayerAlbedo =
-                    baseSample.rgb * bankLayerPalette;
+                half3 bankSubstrateAlbedo =
+                    baseSample.rgb * bankSubstratePalette;
+                half3 bankFeatureAlbedoDelta =
+                    baseSample.rgb *
+                    (bankCompletePalette - bankSubstratePalette);
 
                 float riverbedLegacyPixelInfluence =
                     saturate(_GroundRiverbedLayerDetailC.y);
@@ -479,7 +494,19 @@
                         0.08,
                     -1.0,
                     1.0);
-                half3 riverbedLayerPalette =
+                PS3D_StylizedSurfaceDetail riverbedSubstrateDetail =
+                    PS3D_ResolveStylizedSurfaceSubstrateDetail(
+                        riverbedLayerDetail);
+                half3 riverbedSubstratePalette =
+                    PS3D_ResolveStylizedSurfacePalette(
+                        _GroundRiverbedLayerBaseColor.rgb,
+                        _GroundRiverbedLayerDarkColor.rgb,
+                        _GroundRiverbedLayerLightColor.rgb,
+                        _GroundRiverbedLayerCavityColor.rgb,
+                        riverbedLayerSignedVariation,
+                        _GroundRiverbedLayerDetailB.w,
+                        riverbedSubstrateDetail);
+                half3 riverbedCompletePalette =
                     PS3D_ResolveStylizedSurfacePalette(
                         _GroundRiverbedLayerBaseColor.rgb,
                         _GroundRiverbedLayerDarkColor.rgb,
@@ -488,12 +515,19 @@
                         riverbedLayerSignedVariation,
                         _GroundRiverbedLayerDetailB.w,
                         riverbedLayerDetail);
-                half3 riverbedLayerAlbedo =
-                    baseSample.rgb * riverbedLayerPalette;
+                half3 riverbedSubstrateAlbedo =
+                    baseSample.rgb * riverbedSubstratePalette;
+                half3 riverbedFeatureAlbedoDelta =
+                    baseSample.rgb *
+                    (riverbedCompletePalette - riverbedSubstratePalette);
                 half3 albedo =
                     ordinaryGroundAlbedo * (half)substrateWeights.x +
-                    bankLayerAlbedo * (half)substrateWeights.y +
-                    riverbedLayerAlbedo * (half)substrateWeights.z;
+                    bankSubstrateAlbedo * (half)substrateWeights.y +
+                    riverbedSubstrateAlbedo * (half)substrateWeights.z +
+                    bankFeatureAlbedoDelta *
+                        (half)bankLayerDetail.featureApplicationWeight +
+                    riverbedFeatureAlbedoDelta *
+                        (half)riverbedLayerDetail.featureApplicationWeight;
 
                 // Separate snow value lift from snow hue. Ground Snow Brightness
                 // now controls luminance, while Ground Snow Tint Strength controls
@@ -753,18 +787,37 @@
                     (half)_MonolithicFlatten *
                     (half)_MonolithicSmoothnessBoost -
                     (half)effectiveFrostStrength * 0.06h);
-                half bankDrySmoothness =
+                PS3D_StylizedSurfaceDetail bankSubstrateDetail =
+                    PS3D_ResolveStylizedSurfaceSubstrateDetail(
+                        bankLayerDetail);
+                PS3D_StylizedSurfaceDetail riverbedSubstrateDetail =
+                    PS3D_ResolveStylizedSurfaceSubstrateDetail(
+                        riverbedLayerDetail);
+                half bankSubstrateSmoothness =
+                    PS3D_ResolveStylizedSurfaceDrySmoothness(
+                        (half)_GroundBankLayerDrySmoothness,
+                        bankSubstrateDetail);
+                half bankCompleteSmoothness =
                     PS3D_ResolveStylizedSurfaceDrySmoothness(
                         (half)_GroundBankLayerDrySmoothness,
                         bankLayerDetail);
-                half riverbedDrySmoothness =
+                half riverbedSubstrateSmoothness =
+                    PS3D_ResolveStylizedSurfaceDrySmoothness(
+                        (half)_GroundRiverbedLayerDrySmoothness,
+                        riverbedSubstrateDetail);
+                half riverbedCompleteSmoothness =
                     PS3D_ResolveStylizedSurfaceDrySmoothness(
                         (half)_GroundRiverbedLayerDrySmoothness,
                         riverbedLayerDetail);
                 half resolvedDrySmoothness =
                     ordinaryDrySmoothness * (half)substrateWeights.x +
-                    bankDrySmoothness * (half)substrateWeights.y +
-                    riverbedDrySmoothness * (half)substrateWeights.z;
+                    bankSubstrateSmoothness * (half)substrateWeights.y +
+                    riverbedSubstrateSmoothness * (half)substrateWeights.z +
+                    (bankCompleteSmoothness - bankSubstrateSmoothness) *
+                        (half)bankLayerDetail.featureApplicationWeight +
+                    (riverbedCompleteSmoothness -
+                        riverbedSubstrateSmoothness) *
+                        (half)riverbedLayerDetail.featureApplicationWeight;
                 return saturate(
                     resolvedDrySmoothness +
                     (half)ResolveGroundCombinedWetSmoothnessBoost(
@@ -850,13 +903,31 @@
                         1.0h,
                         0.94h,
                         saturate((half)paintedAccentLinesFeature));
-                half3 bankDrySpecular =
+                PS3D_StylizedSurfaceDetail bankSubstrateDetail =
+                    PS3D_ResolveStylizedSurfaceSubstrateDetail(
+                        bankLayerDetail);
+                PS3D_StylizedSurfaceDetail riverbedSubstrateDetail =
+                    PS3D_ResolveStylizedSurfaceSubstrateDetail(
+                        riverbedLayerDetail);
+                half3 bankSubstrateSpecular =
+                    (half3)_GroundBankLayerDrySpecularStrength *
+                    (half)max(
+                        0.0,
+                        1.0 + bankSubstrateDetail.finishSigned * 0.5 -
+                        bankSubstrateDetail.cavity * 0.18);
+                half3 bankCompleteSpecular =
                     (half3)_GroundBankLayerDrySpecularStrength *
                     (half)max(
                         0.0,
                         1.0 + bankLayerDetail.finishSigned * 0.5 -
                         bankLayerDetail.cavity * 0.18);
-                half3 riverbedDrySpecular =
+                half3 riverbedSubstrateSpecular =
+                    (half3)_GroundRiverbedLayerDrySpecularStrength *
+                    (half)max(
+                        0.0,
+                        1.0 + riverbedSubstrateDetail.finishSigned * 0.5 -
+                        riverbedSubstrateDetail.cavity * 0.18);
+                half3 riverbedCompleteSpecular =
                     (half3)_GroundRiverbedLayerDrySpecularStrength *
                     (half)max(
                         0.0,
@@ -864,8 +935,13 @@
                         riverbedLayerDetail.cavity * 0.18);
                 half3 resolvedDrySpecular =
                     ordinaryDrySpecular * (half)substrateWeights.x +
-                    bankDrySpecular * (half)substrateWeights.y +
-                    riverbedDrySpecular * (half)substrateWeights.z;
+                    bankSubstrateSpecular * (half)substrateWeights.y +
+                    riverbedSubstrateSpecular * (half)substrateWeights.z +
+                    (bankCompleteSpecular - bankSubstrateSpecular) *
+                        (half)bankLayerDetail.featureApplicationWeight +
+                    (riverbedCompleteSpecular -
+                        riverbedSubstrateSpecular) *
+                        (half)riverbedLayerDetail.featureApplicationWeight;
                 surfaceData.specular = saturate(
                     resolvedDrySpecular *
                         (half)ResolveGroundGlobalWetSpecularMultiplier() +
@@ -1023,18 +1099,6 @@
                         riverbedMaterialBlend);
                 float sharedDrySurfaceBlend =
                     1.0 - sequentialSubstrateWeights.x;
-                float bankDetailApplication = lerp(
-                    resolvedBankMaterialBlend,
-                    sharedDrySurfaceBlend,
-                    sameDrySurface);
-                PS3D_StylizedSurfaceDetail bankLayerDetail =
-                    ResolveGroundBankLayerDetail(
-                        input,
-                        bankDetailApplication);
-                PS3D_StylizedSurfaceDetail riverbedLayerDetail =
-                    ResolveGroundRiverbedLayerDetail(
-                        input,
-                        riverbedMaterialBlend);
                 float3 sharedSubstrateWeights = float3(
                     1.0 - sharedDrySurfaceBlend,
                     sharedDrySurfaceBlend,
@@ -1043,12 +1107,31 @@
                     sequentialSubstrateWeights,
                     sharedSubstrateWeights,
                     sameDrySurface);
+                PS3D_StylizedSurfaceDetail bankLayerDetail =
+                    ResolveGroundBankLayerDetail(
+                        input,
+                        substrateWeights.y);
+                PS3D_StylizedSurfaceDetail riverbedLayerDetail =
+                    ResolveGroundRiverbedLayerDetail(
+                        input,
+                        substrateWeights.z);
                 float4 surfaceCoverRetention =
                     ResolveGroundBankCoverRetention(bankMaterialBlend) *
                     (1.0 - saturate(riverbedSupport));
+                PS3D_StylizedSurfaceDetail bankSubstrateDetail =
+                    PS3D_ResolveStylizedSurfaceSubstrateDetail(
+                        bankLayerDetail);
+                PS3D_StylizedSurfaceDetail riverbedSubstrateDetail =
+                    PS3D_ResolveStylizedSurfaceSubstrateDetail(
+                        riverbedLayerDetail);
                 float2 combinedDetailSlope =
-                    bankLayerDetail.slope * substrateWeights.y +
-                    riverbedLayerDetail.slope * substrateWeights.z;
+                    bankSubstrateDetail.slope * substrateWeights.y +
+                    riverbedSubstrateDetail.slope * substrateWeights.z +
+                    (bankLayerDetail.slope - bankSubstrateDetail.slope) *
+                        bankLayerDetail.featureApplicationWeight +
+                    (riverbedLayerDetail.slope -
+                        riverbedSubstrateDetail.slope) *
+                        riverbedLayerDetail.featureApplicationWeight;
                 if (dot(combinedDetailSlope, combinedDetailSlope) > 0.000001)
                 {
                     normalWS = (half3)

@@ -159,6 +159,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float Duration;
             public float Elapsed;
             public float ObjectBuildDuration;
+            public int ObjectContactStrokeCount;
             public float FormationSpeedMetresPerSecond;
             public float RevealPathDistanceMetres;
             public float RawRevealDurationSeconds;
@@ -205,7 +206,8 @@ namespace ProgrammaticStylized3D.Rivers
         private struct FoamSourceEventGpuData
         {
             // x = source type, y = side sign except Object Arc/Semi-Arc
-            // reserved Build code zero, z = reveal progress, w = shape seed.
+            // finite stroke phase (0 = complete packet, 1/2 = contact-only
+            // reinforcement), z = per-stroke reveal progress, w = shape seed.
             public Vector4 Header;
             // x/y = start/end storage global except Object Arc/Semi-Arc
             // contact point 0; z = centre storage global; w = flow direction
@@ -241,7 +243,7 @@ namespace ProgrammaticStylized3D.Rivers
             // source tick, 1 afterward), w reserved. Current phase/progress
             // remain Header.y/z. Positive newly revealed coverage gates
             // nonpersistent source families; Object Arc/Semi-Arc use their
-            // current phase-shaped persistent emitter directly.
+            // finite object burst uses phase changes to reset one-shot permission.
             public Vector4 Deposit;
         }
 

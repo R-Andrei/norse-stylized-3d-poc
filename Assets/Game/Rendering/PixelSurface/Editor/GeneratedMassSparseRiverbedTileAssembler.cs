@@ -21,6 +21,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         internal const int WorkResolution = 2048;
         internal const int CandidateCount = 3;
         internal const int ExpectedSourceCount = 18;
+        internal const int FeatureBoundarySweepWidth = 1024;
+        internal const int FeatureBoundarySweepHeight = 256;
         internal const float MinimumPlacementScale = 0.55f;
         internal const float MaximumPlacementScale = 1.20f;
         internal const float MinimumSmallPlacementFraction = 0.65f;
@@ -77,6 +79,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private const float FeatureCavityEvidenceThreshold = 0.001f;
         private const float FeatureFormEvidenceThreshold = 0.001f;
         private const float FeatureRoughnessEvidenceThreshold = 0.008f;
+        private const int FeatureBoundaryProofOrientationCount = 8;
+        private const float FeatureBoundaryTransitionRadiusFactor = 0.65f;
+        private const float FeatureBoundarySafetyRadiusFactor = 0.20f;
+        private const float FeatureBoundaryFadeRadiusFactor = 1.00f;
+        private const float FeatureBoundaryWeightTolerance = 0.025f;
 
         private static readonly CandidateDefinition[] CandidateDefinitions =
         {
@@ -313,6 +320,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal int FeatureResponseUngatedPixelCount;
             internal int FeatureNeutralGeometricMaskPixelCount;
             internal int FeatureAnchorLastAcceptedMip;
+            internal Color32[] FeatureBoundarySweepContactSheet;
+            internal float FeatureBoundaryHardMaximumWeightSpread;
+            internal float FeatureBoundaryFadeMaximumWeightSpread;
+            internal int FeatureBoundaryHardPartialRockCount;
+            internal float FeatureBoundaryRemovedMaximumResidual;
+            internal int FeatureBoundaryFadeInconsistentRockCount;
             internal string PalettePayloadFingerprint;
             internal string PalettePreviewNeutralFingerprint;
             internal string PalettePreviewHigherContrastFingerprint;
@@ -2530,11 +2543,21 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 result.PalettePreviewAlternate,
                 result.PaletteForm);
             MeasurePalettePayload(result, final);
+            float[] decodedFeatureAnchorX =
+                DecodeFeatureAnchorXPayload(result.PaletteForm);
+            float[] decodedFeatureAnchorY =
+                DecodeFeatureAnchorYPayload(result.PaletteForm);
             MeasureFeatureAnchorReconstruction(
                 result,
                 placements,
-                DecodeFeatureAnchorXPayload(result.PaletteForm),
-                DecodeFeatureAnchorYPayload(result.PaletteForm));
+                decodedFeatureAnchorX,
+                decodedFeatureAnchorY);
+            MeasureWholeFeatureBoundaryComposition(
+                result,
+                final,
+                placements,
+                decodedFeatureAnchorX,
+                decodedFeatureAnchorY);
             result.PalettePayloadFingerprint =
                 CalculatePairedPayloadFingerprint(result);
             result.PalettePreviewNeutralFingerprint =
@@ -2765,6 +2788,33 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     color,
                     palette.CavityColor,
                     cavityCore);
+                output[index] = (Color32)color;
+            }
+
+            return output;
+        }
+
+        private static Color32[] BuildSubstratePalettePreview(
+            IReadOnlyList<Color32> paletteForm,
+            PaletteDefinition palette)
+        {
+            int count = FinalResolution * FinalResolution;
+            Color32[] output = new Color32[count];
+            for (int index = 0; index < count; index++)
+            {
+                float form = Mathf.Clamp01(
+                    Mathf.GammaToLinearSpace(
+                        paletteForm[index].g / 255f));
+                float signedForm = form * 2f - 1f;
+                Color color = signedForm < 0f
+                    ? Color.Lerp(
+                        palette.BaseColor,
+                        palette.DarkColor,
+                        -signedForm)
+                    : Color.Lerp(
+                        palette.BaseColor,
+                        palette.LightColor,
+                        signedForm);
                 output[index] = (Color32)color;
             }
 
@@ -3394,6 +3444,342 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             result.FeatureAnchorLastAcceptedMip = lastAcceptedMip;
         }
 
+        private static void MeasureWholeFeatureBoundaryComposition(
+            CandidateResult result,
+            FinalBuffers final,
+            IReadOnlyList<PlacementEvidence> placements,
+            IReadOnlyList<float> centerOffsetX,
+            IReadOnlyList<float> centerOffsetY)
+        {
+            List<int>[] featurePixels = new List<int>[placements.Count];
+            for (int index = 0; index < featurePixels.Length; index++)
+            {
+                featurePixels[index] = new List<int>();
+            }
+
+            for (int index = 0; index < result.PaletteForm.Length; index++)
+            {
+                int owner = final.Owner[index];
+                if (owner < 0 || owner >= placements.Count ||
+                    !HasEncodedFeatureResponse(result, index))
+                {
+                    continue;
+                }
+
+                featurePixels[owner].Add(index);
+            }
+
+            float supportRadius = Mathf.Max(
+                0.0001f,
+                result.FeatureMaximumSupportRadiusUv);
+            float transitionDistance =
+                supportRadius * FeatureBoundaryTransitionRadiusFactor;
+            float safetyMargin =
+                supportRadius * FeatureBoundarySafetyRadiusFactor;
+            float fadeDistance =
+                supportRadius * FeatureBoundaryFadeRadiusFactor;
+            float requiredClearance =
+                transitionDistance + safetyMargin;
+            float guardDistance = Mathf.Max(
+                2f / FinalResolution,
+                result.FeatureAnchorMaximumCenterErrorUv * 3f);
+
+            float hardMaximumSpread = 0f;
+            float fadeMaximumSpread = 0f;
+            float removedMaximumResidual = 0f;
+            int hardPartialRockCount = 0;
+            int fadeInconsistentRockCount = 0;
+
+            for (int orientation = 0;
+                 orientation < FeatureBoundaryProofOrientationCount;
+                 orientation++)
+            {
+                float angle =
+                    orientation /
+                    (float)FeatureBoundaryProofOrientationCount *
+                    Mathf.PI * 2f;
+                Vector2 normal = new Vector2(
+                    Mathf.Cos(angle),
+                    Mathf.Sin(angle));
+
+                for (int owner = 0; owner < placements.Count; owner++)
+                {
+                    IReadOnlyList<int> pixels = featurePixels[owner];
+                    if (pixels.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    WeightRange removed = MeasureWholeFeatureWeightRange(
+                        pixels,
+                        placements[owner],
+                        centerOffsetX,
+                        centerOffsetY,
+                        normal,
+                        requiredClearance - guardDistance,
+                        supportRadius,
+                        requiredClearance,
+                        0f);
+                    WeightRange retained = MeasureWholeFeatureWeightRange(
+                        pixels,
+                        placements[owner],
+                        centerOffsetX,
+                        centerOffsetY,
+                        normal,
+                        requiredClearance + guardDistance,
+                        supportRadius,
+                        requiredClearance,
+                        0f);
+                    WeightRange faded = MeasureWholeFeatureWeightRange(
+                        pixels,
+                        placements[owner],
+                        centerOffsetX,
+                        centerOffsetY,
+                        normal,
+                        requiredClearance + fadeDistance * 0.5f,
+                        supportRadius,
+                        requiredClearance,
+                        fadeDistance);
+
+                    hardMaximumSpread = Mathf.Max(
+                        hardMaximumSpread,
+                        Mathf.Max(removed.Spread, retained.Spread));
+                    fadeMaximumSpread = Mathf.Max(
+                        fadeMaximumSpread,
+                        faded.Spread);
+                    removedMaximumResidual = Mathf.Max(
+                        removedMaximumResidual,
+                        removed.Maximum);
+                    if (removed.Maximum > FeatureBoundaryWeightTolerance ||
+                        retained.Minimum <
+                            1f - FeatureBoundaryWeightTolerance ||
+                        removed.Spread > FeatureBoundaryWeightTolerance ||
+                        retained.Spread > FeatureBoundaryWeightTolerance)
+                    {
+                        hardPartialRockCount++;
+                    }
+
+                    if (faded.Spread > FeatureBoundaryWeightTolerance)
+                    {
+                        fadeInconsistentRockCount++;
+                    }
+                }
+            }
+
+            result.FeatureBoundaryHardMaximumWeightSpread =
+                hardMaximumSpread;
+            result.FeatureBoundaryFadeMaximumWeightSpread =
+                fadeMaximumSpread;
+            result.FeatureBoundaryHardPartialRockCount =
+                hardPartialRockCount;
+            result.FeatureBoundaryRemovedMaximumResidual =
+                removedMaximumResidual;
+            result.FeatureBoundaryFadeInconsistentRockCount =
+                fadeInconsistentRockCount;
+            result.FeatureBoundarySweepContactSheet =
+                BuildFeatureBoundarySweepContactSheet(
+                    result,
+                    final,
+                    placements,
+                    centerOffsetX,
+                    centerOffsetY,
+                    requiredClearance,
+                    fadeDistance,
+                    guardDistance,
+                    supportRadius);
+        }
+
+        private struct WeightRange
+        {
+            internal float Minimum;
+            internal float Maximum;
+            internal float Spread => Maximum - Minimum;
+        }
+
+        private static WeightRange MeasureWholeFeatureWeightRange(
+            IReadOnlyList<int> pixels,
+            PlacementEvidence placement,
+            IReadOnlyList<float> centerOffsetX,
+            IReadOnlyList<float> centerOffsetY,
+            Vector2 boundaryNormal,
+            float intendedFeatureEdgeDistance,
+            float supportRadius,
+            float requiredClearance,
+            float fadeDistance)
+        {
+            float minimum = float.PositiveInfinity;
+            float maximum = float.NegativeInfinity;
+            for (int index = 0; index < pixels.Count; index++)
+            {
+                float weight = ResolveProofWholeFeatureWeight(
+                    pixels[index],
+                    placement,
+                    centerOffsetX,
+                    centerOffsetY,
+                    boundaryNormal,
+                    intendedFeatureEdgeDistance,
+                    supportRadius,
+                    requiredClearance,
+                    fadeDistance);
+                minimum = Mathf.Min(minimum, weight);
+                maximum = Mathf.Max(maximum, weight);
+            }
+
+            if (float.IsPositiveInfinity(minimum))
+            {
+                minimum = 0f;
+                maximum = 0f;
+            }
+
+            return new WeightRange
+            {
+                Minimum = minimum,
+                Maximum = maximum
+            };
+        }
+
+        private static float ResolveProofWholeFeatureWeight(
+            int pixelIndex,
+            PlacementEvidence placement,
+            IReadOnlyList<float> centerOffsetX,
+            IReadOnlyList<float> centerOffsetY,
+            Vector2 boundaryNormal,
+            float intendedFeatureEdgeDistance,
+            float supportRadius,
+            float requiredClearance,
+            float fadeDistance)
+        {
+            int x = pixelIndex % FinalResolution;
+            int y = pixelIndex / FinalResolution;
+            float pointX = (x + 0.5f) / FinalResolution;
+            float pointY = (y + 0.5f) / FinalResolution;
+            float centerX = placement.CenterX / WorkResolution;
+            float centerY = placement.CenterY / WorkResolution;
+            Vector2 actualOffset = new Vector2(
+                ToroidalDeltaUv(pointX, centerX),
+                ToroidalDeltaUv(pointY, centerY));
+            Vector2 decodedOffset = new Vector2(
+                centerOffsetX[pixelIndex],
+                centerOffsetY[pixelIndex]) * supportRadius;
+            float reconstructedFeatureEdgeDistance =
+                intendedFeatureEdgeDistance +
+                Vector2.Dot(
+                    actualOffset - decodedOffset,
+                    boundaryNormal);
+            if (fadeDistance <= 0.0001f)
+            {
+                return reconstructedFeatureEdgeDistance >= requiredClearance
+                    ? 1f
+                    : 0f;
+            }
+
+            return SmoothStep(
+                requiredClearance,
+                requiredClearance + fadeDistance,
+                reconstructedFeatureEdgeDistance);
+        }
+
+        private static bool HasEncodedFeatureResponse(
+            CandidateResult result,
+            int index)
+        {
+            Color32 palettePayload = result.PaletteForm[index];
+            float form = DecodePaletteForm(palettePayload);
+            float substrateForm = Mathf.Clamp01(
+                Mathf.GammaToLinearSpace(
+                    palettePayload.g / 255f));
+            Color32 packed = result.RuntimePackedDetail[index];
+            float slopeX = packed.r / 255f * 2f - 1f;
+            float slopeY = packed.g / 255f * 2f - 1f;
+            float slopeMagnitude = Mathf.Sqrt(
+                slopeX * slopeX + slopeY * slopeY);
+            float cavity = packed.b / 255f;
+            float roughness = packed.a / 255f;
+            return
+                slopeMagnitude >= FeatureSlopeEvidenceThreshold ||
+                cavity >= FeatureCavityEvidenceThreshold ||
+                Mathf.Abs(form - substrateForm) >=
+                    FeatureFormEvidenceThreshold ||
+                Mathf.Abs(
+                    roughness - result.FeatureSubstrateRoughness) >=
+                    FeatureRoughnessEvidenceThreshold;
+        }
+
+        private static Color32[] BuildFeatureBoundarySweepContactSheet(
+            CandidateResult result,
+            FinalBuffers final,
+            IReadOnlyList<PlacementEvidence> placements,
+            IReadOnlyList<float> centerOffsetX,
+            IReadOnlyList<float> centerOffsetY,
+            float requiredClearance,
+            float fadeDistance,
+            float guardDistance,
+            float supportRadius)
+        {
+            Color32[] output = new Color32[
+                FeatureBoundarySweepWidth * FeatureBoundarySweepHeight];
+            Color32[] substratePreview = BuildSubstratePalettePreview(
+                result.PaletteForm,
+                NeutralPalette);
+            float[] edgeDistances =
+            {
+                requiredClearance - guardDistance,
+                requiredClearance + guardDistance,
+                requiredClearance + fadeDistance * 0.25f,
+                requiredClearance + fadeDistance * 0.75f
+            };
+            float[] fades =
+            {
+                0f,
+                0f,
+                fadeDistance,
+                fadeDistance
+            };
+            Vector2 normal = new Vector2(0.8320503f, 0.5547002f);
+            int panelSize = FeatureBoundarySweepHeight;
+
+            for (int panel = 0; panel < edgeDistances.Length; panel++)
+            {
+                Color32[] panelPixels = new Color32[
+                    FinalResolution * FinalResolution];
+                for (int index = 0; index < panelPixels.Length; index++)
+                {
+                    int owner = final.Owner[index];
+                    float weight = 0f;
+                    if (owner >= 0 && owner < placements.Count &&
+                        HasEncodedFeatureResponse(result, index))
+                    {
+                        weight = ResolveProofWholeFeatureWeight(
+                            index,
+                            placements[owner],
+                            centerOffsetX,
+                            centerOffsetY,
+                            normal,
+                            edgeDistances[panel],
+                            supportRadius,
+                            requiredClearance,
+                            fades[panel]);
+                    }
+
+                    panelPixels[index] = (Color32)Color.Lerp(
+                        substratePreview[index],
+                        result.PalettePreviewNeutral[index],
+                        weight);
+                }
+
+                BlitScaled(
+                    panelPixels,
+                    FinalResolution,
+                    output,
+                    FeatureBoundarySweepWidth,
+                    panel * panelSize,
+                    0,
+                    panelSize);
+            }
+
+            return output;
+        }
+
         private static float SampleToroidalBilinearField(
             IReadOnlyList<float> field,
             int resolution,
@@ -3970,6 +4356,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             candidate.RootDarkening = null;
             candidate.EdgeWear = null;
             candidate.MipContactSheet = null;
+            candidate.FeatureBoundarySweepContactSheet = null;
             candidate.PaletteForm = null;
             candidate.RuntimePackedDetail = null;
             candidate.PalettePreviewNeutral = null;
@@ -4018,6 +4405,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 writer.Write(result.FeatureMaximumSupportRadiusUv);
                 writer.Write(result.FeatureAnchorMaximumCenterErrorUv);
                 writer.Write(result.FeatureAnchorMaximumRetentionSpread);
+                writer.Write(result.FeatureBoundaryHardMaximumWeightSpread);
+                writer.Write(result.FeatureBoundaryFadeMaximumWeightSpread);
+                writer.Write(result.FeatureBoundaryHardPartialRockCount);
+                writer.Write(result.FeatureBoundaryRemovedMaximumResidual);
+                writer.Write(result.FeatureBoundaryFadeInconsistentRockCount);
                 WritePixels(writer, result.Moderate);
                 WritePixels(writer, result.PlacementDebug);
                 WritePixels(writer, result.StableIdDebug);
@@ -4028,6 +4420,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 WritePixels(writer, result.RootDarkening);
                 WritePixels(writer, result.EdgeWear);
                 WritePixels(writer, result.MipContactSheet);
+                WritePixels(writer, result.FeatureBoundarySweepContactSheet);
                 WritePixels(writer, result.PaletteForm);
                 WritePixels(writer, result.RuntimePackedDetail);
                 WritePixels(writer, result.PalettePreviewNeutral);

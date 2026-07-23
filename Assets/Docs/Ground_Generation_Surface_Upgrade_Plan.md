@@ -1,3 +1,96 @@
+## 2026-07-23 — GSU-M2.7C.5E.2.4B.3: Whole-rock final-response composition
+
+**Status:** Source implementation and post-change static consistency/compliance audit complete in the declared seven-file scope. Unity C#/ForwardLit compilation, corrected algorithm-10 boundary-sweep proof, installation, scene acceptance, and GPU measurement remain pending.
+
+### Trigger and proven defect
+
+The user-run algorithm-10 proof passed the non-ID centre-anchor contract for all three candidates: owner mismatches, invalid samples, inconsistent rocks, and ungated emitted-response pixels were zero; maximum reconstructed-centre error was `0.00033` tile UV; maximum anchor-retention spread was `0.00041`; and mip 3 was accepted. Scene evidence nevertheless shows rocks still phasing across the application boundary.
+
+Read-only review proves the runtime applies whole-feature retention only inside `PS3D_StylizedSurfaceDetail`, then multiplies the resulting rock response by fragment-local Bank/Riverbed substrate weights in final albedo, normal, smoothness, and specular composition. `ResolveGroundWholeFeatureRetention` also ignores `transitionSettings.x`, so a rock can return while part of its silhouette remains inside the ordinary material blend. The existing proof measures anchor reconstruction only; it does not sweep an application boundary through the actual final-response weight.
+
+### Objective and acceptance
+
+Separate each feature-aware layer into a locally composed substrate-only response plus a discrete-rock response delta. Apply the substrate-only response with the existing fragment-local Bank/Riverbed weights, and apply the rock delta with one centre-evaluated whole-rock application weight.
+
+Acceptance requires:
+
+- Material Blend Distance is included automatically in the feature-free distance: `required clearance = Material Blend Distance + Feature Safety Margin`.
+- Whole Feature Return Fade `0` yields only fully absent or fully present rocks; positive fade yields one common scalar for the entire rock.
+- The common scalar controls rock albedo/form/cavity, normal slope, roughness/smoothness, and dry specular response.
+- Feature-texture substrate response continues to use fragment-local application composition.
+- Equivalent Bank/Riverbed dry surfaces apply the shared rock delta once through the Bank/shared slot.
+- Algorithm-10 B/A anchor channels, placements, support radius, evidence thresholds, installer identity, texture samples, corridor data, controls, and 2.4A.2 direct handoff remain unchanged.
+
+### Approved scope
+
+Modify only:
+
+1. `Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md`
+2. `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+3. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssembler.cs`
+4. `Assets/Game/Rendering/PixelSurface/Editor/GeneratedMassSparseRiverbedTileAssemblyValidation.cs`
+5. `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceMaterialDetail.hlsl`
+6. `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl`
+7. `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl`
+
+Create/delete/move/rename: none. Proof images remain local under `Library`.
+
+### Reviewed evidence, producers, consumers, and invariants
+
+- Current source reconstructed from `Assets-Code-Archive(13).zip` plus accepted 2.4A, 2.4A.1, 2.4A.2, 2.4B, and 2.4B.2 packages; the supplied archive has no `.git`, so branch, HEAD, status, and unrelated live changes are unavailable.
+- `PixelSurfaceGroundForwardPass.hlsl` was reviewed completely, including both detail samplers, albedo composition, normal composition, smoothness, dry specular, texture-form lighting response, and `Frag` call order.
+- `PixelSurfaceGroundResponse.hlsl` was reviewed completely, including the application transition, world-XZ gradient solve, whole-feature retention, normalized Ground/Bank/Riverbed composition, and Bank/Riverbed material blend producers.
+- `PixelSurfaceMaterialDetail.hlsl` was reviewed completely. The current feature-retention helper replaces full detail with substrate detail before final composition but carries no final whole-feature application weight.
+- `GeneratedMassSparseRiverbedTileAssembler.cs` and `GeneratedMassSparseRiverbedTileAssemblyValidation.cs` were reviewed through payload production, centre-anchor proof, report gates, evidence output, and fingerprints.
+- Shared-shader impact: `PixelSurfaceMaterialDetail.hlsl` is consumed by Ground ForwardLit only in the supplied source. `PixelSurfaceGroundResponse.hlsl` is also included by the Generated Mass shader, but all new whole-feature functions remain inside the Ground material-property guard and are not called by Generated Mass.
+
+### Implementation sequence
+
+1. Extend the detail result with an absolute feature-application weight and add a substrate-only detail resolver that preserves ordinary/non-feature payloads unchanged.
+2. Replace fragment-detail retention with a centre-evaluated whole-feature application weight. Include Material Blend Distance in the hard/fade threshold and reconstruct the application weight at the same centre through the existing guarded world-XZ gradient solve.
+3. Pass final normalized Bank/Riverbed composition weights into detail resolution. Compose substrate-only albedo/normal/smoothness/specular locally, then add full-minus-substrate rock deltas using the absolute whole-rock weights.
+4. Preserve equivalent-surface composition by assigning the shared normalized weight to Bank and zero to Riverbed before detail resolution.
+5. Extend algorithm-10 proof with hard and fade boundary sweeps over actual emitted feature-response weights; report maximum within-rock spread, partial-rock count, removal residual, and produce a boundary-sweep contact sheet.
+6. Update validation/report gates and architecture, then run exact-scope, full-file reread, delimiter/preprocessor, symbol, sample-site, branch, payload, algorithm, and package audits.
+
+### Performance and risk
+
+No texture sample, draw call, mesh stream, payload channel, CBUFFER property, runtime allocation, per-frame CPU work, ID, array, metadata texture, or shader search is added. Runtime adds substrate-detail derivation, a second scalar-gradient solve for feature pixels when whole-feature handling is enabled, and full-minus-substrate scalar/vector delta composition. `PERFORMANCE EXCEPTION`: none; GPU measurement against 2.4A.2 remains mandatory.
+
+Primary risks are FXC sensitivity to expanded final composition and centre-application extrapolation error. Mitigations are branchless scalar/vector delta composition, unchanged sample sites, uniform-only gating around derivative work, conservative zero fallback for invalid gradients, compile-before-proof/install, and numerical boundary-sweep gates.
+
+### Validation gates
+
+- C# and ForwardLit compile before proof or installation.
+- Algorithm-10 proof reports zero hard-mode partial rocks, zero removed-response residual within tolerance, and whole-rock hard/fade spread within tolerance for every candidate.
+- Boundary-sweep contact sheets show rocks absent/present or uniformly faded, never spatially clipped.
+- Installer remains blocked unless the corrected proof passes.
+- Scene validation covers hard return, positive fade, Bank and Riverbed boundaries, close/production camera, repeats, and mips.
+- GPU timing is compared against the accepted 2.4A.2 baseline.
+
+### Implementation result and post-change audit
+
+The implementation changed exactly the seven declared files and no others. The final runtime path now resolves the feature-aware layer as local substrate response plus a full-minus-substrate discrete-rock delta. The delta is multiplied by `featureApplicationWeight`, an absolute centre-evaluated layer weight that includes the ordinary Material Blend Distance in its required clearance. Bank and Riverbed albedo, world-XZ slope, roughness-derived smoothness, and dry specular all use the same decomposition. Equivalent Bank/Riverbed surfaces continue to place the shared normalized application in Bank and zero Riverbed before detail resolution, so the rock delta is applied once.
+
+The algorithm-10 proof now adds eight-orientation hard/fade boundary sweeps over every emitted rock response, reports hard/fade maximum within-rock weight spread, hard partial-rock count, removed-state residual, and fade inconsistency count, and writes a four-panel `WholeFeatureBoundarySweep` contact sheet. Algorithm version, payload bytes, anchor channels, support-radius metadata, evidence thresholds, installer identity, and installed asset paths are unchanged.
+
+Post-change static evidence:
+
+- exact expected-versus-actual file scope: passed;
+- full changed-file reread and producer/consumer reconciliation: passed;
+- C# and HLSL delimiter balance: passed;
+- HLSL preprocessor balance: passed;
+- old whole-feature-retention caller removal and new application-weight caller parity: passed;
+- 250,000 randomized full-response decomposition identities: maximum numerical error `6.67e-16`;
+- Ground ForwardPass sample sites remain four texture-array samples plus one ordinary texture sample;
+- `[branch]`, `ddx`, and `ddy` source-site counts are unchanged; the existing gradient helper is invoked a second time at runtime;
+- no ID, search array, metadata texture, ShaderLab property, CBUFFER member, payload channel, corridor edit, installer edit, profile edit, or control edit was introduced;
+- assembler algorithm remains `10`.
+
+Unity compilation and execution evidence are unavailable in the reconstruction environment. Compile-before-proof/install remains a hard gate.
+
+---
+
 ## 2026-07-23 — GSU-M2.7C.5E.2.4B.2: Complete feature-response gating proof
 
 **Status:** Source correction and static consistency/compliance audit complete in the declared five-file scope. Unity C#/ForwardLit compilation and the corrected algorithm-10 proof remain pending. The canonical installer remains blocked.

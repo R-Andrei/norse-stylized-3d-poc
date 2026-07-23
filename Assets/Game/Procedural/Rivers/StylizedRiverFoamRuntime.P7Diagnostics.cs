@@ -385,7 +385,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool ValidateP7AutomaticSourceOwnershipContracts(
             StringBuilder report)
         {
-            report.AppendLine("ONE-SHOT AUTOMATIC-SOURCE OWNERSHIP");
+            report.AppendLine("FINITE-BURST AUTOMATIC-SOURCE OWNERSHIP");
             StylizedRiverFoamGridDescriptor descriptor =
                 gridDescriptor.IsCreated
                     ? gridDescriptor
@@ -411,25 +411,42 @@ namespace ProgrammaticStylized3D.Rivers
                 river.Domain.GlobalDistanceMinimum + 5.5f,
                 0.25f);
             arc.Elapsed = 0.65f;
-            FoamSourceEventGpuData arcBuild =
+            FoamSourceEventGpuData arcFirstStroke =
                 BuildAutomaticFoamSourceGpuData(arc, 0.55f, descriptor);
-            FoamSourceEventGpuData arcRepeated =
+            arc.Elapsed = 0.75f;
+            FoamSourceEventGpuData arcPhaseBoundary =
                 BuildAutomaticFoamSourceGpuData(arc, 0.65f, descriptor);
+            arc.Elapsed = 0.90f;
+            FoamSourceEventGpuData arcReinforcement =
+                BuildAutomaticFoamSourceGpuData(arc, 0.80f, descriptor);
+            FoamSourceEventGpuData arcRepeatedReinforcement =
+                BuildAutomaticFoamSourceGpuData(arc, 0.90f, descriptor);
 
             bool shoreBuildAdvances =
                 shoreBuild.Header.z > shoreBuild.Deposit.y;
             bool repeatedNonpersistentInteriorZero = P7FloatBitsEqual(
                 shoreRepeated.Header.z,
                 shoreRepeated.Deposit.y);
-            bool arcBuildAdvances =
-                arcBuild.Header.y == 0f && arcBuild.Deposit.x == 0f &&
-                arcBuild.Header.z > arcBuild.Deposit.y;
-            bool repeatedArcInteriorZero = P7FloatBitsEqual(
-                arcRepeated.Header.z,
-                arcRepeated.Deposit.y);
-            bool arcBuildOnlyDuration = Mathf.Approximately(
+            bool firstStrokeAdvances =
+                arcFirstStroke.Header.y == 0f &&
+                arcFirstStroke.Deposit.x == 0f &&
+                arcFirstStroke.Header.z > arcFirstStroke.Deposit.y;
+            bool phaseBoundaryResets =
+                arcPhaseBoundary.Header.y == 1f &&
+                arcPhaseBoundary.Deposit.x == 0f &&
+                arcPhaseBoundary.Header.z >= 0f;
+            bool reinforcementAdvances =
+                arcReinforcement.Header.y == 1f &&
+                arcReinforcement.Deposit.x == 1f &&
+                arcReinforcement.Header.z >
+                    arcReinforcement.Deposit.y;
+            bool repeatedReinforcementInteriorZero = P7FloatBitsEqual(
+                arcRepeatedReinforcement.Header.z,
+                arcRepeatedReinforcement.Deposit.y);
+            bool finiteBurstDuration = Mathf.Approximately(
                 arc.Duration,
-                arc.ObjectBuildDuration);
+                arc.ObjectBuildDuration * arc.ObjectContactStrokeCount) &&
+                arc.ObjectContactStrokeCount == 2;
 
             string projectRoot = Path.GetFullPath(
                 Path.Combine(Application.dataPath, ".."));
@@ -458,6 +475,23 @@ namespace ProgrammaticStylized3D.Rivers
                 computeSource.IndexOf(
                     "previousSourceEvent.header.z = sourceEvent.deposit.y;",
                     StringComparison.Ordinal) >= 0;
+            bool phaseResetContract =
+                computeSource.IndexOf(
+                    "bool depositionPhaseChanged",
+                    StringComparison.Ordinal) >= 0 &&
+                computeSource.IndexOf(
+                    "!depositionPhaseChanged",
+                    StringComparison.Ordinal) >= 0 &&
+                injectionSource.IndexOf(
+                    "bool depositionPhaseChanged",
+                    StringComparison.Ordinal) >= 0;
+            bool contactOnlyReinforcement =
+                CountP7TextOccurrences(
+                    computeSource,
+                    "return saturate(frontShape * reinforcementPhase);") == 2 &&
+                computeSource.IndexOf(
+                    "if (sourceEvent.header.y >= 0.5)",
+                    StringComparison.Ordinal) >= 0;
             bool persistentBypassRemoved =
                 computeSource.IndexOf(
                     "refreshObjectContact",
@@ -471,19 +505,16 @@ namespace ProgrammaticStylized3D.Rivers
                 injectionSource.IndexOf(
                     "releasePhase",
                     StringComparison.Ordinal) < 0;
-            bool buildOnlyPhaseResolver =
+            bool finiteStrokeResolver =
                 injectionSource.IndexOf(
-                    "? 0f",
+                    "sourceEvent.ObjectContactStrokeCount",
                     StringComparison.Ordinal) >= 0 &&
                 injectionSource.IndexOf(
-                    "sourceEvent.Duration",
+                    "strokeElapsed / strokeDuration",
                     StringComparison.Ordinal) >= 0 &&
                 injectionSource.IndexOf(
-                    "phaseOrSide = 1f;",
-                    StringComparison.Ordinal) < 0 &&
-                injectionSource.IndexOf(
-                    "phaseOrSide = 2f;",
-                    StringComparison.Ordinal) < 0;
+                    "depositionPhaseDuration = objectContactCycle",
+                    StringComparison.Ordinal) >= 0;
             bool absoluteTargetPreserved =
                 computeSource.IndexOf(
                     "float birthContribution = currentContribution;",
@@ -491,40 +522,68 @@ namespace ProgrammaticStylized3D.Rivers
                 computeSource.IndexOf(
                     "FoamMergeBornPresence(",
                     StringComparison.Ordinal) >= 0;
-            bool oneShotDeadCellRemainsDead =
+            bool finiteOneShotContract =
                 repeatedNonpersistentInteriorZero &&
-                repeatedArcInteriorZero &&
+                repeatedReinforcementInteriorZero &&
                 computeSource.IndexOf(
                     "newlyRevealedPermission <= FoamMaterialStateEpsilon",
                     StringComparison.Ordinal) >= 0;
 
             bool exact = descriptor.IsCreated && shoreBuildAdvances &&
-                repeatedNonpersistentInteriorZero && arcBuildAdvances &&
-                repeatedArcInteriorZero && arcBuildOnlyDuration &&
-                universalDifferenceGate && persistentBypassRemoved &&
-                buildOnlyPhaseResolver && absoluteTargetPreserved &&
-                oneShotDeadCellRemainsDead;
+                repeatedNonpersistentInteriorZero && firstStrokeAdvances &&
+                phaseBoundaryResets && reinforcementAdvances &&
+                repeatedReinforcementInteriorZero && finiteBurstDuration &&
+                universalDifferenceGate && phaseResetContract &&
+                contactOnlyReinforcement && persistentBypassRemoved &&
+                finiteStrokeResolver && absoluteTargetPreserved &&
+                finiteOneShotContract;
             report.AppendLine(
-                $"Shore Build frontier advances: {shoreBuildAdvances}; " +
-                $"repeated Shore interior zero: " +
-                $"{repeatedNonpersistentInteriorZero}");
+                $"Shore frontier advances: {shoreBuildAdvances}; repeated " +
+                $"Shore interior zero: {repeatedNonpersistentInteriorZero}");
             report.AppendLine(
-                $"Object Build advances: {arcBuildAdvances}; " +
-                $"repeated Object interior zero: {repeatedArcInteriorZero}; " +
-                $"Build-only duration: {arcBuildOnlyDuration}");
+                $"Object first stroke advances: {firstStrokeAdvances}; phase " +
+                $"boundary resets: {phaseBoundaryResets}; reinforcement " +
+                $"advances: {reinforcementAdvances}");
             report.AppendLine(
-                $"Universal GPU difference gate: {universalDifferenceGate}; " +
-                $"persistent bypass removed: {persistentBypassRemoved}; " +
-                $"Build-only phase resolver: {buildOnlyPhaseResolver}");
+                $"Repeated reinforcement interior zero: " +
+                $"{repeatedReinforcementInteriorZero}; finite burst duration: " +
+                $"{finiteBurstDuration}");
             report.AppendLine(
-                $"Absolute birth target preserved: {absoluteTargetPreserved}; " +
-                $"repeated cells remain unwritten: " +
-                $"{oneShotDeadCellRemainsDead}");
+                $"Universal difference gate: {universalDifferenceGate}; phase " +
+                $"reset contract: {phaseResetContract}; contact-only " +
+                $"reinforcement: {contactOnlyReinforcement}");
             report.AppendLine(
-                "ONE-SHOT SOURCE OWNERSHIP VERDICT: " +
+                $"Persistent bypass removed: {persistentBypassRemoved}; finite " +
+                $"stroke resolver: {finiteStrokeResolver}; absolute target: " +
+                $"{absoluteTargetPreserved}");
+            report.AppendLine(
+                "FINITE-BURST SOURCE OWNERSHIP VERDICT: " +
                 (exact ? "PASS" : "FAIL"));
             report.AppendLine();
             return exact;
+        }
+
+        private static int CountP7TextOccurrences(
+            string source,
+            string value)
+        {
+            if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(value))
+            {
+                return 0;
+            }
+
+            int count = 0;
+            int searchIndex = 0;
+            while ((searchIndex = source.IndexOf(
+                       value,
+                       searchIndex,
+                       StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                searchIndex += value.Length;
+            }
+
+            return count;
         }
 
         private bool ValidateP7AutomaticSources(StringBuilder report)
@@ -683,9 +742,17 @@ namespace ProgrammaticStylized3D.Rivers
                 StartGlobalDistance = startGlobal,
                 EndGlobalDistance = endGlobal,
                 ObjectCentreGlobalDistance = centreGlobal,
-                Duration = 0.7f,
+                Duration = type == AutomaticFoamSourceEventType.ObjectContactArc ||
+                    type == AutomaticFoamSourceEventType.ObjectContactSemiArc
+                        ? 1.4f
+                        : 0.7f,
                 Elapsed = 0.65f,
                 ObjectBuildDuration = 0.7f,
+                ObjectContactStrokeCount =
+                    type == AutomaticFoamSourceEventType.ObjectContactArc ||
+                    type == AutomaticFoamSourceEventType.ObjectContactSemiArc
+                        ? 2
+                        : 1,
                 FormationSpeedMetresPerSecond = 0.55f,
                 HeadTrailMetres = 0.45f,
                 ShoreInsetMetres = 0.05f,

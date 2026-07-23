@@ -44,8 +44,10 @@ namespace ProgrammaticStylized3D.Rivers
                 "multiplier × deterministic jitter; resolved duration = " +
                 "max(material step, path distance / requested speed).");
             report.AppendLine(
-                "Arc/Semi-Arc timing below describes Build only. Hold, Release, " +
-                "and Rest remain separate authored lifecycle phases.");
+                "Arc/Semi-Arc requested and resolved timing describes one stroke. " +
+                "Stroke one emits the complete packet; finite later strokes " +
+                "reinforce only the contact profile. Total burst duration equals " +
+                "per-stroke duration multiplied by Stroke Count.");
             report.AppendLine();
 
             float updateRate = ResolveUpdateRate();
@@ -117,7 +119,11 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 anyActive = true;
-                float revealDuration = sourceEvent.Duration;
+                bool objectContactCycle =
+                    IsAutomaticObjectContactCycle(sourceEvent.Type);
+                float revealDuration = objectContactCycle
+                    ? sourceEvent.ObjectBuildDuration
+                    : sourceEvent.Duration;
                 float actualSpeed = sourceEvent.RevealPathDistanceMetres /
                     Mathf.Max(0.0001f, revealDuration);
                 report.AppendLine(
@@ -125,8 +131,21 @@ namespace ProgrammaticStylized3D.Rivers
                     $"{AutomaticRevealSourceName(sourceEvent.Type)}");
                 report.AppendLine(
                     $"  elapsed={sourceEvent.Elapsed:0.###} s; " +
-                    $"revealDuration={revealDuration:0.###} s; " +
+                    $"perStrokeRevealDuration={revealDuration:0.###} s; " +
                     $"path={sourceEvent.RevealPathDistanceMetres:0.###} m");
+                if (objectContactCycle)
+                {
+                    ResolveAutomaticSourceDepositionState(
+                        sourceEvent,
+                        sourceEvent.Elapsed,
+                        out float strokePhase,
+                        out float strokeProgress);
+                    report.AppendLine(
+                        $"  stroke={(int)strokePhase + 1}/" +
+                        $"{Mathf.Clamp(sourceEvent.ObjectContactStrokeCount, 1, 3)}; " +
+                        $"strokeProgress={strokeProgress:0.###}; " +
+                        $"totalBurstDuration={sourceEvent.Duration:0.###} s");
+                }
                 report.AppendLine(
                     $"  requested={sourceEvent.FormationSpeedMetresPerSecond:0.###} m/s; " +
                     $"raw={sourceEvent.RawRevealDurationSeconds:0.###} s; " +

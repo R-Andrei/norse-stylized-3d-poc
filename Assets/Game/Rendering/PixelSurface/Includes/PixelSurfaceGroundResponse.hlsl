@@ -240,15 +240,16 @@
                         safeDeterminant);
             }
 
-            float ResolveGroundWholeFeatureRetention(
-                float regionWeight,
+            float ResolveGroundWholeFeatureApplicationWeight(
                 float inwardDistance,
+                float localApplicationWeight,
                 float3 positionWS,
                 float2 featureCenterOffsetNormalized,
                 float maximumSupportRadiusUv,
                 float detailUvScale,
                 float4 transitionSettings)
             {
+                float transitionDistance = max(0.0, transitionSettings.x);
                 float safetyMargin = max(0.0, transitionSettings.z);
                 float fadeDistance = max(0.0, transitionSettings.w);
                 float safeUvScale = max(0.0001, detailUvScale);
@@ -257,9 +258,10 @@
                 float metadataEnabled = step(
                     1e-5,
                     conservativeSupportRadius);
-                float enabled =
-                    step(0.0001, safetyMargin) *
-                    step(0.0001, regionWeight) *
+                float wholeFeatureEnabled =
+                    step(
+                        0.0001,
+                        transitionDistance + safetyMargin + fadeDistance) *
                     metadataEnabled;
 
                 float2 centreOffset =
@@ -275,35 +277,50 @@
                 float centreInwardDistance =
                     inwardDistance - dot(inwardGradient, centreOffset);
 
+                float applicationGradientValid;
+                float2 applicationGradient =
+                    ResolveGroundWorldXZScalarGradient(
+                        localApplicationWeight,
+                        positionWS,
+                        applicationGradientValid);
+                float centreApplicationWeight = saturate(
+                    localApplicationWeight -
+                    dot(applicationGradient, centreOffset));
+
                 float anchorDistanceSquared = dot(
                     featureCenterOffsetNormalized,
                     featureCenterOffsetNormalized);
                 float payloadValid =
                     inwardGradientValid *
+                    applicationGradientValid *
                     step(1e-5, conservativeSupportRadius) *
                     step(anchorDistanceSquared, 1.0001);
 
                 float reconstructedEdgeDistance =
                     centreInwardDistance - conservativeSupportRadius;
-                // Invalid payload/derivative reconstruction is rejected
-                // conservatively. The algorithm-10 proof requires zero invalid
-                // accepted feature samples before installation.
+                float requiredClearance =
+                    transitionDistance + safetyMargin;
                 float featureEdgeDistance = lerp(
                     -1000000.0,
                     reconstructedEdgeDistance,
                     payloadValid);
                 float hardRetention = step(
-                    safetyMargin,
+                    requiredClearance,
                     featureEdgeDistance);
                 float softRetention = smoothstep(
-                    safetyMargin,
-                    safetyMargin + max(0.0001, fadeDistance),
+                    requiredClearance,
+                    requiredClearance + max(0.0001, fadeDistance),
                     featureEdgeDistance);
                 float retention = lerp(
                     hardRetention,
                     softRetention,
                     step(0.0001, fadeDistance));
-                return lerp(1.0, retention, enabled);
+                float wholeFeatureWeight =
+                    centreApplicationWeight * retention;
+                return lerp(
+                    saturate(localApplicationWeight),
+                    wholeFeatureWeight,
+                    wholeFeatureEnabled);
             }
 
             float ResolveGroundComposedShoreWetness(

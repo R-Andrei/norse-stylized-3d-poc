@@ -8829,7 +8829,7 @@ MonoBehaviour:
   renderCurveSubdivisionsPerBackboneSection: 8
   minimumPathWindStrength: 0.12
   minimumCompletedPathLengthMetres: 4
-  maximumTurnDegreesPerSegment: 55
+  maximumLocalWindDirectionMismatchDegrees: 35
   selfApproachDistanceMetres: 0.3
   minimumSegmentWindAlignment: 0.35
   minimumAliveDurationSeconds: 6
@@ -8852,9 +8852,12 @@ MonoBehaviour:
   occasionalLargerLoopChance: 0.2
   occasionalLargerLoopExtraStrengthMetres: 0.3
   trailOpacity: 0.96
-  serializedBaselineVersion: 4
-  candidateViewportMargin: 0.05
-  cameraSpawnPreference: 0.75
+  serializedBaselineVersion: 5
+  upwindEntryMarginViewport: 0.03
+  upwindSpawnBandDepth: 0.3
+  cameraEntryPreference: 0.9
+  preferredVisibleRunwayMetres: 12
+  minimumAcceptedVisibleRunwayMetres: 7
 --- !u!1 &1356653794
 GameObject:
   m_ObjectHideFlags: 0
@@ -11685,6 +11688,7 @@ MonoBehaviour:
   foamAutomaticShoreBirthEnabled: 1
   foamShoreFoamCoverage: 0.45
   foamShoreFoamActivity: 0.5
+  foamShoreMinimumPacketGapMetres: 0.75
   foamShoreFoamPatchSize: 0.4
   foamShoreFoamFormationSpeedMetresPerSecond: 0.924
   foamShoreFoamPattern: 0
@@ -11700,8 +11704,6 @@ MonoBehaviour:
   foamShoreRibbonInitialPresenceMax: 1
   foamShoreRibbonInitialLifeMin: 0.918
   foamShoreRibbonInitialLifeMax: 1
-  foamShoreRibbonBreakupStrengthMin: 0.12
-  foamShoreRibbonBreakupStrengthMax: 0.38
   foamInwardWashFormationSpeedMultiplier: 1
   foamInwardWashLengthMinMetres: 0.8
   foamInwardWashLengthMaxMetres: 3
@@ -11715,26 +11717,17 @@ MonoBehaviour:
   foamInwardWashInitialPresenceMax: 0.5
   foamInwardWashInitialLifeMin: 0.2
   foamInwardWashInitialLifeMax: 0.4
-  foamInwardWashBreakupStrengthMin: 0.04
-  foamInwardWashBreakupStrengthMax: 0.14
   foamAutomaticObjectBirthEnabled: 1
   foamObjectFoamCoverage: 0.6
   foamObjectContactCycleCoverage: 1
   foamObjectFoamActivity: 0.7
+  foamObjectContactMinimumPacketGapMetres: 1
+  foamObjectContactStrokeCount: 2
   foamObjectFoamFormationSpeedMetresPerSecond: 0.74
-  foamObjectContactHoldDurationMinSeconds: 5
-  foamObjectContactHoldDurationMaxSeconds: 10
-  foamObjectContactReleaseDurationMinSeconds: 0.6
-  foamObjectContactReleaseDurationMaxSeconds: 1.4
-  foamObjectContactRestDurationMinSeconds: 1
-  foamObjectContactRestDurationMaxSeconds: 3
   foamObjectFoamPattern: 0
-  foamObjectContactArcPatternWeight: 0.14502627
-  foamObjectContactSemiArcPatternWeight: 0.67697376
-  foamObjectContactFleckPatternWeight: 0.178
+  foamObjectContactArcPatternWeight: 0.17643097
+  foamObjectContactSemiArcPatternWeight: 0.823569
   foamObjectContactArcFormationSpeedMultiplier: 0.85
-  foamObjectContactArcArmReachMin: 0.45
-  foamObjectContactArcArmReachMax: 0.7
   foamObjectContactArcLengthMinMetres: 0.45
   foamObjectContactArcLengthMaxMetres: 1.6
   foamObjectContactArcAlongFlowContactOffsetMetres: 0
@@ -11747,11 +11740,7 @@ MonoBehaviour:
   foamObjectContactArcInitialPresenceMax: 1
   foamObjectContactArcInitialLifeMin: 0.75
   foamObjectContactArcInitialLifeMax: 1
-  foamObjectContactArcBreakupStrengthMin: 0.08
-  foamObjectContactArcBreakupStrengthMax: 0.28
   foamObjectContactSemiArcFormationSpeedMultiplier: 0.85
-  foamObjectContactSemiArcArmReachMin: 0.6
-  foamObjectContactSemiArcArmReachMax: 0.9
   foamObjectContactSemiArcLengthMinMetres: 0.35
   foamObjectContactSemiArcLengthMaxMetres: 1.25
   foamObjectContactSemiArcAlongFlowContactOffsetMetres: 0
@@ -11764,10 +11753,6 @@ MonoBehaviour:
   foamObjectContactSemiArcInitialPresenceMax: 1
   foamObjectContactSemiArcInitialLifeMin: 0.712
   foamObjectContactSemiArcInitialLifeMax: 1
-  foamObjectContactSemiArcBreakupStrengthMin: 0.08
-  foamObjectContactSemiArcBreakupStrengthMax: 0.32
-  foamObjectContactSemiArcLopsidednessMin: 0.45
-  foamObjectContactSemiArcLopsidednessMax: 1
   foamObjectContactFleckFormationSpeedMultiplier: 0.85
   foamObjectContactFleckLengthMinMetres: 0.12
   foamObjectContactFleckLengthMaxMetres: 0.55
@@ -11779,11 +11764,10 @@ MonoBehaviour:
   foamObjectContactFleckInitialPresenceMax: 0.97
   foamObjectContactFleckInitialLifeMin: 0.747
   foamObjectContactFleckInitialLifeMax: 0.948
-  foamObjectContactFleckBreakupStrengthMin: 0.18
-  foamObjectContactFleckBreakupStrengthMax: 0.45
   foamAutomaticFreeWaterBirthEnabled: 1
   foamFreeWaterFoamCoverage: 0.89
   foamFreeWaterFoamActivity: 0.87
+  foamFreeWaterMinimumPacketGapMetres: 1
   foamFreeWaterFoamFormationSpeedMetresPerSecond: 0.969
   foamFreeWaterFoamPattern: 0
   foamFreeWaterLaceConnectorPatternWeight: 0.628
@@ -11798,8 +11782,6 @@ MonoBehaviour:
   foamFreeWaterLaceInitialPresenceMax: 1
   foamFreeWaterLaceInitialLifeMin: 0.836
   foamFreeWaterLaceInitialLifeMax: 1
-  foamFreeWaterLaceBreakupStrengthMin: 0.22
-  foamFreeWaterLaceBreakupStrengthMax: 0.55
   foamFreeWaterLaceCurvatureMin: 0.538
   foamFreeWaterLaceCurvatureMax: 1
   foamFreeWaterCrossLaceFormationSpeedMultiplier: 1
@@ -11811,8 +11793,6 @@ MonoBehaviour:
   foamFreeWaterCrossLaceInitialPresenceMax: 1
   foamFreeWaterCrossLaceInitialLifeMin: 0.866
   foamFreeWaterCrossLaceInitialLifeMax: 1
-  foamFreeWaterCrossLaceBreakupStrengthMin: 0.2
-  foamFreeWaterCrossLaceBreakupStrengthMax: 0.55
   foamFreeWaterFragmentFormationSpeedMultiplier: 0.85
   foamFreeWaterFragmentLengthMinMetres: 0.35
   foamFreeWaterFragmentLengthMaxMetres: 1.35
@@ -11822,8 +11802,6 @@ MonoBehaviour:
   foamFreeWaterFragmentInitialPresenceMax: 1
   foamFreeWaterFragmentInitialLifeMin: 0.807
   foamFreeWaterFragmentInitialLifeMax: 1
-  foamFreeWaterFragmentBreakupStrengthMin: 0.3
-  foamFreeWaterFragmentBreakupStrengthMax: 0.7
   foamShoreFoamStrength: 0.35
   foamShoreFoamPersistence: 0.3
   foamNeutralLifetime: 10
@@ -11840,8 +11818,10 @@ MonoBehaviour:
   foamMotionFieldNeutralCoverage: 0.09
   foamMotionFieldLaneScale: 1.58
   foamMotionFieldAcrossRiverCoherence: 1
-  foamObstacleSlowdownStrength: 0.85
-  foamObstacleMinimumDownstreamFactor: 0.12
+  foamObstacleSlowdownStrength: 0.98
+  foamObstacleMinimumDownstreamFactor: 0.02
+  foamObjectContactFullSlowdownReachMetres: 0.15
+  foamObjectContactSlowdownOuterReachMetres: 0.45
   foamVisualOccupancyBuildTime: 0.2
   foamVisualOccupancyReleaseTime: 0.8
   foamMaterialLifecycleTuningVersion: 1

@@ -2242,6 +2242,11 @@ namespace ProgrammaticStylized3D.Rivers
                 sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
             float resolvedBuildDuration =
                 revealTiming.ResolvedDurationSeconds;
+            int objectContactStrokeCount = contactCycle && river != null
+                ? river.FoamObjectContactStrokeCount
+                : 1;
+            float resolvedEventDuration = resolvedBuildDuration *
+                Mathf.Max(1, objectContactStrokeCount);
 
             automaticFoamSourceEvents[slotIndex] = new AutomaticFoamSourceEvent
             {
@@ -2253,9 +2258,10 @@ namespace ProgrammaticStylized3D.Rivers
                 StartGlobalDistance = startGlobalDistance,
                 EndGlobalDistance = endGlobalDistance,
                 ObjectCentreGlobalDistance = objectCentreGlobalDistance,
-                Duration = resolvedBuildDuration,
+                Duration = resolvedEventDuration,
                 Elapsed = 0f,
                 ObjectBuildDuration = resolvedBuildDuration,
+                ObjectContactStrokeCount = objectContactStrokeCount,
                 FormationSpeedMetresPerSecond =
                     revealTiming.RequestedSpeedMetresPerSecond,
                 RevealPathDistanceMetres = revealTiming.PathDistanceMetres,

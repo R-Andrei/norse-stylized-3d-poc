@@ -1777,16 +1777,29 @@ float FoamEvaluateObjectContactArcSource(
          positiveArmT * wakeArmLength) /
         totalPathLength);
 
+    float contactFrontPathT = frontT;
     bool reverseSweep = FoamHash11(sourceEvent.header.w + 73.17) < 0.5;
     if (reverseSweep)
     {
         negativePathT = 1.0 - negativePathT;
         frontPathT = 1.0 - frontPathT;
         positivePathT = 1.0 - positivePathT;
+        contactFrontPathT = 1.0 - contactFrontPathT;
     }
 
     float progress = saturate(sourceEvent.header.z);
     float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
+    if (sourceEvent.header.y >= 0.5)
+    {
+        float reinforcementPhase = FoamResolveObjectRibbonBuildMask(
+            contactFrontPathT,
+            progress,
+            materialStepProgress,
+            frontProfileLength,
+            physicalCellSpacing);
+        coverageMultiplier = 1.0;
+        return saturate(frontShape * reinforcementPhase);
+    }
     float negativePhase = FoamResolveObjectRibbonBuildMask(
         negativePathT,
         progress,
@@ -1894,14 +1907,27 @@ float FoamEvaluateObjectContactSemiArcSource(
     // Build begins at the front point and advances through the selected face
     // half toward the shoulder and finite downstream arm tip. Every location is
     // born once and becomes ordinary transported Layer C material afterward.
+    float contactFrontPathT = saturate(1.0 - frontHalfT);
     float frontPathT = saturate(
-        (1.0 - frontHalfT) * selectedFrontLength /
+        contactFrontPathT * selectedFrontLength /
         totalPathLength);
     float armPathT = saturate(
         (selectedFrontLength + armT * armLength) /
         totalPathLength);
     float progress = saturate(sourceEvent.header.z);
     float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
+    if (sourceEvent.header.y >= 0.5)
+    {
+        float reinforcementPhase = FoamResolveObjectRibbonBuildMask(
+            contactFrontPathT,
+            progress,
+            materialStepProgress,
+            selectedFrontLength,
+            physicalCellSpacing);
+        coverageMultiplier = 1.0;
+        return saturate(frontShape * reinforcementPhase);
+    }
+
     float armPhase = FoamResolveObjectRibbonBuildMask(
         armPathT,
         progress,
@@ -2372,7 +2398,9 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
         previousSourceEvent.header.y = sourceEvent.deposit.x;
         previousSourceEvent.header.z = sourceEvent.deposit.y;
         float previousContribution = 0.0;
-        if (sourceEvent.deposit.z > 0.5)
+        bool depositionPhaseChanged = abs(
+            sourceEvent.header.y - sourceEvent.deposit.x) > 0.0001;
+        if (sourceEvent.deposit.z > 0.5 && !depositionPhaseChanged)
         {
             float previousCoverageMultiplier = 1.0;
             float previousShape = 0.0;
@@ -2472,8 +2500,9 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     }
 
     // Every automatic source deposits only the newly revealed interval. Object
-    // Arc/Semi-Arc front and wake geometry are one-shot Build products and are
-    // never refreshed after the reveal head passes.
+    // Arc/Semi-Arc stroke zero emits the complete contact-and-wake packet. Finite
+    // later stroke phases reset one-shot permission and reinforce only the
+    // immediate contact profile; wake arms are never emitted by reinforcement.
 
     // P13A makes Initial Presence and Initial Life authoritative material
     // properties. Source shape, family/subcell shaping, reveal progression and

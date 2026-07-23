@@ -2389,3 +2389,37 @@ Impact classification:
 - expected active-gameplay source-raster work decreases because Build-only events leave the 32-slot pool sooner and perform no Hold/Release dispatches;
 - Offline validation passes `35/35`; Unity compilation, Play Mode source/retention acceptance, and profiling remain pending.
 
+
+## RG-METRIC-P13D — Finite Object Contact Reinforcement Burst
+
+P13D modifies only Object Arc/Semi-Arc source-event scheduling and source-raster interpretation. The accepted P13C full-vector object-contact slowdown, shared object clearance gate, and authored slowdown reaches remain unchanged.
+
+Object contact dependency:
+
+```text
+resolved per-stroke Build duration
+    × authored stroke count [1, 3]
+    -> one finite source event duration
+stroke 0
+    -> accepted complete Arc/Semi-Arc packet
+stroke 1 / stroke 2
+    -> immediate contact profile only
+final stroke completion
+    -> existing shared halo + packet-gap rearm
+```
+
+- `Object Contact Stroke Count` is an authored integer with range `1–3` and default `2`.
+- Each stroke uses the same resolved Reveal Speed and per-stroke Build duration. Increasing the count does not accelerate any stroke.
+- Stroke zero preserves the accepted Arc/Semi-Arc contact and finite wake geometry. Later strokes never regenerate wake arms.
+- Phase identity is carried through existing CPU event state and existing GPU event lanes; no GPU record field, buffer, texture, kernel, resource declaration, dispatch class, pass, draw call, or shader sample is added.
+- At each stroke boundary, previous-deposition ownership resets so the first interval of the new contact-only stroke cannot be suppressed by progress wrapping from `1` back to `0`.
+- Source Coverage/Presence/Life merge, transport, topology support, negative aging, P13C slowdown, shared rearm, and Layer E rendering remain unchanged.
+
+Impact classification:
+
+- modified CPU producers: Arc/Semi-Arc event duration, stroke phase/progress resolution, and finite-burst diagnostics;
+- modified GPU consumer: Arc/Semi-Arc source evaluation and previous-deposition phase reset;
+- bounded active-gameplay cost: at most two additional contact-only source sweeps per object event;
+- expected default cost: one additional contact-only sweep because the default stroke count is `2`;
+- no continuous emission is restored and no wake-arm repetition occurs;
+- `36/36` offline validation passes. Unity compilation, Play Mode contact-establishment acceptance, and profiling remain pending.

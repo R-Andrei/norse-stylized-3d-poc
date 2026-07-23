@@ -4928,3 +4928,41 @@ The shader first resolves normal downstream/lateral routing, then multiplies the
 
 Eighteen existing project files are modified: five canonical documents; River authoring and two Editor files; eight runtime partials; the source compute file; and the shared velocity include. No project file is created, deleted, moved, or renamed. No runtime allocation/resource/pass/sample count is added. Build-only event occupancy and dispatch count are expected to decrease. Offline validation passes `35/35`; measured performance remains pending Unity profiling.
 
+
+## RG-METRIC-P13D — Finite Object Contact Reinforcement Burst
+
+P13D retains P13C one-shot object ownership and adds a bounded finite reinforcement burst for Arc/Semi-Arc packets.
+
+### Authoring contract
+
+```text
+Object Contact Stroke Count: integer 1–3
+Default: 2
+```
+
+- Stroke `0` progressively emits the complete accepted Arc/Semi-Arc packet.
+- Strokes `1` and `2`, when enabled, progressively emit only the immediate contact profile.
+- All strokes reuse the same Reveal Speed and resolved per-stroke Build duration.
+- Total source-event duration is `perStrokeBuildDuration × strokeCount`.
+- After the final stroke, the source event ends and P13C shared object clearance begins. No Hold, Release, Rest, persistent refresh, or alternate hidden cooldown is reintroduced.
+
+### CPU/GPU progression contract
+
+CPU event state stores the authored stroke count. Injection resolves:
+
+```text
+strokeIndex = floor(elapsed / perStrokeBuildDuration)
+strokeProgress = fractional progress within that stroke
+```
+
+The existing GPU event header carries stroke identity and current progress; existing deposit lanes carry previous stroke identity and previous progress. A stroke-identity change invalidates previous contribution for that dispatch so the first contact interval of a reinforcement stroke is born correctly despite progress resetting from `1` to `0`.
+
+### Source geometry contract
+
+Arc/Semi-Arc evaluation preserves the complete first-stroke build arithmetic. For later strokes, evaluation returns only the immediate front/contact profile and excludes both downstream arms. Existing source amount, Initial Presence, Initial Life, Pattern, Coverage packing, and merge rules remain unchanged.
+
+### Scope and performance
+
+Thirteen existing project files are modified: five canonical documents; River authoring and Foam Inspector; four runtime/source diagnostic files; event state; and the source compute file. No file is created, deleted, moved, or renamed. No runtime resource, GPU ABI lane, kernel, pass, draw call, or sample is added.
+
+**PERFORMANCE EXCEPTION — approved:** finite contact reinforcement adds at most two bounded contact-only sweeps per Arc/Semi-Arc event. This is accepted to establish reliable Layer C contact material without restoring continuous source emission. The default adds one contact-only sweep. `36/36` offline validation passes. Profiling remains pending Unity validation.

@@ -64,6 +64,9 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private const float MaximumFeatureAnchorCenterErrorUv = 0.01f;
         private const float MaximumFeatureAnchorRetentionSpread = 0.01f;
         private const int MinimumFeatureAnchorAcceptedMip = 3;
+        private const float MaximumFeatureBoundaryHardWeightSpread = 0.025f;
+        private const float MaximumFeatureBoundaryFadeWeightSpread = 0.025f;
+        private const float MaximumFeatureBoundaryRemovedResidual = 0.025f;
 
         private sealed class AcceptedSourceContract
         {
@@ -1021,6 +1024,33 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     candidate.FeatureAnchorLastAcceptedMip + ".");
             }
 
+            if (candidate.FeatureBoundaryHardMaximumWeightSpread >
+                    MaximumFeatureBoundaryHardWeightSpread ||
+                candidate.FeatureBoundaryFadeMaximumWeightSpread >
+                    MaximumFeatureBoundaryFadeWeightSpread ||
+                candidate.FeatureBoundaryHardPartialRockCount != 0 ||
+                candidate.FeatureBoundaryRemovedMaximumResidual >
+                    MaximumFeatureBoundaryRemovedResidual ||
+                candidate.FeatureBoundaryFadeInconsistentRockCount != 0)
+            {
+                failures.Add(
+                    candidate.Definition.StableId +
+                    ": whole-rock final-response boundary sweep failed. " +
+                    "hard/fade spread = " +
+                    FormatFloat(
+                        candidate.FeatureBoundaryHardMaximumWeightSpread) +
+                    " / " +
+                    FormatFloat(
+                        candidate.FeatureBoundaryFadeMaximumWeightSpread) +
+                    ", hard partial rocks / removed residual / fade " +
+                    "inconsistent rocks = " +
+                    candidate.FeatureBoundaryHardPartialRockCount + " / " +
+                    FormatFloat(
+                        candidate.FeatureBoundaryRemovedMaximumResidual) +
+                    " / " +
+                    candidate.FeatureBoundaryFadeInconsistentRockCount + ".");
+            }
+
             if (string.IsNullOrEmpty(candidate.PalettePayloadFingerprint) ||
                 string.IsNullOrEmpty(
                     candidate.PalettePreviewNeutralFingerprint) ||
@@ -1116,6 +1146,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 candidate.MipContactSheet,
                 GeneratedMassSparseRiverbedTileAssembler.FinalResolution,
                 GeneratedMassSparseRiverbedTileAssembler.FinalResolution,
+                failures);
+            ValidatePixels(
+                prefix + "FeatureBoundarySweepContactSheet",
+                candidate.FeatureBoundarySweepContactSheet,
+                GeneratedMassSparseRiverbedTileAssembler
+                    .FeatureBoundarySweepWidth,
+                GeneratedMassSparseRiverbedTileAssembler
+                    .FeatureBoundarySweepHeight,
                 failures);
             ValidatePixels(
                 prefix + "PaletteForm",
@@ -1264,6 +1302,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     builder.AppendLine(prefix + "_RootDarkening.png");
                     builder.AppendLine(prefix + "_EdgeWear.png");
                     builder.AppendLine(prefix + "_MipContactSheet.png");
+                    builder.AppendLine(
+                        prefix + "_WholeFeatureBoundarySweep.png");
                     builder.AppendLine(prefix + "_PaletteForm.png");
                     builder.AppendLine(prefix + "_RuntimePackedDetail.png");
                     builder.AppendLine(prefix + "_PalettePreview_Neutral.png");
@@ -1308,15 +1348,17 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     "scales, root-sector limits, toroidal seams, low-macro " +
                     "micro-noise substrate gates, feature-aware packed " +
                     "palette payload, distinct recolour previews, " +
-                    "mip evidence and complete output generation passed.");
+                    "mip evidence, whole-rock final-response boundary " +
+                    "sweeps and complete output generation passed.");
             }
 
             builder.AppendLine();
             builder.AppendLine(
                 "PENDING GATE: inspect the feature-aware PaletteForm, " +
-                "RuntimePackedDetail and HigherContrast 3x3 outputs, then " +
-                "refresh the three installed candidates and validate Bank " +
-                "and Riverbed feature-free edge clearances in scene.");
+                "RuntimePackedDetail, WholeFeatureBoundarySweep and " +
+                "HigherContrast 3x3 outputs, then refresh the three installed " +
+                "candidates and validate hard and faded whole-rock Bank and " +
+                "Riverbed boundary response in scene.");
             return builder.ToString();
         }
 
@@ -1500,6 +1542,19 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 "    anchor last accepted mip: " +
                 candidate.FeatureAnchorLastAcceptedMip);
             builder.AppendLine(
+                "    final-response hard/fade maximum weight spread: " +
+                FormatFloat(
+                    candidate.FeatureBoundaryHardMaximumWeightSpread) +
+                " / " +
+                FormatFloat(
+                    candidate.FeatureBoundaryFadeMaximumWeightSpread));
+            builder.AppendLine(
+                "    final-response hard partial rocks / removed residual / fade inconsistent rocks: " +
+                candidate.FeatureBoundaryHardPartialRockCount + " / " +
+                FormatFloat(
+                    candidate.FeatureBoundaryRemovedMaximumResidual) + " / " +
+                candidate.FeatureBoundaryFadeInconsistentRockCount);
+            builder.AppendLine(
                 "    retired roughness-field maximum scalar deviation: " +
                 FormatFloat(
                     candidate.FeatureSubstrateRoughnessMaximumDeviation));
@@ -1623,6 +1678,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     candidate.MipContactSheet,
                     GeneratedMassSparseRiverbedTileAssembler.FinalResolution,
                     GeneratedMassSparseRiverbedTileAssembler.FinalResolution);
+                WritePng(
+                    prefix + "_WholeFeatureBoundarySweep.png",
+                    candidate.FeatureBoundarySweepContactSheet,
+                    GeneratedMassSparseRiverbedTileAssembler
+                        .FeatureBoundarySweepWidth,
+                    GeneratedMassSparseRiverbedTileAssembler
+                        .FeatureBoundarySweepHeight);
                 WritePng(
                     prefix + "_PaletteForm.png",
                     candidate.PaletteForm,

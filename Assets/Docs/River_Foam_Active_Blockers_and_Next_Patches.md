@@ -1519,3 +1519,112 @@ Create/delete/move/rename: none inside the Unity project. Patch archive, validat
 
 `35/35 PASS`, including exact 18-file reconciliation, no additions/deletions, stale-state scans, serialized-property resolution, shared-owner checks, Build-only dispatch/evaluation checks, 200,000 one-shot permission cases, 200,000 packet-clearance cases, 200,000 full-vector slowdown cases, C#/HLSL/preprocessor/Markdown structure, unchanged 23-kernel manifest, unchanged eight-`float4` source GPU ABI, byte-identical P12u reveal resolver, byte-identical P13A simulation contract, and byte-identical P12t/P13A rendering include.
 
+
+## RG-METRIC-P13D — Finite Object Contact Reinforcement Burst
+
+**Status:** source implementation and offline validation complete; Unity import, Play Mode acceptance, and profiling pending.
+
+### Objective
+
+Make one-shot Object Arc and Semi-Arc packets establish a reliable supported contact band without restoring persistent emission. Each object packet uses a finite authored stroke count: stroke one emits the accepted complete Arc/Semi-Arc geometry, and strokes two and three, when enabled, progressively reinforce only the immediate object-contact profile. The burst then ends and the existing shared object packet-clearance gate begins.
+
+The observed contact holes are treated as Layer C/source-establishment loss. P13D does not attribute them to Layer E and does not modify Chipping, Strands, Final Visibility, or Presence Footprint.
+
+### Reviewed evidence and current constraints
+
+- `StylizedRiverFoamRuntime.Injection.cs::ResolveAutomaticSourceDepositionState` currently gives Arc/Semi-Arc one normalized Build from zero to one. `UpdateAutomaticFoamSourceEvents` dispatches only when reveal progress advances and completes the event at `Elapsed >= Duration`.
+- `CS_RiverFoam.compute::FoamEvaluateObjectContactArcSource` evaluates the complete front profile plus both finite wake arms; `FoamEvaluateObjectContactSemiArcSource` evaluates the selected contact half plus one finite wake arm. `FoamEvaluateAutomaticSourceContribution` uses current-minus-previous permission and writes the complete current Coverage target once.
+- `AutomaticFoamSourceEvent` already carries CPU-only `ObjectBuildDuration`; the fixed GPU event ABI has an available Object Arc/Semi-Arc `Header.y` phase lane and existing previous phase/progress lanes in `Deposit`. No new GPU vector, buffer, texture, kernel, pass, or draw call is required.
+- A multi-stroke event must reset deposition permission when the stroke phase changes. Otherwise normalized progress wraps from approximately one to zero and both CPU dispatch gating and GPU current-minus-previous evaluation would skip the first interval of the reinforcement stroke.
+- Object `materialStepProgress` must remain based on one stroke's `ObjectBuildDuration`, not total burst duration, so raster continuity is unchanged when Stroke Count exceeds one.
+- `StylizedRiverFoamRuntime.P7Diagnostics.cs::ValidateP7AutomaticSourceOwnershipContracts` currently asserts Build-only duration and a constant zero phase; it must be replaced with finite-burst, phase-reset, full-first/contact-only-reinforcement evidence.
+- `StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs` still contains superseded Hold/Release/Rest wording and computes Arc/Semi-Arc reveal speed from total event duration. It must report per-stroke reveal duration and total burst duration separately.
+- The source set contains no `.git` metadata. The immutable reconstructed post-P13C tree at `/mnt/data/p13d_post_p13c` is the comparison authority.
+
+### Approved file scope
+
+**Modify:**
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Assets/Docs/River_Foam_Stage6_Architecture.md`
+5. `Assets/Docs/River_Rendering_Roadmap.md`
+6. `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+9. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+10. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+11. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+12. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs`
+13. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+
+**Create/Delete/Move/Metadata:** none.
+
+If evidence requires another path, implementation stops and this scope is amended before that path is edited.
+
+### Authoritative contract
+
+1. Add `Object Contact Stroke Count`, integer range `1–3`, default `2`.
+2. One Arc/Semi-Arc event contains exactly the configured finite number of strokes.
+3. Stroke `0` progressively emits the accepted complete packet: contact profile plus finite wake arm or arms.
+4. Strokes `1` and `2` progressively emit only the immediate contact profile. They never emit or refresh wake arms.
+5. Every stroke uses the same resolved Reveal Speed and therefore the same per-stroke Build duration. Total event duration is `perStrokeBuildDuration × strokeCount`.
+6. At a stroke boundary, CPU dispatch gating treats the changed stroke phase as new deposition even though normalized stroke progress wrapped to zero. GPU previous contribution is reset for the changed phase.
+7. Reinforcement uses the existing P13A Max + Refresh birth merge. It is not additive beyond the authored Coverage target, but it may restore Coverage and Life lost since the prior stroke.
+8. After the last stroke, the event ends completely. No emitter remains. The existing shared per-object clearance authority starts from final burst completion.
+9. P13C full-vector slowdown remains unchanged. Unity validation uses `Object Contact Minimum Speed Factor = 0.02` for 98% slowdown; P13D does not raw-edit the scene or silently replace its serialized value.
+10. The holes are not assigned to Layer E. Layer E files and controls remain byte-identical.
+
+### Implementation sequence
+
+1. Add the serialized Stroke Count field, sanitized public property, Inspector control, tooltip, and reset/sanitize ownership.
+2. Carry the finite Stroke Count in the CPU event state and create Arc/Semi-Arc events with total duration equal to per-stroke Build duration multiplied by Stroke Count.
+3. Resolve Arc/Semi-Arc deposition state as integer stroke phase plus normalized per-stroke progress. Preserve ordinary source side/progress semantics.
+4. Update dispatch gating and GPU previous-state handling so phase changes reset one-shot deposition permission without reintroducing a persistent bypass.
+5. In HLSL, keep complete geometry for phase zero and switch phases one/two to progressive contact-profile-only evaluation. Preserve current profile geometry, raster widths, source material, and initial life/presence.
+6. Reconcile P7 and reveal-speed diagnostics with the finite-burst contract.
+7. Update all five canonical documents with the accepted P13D ownership and performance implications.
+
+### Invariants and non-goals
+
+- Preserve P13A Coverage/Presence/Life/Pattern packing and Max + Refresh merge.
+- Preserve P13C shared object rearm, packet-gap calculation, full-vector slowdown, halo dimensions, and object-source exclusivity.
+- Preserve Object Arc/Semi-Arc first-stroke geometry and build order.
+- Preserve Fleck, Shore, and Free-Water source behaviour.
+- Preserve P12u Reveal Speed resolver calculations; only event scheduling multiplies the resolved per-stroke duration by a finite count.
+- Preserve P12t Chipping and all Layer D/E rendering code byte-for-byte.
+- No continuous source refresh, no Hold/Release/Rest restoration, no extra interval control, and no additive accumulation loop.
+
+### Performance
+
+Execution remains bounded by the existing 32-event pool and source raster kernel. An Arc/Semi-Arc event may remain active for two or three per-stroke Build durations and issue one or two additional contact-profile-only raster sequences. Wake arms are evaluated geometrically inside the shared source function but contribute zero during reinforcement phases; no full-field pass or persistent emitter is restored. Default Stroke Count `2` approximately doubles object-cycle source dispatch duration relative to P13C for those events, but object clearance begins later and the shared per-object gate prevents overlapping cycles. Measured Unity CPU/GPU cost remains pending.
+
+**PERFORMANCE EXCEPTION — approved:** one bounded contact-only reinforcement stroke is accepted to make supported object Foam establish reliably. The lower-cost single-stroke P13C result was visually insufficient. Stroke Count remains capped at three and defaults to two.
+
+### Acceptance criteria
+
+1. Stroke Count is clamped to `1–3` and appears once under Object Foam.
+2. Stroke one produces the complete current Arc/Semi-Arc packet.
+3. Later strokes write contact profile Coverage but produce zero wake-arm Coverage.
+4. No deposition interval is lost when phase changes.
+5. No source dispatch occurs after the final stroke.
+6. The shared object clearance timer starts only after the final stroke completes.
+7. P12u requested/per-stroke reveal speed remains exact; diagnostics distinguish per-stroke duration from total burst duration.
+8. No Layer E source or shader file changes.
+9. Exact 13-file scope reconciliation and package reproduction pass.
+10. Unity import, Play Mode contact establishment, and profiler evidence are explicitly pending.
+
+### Implementation record
+
+- Added one serialized `Object Contact Stroke Count` control with range `1–3` and default `2`; no scene or prefab was raw-edited.
+- Arc/Semi-Arc event creation captures the sanitized stroke count and sets total event duration to resolved per-stroke Build duration multiplied by that count. Flecks remain one stroke.
+- Injection resolves integer stroke phase plus normalized per-stroke progress. CPU dispatch treats a phase change as new deposition, and the existing GPU `Header`/`Deposit` lanes carry current/previous phase without changing the eight-`float4` event ABI.
+- Arc and Semi-Arc phase zero preserve the complete accepted packet. Later phases return only the progressively revealed immediate contact profile. Both wake-arm paths are excluded from reinforcement.
+- GPU previous contribution is omitted when the stroke phase changes, then ordinary current-minus-previous one-shot ownership resumes within the new stroke.
+- Reveal-speed diagnostics now report per-stroke duration, stroke index/progress, and total burst duration. P7 diagnostics validate first-stroke progression, phase reset, contact-only reinforcement, repeated-interior zero, and finite total duration.
+- P13C velocity/clearance code, P13A material transport/packing, P12u reveal resolver, and P12t/P13A Layer E rendering remain byte-identical.
+
+### Offline validation evidence
+
+`36/36 PASS`, including exact 13-file reconciliation; no added/deleted project paths; serialized-property and Inspector uniqueness; event-state/duration/phase ownership; exactly two contact-only reinforcement branches; persistent-emitter absence; 500,000 stroke phase/progress cases; 500,000 duration cases; 500,000 phase-boundary dispatch cases; 500,000 one-shot phase-reset cases; 500,000 per-stroke reveal-speed cases; C#/HLSL/preprocessor/Markdown structure; unchanged 23-kernel manifest; unchanged eight-`float4` source GPU ABI; byte-identical P13C velocity and P13A/P12t protected files; and byte-identical P12u reveal-speed resolver. Package reproduction is recorded in the external validation report after final archive generation.

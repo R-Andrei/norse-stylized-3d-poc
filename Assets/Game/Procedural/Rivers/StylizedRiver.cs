@@ -370,6 +370,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MaximumFoamPacketGapMetres = 10f;
         private const float DefaultShoreFoamPacketGapMetres = 0.75f;
         private const float DefaultObjectContactPacketGapMetres = 1.00f;
+        private const int MinimumObjectContactStrokeCount = 1;
+        private const int MaximumObjectContactStrokeCount = 3;
+        private const int DefaultObjectContactStrokeCount = 2;
         private const float DefaultFreeWaterFoamPacketGapMetres = 1.00f;
         private const float MinimumFoamMaximumLateralSpeedRatio = 0f;
         private const float MaximumFoamMaximumLateralSpeedRatio = 1f;
@@ -1198,7 +1201,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectFoamCoverage = 0.45f;
 
-        [Tooltip("Stable share of registered static object anchors that receive the per-object Build / Hold / Progressive Release / Rest Contact Arc or Contact Semi-Arc cycle. One includes every eligible object anchor.")]
+        [Tooltip("Stable share of registered static object anchors that can emit a finite Contact Arc or Contact Semi-Arc reinforcement burst. One includes every eligible object anchor.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactCycleCoverage = 1.00f;
 
@@ -1211,7 +1214,12 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamObjectContactMinimumPacketGapMetres =
             DefaultObjectContactPacketGapMetres;
 
-        [Tooltip("Base reveal speed in metres per second for one-shot Object Arc, Semi-Arc, and Fleck Build. Per-pattern Reveal Speed multipliers remain available. This does not change later Layer C transport.")]
+        [Tooltip("Finite number of strokes in each Object Arc or Semi-Arc burst. Stroke one emits the complete contact packet and finite wake arm or arms. Later strokes reinforce only the immediate object-contact profile. The emitter ends after the final stroke and cannot bypass the shared packet-clearance gate.")]
+        [Range(MinimumObjectContactStrokeCount, MaximumObjectContactStrokeCount)]
+        [SerializeField] private int foamObjectContactStrokeCount =
+            DefaultObjectContactStrokeCount;
+
+        [Tooltip("Base reveal speed in metres per second for each finite Object Arc, Semi-Arc, and Fleck stroke. Per-pattern Reveal Speed multipliers remain available. This does not change later Layer C transport.")]
         [Range(
             MinimumShoreFoamFormationSpeedMetresPerSecond,
             MaximumShoreFoamFormationSpeedMetresPerSecond)]
@@ -1231,7 +1239,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcPatternWeight = 0.35f;
 
-        [Tooltip("Reveal Speed multiplier for Object Contact Arc Build across the upstream contact bridge and two straight downstream wake arms.")]
+        [Tooltip("Reveal Speed multiplier for each Object Contact Arc stroke. Stroke one traverses the upstream contact bridge and two straight downstream wake arms; later finite strokes traverse only the immediate contact bridge.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactArcFormationSpeedMultiplier = 1.00f;
 
@@ -1287,7 +1295,7 @@ namespace ProgrammaticStylized3D.Rivers
 
 
 
-        [Tooltip("Reveal Speed multiplier for Object Contact Semi-Arc Build from the arm-free face shoulder, across the upstream connector, and along the single selected-side downstream wake arm.")]
+        [Tooltip("Reveal Speed multiplier for each Object Contact Semi-Arc stroke. Stroke one traverses the selected upstream contact half and one straight downstream wake arm; later finite strokes traverse only that contact half.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactSemiArcFormationSpeedMultiplier = 1.00f;
 
@@ -2532,6 +2540,11 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactMinimumPacketGapMetres,
                 MinimumFoamPacketGapMetres,
                 MaximumFoamPacketGapMetres);
+        public int FoamObjectContactStrokeCount =>
+            Mathf.Clamp(
+                foamObjectContactStrokeCount,
+                MinimumObjectContactStrokeCount,
+                MaximumObjectContactStrokeCount);
         public float FoamObjectFoamFormationSpeedMetresPerSecond =>
             Mathf.Clamp(
                 foamObjectFoamFormationSpeedMetresPerSecond,
@@ -3238,6 +3251,10 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactMinimumPacketGapMetres,
                 MinimumFoamPacketGapMetres,
                 MaximumFoamPacketGapMetres);
+            foamObjectContactStrokeCount = Mathf.Clamp(
+                foamObjectContactStrokeCount,
+                MinimumObjectContactStrokeCount,
+                MaximumObjectContactStrokeCount);
             foamObjectFoamFormationSpeedMetresPerSecond = Mathf.Clamp(
                 foamObjectFoamFormationSpeedMetresPerSecond,
                 MinimumShoreFoamFormationSpeedMetresPerSecond,

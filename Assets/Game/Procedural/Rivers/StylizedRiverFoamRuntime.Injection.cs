@@ -262,8 +262,11 @@ namespace ProgrammaticStylized3D.Rivers
 
                     FoamSourceEventGpuData gpuData =
                         automaticFoamSourceEventGpuData[index];
+                    bool depositionPhaseChanged = Mathf.Abs(
+                        gpuData.Header.y - gpuData.Deposit.x) > 0.0001f;
                     bool hasNewDeposition =
                         gpuData.Deposit.z < 0.5f ||
+                        depositionPhaseChanged ||
                         gpuData.Header.z >
                             gpuData.Deposit.y + 0.000001f;
                     if (hasNewDeposition)
@@ -313,11 +316,31 @@ namespace ProgrammaticStylized3D.Rivers
             out float phaseOrSide,
             out float progress)
         {
-            phaseOrSide = IsAutomaticObjectContactCycle(sourceEvent.Type)
-                ? 0f
-                : sourceEvent.SideSign;
-            progress = Mathf.Clamp01(
-                elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
+            if (!IsAutomaticObjectContactCycle(sourceEvent.Type))
+            {
+                phaseOrSide = sourceEvent.SideSign;
+                progress = Mathf.Clamp01(
+                    elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
+                return;
+            }
+
+            int strokeCount = Mathf.Clamp(
+                sourceEvent.ObjectContactStrokeCount,
+                1,
+                3);
+            float strokeDuration = Mathf.Max(
+                0.0001f,
+                sourceEvent.ObjectBuildDuration);
+            float clampedElapsed = Mathf.Clamp(
+                elapsed,
+                0f,
+                strokeDuration * strokeCount);
+            int strokeIndex = Mathf.Min(
+                strokeCount - 1,
+                Mathf.FloorToInt(clampedElapsed / strokeDuration));
+            float strokeElapsed = clampedElapsed - strokeIndex * strokeDuration;
+            phaseOrSide = strokeIndex;
+            progress = Mathf.Clamp01(strokeElapsed / strokeDuration);
         }
 
         private FoamSourceEventGpuData BuildAutomaticFoamSourceGpuData(
@@ -348,9 +371,12 @@ namespace ProgrammaticStylized3D.Rivers
                 previousElapsed,
                 out float previousPhaseCode,
                 out float previousProgress);
+            float depositionPhaseDuration = objectContactCycle
+                ? sourceEvent.ObjectBuildDuration
+                : sourceEvent.Duration;
             float materialStepProgress = Mathf.Clamp01(
                 (1f / Mathf.Max(1f, ResolveUpdateRate())) /
-                Mathf.Max(0.0001f, sourceEvent.Duration));
+                Mathf.Max(0.0001f, depositionPhaseDuration));
 
             Vector4 distanceData;
             Vector4 shoreData;

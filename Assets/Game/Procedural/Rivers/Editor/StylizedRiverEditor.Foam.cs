@@ -1365,10 +1365,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Object Contact Minimum Packet Gap (m)",
                         "Minimum downstream clearance after any Object Arc, Semi-Arc, or Fleck finishes before the same object may emit another packet. Rearm also includes conservative clearance through the object-contact slowdown halo."));
                 EditorGUILayout.PropertyField(
+                    Find("foamObjectContactStrokeCount"),
+                    new GUIContent(
+                        "Object Contact Stroke Count",
+                        "Finite Arc/Semi-Arc burst size. Stroke one emits the complete contact packet and finite wake arm or arms. Additional strokes progressively reinforce only the immediate object-contact profile. Range 1–3; default 2."));
+                EditorGUILayout.PropertyField(
                     Find("foamObjectFoamFormationSpeedMetresPerSecond"),
                     new GUIContent(
                         "Base Reveal Speed",
-                        "Base reveal speed used for one-shot Arc, Semi-Arc, and Fleck Build. Activity, packet clearance, and later Layer C transport remain independent."));
+                        "Base reveal speed used independently by each finite Arc/Semi-Arc stroke and by each Fleck. Stroke Count changes total burst duration, not metres-per-second reveal speed. Activity, packet clearance, and later Layer C transport remain independent."));
 
                 EditorGUILayout.Space(4f);
                 EditorGUILayout.LabelField(
@@ -1378,9 +1383,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamObjectContactCycleCoverage"),
                     new GUIContent(
                         "Anchor Coverage",
-                        "Stable share of registered object anchors that can emit one-shot Arc/Semi-Arc packets. One includes every eligible object."));
+                        "Stable share of registered object anchors that can emit finite Arc/Semi-Arc reinforcement bursts. One includes every eligible object."));
                 EditorGUILayout.HelpBox(
-                    "Arc, Semi-Arc, and Fleck are finite one-shot packets. Arc/Semi-Arc deposit only while Build advances; no Hold, Release, or persistent contact refresh exists. All three recipes share one per-object clearance gate. If contact slowdown is enabled with Minimum Speed Factor zero, automatic object rearm remains disabled because the previous packet is authored as stationary.",
+                    "Arc and Semi-Arc use a finite reinforcement burst: stroke one deposits the complete packet, while later strokes reinforce only the immediate contact profile. No Hold, Release, or persistent emitter exists after the final stroke. Flecks remain finite one-shot packets. All recipes share one per-object clearance gate. If contact slowdown is enabled with Minimum Speed Factor zero, automatic object rearm remains disabled because the previous packet is authored as stationary.",
                     MessageType.None);
 
                 EditorGUILayout.PropertyField(
@@ -1409,7 +1414,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Contact Semi-Arcs",
                         "Relative share of Mixed per-object contact cycles assigned to single-arm Contact Semi-Arcs. Flecks are independent and are not part of this normalized cycle mix."));
                 EditorGUILayout.HelpBox(
-                    "Contact Flecks are an independent packet population. Their Coverage, Activity, and Minimum Fleck Packet Gap control them directly; Arc/Semi-Arc weights do not scale Fleck rate.",
+                    "Contact Flecks are an independent packet population. Their Coverage and Activity control eligibility behind the shared Object Contact Minimum Packet Gap; Arc/Semi-Arc weights do not scale Fleck rate.",
                     MessageType.None);
 
                 EditorGUILayout.Space(4f);
@@ -1422,7 +1427,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamObjectContactArcFormationSpeedMultiplier"),
                         new GUIContent(
                             "Reveal Speed Multiplier",
-                            "Multiplier applied to Object Foam Base Reveal Speed for Contact Arc Build only."));
+                            "Multiplier applied to Object Foam Base Reveal Speed for every Contact Arc stroke. Stroke one reveals the complete packet; later strokes reveal only the contact profile."));
                     DrawMinMaxMetreControls(
                         "Wake Arm Length",
                         Find("foamObjectContactArcLengthMinMetres"),
@@ -1460,7 +1465,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamObjectContactSemiArcFormationSpeedMultiplier"),
                         new GUIContent(
                             "Reveal Speed Multiplier",
-                            "Multiplier applied to Object Foam Base Reveal Speed for Contact Semi-Arc Build only."));
+                            "Multiplier applied to Object Foam Base Reveal Speed for every Contact Semi-Arc stroke. Stroke one reveals the complete packet; later strokes reveal only the selected contact profile."));
                     DrawMinMaxMetreControls(
                         "Wake Arm Length",
                         Find("foamObjectContactSemiArcLengthMinMetres"),

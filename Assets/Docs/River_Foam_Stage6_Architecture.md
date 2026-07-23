@@ -4435,3 +4435,29 @@ Layer boundaries remain:
 - Layers D/E remain unchanged by P13C.
 
 P13C offline validation: `35/35 PASS`. Unity compilation, Play Mode source/retention acceptance, and profiling remain pending.
+
+## P13D addendum — finite object-contact reinforcement
+
+P13D refines P13C Object Arc/Semi-Arc birth without changing layer ownership.
+
+```text
+stroke 0: complete finite Object packet
+    contact front + accepted finite wake geometry
+stroke 1/2: contact-only reinforcement
+    immediate supported front profile only
+then: source ownership ends
+    Layer B transport + Layer A lifecycle/support own persistence
+```
+
+The authored `Object Contact Stroke Count` is bounded to `1–3` with default `2`. Each stroke is a complete progressive Build at the existing Reveal Speed. The event remains finite: there is no Hold, Release, Rest, persistent emitter, or repeated wake ownership.
+
+Stroke transitions are explicit source phases. Previous-deposition subtraction applies only within the same stroke phase; it resets at each phase boundary so a new contact-only sweep cannot be cancelled by the previous stroke ending at progress one.
+
+Layer boundaries remain:
+
+- Layer A support may prolong reinforced contact material but does not emit it.
+- Layer B P13C full-vector slowdown may retain the finite contact burst near the obstacle but does not create or refresh material.
+- Layer C owns the bounded source burst, intrinsic birth properties, transport, and lifecycle.
+- Layers D/E do not create the observed contact holes and are unchanged by P13D.
+
+P13D adds no texture, buffer, event GPU lane, kernel, pass, draw call, or shader sample. Its bounded extra source-raster work is limited to at most two contact-only sweeps per Arc/Semi-Arc event. `36/36` offline validation passes; Unity compilation, Play Mode acceptance, and profiling remain pending.
